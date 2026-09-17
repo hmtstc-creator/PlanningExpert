@@ -2,94 +2,176 @@ import { v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
 
-const dayValidator = v.object({
-  key: v.string(),
-  shifts: v.number(),
-  overtimeShifts: v.number(),
-})
-
-const settingsValidator = v.object({
-  _id: v.id('pressCalendarSettings'),
-  _creationTime: v.number(),
-  press: v.string(),
-  shiftMinutes: v.number(),
-  overtimeShiftMinutes: v.number(),
-  country: v.optional(v.string()),
-})
-
-const weekValidator = v.object({
-  _id: v.id('pressCalendarWeeks'),
-  _creationTime: v.number(),
-  press: v.string(),
-  weekStart: v.string(),
-  days: v.array(dayValidator),
-})
-
-export const listSettings = query({
-  args: {},
-  returns: v.array(settingsValidator),
-  handler: async (ctx) => ctx.db.query('pressCalendarSettings').collect(),
-})
-
-export const saveSettings = mutation({
-  args: {
-    press: v.string(),
+const globalSettingsValidator = v.union(
+  v.object({
+    _id: v.id('globalShiftSettings'),
+    _creationTime: v.number(),
+    key: v.string(),
     shiftMinutes: v.number(),
     overtimeShiftMinutes: v.number(),
-    country: v.optional(v.string()),
+    country: v.string(),
+  }),
+  v.null(),
+)
+
+export const getGlobalSettings = query({
+  args: {},
+  returns: globalSettingsValidator,
+  handler: async (ctx) =>
+    ctx.db
+      .query('globalShiftSettings')
+      .withIndex('by_key', (q) => q.eq('key', 'default'))
+      .unique(),
+})
+
+export const saveGlobalSettings = mutation({
+  args: {
+    shiftMinutes: v.number(),
+    overtimeShiftMinutes: v.number(),
+    country: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const press = args.press.trim()
-    if (!press) throw new Error('Pres adı zorunludur')
     const existing = await ctx.db
-      .query('pressCalendarSettings')
-      .withIndex('by_press', (q) => q.eq('press', press))
+      .query('globalShiftSettings')
+      .withIndex('by_key', (q) => q.eq('key', 'default'))
       .unique()
     if (existing) {
-      await ctx.db.patch(existing._id, {
-        shiftMinutes: args.shiftMinutes,
-        overtimeShiftMinutes: args.overtimeShiftMinutes,
-        country: args.country,
-      })
+      await ctx.db.patch(existing._id, args)
     } else {
-      await ctx.db.insert('pressCalendarSettings', { ...args, press })
+      await ctx.db.insert('globalShiftSettings', { key: 'default', ...args })
     }
     return null
   },
 })
 
-export const listWeeks = query({
+const templateValidator = v.union(
+  v.object({
+    _id: v.id('pressTemplates'),
+    _creationTime: v.number(),
+    press: v.string(),
+    workingDays: v.number(),
+    shiftsPerDay: v.number(),
+    overtimeShifts: v.number(),
+  }),
+  v.null(),
+)
+
+export const getTemplate = query({
   args: { press: v.string() },
-  returns: v.array(weekValidator),
+  returns: templateValidator,
   handler: async (ctx, { press }) =>
     ctx.db
-      .query('pressCalendarWeeks')
-      .withIndex('by_press_week', (q) => q.eq('press', press))
-      .collect(),
+      .query('pressTemplates')
+      .withIndex('by_press', (q) => q.eq('press', press))
+      .unique(),
 })
 
-export const saveWeek = mutation({
+export const listTemplates = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id('pressTemplates'),
+      _creationTime: v.number(),
+      press: v.string(),
+      workingDays: v.number(),
+      shiftsPerDay: v.number(),
+      overtimeShifts: v.number(),
+    }),
+  ),
+  handler: async (ctx) => ctx.db.query('pressTemplates').collect(),
+})
+
+export const saveTemplate = mutation({
   args: {
     press: v.string(),
-    weekStart: v.string(),
-    days: v.array(dayValidator),
+    workingDays: v.number(),
+    shiftsPerDay: v.number(),
+    overtimeShifts: v.number(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
     if (!press) throw new Error('Pres adı zorunludur')
     const existing = await ctx.db
-      .query('pressCalendarWeeks')
+      .query('pressTemplates')
+      .withIndex('by_press', (q) => q.eq('press', press))
+      .unique()
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        workingDays: args.workingDays,
+        shiftsPerDay: args.shiftsPerDay,
+        overtimeShifts: args.overtimeShifts,
+      })
+    } else {
+      await ctx.db.insert('pressTemplates', { ...args, press })
+    }
+    return null
+  },
+})
+
+const overrideValidator = v.object({
+  _id: v.id('pressWeekOverrides'),
+  _creationTime: v.number(),
+  press: v.string(),
+  weekStart: v.string(),
+  workingDays: v.number(),
+  shiftsPerDay: v.number(),
+  overtimeShifts: v.number(),
+})
+
+export const listOverrides = query({
+  args: { press: v.string() },
+  returns: v.array(overrideValidator),
+  handler: async (ctx, { press }) =>
+    ctx.db
+      .query('pressWeekOverrides')
+      .withIndex('by_press_week', (q) => q.eq('press', press))
+      .collect(),
+})
+
+export const saveOverride = mutation({
+  args: {
+    press: v.string(),
+    weekStart: v.string(),
+    workingDays: v.number(),
+    shiftsPerDay: v.number(),
+    overtimeShifts: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const press = args.press.trim()
+    if (!press) throw new Error('Pres adı zorunludur')
+    const existing = await ctx.db
+      .query('pressWeekOverrides')
       .withIndex('by_press_week', (q) =>
         q.eq('press', press).eq('weekStart', args.weekStart),
       )
       .unique()
     if (existing) {
-      await ctx.db.patch(existing._id, { days: args.days })
+      await ctx.db.patch(existing._id, {
+        workingDays: args.workingDays,
+        shiftsPerDay: args.shiftsPerDay,
+        overtimeShifts: args.overtimeShifts,
+      })
     } else {
-      await ctx.db.insert('pressCalendarWeeks', { ...args, press })
+      await ctx.db.insert('pressWeekOverrides', { ...args, press })
     }
+    return null
+  },
+})
+
+export const clearOverride = mutation({
+  args: { press: v.string(), weekStart: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { press, weekStart }) => {
+    const existing = await ctx.db
+      .query('pressWeekOverrides')
+      .withIndex('by_press_week', (q) =>
+        q.eq('press', press).eq('weekStart', weekStart),
+      )
+      .unique()
+    if (existing) await ctx.db.delete(existing._id)
     return null
   },
 })

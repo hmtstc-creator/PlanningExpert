@@ -84,27 +84,34 @@ export default defineSchema({
     holidays: v.array(v.string()),
   }).index('by_key', ['key']),
 
-  // Pres bazlı takvim ayarları: her presin kendi vardiya süresi, fazla
-  // mesai vardiya süresi ve tatil ülkesi olabilir.
-  pressCalendarSettings: defineTable({
-    press: v.string(),
+  // Vardiya süresi tüm presler için ortaktır (dakika); tatil ülkesi de
+  // tek bir global seçimdir.
+  globalShiftSettings: defineTable({
+    key: v.string(),
     shiftMinutes: v.number(),
     overtimeShiftMinutes: v.number(),
-    country: v.optional(v.string()),
+    country: v.string(),
+  }).index('by_key', ['key']),
+
+  // Her presin "standart" haftalık düzeni: kaç gün çalışılır, gün başına
+  // kaç vardiya, haftalık kaç fazla mesai vardiyası. 30 haftalık takvimde
+  // özel olarak düzenlenmemiş her hafta bu şablonu kullanır — yani hafta
+  // ilerledikçe otomatik "kayar", elle yeniden girmeye gerek kalmaz.
+  pressTemplates: defineTable({
+    press: v.string(),
+    workingDays: v.number(),
+    shiftsPerDay: v.number(),
+    overtimeShifts: v.number(),
   }).index('by_press', ['press']),
 
-  // Pres bazlı haftalık takvim: her hafta için her günün normal ve fazla
-  // mesai vardiya sayısı ayrı ayrı tutulur.
-  pressCalendarWeeks: defineTable({
+  // İstisna haftalar: plan değişikliği olan belirli bir hafta için
+  // şablonu geçersiz kılan kayıt.
+  pressWeekOverrides: defineTable({
     press: v.string(),
     weekStart: v.string(),
-    days: v.array(
-      v.object({
-        key: v.string(),
-        shifts: v.number(),
-        overtimeShifts: v.number(),
-      }),
-    ),
+    workingDays: v.number(),
+    shiftsPerDay: v.number(),
+    overtimeShifts: v.number(),
   }).index('by_press_week', ['press', 'weekStart']),
 
   changeLog: defineTable({

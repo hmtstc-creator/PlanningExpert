@@ -193,6 +193,12 @@ function TakvimPage() {
 
 // ---- Pres bazlı detaylı takvim -------------------------------------------
 
+interface WeekPattern {
+  workingDays: number
+  shiftsPerDay: number
+  overtimeShifts: number
+}
+
 function mondayOf(date: Date): Date {
   const d = new Date(date)
   const day = d.getDay() // 0 = Pazar
@@ -218,17 +224,12 @@ function formatWeekLabel(monday: Date): string {
   return `${fmt(monday)} – ${fmt(sunday)} ${sunday.getFullYear()}`
 }
 
-function defaultDays(weekDates: Date[], holidaySet: Set<string>) {
-  return DAYS.map((d, i) => {
-    const date = weekDates[i]
-    const isHoliday = holidaySet.has(isoDate(date))
-    const isWeekend = d.key === 'SA' || d.key === 'SU'
-    return {
-      key: d.key,
-      shifts: isHoliday || isWeekend ? 0 : 1,
-      overtimeShifts: 0,
-    }
-  })
+function totalShifts(p: WeekPattern) {
+  return p.workingDays * p.shiftsPerDay + p.overtimeShifts
+}
+
+function totalMinutes(p: WeekPattern, shiftMinutes: number, overtimeShiftMinutes: number) {
+  return p.workingDays * p.shiftsPerDay * shiftMinutes + p.overtimeShifts * overtimeShiftMinutes
 }
 
 function PressCalendarSection() {
@@ -237,8 +238,11 @@ function PressCalendarSection() {
     {},
     { initialNumItems: 500 },
   )
-  const settingsList = useQuery(api.pressCalendar.listSettings) ?? []
-  const saveSettings = useMutation(api.pressCalendar.saveSettings)
+  const globalCalendar = useQuery(api.workCalendar.get)
+  const globalSettings = useQuery(api.pressCalendar.getGlobalSettings)
+  const saveGlobalSettingsMutation = useMutation(api.pressCalendar.saveGlobalSettings)
+  const templatesList = useQuery(api.pressCalendar.listTemplates) ?? []
+  const saveTemplateMutation = useMutation(api.pressCalendar.saveTemplate)
 
   const discoveredPresses = useMemo(() => {
     const set = new Set<string>()
@@ -247,13 +251,13 @@ function PressCalendarSection() {
         if (m && m.trim()) set.add(m.trim())
       }
     }
-    for (const s of settingsList) set.add(s.press)
+    for (const t of templatesList) set.add(t.press)
     return Array.from(set).sort()
-  }, [products, settingsList])
+  }, [products, templatesList])
 
   const [extraPresses, setExtraPresses] = useState<string[]>([])
   const [newPress, setNewPress] = useState('')
-  const [press, setPress] = useState<string>('')
+  const [press, setPress] = useState('')
 
   const pressOptions = useMemo(
     () => Array.from(new Set([...discoveredPresses, ...extraPresses])).sort(),
@@ -272,31 +276,68 @@ function PressCalendarSection() {
     setNewPress('')
   }
 
-  const currentSettings = settingsList.find((s) => s.press === press)
+  // Vardiya süresi (dk) tüm presler için ortaktır.
   const [shiftMinutes, setShiftMinutes] = useState(480)
-  const [overtimeShiftMinutes, setOvertimeShiftMinutes] = useState(600)
+  const [overtimeShiftMinutes, setOvertimeShiftMinutes] = useState(480)
   const [country, setCountry] = useState('TR')
-
   useEffect(() => {
-    if (currentSettings) {
-      setShiftMinutes(currentSettings.shiftMinutes)
-      setOvertimeShiftMinutes(currentSettings.overtimeShiftMinutes)
-      setCountry(currentSettings.country ?? 'TR')
-    } else {
-      setShiftMinutes(480)
-      setOvertimeShiftMinutes(600)
-      setCountry('TR')
+    if (globalSettings) {
+      setShiftMinutes(globalSettings.shiftMinutes)
+      setOvertimeShiftMinutes(globalSettings.overtimeShiftMinutes)
+      setCountry(globalSettings.country)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [press])
+  }, [globalSettings])
 
-  async function persistSettings() {
-    if (!press) return
-    await saveSettings({ press, shiftMinutes, overtimeShiftMinutes, country })
+  async function persistGlobalSettings(next?: Partial<{ shiftMinutes: number; overtimeShiftMinutes: number; country: string }>) {
+    await saveGlobalSettingsMutation({
+      shiftMinutes: next?.shiftMinutes ?? shiftMinutes,
+      overtimeShiftMinutes: next?.overtimeShiftMinutes ?? overtimeShiftMinutes,
+      country: next?.country ?? country,
+    })
   }
 
+  const template = templatesList.find((t) => t.press === press)
+  const defaultWorkingDays = globalCalendar?.workingDays.length ?? 5
+
+  const [workingDays, setWorkingDays] = useState(defaultWorkingDays)
+  const [shiftsPerDay, setShiftsPerDay] = useState(1)
+  const [overtimeShifts, setOvertimeShifts] = useState(0)
+
+  useEffect(() => {
+    if (template) {
+      setWorkingDays(template.workingDays)
+      setShiftsPerDay(template.shiftsPerDay)
+      setOvertimeShifts(template.overtimeShifts)
+    } else {
+      setWorkingDays(defaultWorkingDays)
+      setShiftsPerDay(1)
+      setOvertimeShifts(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [press, template?.workingDays, template?.shiftsPerDay, template?.overtimeShifts])
+
+  async function saveTemplate(next?: Partial<WeekPattern>) {
+    if (!press) return
+    await saveTemplateMutation({
+      press,
+      workingDays: next?.workingDays ?? workingDays,
+      shiftsPerDay: next?.shiftsPerDay ?? shiftsPerDay,
+      overtimeShifts: next?.overtimeShifts ?? overtimeShifts,
+    })
+  }
+
+  function pickShiftsPerDay(n: number) {
+    setShiftsPerDay(n)
+    void saveTemplate({ shiftsPerDay: n })
+  }
+
+  const currentTemplate: WeekPattern = { workingDays, shiftsPerDay, overtimeShifts }
+  const templateTotalShifts = totalShifts(currentTemplate)
+  const templateTotalHours = totalMinutes(currentTemplate, shiftMinutes, overtimeShiftMinutes) / 60
+
   // 30 haftalık pencere: bulunduğumuz haftadan 1 hafta öncesinden başlar,
-  // toplam 30 hafta (her zaman ~29 hafta ileriyi gösterir).
+  // toplam 30 hafta. Her sayfa yüklendiğinde bugüne göre yeniden
+  // hesaplanır, yani hafta ilerledikçe otomatik kayar.
   const weekStarts = useMemo(() => {
     const start = addDays(mondayOf(new Date()), -7)
     return Array.from({ length: 30 }, (_, i) => addDays(start, i * 7))
@@ -358,20 +399,6 @@ function PressCalendarSection() {
   }, [country, years.join(',')])
 
   const holidaySet = useMemo(() => new Set(holidays.map((h) => h.date)), [holidays])
-  const holidayNames = useMemo(() => new Map(holidays.map((h) => [h.date, h.name])), [holidays])
-
-  type PressWeek = {
-    weekStart: string
-    days: { key: string; shifts: number; overtimeShifts: number }[]
-  }
-  const weeksData = (useQuery(
-    api.pressCalendar.listWeeks,
-    press ? { press } : 'skip',
-  ) ?? []) as PressWeek[]
-  const weeksByStart = useMemo(
-    () => new Map(weeksData.map((w) => [w.weekStart, w])),
-    [weeksData],
-  )
 
   const visibleHolidays = useMemo(() => {
     const lastDate = isoDate(addDays(weekStarts[weekStarts.length - 1], 6))
@@ -381,14 +408,70 @@ function PressCalendarSection() {
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [holidays, weekStarts])
 
+  type Override = WeekPattern & { weekStart: string }
+  const overridesList = (useQuery(
+    api.pressCalendar.listOverrides,
+    press ? { press } : 'skip',
+  ) ?? []) as Override[]
+  const overridesByWeek = useMemo(
+    () => new Map(overridesList.map((o) => [o.weekStart, o])),
+    [overridesList],
+  )
+
   return (
     <section className="mt-6 rounded-lg border border-border p-5">
       <h2 className="font-semibold text-foreground">Pres Bazlı Detaylı Takvim</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Her pres için ayrı vardiya süresi, fazla mesai süresi ve 30 haftalık
-        (bulunduğumuz haftadan 1 hafta öncesinden başlayan) çalışma takvimi
-        tanımla. Resmi/dini tatiller seçtiğin ülkeye göre otomatik işaretlenir.
+        Vardiya süresi tüm presler için ortaktır. Her pres için haftalık
+        standart çalışma düzenini (kaç gün, gün başına kaç vardiya, kaç fazla
+        mesai vardiyası) tanımla — 30 haftalık takvim bu standardı otomatik
+        uygular, hafta ilerledikçe elle yeniden girmen gerekmez. Belirli bir
+        haftada plan değişirse o haftayı ayrıca düzenleyip kaydedebilirsin.
       </p>
+
+      <div className="mt-4 flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
+            Vardiya süresi (dk) — tüm presler için ortak
+          </span>
+          <input
+            type="number"
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={shiftMinutes}
+            onChange={(e) => setShiftMinutes(Number(e.target.value) || 0)}
+            onBlur={() => void persistGlobalSettings()}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
+            Fazla mesai vardiya süresi (dk) — tüm presler için ortak
+          </span>
+          <input
+            type="number"
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={overtimeShiftMinutes}
+            onChange={(e) => setOvertimeShiftMinutes(Number(e.target.value) || 0)}
+            onBlur={() => void persistGlobalSettings()}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Tatil ülkesi</span>
+          <select
+            className="mt-1 w-48 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={country}
+            onChange={(e) => {
+              setCountry(e.target.value)
+              void persistGlobalSettings({ country: e.target.value })
+            }}
+          >
+            {countries.map((c) => (
+              <option key={c.countryCode} value={c.countryCode}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="text-sm">
@@ -431,66 +514,92 @@ function PressCalendarSection() {
 
       {press && (
         <>
-          <div className="mt-4 flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
-            <label className="text-sm">
-              <span className="block text-xs text-muted-foreground">
-                Normal vardiya süresi (dk)
-              </span>
-              <input
-                type="number"
-                className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                value={shiftMinutes}
-                onChange={(e) => setShiftMinutes(Number(e.target.value) || 0)}
-                onBlur={() => void persistSettings()}
-              />
-            </label>
-            <label className="text-sm">
-              <span className="block text-xs text-muted-foreground">
-                Fazla mesai vardiya süresi (dk)
-              </span>
-              <input
-                type="number"
-                className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                value={overtimeShiftMinutes}
-                onChange={(e) => setOvertimeShiftMinutes(Number(e.target.value) || 0)}
-                onBlur={() => void persistSettings()}
-              />
-            </label>
-            <label className="text-sm">
-              <span className="block text-xs text-muted-foreground">Tatil ülkesi</span>
-              <select
-                className="mt-1 w-48 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                value={country}
-                onChange={(e) => {
-                  setCountry(e.target.value)
-                  void saveSettings({
-                    press,
-                    shiftMinutes,
-                    overtimeShiftMinutes,
-                    country: e.target.value,
-                  })
-                }}
+          <div className="mt-4 rounded-md border border-border p-3">
+            <p className="text-sm font-medium text-foreground">Standart haftalık düzen</p>
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="text-sm">
+                <span className="block text-xs text-muted-foreground">Normal çalışma günü</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={7}
+                  className="mt-1 w-24 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                  value={workingDays}
+                  onChange={(e) => setWorkingDays(Number(e.target.value) || 0)}
+                  onBlur={() => void saveTemplate()}
+                />
+              </label>
+
+              <div className="text-sm">
+                <span className="block text-xs text-muted-foreground">
+                  Normal çalışma günü vardiya sayısı
+                </span>
+                <div className="mt-1 flex items-center gap-1">
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => pickShiftsPerDay(n)}
+                      className={`rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                        shiftsPerDay === n
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-16 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                    value={shiftsPerDay}
+                    onChange={(e) => setShiftsPerDay(Number(e.target.value) || 0)}
+                    onBlur={() => void saveTemplate()}
+                  />
+                </div>
+              </div>
+
+              <label className="text-sm">
+                <span className="block text-xs text-muted-foreground">
+                  Fazla mesai vardiya sayısı
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  className="mt-1 w-24 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                  value={overtimeShifts}
+                  onChange={(e) => setOvertimeShifts(Number(e.target.value) || 0)}
+                  onBlur={() => void saveTemplate()}
+                />
+              </label>
+
+              <button
+                onClick={() => void saveTemplate()}
+                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
               >
-                {countries.map((c) => (
-                  <option key={c.countryCode} value={c.countryCode}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                Pres Kaydet
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Toplam: <strong className="text-foreground">{templateTotalShifts} vardiya</strong>{' '}
+              · <strong className="text-foreground">{templateTotalHours.toFixed(1)} saat</strong>
+              /hafta ({workingDays} gün × {shiftsPerDay} vardiya + {overtimeShifts} fazla mesai
+              vardiyası)
+            </p>
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
             <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full border-collapse text-left text-xs">
+              <table className="w-full border-collapse text-left text-sm">
                 <thead className="bg-muted text-muted-foreground">
                   <tr>
                     <th className="px-2 py-2 font-medium">Hafta</th>
-                    {DAYS.map((d) => (
-                      <th key={d.key} className="px-1 py-2 text-center font-medium">
-                        {d.short}
-                      </th>
-                    ))}
+                    <th className="px-2 py-2 text-center font-medium">Normal gün</th>
+                    <th className="px-2 py-2 text-center font-medium">Vardiya/gün</th>
+                    <th className="px-2 py-2 text-center font-medium">Fazla mesai vardiya</th>
+                    <th className="px-2 py-2 text-center font-medium">Toplam vardiya</th>
+                    <th className="px-2 py-2 text-center font-medium">Toplam saat</th>
+                    <th className="px-2 py-2 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
@@ -499,9 +608,11 @@ function PressCalendarSection() {
                       key={isoDate(monday)}
                       press={press}
                       monday={monday}
-                      saved={weeksByStart.get(isoDate(monday))}
+                      template={currentTemplate}
+                      override={overridesByWeek.get(isoDate(monday))}
                       holidaySet={holidaySet}
-                      holidayNames={holidayNames}
+                      shiftMinutes={shiftMinutes}
+                      overtimeShiftMinutes={overtimeShiftMinutes}
                     />
                   ))}
                 </tbody>
@@ -549,79 +660,151 @@ function PressCalendarSection() {
 function WeekRow({
   press,
   monday,
-  saved,
+  template,
+  override,
   holidaySet,
-  holidayNames,
+  shiftMinutes,
+  overtimeShiftMinutes,
 }: {
   press: string
   monday: Date
-  saved: { days: { key: string; shifts: number; overtimeShifts: number }[] } | undefined
+  template: WeekPattern
+  override: (WeekPattern & { weekStart: string }) | undefined
   holidaySet: Set<string>
-  holidayNames: Map<string, string>
+  shiftMinutes: number
+  overtimeShiftMinutes: number
 }) {
-  const saveWeek = useMutation(api.pressCalendar.saveWeek)
+  const saveOverrideMutation = useMutation(api.pressCalendar.saveOverride)
+  const clearOverrideMutation = useMutation(api.pressCalendar.clearOverride)
   const weekStart = isoDate(monday)
-  const weekDates = useMemo(() => DAYS.map((_, i) => addDays(monday, i)), [monday])
+  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday])
+  const weekHolidays = weekDates.filter((d) => holidaySet.has(isoDate(d)))
 
-  const [days, setDays] = useState(() => saved?.days ?? defaultDays(weekDates, holidaySet))
+  const effective: WeekPattern = override ?? template
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<WeekPattern>(effective)
 
   useEffect(() => {
-    setDays(saved?.days ?? defaultDays(weekDates, holidaySet))
+    if (!editing) setDraft(effective)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saved, weekStart])
-
-  function updateDay(index: number, patch: Partial<{ shifts: number; overtimeShifts: number }>) {
-    const next = days.map((d, i) => (i === index ? { ...d, ...patch } : d))
-    setDays(next)
-    void saveWeek({ press, weekStart, days: next })
-  }
+  }, [effective.workingDays, effective.shiftsPerDay, effective.overtimeShifts, editing])
 
   const isCurrentWeek = weekStart === isoDate(mondayOf(new Date()))
+  const isOverridden = !!override
+
+  async function handleSave() {
+    await saveOverrideMutation({ press, weekStart, ...draft })
+    setEditing(false)
+  }
+
+  async function handleRevert() {
+    await clearOverrideMutation({ press, weekStart })
+    setEditing(false)
+  }
+
+  const shown = editing ? draft : effective
 
   return (
-    <tr className={`border-t border-border ${isCurrentWeek ? 'bg-primary/5' : ''}`}>
+    <tr
+      className={`border-t border-border ${isCurrentWeek ? 'bg-primary/5' : ''} ${
+        weekHolidays.length > 0 ? 'bg-red-50/50' : ''
+      }`}
+    >
       <td className="whitespace-nowrap px-2 py-1.5 font-medium text-foreground">
         {formatWeekLabel(monday)}
+        {isOverridden && (
+          <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+            özel
+          </span>
+        )}
+        {weekHolidays.length > 0 && (
+          <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
+            tatil ({weekHolidays.length})
+          </span>
+        )}
       </td>
-      {weekDates.map((date, i) => {
-        const dateStr = isoDate(date)
-        const isHoliday = holidaySet.has(dateStr)
-        const day = days[i]
-        return (
-          <td
-            key={dateStr}
-            title={isHoliday ? holidayNames.get(dateStr) : undefined}
-            className={`px-1 py-1 text-center ${
-              isHoliday ? 'bg-red-100' : ''
-            }`}
-          >
-            <div className="flex flex-col items-center gap-0.5">
-              <select
-                className="w-11 rounded border border-input bg-background px-0.5 py-0.5 text-[11px]"
-                value={day.shifts}
-                onChange={(e) => updateDay(i, { shifts: Number(e.target.value) })}
+      <td className="px-1 py-1 text-center">
+        {editing ? (
+          <input
+            type="number"
+            min={0}
+            max={7}
+            className="w-14 rounded border border-input bg-background px-1 py-0.5 text-center text-xs"
+            value={draft.workingDays}
+            onChange={(e) => setDraft((d) => ({ ...d, workingDays: Number(e.target.value) || 0 }))}
+          />
+        ) : (
+          shown.workingDays
+        )}
+      </td>
+      <td className="px-1 py-1 text-center">
+        {editing ? (
+          <input
+            type="number"
+            min={0}
+            className="w-14 rounded border border-input bg-background px-1 py-0.5 text-center text-xs"
+            value={draft.shiftsPerDay}
+            onChange={(e) => setDraft((d) => ({ ...d, shiftsPerDay: Number(e.target.value) || 0 }))}
+          />
+        ) : (
+          shown.shiftsPerDay
+        )}
+      </td>
+      <td className="px-1 py-1 text-center">
+        {editing ? (
+          <input
+            type="number"
+            min={0}
+            className="w-14 rounded border border-input bg-background px-1 py-0.5 text-center text-xs"
+            value={draft.overtimeShifts}
+            onChange={(e) => setDraft((d) => ({ ...d, overtimeShifts: Number(e.target.value) || 0 }))}
+          />
+        ) : (
+          shown.overtimeShifts
+        )}
+      </td>
+      <td className="px-1 py-1 text-center text-muted-foreground">{totalShifts(shown)}</td>
+      <td className="px-1 py-1 text-center text-muted-foreground">
+        {(totalMinutes(shown, shiftMinutes, overtimeShiftMinutes) / 60).toFixed(1)}
+      </td>
+      <td className="px-2 py-1 text-right">
+        {editing ? (
+          <div className="flex justify-end gap-1">
+            <button
+              onClick={() => void handleSave()}
+              className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:opacity-90"
+            >
+              Kaydet
+            </button>
+            <button
+              onClick={() => {
+                setDraft(effective)
+                setEditing(false)
+              }}
+              className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
+            >
+              Vazgeç
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-1">
+            <button
+              onClick={() => setEditing(true)}
+              className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
+            >
+              Düzenle
+            </button>
+            {isOverridden && (
+              <button
+                onClick={() => void handleRevert()}
+                className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
               >
-                {[0, 1, 2, 3].map((n) => (
-                  <option key={n} value={n}>
-                    {n}V
-                  </option>
-                ))}
-              </select>
-              <select
-                className="w-11 rounded border border-input bg-muted px-0.5 py-0.5 text-[11px] text-muted-foreground"
-                value={day.overtimeShifts}
-                onChange={(e) => updateDay(i, { overtimeShifts: Number(e.target.value) })}
-              >
-                {[0, 1, 2, 3].map((n) => (
-                  <option key={n} value={n}>
-                    {n}FM
-                  </option>
-                ))}
-              </select>
-            </div>
-          </td>
-        )
-      })}
+                Şablona dön
+              </button>
+            )}
+          </div>
+        )}
+      </td>
     </tr>
   )
 }
