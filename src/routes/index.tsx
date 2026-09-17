@@ -23,8 +23,10 @@ function HomePage() {
   const availableStock = useMemo(() => {
     let total = 0
     for (const s of stockRows) {
-      const cat = s.storageLocation ? locCategory.get(s.storageLocation) ?? 'available' : 'available'
-      if (cat === 'available') total += s.unrestricted ?? 0
+      const cat = s.storageLocation
+        ? locCategory.get(s.storageLocation) ?? 'finished_goods'
+        : 'finished_goods'
+      if (cat === 'finished_goods' || cat === 'production_area') total += s.unrestricted ?? 0
     }
     return total
   }, [stockRows, locCategory])

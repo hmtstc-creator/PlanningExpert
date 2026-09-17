@@ -8,26 +8,41 @@ export const Route = createFileRoute('/depolar')({
   component: DepolarPage,
 })
 
+// Bu değerler planlama.tsx'teki COUNTED_CATEGORIES ile birebir eşleşmeli.
 const CATEGORIES = [
   {
-    value: 'available',
-    label: 'Planlamaya dahil',
-    hint: 'Elimizde duruyor, siparişten düşülmemiş — üretim ihtiyacından düşülür.',
+    value: 'finished_goods',
+    label: 'Mamul Deposu (Finish Good)',
+    hint: 'Bitmiş ürün — üretim ihtiyacından düşülür.',
     color: 'bg-emerald-100 text-emerald-800',
   },
   {
-    value: 'sold_buffer',
-    label: 'Satılmış (buffer)',
-    hint: 'Satılmış, irsaliye için transfer edilmiş — stok sayılmaz.',
+    value: 'production_area',
+    label: 'Üretim Alanı (Production Area)',
+    hint: 'Üretimdeki/WIP stok — üretim ihtiyacından düşülür.',
+    color: 'bg-teal-100 text-teal-800',
+  },
+  {
+    value: 'raw_material',
+    label: 'Hammadde Deposu (Raw Material)',
+    hint: 'Hammadde — mamul stok sayılmaz, üretim ihtiyacından düşülmez.',
+    color: 'bg-slate-200 text-slate-700',
+  },
+  {
+    value: 'quality',
+    label: 'Kalite (Quality)',
+    hint: 'Kalite kontrol bekliyor — henüz kullanılabilir sayılmaz.',
     color: 'bg-amber-100 text-amber-800',
   },
   {
-    value: 'excluded',
-    label: 'Planlama dışı',
-    hint: 'Başka bir nedenle hesaba katılmaz.',
+    value: 'customer',
+    label: 'Müşteri (Customer)',
+    hint: 'Müşteriye transfer edilmiş/satılmış — stok sayılmaz.',
     color: 'bg-slate-200 text-slate-700',
   },
 ]
+
+const DEFAULT_CATEGORY = 'finished_goods'
 
 function DepolarPage() {
   const { results: locations } = usePaginatedQuery(
@@ -67,7 +82,7 @@ function DepolarPage() {
     if (!code) return
     setSaving(code)
     try {
-      await upsert({ code, category: 'available' })
+      await upsert({ code, category: DEFAULT_CATEGORY })
       setNewCode('')
     } finally {
       setSaving(null)
@@ -166,7 +181,7 @@ function DepolarPage() {
                     onBlur={(e) =>
                       void setCategory(
                         code,
-                        current?.category ?? 'available',
+                        current?.category ?? DEFAULT_CATEGORY,
                         e.target.value,
                       )
                     }
@@ -198,7 +213,7 @@ function DepolarPage() {
       )}
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Tanımlanmamış depolar varsayılan olarak "Planlamaya dahil" sayılır.
+        Tanımlanmamış depolar varsayılan olarak "Mamul Deposu (Finish Good)" sayılır.
       </p>
     </div>
   )

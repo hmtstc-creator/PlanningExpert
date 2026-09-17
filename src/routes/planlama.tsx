@@ -74,12 +74,16 @@ function PlanlamaPage() {
     [locations],
   )
 
-  // Sadece "planlamaya dahil" depolardaki stok sayılır.
+  // Sadece Mamul (finished_goods) ve Üretim Alanı (production_area)
+  // depolarındaki stok üretim ihtiyacından düşülür — Hammadde, Kalite ve
+  // Müşteri depoları hesaba katılmaz. Bkz. depolar.tsx CATEGORIES.
   const stockByMaterial = useMemo(() => {
     const map = new Map<string, number>()
     for (const s of stockRows) {
-      const cat = s.storageLocation ? locCategory.get(s.storageLocation) ?? 'available' : 'available'
-      if (cat !== 'available') continue
+      const cat = s.storageLocation
+        ? locCategory.get(s.storageLocation) ?? 'finished_goods'
+        : 'finished_goods'
+      if (cat !== 'finished_goods' && cat !== 'production_area') continue
       map.set(s.material, (map.get(s.material) ?? 0) + (s.unrestricted ?? 0))
     }
     return map
