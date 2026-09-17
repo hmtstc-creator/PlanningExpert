@@ -43,19 +43,36 @@ function DepolarPage() {
   const upsert = useMutation(api.storageLocations.upsert)
 
   const [saving, setSaving] = useState<string | null>(null)
-
-  const discovered = useMemo(() => {
-    const set = new Set<string>()
-    for (const s of stockRows) {
-      if (s.storageLocation) set.add(s.storageLocation)
-    }
-    return Array.from(set).sort()
-  }, [stockRows])
+  const [newCode, setNewCode] = useState('')
 
   const byCode = useMemo(
     () => new Map(locations.map((l) => [l.code, l])),
     [locations],
   )
+
+  // Liste artık sadece MB52'de görülen depolarla sınırlı değil: elle
+  // tanımlanmış depolar da (henüz stok verisi gelmemiş olsa bile) burada
+  // görünür, çünkü planlama hesaplaması bu tanımlara göre çalışır.
+  const allCodes = useMemo(() => {
+    const set = new Set<string>()
+    for (const s of stockRows) {
+      if (s.storageLocation) set.add(s.storageLocation)
+    }
+    for (const l of locations) set.add(l.code)
+    return Array.from(set).sort()
+  }, [stockRows, locations])
+
+  async function addManualLocation() {
+    const code = newCode.trim()
+    if (!code) return
+    setSaving(code)
+    try {
+      await upsert({ code, category: 'available' })
+      setNewCode('')
+    } finally {
+      setSaving(null)
+    }
+  }
 
   const stockByLocation = useMemo(() => {
     const map = new Map<string, number>()
@@ -82,9 +99,11 @@ function DepolarPage() {
     <div className="mx-auto max-w-4xl px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Depo Tanımları</h1>
       <p className="mt-2 text-muted-foreground">
-        MB52'de bulunan her depo yerinin planlamada nasıl değerlendirileceğini
-        seç. Bu ayar, "hangi stok gerçekten elimde?" sorusunu belirler ve
-        üretim miktarını doğrudan etkiler.
+        Depo kodlarını elle ekle ya da MB52 yüklemesiyle otomatik gelmesini
+        bekle, sonra her birinin planlamada nasıl değerlendirileceğini seç.
+        Bu ayar, "hangi stok gerçekten elimde?" sorusunu belirler ve üretim
+        miktarını doğrudan etkiler — planlama hesaplaması bu tanımlara göre
+        çalışır.
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -98,14 +117,34 @@ function DepolarPage() {
         ))}
       </div>
 
-      {discovered.length === 0 ? (
+      <div className="mt-6 flex gap-2">
+        <input
+          className="w-48 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          placeholder="Depo kodu (örn. 1009)"
+          value={newCode}
+          onChange={(e) => setNewCode(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void addManualLocation()
+          }}
+        />
+        <button
+          onClick={() => void addManualLocation()}
+          disabled={!newCode.trim() || saving === newCode.trim()}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        >
+          Depo ekle
+        </button>
+      </div>
+
+      {allCodes.length === 0 ? (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          Henüz MB52 stok verisi yüklenmedi. Önce Stoklar sayfasından MB52
-          dosyasını yükle — depo kodları otomatik burada listelenecek.
+          Henüz depo tanımlı değil. Yukarıdan elle ekleyebilir, ya da Stoklar
+          sayfasından MB52 dosyası yükleyip depo kodlarının otomatik
+          listelenmesini bekleyebilirsin.
         </p>
       ) : (
-        <div className="mt-8 space-y-2">
-          {discovered.map((code) => {
+        <div className="mt-4 space-y-2">
+          {allCodes.map((code) => {
             const current = byCode.get(code)
             const qty = stockByLocation.get(code) ?? 0
             return (
