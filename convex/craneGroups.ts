@@ -1,0 +1,42 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from 'convex/server'
+import { v } from 'convex/values'
+
+import { mutation, query } from './_generated/server'
+
+const groupValidator = v.object({
+  _id: v.id('craneGroups'),
+  _creationTime: v.number(),
+  groupName: v.string(),
+  machines: v.array(v.string()),
+})
+
+export const list = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(groupValidator),
+  handler: async (ctx, args) =>
+    ctx.db.query('craneGroups').order('desc').paginate(args.paginationOpts),
+})
+
+export const create = mutation({
+  args: { groupName: v.string(), machines: v.array(v.string()) },
+  returns: v.id('craneGroups'),
+  handler: async (ctx, args) => {
+    const groupName = args.groupName.trim()
+    const machines = args.machines.map((m) => m.trim()).filter(Boolean)
+    if (!groupName) throw new Error('Grup adı zorunludur')
+    if (machines.length < 2) throw new Error('En az 2 makine girilmelidir')
+    return ctx.db.insert('craneGroups', { groupName, machines })
+  },
+})
+
+export const remove = mutation({
+  args: { id: v.id('craneGroups') },
+  returns: v.null(),
+  handler: async (ctx, { id }) => {
+    await ctx.db.delete(id)
+    return null
+  },
+})
