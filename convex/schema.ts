@@ -234,6 +234,17 @@ export default defineSchema({
         endMinute: v.number(),
         // İş gün sınırını aştıysa bittiği gün; eski kayıtlarda yok.
         endDate: v.optional(v.string()),
+        // İşin parçaları — dondurulmuş ufku çizebilmek için.
+        segments: v.optional(
+          v.array(
+            v.object({
+              kind: v.string(),
+              date: v.string(),
+              start: v.number(),
+              end: v.number(),
+            }),
+          ),
+        ),
         reason: v.string(),
       }),
     ),

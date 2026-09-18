@@ -63,6 +63,23 @@ export interface SchedulerOptions {
    * yasak gün bazındadır: işin HİÇBİR parçası o güne düşemez.
    */
   moldBlackouts?: { material: string; date: string }[]
+  /**
+   * Zaten taahhüt edilmiş işler: dondurulmuş ufuktaki onaylı plan.
+   *
+   * Bunlar yeniden hesaplanmaz — presin ekseninde yer kaplarlar, vinç ve
+   * kalıp kaydına işlenirler, yeni iş üstlerine konamaz. Amaç sahadaki
+   * ekibin hazırlığını bozmamaktır: ertesi sabah kurulacak kalıp, planın
+   * yeniden hesaplanması yüzünden başka bir prese kaymamalı.
+   */
+  fixedJobs?: FixedJob[]
+}
+
+/** Dondurulmuş ufuktan gelen, yeniden planlanmayacak iş. */
+export interface FixedJob {
+  material: string
+  press: string
+  date: string
+  segments: { kind: string; date: string; start: number; end: number }[]
 }
 
 /**
@@ -424,6 +441,16 @@ export function schedule(
   // farklı preslerde ardışık olarak çalışabilir.
   const moldUsage: MoldUsage = new Map()
 
+  // Dondurulmuş ufuk: taahhüt edilmiş işler önce yerleşir, sonra motor
+  // kalan boşluğu planlar.
+  applyFixedJobs(
+    options.fixedJobs ?? [],
+    timelines,
+    pressByName,
+    hallSetups,
+    moldUsage,
+  )
+
   // malzeme → bakım günleri
   const blackoutsByMaterial = new Map<string, Set<string>>()
   for (const b of options.moldBlackouts ?? []) {
@@ -528,6 +555,68 @@ export function schedule(
   }
 
   return { jobs, unplanned }
+}
+
+/**
+ * Taahhüt edilmiş işleri preslerin eksenine ve ortak kaynaklara işler.
+ *
+ * Parçalar gün bazında gelir (onaylı plandan); eksendeki karşılıkları
+ * bulunup tek bir dolu aralık olarak kaydedilir. Vinç kaydına yalnızca
+ * setup ve rulo değişimi girer — üretim vinç kullanmaz.
+ */
+function applyFixedJobs(
+  fixedJobs: FixedJob[],
+  timelines: Map<string, PressTimeline>,
+  pressByName: Map<string, PressSpec>,
+  hallSetups: Map<string, HallSetupLog>,
+  moldUsage: MoldUsage,
+): void {
+  for (const job of fixedJobs) {
+    const timeline = timelines.get(job.press)
+    const press = pressByName.get(job.press)
+    if (!timeline || !press || job.segments.length === 0) continue
+
+    let min = Number.POSITIVE_INFINITY
+    let max = Number.NEGATIVE_INFINITY
+    const perDate = new Map<string, { start: number; end: number }>()
+
+    for (const segment of job.segments) {
+      const day = timeline.days.find((d) => d.date === segment.date)
+      if (!day) continue
+      const start = day.offset + Math.max(0, segment.start)
+      const end = day.offset + Math.min(day.capacity, segment.end)
+      if (end <= start) continue
+      min = Math.min(min, start)
+      max = Math.max(max, end)
+
+      const span = perDate.get(segment.date)
+      perDate.set(segment.date, {
+        start: span ? Math.min(span.start, segment.start) : segment.start,
+        end: span ? Math.max(span.end, segment.end) : segment.end,
+      })
+
+      if (segment.kind === 'setup' || segment.kind === 'coil') {
+        const hallLog = hallSetups.get(segment.date) ?? new Map<string, HallResources>()
+        const resources = hallLog.get(press.hall) ?? { mold: [], coil: [] }
+        resources[segment.kind === 'setup' ? 'mold' : 'coil'].push({
+          start: segment.start,
+          end: segment.end,
+        })
+        hallLog.set(press.hall, resources)
+        hallSetups.set(segment.date, hallLog)
+      }
+    }
+
+    if (min === Number.POSITIVE_INFINITY) continue
+    timeline.bookings.push({ start: min, end: max, material: job.material })
+    for (const [date, span] of perDate) {
+      recordMoldInterval(moldUsage, job.material, date, {
+        press: job.press,
+        start: span.start,
+        end: span.end,
+      })
+    }
+  }
 }
 
 interface Placement {

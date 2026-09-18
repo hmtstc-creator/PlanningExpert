@@ -156,6 +156,8 @@ function PressCalendarSection() {
   const [shiftStartMinute, setShiftStartMinute] = useState(420) // 07:00
   const [planningHorizonWeeks, setPlanningHorizonWeeks] = useState(4)
   const [breakMinutesPerShift, setBreakMinutesPerShift] = useState(0)
+  // Planın ilk kaç günü dondurulsun — presin kendi değeri yoksa bu geçerli.
+  const [frozenDays, setFrozenDays] = useState(0)
   // Sunucu değerlerini forma yalnızca sunucuda değiştiklerinde yansıt.
   // Aksi halde sorgu her tazelendiğinde kullanıcının yazdığı değer siliniyor.
   useSyncedFields(
@@ -170,6 +172,7 @@ function PressCalendarSection() {
           shiftStartMinute: globalSettings.shiftStartMinute ?? 420,
           planningHorizonWeeks: globalSettings.planningHorizonWeeks ?? 4,
           breakMinutesPerShift: globalSettings.breakMinutesPerShift ?? 0,
+          frozenDays: globalSettings.frozenDays ?? 0,
         }
       : undefined,
     {
@@ -182,6 +185,7 @@ function PressCalendarSection() {
       shiftStartMinute: setShiftStartMinute,
       planningHorizonWeeks: setPlanningHorizonWeeks,
       breakMinutesPerShift: setBreakMinutesPerShift,
+      frozenDays: setFrozenDays,
     },
   )
 
@@ -196,6 +200,7 @@ function PressCalendarSection() {
       shiftStartMinute: number
       planningHorizonWeeks: number
       breakMinutesPerShift: number
+      frozenDays: number
     }>,
   ) {
     await saveGlobalSettingsMutation({
@@ -208,6 +213,7 @@ function PressCalendarSection() {
       shiftStartMinute: next?.shiftStartMinute ?? shiftStartMinute,
       planningHorizonWeeks: next?.planningHorizonWeeks ?? planningHorizonWeeks,
       breakMinutesPerShift: next?.breakMinutesPerShift ?? breakMinutesPerShift,
+      frozenDays: next?.frozenDays ?? frozenDays,
       capacityFactor: globalSettings?.capacityFactor,
     })
     setSavedAt(new Date().toLocaleTimeString('en-GB'))
@@ -296,7 +302,8 @@ function PressCalendarSection() {
       (globalSettings.coilSetupGapMinutes ?? 30) !== coilSetupGapMinutes ||
       (globalSettings.concurrentSetupsPerHall ?? 1) !== concurrentSetupsPerHall ||
       (globalSettings.shiftStartMinute ?? 420) !== shiftStartMinute ||
-      (globalSettings.planningHorizonWeeks ?? 4) !== planningHorizonWeeks)
+      (globalSettings.planningHorizonWeeks ?? 4) !== planningHorizonWeeks ||
+      (globalSettings.frozenDays ?? 0) !== frozenDays)
 
   const calendarDirty =
     !!globalCalendar &&
@@ -330,6 +337,7 @@ function PressCalendarSection() {
       setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? 1)
       setShiftStartMinute(globalSettings.shiftStartMinute ?? 420)
       setPlanningHorizonWeeks(globalSettings.planningHorizonWeeks ?? 4)
+      setFrozenDays(globalSettings.frozenDays ?? 0)
     }
     if (globalCalendar) {
       setWorkingDayKeys(globalCalendar.workingDays)
@@ -743,6 +751,20 @@ function PressCalendarSection() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
+            Frozen days (0 = off)
+          </span>
+          <input
+            type="number"
+            min={0}
+            max={14}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={frozenDays}
+            onChange={(e) => setFrozenDays(Number(e.target.value) || 0)}
+            onBlur={() => setFrozenDays(Math.min(14, Math.max(0, Math.round(frozenDays) || 0)))}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
             Concurrent setups per hall
           </span>
           <input
@@ -755,6 +777,10 @@ function PressCalendarSection() {
         </label>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
+        Frozen days: the first {frozenDays} day(s) of the plan are taken from
+        the approved plan instead of being recalculated, so the shop floor's
+        preparation is not disturbed. A press can override this on the Press
+        Definitions page. 0 turns it off.{' '}
         Crane constraint: presses in the same hall can run at most{' '}
         {concurrentSetupsPerHall} setup(s) at a time, with at least{' '}
         {setupGapMinutes} min between consecutive mould setups and{' '}

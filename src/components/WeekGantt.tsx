@@ -65,6 +65,11 @@ export interface WeekGanttJob {
   material: string
   quantity: number
   late: boolean
+  /**
+   * Dondurulmuş ufuktan gelen taahhüt: yeniden hesaplanmadı, onaylı plandan
+   * olduğu gibi çizilir. Planlamacı neye dokunamayacağını görmeli.
+   */
+  frozen?: boolean
   setupStartMinute: number
   endMinute: number
   /** Setup → approval → production → coil change → production … */
@@ -101,6 +106,8 @@ interface PlacedBlock extends Segment {
   /** Shown instead of `label` when the block is wide enough for it. */
   longLabel?: string
   title: string
+  /** Frozen work is drawn hatched so it reads as "not up for replanning". */
+  frozen?: boolean
 }
 
 const ROW_HEIGHT = 32
@@ -189,6 +196,7 @@ export function WeekGantt({
               kind,
               press: press.name,
               hall: press.hall,
+              frozen: job.frozen,
               start: base + seg.start,
               end: base + seg.end,
               label: kind === 'coil' ? undefined : job.material,
@@ -206,6 +214,7 @@ export function WeekGantt({
                 `${clockLabel(seg.start)}–${clockLabel(seg.end)}` +
                 ` · ${job.quantity.toLocaleString('en-GB')} pcs` +
                 (carriedOver ? ` · continued from ${job.date}` : '') +
+                (job.frozen ? ' · FROZEN (from the approved plan)' : '') +
                 (job.late ? ' · LATE' : ''),
             })
           }
@@ -429,6 +438,12 @@ export function WeekGantt({
                             width,
                             height: ROW_HEIGHT - 8,
                             backgroundColor: COLORS[b.kind].fill,
+                            // Dondurulmuş iş taralı çizilir: rengi korur
+                            // (hangi iş olduğu belli kalsın) ama dokusundan
+                            // yeniden planlanmayacağı anlaşılır.
+                            backgroundImage: b.frozen
+                              ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.35) 0 3px, transparent 3px 7px)'
+                              : undefined,
                           }}
                         >
                           {width > 34 && b.label && (

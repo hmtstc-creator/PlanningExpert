@@ -78,6 +78,7 @@ function PlanlamaPage() {
     hall: string
     category?: string
     feedsCoil?: boolean
+    frozenDays?: number
   }[]
   const templates = (useQuery(api.pressCalendar.listTemplates) ?? []) as {
     press: string
@@ -217,12 +218,57 @@ function PlanlamaPage() {
   // 02:00 the shop is still on the previous day's third shift.
   const { date: todayIso, clockMinute: nowClockMinute } = productionDayOf(now, shiftStartMinute)
 
+  // ---- Dondurulmuş ufuk ---------------------------------------------------
+  //
+  // Sahadaki ekip yarın kuracağı kalıbı bugünden hazırlar. Plan her açılışta
+  // sıfırdan hesaplandığı için, hiçbir şey değişmese bile iş başka bir prese
+  // kayabilir. Dondurulmuş gün sayısı kadar ileriyi ONAYLI plandan alıyoruz:
+  // o işler yeniden hesaplanmaz, motor kalan boşluğu planlar.
+  const globalFrozenDays = Math.max(0, globalSettings?.frozenDays ?? 0)
+  const frozenUntilByPress = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const press of presses) {
+      const days = press.frozenDays ?? globalFrozenDays
+      if (days <= 0) continue
+      // `days` gün ileri: bugün dahil, o yüzden days - 1.
+      map.set(press.name, isoDate(addDays(new Date(`${todayIso}T00:00:00`), days - 1)))
+    }
+    return map
+  }, [presses, globalFrozenDays, todayIso])
+
+  const frozenJobs = useMemo(() => {
+    if (!latestSnapshot || frozenUntilByPress.size === 0) return []
+    // Kırpılmış bir anlık görüntü eksiktir; onunla dondurmak sahada olmayan
+    // bir planı dondurmak olur.
+    if (latestSnapshot.truncated) return []
+    return latestSnapshot.jobs.filter((job) => {
+      const until = frozenUntilByPress.get(job.press)
+      if (!until) return false
+      if (job.date < todayIso) return false
+      return job.date <= until && (job.segments?.length ?? 0) > 0
+    })
+  }, [latestSnapshot, frozenUntilByPress, todayIso])
+
+  /**
+   * Dondurulmuş işlerin ürettiği adet, o malzemenin talebini karşılar.
+   * Taahhüt edilmiş arz stok gibi davranır: FIFO olarak en yakın haftadan
+   * düşülür, kalanı motor planlar. Sayılmazsa aynı iş iki kere planlanır.
+   */
+  const committedByMaterial = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const job of frozenJobs) {
+      map.set(job.material, (map.get(job.material) ?? 0) + job.quantity)
+    }
+    return map
+  }, [frozenJobs])
+
   const demand = useMemo(() => {
     const rows: DemandInput[] = weeklyDemand.map((d) => ({
       material: d.material,
       overdue: d.overdue ?? 0,
       periods: d.periods,
-      stock: stockByMaterial.get(d.material) ?? 0,
+      stock:
+        (stockByMaterial.get(d.material) ?? 0) + (committedByMaterial.get(d.material) ?? 0),
     }))
     return buildDemandSchedule(rows, productByCode, {
       baseMonday: horizonMonday,
@@ -232,6 +278,7 @@ function PlanlamaPage() {
   }, [
     weeklyDemand,
     stockByMaterial,
+    committedByMaterial,
     workingDaysPerWeek,
     productByCode,
     horizonMonday,
@@ -332,6 +379,12 @@ function PlanlamaPage() {
         concurrentSetupsPerHall,
         overrides,
         moldBlackouts,
+        fixedJobs: frozenJobs.map((job) => ({
+          material: job.material,
+          press: job.press,
+          date: job.date,
+          segments: job.segments ?? [],
+        })),
         // Her vardiyanın kendi net dakikası verilir: devir toplantısı, çay ve
         // yemek vardiyadan vardiyaya değişir, tek bir uzunlukla bölmek 2. ve
         // 3. vardiyanın sınırını kaydırırdı.
@@ -351,10 +404,56 @@ function PlanlamaPage() {
       coilSetupGapMinutes,
       overrides,
       moldBlackouts,
+      frozenJobs,
       stopMinutesByShift,
     ],
   )
 
+
+  /**
+   * Ekranda gösterilen işler: dondurulmuş ufuktaki taahhütler + yeni plan.
+   *
+   * Dondurulmuş işler motorun çıktısında yoktur (yeniden hesaplanmadılar),
+   * ama sahada o presler o saatlerde onları yapacak — grafikte olmazlarsa
+   * pres boş görünür.
+   */
+  const displayJobs = useMemo<(ScheduledJob & { frozen?: boolean })[]>(() => {
+    if (frozenJobs.length === 0) return result.jobs
+    const fixed = frozenJobs.map(
+      (job): ScheduledJob & { frozen: boolean } => ({
+        material: job.material,
+        press: job.press,
+        hall: job.hall,
+        date: job.date,
+        endDate: job.endDate ?? job.date,
+        spansDays: (job.endDate ?? job.date) !== job.date,
+        phase: job.phase as ScheduledJob['phase'],
+        urgency: 0,
+        dueDate: job.date,
+        bucketLabel: 'Frozen',
+        late: false,
+        quantity: job.quantity,
+        shots: job.shots,
+        coilsNeeded: job.coilsNeeded,
+        coilChanges: 0,
+        segments: (job.segments ?? []) as ScheduledJob['segments'],
+        pinned: false,
+        coProductQuantity: 0,
+        setupStartMinute: job.setupStartMinute,
+        setupEndMinute: job.setupStartMinute,
+        qualityEndMinute: job.setupStartMinute,
+        endMinute: job.endMinute,
+        runMinutes: 0,
+        setupMinutes: 0,
+        qualityApprovalMinutes: 0,
+        reason: `Frozen — from the plan approved on ${
+          latestSnapshot ? new Date(latestSnapshot.createdAt).toLocaleDateString('en-GB') : ''
+        }`,
+        frozen: true,
+      }),
+    )
+    return [...fixed, ...result.jobs]
+  }, [frozenJobs, result.jobs, latestSnapshot])
 
   // Onaylı planla canlı planın farkı — "onayladığımdan bu yana ne değişti".
   const planDiff = useMemo(() => {
@@ -401,7 +500,7 @@ function PlanlamaPage() {
    * run, or no capacity are three different problems.
    */
   const weeks = useMemo(() => {
-    const byWeek = new Map<string, { dates: Set<string>; jobs: typeof result.jobs }>()
+    const byWeek = new Map<string, { dates: Set<string>; jobs: typeof displayJobs }>()
     for (const [pressName, list] of buckets) {
       void pressName
       for (const b of list) {
@@ -412,7 +511,7 @@ function PlanlamaPage() {
         byWeek.set(weekStart, entry)
       }
     }
-    for (const job of result.jobs) {
+    for (const job of displayJobs) {
       // A job that does not fit before the week closes carries on into the
       // next one, so it belongs to every week its pieces actually run in —
       // otherwise the continuation would be missing from that week's chart.
@@ -469,7 +568,7 @@ function PlanlamaPage() {
           })
         return { weekStart, dates, jobs: entry.jobs, idlePresses }
       })
-  }, [buckets, result, presses, productByCode, capacityByPressDate])
+  }, [buckets, displayJobs, presses, productByCode, capacityByPressDate])
 
   const lateCount = result.jobs.filter((j) => j.late).length
 
@@ -586,7 +685,9 @@ function PlanlamaPage() {
       await approve({
         horizonStart,
         unplannedCount: result.unplanned.length,
-        jobs: result.jobs.map((j) => ({
+        // Onay, ekranda görünen planın tamamını kaydeder: dondurulmuş
+        // taahhütler de bir sonraki onayın temeli olmalı.
+        jobs: displayJobs.map((j) => ({
           material: j.material,
           press: j.press,
           hall: j.hall,
@@ -658,6 +759,28 @@ function PlanlamaPage() {
             relying on this plan.
           </p>
         </div>
+      )}
+
+      {frozenJobs.length > 0 && (
+        <p className="mt-6 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+          <strong className="text-foreground">{frozenJobs.length} jobs are frozen</strong> —
+          taken from the plan approved on{' '}
+          {latestSnapshot
+            ? new Date(latestSnapshot.createdAt).toLocaleString('en-GB')
+            : ''}{' '}
+          instead of being recalculated, so the shop floor's preparation is not
+          disturbed. They are drawn hatched below and the quantity they produce
+          is deducted from the requirement. Change the frozen day count on the
+          Work Calendar page, or per press on Press Definitions.
+        </p>
+      )}
+
+      {globalFrozenDays > 0 && frozenJobs.length === 0 && !latestSnapshot && (
+        <p className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          Frozen days are set to {globalFrozenDays}, but no plan has been
+          approved yet, so there is nothing to freeze. Approve a plan once and
+          the near term will stop moving.
+        </p>
       )}
 
       {warnings.length > 0 && (
@@ -951,6 +1074,7 @@ function PlanlamaPage() {
                   material: j.material,
                   quantity: j.quantity,
                   late: j.late,
+                  frozen: j.frozen,
                   setupStartMinute: j.setupStartMinute,
                   endMinute: j.endMinute,
                   segments: j.segments,

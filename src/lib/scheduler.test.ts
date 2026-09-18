@@ -846,3 +846,93 @@ describe('boşluğa geri dönük yerleştirme', () => {
     expect(result.jobs[1].reason).toContain('setup not repeated')
   })
 })
+
+describe('dondurulmuş ufuk', () => {
+  const twoWeeks = (presses: string[]) => {
+    const calendar = { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 0 }
+    const map = new Map<string, DayBucket[]>()
+    for (const press of presses) {
+      map.set(press, [
+        ...buildWeekBuckets(monday, calendar, settings),
+        ...buildWeekBuckets(new Date('2026-09-21T00:00:00Z'), calendar, settings),
+      ])
+    }
+    return map
+  }
+
+  const frozenJob = {
+    material: 'F',
+    press: 'PRS-1',
+    date: '2026-09-14',
+    segments: [
+      { kind: 'setup', date: '2026-09-14', start: 0, end: 60 },
+      { kind: 'run', date: '2026-09-14', start: 60, end: 600 },
+    ],
+  }
+
+  it('taahhüt edilmiş işin üstüne yeni iş konmaz', () => {
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeeks(['PRS-1']),
+      settings,
+      { ...options, fixedJobs: [frozenJob] },
+    )
+    const [job] = result.jobs
+    // Donmuş iş 0–600 arasını kaplıyor; yeni iş ancak sonrasında başlar.
+    expect(job.date).toBe('2026-09-14')
+    expect(job.setupStartMinute).toBeGreaterThanOrEqual(600)
+  })
+
+  it('donmuş işin setup\'ı vinç kaydına girer', () => {
+    // Aynı holdeki ikinci pres, donmuş setup'la çakışan bir setup yapamaz.
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', { ...baseProduct, mainMachine: 'PRS-2' }]]),
+      [
+        { name: 'PRS-1', hall: 'Hol 1' },
+        { name: 'PRS-2', hall: 'Hol 1' },
+      ],
+      twoWeeks(['PRS-1', 'PRS-2']),
+      settings,
+      { ...options, fixedJobs: [frozenJob], setupGapMinutes: 60 },
+    )
+    const [job] = result.jobs
+    expect(job.press).toBe('PRS-2')
+    // Donmuş setup 0–60; vinç kuralı gereği sonraki setup en erken 120.
+    expect(job.setupStartMinute).toBeGreaterThanOrEqual(120)
+  })
+
+  it('donmuş işin kalıbı aynı anda başka preste çalışamaz', () => {
+    const result = schedule(
+      [{ ...backlogEntry, material: 'F' }],
+      new Map([['F', { ...baseProduct, code: 'F', mainMachine: 'PRS-2' }]]),
+      [
+        { name: 'PRS-1', hall: 'Hol 1' },
+        { name: 'PRS-2', hall: 'Hol 2' },
+      ],
+      twoWeeks(['PRS-1', 'PRS-2']),
+      settings,
+      { ...options, fixedJobs: [frozenJob] },
+    )
+    const [job] = result.jobs
+    expect(job.press).toBe('PRS-2')
+    // F kalıbı 14 Eylül 0–600 arası PRS-1'de; PRS-2'de ancak sonrasında.
+    const onSameDay = job.segments.filter((s) => s.date === '2026-09-14')
+    expect(onSameDay.every((s) => s.start >= 600)).toBe(true)
+  })
+
+  it('tanımsız prese ait taahhüt planı bozmaz', () => {
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeeks(['PRS-1']),
+      settings,
+      { ...options, fixedJobs: [{ ...frozenJob, press: 'PRS-GONE' }] },
+    )
+    expect(result.unplanned).toHaveLength(0)
+    expect(result.jobs[0].setupStartMinute).toBe(0)
+  })
+})

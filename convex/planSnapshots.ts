@@ -15,6 +15,20 @@ const jobValidator = v.object({
   endMinute: v.number(),
   // İş gün sınırını aştıysa bittiği gün; eski kayıtlarda yok.
   endDate: v.optional(v.string()),
+  /**
+   * İşin parçaları. Dondurulmuş ufuk onaylı planı yeniden ÇİZER, yeniden
+   * hesaplamaz; parçalar olmadan o iş grafikte gösterilemez.
+   */
+  segments: v.optional(
+    v.array(
+      v.object({
+        kind: v.string(),
+        date: v.string(),
+        start: v.number(),
+        end: v.number(),
+      }),
+    ),
+  ),
   reason: v.string(),
 })
 
@@ -31,11 +45,12 @@ const snapshotValidator = v.object({
 })
 
 /**
- * Convex doküman boyut sınırı ~1 MB. Her iş kaydı yaklaşık 200 bayt,
- * dolayısıyla 2000 iş güvenli bir üst sınır. Bunun üstü kırpılır ve
- * `truncated` ile işaretlenir — jobCount yine gerçek sayıyı gösterir.
+ * Convex doküman boyut sınırı ~1 MB. Kayıtlar artık parçaları da taşıyor
+ * (dondurulmuş ufkun onaylı planı çizebilmesi için), yani iş başına ~450
+ * bayt. 1500 iş güvenli bir üst sınır. Üstü kırpılır ve `truncated` ile
+ * işaretlenir — jobCount yine gerçek sayıyı gösterir.
  */
-const MAX_STORED_JOBS = 2000
+const MAX_STORED_JOBS = 1500
 
 export const latest = query({
   args: {},
