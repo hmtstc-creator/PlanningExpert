@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -244,8 +244,14 @@ function PressCalendarSection() {
   const templatesList = useQuery(api.pressCalendar.listTemplates) ?? []
   const saveTemplateMutation = useMutation(api.pressCalendar.saveTemplate)
 
-  const discoveredPresses = useMemo(() => {
+  // Pres listesi artık kalıcı `presses` tablosundan gelir (Makine Tanımları
+  // sayfası). Referanslarda geçen ama tanımlanmamış presler de listelenir ki
+  // takvim tanımlanabilsin.
+  const definedPresses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string }[]
+
+  const pressOptions = useMemo(() => {
     const set = new Set<string>()
+    for (const p of definedPresses) set.add(p.name)
     for (const p of products) {
       for (const m of [p.mainMachine, p.altMachine1, p.altMachine2, p.altMachine3, p.altMachine4]) {
         if (m && m.trim()) set.add(m.trim())
@@ -253,28 +259,18 @@ function PressCalendarSection() {
     }
     for (const t of templatesList) set.add(t.press)
     return Array.from(set).sort()
-  }, [products, templatesList])
+  }, [definedPresses, products, templatesList])
 
-  const [extraPresses, setExtraPresses] = useState<string[]>([])
-  const [newPress, setNewPress] = useState('')
   const [press, setPress] = useState('')
-
-  const pressOptions = useMemo(
-    () => Array.from(new Set([...discoveredPresses, ...extraPresses])).sort(),
-    [discoveredPresses, extraPresses],
-  )
 
   useEffect(() => {
     if (!press && pressOptions.length > 0) setPress(pressOptions[0])
   }, [press, pressOptions])
 
-  function addPress() {
-    const name = newPress.trim()
-    if (!name) return
-    setExtraPresses((prev) => (prev.includes(name) ? prev : [...prev, name]))
-    setPress(name)
-    setNewPress('')
-  }
+  const hallOfPress = useMemo(
+    () => new Map(definedPresses.map((p) => [p.name, p.hall])),
+    [definedPresses],
+  )
 
   // Vardiya süresi (dk) tüm presler için ortaktır.
   const [shiftMinutes, setShiftMinutes] = useState(480)
@@ -485,31 +481,18 @@ function PressCalendarSection() {
             {pressOptions.map((p) => (
               <option key={p} value={p}>
                 {p}
+                {hallOfPress.get(p) ? ` · ${hallOfPress.get(p)}` : ''}
               </option>
             ))}
           </select>
         </label>
-        <div className="flex items-end gap-2">
-          <label className="text-sm">
-            <span className="block text-xs text-muted-foreground">Yeni pres ekle</span>
-            <input
-              className="mt-1 w-40 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-              placeholder="Pres adı"
-              value={newPress}
-              onChange={(e) => setNewPress(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') addPress()
-              }}
-            />
-          </label>
-          <button
-            onClick={addPress}
-            disabled={!newPress.trim()}
-            className="rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/70 disabled:opacity-50"
-          >
-            Ekle
-          </button>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Pres eklemek/hol tanımlamak için{' '}
+          <Link to="/makineler" className="font-medium underline">
+            Makine Tanımları
+          </Link>{' '}
+          sayfasını kullan.
+        </p>
       </div>
 
       {press && (

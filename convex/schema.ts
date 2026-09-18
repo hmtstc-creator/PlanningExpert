@@ -32,6 +32,8 @@ export default defineSchema({
     altMachine2: v.optional(v.string()),
     altMachine3: v.optional(v.string()),
     altMachine4: v.optional(v.string()),
+    // Kalıbın bakım öncesi maksimum baskı (shot) limiti — kullanıcı tanımlar.
+    maxShots: v.optional(v.number()),
     name: v.optional(v.string()),
     material: v.optional(v.string()),
     cycleTimeSeconds: v.optional(v.number()),
@@ -41,6 +43,14 @@ export default defineSchema({
     groupName: v.string(),
     machines: v.array(v.string()),
   }),
+
+  // Pres tanımları: hangi pres hangi holde. Aynı holdeki presler aynı anda
+  // setup yapamaz (vinç kısıtı) — planlama motoru bunu buradan okur.
+  presses: defineTable({
+    name: v.string(),
+    hall: v.string(),
+    tonnage: v.optional(v.number()),
+  }).index('by_name', ['name']),
 
   demandWeekly: defineTable({
     material: v.string(),

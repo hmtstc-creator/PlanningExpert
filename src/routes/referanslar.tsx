@@ -24,6 +24,7 @@ const emptyForm = {
   altMachine2: '',
   altMachine3: '',
   altMachine4: '',
+  maxShots: '',
 }
 
 function ReferanslarPage() {
@@ -71,6 +72,7 @@ function ReferanslarPage() {
         altMachine2: str(form.altMachine2),
         altMachine3: str(form.altMachine3),
         altMachine4: str(form.altMachine4),
+        maxShots: num(form.maxShots),
       })
       setForm(emptyForm)
     } catch (err) {
@@ -115,6 +117,12 @@ function ReferanslarPage() {
       altMachine2: s(row['Alternative 2'] ?? row['Alternatif Makine 2'] ?? row['altMachine2']),
       altMachine3: s(row['Alternative 3'] ?? row['Alternatif Makine 3'] ?? row['altMachine3']),
       altMachine4: s(row['Alternative 4'] ?? row['Alternatif Makine 4'] ?? row['altMachine4']),
+      maxShots: n(
+        row['Max Shot'] ??
+          row['Max Shots'] ??
+          row['Kalıp Max Shot'] ??
+          row['maxShots'],
+      ),
     }))
     const validRows = parsed.filter((r) => r.code)
     const result = await bulkUpsert({ rows: validRows })
@@ -145,6 +153,7 @@ function ReferanslarPage() {
             'Coil Setup Time',
             'Main Machine',
             'Alternative 1-4',
+            'Max Shot',
           ]}
           onRows={handleExcelRows}
         />
@@ -172,6 +181,7 @@ function ReferanslarPage() {
           <Field label="Alternative 2" value={form.altMachine2} onChange={(v) => update('altMachine2', v)} placeholder="" />
           <Field label="Alternative 3" value={form.altMachine3} onChange={(v) => update('altMachine3', v)} placeholder="" />
           <Field label="Alternative 4" value={form.altMachine4} onChange={(v) => update('altMachine4', v)} placeholder="" />
+          <Field label="Kalıp Max Shot limiti" value={form.maxShots} onChange={(v) => update('maxShots', v)} type="number" placeholder="500000" />
 
           {error && <p className="text-sm text-destructive sm:col-span-3">{error}</p>}
           <button
@@ -199,20 +209,21 @@ function ReferanslarPage() {
               <th className="px-3 py-2 font-medium">Coil Setup</th>
               <th className="px-3 py-2 font-medium">Ana Makine</th>
               <th className="px-3 py-2 font-medium">Alternatifler</th>
+              <th className="px-3 py-2 font-medium">Max Shot</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody>
             {status === 'LoadingFirstPage' && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={12}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={13}>
                   Yükleniyor…
                 </td>
               </tr>
             )}
             {status !== 'LoadingFirstPage' && products.length === 0 && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={12}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={13}>
                   Henüz referans eklenmedi.
                 </td>
               </tr>
@@ -234,6 +245,9 @@ function ReferanslarPage() {
                   <td className="px-3 py-2 text-foreground">{p.coilSetupMinutes ?? '—'}</td>
                   <td className="px-3 py-2 text-foreground">{p.mainMachine ?? '—'}</td>
                   <td className="px-3 py-2 text-muted-foreground">{alternatives || '—'}</td>
+                  <td className="px-3 py-2 text-foreground">
+                    {p.maxShots ? p.maxShots.toLocaleString('tr-TR') : '—'}
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <button
                       className="text-xs text-destructive hover:underline"
