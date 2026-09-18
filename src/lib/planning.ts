@@ -26,21 +26,29 @@ export interface DemandInput {
   stock: number
 }
 
-export interface DemandPoolItem {
+/**
+ * Talep havuzundaki tek bir kalem: bir malzemenin belirli bir haftaya ait
+ * net ihtiyacı. ZPP kovaları takvim haftalarına bağlandığı için her kalem
+ * "ne zaman gerekiyor" bilgisini taşır.
+ */
+export interface DemandEntry {
   material: string
-  overdue: number
-  horizonNeed: number
-  grossNeed: number
-  netNeed: number
-  weeklyAvg: number
-  dailyRate: number
-  daysOfCover: number
-  urgency: number
+  qty: number
+  /** Bu ihtiyacın ait olduğu haftanın başlangıcı (ISO). */
+  dueDate: string
+  /** Bu işin üretilebileceği en erken gün (ISO). */
+  earliestDate: string
+  /** ZPP'deki kova etiketi (bakiye için 'Bakiye'). */
+  bucketLabel: string
   phase: 'backlog' | 'urgent' | 'fill'
+  urgency: number
+  daysOfCover: number
 }
 
-export interface DemandPoolOptions {
-  /** Kaç haftalık kovayı ihtiyaç olarak al (varsayılan 2). */
+export interface DemandScheduleOptions {
+  /** Planın başlangıç haftası (Pazartesi). */
+  baseMonday: Date
+  /** Kaç haftalık kovayı plana al (varsayılan 4). */
   horizonWeeks?: number
   /** Aciliyet hesabında haftada kaç gün çalışıldığı (varsayılan 5). */
   workingDaysPerWeek?: number
@@ -49,62 +57,119 @@ export interface DemandPoolOptions {
 }
 
 /**
- * Teslim tarihi verisi olmadığı için aciliyet, ZPP kovalarının ortalamasından
- * türetilen günlük tüketim hızına göre hesaplanır: stok kaç gün yetiyor?
- * Bakiyesi olan malzeme her zaman ilk fazdadır.
+ * ZPP kovalarını takvim haftalarına bağlayarak hafta bazlı talep havuzu üretir.
+ *
+ * - Kova sırası takvim haftasına karşılık gelir: 0. kova içinde bulunulan
+ *   hafta, 1. kova sonraki hafta, ...
+ * - Mevcut stok en erken ihtiyaçtan başlayarak tüketilir (FIFO).
+ * - Bakiye ve acil kalemler "en erken" üretilebilir; dolgu kalemleri kendi
+ *   haftasından önce üretilmez (erken üretim stok şişirir).
+ * - Eş ürün (aynı vuruşta çıkan parça) üretilecek miktar kadar, eş ürünün
+ *   talebinden düşülür — aksi halde aynı parça iki kez planlanır.
  */
-export function buildDemandPool(
+export function buildDemandSchedule(
   rows: DemandInput[],
-  options: DemandPoolOptions = {},
-): DemandPoolItem[] {
-  const horizonWeeks = options.horizonWeeks ?? 2
+  products: Map<string, ProductSpec>,
+  options: DemandScheduleOptions,
+): DemandEntry[] {
+  const horizonWeeks = options.horizonWeeks ?? 4
   const workingDaysPerWeek = options.workingDaysPerWeek ?? 5
   const urgentCoverDays = options.urgentCoverDays ?? 14
+  const baseMonday = options.baseMonday
+  const baseIso = isoDate(baseMonday)
 
-  return rows
-    .map((row) => {
-      const periods = row.periods.map((p) => Math.abs(p.qty))
-      const weeklyAvg =
-        periods.length > 0 ? periods.reduce((s, q) => s + q, 0) / periods.length : 0
-      const horizonNeed = periods.slice(0, horizonWeeks).reduce((s, q) => s + q, 0)
-      const overdue = Math.abs(row.overdue)
-      const grossNeed = overdue + horizonNeed
-      const netNeed = Math.max(0, grossNeed - row.stock)
+  // malzeme → hafta indeksi → kalem
+  const entriesByMaterial = new Map<string, DemandEntry[]>()
 
-      const dailyRate = weeklyAvg > 0 ? weeklyAvg / workingDaysPerWeek : 0
-      const daysOfCover =
-        dailyRate > 0 ? row.stock / dailyRate : row.stock > 0 ? Number.POSITIVE_INFINITY : 0
+  for (const row of rows) {
+    const periods = row.periods.map((p) => ({ label: p.label, qty: Math.abs(p.qty) }))
+    const weeklyAvg =
+      periods.length > 0 ? periods.reduce((s, p) => s + p.qty, 0) / periods.length : 0
+    const dailyRate = weeklyAvg > 0 ? weeklyAvg / workingDaysPerWeek : 0
+    const daysOfCover =
+      dailyRate > 0 ? row.stock / dailyRate : row.stock > 0 ? Number.POSITIVE_INFINITY : 0
+    const isUrgent = daysOfCover < urgentCoverDays
 
-      let phase: DemandPoolItem['phase']
-      let urgency: number
-      if (overdue > 0) {
-        phase = 'backlog'
-        urgency = 100
-      } else if (daysOfCover < urgentCoverDays) {
-        phase = 'urgent'
-        urgency = Math.round(
-          Math.max(0, Math.min(99, ((urgentCoverDays - daysOfCover) / urgentCoverDays) * 99)),
-        )
-      } else {
-        phase = 'fill'
-        urgency = 0
-      }
-
-      return {
+    const list: DemandEntry[] = []
+    const overdue = Math.abs(row.overdue)
+    if (overdue > 0) {
+      list.push({
         material: row.material,
-        overdue,
-        horizonNeed,
-        grossNeed,
-        netNeed,
-        weeklyAvg,
-        dailyRate,
+        qty: overdue,
+        dueDate: baseIso,
+        earliestDate: baseIso,
+        bucketLabel: 'Bakiye',
+        phase: 'backlog',
+        urgency: 100,
         daysOfCover,
-        urgency,
+      })
+    }
+
+    periods.slice(0, horizonWeeks).forEach((period, index) => {
+      if (period.qty <= 0) return
+      const due = isoDate(addDays(baseMonday, index * 7))
+      const phase: DemandEntry['phase'] = isUrgent ? 'urgent' : 'fill'
+      list.push({
+        material: row.material,
+        qty: period.qty,
+        dueDate: due,
+        // Acil kalemler öne çekilebilir, dolgu kalemleri kendi haftasından
+        // önce üretilmez.
+        earliestDate: phase === 'urgent' ? baseIso : due,
+        bucketLabel: period.label,
         phase,
-      }
+        urgency: isUrgent
+          ? Math.round(
+              Math.max(0, Math.min(99, ((urgentCoverDays - daysOfCover) / urgentCoverDays) * 99)),
+            )
+          : 0,
+        daysOfCover,
+      })
     })
-    .filter((item) => item.netNeed > 0)
-    .sort((a, b) => b.urgency - a.urgency || a.daysOfCover - b.daysOfCover)
+
+    // Stok en erken ihtiyaçtan başlayarak düşülür.
+    let stockLeft = row.stock
+    for (const entry of list) {
+      if (stockLeft <= 0) break
+      const used = Math.min(stockLeft, entry.qty)
+      entry.qty -= used
+      stockLeft -= used
+    }
+
+    entriesByMaterial.set(row.material, list)
+  }
+
+  // Eş ürün düşümü: A üretilirken aynı vuruştan B de çıkar, B'nin talebinden
+  // düşülmelidir.
+  for (const [material, list] of entriesByMaterial) {
+    const product = products.get(material)
+    const coProduct = product?.coProduct?.trim()
+    if (!coProduct) continue
+    const coList = entriesByMaterial.get(coProduct)
+    if (!coList) continue
+
+    let byproduct = list.reduce((s, e) => s + e.qty, 0)
+    for (const entry of coList) {
+      if (byproduct <= 0) break
+      const used = Math.min(byproduct, entry.qty)
+      entry.qty -= used
+      byproduct -= used
+    }
+  }
+
+  return Array.from(entriesByMaterial.values())
+    .flat()
+    .filter((entry) => entry.qty > 0)
+    .sort(
+      (a, b) =>
+        phaseRank(a.phase) - phaseRank(b.phase) ||
+        a.dueDate.localeCompare(b.dueDate) ||
+        b.urgency - a.urgency,
+    )
+}
+
+function phaseRank(phase: DemandEntry['phase']): number {
+  return phase === 'backlog' ? 0 : phase === 'urgent' ? 1 : 2
 }
 
 // ---- 2) Rulo / parti hesabı ----------------------------------------------

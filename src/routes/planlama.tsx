@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import {
-  buildDemandPool,
+  buildDemandSchedule,
   buildWeekBuckets,
   type DayBucket,
   type DemandInput,
@@ -115,19 +115,25 @@ function PlanlamaPage() {
     [workCalendar],
   )
 
-  const pool = useMemo(() => {
+  const horizonMonday = useMemo(() => mondayOf(new Date()), [])
+
+  const demand = useMemo(() => {
     const rows: DemandInput[] = weeklyDemand.map((d) => ({
       material: d.material,
       overdue: d.overdue ?? 0,
       periods: d.periods,
       stock: stockByMaterial.get(d.material) ?? 0,
     }))
-    return buildDemandPool(rows, { workingDaysPerWeek })
-  }, [weeklyDemand, stockByMaterial, workingDaysPerWeek])
+    return buildDemandSchedule(rows, productByCode, {
+      baseMonday: horizonMonday,
+      horizonWeeks: HORIZON_WEEKS,
+      workingDaysPerWeek,
+    })
+  }, [weeklyDemand, stockByMaterial, workingDaysPerWeek, productByCode, horizonMonday])
 
   const buckets = useMemo(() => {
     const map = new Map<string, DayBucket[]>()
-    const start = mondayOf(new Date())
+    const start = horizonMonday
     const templateByPress = new Map(templates.map((t) => [t.press, t]))
     for (const press of presses) {
       const pattern = templateByPress.get(press.name) ?? {
@@ -149,15 +155,15 @@ function PlanlamaPage() {
       map.set(press.name, all)
     }
     return map
-  }, [presses, templates, shiftMinutes, overtimeShiftMinutes, holidays, workingDaysPerWeek])
+  }, [presses, templates, shiftMinutes, overtimeShiftMinutes, holidays, workingDaysPerWeek, horizonMonday])
 
   const result = useMemo(
     () =>
-      schedule(pool, productByCode, presses, buckets, { shiftMinutes, overtimeShiftMinutes }, {
+      schedule(demand, productByCode, presses, buckets, { shiftMinutes, overtimeShiftMinutes }, {
         setupGapMinutes,
         concurrentSetupsPerHall,
       }),
-    [pool, productByCode, presses, buckets, shiftMinutes, overtimeShiftMinutes, setupGapMinutes, concurrentSetupsPerHall],
+    [demand, productByCode, presses, buckets, shiftMinutes, overtimeShiftMinutes, setupGapMinutes, concurrentSetupsPerHall],
   )
 
   const byDate = useMemo(() => {
@@ -186,7 +192,8 @@ function PlanlamaPage() {
   }, [presses, templates, weeklyDemand, stockRows, products])
 
   const totalPlannedQty = result.jobs.reduce((s, j) => s + j.quantity, 0)
-  const horizonStart = isoDate(mondayOf(new Date()))
+  const lateCount = result.jobs.filter((j) => j.late).length
+  const horizonStart = isoDate(horizonMonday)
 
   async function handleApprove() {
     setApproving(true)
@@ -243,7 +250,11 @@ function PlanlamaPage() {
           value={result.unplanned.length.toLocaleString('tr-TR')}
           warn={result.unplanned.length > 0}
         />
-        <Stat label="Talep havuzu" value={pool.length.toLocaleString('tr-TR')} />
+        <Stat
+          label="Geciken iş"
+          value={lateCount.toLocaleString('tr-TR')}
+          warn={lateCount > 0}
+        />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -295,6 +306,7 @@ function PlanlamaPage() {
                     <th className="px-3 py-2 font-medium">Pres</th>
                     <th className="px-3 py-2 font-medium">Hol</th>
                     <th className="px-3 py-2 font-medium">Malzeme</th>
+                    <th className="px-3 py-2 font-medium">İhtiyaç</th>
                     <th className="px-3 py-2 font-medium">Adet</th>
                     <th className="px-3 py-2 font-medium">Vuruş</th>
                     <th className="px-3 py-2 font-medium">Rulo</th>
@@ -313,6 +325,12 @@ function PlanlamaPage() {
                         {job.coProduct && (
                           <span className="text-muted-foreground"> +{job.coProduct}</span>
                         )}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        <span className={job.late ? 'text-destructive' : 'text-muted-foreground'}>
+                          {job.bucketLabel}
+                          {job.late && ' ⚠'}
+                        </span>
                       </td>
                       <td className="px-3 py-2 text-foreground">
                         {job.quantity.toLocaleString('tr-TR')}
@@ -349,6 +367,7 @@ function PlanlamaPage() {
                   <th className="px-3 py-2 font-medium">Malzeme</th>
                   <th className="px-3 py-2 font-medium">Adet</th>
                   <th className="px-3 py-2 font-medium">Faz</th>
+                  <th className="px-3 py-2 font-medium">İhtiyaç haftası</th>
                   <th className="px-3 py-2 font-medium">Neden</th>
                 </tr>
               </thead>
@@ -360,6 +379,7 @@ function PlanlamaPage() {
                       {Math.round(u.quantity).toLocaleString('tr-TR')}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{u.phase}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{u.dueDate}</td>
                     <td className="px-3 py-2 text-muted-foreground">{u.reason}</td>
                   </tr>
                 ))}

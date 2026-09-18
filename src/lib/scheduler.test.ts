@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildWeekBuckets, type DayBucket, type ProductSpec } from './planning'
+import {
+  buildWeekBuckets,
+  type DayBucket,
+  type DemandEntry,
+  type ProductSpec,
+} from './planning'
 import { schedule } from './scheduler'
 
 const settings = { shiftMinutes: 480, overtimeShiftMinutes: 480 }
@@ -26,23 +31,21 @@ const baseProduct: ProductSpec & { mainMachine?: string } = {
   mainMachine: 'PRS-1',
 }
 
-const poolItem = {
+const backlogEntry: DemandEntry = {
   material: 'A',
-  overdue: 500,
-  horizonNeed: 0,
-  grossNeed: 500,
-  netNeed: 500,
-  weeklyAvg: 500,
-  dailyRate: 100,
-  daysOfCover: 0,
+  qty: 500,
+  dueDate: '2026-09-14',
+  earliestDate: '2026-09-14',
+  bucketLabel: 'Bakiye',
+  phase: 'backlog',
   urgency: 100,
-  phase: 'backlog' as const,
+  daysOfCover: 0,
 }
 
 describe('schedule', () => {
   it('bakiyeyi uygun prese ilk günde yerleştirir', () => {
     const result = schedule(
-      [poolItem],
+      [backlogEntry],
       new Map([['A', baseProduct]]),
       [{ name: 'PRS-1', hall: 'Hol 1' }],
       bucketsFor(['PRS-1']),
@@ -62,7 +65,7 @@ describe('schedule', () => {
       ['B', { ...baseProduct, code: 'B', mainMachine: 'PRS-2' }],
     ])
     const result = schedule(
-      [poolItem, { ...poolItem, material: 'B' }],
+      [backlogEntry, { ...backlogEntry, material: 'B' }],
       products,
       [
         { name: 'PRS-1', hall: 'Hol 1' },
@@ -83,7 +86,7 @@ describe('schedule', () => {
       ['B', { ...baseProduct, code: 'B', mainMachine: 'PRS-2' }],
     ])
     const result = schedule(
-      [poolItem, { ...poolItem, material: 'B' }],
+      [backlogEntry, { ...backlogEntry, material: 'B' }],
       products,
       [
         { name: 'PRS-1', hall: 'Hol 1' },
@@ -96,10 +99,10 @@ describe('schedule', () => {
     expect(result.jobs.map((j) => j.setupStartMinute)).toEqual([0, 0])
   })
 
-  it('aynı kalıbı (malzeme) aynı gün iki preste çalıştırmaz', () => {
+  it('aynı kalıbı aynı anda iki preste çalıştırmaz ama aynı güne planlayabilir', () => {
     const product = { ...baseProduct, altMachine1: 'PRS-2' }
     const result = schedule(
-      [poolItem, { ...poolItem, netNeed: 400 }],
+      [backlogEntry, { ...backlogEntry, qty: 400 }],
       new Map([['A', product]]),
       [
         { name: 'PRS-1', hall: 'Hol 1' },
@@ -109,14 +112,60 @@ describe('schedule', () => {
       settings,
       options,
     )
-    const dates = result.jobs.map((j) => j.date)
-    expect(new Set(dates).size).toBe(dates.length)
+    expect(result.unplanned).toHaveLength(0)
+    expect(result.jobs).toHaveLength(2)
+    // Eski davranış aynı malzemeyi aynı güne koymuyordu; artık koyabilir.
+    expect(result.jobs[0].date).toBe(result.jobs[1].date)
+    // Ama aynı kalıbın iki işi zaman olarak çakışamaz.
+    const [a, b] = [...result.jobs].sort((x, y) => x.setupStartMinute - y.setupStartMinute)
+    expect(b.setupStartMinute).toBeGreaterThanOrEqual(a.endMinute)
+  })
+
+  it('dolgu işini kendi haftasından önce planlamaz', () => {
+    const fill: DemandEntry = {
+      material: 'A',
+      qty: 500,
+      dueDate: '2026-09-17',
+      earliestDate: '2026-09-17',
+      bucketLabel: 'W38',
+      phase: 'fill',
+      urgency: 0,
+      daysOfCover: 30,
+    }
+    const result = schedule(
+      [fill],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      bucketsFor(['PRS-1']),
+      settings,
+      options,
+    )
+    expect(result.jobs[0].date).toBe('2026-09-17')
+    expect(result.jobs[0].late).toBe(false)
+  })
+
+  it('ihtiyaç haftasından sonraya kayan işi geç olarak işaretler', () => {
+    const past: DemandEntry = {
+      ...backlogEntry,
+      dueDate: '2026-09-10',
+      earliestDate: '2026-09-14',
+    }
+    const result = schedule(
+      [past],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      bucketsFor(['PRS-1']),
+      settings,
+      options,
+    )
+    expect(result.jobs[0].late).toBe(true)
+    expect(result.jobs[0].reason).toContain('geç')
   })
 
   it('kalıp limitini aşan üretimi partilere bölerek planlar', () => {
     const limited = { ...baseProduct, maxShots: 300 }
     const result = schedule(
-      [poolItem],
+      [backlogEntry],
       new Map([['A', limited]]),
       [{ name: 'PRS-1', hall: 'Hol 1' }],
       bucketsFor(['PRS-1']),
@@ -129,7 +178,7 @@ describe('schedule', () => {
 
   it('pres tanımlı değilse gerekçesiyle planlanamadı listesine yazar', () => {
     const result = schedule(
-      [poolItem],
+      [backlogEntry],
       new Map([['A', { ...baseProduct, mainMachine: 'YOK' }]]),
       [{ name: 'PRS-1', hall: 'Hol 1' }],
       bucketsFor(['PRS-1']),
@@ -141,7 +190,7 @@ describe('schedule', () => {
   })
 
   it('kapasite yetmezse planlanamadı listesine gerekçe yazar', () => {
-    const huge = { ...poolItem, netNeed: 10_000_000 }
+    const huge = { ...backlogEntry, qty: 10_000_000 }
     const result = schedule(
       [huge],
       new Map([['A', baseProduct]]),
@@ -157,7 +206,7 @@ describe('schedule', () => {
   it('eş ürün miktarını işte taşır', () => {
     const withCo = { ...baseProduct, coProduct: 'B' }
     const result = schedule(
-      [poolItem],
+      [backlogEntry],
       new Map([['A', withCo]]),
       [{ name: 'PRS-1', hall: 'Hol 1' }],
       bucketsFor(['PRS-1']),

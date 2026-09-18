@@ -1,66 +1,143 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  buildDemandPool,
+  buildDemandSchedule,
   buildWeekBuckets,
   computeRunPlan,
+  type ProductSpec,
   splitByMoldLimit,
   weekTotalMinutes,
   weekTotalShifts,
 } from './planning'
 
-describe('buildDemandPool', () => {
+const baseMonday = new Date('2026-09-14T00:00:00Z')
+const noProducts = new Map<string, ProductSpec>()
+
+describe('buildDemandSchedule', () => {
   it('bakiyesi olan malzemeyi backlog fazına koyar ve en üste alır', () => {
-    const pool = buildDemandPool([
-      { material: 'A', overdue: -500, periods: [{ label: 'W1', qty: -1000 }], stock: 0 },
-      { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: -1000 }], stock: 5000 },
-    ])
-    expect(pool[0].material).toBe('A')
-    expect(pool[0].phase).toBe('backlog')
-    expect(pool[0].urgency).toBe(100)
+    const entries = buildDemandSchedule(
+      [
+        { material: 'A', overdue: -500, periods: [{ label: 'W1', qty: -1000 }], stock: 0 },
+        { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: -1000 }], stock: 5000 },
+      ],
+      noProducts,
+      { baseMonday },
+    )
+    expect(entries[0].material).toBe('A')
+    expect(entries[0].phase).toBe('backlog')
+    expect(entries[0].urgency).toBe(100)
+    expect(entries[0].dueDate).toBe('2026-09-14')
   })
 
-  it('net ihtiyacı stoğu düşerek hesaplar ve sıfırsa listeden çıkarır', () => {
-    const pool = buildDemandPool([
-      { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 400 },
-      { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: 300 }], stock: 5000 },
-    ])
-    expect(pool).toHaveLength(1)
-    expect(pool[0].material).toBe('A')
-    expect(pool[0].netNeed).toBe(600)
+  it('ZPP kovalarını takvim haftalarına bağlar', () => {
+    const entries = buildDemandSchedule(
+      [
+        {
+          material: 'A',
+          overdue: 0,
+          periods: [
+            { label: 'W38', qty: 1000 },
+            { label: 'W39', qty: 1000 },
+            { label: 'W40', qty: 1000 },
+          ],
+          stock: 0,
+        },
+      ],
+      noProducts,
+      { baseMonday },
+    )
+    expect(entries.map((e) => e.dueDate)).toEqual(['2026-09-14', '2026-09-21', '2026-09-28'])
+  })
+
+  it('stoğu en erken ihtiyaçtan başlayarak düşer (FIFO)', () => {
+    const entries = buildDemandSchedule(
+      [
+        {
+          material: 'A',
+          overdue: 0,
+          periods: [
+            { label: 'W1', qty: 1000 },
+            { label: 'W2', qty: 1000 },
+          ],
+          stock: 1400,
+        },
+      ],
+      noProducts,
+      { baseMonday },
+    )
+    // İlk hafta tamamen stoktan karşılanır, ikinci haftadan 400 düşer.
+    expect(entries).toHaveLength(1)
+    expect(entries[0].dueDate).toBe('2026-09-21')
+    expect(entries[0].qty).toBe(600)
   })
 
   it('aciliyeti stok kaç gün yeter üzerinden türetir', () => {
     // Haftada 1000 adet tüketim, 5 iş günü => günde 200. 200 stok = 1 gün.
-    const pool = buildDemandPool([
-      { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 200 },
-    ])
-    expect(pool[0].dailyRate).toBe(200)
-    expect(pool[0].daysOfCover).toBe(1)
-    expect(pool[0].phase).toBe('urgent')
-    expect(pool[0].urgency).toBeGreaterThan(80)
+    const entries = buildDemandSchedule(
+      [{ material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 200 }],
+      noProducts,
+      { baseMonday },
+    )
+    expect(entries[0].daysOfCover).toBe(1)
+    expect(entries[0].phase).toBe('urgent')
+    expect(entries[0].urgency).toBeGreaterThan(80)
+    // Acil kalem plan başında üretilebilir.
+    expect(entries[0].earliestDate).toBe('2026-09-14')
   })
 
-  it('stoğu uzun süre yeten malzemeyi dolgu fazına koyar', () => {
-    const pool = buildDemandPool([
-      { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 100 }], stock: 50 },
-    ])
-    // günde 20 adet, 50 stok = 2.5 gün => acil
-    expect(pool[0].phase).toBe('urgent')
+  it('stoğu uzun süre yeten malzemeyi dolgu fazına koyar ve erken üretmez', () => {
+    const entries = buildDemandSchedule(
+      [
+        {
+          material: 'B',
+          overdue: 0,
+          periods: [
+            { label: 'W1', qty: 1000 },
+            { label: 'W2', qty: 1000 },
+            { label: 'W3', qty: 1000 },
+            { label: 'W4', qty: 1000 },
+          ],
+          stock: 3000,
+        },
+      ],
+      noProducts,
+      { baseMonday },
+    )
+    // günde 200, 3000 stok = 15 gün => dolgu
+    expect(entries).toHaveLength(1)
+    expect(entries[0].phase).toBe('fill')
+    expect(entries[0].daysOfCover).toBe(15)
+    // Dolgu kalemi kendi haftasından önce üretilmez.
+    expect(entries[0].earliestDate).toBe(entries[0].dueDate)
+    expect(entries[0].earliestDate).toBe('2026-10-05')
+  })
 
-    const pool2 = buildDemandPool([
-      {
-        material: 'B',
-        overdue: 0,
-        periods: [
-          { label: 'W1', qty: 1000 },
-          { label: 'W2', qty: 1000 },
-        ],
-        stock: 1500,
-      },
-    ])
-    // günde 200, 1500 stok = 7.5 gün => hâlâ 14 günün altında, acil
-    expect(pool2[0].daysOfCover).toBe(7.5)
+  it('eş üründen çıkan miktarı eş ürünün talebinden düşer', () => {
+    const products = new Map<string, ProductSpec>([['A', { code: 'A', coProduct: 'B' }]])
+    const entries = buildDemandSchedule(
+      [
+        { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 0 },
+        { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: 800 }], stock: 0 },
+      ],
+      products,
+      { baseMonday },
+    )
+    // A üretilirken B de çıkar => B'nin 800'ü karşılanır, listede kalmaz.
+    expect(entries.map((e) => e.material)).toEqual(['A'])
+  })
+
+  it('eş üründen artan talep listede kalır', () => {
+    const products = new Map<string, ProductSpec>([['A', { code: 'A', coProduct: 'B' }]])
+    const entries = buildDemandSchedule(
+      [
+        { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 600 }], stock: 0 },
+        { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 0 },
+      ],
+      products,
+      { baseMonday },
+    )
+    const b = entries.find((e) => e.material === 'B')!
+    expect(b.qty).toBe(400)
   })
 })
 
