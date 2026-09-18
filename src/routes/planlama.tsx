@@ -18,7 +18,11 @@ import {
   type WeekGanttJob,
   type WeekGanttPress,
 } from '../components/WeekGantt'
-import { remainingCapacityMinutes } from '../lib/gantt'
+import {
+  buildDayTimeline,
+  productionDayOf,
+  remainingCapacityMinutes,
+} from '../lib/shiftTimeline'
 import { diffPlans } from '../lib/planDiff'
 import { schedule, type PlanOverride, type ScheduledJob } from '../lib/scheduler'
 
@@ -108,7 +112,7 @@ function PlanlamaPage() {
   const overtimeShiftMinutes = globalSettings?.overtimeShiftMinutes ?? 480
   const setupGapMinutes = globalSettings?.setupGapMinutes ?? 60
   const concurrentSetupsPerHall = globalSettings?.concurrentSetupsPerHall ?? 1
-  const shiftStartMinute = globalSettings?.shiftStartMinute ?? 480
+  const shiftStartMinute = globalSettings?.shiftStartMinute ?? 420 // 07:00
   const breakMinutesPerShift = globalSettings?.breakMinutesPerShift ?? 0
 
   // Planned stops replace the old single break figure; capacity is reduced
@@ -195,8 +199,9 @@ function PlanlamaPage() {
     const id = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(id)
   }, [])
-  const todayIso = isoDate(now)
-  const nowClockMinute = now.getHours() * 60 + now.getMinutes()
+  // The plan day runs from the first shift's start, not from midnight: at
+  // 02:00 the shop is still on the previous day's third shift.
+  const { date: todayIso, clockMinute: nowClockMinute } = productionDayOf(now, shiftStartMinute)
 
   const demand = useMemo(() => {
     const rows: DemandInput[] = weeklyDemand.map((d) => ({
@@ -242,14 +247,20 @@ function PlanlamaPage() {
         )
       }
       // Two corrections, in order: the measured attainment rate, then the
-      // hours that have already gone by. Planning starts from Monday of the
-      // current week, so without the second one the engine fills days that
-      // have passed and the part of today that is already over.
+      // hours that have already gone by. Elapsed time is measured against the
+      // day's real timeline, so minutes spent in a handover or a meal break
+      // are not counted as production that was lost.
       map.set(
         press.name,
         all.map((b) => {
           const adjusted =
             capacityFactor === 1 ? b.minutes : Math.floor(b.minutes * capacityFactor)
+          const timeline = buildDayTimeline(
+            shiftStartMinute,
+            shiftMinutes,
+            b.shifts,
+            plannedStops,
+          )
           return {
             ...b,
             minutes: remainingCapacityMinutes(
@@ -257,7 +268,7 @@ function PlanlamaPage() {
               todayIso,
               nowClockMinute,
               adjusted,
-              { shiftStartMinute, shiftMinutes, breakMinutesPerShift },
+              timeline,
             ),
           }
         }),
@@ -277,6 +288,7 @@ function PlanlamaPage() {
     horizonWeeks,
     breakMinutesPerShift,
     stopMinutesByShift,
+    plannedStops,
     shiftStartMinute,
     todayIso,
     nowClockMinute,
@@ -420,7 +432,6 @@ function PlanlamaPage() {
   // real reason is that half the week has gone.
   const thisWeekCapacity = useMemo(() => {
     const weekEnd = isoDate(addDays(horizonMonday, 6))
-    const layout = { shiftStartMinute, shiftMinutes, breakMinutesPerShift }
     let full = 0
     let remaining = 0
     const templateByPress = new Map(templates.map((t) => [t.press, t]))
@@ -446,7 +457,7 @@ function PlanlamaPage() {
           todayIso,
           nowClockMinute,
           adjusted,
-          layout,
+          buildDayTimeline(shiftStartMinute, shiftMinutes, bucket.shifts, plannedStops),
         )
       }
     }
@@ -463,6 +474,7 @@ function PlanlamaPage() {
     workingDayKeys,
     workingDaysPerWeek,
     capacityFactor,
+    plannedStops,
     todayIso,
     nowClockMinute,
   ])

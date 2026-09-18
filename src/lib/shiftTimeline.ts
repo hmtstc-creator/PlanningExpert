@@ -185,3 +185,55 @@ export function stopMinutesInShift(shiftIndex: number, stops: PlannedStop[]): nu
     .filter((s) => s.shiftIndex === shiftIndex)
     .reduce((sum, s) => sum + s.durationMinutes, 0)
 }
+
+/**
+ * The production day a moment belongs to.
+ *
+ * With shifts at 07:00–15:00, 15:00–23:00 and 23:00–07:00, the plan day runs
+ * from 07:00 to 07:00. At 02:00 on Tuesday the shop is still working Monday's
+ * third shift, so the calendar date is the wrong answer: treating Monday as
+ * past would zero out capacity that is being used right now.
+ *
+ * Returns the plan day's date and the clock reading measured from midnight of
+ * THAT day, which is why it can exceed 1440.
+ */
+export function productionDayOf(
+  now: Date,
+  shiftStartMinute: number,
+): { date: string; clockMinute: number } {
+  const minuteOfDay = now.getHours() * 60 + now.getMinutes()
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  if (minuteOfDay >= shiftStartMinute) {
+    return { date: localIso(day), clockMinute: minuteOfDay }
+  }
+  day.setDate(day.getDate() - 1)
+  return { date: localIso(day), clockMinute: minuteOfDay + 1440 }
+}
+
+function localIso(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/**
+ * Capacity a press still has on a given plan day.
+ *
+ * Planning starts from Monday of the current week, so without this the engine
+ * would fill days that have passed and the hours of today that are already
+ * gone. Elapsed time is measured against the day's timeline, so minutes spent
+ * in a handover or a meal break are not counted as production that was lost.
+ */
+export function remainingCapacityMinutes(
+  bucketDate: string,
+  productionDate: string,
+  clockMinute: number,
+  fullCapacityMinutes: number,
+  timeline: DayTimeline,
+): number {
+  if (bucketDate < productionDate) return 0
+  if (bucketDate > productionDate) return fullCapacityMinutes
+  return Math.max(0, fullCapacityMinutes - clockToNet(clockMinute, timeline))
+}

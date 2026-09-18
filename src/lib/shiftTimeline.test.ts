@@ -5,6 +5,8 @@ import {
   clockToNet,
   netIntervalToClockBlocks,
   netToClock,
+  productionDayOf,
+  remainingCapacityMinutes,
   stopMinutesInShift,
   type PlannedStop,
 } from './shiftTimeline'
@@ -121,5 +123,94 @@ describe('stopMinutesInShift', () => {
     expect(stopMinutesInShift(1, stops)).toBe(45)
     expect(stopMinutesInShift(2, stops)).toBe(15)
     expect(stopMinutesInShift(3, stops)).toBe(0)
+  })
+})
+
+describe('üç vardiya düzeni: 07:00 – 15:00 – 23:00 – 07:00', () => {
+  const shiftStart = 7 * 60 // 07:00
+  const shiftLength = 8 * 60
+
+  const threeShiftStops: PlannedStop[] = [
+    { shiftIndex: 1, name: 'Handover', kind: 'handover', startMinute: 420, durationMinutes: 15 },
+    { shiftIndex: 2, name: 'Handover', kind: 'handover', startMinute: 900, durationMinutes: 15 },
+    { shiftIndex: 3, name: 'Handover', kind: 'handover', startMinute: 1380, durationMinutes: 15 },
+    { shiftIndex: 3, name: 'Tea', kind: 'tea', startMinute: 180, durationMinutes: 20 },
+  ]
+
+  it('üç vardiyayı 07:00den 07:00e kesintisiz döşer', () => {
+    const t = buildDayTimeline(shiftStart, shiftLength, 3, [])
+    expect(t.shiftStarts).toEqual([420, 900, 1380])
+    // Son vardiya ertesi sabah 07:00de biter: 1380 + 480 = 1860.
+    expect(t.segments[t.segments.length - 1].end).toBe(1860)
+    expect(t.netMinutes).toBe(1440)
+  })
+
+  it('gece yarısını aşan vardiyadaki duruşu doğru güne taşır', () => {
+    const t = buildDayTimeline(shiftStart, shiftLength, 3, threeShiftStops)
+    const tea = t.stops.find((s) => s.name === 'Tea')!
+    // 03:00 girildi; üçüncü vardiya penceresinde ertesi güne denk gelir.
+    expect(tea.start).toBe(180 + 1440)
+    expect(t.netMinutes).toBe(1440 - 15 * 3 - 20)
+  })
+
+  it('her vardiya devri kendi vardiyasının başına oturur', () => {
+    const t = buildDayTimeline(shiftStart, shiftLength, 3, threeShiftStops)
+    const handovers = t.stops.filter((s) => s.kind === 'handover').map((s) => s.start)
+    expect(handovers).toEqual([420, 900, 1380])
+    // Üretim 07:00da değil, devir bitince 07:15te başlar.
+    expect(netToClock(0, t)).toBe(435)
+  })
+})
+
+describe('productionDayOf', () => {
+  const shiftStart = 7 * 60
+
+  it('vardiya başlangıcından sonra bugünü verir', () => {
+    const at = new Date(2026, 8, 18, 9, 30)
+    expect(productionDayOf(at, shiftStart)).toEqual({ date: '2026-09-18', clockMinute: 570 })
+  })
+
+  it('gece yarısından sonra hâlâ önceki günün vardiyasındadır', () => {
+    // Salı 02:00: saha Pazartesinin üçüncü vardiyasını çalışıyor.
+    const at = new Date(2026, 8, 22, 2, 0)
+    expect(productionDayOf(at, shiftStart)).toEqual({ date: '2026-09-21', clockMinute: 120 + 1440 })
+  })
+
+  it('vardiya başlangıcında günü devreder', () => {
+    const at = new Date(2026, 8, 22, 7, 0)
+    expect(productionDayOf(at, shiftStart)).toEqual({ date: '2026-09-22', clockMinute: 420 })
+  })
+})
+
+describe('remainingCapacityMinutes', () => {
+  const shiftStart = 7 * 60
+  const timeline = buildDayTimeline(shiftStart, 8 * 60, 3, [])
+
+  it('geçmiş güne kapasite vermez', () => {
+    expect(remainingCapacityMinutes('2026-09-17', '2026-09-18', 600, 1440, timeline)).toBe(0)
+  })
+
+  it('gelecek güne tam kapasite verir', () => {
+    expect(remainingCapacityMinutes('2026-09-19', '2026-09-18', 600, 1440, timeline)).toBe(1440)
+  })
+
+  it('bugüne yalnızca kalanı verir', () => {
+    // 09:00: 07:00den beri 120 dakika üretim geçmiş.
+    expect(remainingCapacityMinutes('2026-09-18', '2026-09-18', 540, 1440, timeline)).toBe(1320)
+  })
+
+  it('gece yarısını aşan vardiyada kalanı doğru hesaplar', () => {
+    // Ertesi sabah 02:00 = plan günü saat 26:00; 19 saat üretim geçmiş.
+    expect(remainingCapacityMinutes('2026-09-18', '2026-09-18', 120 + 1440, 1440, timeline)).toBe(
+      1440 - 19 * 60,
+    )
+  })
+
+  it('duruşta geçen süreyi üretim kaybı saymaz', () => {
+    const withStops = buildDayTimeline(shiftStart, 8 * 60, 1, [
+      { shiftIndex: 1, name: 'Meal', kind: 'meal', startMinute: 660, durationMinutes: 30 },
+    ])
+    // 11:15 yemek arasının içi: 11:00a kadar 240 dk üretim olmuş, sayaç durur.
+    expect(remainingCapacityMinutes('2026-09-18', '2026-09-18', 675, 450, withStops)).toBe(210)
   })
 })

@@ -43,8 +43,10 @@ function TakvimPage() {
       <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Work Calendar</h1>
       <p className="mt-2 text-muted-foreground">
         Define when and how much the plant runs so planning stays realistic.
-        Shift length, working days and holidays are shared by all presses; each
-        press then gets its own weekly pattern.
+        Shifts run back to back from the start time — 07:00 with 8-hour shifts
+        gives 07:00–15:00, 15:00–23:00 and 23:00–07:00. Shift length, working
+        days and holidays are shared by all presses; each press then gets its
+        own weekly pattern.
       </p>
 
       <PressCalendarSection />
@@ -148,7 +150,7 @@ function PressCalendarSection() {
   const [country, setCountry] = useState('TR')
   const [setupGapMinutes, setSetupGapMinutes] = useState(60)
   const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
-  const [shiftStartMinute, setShiftStartMinute] = useState(480)
+  const [shiftStartMinute, setShiftStartMinute] = useState(420) // 07:00
   const [planningHorizonWeeks, setPlanningHorizonWeeks] = useState(4)
   const [breakMinutesPerShift, setBreakMinutesPerShift] = useState(0)
   // Sunucu değerlerini forma yalnızca sunucuda değiştiklerinde yansıt.
@@ -161,7 +163,7 @@ function PressCalendarSection() {
           country: globalSettings.country,
           setupGapMinutes: globalSettings.setupGapMinutes ?? 60,
           concurrentSetupsPerHall: globalSettings.concurrentSetupsPerHall ?? 1,
-          shiftStartMinute: globalSettings.shiftStartMinute ?? 480,
+          shiftStartMinute: globalSettings.shiftStartMinute ?? 420,
           planningHorizonWeeks: globalSettings.planningHorizonWeeks ?? 4,
           breakMinutesPerShift: globalSettings.breakMinutesPerShift ?? 0,
         }
