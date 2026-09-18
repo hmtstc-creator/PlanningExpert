@@ -1,8 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ErrorBanner } from '../components/ErrorBanner'
+import {
+  draftOf,
+  pressPayload,
+  sameDraft,
+  type PressDraft as Draft,
+} from '../lib/pressDraft'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { api } from '../../convex/_generated/api'
 
@@ -51,7 +57,97 @@ function MakinelerPage() {
   const [tonnage, setTonnage] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [justSaved, setJustSaved] = useState<Record<string, boolean>>({})
+
   const byName = useMemo(() => new Map(presses.map((p) => [p.name, p])), [presses])
+
+  const serverDrafts = useMemo(() => {
+    const map: Record<string, Draft> = {}
+    for (const p of presses) map[p._id] = draftOf(p)
+    return map
+  }, [presses])
+  const signature = JSON.stringify(serverDrafts)
+
+  // Son görülen sunucu hâli. Kullanıcının yazdığını silmemek için: yerel
+  // değer sunucudan farklıysa ve sunucu tarafı bu arada değişmediyse yerel
+  // düzenleme korunur; başka bir cihaz kaydı değiştirdiyse o kazanır.
+  const baseline = useRef<Record<string, Draft>>({})
+  useEffect(() => {
+    setDrafts((current) => {
+      const next: Record<string, Draft> = {}
+      for (const [id, server] of Object.entries(serverDrafts)) {
+        const local = current[id]
+        const base = baseline.current[id]
+        const locallyEdited = local && base && !sameDraft(local, base)
+        const serverChanged = !base || !sameDraft(base, server)
+        next[id] = locallyEdited && !serverChanged ? local : server
+      }
+      baseline.current = serverDrafts
+      return next
+    })
+    // serverDrafts her render'da yeni nesne olur; içerik imzasına bağlanıyor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature])
+
+  const dirtyIds = useMemo(
+    () =>
+      Object.keys(serverDrafts).filter(
+        (id) => drafts[id] && !sameDraft(drafts[id], serverDrafts[id]),
+      ),
+    [drafts, serverDrafts],
+  )
+
+  // Kaydedilmemiş değişiklikle sayfadan çıkılırsa tarayıcı uyarsın.
+  useEffect(() => {
+    if (dirtyIds.length === 0) return
+    const handler = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirtyIds.length])
+
+  function editDraft(id: string, patch: Partial<Draft>) {
+    setDrafts((current) => ({ ...current, [id]: { ...current[id], ...patch } }))
+    setJustSaved((s) => (s[id] ? { ...s, [id]: false } : s))
+  }
+
+  const saveRow = useCallback(
+    async (press: Press, draft: Draft): Promise<boolean> => {
+      setSavingId(press._id)
+      let ok = false
+      try {
+        // Kayıt her zaman eksiksiz gönderilir: sunucu tarafı gelmeyen alanı
+        // silinmiş sayar, bu yüzden kısmi gönderim diğer alanları uçurur.
+        ok = await upsert(pressPayload(press.name, draft))
+      } finally {
+        setSavingId(null)
+      }
+      if (ok) {
+        setJustSaved((s) => ({ ...s, [press._id]: true }))
+        setTimeout(
+          () => setJustSaved((s) => ({ ...s, [press._id]: false })),
+          3000,
+        )
+      }
+      return ok
+    },
+    [upsert],
+  )
+
+  async function saveAll() {
+    for (const id of dirtyIds) {
+      const press = presses.find((p) => p._id === id)
+      const draft = drafts[id]
+      if (!press || !draft) continue
+      const ok = await saveRow(press, draft)
+      if (!ok) return
+    }
+  }
+
+  function discardAll() {
+    setDrafts(serverDrafts)
+  }
 
   // Referanslardaki ana/alternatif makine alanlarında geçen ama henüz
   // tanımlanmamış presler — tek tıkla eklenebilsin.
@@ -98,8 +194,11 @@ function MakinelerPage() {
     }
   }
 
+  const inputClass =
+    'rounded-md border border-input bg-background px-2 py-1 text-sm'
+
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
+    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-12">
       <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Press Definitions</h1>
       <p className="mt-2 text-muted-foreground">
         Define which hall each press sits in — presses in the same hall cannot
@@ -111,6 +210,11 @@ function MakinelerPage() {
         change. A transfer press runs blanks, so it has a single setup and no
         coil changes — untick it there. Frozen days locks that press's plan for
         the given number of days; leave it empty to use the global setting.
+      </p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Edits in the table below are <strong className="text-foreground">not</strong>{' '}
+        saved until you press Save on that row, or Save all at the bottom of the
+        page. An edited row is marked until it is saved.
       </p>
 
       <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
@@ -179,7 +283,7 @@ function MakinelerPage() {
           disabled={!name.trim() || saving}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
-          Add press
+          {saving ? 'Adding…' : 'Add press'}
         </button>
       </div>
 
@@ -192,7 +296,14 @@ function MakinelerPage() {
             {undefinedPresses.map((p) => (
               <button
                 key={p}
-                onClick={() => void upsert({ name: p, hall: hall.trim() || 'Hol 1' })}
+                onClick={() =>
+                  void upsert({
+                    name: p,
+                    hall: hall.trim() || 'Hall 1',
+                    category: category.trim() || undefined,
+                    feedsCoil,
+                  })
+                }
                 className="rounded-md bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-200"
               >
                 + {p}
@@ -200,7 +311,8 @@ function MakinelerPage() {
             ))}
           </div>
           <p className="mt-2 text-xs text-amber-800">
-            Clicking adds the press with the hall entered in the "Hall" box above.
+            Clicking adds the press with the hall, category and coil setting
+            entered in the boxes above.
           </p>
         </div>
       )}
@@ -236,6 +348,7 @@ function MakinelerPage() {
                       <th className="px-3 py-2 font-medium" title="Days of this press's plan that stay locked">
                         Frozen days
                       </th>
+                      <th className="px-3 py-2 font-medium">Status</th>
                       <th className="px-3 py-2" />
                     </tr>
                   </thead>
@@ -243,114 +356,143 @@ function MakinelerPage() {
                     {list
                       .slice()
                       .sort((a, b) => a.name.localeCompare(b.name))
-                      .map((p) => (
-                        <tr key={p._id} className="border-t border-border">
-                          <td className="px-3 py-2 font-medium text-foreground">{p.name}</td>
-                          <td className="px-3 py-2">
-                            <input
-                              className="w-32 rounded-md border border-input bg-background px-2 py-1 text-sm"
-                              defaultValue={p.hall}
-                              onBlur={(e) =>
-                                void upsert({
-                                  name: p.name,
-                                  hall: e.target.value.trim() || 'Hol 1',
-                                  tonnage: p.tonnage,
-                                })
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              className="w-40 rounded-md border border-input bg-background px-2 py-1 text-sm"
-                              list="press-categories"
-                              placeholder="—"
-                              defaultValue={p.category ?? ''}
-                              onBlur={(e) =>
-                                void upsert({
-                                  name: p.name,
-                                  hall: p.hall,
-                                  category: e.target.value.trim() || undefined,
-                                  feedsCoil: p.feedsCoil,
-                                  tonnage: p.tonnage,
-                                  frozenDays: p.frozenDays,
-                                })
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={p.feedsCoil !== false}
-                              onChange={(e) =>
-                                void upsert({
-                                  name: p.name,
-                                  hall: p.hall,
-                                  category: p.category,
-                                  feedsCoil: e.target.checked,
-                                  tonnage: p.tonnage,
-                                  frozenDays: p.frozenDays,
-                                })
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              className="w-24 rounded-md border border-input bg-background px-2 py-1 text-sm"
-                              defaultValue={p.tonnage ?? ''}
-                              onBlur={(e) =>
-                                void upsert({
-                                  name: p.name,
-                                  hall: p.hall,
-                                  category: p.category,
-                                  feedsCoil: p.feedsCoil,
-                                  frozenDays: p.frozenDays,
-                                  tonnage:
-                                    e.target.value.trim() === ''
-                                      ? undefined
-                                      : Number(e.target.value),
-                                })
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              min={0}
-                              className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm"
-                              placeholder="—"
-                              defaultValue={p.frozenDays ?? ''}
-                              onBlur={(e) =>
-                                void upsert({
-                                  name: p.name,
-                                  hall: p.hall,
-                                  category: p.category,
-                                  feedsCoil: p.feedsCoil,
-                                  tonnage: p.tonnage,
-                                  frozenDays:
-                                    e.target.value.trim() === ''
-                                      ? undefined
-                                      : Math.max(0, Number(e.target.value)),
-                                })
-                              }
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <button
-                              className="text-xs text-destructive hover:underline"
-                              onClick={() => void remove({ id: p._id as never })}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      .map((p) => {
+                        const draft = drafts[p._id] ?? draftOf(p)
+                        const dirty = !sameDraft(draft, draftOf(p))
+                        const busy = savingId === p._id
+                        const saveThisRow = () => {
+                          if (dirty && !busy) void saveRow(p, draft)
+                        }
+                        return (
+                          <tr
+                            key={p._id}
+                            className={`border-t border-border ${
+                              dirty ? 'bg-amber-50' : ''
+                            }`}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveThisRow()
+                            }}
+                          >
+                            <td className="px-3 py-2 font-medium text-foreground">{p.name}</td>
+                            <td className="px-3 py-2">
+                              <input
+                                className={`w-32 ${inputClass}`}
+                                value={draft.hall}
+                                onChange={(e) => editDraft(p._id, { hall: e.target.value })}
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                className={`w-40 ${inputClass}`}
+                                list="press-categories"
+                                placeholder="—"
+                                value={draft.category}
+                                onChange={(e) => editDraft(p._id, { category: e.target.value })}
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={draft.feedsCoil}
+                                onChange={(e) =>
+                                  editDraft(p._id, { feedsCoil: e.target.checked })
+                                }
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                className={`w-24 ${inputClass}`}
+                                placeholder="—"
+                                value={draft.tonnage}
+                                onChange={(e) => editDraft(p._id, { tonnage: e.target.value })}
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min={0}
+                                className={`w-20 ${inputClass}`}
+                                placeholder="—"
+                                value={draft.frozenDays}
+                                onChange={(e) =>
+                                  editDraft(p._id, { frozenDays: e.target.value })
+                                }
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-xs whitespace-nowrap">
+                              {busy ? (
+                                <span className="text-muted-foreground">Saving…</span>
+                              ) : dirty ? (
+                                <span className="font-medium text-amber-700">
+                                  ● Unsaved
+                                </span>
+                              ) : justSaved[p._id] ? (
+                                <span className="font-medium text-emerald-700">
+                                  ✓ Saved
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">Saved</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right whitespace-nowrap">
+                              <button
+                                onClick={saveThisRow}
+                                disabled={!dirty || busy}
+                                className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+                              >
+                                Save
+                              </button>
+                              <button
+                                className="ml-3 text-xs text-destructive hover:underline"
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      `Delete press ${p.name}? This cannot be undone.`,
+                                    )
+                                  ) {
+                                    void remove({ id: p._id as never })
+                                  }
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
                   </tbody>
                 </table>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {dirtyIds.length > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-amber-300 bg-amber-50 px-4 py-3 shadow-lg">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-amber-900">
+              {dirtyIds.length === 1
+                ? '1 press has unsaved changes'
+                : `${dirtyIds.length} presses have unsaved changes`}
+            </span>
+            <button
+              onClick={() => void saveAll()}
+              disabled={savingId !== null}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {savingId !== null ? 'Saving…' : 'Save all'}
+            </button>
+            <button
+              onClick={discardAll}
+              disabled={savingId !== null}
+              className="text-sm text-amber-900 underline hover:no-underline disabled:opacity-50"
+            >
+              Discard changes
+            </button>
+          </div>
         </div>
       )}
     </div>
