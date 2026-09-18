@@ -14,6 +14,7 @@ const globalSettingsValidator = v.union(
     concurrentSetupsPerHall: v.optional(v.number()),
     shiftStartMinute: v.optional(v.number()),
     capacityFactor: v.optional(v.number()),
+    planningHorizonWeeks: v.optional(v.number()),
   }),
   v.null(),
 )
@@ -37,6 +38,7 @@ export const saveGlobalSettings = mutation({
     concurrentSetupsPerHall: v.optional(v.number()),
     shiftStartMinute: v.optional(v.number()),
     capacityFactor: v.optional(v.number()),
+    planningHorizonWeeks: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

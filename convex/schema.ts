@@ -112,6 +112,9 @@ export default defineSchema({
     // gerçekleşme oranı buraya yazılabilir; planlama kapasiteyi bu oranla
     // çarpar, böylece plan gerçekçi olur.
     capacityFactor: v.optional(v.number()),
+    // Planlamanın kaç haftalık ufka baktığı. Çalışma takvimi 30 hafta
+    // gösterir; plan ufku bundan bağımsız ve ayarlanabilirdir.
+    planningHorizonWeeks: v.optional(v.number()),
   }).index('by_key', ['key']),
 
   // Her presin "standart" haftalık düzeni: kaç gün çalışılır, gün başına
@@ -134,6 +137,15 @@ export default defineSchema({
     shiftsPerDay: v.number(),
     overtimeShifts: v.number(),
   }).index('by_press_week', ['press', 'weekStart']),
+
+  // Kalıp bakım kayıtları. Kalıp ömrü sayacı son bakımdan sonraki
+  // üretimi sayar; bakım kaydı yoksa eldeki tüm gerçekleşen üretim sayılır.
+  moldMaintenance: defineTable({
+    material: v.string(),
+    date: v.string(),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index('by_material', ['material']),
 
   // Otomatik plana kullanıcı müdahaleleri. Plan her zaman otomatik
   // hesaplanır; burada tutulan kurallar hesaba girdi olarak katılır, yani

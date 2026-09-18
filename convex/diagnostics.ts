@@ -25,6 +25,14 @@ const TABLES = [
   'actualProduction',
   'planSnapshots',
   'changeLog',
+  'moldMaintenance',
+  'planOverrides',
+  'officialHolidays',
+  // Kullanımdan kaldırılan tablolar — içlerinde veri kalmışsa burada
+  // görünür, böylece taşınıp taşınmayacağına karar verilebilir.
+  'machines',
+  'machinePriorities',
+  'craneGroups',
 ] as const
 
 type TableName = (typeof TABLES)[number]

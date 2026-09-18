@@ -13,6 +13,7 @@ const LINKS = [
 
 const SETTINGS_LINKS = [
   { to: '/makineler', label: 'Makine Tanımları' },
+  { to: '/kaliplar', label: 'Kalıp Ömrü' },
   { to: '/depolar', label: 'Depo Tanımları' },
   { to: '/takvim', label: 'Çalışma Takvimi' },
   { to: '/kayitlar', label: 'Değişiklik Kayıtları' },

@@ -21,7 +21,7 @@ export const Route = createFileRoute('/planlama')({
 
 const COUNTED_STOCK = new Set(['finished_goods', 'production_area'])
 const RAW_STOCK = new Set(['raw_material'])
-const HORIZON_WEEKS = 4
+const DEFAULT_HORIZON_WEEKS = 4
 
 function mondayOf(date: Date): Date {
   const d = new Date(date)
@@ -112,6 +112,10 @@ function PlanlamaPage() {
   // Kapasite düzeltme katsayısı: ölçülen gerçekleşme oranı (Performans
   // sayfasından yazılır). Tanımsızsa kapasite olduğu gibi kullanılır.
   const capacityFactor = globalSettings?.capacityFactor ?? 1
+  const horizonWeeks = Math.min(
+    30,
+    Math.max(1, globalSettings?.planningHorizonWeeks ?? DEFAULT_HORIZON_WEEKS),
+  )
 
   const locCategory = useMemo(
     () => new Map(locations.map((l) => [l.code, l.category])),
@@ -180,10 +184,17 @@ function PlanlamaPage() {
     }))
     return buildDemandSchedule(rows, productByCode, {
       baseMonday: horizonMonday,
-      horizonWeeks: HORIZON_WEEKS,
+      horizonWeeks,
       workingDaysPerWeek,
     })
-  }, [weeklyDemand, stockByMaterial, workingDaysPerWeek, productByCode, horizonMonday])
+  }, [
+    weeklyDemand,
+    stockByMaterial,
+    workingDaysPerWeek,
+    productByCode,
+    horizonMonday,
+    horizonWeeks,
+  ])
 
   const buckets = useMemo(() => {
     const map = new Map<string, DayBucket[]>()
@@ -196,7 +207,7 @@ function PlanlamaPage() {
         overtimeShifts: 0,
       }
       const all: DayBucket[] = []
-      for (let w = 0; w < HORIZON_WEEKS; w++) {
+      for (let w = 0; w < horizonWeeks; w++) {
         all.push(
           ...buildWeekBuckets(
             addDays(start, w * 7),
@@ -226,6 +237,7 @@ function PlanlamaPage() {
     workingDayKeys,
     horizonMonday,
     capacityFactor,
+    horizonWeeks,
   ])
 
   const overrides = useMemo<PlanOverride[]>(
@@ -358,7 +370,8 @@ function PlanlamaPage() {
         Plan otomatik oluşturulur: bakiyeler önce, sonra stoğu en çabuk bitecek
         (en acil) malzemeler, kalan kapasite de diğer ihtiyaçlarla doldurulur.
         Vinç kısıtı, kalıp limiti ve rulo hesabı dikkate alınır. Sen sadece
-        kontrol edip onaylarsın.
+        kontrol edip onaylarsın. Plan ufku {horizonWeeks} hafta (Çalışma
+        Takvimi sayfasından değiştirilebilir).
       </p>
 
       {capacityFactor !== 1 && (

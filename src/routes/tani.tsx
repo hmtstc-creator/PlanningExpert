@@ -38,7 +38,15 @@ const TABLE_LABELS: Record<string, string> = {
   actualProduction: 'MB51 gerçekleşen',
   planSnapshots: 'Onaylı planlar',
   changeLog: 'Değişiklik kayıtları',
+  moldMaintenance: 'Kalıp bakım kayıtları',
+  planOverrides: 'Plan müdahaleleri',
+  officialHolidays: 'Resmi tatiller',
+  machines: 'Makineler (kullanımdan kalktı)',
+  machinePriorities: 'Makine öncelikleri (kullanımdan kalktı)',
+  craneGroups: 'Vinç grupları (kullanımdan kalktı)',
 }
+
+const DEPRECATED = new Set(['machines', 'machinePriorities', 'craneGroups'])
 
 function TaniPage() {
   const convex = useConvex()
@@ -128,7 +136,11 @@ function TaniPage() {
               <tbody>
                 {summary.tables.map((t) => (
                   <tr key={t.name} className="border-t border-border">
-                    <td className="px-3 py-2 text-foreground">
+                    <td
+                      className={`px-3 py-2 ${
+                        DEPRECATED.has(t.name) ? 'text-muted-foreground' : 'text-foreground'
+                      }`}
+                    >
                       {TABLE_LABELS[t.name] ?? t.name}
                     </td>
                     <td

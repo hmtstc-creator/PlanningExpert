@@ -279,6 +279,7 @@ function PressCalendarSection() {
   const [setupGapMinutes, setSetupGapMinutes] = useState(60)
   const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
   const [shiftStartMinute, setShiftStartMinute] = useState(480)
+  const [planningHorizonWeeks, setPlanningHorizonWeeks] = useState(4)
   useEffect(() => {
     if (globalSettings) {
       setShiftMinutes(globalSettings.shiftMinutes)
@@ -287,6 +288,7 @@ function PressCalendarSection() {
       setSetupGapMinutes(globalSettings.setupGapMinutes ?? 60)
       setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? 1)
       setShiftStartMinute(globalSettings.shiftStartMinute ?? 480)
+      setPlanningHorizonWeeks(globalSettings.planningHorizonWeeks ?? 4)
     }
   }, [globalSettings])
 
@@ -298,6 +300,7 @@ function PressCalendarSection() {
       setupGapMinutes: number
       concurrentSetupsPerHall: number
       shiftStartMinute: number
+      planningHorizonWeeks: number
     }>,
   ) {
     await saveGlobalSettingsMutation({
@@ -307,6 +310,7 @@ function PressCalendarSection() {
       setupGapMinutes: next?.setupGapMinutes ?? setupGapMinutes,
       concurrentSetupsPerHall: next?.concurrentSetupsPerHall ?? concurrentSetupsPerHall,
       shiftStartMinute: next?.shiftStartMinute ?? shiftStartMinute,
+      planningHorizonWeeks: next?.planningHorizonWeeks ?? planningHorizonWeeks,
       capacityFactor: globalSettings?.capacityFactor,
     })
   }
@@ -486,6 +490,22 @@ function PressCalendarSection() {
             className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={overtimeShiftMinutes}
             onChange={(e) => setOvertimeShiftMinutes(Number(e.target.value) || 0)}
+            onBlur={() => void persistGlobalSettings()}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
+            Plan ufku (hafta)
+          </span>
+          <input
+            type="number"
+            min={1}
+            max={30}
+            className="mt-1 w-28 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={planningHorizonWeeks}
+            onChange={(e) =>
+              setPlanningHorizonWeeks(Math.min(30, Math.max(1, Number(e.target.value) || 1)))
+            }
             onBlur={() => void persistGlobalSettings()}
           />
         </label>

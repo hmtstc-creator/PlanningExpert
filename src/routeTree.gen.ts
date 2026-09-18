@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DepolarRouteImport } from './routes/depolar'
 import { Route as GerceklesenRouteImport } from './routes/gerceklesen'
+import { Route as KaliplarRouteImport } from './routes/kaliplar'
 import { Route as KayitlarRouteImport } from './routes/kayitlar'
 import { Route as MakinelerRouteImport } from './routes/makineler'
 import { Route as PerformansRouteImport } from './routes/performans'
@@ -35,6 +36,11 @@ const DepolarRoute = DepolarRouteImport.update({
 const GerceklesenRoute = GerceklesenRouteImport.update({
   id: '/gerceklesen',
   path: '/gerceklesen',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KaliplarRoute = KaliplarRouteImport.update({
+  id: '/kaliplar',
+  path: '/kaliplar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KayitlarRoute = KayitlarRouteImport.update({
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
+  '/kaliplar': typeof KaliplarRoute
   '/kayitlar': typeof KayitlarRoute
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
+  '/kaliplar': typeof KaliplarRoute
   '/kayitlar': typeof KayitlarRoute
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
+  '/kaliplar': typeof KaliplarRoute
   '/kayitlar': typeof KayitlarRoute
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/'
     | '/depolar'
     | '/gerceklesen'
+    | '/kaliplar'
     | '/kayitlar'
     | '/makineler'
     | '/performans'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/'
     | '/depolar'
     | '/gerceklesen'
+    | '/kaliplar'
     | '/kayitlar'
     | '/makineler'
     | '/performans'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/'
     | '/depolar'
     | '/gerceklesen'
+    | '/kaliplar'
     | '/kayitlar'
     | '/makineler'
     | '/performans'
@@ -175,6 +187,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DepolarRoute: typeof DepolarRoute
   GerceklesenRoute: typeof GerceklesenRoute
+  KaliplarRoute: typeof KaliplarRoute
   KayitlarRoute: typeof KayitlarRoute
   MakinelerRoute: typeof MakinelerRoute
   PerformansRoute: typeof PerformansRoute
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/gerceklesen'
       fullPath: '/gerceklesen'
       preLoaderRoute: typeof GerceklesenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kaliplar': {
+      id: '/kaliplar'
+      path: '/kaliplar'
+      fullPath: '/kaliplar'
+      preLoaderRoute: typeof KaliplarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/kayitlar': {
@@ -279,6 +299,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DepolarRoute: DepolarRoute,
   GerceklesenRoute: GerceklesenRoute,
+  KaliplarRoute: KaliplarRoute,
   KayitlarRoute: KayitlarRoute,
   MakinelerRoute: MakinelerRoute,
   PerformansRoute: PerformansRoute,
