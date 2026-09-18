@@ -90,6 +90,8 @@ interface PlacedBlock extends Segment {
   press: string
   hall: string
   label?: string
+  /** Shown instead of `label` when the block is wide enough for it. */
+  longLabel?: string
   title: string
 }
 
@@ -174,6 +176,13 @@ export function WeekGantt({
                 start: base + seg.start,
                 end: base + seg.end,
                 label: kind === 'coil' ? undefined : job.material,
+                // The quantity the setup is being made for is the first thing
+                // a planner needs off the bar; it shows as soon as there is
+                // room for it.
+                longLabel:
+                  kind === 'coil'
+                    ? undefined
+                    : `${job.material} (${job.quantity.toLocaleString('en-GB')})`,
                 title:
                   `${job.material} · ${COLORS[kind].label} · ` +
                   `${clockLabel(seg.start)}–${clockLabel(seg.end)}` +
@@ -404,7 +413,11 @@ export function WeekGantt({
                             backgroundColor: COLORS[b.kind].fill,
                           }}
                         >
-                          {width > 34 && b.label && <span className="truncate">{b.label}</span>}
+                          {width > 34 && b.label && (
+                            <span className="truncate">
+                              {width > 96 && b.longLabel ? b.longLabel : b.label}
+                            </span>
+                          )}
                         </div>
                       )
                     })}
