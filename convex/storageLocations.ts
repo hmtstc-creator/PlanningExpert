@@ -21,6 +21,17 @@ export const list = query({
     ctx.db.query('storageLocations').order('desc').paginate(args.paginationOpts),
 })
 
+/**
+ * Tanımlı tüm depolar. Depo kategorisi hangi stoğun sayılacağını belirler,
+ * yani plana doğrudan girer — sayfa sınırında kalan bir depo stoğun yanlış
+ * kategoride sayılmasına yol açardı.
+ */
+export const listAll = query({
+  args: {},
+  returns: v.array(locValidator),
+  handler: async (ctx) => ctx.db.query('storageLocations').collect(),
+})
+
 export const upsert = mutation({
   args: {
     code: v.string(),

@@ -22,11 +22,30 @@ const stockValidator = v.object({
   uploadedAt: v.number(),
 })
 
+/** Tek sorguda okunacak en fazla satır — bkz. products.listAll. */
+const PLANNING_ROW_LIMIT = 8000
+
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(stockValidator),
   handler: async (ctx, args) =>
     ctx.db.query('stock').order('desc').paginate(args.paginationOpts),
+})
+
+/** Planlamanın okuduğu eksiksiz stok. Bkz. products.listAll. */
+export const listAll = query({
+  args: {},
+  returns: v.object({
+    rows: v.array(stockValidator),
+    complete: v.boolean(),
+  }),
+  handler: async (ctx) => {
+    const rows = await ctx.db.query('stock').take(PLANNING_ROW_LIMIT + 1)
+    return {
+      rows: rows.slice(0, PLANNING_ROW_LIMIT),
+      complete: rows.length <= PLANNING_ROW_LIMIT,
+    }
+  },
 })
 
 export const replaceAll = mutation({

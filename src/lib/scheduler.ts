@@ -41,15 +41,28 @@ export interface SchedulerOptions {
   /** Aynı holde iki rulo değişimi arasındaki en az süre. */
   coilSetupGapMinutes?: number
   /**
-   * Bir vardiyanın net üretim dakikası. Verilirse setup vardiya sınırını
-   * aşamaz: bitişe yetmeyen setup sonraki vardiyaya atılır, çünkü sahada
-   * bitiremeyeceği setup'ı başlatan ekip yoktur.
+   * Gün içindeki vardiyaların net üretim dakikaları, SIRAYLA.
+   *
+   * Verilirse setup vardiya sınırını aşamaz: bitişe yetmeyen setup sonraki
+   * vardiyaya atılır, çünkü sahada bitiremeyeceği setup'ı başlatan ekip
+   * yoktur. Dizi olmasının sebebi vardiyaların eşit olmamasıdır — devir
+   * toplantısı, çay ve yemek her vardiyada farklı dakika götürür, bu yüzden
+   * tek bir "vardiya uzunluğu" sınırları yanlış yere koyar.
    */
-  netShiftMinutes?: number
+  shiftNetMinutes?: number[]
   /** Aynı holde aynı anda yapılabilecek setup sayısı. */
   concurrentSetupsPerHall: number
   /** Kullanıcının elle müdahaleleri. */
   overrides?: PlanOverride[]
+  /**
+   * Kalıbın bakımda olduğu günler: malzeme → o kalıbın çalışamayacağı
+   * tarihler.
+   *
+   * Bakım bir günlük bir olaydır; malzemeyi ufkun tamamından çıkarmak
+   * (`exclude`) yanlış olurdu — kalıp ertesi gün yine çalışır. Bu yüzden
+   * yasak gün bazındadır: işin HİÇBİR parçası o güne düşemez.
+   */
+  moldBlackouts?: { material: string; date: string }[]
 }
 
 /**
@@ -127,19 +140,30 @@ interface DayWindow {
   capacity: number
 }
 
+/** Presin ekseninde dolu bir aralık ve o sırada takılı olan kalıp. */
+interface Booking {
+  start: number
+  end: number
+  material: string
+}
+
 /**
  * Bir presin tüm ufku tek bir sürekli zaman ekseni olarak.
  *
  * Önceden her gün ayrı bir kovaydı ve iş tek güne sığmak zorundaydı: sığmayan
  * iş tümden ertesi güne atılıyor, günün sonu boş kalıyordu. Oysa sahada
- * vardiya kapanışında yarım kalan iş ertesi gün kaldığı yerden sürer. Artık
- * imleç günler boyunca kesintisiz ilerliyor.
+ * vardiya kapanışında yarım kalan iş ertesi gün kaldığı yerden sürer.
+ *
+ * Eksen tek yönlü bir imleçle de tutulmuyor. İmleç geriye bakamaz: bir iş
+ * kalıp bakımı, kalıp çakışması ya da vinç yüzünden ertelendiğinde imleç de
+ * onunla birlikte ileri kayar ve geride kalan saatler bir daha kullanılamaz.
+ * Sahada o presi boş bırakmazlar, sıradaki işi çekerler. Bu yüzden dolu
+ * aralıklar tutuluyor ve yeni iş aradaki boşluğa da yerleşebiliyor.
  */
 interface PressTimeline {
   days: DayWindow[]
   total: number
-  cursor: number
-  lastMaterial: string | null
+  bookings: Booking[]
 }
 
 function buildTimeline(buckets: DayBucket[]): PressTimeline {
@@ -150,7 +174,52 @@ function buildTimeline(buckets: DayBucket[]): PressTimeline {
     days.push({ date: bucket.date, offset, capacity: bucket.minutes })
     offset += bucket.minutes
   }
-  return { days, total: offset, cursor: 0, lastMaterial: null }
+  return { days, total: offset, bookings: [] }
+}
+
+/** `[start, end)` aralığıyla çakışan ilk dolu aralık. */
+function firstOverlap(timeline: PressTimeline, start: number, end: number): Booking | null {
+  let found: Booking | null = null
+  for (const booking of timeline.bookings) {
+    if (booking.start < end && start < booking.end) {
+      if (!found || booking.end < found.end) found = booking
+    }
+  }
+  return found
+}
+
+/**
+ * `from` dakikasından itibaren presin boş olduğu ilk an.
+ *
+ * Yerleştirmeye doğrudan buradan başlamak önemli: dolu bir aralığın
+ * içinden başlayıp çakışma çıkınca ileri atlamak, "önceki iş" bilgisini
+ * yanlış okumaya yol açar — aynı kalıbın ikinci partisi için setup
+ * gereksiz yere tekrarlanır.
+ */
+function firstFreePoint(timeline: PressTimeline, from: number): number {
+  let point = Math.max(0, from)
+  for (let guard = 0; guard <= timeline.bookings.length; guard++) {
+    const inside = timeline.bookings.find((b) => b.start <= point && point < b.end)
+    if (!inside) return point
+    point = inside.end
+  }
+  return point
+}
+
+/**
+ * `at` dakikasından önce bu preste en son çalışan malzeme.
+ *
+ * Setup'ın tekrarlanıp tekrarlanmayacağını bu belirler: kalıp hâlâ
+ * takılıysa yeniden bağlanmaz. Araya boşluk girmesi kalıbı sökmez, bu
+ * yüzden bitişiklik değil sıra aranır.
+ */
+function materialBefore(timeline: PressTimeline, at: number): string | null {
+  let latest: Booking | null = null
+  for (const booking of timeline.bookings) {
+    if (booking.end > at) continue
+    if (!latest || booking.end > latest.end) latest = booking
+  }
+  return latest?.material ?? null
 }
 
 /** Eksendeki dakikayı içeren gün. */
@@ -355,6 +424,14 @@ export function schedule(
   // farklı preslerde ardışık olarak çalışabilir.
   const moldUsage: MoldUsage = new Map()
 
+  // malzeme → bakım günleri
+  const blackoutsByMaterial = new Map<string, Set<string>>()
+  for (const b of options.moldBlackouts ?? []) {
+    const set = blackoutsByMaterial.get(b.material) ?? new Set<string>()
+    set.add(b.date)
+    blackoutsByMaterial.set(b.material, set)
+  }
+
   for (const entry of ordered) {
     if (excluded.has(entry.material)) {
       unplanned.push({
@@ -431,6 +508,7 @@ export function schedule(
         pin?.date,
         moldUsage,
         options,
+        blackoutsByMaterial.get(entry.material),
         !!pin,
       )
       if (placed) {
@@ -465,12 +543,40 @@ interface Placement {
   endGlobal: number
   /** Kalite onayının bittiği, üretimin başladığı eksen dakikası. */
   qualityEndGlobal: number
+  /** Kalıp zaten takılıydı, setup tekrarlanmadı. */
+  sameMaterial: boolean
   /** Bitiş gününün içindeki bitiş dakikası. */
   endMinute: number
   segments: JobSegment[]
   /** Hol kaydına yazılacak kalıp setupı, gününe göre. */
   moldReservation: { date: string; start: number; end: number } | null
   coilReservations: { date: string; start: number; end: number }[]
+}
+
+/**
+ * `within` dakikasını içeren vardiyanın gün içindeki bitişi.
+ *
+ * Vardiyalar eşit uzunlukta değildir: devir toplantısı, çay ve yemek her
+ * vardiyadan farklı dakika götürür. Tek bir vardiya uzunluğuyla bölmek
+ * ikinci ve üçüncü vardiyanın sınırını kaydırır ve setup'ı yanlış yere
+ * koyar, bu yüzden dizinin üzerinde yürünür.
+ */
+export function shiftEndAfter(
+  within: number,
+  shiftNetMinutes: number[] | undefined,
+  dayCapacity: number,
+): number {
+  if (!shiftNetMinutes || shiftNetMinutes.length === 0) return dayCapacity
+  let start = 0
+  for (const length of shiftNetMinutes) {
+    if (length <= 0) continue
+    const end = start + length
+    if (within < end) return Math.min(end, dayCapacity)
+    start = end
+  }
+  // Tanımlı vardiyaların dışında kalan süre (ör. fazla mesai) gün sonuna
+  // kadar tek parça sayılır.
+  return dayCapacity
 }
 
 /**
@@ -488,7 +594,7 @@ function reserveSlot(
   type: 'mold' | 'coil',
   gap: number,
   concurrent: number,
-  netShiftMinutes: number | undefined,
+  shiftNetMinutes: number[] | undefined,
   /**
    * Bu yerleştirmenin henüz hol defterine yazılmamış kendi rezervasyonları.
    * Aynı işin ardışık rulo değişimleri de vinç kısıtına tabidir — kısa üretim
@@ -512,11 +618,7 @@ function reserveSlot(
 
     const within = cursor - day.offset
     // Vardiya sınırı: gün içinde vardiya sonuna sığmıyorsa sonrakine geç.
-    const perShift = netShiftMinutes && netShiftMinutes > 0 ? netShiftMinutes : day.capacity
-    const shiftEnd = Math.min(
-      (Math.floor(within / perShift) + 1) * perShift,
-      day.capacity,
-    )
+    const shiftEnd = shiftEndAfter(within, shiftNetMinutes, day.capacity)
 
     const resources = hallSetups.get(day.date)?.get(hall) ?? { mold: [], coil: [] }
     const own = pending.filter((r) => r.date === day.date)
@@ -558,16 +660,19 @@ function tryPlaceOnPress(
   moldUsage: MoldUsage,
   options: SchedulerOptions,
   feedsCoil: boolean,
+  blackoutDates: Set<string> | undefined,
 ): Placement | null {
-  const sameMaterial = timeline.lastMaterial === entry.material
-  const setupMinutes = sameMaterial ? 0 : run.setupMinutes
   const coilChangeMinutes = feedsCoil ? run.coilChangeMinutes : 0
   const coilGap = options.coilSetupGapMinutes ?? 30
   const concurrent = Math.max(1, options.concurrentSetupsPerHall)
 
-  let start = Math.max(timeline.cursor, earliestGlobal)
+  let start = firstFreePoint(timeline, earliestGlobal)
 
-  for (let guard = 0; guard < 12; guard++) {
+  for (let guard = 0; guard < timeline.days.length * 2 + 24; guard++) {
+    // Kalıp o an takılıysa setup tekrarlanmaz. Boşluğa geri dönük yerleşen
+    // bir iş için de "önceki iş" doğru olsun diye sıraya bakılır.
+    const sameMaterial = materialBefore(timeline, start) === entry.material
+    const setupMinutes = sameMaterial ? 0 : run.setupMinutes
     const segments: JobSegment[] = []
     let moldReservation: Placement['moldReservation'] = null
     const coilReservations: Placement['coilReservations'] = []
@@ -582,7 +687,7 @@ function tryPlaceOnPress(
       'mold',
       options.setupGapMinutes,
       concurrent,
-      options.netShiftMinutes,
+      options.shiftNetMinutes,
     )
     if (!setupSlot) return null
 
@@ -622,7 +727,7 @@ function tryPlaceOnPress(
           'coil',
           coilGap,
           1,
-          options.netShiftMinutes,
+          options.shiftNetMinutes,
           [
             ...(moldReservation ? [{ ...moldReservation, type: 'mold' as const }] : []),
             ...coilReservations.map((r) => ({ ...r, type: 'coil' as const })),
@@ -652,6 +757,25 @@ function tryPlaceOnPress(
     const end = cursor
     if (end > timeline.total) return null
 
+    // Pres o sırada başka bir iş yapıyorsa o işin bitişinden sonra dene.
+    const busy = firstOverlap(timeline, setupGlobalStart, end)
+    if (busy) {
+      start = firstFreePoint(timeline, Math.max(start + 1, busy.end))
+      if (start >= timeline.total) return null
+      continue
+    }
+
+    // Kalıp bakımda: işin hiçbir parçası o güne düşemez. İş uzun olduğu
+    // için bakım gününü "atlayamaz" — bakımdan sonra yeniden başlar.
+    const blackout = blackoutDates && segments.find((seg) => blackoutDates.has(seg.date))
+    if (blackout) {
+      const resumeDay = timeline.days.find((d) => d.date > blackout.date)
+      if (!resumeDay) return null
+      start = firstFreePoint(timeline, Math.max(start + 1, resumeDay.offset))
+      if (start >= timeline.total) return null
+      continue
+    }
+
     // Kalıp çakışması: aynı kalıp başka bir preste bu aralıkta meşgulse
     // işi o işin bitişine ötele. Kontrol gün bazında yapılır.
     const conflict = findMoldConflict(moldUsage, entry.material, pressName, segments)
@@ -666,6 +790,7 @@ function tryPlaceOnPress(
         startGlobal: setupGlobalStart,
         endGlobal: end,
         qualityEndGlobal,
+        sameMaterial,
         endMinute: last?.end ?? 0,
         segments,
         moldReservation,
@@ -675,7 +800,10 @@ function tryPlaceOnPress(
 
     // Çakışan işin bitişinden sonra yeniden dene.
     const nextDay = timeline.days.find((d) => d.date === conflict.date)
-    start = Math.max(start + 1, (nextDay?.offset ?? 0) + conflict.end)
+    start = firstFreePoint(
+      timeline,
+      Math.max(start + 1, (nextDay?.offset ?? 0) + conflict.end),
+    )
     if (start >= timeline.total) return null
   }
   return null
@@ -711,6 +839,7 @@ function placeRun(
   pinDate: string | undefined,
   moldUsage: MoldUsage,
   options: SchedulerOptions,
+  blackoutDates: Set<string> | undefined,
   pinned = false,
 ): ScheduledJob | null {
   let best: Placement | null = null
@@ -744,6 +873,7 @@ function placeRun(
       moldUsage,
       options,
       press.feedsCoil !== false,
+      blackoutDates,
     )
     if (!placement) continue
     if (limit !== null && placement.endGlobal > limit) continue
@@ -763,10 +893,13 @@ function placeRun(
 
   const press = pressByName.get(best.press)!
   const timeline = timelines.get(best.press)!
-  const sameMaterial = timeline.lastMaterial === entry.material
+  const sameMaterial = best.sameMaterial
 
-  timeline.cursor = best.endGlobal
-  timeline.lastMaterial = entry.material
+  timeline.bookings.push({
+    start: best.startGlobal,
+    end: best.endGlobal,
+    material: entry.material,
+  })
 
   // Vinç kaydı: kalıp ve rulo setupları ait oldukları günün defterine yazılır.
   const reserve = (date: string, type: 'mold' | 'coil', interval: SetupInterval) => {

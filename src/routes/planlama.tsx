@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport'
+import { useMutation, useQuery } from '../lib/convexTransport'
 import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -48,26 +48,31 @@ function formatClock(minute: number, shiftMinutes: number, shiftStartMinute: num
 }
 
 function PlanlamaPage() {
-  const { results: products, status: productStatus } = usePaginatedQuery(
-    api.products.list,
-    {},
-    { initialNumItems: 500 },
-  )
-  const { results: weeklyDemand } = usePaginatedQuery(
-    api.demand.listWeekly,
-    {},
-    { initialNumItems: 500 },
-  )
-  const { results: stockRows } = usePaginatedQuery(
-    api.stock.list,
-    {},
-    { initialNumItems: 1000 },
-  )
-  const { results: locations } = usePaginatedQuery(
-    api.storageLocations.list,
-    {},
-    { initialNumItems: 200 },
-  )
+  // Planlama sayfalı sorgu KULLANMAZ. Sayfalı sorgu ilk sayfada durur ve
+  // sınırın ötesindeki malzemeler plana hiç girmez — üstelik hiçbir uyarı
+  // çıkmaz. Bu sorgular ya hepsini verir ya da eksik olduğunu söyler.
+  const productsResult = useQuery(api.products.listAll)
+  const demandResult = useQuery(api.demand.listAllWeekly)
+  const stockResult = useQuery(api.stock.listAll)
+  const products = useMemo(() => productsResult?.rows ?? [], [productsResult])
+  const weeklyDemand = useMemo(() => demandResult?.rows ?? [], [demandResult])
+  const stockRows = useMemo(() => stockResult?.rows ?? [], [stockResult])
+  const locations = (useQuery(api.storageLocations.listAll) ?? []) as {
+    code: string
+    category: string
+  }[]
+
+  /** Plan girdisi eksikse hangi tablodan kaynaklandığı. */
+  const truncatedInputs = [
+    productsResult && !productsResult.complete ? 'master data' : null,
+    demandResult && !demandResult.complete ? 'demand' : null,
+    stockResult && !stockResult.complete ? 'stock' : null,
+  ].filter((v): v is string => v !== null)
+
+  const inputsLoading =
+    productsResult === undefined ||
+    demandResult === undefined ||
+    stockResult === undefined
   const presses = (useQuery(api.presses.list) ?? []) as {
     name: string
     hall: string
@@ -97,6 +102,13 @@ function PlanlamaPage() {
     kind: string
     press?: string
     date?: string
+    note?: string
+  }[]
+  // Kalıp bakım kayıtları plana doğrudan girer: bakım günü o kalıp
+  // çalışamaz. Kullanıcının ayrıca "exclude" yazması gerekmemeli.
+  const maintenanceRows = (useQuery(api.moldMaintenance.list) ?? []) as {
+    material: string
+    date: string
     note?: string
   }[]
   const setOverride = useMutation(api.planOverrides.set)
@@ -307,6 +319,11 @@ function PlanlamaPage() {
     [overrideRows],
   )
 
+  const moldBlackouts = useMemo(
+    () => maintenanceRows.map((m) => ({ material: m.material, date: m.date })),
+    [maintenanceRows],
+  )
+
   const result = useMemo(
     () =>
       schedule(demand, productByCode, presses, buckets, { shiftMinutes, overtimeShiftMinutes }, {
@@ -314,7 +331,13 @@ function PlanlamaPage() {
         coilSetupGapMinutes,
         concurrentSetupsPerHall,
         overrides,
-        netShiftMinutes: Math.max(1, shiftMinutes - (stopMinutesByShift[0] ?? 0)),
+        moldBlackouts,
+        // Her vardiyanın kendi net dakikası verilir: devir toplantısı, çay ve
+        // yemek vardiyadan vardiyaya değişir, tek bir uzunlukla bölmek 2. ve
+        // 3. vardiyanın sınırını kaydırırdı.
+        shiftNetMinutes: stopMinutesByShift.map((stopped) =>
+          Math.max(1, shiftMinutes - stopped),
+        ),
       }),
     [
       demand,
@@ -327,6 +350,7 @@ function PlanlamaPage() {
       concurrentSetupsPerHall,
       coilSetupGapMinutes,
       overrides,
+      moldBlackouts,
       stopMinutesByShift,
     ],
   )
@@ -335,6 +359,10 @@ function PlanlamaPage() {
   // Onaylı planla canlı planın farkı — "onayladığımdan bu yana ne değişti".
   const planDiff = useMemo(() => {
     if (!latestSnapshot) return null
+    // Kırpılmış bir anlık görüntüyle karşılaştırmak yalan söyler: saklanmayan
+    // işler "plandan düştü" gibi görünür. Böyle bir karşılaştırma yapmaktansa
+    // hiç yapmamak doğrudur.
+    if (latestSnapshot.truncated) return null
     return diffPlans(latestSnapshot.jobs, result.jobs)
   }, [latestSnapshot, result])
 
@@ -523,6 +551,17 @@ function PlanlamaPage() {
       list.push(
         `${missingRawSpec.length} materials have no raw material code or gross weight — the raw material check cannot run.`,
       )
+    // Ufkun içindeki bakım günleri planı doğrudan değiştirdiği için
+    // görünür olmalı — iş neden o güne konmadı sorusunun cevabı budur.
+    const upcomingMaintenance = moldBlackouts.filter((b) => b.date >= todayIso)
+    if (upcomingMaintenance.length > 0) {
+      const moulds = Array.from(new Set(upcomingMaintenance.map((b) => b.material)))
+      list.push(
+        `${moulds.length} mould${moulds.length > 1 ? 's are' : ' is'} in maintenance on ` +
+          `${upcomingMaintenance.length} day(s) and cannot run then: ` +
+          `${moulds.slice(0, 6).join(', ')}${moulds.length > 6 ? '…' : ''}.`,
+      )
+    }
     return list
   }, [
     presses,
@@ -534,6 +573,8 @@ function PlanlamaPage() {
     rawShortages,
     missingRawSpec,
     lateCount,
+    moldBlackouts,
+    todayIso,
   ])
 
   const totalPlannedQty = result.jobs.reduce((s, j) => s + j.quantity, 0)
@@ -605,6 +646,20 @@ function PlanlamaPage() {
         </p>
       )}
 
+      {truncatedInputs.length > 0 && (
+        <div className="mt-6 rounded-lg border-2 border-destructive bg-destructive/10 p-4">
+          <p className="text-sm font-semibold text-destructive">
+            This plan is incomplete — do not approve it
+          </p>
+          <p className="mt-1 text-sm text-foreground">
+            There are more rows in {truncatedInputs.join(', ')} than one query can
+            read, so part of the data did not reach the planner. Everything shown
+            below was planned without it. Reduce the data or split the plant before
+            relying on this plan.
+          </p>
+        </div>
+      )}
+
       {warnings.length > 0 && (
         <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-medium text-amber-900">Needs attention</p>
@@ -634,7 +689,19 @@ function PlanlamaPage() {
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           onClick={() => void handleApprove()}
-          disabled={approving || result.jobs.length === 0}
+          disabled={
+            approving ||
+            result.jobs.length === 0 ||
+            inputsLoading ||
+            truncatedInputs.length > 0
+          }
+          title={
+            truncatedInputs.length > 0
+              ? 'Part of the data did not reach the planner'
+              : inputsLoading
+                ? 'Still loading the plan inputs'
+                : undefined
+          }
           className="rounded-md bg-foreground px-5 py-2.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
         >
           {approving ? 'Approving…' : 'Approve plan'}
@@ -647,6 +714,16 @@ function PlanlamaPage() {
           </span>
         )}
       </div>
+
+      {latestSnapshot?.truncated && (
+        <p className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          The approved plan of{' '}
+          {new Date(latestSnapshot.createdAt).toLocaleString('en-GB')} was too
+          large to store in full ({latestSnapshot.jobCount} jobs), so it cannot be
+          compared with the plan below — a comparison would report the jobs that
+          were not stored as dropped. Approve again to get a comparable plan.
+        </p>
+      )}
 
       {planDiff && planDiff.changes.length > 0 && (
         <div className="mt-6 rounded-lg border border-border p-4">
@@ -818,11 +895,11 @@ function PlanlamaPage() {
         )}
       </div>
 
-      {productStatus === 'LoadingFirstPage' && (
+      {inputsLoading && (
         <p className="mt-8 text-sm text-muted-foreground">Loading data…</p>
       )}
 
-      {weeks.length === 0 && productStatus !== 'LoadingFirstPage' && (
+      {weeks.length === 0 && !inputsLoading && (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           No jobs to plan. Make sure ZPP demand, MB52 stock and{' '}
           <Link to="/makineler" className="underline">

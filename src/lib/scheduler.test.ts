@@ -6,7 +6,7 @@ import {
   type DemandEntry,
   type ProductSpec,
 } from './planning'
-import { schedule, type PlanOverride } from './scheduler'
+import { schedule, shiftEndAfter, type PlanOverride } from './scheduler'
 
 const settings = { shiftMinutes: 480, overtimeShiftMinutes: 480 }
 const options = { setupGapMinutes: 60, concurrentSetupsPerHall: 1 }
@@ -610,5 +610,239 @@ describe('vinç kısıtı ve rulo besleme', () => {
         expect(overlaps).toBe(false)
       }
     }
+  })
+})
+
+describe('vardiya sınırı', () => {
+  it('eşit olmayan vardiyalarda sınırı doğru yere koyar', () => {
+    // Devir toplantısı ve yemek her vardiyada farklı: 450 / 465 / 470.
+    const shifts = [450, 465, 470]
+    const capacity = 1385
+    expect(shiftEndAfter(0, shifts, capacity)).toBe(450)
+    expect(shiftEndAfter(449, shifts, capacity)).toBe(450)
+    expect(shiftEndAfter(450, shifts, capacity)).toBe(915)
+    expect(shiftEndAfter(914, shifts, capacity)).toBe(915)
+    expect(shiftEndAfter(915, shifts, capacity)).toBe(1385)
+  })
+
+  it('gün kapasitesini aşmaz', () => {
+    // Gün iki vardiya çalışıyorsa üçüncü vardiyanın sınırı gün sonudur.
+    expect(shiftEndAfter(500, [450, 465, 470], 915)).toBe(915)
+  })
+
+  it('vardiya tanımı yoksa gün tek parçadır', () => {
+    expect(shiftEndAfter(100, undefined, 480)).toBe(480)
+    expect(shiftEndAfter(100, [], 480)).toBe(480)
+  })
+
+  it('sıfır uzunluklu vardiyayı atlar', () => {
+    expect(shiftEndAfter(0, [0, 480], 480)).toBe(480)
+  })
+
+  it('setup kendi vardiyasına sığmıyorsa sonraki vardiyaya atılır', () => {
+    // 1. vardiya 450 dk (30 dk duruş), 45 dakikalık setup 420. dakikada
+    // başlayamaz — vardiya biterken yarım kalırdı.
+    const longSetup: ProductSpec & { mainMachine?: string } = {
+      ...baseProduct,
+      setupMinutes: 45,
+      spm: 1,
+      coilWeight: 1_000_000,
+    }
+    const buckets = new Map<string, DayBucket[]>([
+      ['PRS-1', [{ date: '2026-09-14', dayKey: 'MO', shifts: 3, isOvertime: false, isHoliday: false, minutes: 1385 }]],
+    ])
+    const result = schedule(
+      [
+        { ...backlogEntry, material: 'A', qty: 410 },
+        { ...backlogEntry, material: 'B', qty: 10 },
+      ],
+      new Map([
+        ['A', longSetup],
+        ['B', { ...longSetup, code: 'B' }],
+      ]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      buckets,
+      settings,
+      { ...options, setupGapMinutes: 0, shiftNetMinutes: [450, 465, 470] },
+    )
+    const b = result.jobs.find((j) => j.material === 'B')
+    expect(b).toBeDefined()
+    // A: 45 setup + 410 üretim = 455. B'nin setup'ı 455'te başlarsa 500'de
+    // biter — 1. vardiya 450'de kapandığı için bu zaten 2. vardiyadadır ve
+    // 2. vardiya 915'te kapanır, yani sığar.
+    expect(b!.setupStartMinute).toBeGreaterThanOrEqual(455)
+    expect(b!.setupStartMinute + 45).toBeLessThanOrEqual(915)
+  })
+})
+
+describe('kalıp bakımı', () => {
+  const twoWeeks = (press: string) => {
+    const calendar = { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 0 }
+    return new Map([
+      [
+        press,
+        [
+          ...buildWeekBuckets(monday, calendar, settings),
+          ...buildWeekBuckets(new Date('2026-09-21T00:00:00Z'), calendar, settings),
+        ],
+      ],
+    ])
+  }
+
+  it('bakım günü işi o güne koymaz, ertesi güne alır', () => {
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeeks('PRS-1'),
+      settings,
+      { ...options, moldBlackouts: [{ material: 'A', date: '2026-09-14' }] },
+    )
+    expect(result.unplanned).toHaveLength(0)
+    expect(result.jobs[0].date).toBe('2026-09-15')
+    expect(result.jobs[0].segments.every((s) => s.date !== '2026-09-14')).toBe(true)
+  })
+
+  it('bakım malzemeyi ufuktan atmaz, sadece o günü kapatır', () => {
+    // Üç gün üst üste bakım varsa iş dördüncü güne düşer, düşmeden kalmaz.
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeeks('PRS-1'),
+      settings,
+      {
+        ...options,
+        moldBlackouts: [
+          { material: 'A', date: '2026-09-14' },
+          { material: 'A', date: '2026-09-15' },
+          { material: 'A', date: '2026-09-16' },
+        ],
+      },
+    )
+    expect(result.unplanned).toHaveLength(0)
+    expect(result.jobs[0].date).toBe('2026-09-17')
+  })
+
+  it('başka malzemeyi etkilemez', () => {
+    const result = schedule(
+      [backlogEntry, { ...backlogEntry, material: 'B' }],
+      new Map([
+        ['A', baseProduct],
+        ['B', { ...baseProduct, code: 'B' }],
+      ]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeeks('PRS-1'),
+      settings,
+      { ...options, moldBlackouts: [{ material: 'A', date: '2026-09-14' }] },
+    )
+    const b = result.jobs.find((j) => j.material === 'B')!
+    expect(b.date).toBe('2026-09-14')
+  })
+
+  it('gün sınırını aşan iş bakım gününe taşamaz', () => {
+    // 2000 dk'lık iş 14 Eylül'de başlasa 15'ine taşardı; 15'i bakımda.
+    const longRun: ProductSpec & { mainMachine?: string } = {
+      ...baseProduct,
+      coilWeight: 100_000_000,
+    }
+    const result = schedule(
+      [{ ...backlogEntry, qty: 200_000 }],
+      new Map([['A', longRun]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeeks('PRS-1'),
+      settings,
+      { ...options, moldBlackouts: [{ material: 'A', date: '2026-09-15' }] },
+    )
+    expect(result.unplanned).toHaveLength(0)
+    const [job] = result.jobs
+    expect(job.segments.some((s) => s.date === '2026-09-15')).toBe(false)
+    expect(job.date).toBe('2026-09-16')
+  })
+})
+
+describe('boşluğa geri dönük yerleştirme', () => {
+  const twoWeeks = (press: string) => {
+    const calendar = { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 0 }
+    return new Map([
+      [
+        press,
+        [
+          ...buildWeekBuckets(monday, calendar, settings),
+          ...buildWeekBuckets(new Date('2026-09-21T00:00:00Z'), calendar, settings),
+        ],
+      ],
+    ])
+  }
+
+  it('ertelenen iş arkasındaki günü boş bırakmaz', () => {
+    // A bakım yüzünden 15'ine itiliyor. Eski modelde imleç de ileri kayar ve
+    // 14 Eylül tümüyle boşa giderdi; sahada o presi boş bırakmazlar.
+    const result = schedule(
+      [backlogEntry, { ...backlogEntry, material: 'B' }],
+      new Map([
+        ['A', baseProduct],
+        ['B', { ...baseProduct, code: 'B' }],
+      ]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeeks('PRS-1'),
+      settings,
+      { ...options, moldBlackouts: [{ material: 'A', date: '2026-09-14' }] },
+    )
+    const a = result.jobs.find((j) => j.material === 'A')!
+    const b = result.jobs.find((j) => j.material === 'B')!
+    expect(a.date).toBe('2026-09-15')
+    expect(b.date).toBe('2026-09-14')
+  })
+
+  it('geri dönük yerleşen iş çalışan işin üstüne binmez', () => {
+    const result = schedule(
+      [backlogEntry, { ...backlogEntry, material: 'B' }, { ...backlogEntry, material: 'C' }],
+      new Map([
+        ['A', baseProduct],
+        ['B', { ...baseProduct, code: 'B' }],
+        ['C', { ...baseProduct, code: 'C' }],
+      ]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeeks('PRS-1'),
+      settings,
+      { ...options, moldBlackouts: [{ material: 'A', date: '2026-09-14' }] },
+    )
+    // Aynı gün ve preste hiçbir iş bir diğeriyle çakışmaz.
+    const byDate = new Map<string, { start: number; end: number }[]>()
+    for (const job of result.jobs) {
+      for (const seg of job.segments) {
+        const list = byDate.get(seg.date) ?? []
+        list.push({ start: seg.start, end: seg.end })
+        byDate.set(seg.date, list)
+      }
+    }
+    for (const list of byDate.values()) {
+      list.sort((x, y) => x.start - y.start)
+      for (let i = 1; i < list.length; i++) {
+        expect(list[i].start).toBeGreaterThanOrEqual(list[i - 1].end)
+      }
+    }
+  })
+
+  it('araya boşluk girse de takılı kalıp için setup tekrarlanmaz', () => {
+    // Aynı malzemenin iki partisi peş peşe gelir: ikincisinde kalıp zaten
+    // takılıdır.
+    const splitProduct: ProductSpec & { mainMachine?: string } = {
+      ...baseProduct,
+      maxShots: 300,
+    }
+    const result = schedule(
+      [{ ...backlogEntry, qty: 600 }],
+      new Map([['A', splitProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeeks('PRS-1'),
+      settings,
+      options,
+    )
+    expect(result.jobs.length).toBeGreaterThan(1)
+    expect(result.jobs[0].setupMinutes).toBe(baseProduct.setupMinutes)
+    expect(result.jobs[1].setupMinutes).toBe(0)
+    expect(result.jobs[1].reason).toContain('setup not repeated')
   })
 })

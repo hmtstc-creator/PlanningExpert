@@ -19,11 +19,30 @@ const weeklyValidator = v.object({
   uploadedAt: v.number(),
 })
 
+/** Tek sorguda okunacak en fazla satır — bkz. products.listAll. */
+const PLANNING_ROW_LIMIT = 8000
+
 export const listWeekly = query({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(weeklyValidator),
   handler: async (ctx, args) =>
     ctx.db.query('demandWeekly').order('desc').paginate(args.paginationOpts),
+})
+
+/** Planlamanın okuduğu eksiksiz haftalık talep. Bkz. products.listAll. */
+export const listAllWeekly = query({
+  args: {},
+  returns: v.object({
+    rows: v.array(weeklyValidator),
+    complete: v.boolean(),
+  }),
+  handler: async (ctx) => {
+    const rows = await ctx.db.query('demandWeekly').take(PLANNING_ROW_LIMIT + 1)
+    return {
+      rows: rows.slice(0, PLANNING_ROW_LIMIT),
+      complete: rows.length <= PLANNING_ROW_LIMIT,
+    }
+  },
 })
 
 export const replaceWeekly = mutation({

@@ -54,6 +54,13 @@ const productArgs = {
   cycleTimeSeconds: v.optional(v.number()),
 }
 
+/**
+ * Tek sorguda okunacak en fazla satır. Convex'in okuma sınırının altında
+ * kalacak kadar küçük, bir pres atölyesinin malzeme sayısının kat kat
+ * üstünde. Aşılırsa sorgu bunu saklamaz.
+ */
+const PLANNING_ROW_LIMIT = 8000
+
 function withDefaults<T extends Record<string, unknown>>(doc: T) {
   return {
     ...doc,
@@ -78,6 +85,29 @@ export const list = query({
       .order('desc')
       .paginate(args.paginationOpts)
     return { ...result, page: result.page.map(withDefaults) }
+  },
+})
+
+/**
+ * Planlamanın okuduğu eksiksiz liste.
+ *
+ * Sayfalı `list` ekranda iyi çalışır ama planlama için tehlikelidir: sayfa
+ * sınırında kalan malzemeler sessizce plana girmez ve hiçbir uyarı çıkmaz.
+ * Bu sorgu ya hepsini verir ya da `complete: false` diyerek yalan söylemeyi
+ * reddeder — ekran o zaman planın eksik olduğunu söyler.
+ */
+export const listAll = query({
+  args: {},
+  returns: v.object({
+    rows: v.array(productValidator),
+    complete: v.boolean(),
+  }),
+  handler: async (ctx) => {
+    const rows = await ctx.db.query('products').take(PLANNING_ROW_LIMIT + 1)
+    return {
+      rows: rows.slice(0, PLANNING_ROW_LIMIT).map(withDefaults),
+      complete: rows.length <= PLANNING_ROW_LIMIT,
+    }
   },
 })
 
