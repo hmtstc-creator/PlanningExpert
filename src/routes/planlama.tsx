@@ -385,11 +385,25 @@ function PlanlamaPage() {
       }
     }
     for (const job of result.jobs) {
-      const weekStart = isoDate(mondayOf(new Date(`${job.date}T00:00:00`)))
-      const entry = byWeek.get(weekStart) ?? { dates: new Set<string>(), jobs: [] }
-      entry.dates.add(job.date)
-      entry.jobs.push(job)
-      byWeek.set(weekStart, entry)
+      // A job that does not fit before the week closes carries on into the
+      // next one, so it belongs to every week its pieces actually run in —
+      // otherwise the continuation would be missing from that week's chart.
+      const jobDates = new Set<string>([job.date, ...job.segments.map((s) => s.date)])
+      const weeksTouched = new Set<string>()
+      for (const date of jobDates) {
+        if (!date) continue
+        weeksTouched.add(isoDate(mondayOf(new Date(`${date}T00:00:00`))))
+      }
+      for (const weekStart of weeksTouched) {
+        const entry = byWeek.get(weekStart) ?? { dates: new Set<string>(), jobs: [] }
+        for (const date of jobDates) {
+          if (date && isoDate(mondayOf(new Date(`${date}T00:00:00`))) === weekStart) {
+            entry.dates.add(date)
+          }
+        }
+        entry.jobs.push(job)
+        byWeek.set(weekStart, entry)
+      }
     }
 
     const eligiblePresses = new Set<string>()
@@ -542,6 +556,7 @@ function PlanlamaPage() {
           coilsNeeded: j.coilsNeeded,
           setupStartMinute: j.setupStartMinute,
           endMinute: j.endMinute,
+          endDate: j.endDate,
           reason: j.reason,
         })),
       })
@@ -924,6 +939,16 @@ function PlanlamaPage() {
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {formatClock(job.endMinute, shiftMinutes, shiftStartMinute)}
+                        {job.spansDays && (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            (
+                            {new Date(`${job.endDate}T00:00:00`).toLocaleDateString('en-GB', {
+                              weekday: 'short',
+                              day: '2-digit',
+                            })}
+                            )
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{job.reason}</td>
                     </tr>

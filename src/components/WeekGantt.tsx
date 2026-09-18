@@ -47,11 +47,19 @@ const DEFAULT_ZOOM = 4
 
 export interface WeekGanttSegment {
   kind: 'setup' | 'quality' | 'run' | 'coil'
+  /**
+   * The segment's own day. A job is not confined to one day: production that
+   * does not fit before the shift closes continues the next morning, so each
+   * piece is drawn against the day it actually runs on, not the day the job
+   * started.
+   */
+  date: string
   start: number
   end: number
 }
 
 export interface WeekGanttJob {
+  /** The day the job starts; `segments` may reach beyond it. */
   date: string
   press: string
   material: string
@@ -136,12 +144,18 @@ export function WeekGantt({
     const dayWidthMinutes = maxShifts * shiftMinutes
     const dayIndex = new Map(visibleDates.map((d, i) => [d, i]))
 
-    const jobsByPressDate = new Map<string, WeekGanttJob[]>()
+    // Parçalar kendi günlerine göre dağıtılır — işin başladığı güne değil.
+    const spansByPressDate = new Map<
+      string,
+      { job: WeekGanttJob; span: WeekGanttSegment }[]
+    >()
     for (const job of jobs) {
-      const key = `${job.press}|${job.date}`
-      const list = jobsByPressDate.get(key) ?? []
-      list.push(job)
-      jobsByPressDate.set(key, list)
+      for (const span of job.segments) {
+        const key = `${job.press}|${span.date || job.date}`
+        const list = spansByPressDate.get(key) ?? []
+        list.push({ job, span })
+        spansByPressDate.set(key, list)
+      }
     }
 
     const rows = presses.map((press) => {
@@ -165,31 +179,35 @@ export function WeekGantt({
           })
         }
 
-        for (const job of jobsByPressDate.get(`${press.name}|${day.date}`) ?? []) {
-          for (const span of job.segments) {
-            const kind = span.kind as BlockKind
-            for (const seg of netIntervalToClockBlocks(span.start, span.end, timeline)) {
-              blocks.push({
-                kind,
-                press: press.name,
-                hall: press.hall,
-                start: base + seg.start,
-                end: base + seg.end,
-                label: kind === 'coil' ? undefined : job.material,
-                // The quantity the setup is being made for is the first thing
-                // a planner needs off the bar; it shows as soon as there is
-                // room for it.
-                longLabel:
-                  kind === 'coil'
-                    ? undefined
-                    : `${job.material} (${job.quantity.toLocaleString('en-GB')})`,
-                title:
-                  `${job.material} · ${COLORS[kind].label} · ` +
-                  `${clockLabel(seg.start)}–${clockLabel(seg.end)}` +
-                  ` · ${job.quantity.toLocaleString('en-GB')} pcs` +
-                  (job.late ? ' · LATE' : ''),
-              })
-            }
+        for (const { job, span } of spansByPressDate.get(`${press.name}|${day.date}`) ?? []) {
+          const kind = span.kind as BlockKind
+          // A piece that carries on from the previous day is marked so the
+          // planner does not read it as a second setup for the same part.
+          const carriedOver = (span.date || job.date) !== job.date
+          for (const seg of netIntervalToClockBlocks(span.start, span.end, timeline)) {
+            blocks.push({
+              kind,
+              press: press.name,
+              hall: press.hall,
+              start: base + seg.start,
+              end: base + seg.end,
+              label: kind === 'coil' ? undefined : job.material,
+              // The quantity the setup is being made for is the first thing
+              // a planner needs off the bar; it shows as soon as there is
+              // room for it.
+              longLabel:
+                kind === 'coil'
+                  ? undefined
+                  : `${job.material} (${job.quantity.toLocaleString('en-GB')})${
+                      carriedOver ? ' ↻' : ''
+                    }`,
+              title:
+                `${job.material} · ${COLORS[kind].label} · ` +
+                `${clockLabel(seg.start)}–${clockLabel(seg.end)}` +
+                ` · ${job.quantity.toLocaleString('en-GB')} pcs` +
+                (carriedOver ? ` · continued from ${job.date}` : '') +
+                (job.late ? ' · LATE' : ''),
+            })
           }
         }
       }

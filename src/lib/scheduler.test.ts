@@ -42,6 +42,109 @@ const backlogEntry: DemandEntry = {
   daysOfCover: 0,
 }
 
+describe('gün ve hafta sınırını aşan işler', () => {
+  // Tek ruloya sığan, çok uzun süren bir iş: rulo değişimi araya girmesin.
+  const longRun: ProductSpec & { mainMachine?: string } = {
+    ...baseProduct,
+    coilWeight: 100_000_000,
+    setupMinutes: 30,
+  }
+
+  function twoWeekBuckets(press: string): Map<string, DayBucket[]> {
+    const calendar = { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 0 }
+    const nextMonday = new Date('2026-09-21T00:00:00Z')
+    return new Map([
+      [
+        press,
+        [
+          ...buildWeekBuckets(monday, calendar, settings),
+          ...buildWeekBuckets(nextMonday, calendar, settings),
+        ],
+      ],
+    ])
+  }
+
+  it('gün kapasitesini aşan iş ertesi gün kaldığı yerden sürer', () => {
+    // 200.000 adet / 100 spm = 2000 dk üretim; gün 1440 dk.
+    const result = schedule(
+      [{ ...backlogEntry, qty: 200_000 }],
+      new Map([['A', longRun]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeekBuckets('PRS-1'),
+      settings,
+      options,
+    )
+    expect(result.unplanned).toHaveLength(0)
+    const [job] = result.jobs
+    expect(job.date).toBe('2026-09-14')
+    expect(job.spansDays).toBe(true)
+    expect(job.endDate).toBe('2026-09-15')
+    // İlk gün tam dolar, ikinci gün sıfırdan devam eder.
+    const firstDay = job.segments.filter((seg) => seg.date === '2026-09-14')
+    const secondDay = job.segments.filter((seg) => seg.date === '2026-09-15')
+    expect(Math.max(...firstDay.map((seg) => seg.end))).toBe(1440)
+    expect(Math.min(...secondDay.map((seg) => seg.start))).toBe(0)
+    // Toplam süre korunur: setup 30 + üretim 2000.
+    const total = job.segments.reduce((sum, seg) => sum + (seg.end - seg.start), 0)
+    expect(total).toBe(2030)
+    expect(job.endMinute).toBe(2030 - 1440)
+  })
+
+  it('hafta kapanışında yarım kalan iş sonraki haftaya devam eder', () => {
+    // Hafta 1 kapasitesi 5 × 1440 = 7200 dk; iş 7500 dk üretim istiyor.
+    const result = schedule(
+      [{ ...backlogEntry, qty: 750_000 }],
+      new Map([['A', longRun]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeekBuckets('PRS-1'),
+      settings,
+      options,
+    )
+    expect(result.unplanned).toHaveLength(0)
+    const [job] = result.jobs
+    expect(job.date).toBe('2026-09-14')
+    // Hafta 1'in son günü 18 Eylül; iş 21 Eylül'e taşar.
+    expect(job.endDate).toBe('2026-09-21')
+    const dates = Array.from(new Set(job.segments.map((seg) => seg.date)))
+    expect(dates).toEqual([
+      '2026-09-14',
+      '2026-09-15',
+      '2026-09-16',
+      '2026-09-17',
+      '2026-09-18',
+      '2026-09-21',
+    ])
+    // Yeni hafta sıfırdan başlamaz: kalan iş devam eder.
+    const spill = job.segments.filter((seg) => seg.date === '2026-09-21')
+    expect(spill.every((seg) => seg.kind === 'run')).toBe(true)
+    expect(Math.min(...spill.map((seg) => seg.start))).toBe(0)
+    expect(job.endMinute).toBe(7530 - 7200)
+  })
+
+  it('devam eden işten sonra sıradaki iş kaldığı yerden başlar', () => {
+    const result = schedule(
+      [
+        { ...backlogEntry, qty: 200_000 },
+        { ...backlogEntry, material: 'B', qty: 1000 },
+      ],
+      new Map([
+        ['A', longRun],
+        ['B', { ...longRun, code: 'B' }],
+      ]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      twoWeekBuckets('PRS-1'),
+      settings,
+      options,
+    )
+    expect(result.unplanned).toHaveLength(0)
+    const [first, second] = result.jobs
+    expect(first.endDate).toBe('2026-09-15')
+    // İkinci iş, birincinin bittiği gün ve dakikadan sonra başlar.
+    expect(second.date).toBe('2026-09-15')
+    expect(second.setupStartMinute).toBeGreaterThanOrEqual(first.endMinute)
+  })
+})
+
 describe('schedule', () => {
   it('bakiyeyi uygun prese ilk günde yerleştirir', () => {
     const result = schedule(
@@ -448,12 +551,25 @@ describe('vinç kısıtı ve rulo besleme', () => {
       settings,
       { ...options, coilSetupGapMinutes: 30 },
     )
-    const coils = result.jobs
-      .flatMap((j) => j.segments.filter((seg) => seg.kind === 'coil'))
-      .sort((a, b) => a.start - b.start)
-    for (let i = 1; i < coils.length; i++) {
-      expect(coils[i].start).toBeGreaterThanOrEqual(coils[i - 1].end + 30)
+    // Vinç kısıtı gün bazındadır: iş gün sınırını aşabildiği için parçalar
+    // önce kendi gününe göre gruplanır.
+    const byDate = new Map<string, { start: number; end: number }[]>()
+    for (const seg of result.jobs.flatMap((j) =>
+      j.segments.filter((s) => s.kind === 'coil'),
+    )) {
+      const list = byDate.get(seg.date) ?? []
+      list.push({ start: seg.start, end: seg.end })
+      byDate.set(seg.date, list)
     }
+    let checked = 0
+    for (const list of byDate.values()) {
+      list.sort((a, b) => a.start - b.start)
+      for (let i = 1; i < list.length; i++) {
+        expect(list[i].start).toBeGreaterThanOrEqual(list[i - 1].end + 30)
+        checked++
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
   })
 
   it('kalıp setup ile rulo setup kesişemez ama peş peşe gelebilir', () => {

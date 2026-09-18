@@ -207,12 +207,24 @@ describe('planlama hattı (uçtan uca)', () => {
 
   it('aynı kalıbın iki işi zaman olarak çakışmaz', () => {
     const { result } = runPipeline()
+    // İş gün sınırını aşabildiği için karşılaştırma parçaların kendi günü
+    // üzerinden yapılır.
     const byMaterialDate = new Map<string, { start: number; end: number }[]>()
     for (const job of result.jobs) {
-      const key = `${job.material}|${job.date}`
-      const list = byMaterialDate.get(key) ?? []
-      list.push({ start: job.setupStartMinute, end: job.endMinute })
-      byMaterialDate.set(key, list)
+      const spans = new Map<string, { start: number; end: number }>()
+      for (const seg of job.segments) {
+        const current = spans.get(seg.date)
+        spans.set(seg.date, {
+          start: current ? Math.min(current.start, seg.start) : seg.start,
+          end: current ? Math.max(current.end, seg.end) : seg.end,
+        })
+      }
+      for (const [date, span] of spans) {
+        const key = `${job.material}|${date}`
+        const list = byMaterialDate.get(key) ?? []
+        list.push(span)
+        byMaterialDate.set(key, list)
+      }
     }
     for (const intervals of byMaterialDate.values()) {
       const sorted = intervals.slice().sort((a, b) => a.start - b.start)
@@ -222,11 +234,36 @@ describe('planlama hattı (uçtan uca)', () => {
     }
   })
 
-  it('hiçbir iş presin gün kapasitesini aşmaz', () => {
+  it('hiçbir iş parçası presin gün kapasitesini aşmaz', () => {
     const { buckets, result } = runPipeline()
     for (const job of result.jobs) {
-      const bucket = buckets.get(job.press)!.find((b) => b.date === job.date)!
-      expect(job.endMinute).toBeLessThanOrEqual(bucket.minutes)
+      for (const seg of job.segments) {
+        const bucket = buckets.get(job.press)!.find((b) => b.date === seg.date)!
+        expect(bucket).toBeDefined()
+        expect(seg.end).toBeLessThanOrEqual(bucket.minutes)
+      }
+    }
+  })
+
+  it('gün sınırını aşan iş ertesi gün kaldığı yerden sürer', () => {
+    const { buckets, result } = runPipeline()
+    for (const job of result.jobs.filter((j) => j.spansDays)) {
+      const dates = Array.from(new Set(job.segments.map((s) => s.date))).sort()
+      expect(dates.length).toBeGreaterThan(1)
+      expect(dates[0]).toBe(job.date)
+      expect(dates[dates.length - 1]).toBe(job.endDate)
+      // Devam eden gün sıfırdan başlar, önceki gün tam dolmuştur.
+      for (let i = 1; i < dates.length; i++) {
+        const previous = buckets.get(job.press)!.find((b) => b.date === dates[i - 1])!
+        const lastOfPrevious = Math.max(
+          ...job.segments.filter((s) => s.date === dates[i - 1]).map((s) => s.end),
+        )
+        const firstOfDay = Math.min(
+          ...job.segments.filter((s) => s.date === dates[i]).map((s) => s.start),
+        )
+        expect(lastOfPrevious).toBe(previous.minutes)
+        expect(firstOfDay).toBe(0)
+      }
     }
   })
 

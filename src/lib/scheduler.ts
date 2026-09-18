@@ -52,10 +52,16 @@ export interface SchedulerOptions {
   overrides?: PlanOverride[]
 }
 
-/** Bir işin gün içindeki parçaları; grafiğin çizdiği şey budur. */
+/**
+ * Bir işin parçaları; grafiğin çizdiği şey budur.
+ *
+ * Her parça kendi gününü taşır, çünkü bir iş gün (ve hafta) sınırını aşabilir:
+ * vardiya kapanışında yarım kalan iş ertesi gün kaldığı yerden sürer.
+ */
 export interface JobSegment {
   kind: 'setup' | 'quality' | 'run' | 'coil'
-  /** Gün içi net üretim dakikası. */
+  date: string
+  /** O gün içindeki net üretim dakikası. */
   start: number
   end: number
 }
@@ -71,6 +77,10 @@ export interface ScheduledJob {
   dueDate: string
   /** ZPP kova etiketi ('Bakiye' veya hafta etiketi). */
   bucketLabel: string
+  /** İşin bittiği gün — gün/hafta sınırını aşmışsa `date`'ten farklıdır. */
+  endDate: string
+  /** İş gün sınırını aşıyor mu? */
+  spansDays: boolean
   /** Planlanan gün, ihtiyaç haftasından sonraysa true. */
   late: boolean
   quantity: number
@@ -108,11 +118,84 @@ export interface ScheduleResult {
   unplanned: UnplannedItem[]
 }
 
-interface PressDayState {
-  /** Preste dolmuş dakika (gün içi imleç). */
-  cursor: number
+/** Bir presin bir günü, sürekli eksen üzerindeki yeriyle. */
+interface DayWindow {
+  date: string
+  /** Presin ekseninde bu günün başladığı dakika. */
+  offset: number
+  /** Günün net üretim dakikası. */
   capacity: number
+}
+
+/**
+ * Bir presin tüm ufku tek bir sürekli zaman ekseni olarak.
+ *
+ * Önceden her gün ayrı bir kovaydı ve iş tek güne sığmak zorundaydı: sığmayan
+ * iş tümden ertesi güne atılıyor, günün sonu boş kalıyordu. Oysa sahada
+ * vardiya kapanışında yarım kalan iş ertesi gün kaldığı yerden sürer. Artık
+ * imleç günler boyunca kesintisiz ilerliyor.
+ */
+interface PressTimeline {
+  days: DayWindow[]
+  total: number
+  cursor: number
   lastMaterial: string | null
+}
+
+function buildTimeline(buckets: DayBucket[]): PressTimeline {
+  const days: DayWindow[] = []
+  let offset = 0
+  for (const bucket of buckets) {
+    if (bucket.minutes <= 0) continue
+    days.push({ date: bucket.date, offset, capacity: bucket.minutes })
+    offset += bucket.minutes
+  }
+  return { days, total: offset, cursor: 0, lastMaterial: null }
+}
+
+/** Eksendeki dakikayı içeren gün. */
+function dayAt(timeline: PressTimeline, minute: number): DayWindow | null {
+  for (const day of timeline.days) {
+    if (minute < day.offset + day.capacity) return day
+  }
+  return null
+}
+
+/** Eksendeki dakikanın takvim karşılığı: hangi gün, o günün kaçıncı dakikası. */
+function locate(timeline: PressTimeline, minute: number): { date: string; minute: number } {
+  const day = dayAt(timeline, Math.max(0, minute - 1)) ?? timeline.days[timeline.days.length - 1]
+  if (!day) return { date: '', minute: 0 }
+  return { date: day.date, minute: Math.max(0, Math.min(day.capacity, minute - day.offset)) }
+}
+
+/** Verilen tarihin (veya ondan sonraki ilk günün) eksendeki başlangıcı. */
+function offsetOfDate(timeline: PressTimeline, date: string): number {
+  for (const day of timeline.days) {
+    if (day.date >= date) return day.offset
+  }
+  return timeline.total
+}
+
+/**
+ * Eksendeki bir aralığı günlere böler. Gün sınırını aşan üretim iki parça
+ * olarak çizilir — sahada tek iştir, takvimde iki gündür.
+ */
+function toDatedSegments(
+  timeline: PressTimeline,
+  kind: JobSegment['kind'],
+  start: number,
+  end: number,
+): JobSegment[] {
+  const out: JobSegment[] = []
+  for (const day of timeline.days) {
+    const dayEnd = day.offset + day.capacity
+    const from = Math.max(start, day.offset)
+    const to = Math.min(end, dayEnd)
+    if (to <= from) continue
+    out.push({ kind, date: day.date, start: from - day.offset, end: to - day.offset })
+    if (to >= end) break
+  }
+  return out
 }
 
 interface SetupInterval {
@@ -255,18 +338,11 @@ export function schedule(
     ),
   ).sort()
 
-  // pres → tarih → durum
-  const state = new Map<string, Map<string, PressDayState>>()
+  // pres → sürekli zaman ekseni. Her pres kendi ufkunu tek bir şerit olarak
+  // görür; iş gün sınırında kesilmez, ertesi gün kaldığı yerden sürer.
+  const timelines = new Map<string, PressTimeline>()
   for (const press of presses) {
-    const perDay = new Map<string, PressDayState>()
-    for (const bucket of buckets.get(press.name) ?? []) {
-      perDay.set(bucket.date, {
-        cursor: 0,
-        capacity: bucket.minutes,
-        lastMaterial: null,
-      })
-    }
-    state.set(press.name, perDay)
+    timelines.set(press.name, buildTimeline(buckets.get(press.name) ?? []))
   }
 
   // hol → tarih → setup başlangıçları
@@ -350,9 +426,9 @@ export function schedule(
         run,
         allowedPresses,
         pressByName,
-        state,
+        timelines,
         hallSetups,
-        pin?.date ? dates.filter((d) => d === pin.date) : dates,
+        pin?.date,
         moldUsage,
         options,
         !!pin,
@@ -378,133 +454,251 @@ export function schedule(
 
 interface Placement {
   press: string
+  /** İşin başladığı gün. */
   date: string
+  /** İşin bittiği gün — gün sınırını aşmışsa farklıdır. */
+  endDate: string
+  /** Başlangıç gününün içindeki setup dakikası. */
   setupStart: number
-  setupEnd: number
-  qualityEnd: number
-  end: number
+  /** Eksendeki başlangıç ve bitiş; presin imleci bitişe taşınır. */
+  startGlobal: number
+  endGlobal: number
+  /** Kalite onayının bittiği, üretimin başladığı eksen dakikası. */
+  qualityEndGlobal: number
+  /** Bitiş gününün içindeki bitiş dakikası. */
+  endMinute: number
   segments: JobSegment[]
-  coilIntervals: SetupInterval[]
+  /** Hol kaydına yazılacak kalıp setupı, gününe göre. */
+  moldReservation: { date: string; start: number; end: number } | null
+  coilReservations: { date: string; start: number; end: number }[]
 }
 
 /**
- * Bir pres/gün ikilisinde işin sığıp sığmadığını, hol setup kısıtı ve kalıp
- * çakışması gözetilerek hesaplar. Sığmıyorsa null döner.
+ * Bir setup ya da rulo değişimi için eksende en erken uygun yeri bulur.
+ *
+ * Bu bloklar gün ve vardiya sınırını aşamaz — bitiremeyeceği setup'ı
+ * başlatan ekip yoktur — ve ait oldukları günün hol kaydına uymalıdır.
+ */
+function reserveSlot(
+  timeline: PressTimeline,
+  from: number,
+  duration: number,
+  hallSetups: Map<string, HallSetupLog>,
+  hall: string,
+  type: 'mold' | 'coil',
+  gap: number,
+  concurrent: number,
+  netShiftMinutes: number | undefined,
+  /**
+   * Bu yerleştirmenin henüz hol defterine yazılmamış kendi rezervasyonları.
+   * Aynı işin ardışık rulo değişimleri de vinç kısıtına tabidir — kısa üretim
+   * parçaları arka arkaya rulo bağlamayı 30 dakikanın altına düşürebilir.
+   */
+  pending: { date: string; start: number; end: number; type: 'mold' | 'coil' }[] = [],
+): { global: number; date: string; start: number } | null {
+  if (duration <= 0) {
+    const day = dayAt(timeline, from)
+    if (!day) return null
+    return { global: from, date: day.date, start: Math.max(0, from - day.offset) }
+  }
+
+  let cursor = from
+  for (let guard = 0; guard < timeline.days.length * 4 + 8; guard++) {
+    const day = timeline.days.find(
+      (d) => cursor < d.offset + d.capacity && d.offset + d.capacity > 0,
+    )
+    if (!day) return null
+    if (cursor < day.offset) cursor = day.offset
+
+    const within = cursor - day.offset
+    // Vardiya sınırı: gün içinde vardiya sonuna sığmıyorsa sonrakine geç.
+    const perShift = netShiftMinutes && netShiftMinutes > 0 ? netShiftMinutes : day.capacity
+    const shiftEnd = Math.min(
+      (Math.floor(within / perShift) + 1) * perShift,
+      day.capacity,
+    )
+
+    const resources = hallSetups.get(day.date)?.get(hall) ?? { mold: [], coil: [] }
+    const own = pending.filter((r) => r.date === day.date)
+    const same = [
+      ...(type === 'mold' ? resources.mold : resources.coil),
+      ...own.filter((r) => r.type === type),
+    ]
+    const others = [
+      ...(type === 'mold' ? resources.coil : resources.mold),
+      ...own.filter((r) => r.type !== type),
+    ]
+    const candidate = earliestFreeStart(same, gap, others, within, duration, concurrent)
+
+    if (candidate + duration <= shiftEnd) {
+      return { global: day.offset + candidate, date: day.date, start: candidate }
+    }
+    cursor = day.offset + shiftEnd
+    if (cursor >= day.offset + day.capacity) {
+      const next = timeline.days.find((d) => d.offset >= day.offset + day.capacity)
+      if (!next) return null
+      cursor = next.offset
+    }
+  }
+  return null
+}
+
+/**
+ * İşi presin sürekli ekseninde yerleştirir. Üretim gün sınırını aşabilir;
+ * setup ve rulo değişimi aşamaz.
  */
 function tryPlaceOnPress(
   entry: DemandEntry,
   run: RunPlan,
   pressName: string,
   hall: string,
-  date: string,
-  dayState: PressDayState,
-  hallLog: HallSetupLog,
+  timeline: PressTimeline,
+  earliestGlobal: number,
+  hallSetups: Map<string, HallSetupLog>,
   moldUsage: MoldUsage,
   options: SchedulerOptions,
   feedsCoil: boolean,
 ): Placement | null {
-  const sameMaterial = dayState.lastMaterial === entry.material
+  const sameMaterial = timeline.lastMaterial === entry.material
   const setupMinutes = sameMaterial ? 0 : run.setupMinutes
-  // Transfer preste rulo değişimi yoktur; setup tektir.
   const coilChangeMinutes = feedsCoil ? run.coilChangeMinutes : 0
-  const moldIntervals = moldIntervalsFor(moldUsage, entry.material, date)
-  const resources = hallLog.get(hall) ?? { mold: [], coil: [] }
   const coilGap = options.coilSetupGapMinutes ?? 30
   const concurrent = Math.max(1, options.concurrentSetupsPerHall)
 
-  let start = dayState.cursor
-  for (let guard = 0; guard < moldIntervals.length + 4; guard++) {
-    const segments: JobSegment[] = []
+  let start = Math.max(timeline.cursor, earliestGlobal)
 
-    // 1) Kalıp setup'ı: kendi türüyle arası açık, rulo setuplarıyla kesişmez.
-    let setupStart = earliestFreeStart(
-      resources.mold,
-      options.setupGapMinutes,
-      resources.coil,
+  for (let guard = 0; guard < 12; guard++) {
+    const segments: JobSegment[] = []
+    let moldReservation: Placement['moldReservation'] = null
+    const coilReservations: Placement['coilReservations'] = []
+
+    // 1) Kalıp setup'ı.
+    const setupSlot = reserveSlot(
+      timeline,
       start,
       setupMinutes,
+      hallSetups,
+      hall,
+      'mold',
+      options.setupGapMinutes,
       concurrent,
+      options.netShiftMinutes,
     )
+    if (!setupSlot) return null
 
-    // Bitiremeyeceği setup'ı başlatan ekip yoktur: vardiya sınırını aşamaz.
-    const perShift = options.netShiftMinutes
-    if (perShift && perShift > 0 && setupMinutes > 0) {
-      const shiftEnd = (Math.floor(setupStart / perShift) + 1) * perShift
-      if (setupStart + setupMinutes > shiftEnd) {
-        setupStart = earliestFreeStart(
-          resources.mold,
-          options.setupGapMinutes,
-          resources.coil,
-          shiftEnd,
-          setupMinutes,
-          concurrent,
-        )
-      }
-    }
-
-    let cursor = setupStart
+    let cursor = setupSlot.global
+    const setupGlobalStart = cursor
     if (setupMinutes > 0) {
-      segments.push({ kind: 'setup', start: cursor, end: cursor + setupMinutes })
+      segments.push(...toDatedSegments(timeline, 'setup', cursor, cursor + setupMinutes))
+      moldReservation = {
+        date: setupSlot.date,
+        start: setupSlot.start,
+        end: setupSlot.start + setupMinutes,
+      }
       cursor += setupMinutes
     }
-    const setupEnd = cursor
 
     // 2) Kalite onayı.
     if (run.qualityApprovalMinutes > 0) {
-      segments.push({ kind: 'quality', start: cursor, end: cursor + run.qualityApprovalMinutes })
+      segments.push(
+        ...toDatedSegments(timeline, 'quality', cursor, cursor + run.qualityApprovalMinutes),
+      )
       cursor += run.qualityApprovalMinutes
     }
-    const qualityEnd = cursor
+    const qualityEndGlobal = cursor
 
-    // 3) Üretim, rulo başına parçalar hâlinde. Rulo değişimleri parçaların
-    //    ARASINA girer: hangi saatte hangi rulonun bağlanacağı sahada
-    //    önemlidir, hepsini başa toplamak yanlış tablo verirdi.
-    const coilStarts: SetupInterval[] = []
+    // 3) Üretim, rulo başına parçalar hâlinde; aralarına rulo değişimi girer.
+    //    Üretim gün sınırını aşabilir — yarım kalan iş ertesi gün sürer.
+    let failed = false
     run.coilRunMinutes.forEach((minutes, index) => {
+      if (failed) return
       if (index > 0 && coilChangeMinutes > 0) {
-        const changeStart = earliestFreeStart(
-          [...resources.coil, ...coilStarts],
-          coilGap,
-          resources.mold,
+        const slot = reserveSlot(
+          timeline,
           cursor,
           coilChangeMinutes,
+          hallSetups,
+          hall,
+          'coil',
+          coilGap,
           1,
+          options.netShiftMinutes,
+          [
+            ...(moldReservation ? [{ ...moldReservation, type: 'mold' as const }] : []),
+            ...coilReservations.map((r) => ({ ...r, type: 'coil' as const })),
+          ],
         )
-        segments.push({ kind: 'coil', start: changeStart, end: changeStart + coilChangeMinutes })
-        coilStarts.push({ start: changeStart, end: changeStart + coilChangeMinutes })
-        cursor = changeStart + coilChangeMinutes
+        if (!slot) {
+          failed = true
+          return
+        }
+        segments.push(
+          ...toDatedSegments(timeline, 'coil', slot.global, slot.global + coilChangeMinutes),
+        )
+        coilReservations.push({
+          date: slot.date,
+          start: slot.start,
+          end: slot.start + coilChangeMinutes,
+        })
+        cursor = slot.global + coilChangeMinutes
       }
       if (minutes > 0) {
-        segments.push({ kind: 'run', start: cursor, end: cursor + minutes })
+        segments.push(...toDatedSegments(timeline, 'run', cursor, cursor + minutes))
         cursor += minutes
       }
     })
+    if (failed) return null
 
     const end = cursor
+    if (end > timeline.total) return null
 
     // Kalıp çakışması: aynı kalıp başka bir preste bu aralıkta meşgulse
-    // işi o işin bitişine ötele.
-    const conflicts = moldIntervals.filter(
-      (iv) => iv.press !== pressName && iv.start < end && setupStart < iv.end,
-    )
-    if (conflicts.length === 0) {
-      if (end > dayState.capacity) return null
+    // işi o işin bitişine ötele. Kontrol gün bazında yapılır.
+    const conflict = findMoldConflict(moldUsage, entry.material, pressName, segments)
+    if (!conflict) {
+      const first = segments[0]
+      const last = segments[segments.length - 1]
       return {
         press: pressName,
-        date,
-        setupStart,
-        setupEnd,
-        qualityEnd,
-        end,
+        date: first?.date ?? timeline.days[0]?.date ?? '',
+        endDate: last?.date ?? first?.date ?? '',
+        setupStart: first?.start ?? 0,
+        startGlobal: setupGlobalStart,
+        endGlobal: end,
+        qualityEndGlobal,
+        endMinute: last?.end ?? 0,
         segments,
-        coilIntervals: coilStarts,
+        moldReservation,
+        coilReservations,
       }
     }
-    start = Math.max(...conflicts.map((c) => c.end))
-    if (start >= dayState.capacity) return null
+
+    // Çakışan işin bitişinden sonra yeniden dene.
+    const nextDay = timeline.days.find((d) => d.date === conflict.date)
+    start = Math.max(start + 1, (nextDay?.offset ?? 0) + conflict.end)
+    if (start >= timeline.total) return null
   }
   return null
 }
+
+/** Aynı kalıbın başka bir preste çakıştığı ilk aralık. */
+function findMoldConflict(
+  moldUsage: MoldUsage,
+  material: string,
+  pressName: string,
+  segments: JobSegment[],
+): { date: string; end: number } | null {
+  for (const segment of segments) {
+    for (const iv of moldIntervalsFor(moldUsage, material, segment.date)) {
+      if (iv.press === pressName) continue
+      if (iv.start < segment.end && segment.start < iv.end) {
+        return { date: segment.date, end: iv.end }
+      }
+    }
+  }
+  return null
+}
+
 
 function placeRun(
   entry: DemandEntry,
@@ -512,70 +706,106 @@ function placeRun(
   run: RunPlan,
   candidates: string[],
   pressByName: Map<string, PressSpec>,
-  state: Map<string, Map<string, PressDayState>>,
+  timelines: Map<string, PressTimeline>,
   hallSetups: Map<string, HallSetupLog>,
-  dates: string[],
+  pinDate: string | undefined,
   moldUsage: MoldUsage,
   options: SchedulerOptions,
   pinned = false,
 ): ScheduledJob | null {
   let best: Placement | null = null
 
-  for (const date of dates) {
+  for (const pressName of candidates) {
+    const press = pressByName.get(pressName)
+    const timeline = timelines.get(pressName)
+    if (!press || !timeline || timeline.days.length === 0) continue
+
     // Dolgu işleri kendi haftasından önce üretilmez; bakiye/acil işler
     // planın ilk gününden itibaren serbesttir.
-    if (date < entry.earliestDate) continue
-
-    for (const pressName of candidates) {
-      const press = pressByName.get(pressName)!
-      const dayState = state.get(pressName)?.get(date)
-      if (!dayState || dayState.capacity <= 0) continue
-
-      const placement = tryPlaceOnPress(
-        entry,
-        run,
-        pressName,
-        press.hall,
-        date,
-        dayState,
-        hallSetups.get(date)!,
-        moldUsage,
-        options,
-        press.feedsCoil !== false,
-      )
-      if (!placement) continue
-
-      if (!best || placement.end < best.end) best = placement
+    let earliest = offsetOfDate(timeline, entry.earliestDate)
+    // Kullanıcı günü de sabitlediyse iş o günün penceresinde kalmalıdır.
+    let limit: number | null = null
+    if (pinDate) {
+      const day = timeline.days.find((d) => d.date === pinDate)
+      if (!day) continue
+      earliest = Math.max(earliest, day.offset)
+      limit = day.offset + day.capacity
     }
+    if (earliest >= timeline.total) continue
 
-    // İlk uygun günde yerleştir — ileriye taşımak aciliyeti bozar.
-    if (best) break
+    const placement = tryPlaceOnPress(
+      entry,
+      run,
+      pressName,
+      press.hall,
+      timeline,
+      earliest,
+      hallSetups,
+      moldUsage,
+      options,
+      press.feedsCoil !== false,
+    )
+    if (!placement) continue
+    if (limit !== null && placement.endGlobal > limit) continue
+
+    // Takvimde en erken biten pres kazanır. Eksen dakikaları preslere göre
+    // farklı ölçekte olduğu için karşılaştırma takvim üzerinden yapılır.
+    if (
+      !best ||
+      placement.endDate < best.endDate ||
+      (placement.endDate === best.endDate && placement.endMinute < best.endMinute)
+    ) {
+      best = placement
+    }
   }
 
   if (!best) return null
 
   const press = pressByName.get(best.press)!
-  const dayState = state.get(best.press)!.get(best.date)!
-  const sameMaterial = dayState.lastMaterial === entry.material
+  const timeline = timelines.get(best.press)!
+  const sameMaterial = timeline.lastMaterial === entry.material
 
-  dayState.cursor = best.end
-  dayState.lastMaterial = entry.material
+  timeline.cursor = best.endGlobal
+  timeline.lastMaterial = entry.material
 
-  const hallLog = hallSetups.get(best.date)!
-  const resources = hallLog.get(press.hall) ?? { mold: [], coil: [] }
-  if (!sameMaterial && run.setupMinutes > 0) {
-    resources.mold.push({ start: best.setupStart, end: best.setupEnd })
+  // Vinç kaydı: kalıp ve rulo setupları ait oldukları günün defterine yazılır.
+  const reserve = (date: string, type: 'mold' | 'coil', interval: SetupInterval) => {
+    const hallLog = hallSetups.get(date) ?? new Map<string, HallResources>()
+    const resources = hallLog.get(press.hall) ?? { mold: [], coil: [] }
+    resources[type].push(interval)
+    hallLog.set(press.hall, resources)
+    hallSetups.set(date, hallLog)
   }
-  resources.coil.push(...best.coilIntervals)
-  hallLog.set(press.hall, resources)
+  if (best.moldReservation) {
+    reserve(best.moldReservation.date, 'mold', {
+      start: best.moldReservation.start,
+      end: best.moldReservation.end,
+    })
+  }
+  for (const coil of best.coilReservations) {
+    reserve(coil.date, 'coil', { start: coil.start, end: coil.end })
+  }
 
-  recordMoldInterval(moldUsage, entry.material, best.date, {
-    press: best.press,
-    start: best.setupStart,
-    end: best.end,
-  })
+  // Kalıp meşguliyeti gün gün işlenir: iş gün sınırını aştıysa kalıp ertesi
+  // gün de o preste kilitlidir.
+  const perDate = new Map<string, { start: number; end: number }>()
+  for (const segment of best.segments) {
+    const current = perDate.get(segment.date)
+    perDate.set(segment.date, {
+      start: current ? Math.min(current.start, segment.start) : segment.start,
+      end: current ? Math.max(current.end, segment.end) : segment.end,
+    })
+  }
+  for (const [date, span] of perDate) {
+    recordMoldInterval(moldUsage, entry.material, date, {
+      press: best.press,
+      start: span.start,
+      end: span.end,
+    })
+  }
 
   const late = best.date > entry.dueDate
+  const spansDays = best.endDate !== best.date
 
   const reasonParts = [
     entry.phase === 'backlog'
@@ -595,14 +825,20 @@ function placeRun(
   if (run.clampedToTheoretical) {
     reasonParts.push('⚠ window too short for setup + approval')
   }
+  if (spansDays) reasonParts.push(`continues until ${best.endDate}`)
   if (late) reasonParts.push(`⚠ later than required week ${entry.dueDate}`)
   if (pinned) reasonParts.push('pinned by user')
+
+  const setupEnd = locate(timeline, best.startGlobal + (sameMaterial ? 0 : run.setupMinutes))
+  const qualityEnd = locate(timeline, best.qualityEndGlobal)
 
   return {
     material: entry.material,
     press: best.press,
     hall: press.hall,
     date: best.date,
+    endDate: best.endDate,
+    spansDays,
     phase: entry.phase,
     urgency: entry.urgency,
     dueDate: entry.dueDate,
@@ -615,9 +851,9 @@ function placeRun(
     coProduct: product.coProduct,
     coProductQuantity: run.coProductQuantity,
     setupStartMinute: best.setupStart,
-    setupEndMinute: best.setupEnd,
-    qualityEndMinute: best.qualityEnd,
-    endMinute: best.end,
+    setupEndMinute: setupEnd.minute,
+    qualityEndMinute: qualityEnd.minute,
+    endMinute: best.endMinute,
     runMinutes: run.runMinutes,
     setupMinutes: sameMaterial ? 0 : run.setupMinutes,
     qualityApprovalMinutes: run.qualityApprovalMinutes,

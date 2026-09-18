@@ -232,6 +232,8 @@ export default defineSchema({
         coilsNeeded: v.number(),
         setupStartMinute: v.number(),
         endMinute: v.number(),
+        // İş gün sınırını aştıysa bittiği gün; eski kayıtlarda yok.
+        endDate: v.optional(v.string()),
         reason: v.string(),
       }),
     ),
