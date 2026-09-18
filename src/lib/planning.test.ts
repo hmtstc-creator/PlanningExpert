@@ -214,13 +214,23 @@ describe('computeRunPlan', () => {
     // Rulodan 5333 parça çıkar; 2 gözlü kalıpta bu 2666 vuruştur.
     expect(plan.shotsPerCoil).toBe(2666)
     expect(plan.coilsNeeded).toBe(2) // ceil(10.000 / 5333)
-    expect(plan.totalMinutes).toBe(30 + 15 * 2 + 250)
+    // İlk rulo ana setup'ın içinde bağlanır; yalnızca ikincisi ek kayıptır.
+    expect(plan.coilChanges).toBe(1)
+    expect(plan.totalMinutes).toBe(30 + 15 * 1 + 250)
   })
 
-  it('birden fazla rulo gerektiğinde her rulo için setup ekler', () => {
+  it('yalnızca ikinci ve sonraki rulolar için setup ekler', () => {
     const plan = computeRunPlan(product, 40_000)
     expect(plan.coilsNeeded).toBe(8) // ceil(40.000 adet / 5333 adet-per-rulo)
-    expect(plan.coilSetupMinutes).toBe(120) // 8 × 15
+    expect(plan.coilChanges).toBe(7) // ilki ana setup'ın içinde
+    expect(plan.coilSetupMinutes).toBe(105) // 7 × 15
+  })
+
+  it('tek rulo yetiyorsa rulo setup süresi eklenmez', () => {
+    const plan = computeRunPlan(product, 2000)
+    expect(plan.coilsNeeded).toBe(1)
+    expect(plan.coilChanges).toBe(0)
+    expect(plan.coilSetupMinutes).toBe(0)
   })
 
   it('eş ürün miktarını aynı vuruştan üretilen adet olarak verir', () => {

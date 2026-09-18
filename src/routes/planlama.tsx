@@ -72,6 +72,7 @@ function PlanlamaPage() {
     name: string
     hall: string
     category?: string
+    feedsCoil?: boolean
   }[]
   const templates = (useQuery(api.pressCalendar.listTemplates) ?? []) as {
     press: string

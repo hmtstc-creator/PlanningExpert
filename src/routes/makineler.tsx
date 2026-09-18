@@ -15,6 +15,7 @@ type Press = {
   name: string
   hall: string
   category?: string
+  feedsCoil?: boolean
   tonnage?: number
   frozenDays?: number
 }
@@ -46,6 +47,7 @@ function MakinelerPage() {
   const [name, setName] = useState('')
   const [hall, setHall] = useState('')
   const [category, setCategory] = useState('')
+  const [feedsCoil, setFeedsCoil] = useState(true)
   const [tonnage, setTonnage] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -83,6 +85,7 @@ function MakinelerPage() {
         name: n,
         hall: hall.trim() || 'Hall 1',
         category: category.trim() || undefined,
+        feedsCoil,
         tonnage: tonnage.trim() === '' ? undefined : Number(tonnage),
       })
     } finally {
@@ -103,9 +106,11 @@ function MakinelerPage() {
         set up at the same time, which is the crane constraint the planner
         relies on. The category is for grouping the plan on screen only;
         which press can run a material still comes from the main and
-        alternative machines in master data. Frozen days locks that press's
-        plan for the given number of days; leave it empty to use the global
-        setting.
+        alternative machines in master data. Coil fed marks a progressive line:
+        the first coil goes on during setup and every coil after it costs a coil
+        change. A transfer press runs blanks, so it has a single setup and no
+        coil changes — untick it there. Frozen days locks that press's plan for
+        the given number of days; leave it empty to use the global setting.
       </p>
 
       <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
@@ -146,6 +151,18 @@ function MakinelerPage() {
               <option key={c} value={c} />
             ))}
           </datalist>
+        </label>
+        <label className="flex items-center gap-2 pb-2 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={feedsCoil}
+            onChange={(e) => setFeedsCoil(e.target.checked)}
+          />
+          <span className="text-xs text-muted-foreground">
+            Coil fed
+            <span className="block text-[10px]">uncheck for transfer presses</span>
+          </span>
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Tonnage (opt.)</span>
@@ -209,6 +226,12 @@ function MakinelerPage() {
                       <th className="px-3 py-2 font-medium">Press</th>
                       <th className="px-3 py-2 font-medium">Hall</th>
                       <th className="px-3 py-2 font-medium">Category</th>
+                      <th
+                        className="px-3 py-2 font-medium"
+                        title="Progressive lines are coil fed; transfer presses run blanks and have a single setup"
+                      >
+                        Coil fed
+                      </th>
                       <th className="px-3 py-2 font-medium">Tonnage</th>
                       <th className="px-3 py-2 font-medium" title="Days of this press's plan that stay locked">
                         Frozen days
@@ -247,6 +270,24 @@ function MakinelerPage() {
                                   name: p.name,
                                   hall: p.hall,
                                   category: e.target.value.trim() || undefined,
+                                  feedsCoil: p.feedsCoil,
+                                  tonnage: p.tonnage,
+                                  frozenDays: p.frozenDays,
+                                })
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={p.feedsCoil !== false}
+                              onChange={(e) =>
+                                void upsert({
+                                  name: p.name,
+                                  hall: p.hall,
+                                  category: p.category,
+                                  feedsCoil: e.target.checked,
                                   tonnage: p.tonnage,
                                   frozenDays: p.frozenDays,
                                 })
@@ -263,6 +304,7 @@ function MakinelerPage() {
                                   name: p.name,
                                   hall: p.hall,
                                   category: p.category,
+                                  feedsCoil: p.feedsCoil,
                                   frozenDays: p.frozenDays,
                                   tonnage:
                                     e.target.value.trim() === ''
@@ -284,6 +326,7 @@ function MakinelerPage() {
                                   name: p.name,
                                   hall: p.hall,
                                   category: p.category,
+                                  feedsCoil: p.feedsCoil,
                                   tonnage: p.tonnage,
                                   frozenDays:
                                     e.target.value.trim() === ''

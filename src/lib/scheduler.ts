@@ -14,6 +14,12 @@ import {
 export interface PressSpec {
   name: string
   hall: string
+  /**
+   * Rulodan beslenir mi? Progresif hatlar ruloyla çalışır, transfer presler
+   * blank (kesilmiş parça) ile — orada rulo değişimi diye bir şey yoktur, tek
+   * setup vardır. Belirtilmezse rulo beslemeli kabul edilir.
+   */
+  feedsCoil?: boolean
 }
 
 /**
@@ -60,6 +66,8 @@ export interface ScheduledJob {
   quantity: number
   shots: number
   coilsNeeded: number
+  /** Ana setup sonrası bağlanan rulo sayısı; transfer preste her zaman 0. */
+  coilChanges: number
   /** Bu iş bir kullanıcı müdahalesiyle mi konumlandı? */
   pinned: boolean
   coProduct?: string
@@ -95,8 +103,18 @@ interface PressDayState {
   lastMaterial: string | null
 }
 
-/** Bir holde o gün yapılmış setupların başlangıç dakikaları. */
-type HallSetupLog = Map<string, number[]>
+/**
+ * Bir holde o gün yapılmış setupların ARALIKLARI.
+ *
+ * Yalnızca başlangıç saatini tutmak yetmiyordu: 90 dakikalık bir setup ile
+ * 60 dakika sonra başlayan ikinci setup "aralarında 1 saat var" sayılıyor ama
+ * 30 dakika boyunca çakışıyordu. Vinç aynı anda iki yerde olamaz.
+ */
+interface SetupInterval {
+  start: number
+  end: number
+}
+type HallSetupLog = Map<string, SetupInterval[]>
 
 /** Kalıbın o gün hangi preste hangi dakika aralığında meşgul olduğu. */
 interface MoldInterval {
@@ -109,28 +127,31 @@ interface MoldInterval {
 type MoldUsage = Map<string, Map<string, MoldInterval[]>>
 
 /**
- * Bir setup'ın başlayabileceği en erken dakikayı bulur:
- * aynı holde eşzamanlı setup limiti ve setuplar arası minimum ara gözetilir.
+ * Bir setup'ın başlayabileceği en erken dakikayı bulur.
+ *
+ * Setup SÜRESİ hesaba katılır: yeni setup, holdeki başka bir setup'ın
+ * aralığıyla (artı iki yana bırakılan vinç payıyla) çakışamaz. Eşzamanlı
+ * setup limiti bundan kaç tanesine izin verildiğini belirler.
  */
 function earliestSetupStart(
   hallLog: HallSetupLog,
   hall: string,
   earliest: number,
+  duration: number,
   options: SchedulerOptions,
 ): number {
-  const starts = hallLog.get(hall) ?? []
-  if (starts.length === 0) return earliest
+  const intervals = hallLog.get(hall) ?? []
+  if (intervals.length === 0) return earliest
 
+  const gap = options.setupGapMinutes
   let candidate = earliest
-  // Aynı anda başlayan setup sayısı limiti aşmamalı ve ardışık setuplar
-  // arasında en az setupGapMinutes olmalı.
-  for (let guard = 0; guard < starts.length + 1; guard++) {
-    const concurrent = starts.filter(
-      (s) => Math.abs(s - candidate) < options.setupGapMinutes,
+
+  for (let guard = 0; guard < intervals.length + 1; guard++) {
+    const blocking = intervals.filter(
+      (iv) => candidate < iv.end + gap && iv.start < candidate + duration + gap,
     )
-    if (concurrent.length < options.concurrentSetupsPerHall) return candidate
-    const blocking = Math.max(...concurrent)
-    candidate = blocking + options.setupGapMinutes
+    if (blocking.length < options.concurrentSetupsPerHall) return candidate
+    candidate = Math.max(...blocking.map((iv) => iv.end + gap))
   }
   return candidate
 }
@@ -352,16 +373,23 @@ function tryPlaceOnPress(
   hallLog: HallSetupLog,
   moldUsage: MoldUsage,
   options: SchedulerOptions,
+  feedsCoil: boolean,
 ): Placement | null {
   const sameMaterial = dayState.lastMaterial === entry.material
   const setupMinutes = sameMaterial ? 0 : run.setupMinutes
-  const coilSetup = run.coilSetupMinutes
+  // Transfer preste rulo değişimi yoktur; setup tektir.
+  const coilSetup = feedsCoil ? run.coilSetupMinutes : 0
   const intervals = moldIntervalsFor(moldUsage, entry.material, date)
 
   let start = dayState.cursor
   for (let guard = 0; guard < intervals.length + 4; guard++) {
+    // Vinç, kalıp değişimi boyunca meşguldür; rulo bağlama da bu bloğun
+    // içindedir çünkü grafikte tek "Setup" bloğu olarak çizilir.
+    const setupDuration = setupMinutes + coilSetup
     let setupStart =
-      setupMinutes > 0 ? earliestSetupStart(hallLog, hall, start, options) : start
+      setupDuration > 0
+        ? earliestSetupStart(hallLog, hall, start, setupDuration, options)
+        : start
 
     // Setup vardiya sınırını aşamaz.
     const perShift = options.netShiftMinutes
@@ -426,6 +454,7 @@ function placeRun(
         hallSetups.get(date)!,
         moldUsage,
         options,
+        press.feedsCoil !== false,
       )
       if (!placement) continue
 
@@ -447,9 +476,9 @@ function placeRun(
 
   if (!sameMaterial && run.setupMinutes > 0) {
     const hallLog = hallSetups.get(best.date)!
-    const starts = hallLog.get(press.hall) ?? []
-    starts.push(best.setupStart)
-    hallLog.set(press.hall, starts)
+    const intervals = hallLog.get(press.hall) ?? []
+    intervals.push({ start: best.setupStart, end: best.setupEnd })
+    hallLog.set(press.hall, intervals)
   }
 
   recordMoldInterval(moldUsage, entry.material, best.date, {
@@ -467,6 +496,9 @@ function placeRun(
         ? `Stock covers ${entry.daysOfCover === Number.POSITIVE_INFINITY ? '∞' : entry.daysOfCover.toFixed(1)} days`
         : `${entry.bucketLabel} requirement`,
     run.coilsNeeded === 1 ? '1 full coil' : `${run.coilsNeeded} full coils`,
+    ...(press.feedsCoil !== false && run.coilChanges > 0
+      ? [`${run.coilChanges} coil change${run.coilChanges > 1 ? 's' : ''}`]
+      : []),
     sameMaterial ? 'setup not repeated' : `setup ${run.setupMinutes} min`,
   ]
   if (run.qualityApprovalMinutes > 0) {
@@ -501,6 +533,7 @@ function placeRun(
     runMinutes: run.runMinutes,
     setupMinutes: sameMaterial ? 0 : run.setupMinutes,
     qualityApprovalMinutes: run.qualityApprovalMinutes,
+    coilChanges: press.feedsCoil === false ? 0 : run.coilChanges,
     reason: reasonParts.join(' · '),
   }
 }

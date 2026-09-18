@@ -322,21 +322,28 @@ export function WeekGantt({
                     className="absolute top-0 truncate text-[11px] font-medium text-foreground"
                     style={{ left: px(i * dayWidthMinutes) + 3, maxWidth: px(dayWidthMinutes) - 6 }}
                   >
-                    {dayLabel(date)}
+                    {dayLabel(date)} · starts {clockLabel(shiftStartMinute)}
                   </span>
                   {tickHours > 0 &&
                     Array.from(
                       { length: Math.floor(dayWidthMinutes / 60 / tickHours) + 1 },
                       (_, t) => t * tickHours * 60,
-                    ).map((offset) => (
-                      <span
-                        key={offset}
-                        className="absolute bottom-0 -translate-x-1/2 text-[10px] tabular-nums text-muted-foreground"
-                        style={{ left: px(i * dayWidthMinutes + offset) }}
-                      >
-                        {clockLabel(shiftStartMinute + offset)}
-                      </span>
-                    ))}
+                    ).map((offset) => {
+                      // The first label of the first day would be cut in half
+                      // by the pinned press column, so it is left-aligned.
+                      const atStart = i === 0 && offset === 0
+                      return (
+                        <span
+                          key={offset}
+                          className={`absolute bottom-0 text-[10px] tabular-nums text-muted-foreground ${
+                            atStart ? '' : '-translate-x-1/2'
+                          }`}
+                          style={{ left: px(i * dayWidthMinutes + offset) }}
+                        >
+                          {clockLabel(shiftStartMinute + offset)}
+                        </span>
+                      )
+                    })}
                 </Fragment>
               ))}
             </div>

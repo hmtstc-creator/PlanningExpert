@@ -452,6 +452,8 @@ export interface RunPlan {
   kgNeeded: number
   shotsPerCoil: number
   coilsNeeded: number
+  /** Ana setup'tan sonra bağlanan rulo sayısı (ilk rulo setup'a dahildir). */
+  coilChanges: number
   /** İdeal hızda üretim süresi (dk) — çarpan uygulanmamış. */
   theoreticalRunMinutes: number
   /** Gantt'ta çizilecek üretim süresi (dk) — çarpan uygulanmış. */
@@ -491,7 +493,11 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   const coilsNeeded = piecesInCoil > 0 ? Math.ceil(quantity / piecesInCoil) : 0
 
   const setupMinutes = product.setupMinutes ?? 0
-  const coilSetupMinutes = (product.coilSetupMinutes ?? 0) * coilsNeeded
+  // İlk rulo ana setup'ın içinde bağlanır; kayıp yalnızca sonraki rulolarda
+  // yaşanır. Rulo beslemeyen presler (transfer) bunu hiç ödemez — orada
+  // setup tektir.
+  const coilChanges = Math.max(0, coilsNeeded - 1)
+  const coilSetupMinutes = (product.coilSetupMinutes ?? 0) * coilChanges
   const qualityApprovalMinutes = product.qualityApprovalMinutes ?? 0
   const nonProductive = setupMinutes + coilSetupMinutes + qualityApprovalMinutes
 
@@ -518,6 +524,7 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
     kgNeeded,
     shotsPerCoil,
     coilsNeeded,
+    coilChanges,
     theoreticalRunMinutes,
     runMinutes,
     setupMinutes,

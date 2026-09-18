@@ -308,3 +308,84 @@ describe('schedule', () => {
     expect(result.jobs[0].setupStartMinute).toBe(0)
   })
 })
+
+describe('vinç kısıtı ve rulo besleme', () => {
+  const longSetup: ProductSpec & { mainMachine?: string } = {
+    ...baseProduct,
+    setupMinutes: 90,
+    coilSetupMinutes: 0,
+  }
+
+  it('uzun setuplar aynı holde çakışmaz', () => {
+    // Eski hata: yalnızca başlangıç saatleri karşılaştırılıyordu, 90 dakikalık
+    // setup ile 60 dakika sonra başlayan setup "1 saat ara var" sayılıp
+    // çakışıyordu. Vinç aynı anda iki yerde olamaz.
+    const products = new Map<string, ProductSpec & { mainMachine?: string }>([
+      ['A', { ...longSetup, mainMachine: 'PRS-1' }],
+      ['B', { ...longSetup, code: 'B', mainMachine: 'PRS-2' }],
+    ])
+    const result = schedule(
+      [backlogEntry, { ...backlogEntry, material: 'B' }],
+      products,
+      [
+        { name: 'PRS-1', hall: 'Hall 1' },
+        { name: 'PRS-2', hall: 'Hall 1' },
+      ],
+      bucketsFor(['PRS-1', 'PRS-2']),
+      settings,
+      options,
+    )
+    expect(result.jobs).toHaveLength(2)
+    const [a, b] = [...result.jobs].sort((x, y) => x.setupStartMinute - y.setupStartMinute)
+    // İkinci setup, birincisi bitmeden VE vinç payı dolmadan başlayamaz.
+    expect(b.setupStartMinute).toBeGreaterThanOrEqual(a.setupEndMinute + options.setupGapMinutes)
+  })
+
+  it('farklı hollerde uzun setuplar aynı anda olabilir', () => {
+    const products = new Map<string, ProductSpec & { mainMachine?: string }>([
+      ['A', { ...longSetup, mainMachine: 'PRS-1' }],
+      ['B', { ...longSetup, code: 'B', mainMachine: 'PRS-2' }],
+    ])
+    const result = schedule(
+      [backlogEntry, { ...backlogEntry, material: 'B' }],
+      products,
+      [
+        { name: 'PRS-1', hall: 'Hall 1' },
+        { name: 'PRS-2', hall: 'Hall 2' },
+      ],
+      bucketsFor(['PRS-1', 'PRS-2']),
+      settings,
+      options,
+    )
+    expect(result.jobs.map((j) => j.setupStartMinute)).toEqual([0, 0])
+  })
+
+  it('transfer preste rulo setup süresi eklenmez', () => {
+    // Çok rulo gerektiren bir iş: rulo beslemeli preste rulo değişimi ek
+    // süredir, transfer preste yoktur.
+    const coilHungry: ProductSpec & { mainMachine?: string } = {
+      ...baseProduct,
+      coilWeight: 100,
+      grossWeight: 1,
+      coilSetupMinutes: 20,
+      mainMachine: 'PRS-1',
+    }
+    const run = (feedsCoil: boolean) =>
+      schedule(
+        [backlogEntry],
+        new Map([['A', coilHungry]]),
+        [{ name: 'PRS-1', hall: 'Hall 1', feedsCoil }],
+        bucketsFor(['PRS-1']),
+        settings,
+        options,
+      ).jobs[0]
+
+    const progressive = run(true)
+    const transfer = run(false)
+    expect(progressive.coilChanges).toBeGreaterThan(0)
+    expect(transfer.coilChanges).toBe(0)
+    expect(transfer.setupEndMinute - transfer.setupStartMinute).toBeLessThan(
+      progressive.setupEndMinute - progressive.setupStartMinute,
+    )
+  })
+})

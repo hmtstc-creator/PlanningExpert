@@ -58,6 +58,9 @@ export default defineSchema({
     // Kategori yalnızca gruplama/görüntüleme içindir; makine uygunluğu
     // master data'daki ana/alternatif makinelerden gelir.
     category: v.optional(v.string()),
+    // Rulodan mı beslenir? Progresif hatlar rulo, transfer presler blank
+    // kullanır — transferde rulo değişimi yoktur, setup tektir.
+    feedsCoil: v.optional(v.boolean()),
     tonnage: v.optional(v.number()),
     // Bu presin planı kaç gün ileriye kadar dondurulmuş sayılsın.
     // Tanımsızsa global ayar geçerlidir.

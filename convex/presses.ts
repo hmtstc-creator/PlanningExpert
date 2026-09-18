@@ -8,6 +8,7 @@ const pressValidator = v.object({
   name: v.string(),
   hall: v.string(),
   category: v.optional(v.string()),
+  feedsCoil: v.optional(v.boolean()),
   tonnage: v.optional(v.number()),
   frozenDays: v.optional(v.number()),
 })
@@ -23,6 +24,7 @@ export const upsert = mutation({
     name: v.string(),
     hall: v.string(),
     category: v.optional(v.string()),
+    feedsCoil: v.optional(v.boolean()),
     tonnage: v.optional(v.number()),
     frozenDays: v.optional(v.number()),
   },
@@ -38,6 +40,7 @@ export const upsert = mutation({
       await ctx.db.patch(existing._id, {
         hall: args.hall,
         category: args.category,
+        feedsCoil: args.feedsCoil,
         tonnage: args.tonnage,
         frozenDays: args.frozenDays,
       })
