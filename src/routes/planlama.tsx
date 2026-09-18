@@ -113,6 +113,7 @@ function PlanlamaPage() {
   const overtimeShiftMinutes = globalSettings?.overtimeShiftMinutes ?? 480
   const setupGapMinutes = globalSettings?.setupGapMinutes ?? 60
   const concurrentSetupsPerHall = globalSettings?.concurrentSetupsPerHall ?? 1
+  const coilSetupGapMinutes = globalSettings?.coilSetupGapMinutes ?? 30
   const shiftStartMinute = globalSettings?.shiftStartMinute ?? 420 // 07:00
   const breakMinutesPerShift = globalSettings?.breakMinutesPerShift ?? 0
 
@@ -310,6 +311,7 @@ function PlanlamaPage() {
     () =>
       schedule(demand, productByCode, presses, buckets, { shiftMinutes, overtimeShiftMinutes }, {
         setupGapMinutes,
+        coilSetupGapMinutes,
         concurrentSetupsPerHall,
         overrides,
         netShiftMinutes: Math.max(1, shiftMinutes - (stopMinutesByShift[0] ?? 0)),
@@ -323,6 +325,7 @@ function PlanlamaPage() {
       overtimeShiftMinutes,
       setupGapMinutes,
       concurrentSetupsPerHall,
+      coilSetupGapMinutes,
       overrides,
       stopMinutesByShift,
     ],
@@ -853,9 +856,8 @@ function PlanlamaPage() {
                   quantity: j.quantity,
                   late: j.late,
                   setupStartMinute: j.setupStartMinute,
-                  setupEndMinute: j.setupEndMinute,
-                  qualityEndMinute: j.qualityEndMinute,
                   endMinute: j.endMinute,
+                  segments: j.segments,
                 }),
               )}
             />

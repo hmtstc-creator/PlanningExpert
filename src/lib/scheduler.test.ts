@@ -384,8 +384,115 @@ describe('vinç kısıtı ve rulo besleme', () => {
     const transfer = run(false)
     expect(progressive.coilChanges).toBeGreaterThan(0)
     expect(transfer.coilChanges).toBe(0)
-    expect(transfer.setupEndMinute - transfer.setupStartMinute).toBeLessThan(
-      progressive.setupEndMinute - progressive.setupStartMinute,
+    // Kalıp setup'ı ikisinde de aynı; fark rulo değişimlerinde.
+    expect(progressive.segments.some((seg) => seg.kind === 'coil')).toBe(true)
+    expect(transfer.segments.some((seg) => seg.kind === 'coil')).toBe(false)
+    expect(transfer.endMinute).toBeLessThan(progressive.endMinute)
+  })
+
+  it('rulo değişimlerini üretimin arasına yerleştirir, başa toplamaz', () => {
+    // Rulodan 100 adet çıkıyor, 500 adet planlanıyor → 5 rulo, 4 değişim.
+    const multiCoil: ProductSpec & { mainMachine?: string } = {
+      ...baseProduct,
+      coilWeight: 100,
+      grossWeight: 1,
+      coilSetupMinutes: 10,
+      spm: 1, // her rulo 100 dakika üretim
+      mainMachine: 'PRS-1',
+    }
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', multiCoil]]),
+      [{ name: 'PRS-1', hall: 'Hall 1' }],
+      bucketsFor(['PRS-1'], 3),
+      settings,
+      options,
     )
+    const job = result.jobs[0]
+    const kinds = job.segments.map((seg) => seg.kind)
+    // setup, (onay yok), üretim, rulo, üretim, rulo, ...
+    expect(kinds[0]).toBe('setup')
+    expect(kinds[1]).toBe('run')
+    expect(kinds.filter((k) => k === 'coil')).toHaveLength(4)
+    expect(kinds.filter((k) => k === 'run')).toHaveLength(5)
+    // Her rulo değişimi iki üretim parçasının arasında.
+    job.segments.forEach((seg, i) => {
+      if (seg.kind !== 'coil') return
+      expect(job.segments[i - 1].kind).toBe('run')
+      expect(job.segments[i + 1].kind).toBe('run')
+    })
+  })
+
+  it('aynı holde iki rulo değişimi 30 dakikadan yakın olamaz', () => {
+    const multiCoil = (code: string, machine: string): ProductSpec & { mainMachine?: string } => ({
+      ...baseProduct,
+      code,
+      coilWeight: 100,
+      grossWeight: 1,
+      coilSetupMinutes: 10,
+      spm: 5, // her rulo 20 dakika üretim → değişimler sık gelir
+      setupMinutes: 0,
+      mainMachine: machine,
+    })
+    const result = schedule(
+      [backlogEntry, { ...backlogEntry, material: 'B' }],
+      new Map([
+        ['A', multiCoil('A', 'PRS-1')],
+        ['B', multiCoil('B', 'PRS-2')],
+      ]),
+      [
+        { name: 'PRS-1', hall: 'Hall 1' },
+        { name: 'PRS-2', hall: 'Hall 1' },
+      ],
+      bucketsFor(['PRS-1', 'PRS-2'], 3),
+      settings,
+      { ...options, coilSetupGapMinutes: 30 },
+    )
+    const coils = result.jobs
+      .flatMap((j) => j.segments.filter((seg) => seg.kind === 'coil'))
+      .sort((a, b) => a.start - b.start)
+    for (let i = 1; i < coils.length; i++) {
+      expect(coils[i].start).toBeGreaterThanOrEqual(coils[i - 1].end + 30)
+    }
+  })
+
+  it('kalıp setup ile rulo setup kesişemez ama peş peşe gelebilir', () => {
+    const withSetup: ProductSpec & { mainMachine?: string } = {
+      ...baseProduct,
+      setupMinutes: 40,
+      coilWeight: 100,
+      grossWeight: 1,
+      coilSetupMinutes: 10,
+      spm: 5,
+      mainMachine: 'PRS-1',
+    }
+    const other: ProductSpec & { mainMachine?: string } = {
+      ...withSetup,
+      code: 'B',
+      setupMinutes: 40,
+      mainMachine: 'PRS-2',
+    }
+    const result = schedule(
+      [backlogEntry, { ...backlogEntry, material: 'B' }],
+      new Map([
+        ['A', withSetup],
+        ['B', other],
+      ]),
+      [
+        { name: 'PRS-1', hall: 'Hall 1' },
+        { name: 'PRS-2', hall: 'Hall 1' },
+      ],
+      bucketsFor(['PRS-1', 'PRS-2'], 3),
+      settings,
+      options,
+    )
+    const molds = result.jobs.flatMap((j) => j.segments.filter((s) => s.kind === 'setup'))
+    const coils = result.jobs.flatMap((j) => j.segments.filter((s) => s.kind === 'coil'))
+    for (const m of molds) {
+      for (const c of coils) {
+        const overlaps = m.start < c.end && c.start < m.end
+        expect(overlaps).toBe(false)
+      }
+    }
   })
 })

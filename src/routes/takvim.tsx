@@ -149,6 +149,7 @@ function PressCalendarSection() {
   const [overtimeShiftMinutes, setOvertimeShiftMinutes] = useState(480)
   const [country, setCountry] = useState('TR')
   const [setupGapMinutes, setSetupGapMinutes] = useState(60)
+  const [coilSetupGapMinutes, setCoilSetupGapMinutes] = useState(30)
   const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
   const [shiftStartMinute, setShiftStartMinute] = useState(420) // 07:00
   const [planningHorizonWeeks, setPlanningHorizonWeeks] = useState(4)
@@ -162,6 +163,7 @@ function PressCalendarSection() {
           overtimeShiftMinutes: globalSettings.overtimeShiftMinutes,
           country: globalSettings.country,
           setupGapMinutes: globalSettings.setupGapMinutes ?? 60,
+          coilSetupGapMinutes: globalSettings.coilSetupGapMinutes ?? 30,
           concurrentSetupsPerHall: globalSettings.concurrentSetupsPerHall ?? 1,
           shiftStartMinute: globalSettings.shiftStartMinute ?? 420,
           planningHorizonWeeks: globalSettings.planningHorizonWeeks ?? 4,
@@ -173,6 +175,7 @@ function PressCalendarSection() {
       overtimeShiftMinutes: setOvertimeShiftMinutes,
       country: setCountry,
       setupGapMinutes: setSetupGapMinutes,
+      coilSetupGapMinutes: setCoilSetupGapMinutes,
       concurrentSetupsPerHall: setConcurrentSetupsPerHall,
       shiftStartMinute: setShiftStartMinute,
       planningHorizonWeeks: setPlanningHorizonWeeks,
@@ -186,6 +189,7 @@ function PressCalendarSection() {
       overtimeShiftMinutes: number
       country: string
       setupGapMinutes: number
+      coilSetupGapMinutes: number
       concurrentSetupsPerHall: number
       shiftStartMinute: number
       planningHorizonWeeks: number
@@ -197,6 +201,7 @@ function PressCalendarSection() {
       overtimeShiftMinutes: next?.overtimeShiftMinutes ?? overtimeShiftMinutes,
       country: next?.country ?? country,
       setupGapMinutes: next?.setupGapMinutes ?? setupGapMinutes,
+      coilSetupGapMinutes: next?.coilSetupGapMinutes ?? coilSetupGapMinutes,
       concurrentSetupsPerHall: next?.concurrentSetupsPerHall ?? concurrentSetupsPerHall,
       shiftStartMinute: next?.shiftStartMinute ?? shiftStartMinute,
       planningHorizonWeeks: next?.planningHorizonWeeks ?? planningHorizonWeeks,
@@ -660,6 +665,23 @@ function PressCalendarSection() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
+            Min. gap between coil changes (min)
+          </span>
+          <input
+            type="number"
+            min={0}
+            className="mt-1 w-28 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={coilSetupGapMinutes}
+            onChange={(e) => setCoilSetupGapMinutes(Number(e.target.value))}
+            onBlur={() => {
+              const clamped = Math.max(0, Math.round(coilSetupGapMinutes) || 0)
+              setCoilSetupGapMinutes(clamped)
+              void persistGlobalSettings({ coilSetupGapMinutes: clamped })
+            }}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
             Concurrent setups per hall
           </span>
           <input
@@ -675,8 +697,10 @@ function PressCalendarSection() {
       <p className="mt-2 text-xs text-muted-foreground">
         Crane constraint: presses in the same hall can run at most{' '}
         {concurrentSetupsPerHall} setup(s) at a time, with at least{' '}
-        {setupGapMinutes} min between consecutive setups. Hall definitions come
-        from the Press Definitions page.
+        {setupGapMinutes} min between consecutive mould setups and{' '}
+        {coilSetupGapMinutes} min between coil changes. A mould setup and a coil
+        change can follow each other immediately but never overlap. Hall
+        definitions come from the Press Definitions page.
       </p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">

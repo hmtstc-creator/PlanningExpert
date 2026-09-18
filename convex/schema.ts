@@ -119,6 +119,8 @@ export default defineSchema({
     overtimeShiftMinutes: v.number(),
     country: v.string(),
     setupGapMinutes: v.optional(v.number()),
+    // Aynı holde iki rulo değişimi arasındaki en az süre (dk).
+    coilSetupGapMinutes: v.optional(v.number()),
     concurrentSetupsPerHall: v.optional(v.number()),
     // Birinci vardiyanın başlangıç saati (gece yarısından dakika).
     // Planda gerçek saat göstermek için kullanılır.

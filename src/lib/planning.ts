@@ -454,6 +454,14 @@ export interface RunPlan {
   coilsNeeded: number
   /** Ana setup'tan sonra bağlanan rulo sayısı (ilk rulo setup'a dahildir). */
   coilChanges: number
+  /** Tek bir rulo değişiminin süresi (dk). */
+  coilChangeMinutes: number
+  /**
+   * Her rulonun üretim süresi (dk), sırayla. Rulo değişimleri bu parçaların
+   * ARASINA girer — hepsi başta değil, rulo bittikçe. Hangi saatte hangi
+   * rulonun bağlanacağı sahada önemlidir.
+   */
+  coilRunMinutes: number[]
   /** İdeal hızda üretim süresi (dk) — çarpan uygulanmamış. */
   theoreticalRunMinutes: number
   /** Gantt'ta çizilecek üretim süresi (dk) — çarpan uygulanmış. */
@@ -497,7 +505,8 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   // yaşanır. Rulo beslemeyen presler (transfer) bunu hiç ödemez — orada
   // setup tektir.
   const coilChanges = Math.max(0, coilsNeeded - 1)
-  const coilSetupMinutes = (product.coilSetupMinutes ?? 0) * coilChanges
+  const coilChangeMinutes = product.coilSetupMinutes ?? 0
+  const coilSetupMinutes = coilChangeMinutes * coilChanges
   const qualityApprovalMinutes = product.qualityApprovalMinutes ?? 0
   const nonProductive = setupMinutes + coilSetupMinutes + qualityApprovalMinutes
 
@@ -517,6 +526,20 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   const clampedToTheoretical = runFromWindow < theoreticalRunMinutes
   const runMinutes = clampedToTheoretical ? theoreticalRunMinutes : runFromWindow
 
+  // Üretimi rulo başına parçalara böl: her rulo kendi süresi kadar çalışır,
+  // aralarına rulo değişimi girer.
+  const coilRunMinutes: number[] = []
+  if (piecesInCoil > 0 && quantity > 0) {
+    let left = quantity
+    while (left > 0) {
+      const chunk = Math.min(left, piecesInCoil)
+      coilRunMinutes.push((runMinutes * chunk) / quantity)
+      left -= chunk
+    }
+  } else {
+    coilRunMinutes.push(runMinutes)
+  }
+
   return {
     quantity,
     shots,
@@ -525,6 +548,8 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
     shotsPerCoil,
     coilsNeeded,
     coilChanges,
+    coilChangeMinutes,
+    coilRunMinutes,
     theoreticalRunMinutes,
     runMinutes,
     setupMinutes,

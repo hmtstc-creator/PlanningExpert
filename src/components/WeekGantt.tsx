@@ -16,13 +16,20 @@ import {
  * the strip scrolls; the press column stays pinned so the row is still
  * identifiable when scrolled far to the right.
  */
+/**
+ * Grey is deliberately outside the categorical palette: a coil change is the
+ * absence of production rather than another kind of it, and it must not
+ * compete with the mould setup for attention. The five chromatic kinds were
+ * validated together as a set.
+ */
 const COLORS = {
-  setup: { fill: '#3b6fd4', label: 'Setup' },
+  setup: { fill: '#3b6fd4', label: 'Mould setup' },
+  coil: { fill: '#94a3b8', label: 'Coil change' },
   quality: { fill: '#a259a8', label: 'Quality approval' },
   run: { fill: '#5aa97b', label: 'Production' },
   meeting: { fill: '#d1ad33', label: 'Meeting / handover' },
   stop: { fill: '#a8460f', label: 'Tea / meal break' },
-  other: { fill: '#64748b', label: 'Other stop' },
+  other: { fill: '#475569', label: 'Other stop' },
 } as const
 
 type BlockKind = keyof typeof COLORS
@@ -38,6 +45,12 @@ function kindOfStop(stopKind: string): BlockKind {
 const ZOOM_STEPS = [3, 5, 8, 14, 24, 40, 70, 120] as const
 const DEFAULT_ZOOM = 4
 
+export interface WeekGanttSegment {
+  kind: 'setup' | 'quality' | 'run' | 'coil'
+  start: number
+  end: number
+}
+
 export interface WeekGanttJob {
   date: string
   press: string
@@ -45,9 +58,9 @@ export interface WeekGanttJob {
   quantity: number
   late: boolean
   setupStartMinute: number
-  setupEndMinute: number
-  qualityEndMinute: number
   endMinute: number
+  /** Setup → approval → production → coil change → production … */
+  segments: WeekGanttSegment[]
 }
 
 export interface WeekGanttDay {
@@ -151,20 +164,16 @@ export function WeekGantt({
         }
 
         for (const job of jobsByPressDate.get(`${press.name}|${day.date}`) ?? []) {
-          const spans: [BlockKind, number, number][] = [
-            ['setup', job.setupStartMinute, job.setupEndMinute],
-            ['quality', job.setupEndMinute, job.qualityEndMinute],
-            ['run', job.qualityEndMinute, job.endMinute],
-          ]
-          for (const [kind, from, to] of spans) {
-            for (const seg of netIntervalToClockBlocks(from, to, timeline)) {
+          for (const span of job.segments) {
+            const kind = span.kind as BlockKind
+            for (const seg of netIntervalToClockBlocks(span.start, span.end, timeline)) {
               blocks.push({
                 kind,
                 press: press.name,
                 hall: press.hall,
                 start: base + seg.start,
                 end: base + seg.end,
-                label: job.material,
+                label: kind === 'coil' ? undefined : job.material,
                 title:
                   `${job.material} · ${COLORS[kind].label} · ` +
                   `${clockLabel(seg.start)}–${clockLabel(seg.end)}` +
