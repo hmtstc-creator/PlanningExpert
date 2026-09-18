@@ -2,6 +2,7 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 
 import '../styles.css'
 import siteMetadata from '../metadata.json'
+import { ConnectionBanner } from '../components/ConnectionBanner'
 import { Header } from '../components/Header'
 import { MutationErrorToast } from '../components/MutationErrorToast'
 import AppConvexProvider from '@/components/convex-client-provider'
@@ -33,6 +34,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         <AppConvexProvider>
           <Header />
+          <ConnectionBanner />
           {children}
           <MutationErrorToast />
         </AppConvexProvider>
