@@ -13,7 +13,11 @@ import {
   type DemandInput,
   type ProductSpec,
 } from '../lib/planning'
-import { PressGantt, type GanttJob, type GanttPress } from '../components/PressGantt'
+import {
+  WeekGantt,
+  type WeekGanttJob,
+  type WeekGanttPress,
+} from '../components/WeekGantt'
 import { remainingCapacityMinutes } from '../lib/gantt'
 import { diffPlans } from '../lib/planDiff'
 import { schedule, type PlanOverride, type ScheduledJob } from '../lib/scheduler'
@@ -60,7 +64,11 @@ function PlanlamaPage() {
     {},
     { initialNumItems: 200 },
   )
-  const presses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string }[]
+  const presses = (useQuery(api.presses.list) ?? []) as {
+    name: string
+    hall: string
+    category?: string
+  }[]
   const templates = (useQuery(api.pressCalendar.listTemplates) ?? []) as {
     press: string
     workingDays: number
@@ -71,6 +79,13 @@ function PlanlamaPage() {
   const workCalendar = useQuery(api.workCalendar.get)
   const latestSnapshot = useQuery(api.planSnapshots.latest)
   const approve = useMutation(api.planSnapshots.approve)
+  const plannedStops = (useQuery(api.plannedStops.list) ?? []) as {
+    shiftIndex: number
+    name: string
+    kind: string
+    startMinute: number
+    durationMinutes: number
+  }[]
   const overrideRows = (useQuery(api.planOverrides.list) ?? []) as {
     _id: string
     material: string
@@ -95,6 +110,18 @@ function PlanlamaPage() {
   const concurrentSetupsPerHall = globalSettings?.concurrentSetupsPerHall ?? 1
   const shiftStartMinute = globalSettings?.shiftStartMinute ?? 480
   const breakMinutesPerShift = globalSettings?.breakMinutesPerShift ?? 0
+
+  // Planned stops replace the old single break figure; capacity is reduced
+  // shift by shift so a shift with a handover and a meal is worth less than
+  // one with only a tea break.
+  const stopMinutesByShift = useMemo(() => {
+    const perShift = [0, 0, 0]
+    for (const stop of plannedStops) {
+      const i = stop.shiftIndex - 1
+      if (i >= 0 && i < 3) perShift[i] += stop.durationMinutes
+    }
+    return perShift
+  }, [plannedStops])
   // Kapasite düzeltme katsayısı: ölçülen gerçekleşme oranı (Performans
   // sayfasından yazılır). Tanımsızsa kapasite olduğu gibi kullanılır.
   const capacityFactor = globalSettings?.capacityFactor ?? 1
@@ -208,7 +235,7 @@ function PlanlamaPage() {
           ...buildWeekBuckets(
             addDays(start, w * 7),
             pattern,
-            { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift },
+            { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift, stopMinutesByShift },
             holidays,
             workingDayKeys,
           ),
@@ -249,6 +276,7 @@ function PlanlamaPage() {
     capacityFactor,
     horizonWeeks,
     breakMinutesPerShift,
+    stopMinutesByShift,
     shiftStartMinute,
     todayIso,
     nowClockMinute,
@@ -271,6 +299,7 @@ function PlanlamaPage() {
         setupGapMinutes,
         concurrentSetupsPerHall,
         overrides,
+        netShiftMinutes: Math.max(1, shiftMinutes - (stopMinutesByShift[0] ?? 0)),
       }),
     [
       demand,
@@ -282,8 +311,10 @@ function PlanlamaPage() {
       setupGapMinutes,
       concurrentSetupsPerHall,
       overrides,
+      stopMinutesByShift,
     ],
   )
+
 
   // Onaylı planla canlı planın farkı — "onayladığımdan bu yana ne değişti".
   const planDiff = useMemo(() => {
@@ -310,22 +341,77 @@ function PlanlamaPage() {
     return map
   }, [buckets])
 
-  const shiftLayout = useMemo(
-    () => ({ shiftStartMinute, shiftMinutes, breakMinutesPerShift }),
-    [shiftStartMinute, shiftMinutes, breakMinutesPerShift],
-  )
+  // How many shifts each press runs on each day — the Gantt needs this to
+  // lay out the day's shift windows and place the planned stops.
+  const shiftsByPressDate = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const [pressName, list] of buckets) {
+      for (const b of list) map.set(`${pressName}|${b.date}`, b.shifts)
+    }
+    return map
+  }, [buckets])
 
-  const byDate = useMemo(() => {
-    const map = new Map<string, ScheduledJob[]>()
+  /**
+   * The plan grouped by calendar week, with a reason for every press that has
+   * no work. An idle row is ambiguous on its own — no demand, nothing it can
+   * run, or no capacity are three different problems.
+   */
+  const weeks = useMemo(() => {
+    const byWeek = new Map<string, { dates: Set<string>; jobs: typeof result.jobs }>()
+    for (const [pressName, list] of buckets) {
+      void pressName
+      for (const b of list) {
+        if (b.minutes <= 0) continue
+        const weekStart = isoDate(mondayOf(new Date(`${b.date}T00:00:00`)))
+        const entry = byWeek.get(weekStart) ?? { dates: new Set<string>(), jobs: [] }
+        entry.dates.add(b.date)
+        byWeek.set(weekStart, entry)
+      }
+    }
     for (const job of result.jobs) {
-      if (!map.has(job.date)) map.set(job.date, [])
-      map.get(job.date)!.push(job)
+      const weekStart = isoDate(mondayOf(new Date(`${job.date}T00:00:00`)))
+      const entry = byWeek.get(weekStart) ?? { dates: new Set<string>(), jobs: [] }
+      entry.dates.add(job.date)
+      entry.jobs.push(job)
+      byWeek.set(weekStart, entry)
     }
-    for (const list of map.values()) {
-      list.sort((a, b) => a.press.localeCompare(b.press) || a.setupStartMinute - b.setupStartMinute)
+
+    const eligiblePresses = new Set<string>()
+    for (const product of productByCode.values()) {
+      for (const m of [
+        product.mainMachine,
+        product.altMachine1,
+        product.altMachine2,
+        product.altMachine3,
+        product.altMachine4,
+      ]) {
+        if (m && m.trim()) eligiblePresses.add(m.trim())
+      }
     }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [result])
+
+    return Array.from(byWeek.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([weekStart, entry]) => {
+        const dates = Array.from(entry.dates).sort()
+        const busy = new Set(entry.jobs.map((j) => j.press))
+        const idlePresses = presses
+          .filter((p) => !busy.has(p.name))
+          .map((p) => {
+            const capacity = dates.reduce(
+              (sum, d) => sum + (capacityByPressDate.get(`${p.name}|${d}`) ?? 0),
+              0,
+            )
+            const reason =
+              capacity <= 0
+                ? 'no capacity'
+                : !eligiblePresses.has(p.name)
+                  ? 'no material lists it'
+                  : 'no demand for its materials'
+            return { name: p.name, reason }
+          })
+        return { weekStart, dates, jobs: entry.jobs, idlePresses }
+      })
+  }, [buckets, result, presses, productByCode, capacityByPressDate])
 
   const lateCount = result.jobs.filter((j) => j.late).length
 
@@ -694,7 +780,7 @@ function PlanlamaPage() {
         <p className="mt-8 text-sm text-muted-foreground">Loading data…</p>
       )}
 
-      {byDate.length === 0 && productStatus !== 'LoadingFirstPage' && (
+      {weeks.length === 0 && productStatus !== 'LoadingFirstPage' && (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           No jobs to plan. Make sure ZPP demand, MB52 stock and{' '}
           <Link to="/makineler" className="underline">
@@ -704,56 +790,74 @@ function PlanlamaPage() {
         </p>
       )}
 
-      <div className="mt-8 space-y-6">
-        {byDate.map(([date, jobs]) => (
-          <div key={date}>
-            <h2 className="text-sm font-semibold text-foreground">
-              {new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', {
-                weekday: 'long',
+      {weeks.map((week) => (
+        <div key={week.weekStart} className="mt-8">
+          <h2 className="text-sm font-semibold text-foreground">
+            {isoWeekLabel(new Date(`${week.weekStart}T00:00:00`))}{' '}
+            <span className="font-normal text-muted-foreground">
+              · {new Date(`${week.dates[0]}T00:00:00`).toLocaleDateString('en-GB', {
                 day: '2-digit',
-                month: 'long',
-              })}{' '}
-              <span className="font-normal text-muted-foreground">
-                · {isoWeekLabel(new Date(`${date}T00:00:00`))} · {jobs.length} jobs
-              </span>
-            </h2>
+                month: 'short',
+              })}
+              –
+              {new Date(
+                `${week.dates[week.dates.length - 1]}T00:00:00`,
+              ).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}{' '}
+              · {week.jobs.length} jobs
+            </span>
+          </h2>
 
-            <div className="mt-2">
-              <PressGantt
-                date={date}
-                layout={shiftLayout}
-                presses={presses.map(
-                  (p): GanttPress => ({
-                    name: p.name,
-                    hall: p.hall,
-                    capacityMinutes: capacityByPressDate.get(`${p.name}|${date}`) ?? 0,
-                  }),
-                )}
-                jobs={jobs.map(
-                  (j): GanttJob => ({
-                    press: j.press,
-                    hall: j.hall,
-                    material: j.material,
-                    setupStartMinute: j.setupStartMinute,
-                    setupEndMinute: j.setupEndMinute,
-                    endMinute: j.endMinute,
-                    quantity: j.quantity,
-                    late: j.late,
-                  }),
-                )}
-              />
-            </div>
+          <div className="mt-2">
+            <WeekGantt
+              dates={week.dates}
+              stops={plannedStops}
+              shiftStartMinute={shiftStartMinute}
+              shiftMinutes={shiftMinutes}
+              presses={presses.map(
+                (p): WeekGanttPress => ({
+                  name: p.name,
+                  hall: p.hall,
+                  category: p.category,
+                  days: week.dates.map((d) => ({
+                    date: d,
+                    shifts: shiftsByPressDate.get(`${p.name}|${d}`) ?? 0,
+                    capacityMinutes: capacityByPressDate.get(`${p.name}|${d}`) ?? 0,
+                  })),
+                }),
+              )}
+              jobs={week.jobs.map(
+                (j): WeekGanttJob => ({
+                  date: j.date,
+                  press: j.press,
+                  material: j.material,
+                  quantity: j.quantity,
+                  late: j.late,
+                  setupStartMinute: j.setupStartMinute,
+                  setupEndMinute: j.setupEndMinute,
+                  qualityEndMinute: j.qualityEndMinute,
+                  endMinute: j.endMinute,
+                }),
+              )}
+            />
+          </div>
 
-            <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-                Show job list ({jobs.length})
-              </summary>
+          {week.idlePresses.length > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              <strong className="text-foreground">Idle this week:</strong>{' '}
+              {week.idlePresses.map((p) => `${p.name} (${p.reason})`).join(' · ')}
+            </p>
+          )}
+
+          <details className="mt-2">
+            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+              Show job list ({week.jobs.length})
+            </summary>
             <div className="mt-2 overflow-x-auto rounded-lg border border-border">
               <table className="w-full text-left text-sm">
                 <thead className="bg-muted text-muted-foreground">
                   <tr>
+                    <th className="px-3 py-2 font-medium">Day</th>
                     <th className="px-3 py-2 font-medium">Press</th>
-                    <th className="px-3 py-2 font-medium">Hall</th>
                     <th className="px-3 py-2 font-medium">Material</th>
                     <th className="px-3 py-2 font-medium">Required</th>
                     <th className="px-3 py-2 font-medium">Qty</th>
@@ -765,10 +869,15 @@ function PlanlamaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {jobs.map((job, i) => (
+                  {week.jobs.map((job, i) => (
                     <tr key={`${job.press}-${job.material}-${i}`} className="border-t border-border">
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {new Date(`${job.date}T00:00:00`).toLocaleDateString('en-GB', {
+                          weekday: 'short',
+                          day: '2-digit',
+                        })}
+                      </td>
                       <td className="px-3 py-2 font-medium text-foreground">{job.press}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{job.hall}</td>
                       <td className="px-3 py-2 text-foreground">
                         {job.material}
                         {job.coProduct && (
@@ -800,10 +909,9 @@ function PlanlamaPage() {
                 </tbody>
               </table>
             </div>
-            </details>
-          </div>
-        ))}
-      </div>
+          </details>
+        </div>
+      ))}
 
       {rawNeeds.length > 0 && (
         <div className="mt-8">

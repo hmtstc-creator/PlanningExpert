@@ -27,6 +27,8 @@ const emptyForm = {
   altMachine3: '',
   altMachine4: '',
   maxShots: '',
+  qualityApprovalMinutes: '',
+  performanceFactor: '',
 }
 
 function ReferanslarPage() {
@@ -101,6 +103,8 @@ function ReferanslarPage() {
         altMachine3: str(form.altMachine3),
         altMachine4: str(form.altMachine4),
         maxShots: num(form.maxShots),
+        qualityApprovalMinutes: num(form.qualityApprovalMinutes),
+        performanceFactor: num(form.performanceFactor),
       })
       setForm(emptyForm)
     } catch (err) {
@@ -151,6 +155,18 @@ function ReferanslarPage() {
           row['Kalıp Max Shot'] ??
           row['maxShots'],
       ),
+      qualityApprovalMinutes: n(
+        row['Quality Approval'] ??
+          row['Approval Time'] ??
+          row['Kalite Onay Süresi'] ??
+          row['qualityApprovalMinutes'],
+      ),
+      performanceFactor: n(
+        row['Performance Factor'] ??
+          row['OEE Factor'] ??
+          row['Performans Çarpanı'] ??
+          row['performanceFactor'],
+      ),
     }))
     const validRows = parsed.filter((r) => r.code)
     const result = await bulkUpsert({ rows: validRows })
@@ -167,7 +183,9 @@ function ReferanslarPage() {
         data, setup times, mold shot limit and main/alternative machines.
         Upload an Excel file to load them in bulk, then click any cell in the
         table below to correct a value — changes save as soon as you leave the
-        cell.
+        cell. The performance factor (availability × performance, quality taken
+        as 100%) sets each job's total window: setup and quality approval come
+        out of that window and the rest is production time.
       </p>
 
       <div className="mt-6">
@@ -185,6 +203,8 @@ function ReferanslarPage() {
             'Main Machine',
             'Alternative 1-4',
             'Max Shot',
+            'Quality Approval',
+            'Performance Factor',
           ]}
           onRows={handleExcelRows}
         />
@@ -213,6 +233,8 @@ function ReferanslarPage() {
           <Field label="Alternative 3" value={form.altMachine3} onChange={(v) => update('altMachine3', v)} placeholder="" />
           <Field label="Alternative 4" value={form.altMachine4} onChange={(v) => update('altMachine4', v)} placeholder="" />
           <Field label="Max Shot limit" value={form.maxShots} onChange={(v) => update('maxShots', v)} type="number" placeholder="500000" />
+          <Field label="Quality Approval (min)" value={form.qualityApprovalMinutes} onChange={(v) => update('qualityApprovalMinutes', v)} type="number" placeholder="10" />
+          <Field label="Performance factor (0–1)" value={form.performanceFactor} onChange={(v) => update('performanceFactor', v)} type="number" placeholder="0.8" />
 
           {error && <p className="text-sm text-destructive sm:col-span-3">{error}</p>}
           <button
@@ -255,20 +277,22 @@ function ReferanslarPage() {
               <th className="px-3 py-2 font-medium">Main Machine</th>
               <th className="px-3 py-2 font-medium">Alternatives</th>
               <th className="px-3 py-2 font-medium">Max Shot</th>
+              <th className="px-3 py-2 font-medium" title="Setup sonrası ilk parça onayı">Approval</th>
+              <th className="px-3 py-2 font-medium" title="Availability × performance; quality assumed 100%">Perf.</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody>
             {status === 'LoadingFirstPage' && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={13}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={15}>
                   Loading…
                 </td>
               </tr>
             )}
             {status !== 'LoadingFirstPage' && visibleProducts.length === 0 && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={13}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={15}>
                   No materials added yet.
                 </td>
               </tr>
@@ -301,6 +325,8 @@ function ReferanslarPage() {
                   </div>
                 </td>
                 <EditableCell product={p} field="maxShots" value={p.maxShots} numeric onSave={updateField} />
+                <EditableCell product={p} field="qualityApprovalMinutes" value={p.qualityApprovalMinutes} numeric onSave={updateField} />
+                <EditableCell product={p} field="performanceFactor" value={p.performanceFactor} numeric onSave={updateField} />
                 <td className="px-3 py-2 text-right">
                   <button
                     className="text-xs text-destructive hover:underline"

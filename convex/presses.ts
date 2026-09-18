@@ -7,7 +7,9 @@ const pressValidator = v.object({
   _creationTime: v.number(),
   name: v.string(),
   hall: v.string(),
+  category: v.optional(v.string()),
   tonnage: v.optional(v.number()),
+  frozenDays: v.optional(v.number()),
 })
 
 export const list = query({
@@ -20,7 +22,9 @@ export const upsert = mutation({
   args: {
     name: v.string(),
     hall: v.string(),
+    category: v.optional(v.string()),
     tonnage: v.optional(v.number()),
+    frozenDays: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -31,7 +35,12 @@ export const upsert = mutation({
       .withIndex('by_name', (q) => q.eq('name', name))
       .first()
     if (existing) {
-      await ctx.db.patch(existing._id, { hall: args.hall, tonnage: args.tonnage })
+      await ctx.db.patch(existing._id, {
+        hall: args.hall,
+        category: args.category,
+        tonnage: args.tonnage,
+        frozenDays: args.frozenDays,
+      })
     } else {
       await ctx.db.insert('presses', { ...args, name })
     }

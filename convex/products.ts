@@ -24,6 +24,8 @@ const productValidator = v.object({
   altMachine3: v.optional(v.string()),
   altMachine4: v.optional(v.string()),
   maxShots: v.optional(v.number()),
+  qualityApprovalMinutes: v.optional(v.number()),
+  performanceFactor: v.optional(v.number()),
   name: v.string(),
   material: v.string(),
   cycleTimeSeconds: v.number(),
@@ -45,6 +47,8 @@ const productArgs = {
   altMachine3: v.optional(v.string()),
   altMachine4: v.optional(v.string()),
   maxShots: v.optional(v.number()),
+  qualityApprovalMinutes: v.optional(v.number()),
+  performanceFactor: v.optional(v.number()),
   name: v.optional(v.string()),
   material: v.optional(v.string()),
   cycleTimeSeconds: v.optional(v.number()),
@@ -158,6 +162,8 @@ export const updateField = mutation({
       'setupMinutes',
       'coilSetupMinutes',
       'maxShots',
+      'qualityApprovalMinutes',
+      'performanceFactor',
     ]
 
     if (!textFields.includes(field) && !numberFields.includes(field)) {
@@ -174,6 +180,11 @@ export const updateField = mutation({
       const parsed = typeof value === 'number' ? value : Number(value)
       if (!Number.isFinite(parsed)) throw new Error(`${field} must be a number`)
       if (parsed < 0) throw new Error(`${field} cannot be negative`)
+      if (field === 'performanceFactor' && (parsed <= 0 || parsed > 1)) {
+        // A factor above 1 would claim the press runs faster than its own
+        // cycle time; zero would make the job infinitely long.
+        throw new Error('Performance factor must be greater than 0 and at most 1')
+      }
       await ctx.db.patch(id, { [field]: parsed })
       return null
     }

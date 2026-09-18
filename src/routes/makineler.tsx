@@ -10,7 +10,24 @@ export const Route = createFileRoute('/makineler')({
   component: MakinelerPage,
 })
 
-type Press = { _id: string; name: string; hall: string; tonnage?: number }
+type Press = {
+  _id: string
+  name: string
+  hall: string
+  category?: string
+  tonnage?: number
+  frozenDays?: number
+}
+
+// Suggestions only — any text is accepted, since every shop names its press
+// types differently.
+const CATEGORY_SUGGESTIONS = [
+  'Transfer press',
+  'Progressive 800 t',
+  'Progressive 500 t',
+  'Progressive 400 t',
+  'Single stage',
+]
 
 function MakinelerPage() {
   const presses = (useQuery(api.presses.list) ?? []) as Press[]
@@ -28,6 +45,7 @@ function MakinelerPage() {
 
   const [name, setName] = useState('')
   const [hall, setHall] = useState('')
+  const [category, setCategory] = useState('')
   const [tonnage, setTonnage] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -63,7 +81,8 @@ function MakinelerPage() {
     try {
       ok = await upsert({
         name: n,
-        hall: hall.trim() || 'Hol 1',
+        hall: hall.trim() || 'Hall 1',
+        category: category.trim() || undefined,
         tonnage: tonnage.trim() === '' ? undefined : Number(tonnage),
       })
     } finally {
@@ -80,9 +99,13 @@ function MakinelerPage() {
     <div className="w-full px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Press Definitions</h1>
       <p className="mt-2 text-muted-foreground">
-        Define which hall each press sits in. Presses in the same hall cannot
-        set up at the same time (crane constraint) — planning relies on this.
-        The press list on the Work Calendar page comes from here too.
+        Define which hall each press sits in — presses in the same hall cannot
+        set up at the same time, which is the crane constraint the planner
+        relies on. The category is for grouping the plan on screen only;
+        which press can run a material still comes from the main and
+        alternative machines in master data. Frozen days locks that press's
+        plan for the given number of days; leave it empty to use the global
+        setting.
       </p>
 
       <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
@@ -108,6 +131,21 @@ function MakinelerPage() {
             value={hall}
             onChange={(e) => setHall(e.target.value)}
           />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Category</span>
+          <input
+            className="mt-1 w-44 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            list="press-categories"
+            placeholder="Progressive 800 t"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          />
+          <datalist id="press-categories">
+            {CATEGORY_SUGGESTIONS.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Tonnage (opt.)</span>
@@ -170,7 +208,11 @@ function MakinelerPage() {
                     <tr>
                       <th className="px-3 py-2 font-medium">Press</th>
                       <th className="px-3 py-2 font-medium">Hall</th>
+                      <th className="px-3 py-2 font-medium">Category</th>
                       <th className="px-3 py-2 font-medium">Tonnage</th>
+                      <th className="px-3 py-2 font-medium" title="Days of this press's plan that stay locked">
+                        Frozen days
+                      </th>
                       <th className="px-3 py-2" />
                     </tr>
                   </thead>
@@ -196,6 +238,23 @@ function MakinelerPage() {
                           </td>
                           <td className="px-3 py-2">
                             <input
+                              className="w-40 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                              list="press-categories"
+                              placeholder="—"
+                              defaultValue={p.category ?? ''}
+                              onBlur={(e) =>
+                                void upsert({
+                                  name: p.name,
+                                  hall: p.hall,
+                                  category: e.target.value.trim() || undefined,
+                                  tonnage: p.tonnage,
+                                  frozenDays: p.frozenDays,
+                                })
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
                               type="number"
                               className="w-24 rounded-md border border-input bg-background px-2 py-1 text-sm"
                               defaultValue={p.tonnage ?? ''}
@@ -203,10 +262,33 @@ function MakinelerPage() {
                                 void upsert({
                                   name: p.name,
                                   hall: p.hall,
+                                  category: p.category,
+                                  frozenDays: p.frozenDays,
                                   tonnage:
                                     e.target.value.trim() === ''
                                       ? undefined
                                       : Number(e.target.value),
+                                })
+                              }
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              className="w-20 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                              placeholder="—"
+                              defaultValue={p.frozenDays ?? ''}
+                              onBlur={(e) =>
+                                void upsert({
+                                  name: p.name,
+                                  hall: p.hall,
+                                  category: p.category,
+                                  tonnage: p.tonnage,
+                                  frozenDays:
+                                    e.target.value.trim() === ''
+                                      ? undefined
+                                      : Math.max(0, Number(e.target.value)),
                                 })
                               }
                             />

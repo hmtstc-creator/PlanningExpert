@@ -6,6 +6,7 @@ import { api } from '../../convex/_generated/api'
 import { addDays, isoDate, mondayOf } from '../lib/dates'
 import { useSyncedFields } from '../lib/useSyncedFields'
 import { CapacityGrid } from '../components/CapacityGrid'
+import { PlannedStopsEditor, type StopRow } from '../components/PlannedStopsEditor'
 import type { WeekPattern as GridPattern } from '../lib/capacityGrid'
 
 export const Route = createFileRoute('/takvim')({
@@ -92,6 +93,7 @@ function PressCalendarSection() {
     shiftsPerDay: number
     overtimeShifts: number
   }[]
+  const plannedStops = (useQuery(api.plannedStops.list) ?? []) as StopRow[]
   const saveOverrideForGrid = useMutation(api.pressCalendar.saveOverride)
   const clearOverrideForGrid = useMutation(api.pressCalendar.clearOverride)
 
@@ -424,6 +426,18 @@ function PressCalendarSection() {
       </p>
 
       <div className="mt-4">
+        <PlannedStopsEditor
+          stops={plannedStops}
+          shiftCount={3}
+          shiftStartMinute={shiftStartMinute}
+          shiftMinutes={shiftMinutes}
+          addStop={api.plannedStops.add}
+          updateStop={api.plannedStops.update}
+          removeStop={api.plannedStops.remove}
+        />
+      </div>
+
+      <div className="mt-4">
         <h3 className="mb-2 text-sm font-semibold text-foreground">
           Capacity overview — all presses, all weeks
         </h3>
@@ -571,23 +585,6 @@ function PressCalendarSection() {
             value={overtimeShiftMinutes}
             onChange={(e) => setOvertimeShiftMinutes(Number(e.target.value) || 0)}
             onBlur={() => void persistGlobalSettings()}
-          />
-        </label>
-        <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">
-            Break / planned stop per shift (min)
-          </span>
-          <input
-            type="number"
-            min={0}
-            className="mt-1 w-28 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-            value={breakMinutesPerShift}
-            onChange={(e) => setBreakMinutesPerShift(Number(e.target.value))}
-            onBlur={() => {
-              const clamped = Math.max(0, Math.round(breakMinutesPerShift) || 0)
-              setBreakMinutesPerShift(clamped)
-              void persistGlobalSettings({ breakMinutesPerShift: clamped })
-            }}
           />
         </label>
         <label className="text-sm">
