@@ -123,3 +123,74 @@ export const remove = mutation({
     return null
   },
 })
+
+/**
+ * Updates a single field on one material.
+ *
+ * Master data arrives in bulk from Excel, but individual values still need
+ * correcting by hand — a wrong cavity count or SPM silently distorts every
+ * plan. Passing `null` clears an optional field; `undefined` leaves it
+ * untouched.
+ */
+export const updateField = mutation({
+  args: {
+    id: v.id('products'),
+    field: v.string(),
+    value: v.union(v.string(), v.number(), v.null()),
+  },
+  returns: v.null(),
+  handler: async (ctx, { id, field, value }) => {
+    const textFields = [
+      'code',
+      'coProduct',
+      'rawMaterialCode',
+      'mainMachine',
+      'altMachine1',
+      'altMachine2',
+      'altMachine3',
+      'altMachine4',
+    ]
+    const numberFields = [
+      'moldCavities',
+      'spm',
+      'coilWeight',
+      'grossWeight',
+      'setupMinutes',
+      'coilSetupMinutes',
+      'maxShots',
+    ]
+
+    if (!textFields.includes(field) && !numberFields.includes(field)) {
+      throw new Error(`Unknown field: ${field}`)
+    }
+
+    if (value === null) {
+      if (field === 'code') throw new Error('Material code cannot be empty')
+      await ctx.db.patch(id, { [field]: undefined })
+      return null
+    }
+
+    if (numberFields.includes(field)) {
+      const parsed = typeof value === 'number' ? value : Number(value)
+      if (!Number.isFinite(parsed)) throw new Error(`${field} must be a number`)
+      if (parsed < 0) throw new Error(`${field} cannot be negative`)
+      await ctx.db.patch(id, { [field]: parsed })
+      return null
+    }
+
+    const text = String(value).trim()
+    if (field === 'code') {
+      if (!text) throw new Error('Material code cannot be empty')
+      // A duplicate code would make bulk upload and planning ambiguous.
+      const clash = await ctx.db
+        .query('products')
+        .withIndex('by_code', (q) => q.eq('code', text))
+        .first()
+      if (clash && clash._id !== id) {
+        throw new Error(`Material code ${text} is already used by another record`)
+      }
+    }
+    await ctx.db.patch(id, { [field]: text === '' ? undefined : text })
+    return null
+  },
+})

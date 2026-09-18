@@ -1,8 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { ErrorBanner } from '../components/ErrorBanner'
+import { useSafeMutation } from '../lib/useSafeMutation'
 import { ExcelUpload } from '../components/ExcelUpload'
 
 export const Route = createFileRoute('/referanslar')({
@@ -31,11 +33,37 @@ function ReferanslarPage() {
   const createProduct = useMutation(api.products.create)
   const bulkUpsert = useMutation(api.products.bulkUpsert)
   const removeProduct = useMutation(api.products.remove)
+  const {
+    run: updateField,
+    error: updateError,
+    clearError,
+  } = useSafeMutation(api.products.updateField)
+  const [search, setSearch] = useState('')
+
   const { results: products, status } = usePaginatedQuery(
     api.products.list,
     {},
     { initialNumItems: 200 },
   )
+
+  // Excel uploads bring hundreds of rows; without a filter, correcting one
+  // material means scrolling through all of them.
+  const visibleProducts = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return products
+    return products.filter((p) =>
+      [
+        p.code,
+        p.coProduct,
+        p.rawMaterialCode,
+        p.mainMachine,
+        p.altMachine1,
+        p.altMachine2,
+        p.altMachine3,
+        p.altMachine4,
+      ].some((v) => v && String(v).toLowerCase().includes(q)),
+    )
+  }, [products, search])
 
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
@@ -137,6 +165,9 @@ function ReferanslarPage() {
       <p className="mt-2 text-muted-foreground">
         Material code, co-product if any, cavities, SPM, raw material and coil
         data, setup times, mold shot limit and main/alternative machines.
+        Upload an Excel file to load them in bulk, then click any cell in the
+        table below to correct a value — changes save as soon as you leave the
+        cell.
       </p>
 
       <div className="mt-6">
@@ -194,7 +225,21 @@ function ReferanslarPage() {
         </form>
       </details>
 
-      <div className="mt-8 overflow-x-auto rounded-lg border border-border">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+        <input
+          className="w-72 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          placeholder="Search material, machine or raw material code…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <span className="text-xs text-muted-foreground">
+          {visibleProducts.length} of {products.length} materials · click any cell to edit
+        </span>
+      </div>
+
+      <ErrorBanner message={updateError} onDismiss={clearError} />
+
+      <div className="mt-3 overflow-x-auto rounded-lg border border-border">
         <table className="w-full text-left text-sm">
           <thead className="bg-muted text-muted-foreground">
             <tr>
@@ -221,44 +266,51 @@ function ReferanslarPage() {
                 </td>
               </tr>
             )}
-            {status !== 'LoadingFirstPage' && products.length === 0 && (
+            {status !== 'LoadingFirstPage' && visibleProducts.length === 0 && (
               <tr>
                 <td className="px-3 py-3 text-muted-foreground" colSpan={13}>
                   No materials added yet.
                 </td>
               </tr>
             )}
-            {products.map((p) => {
-              const alternatives = [p.altMachine1, p.altMachine2, p.altMachine3, p.altMachine4]
-                .filter(Boolean)
-                .join(', ')
-              return (
-                <tr key={p._id} className="border-t border-border">
-                  <td className="px-3 py-2 text-foreground">{p.code}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{p.coProduct ?? '—'}</td>
-                  <td className="px-3 py-2 text-foreground">{p.moldCavities ?? '—'}</td>
-                  <td className="px-3 py-2 text-foreground">{p.spm ?? '—'}</td>
-                  <td className="px-3 py-2 text-foreground">{p.rawMaterialCode ?? '—'}</td>
-                  <td className="px-3 py-2 text-foreground">{p.coilWeight ?? '—'}</td>
-                  <td className="px-3 py-2 text-foreground">{p.grossWeight ?? '—'}</td>
-                  <td className="px-3 py-2 text-foreground">{p.setupMinutes ?? '—'}</td>
-                  <td className="px-3 py-2 text-foreground">{p.coilSetupMinutes ?? '—'}</td>
-                  <td className="px-3 py-2 text-foreground">{p.mainMachine ?? '—'}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{alternatives || '—'}</td>
-                  <td className="px-3 py-2 text-foreground">
-                    {p.maxShots ? p.maxShots.toLocaleString('en-GB') : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      className="text-xs text-destructive hover:underline"
-                      onClick={() => void removeProduct({ id: p._id })}
-                    >
-                      Sil
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
+            {visibleProducts.map((p) => (
+              <tr key={p._id} className="border-t border-border">
+                <EditableCell product={p} field="code" value={p.code} onSave={updateField} />
+                <EditableCell product={p} field="coProduct" value={p.coProduct} onSave={updateField} />
+                <EditableCell product={p} field="moldCavities" value={p.moldCavities} numeric onSave={updateField} />
+                <EditableCell product={p} field="spm" value={p.spm} numeric onSave={updateField} />
+                <EditableCell product={p} field="rawMaterialCode" value={p.rawMaterialCode} onSave={updateField} />
+                <EditableCell product={p} field="coilWeight" value={p.coilWeight} numeric onSave={updateField} />
+                <EditableCell product={p} field="grossWeight" value={p.grossWeight} numeric onSave={updateField} />
+                <EditableCell product={p} field="setupMinutes" value={p.setupMinutes} numeric onSave={updateField} />
+                <EditableCell product={p} field="coilSetupMinutes" value={p.coilSetupMinutes} numeric onSave={updateField} />
+                <EditableCell product={p} field="mainMachine" value={p.mainMachine} onSave={updateField} />
+                <td className="px-1 py-1">
+                  <div className="flex gap-1">
+                    {(['altMachine1', 'altMachine2', 'altMachine3', 'altMachine4'] as const).map(
+                      (field) => (
+                        <CellInput
+                          key={field}
+                          value={p[field]}
+                          title={field}
+                          className="w-20"
+                          onSave={(next) => onSaveField(updateField, p._id, field, next, false)}
+                        />
+                      ),
+                    )}
+                  </div>
+                </td>
+                <EditableCell product={p} field="maxShots" value={p.maxShots} numeric onSave={updateField} />
+                <td className="px-3 py-2 text-right">
+                  <button
+                    className="text-xs text-destructive hover:underline"
+                    onClick={() => void removeProduct({ id: p._id })}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -290,5 +342,116 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
       />
     </div>
+  )
+}
+
+/**
+ * Saves one field, converting an empty box into "clear this field".
+ * Numeric fields reject anything that is not a number so a typo cannot
+ * silently become 0 and distort every plan.
+ */
+async function onSaveField(
+  save: (args: unknown) => Promise<boolean>,
+  id: string,
+  field: string,
+  raw: string,
+  numeric: boolean,
+): Promise<boolean> {
+  const text = raw.trim()
+  if (text === '') return save({ id, field, value: null })
+  if (numeric) {
+    const parsed = Number(text)
+    if (!Number.isFinite(parsed)) return false
+    return save({ id, field, value: parsed })
+  }
+  return save({ id, field, value: text })
+}
+
+/** A table cell that turns into an input on click and saves on blur. */
+function CellInput({
+  value,
+  title,
+  className = 'w-24',
+  numeric = false,
+  onSave,
+}: {
+  value: string | number | undefined
+  title?: string
+  className?: string
+  numeric?: boolean
+  onSave: (next: string) => Promise<boolean>
+}) {
+  const initial = value === undefined || value === null ? '' : String(value)
+  const [draft, setDraft] = useState(initial)
+  const [dirty, setDirty] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  // Keep in step with the server unless the user is mid-edit.
+  useEffect(() => {
+    if (!dirty) setDraft(initial)
+  }, [initial, dirty])
+
+  return (
+    <input
+      title={title}
+      value={draft}
+      inputMode={numeric ? 'decimal' : undefined}
+      onChange={(e) => {
+        setDraft(e.target.value)
+        setDirty(true)
+        setSaved(false)
+      }}
+      onBlur={async () => {
+        if (!dirty) return
+        const ok = await onSave(draft)
+        setDirty(false)
+        if (ok) {
+          setSaved(true)
+          setTimeout(() => setSaved(false), 1200)
+        } else {
+          setDraft(initial)
+        }
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+        if (e.key === 'Escape') {
+          setDraft(initial)
+          setDirty(false)
+        }
+      }}
+      className={`${className} rounded border bg-background px-1.5 py-1 text-sm transition-colors ${
+        saved
+          ? 'border-emerald-400 bg-emerald-50'
+          : dirty
+            ? 'border-amber-400'
+            : 'border-transparent hover:border-input focus:border-input'
+      }`}
+    />
+  )
+}
+
+function EditableCell({
+  product,
+  field,
+  value,
+  numeric = false,
+  onSave,
+}: {
+  product: { _id: string }
+  field: string
+  value: string | number | undefined
+  numeric?: boolean
+  onSave: (args: unknown) => Promise<boolean>
+}) {
+  return (
+    <td className="px-1 py-1">
+      <CellInput
+        value={value}
+        title={field}
+        numeric={numeric}
+        className={numeric ? 'w-20' : 'w-28'}
+        onSave={(next) => onSaveField(onSave, product._id, field, next, numeric)}
+      />
+    </td>
   )
 }

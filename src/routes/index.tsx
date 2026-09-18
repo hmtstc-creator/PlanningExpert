@@ -16,6 +16,13 @@ function HomePage() {
   const calendar = useQuery(api.workCalendar.get)
   const presses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string }[]
   const snapshot = useQuery(api.planSnapshots.latest)
+  const shiftSettings = useQuery(api.pressCalendar.getGlobalSettings)
+  const templates = (useQuery(api.pressCalendar.listTemplates) ?? []) as { press: string }[]
+
+  // The calendar counts as configured only when both halves exist: the shared
+  // shift settings and the work-calendar record holding working days and
+  // holidays. Either one missing silently changes how capacity is computed.
+  const calendarReady = !!calendar && !!shiftSettings
 
   const locCategory = useMemo(
     () => new Map(locations.map((l) => [l.code, l.category])),
@@ -84,10 +91,22 @@ function HomePage() {
       })
     }
 
-    if (!calendar) {
+    if (!calendarReady) {
       list.push({
         level: 'medium',
-        text: 'No work calendar defined — durations fall back to 8 hours/day.',
+        text: !calendar && !shiftSettings
+          ? 'Work calendar not saved yet — open Work Calendar and press "Save all settings".'
+          : !shiftSettings
+            ? 'Shift settings not saved yet — open Work Calendar and press "Save all settings".'
+            : 'Working days and holidays not saved yet — open Work Calendar and press "Save all settings".',
+        link: '/takvim',
+      })
+    }
+
+    if (calendarReady && templates.length === 0) {
+      list.push({
+        level: 'medium',
+        text: 'No press has a weekly pattern yet — every press defaults to 1 shift.',
         link: '/takvim',
       })
     }
@@ -119,7 +138,18 @@ function HomePage() {
     }
 
     return list
-  }, [products, weekly, stockRows, locCategory, calendar, productCodes, presses])
+  }, [
+    products,
+    weekly,
+    stockRows,
+    locCategory,
+    calendar,
+    calendarReady,
+    shiftSettings,
+    templates,
+    productCodes,
+    presses,
+  ])
 
   const dataReady = products.length > 0 && weekly.length > 0 && stockRows.length > 0
 
@@ -201,7 +231,7 @@ function HomePage() {
           <StepItem n={1} done={weekly.length > 0} title="Upload SAP data" desc="ZPP and ZPP_DAILY → Demand, MB52 → Stock" to="/siparisler" />
           <StepItem n={2} done={locations.length > 0} title="Check storage locations" desc="Which stock do we really have?" to="/depolar" />
           <StepItem n={3} done={presses.length > 0} title="Define presses" desc="Which press is in which hall — the crane constraint" to="/makineler" />
-          <StepItem n={4} done={!!calendar} title="Verify the work calendar" desc="Shifts, working days, breaks, holidays" to="/takvim" />
+          <StepItem n={4} done={calendarReady} title="Verify the work calendar" desc="Shifts, working days, breaks, holidays — then Save all settings" to="/takvim" />
           <StepItem n={5} done={!!snapshot} title="Review and approve the plan" desc="The plan is generated automatically; you review and approve" to="/planlama" />
           <StepItem n={6} done={false} title="Upload actuals and compare" desc="MB51 → performance factor and mold life" to="/performans" />
         </ol>

@@ -131,6 +131,10 @@ function PressCalendarSection() {
   ])
   const [manualHolidays, setManualHolidays] = useState<string[]>([])
   const [newHoliday, setNewHoliday] = useState('')
+  // Auto-save is silent by design, but without any feedback the user cannot
+  // tell whether a setting actually reached the server.
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [savingAll, setSavingAll] = useState(false)
 
   const [press, setPress] = useState('')
 
@@ -202,6 +206,23 @@ function PressCalendarSection() {
       breakMinutesPerShift: next?.breakMinutesPerShift ?? breakMinutesPerShift,
       capacityFactor: globalSettings?.capacityFactor,
     })
+    setSavedAt(new Date().toLocaleTimeString('en-GB'))
+  }
+
+  /**
+   * Writes every shared setting at once, including the work-calendar record.
+   * Individual fields auto-save on change, but a setting the user never
+   * touched (typically Monday–Friday working days) would never be written,
+   * leaving the Overview page reporting "no work calendar defined".
+   */
+  async function saveAllSettings() {
+    setSavingAll(true)
+    try {
+      await persistGlobalSettings()
+      await persistWorkCalendar()
+    } finally {
+      setSavingAll(false)
+    }
   }
 
   useSyncedFields(
@@ -228,6 +249,7 @@ function PressCalendarSection() {
       workingDays: next?.workingDays ?? workingDayKeys,
       holidays: next?.holidays ?? manualHolidays,
     })
+    setSavedAt(new Date().toLocaleTimeString('en-GB'))
   }
 
   function toggleWorkingDay(key: string) {
@@ -386,7 +408,21 @@ function PressCalendarSection() {
 
   return (
     <section className="mt-6 rounded-lg border border-border p-5">
-      <h2 className="font-semibold text-foreground">Per-press Calendar</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-semibold text-foreground">Per-press Calendar</h2>
+        <div className="flex items-center gap-3">
+          {savedAt && (
+            <span className="text-sm text-emerald-600">Saved ✓ {savedAt}</span>
+          )}
+          <button
+            onClick={() => void saveAllSettings()}
+            disabled={savingAll}
+            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+          >
+            {savingAll ? 'Saving…' : 'Save all settings'}
+          </button>
+        </div>
+      </div>
       <p className="mt-1 text-xs text-muted-foreground">
         Define each press's standard weekly pattern (how many days, how many
         shifts per day, how many overtime shifts). The 30-week calendar applies
