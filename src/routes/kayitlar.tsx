@@ -9,11 +9,26 @@ export const Route = createFileRoute('/kayitlar')({
 })
 
 const CATEGORIES = [
-  { value: 'karar', label: 'Karar', color: 'bg-blue-100 text-blue-800' },
-  { value: 'kural', label: 'İş Kuralı', color: 'bg-purple-100 text-purple-800' },
-  { value: 'gelistirme', label: 'Geliştirme', color: 'bg-emerald-100 text-emerald-800' },
-  { value: 'sorun', label: 'Açık Sorun', color: 'bg-red-100 text-red-800' },
+  { value: 'decision', label: 'Decision', color: 'bg-blue-100 text-blue-800' },
+  { value: 'rule', label: 'Business Rule', color: 'bg-purple-100 text-purple-800' },
+  { value: 'improvement', label: 'Improvement', color: 'bg-emerald-100 text-emerald-800' },
+  { value: 'issue', label: 'Open Issue', color: 'bg-red-100 text-red-800' },
+  { value: 'maintenance', label: 'Maintenance', color: 'bg-amber-100 text-amber-900' },
 ]
+
+// Categories used to be stored with Turkish keys. Existing rows keep those
+// keys, so they are mapped onto the current ones instead of being rewritten.
+const LEGACY_CATEGORIES: Record<string, string> = {
+  karar: 'decision',
+  kural: 'rule',
+  gelistirme: 'improvement',
+  sorun: 'issue',
+  'bakım': 'maintenance',
+}
+
+function normaliseCategory(value: string): string {
+  return LEGACY_CATEGORIES[value] ?? value
+}
 
 function KayitlarPage() {
   const { results: logs, status } = usePaginatedQuery(
@@ -26,7 +41,7 @@ function KayitlarPage() {
 
   const [title, setTitle] = useState('')
   const [detail, setDetail] = useState('')
-  const [category, setCategory] = useState('karar')
+  const [category, setCategory] = useState('decision')
   const [author, setAuthor] = useState('')
   const [filter, setFilter] = useState<string | null>(null)
 
@@ -42,28 +57,29 @@ function KayitlarPage() {
     setDetail('')
   }
 
-  const visible = filter ? logs.filter((l) => l.category === filter) : logs
+  const visible = filter
+    ? logs.filter((l) => normaliseCategory(l.category) === filter)
+    : logs
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Değişiklik Kayıtları</h1>
+      <h1 className="text-3xl font-bold text-foreground">Change Log</h1>
       <p className="mt-2 text-muted-foreground">
-        Alınan kararlar, iş kuralları, yapılan geliştirmeler ve açık sorunlar
-        burada kayıt altında tutulur — böylece "bunu neden böyle yaptık?"
-        sorusunun cevabı hiç kaybolmaz.
+        Decisions, business rules, improvements and open issues are recorded
+        here, so the answer to "why did we do it this way?" is never lost.
       </p>
 
       <div className="mt-6 rounded-lg border border-border bg-card p-4">
         <input
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          placeholder="Başlık — örn. '1009/2009/2010 depoları planlamaya dahil edildi'"
+          placeholder="Title — e.g. 'Storage locations 1009/2009/2010 included in planning'"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
         <textarea
           className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           rows={3}
-          placeholder="Detay / gerekçe (opsiyonel)"
+          placeholder="Detail / rationale (optional)"
           value={detail}
           onChange={(e) => setDetail(e.target.value)}
         />
@@ -81,7 +97,7 @@ function KayitlarPage() {
           ))}
           <input
             className="w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-            placeholder="Kim?"
+            placeholder="Who?"
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
           />
@@ -89,7 +105,7 @@ function KayitlarPage() {
             onClick={() => void handleAdd()}
             className="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
-            Kayıt ekle
+            Add entry
           </button>
         </div>
       </div>
@@ -99,10 +115,10 @@ function KayitlarPage() {
           onClick={() => setFilter(null)}
           className={`rounded-md px-3 py-1.5 text-xs font-medium ${!filter ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground'}`}
         >
-          Tümü ({logs.length})
+          All ({logs.length})
         </button>
         {CATEGORIES.map((c) => {
-          const count = logs.filter((l) => l.category === c.value).length
+          const count = logs.filter((l) => normaliseCategory(l.category) === c.value).length
           return (
             <button
               key={c.value}
@@ -117,15 +133,15 @@ function KayitlarPage() {
 
       <div className="mt-4 space-y-3">
         {status === 'LoadingFirstPage' && (
-          <p className="text-sm text-muted-foreground">Yükleniyor…</p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
         )}
         {status !== 'LoadingFirstPage' && visible.length === 0 && (
           <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-            Henüz kayıt yok.
+            No entries yet.
           </p>
         )}
         {visible.map((log) => {
-          const cat = CATEGORIES.find((c) => c.value === log.category)
+          const cat = CATEGORIES.find((c) => c.value === normaliseCategory(log.category))
           return (
             <div key={log._id} className="rounded-lg border border-border p-4">
               <div className="flex items-start justify-between gap-3">
@@ -135,7 +151,7 @@ function KayitlarPage() {
                       {cat?.label ?? log.category}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(log.createdAt).toLocaleString('tr-TR')}
+                      {new Date(log.createdAt).toLocaleString('en-GB')}
                       {log.author && ` · ${log.author}`}
                     </span>
                   </div>
@@ -150,7 +166,7 @@ function KayitlarPage() {
                   className="text-xs text-destructive hover:underline"
                   onClick={() => void remove({ id: log._id })}
                 >
-                  Sil
+                  Delete
                 </button>
               </div>
             </div>

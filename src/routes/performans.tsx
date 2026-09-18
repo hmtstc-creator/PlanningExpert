@@ -182,16 +182,16 @@ function PerformansPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Performans</h1>
+      <h1 className="text-3xl font-bold text-foreground">Performance</h1>
       <p className="mt-2 text-muted-foreground">
-        Onaylı planla MB51'den yüklenen gerçekleşen üretimi karşılaştırır.
-        Çıkan performans faktörü, kapasiteyi gerçekçileştirmek için
-        kullanılabilir.
+        Compares the approved plan with the actual production uploaded from
+        MB51. The resulting performance factor can be fed back to make planning
+        capacity realistic.
       </p>
 
       <div className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border border-border p-4">
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Başlangıç</span>
+          <span className="block text-xs text-muted-foreground">From</span>
           <input
             type="date"
             className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -200,7 +200,7 @@ function PerformansPage() {
           />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Bitiş</span>
+          <span className="block text-xs text-muted-foreground">To</span>
           <input
             type="date"
             className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -211,15 +211,15 @@ function PerformansPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Planlanan adet" value={Math.round(totalPlanned).toLocaleString('tr-TR')} />
-        <Stat label="Gerçekleşen adet" value={Math.round(totalActual).toLocaleString('tr-TR')} />
+        <Stat label="Planned qty" value={Math.round(totalPlanned).toLocaleString('en-GB')} />
+        <Stat label="Actual qty" value={Math.round(totalActual).toLocaleString('en-GB')} />
         <Stat
-          label="Performans faktörü"
+          label="Performance factor"
           value={percent(factor)}
           warn={factor !== null && factor < 0.9}
         />
         <Stat
-          label="Kapasite kullanımı"
+          label="Capacity utilisation"
           value={percent(utilisation)}
           warn={utilisation !== null && utilisation < 0.6}
         />
@@ -229,13 +229,13 @@ function PerformansPage() {
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-border p-4">
           <div className="text-sm">
             <p className="text-foreground">
-              Planlama kapasitesi şu an{' '}
+              Planning capacity currently uses a factor of{' '}
               <strong>%{Math.round((globalSettings?.capacityFactor ?? 1) * 100)}</strong>{' '}
-              katsayısıyla hesaplanıyor.
+              .
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Ölçülen gerçekleşme oranını kapasiteye uygularsan plan, geçmişte
-              fiilen üretilebilen hıza göre kurulur.
+              Applying the measured attainment rate builds the plan around the
+              throughput actually achieved in the past.
             </p>
           </div>
           <button
@@ -245,7 +245,7 @@ function PerformansPage() {
             }}
             className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
           >
-            %{Math.round(factor * 100)} olarak uygula
+            Apply {Math.round(factor * 100)}%
           </button>
           {globalSettings?.capacityFactor !== undefined &&
             globalSettings.capacityFactor !== 1 && (
@@ -253,53 +253,54 @@ function PerformansPage() {
                 onClick={() => void setCapacityFactor({ capacityFactor: 1 }).then(() => setApplied(true))}
                 className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground hover:bg-muted"
               >
-                Sıfırla (%100)
+                Reset to 100%
               </button>
             )}
-          {applied && <span className="text-sm text-emerald-600">Kaydedildi ✓</span>}
+          {applied && <span className="text-sm text-emerald-600">Saved ✓</span>}
         </div>
       )}
 
       <div className="mt-4 rounded-lg border border-border p-4 text-sm text-muted-foreground">
         <p>
-          <strong className="text-foreground">Kapasite kullanımı</strong>, gerçekleşen
-          üretimin ideal hızda kaç dakika süreceğinin açık kapasiteye oranıdır
-          ({Math.round(theoretical).toLocaleString('tr-TR')} dk /{' '}
-          {Math.round(availableMinutes).toLocaleString('tr-TR')} dk).
+          <strong className="text-foreground">Capacity utilisation</strong> is the
+          theoretical time the actual production would take at ideal speed,
+          divided by the available capacity (
+          {Math.round(theoretical).toLocaleString('en-GB')} min /{' '}
+          {Math.round(availableMinutes).toLocaleString('en-GB')} min).
         </p>
         <p className="mt-2">
-          Bu <strong className="text-foreground">tam bir OEE değildir</strong>: sistemde
-          duruş ve fire verisi yok, dolayısıyla kullanılabilirlik ve kalite
-          bileşenleri ayrıştırılamıyor. Gerçek OEE için duruş kayıtlarının da
-          yüklenmesi gerekir.
+          This is <strong className="text-foreground">not a full OEE</strong>:
+          the system has no downtime or scrap data, so the availability and
+          quality components cannot be separated. A true OEE would require
+          downtime records as well.
         </p>
       </div>
 
       {!snapshot && (
         <p className="mt-6 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          Henüz onaylanmış plan yok — karşılaştırma yapılamıyor. Planlama
-          sayfasından bir planı onayla.
+          No plan has been approved yet, so there is nothing to compare against.
+          Approve a plan on the Planning page.
         </p>
       )}
 
       {actualStatus === 'LoadingFirstPage' && (
-        <p className="mt-6 text-sm text-muted-foreground">Gerçekleşen üretim yükleniyor…</p>
+        <p className="mt-6 text-sm text-muted-foreground">Loading actual production…</p>
       )}
 
       {worst.length > 0 && (
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-foreground">
-            Plana en çok sapan malzemeler
+            Materials deviating most from the plan
           </h2>
           <div className="mt-2 overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-left text-sm">
               <thead className="bg-muted text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Malzeme</th>
-                  <th className="px-3 py-2 font-medium">Planlanan</th>
-                  <th className="px-3 py-2 font-medium">Gerçekleşen</th>
-                  <th className="px-3 py-2 font-medium">Fark</th>
-                  <th className="px-3 py-2 font-medium">Gerçekleşme</th>
+                  <th className="px-3 py-2 font-medium">Material</th>
+                  <th className="px-3 py-2 font-medium">Planned</th>
+                  <th className="px-3 py-2 font-medium">Actual</th>
+                  <th className="px-3 py-2 font-medium">Difference</th>
+                  <th className="px-3 py-2 font-medium">Attainment</th>
                 </tr>
               </thead>
               <tbody>
@@ -307,10 +308,10 @@ function PerformansPage() {
                   <tr key={r.material} className="border-t border-border">
                     <td className="px-3 py-2 font-medium text-foreground">{r.material}</td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {Math.round(r.plannedQty).toLocaleString('tr-TR')}
+                      {Math.round(r.plannedQty).toLocaleString('en-GB')}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {Math.round(r.actualQty).toLocaleString('tr-TR')}
+                      {Math.round(r.actualQty).toLocaleString('en-GB')}
                     </td>
                     <td
                       className={`px-3 py-2 font-medium ${
@@ -318,7 +319,7 @@ function PerformansPage() {
                       }`}
                     >
                       {r.diff > 0 ? '+' : ''}
-                      {Math.round(r.diff).toLocaleString('tr-TR')}
+                      {Math.round(r.diff).toLocaleString('en-GB')}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{percent(r.ratio)}</td>
                   </tr>
@@ -332,16 +333,16 @@ function PerformansPage() {
       {adherence.length > 0 && (
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-foreground">
-            Tüm kalemler ({adherence.length})
+            All items ({adherence.length})
           </h2>
           <div className="mt-2 max-h-96 overflow-auto rounded-lg border border-border">
             <table className="w-full text-left text-sm">
               <thead className="sticky top-0 bg-muted text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Malzeme</th>
-                  <th className="px-3 py-2 font-medium">Planlanan</th>
-                  <th className="px-3 py-2 font-medium">Gerçekleşen</th>
-                  <th className="px-3 py-2 font-medium">Fark</th>
+                  <th className="px-3 py-2 font-medium">Material</th>
+                  <th className="px-3 py-2 font-medium">Planned</th>
+                  <th className="px-3 py-2 font-medium">Actual</th>
+                  <th className="px-3 py-2 font-medium">Difference</th>
                 </tr>
               </thead>
               <tbody>
@@ -349,10 +350,10 @@ function PerformansPage() {
                   <tr key={r.material} className="border-t border-border">
                     <td className="px-3 py-2 text-foreground">{r.material}</td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {Math.round(r.plannedQty).toLocaleString('tr-TR')}
+                      {Math.round(r.plannedQty).toLocaleString('en-GB')}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {Math.round(r.actualQty).toLocaleString('tr-TR')}
+                      {Math.round(r.actualQty).toLocaleString('en-GB')}
                     </td>
                     <td
                       className={`px-3 py-2 ${
@@ -360,7 +361,7 @@ function PerformansPage() {
                       }`}
                     >
                       {r.diff > 0 ? '+' : ''}
-                      {Math.round(r.diff).toLocaleString('tr-TR')}
+                      {Math.round(r.diff).toLocaleString('en-GB')}
                     </td>
                   </tr>
                 ))}

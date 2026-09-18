@@ -58,7 +58,7 @@ function HomePage() {
     if (missingMachine.length > 0) {
       list.push({
         level: 'high',
-        text: `${missingMachine.length} referansta ana makine bilgisi eksik — bunlar planlanamıyor.`,
+        text: `${missingMachine.length} materials have no main machine set — they cannot be planned.`,
         link: '/referanslar',
       })
     }
@@ -67,7 +67,7 @@ function HomePage() {
     if (unknownMaterials.length > 0) {
       list.push({
         level: 'medium',
-        text: `Siparişlerde ${unknownMaterials.length} materyalin kalıp/makine kaydı yok — planlamada atlanır.`,
+        text: `${unknownMaterials.length} materials in demand have no master data record — they are skipped in planning.`,
         link: '/referanslar',
       })
     }
@@ -79,7 +79,7 @@ function HomePage() {
     if (undefinedLocs.size > 0) {
       list.push({
         level: 'medium',
-        text: `${undefinedLocs.size} depo yeri henüz tanımlanmadı — varsayılan olarak stok sayılıyor.`,
+        text: `${undefinedLocs.size} storage locations are not defined yet — they count as stock by default.`,
         link: '/depolar',
       })
     }
@@ -87,7 +87,7 @@ function HomePage() {
     if (!calendar) {
       list.push({
         level: 'medium',
-        text: 'Çalışma takvimi tanımlanmadı — süreler varsayılan 8 saat/gün üzerinden hesaplanıyor.',
+        text: 'No work calendar defined — durations fall back to 8 hours/day.',
         link: '/takvim',
       })
     }
@@ -95,7 +95,7 @@ function HomePage() {
     if (presses.length === 0) {
       list.push({
         level: 'high',
-        text: 'Hiç pres tanımlı değil — plan üretilemez.',
+        text: 'No presses defined — a plan cannot be produced.',
         link: '/makineler',
       })
     }
@@ -104,7 +104,7 @@ function HomePage() {
     if (missingMaxShots > 0) {
       list.push({
         level: 'medium',
-        text: `${missingMaxShots} referansta kalıp max shot limiti tanımsız — kalıp ömrü izlenemiyor.`,
+        text: `${missingMaxShots} materials have no max shot limit — mold life cannot be tracked.`,
         link: '/kaliplar',
       })
     }
@@ -113,7 +113,7 @@ function HomePage() {
     if (overdueCount > 0) {
       list.push({
         level: 'high',
-        text: `${overdueCount} materyalde gecikmiş sipariş var.`,
+        text: `${overdueCount} materials have overdue demand.`,
         link: '/siparisler',
       })
     }
@@ -125,51 +125,51 @@ function HomePage() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Üretim Planlama</h1>
+      <h1 className="text-3xl font-bold text-foreground">Production Planning</h1>
       <p className="mt-2 text-muted-foreground">
-        Preshane üretim planlama sistemi — günlük durum özeti
+        Press shop production planning — daily status overview
       </p>
 
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Tanımlı referans" value={products.length} hint="kalıp/makine kaydı olan" to="/referanslar" />
-        <StatCard label="Tanımlı pres" value={presses.length} hint={`${new Set(presses.map((p) => p.hall)).size} hol`} to="/makineler" />
+        <StatCard label="Materials" value={products.length} hint="with a master data record" to="/referanslar" />
+        <StatCard label="Presses" value={presses.length} hint={`${new Set(presses.map((p) => p.hall)).size} halls`} to="/makineler" />
         <StatCard
-          label="Bakiye"
-          value={Math.round(backlogQty).toLocaleString('tr-TR')}
-          hint="gecikmiş talep, planın ilk önceliği"
+          label="Backlog"
+          value={Math.round(backlogQty).toLocaleString('en-GB')}
+          hint="overdue demand — the plan\u2019s first priority"
           to="/siparisler"
           danger={backlogQty > 0}
         />
         <StatCard
-          label="Uyarı"
+          label="Warnings"
           value={warnings.length}
-          hint={warnings.some((w) => w.level === 'high') ? 'kritik var' : 'kontrol et'}
+          hint={warnings.some((w) => w.level === 'high') ? 'critical items' : 'review'}
           to="/planlama"
           danger={warnings.some((w) => w.level === 'high')}
         />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Talep kaydı" value={weekly.length} hint="ZPP materyali" to="/siparisler" />
+        <StatCard label="Demand records" value={weekly.length} hint="ZPP materials" to="/siparisler" />
         <StatCard
-          label="Ufuktaki talep"
-          value={Math.round(horizonDemandQty).toLocaleString('tr-TR')}
-          hint="ZPP kovalarının toplamı"
+          label="Demand in horizon"
+          value={Math.round(horizonDemandQty).toLocaleString('en-GB')}
+          hint="sum of ZPP buckets"
           to="/siparisler"
         />
         <StatCard
-          label="Kullanılabilir stok"
-          value={Math.round(availableStock).toLocaleString('tr-TR')}
-          hint="planlamaya dahil depolar"
+          label="Available stock"
+          value={Math.round(availableStock).toLocaleString('en-GB')}
+          hint="locations counted in planning"
           to="/stoklar"
         />
         <StatCard
-          label="Onaylı plan"
-          value={snapshot ? `${snapshot.jobCount} iş` : 'yok'}
+          label="Approved plan"
+          value={snapshot ? `${snapshot.jobCount} jobs` : 'none'}
           hint={
             snapshot
-              ? new Date(snapshot.createdAt).toLocaleDateString('tr-TR')
-              : 'henüz onaylanmadı'
+              ? new Date(snapshot.createdAt).toLocaleDateString('en-GB')
+              : 'not approved yet'
           }
           to="/planlama"
         />
@@ -177,7 +177,7 @@ function HomePage() {
 
       {warnings.length > 0 && (
         <section className="mt-8">
-          <h2 className="font-semibold text-foreground">Dikkat edilmesi gerekenler</h2>
+          <h2 className="font-semibold text-foreground">Needs attention</h2>
           <div className="mt-3 space-y-2">
             {warnings.map((w, i) => (
               <Link
@@ -196,20 +196,21 @@ function HomePage() {
       )}
 
       <section className="mt-8">
-        <h2 className="font-semibold text-foreground">Günlük akış</h2>
+        <h2 className="font-semibold text-foreground">Daily workflow</h2>
         <ol className="mt-3 space-y-2">
-          <StepItem n={1} done={weekly.length > 0} title="SAP verilerini yükle" desc="ZPP ve ZPP_DAILY → Siparişler, MB52 → Stoklar" to="/siparisler" />
-          <StepItem n={2} done={locations.length > 0} title="Depo tanımlarını kontrol et" desc="Hangi stok gerçekten elimizde?" to="/depolar" />
-          <StepItem n={3} done={presses.length > 0} title="Presleri tanımla" desc="Hangi pres hangi holde — vinç kısıtı buradan gelir" to="/makineler" />
-          <StepItem n={4} done={!!calendar} title="Çalışma takvimini doğrula" desc="Vardiya, çalışma günleri, mola, tatiller" to="/takvim" />
-          <StepItem n={5} done={!!snapshot} title="Planı kontrol et ve onayla" desc="Plan otomatik oluşur; sen kontrol edip onaylarsın" to="/planlama" />
-          <StepItem n={6} done={false} title="Gerçekleşeni yükle ve karşılaştır" desc="MB51 → performans faktörü ve kalıp ömrü" to="/performans" />
+          <StepItem n={1} done={weekly.length > 0} title="Upload SAP data" desc="ZPP and ZPP_DAILY → Demand, MB52 → Stock" to="/siparisler" />
+          <StepItem n={2} done={locations.length > 0} title="Check storage locations" desc="Which stock do we really have?" to="/depolar" />
+          <StepItem n={3} done={presses.length > 0} title="Define presses" desc="Which press is in which hall — the crane constraint" to="/makineler" />
+          <StepItem n={4} done={!!calendar} title="Verify the work calendar" desc="Shifts, working days, breaks, holidays" to="/takvim" />
+          <StepItem n={5} done={!!snapshot} title="Review and approve the plan" desc="The plan is generated automatically; you review and approve" to="/planlama" />
+          <StepItem n={6} done={false} title="Upload actuals and compare" desc="MB51 → performance factor and mold life" to="/performans" />
         </ol>
       </section>
 
       {!dataReady && (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          Sistemin tam çalışması için üç veri seti de gerekli: referanslar, ZPP talep verisi ve MB52 stok verisi.
+          All three data sets are required for the system to work fully: master
+          data, ZPP demand and MB52 stock.
         </p>
       )}
     </div>

@@ -61,34 +61,34 @@ function SiparislerPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-16">
-      <h1 className="text-3xl font-bold text-foreground">Siparişler</h1>
+      <h1 className="text-3xl font-bold text-foreground">Demand</h1>
       <p className="mt-2 text-muted-foreground">
-        SAP'tan çektiğin ZPP (haftalık) ve ZPP_DAILY (günlük) net talep
-        raporlarını her gün buraya yükle — negatif değerler üretilmesi
-        gereken açığı gösterir. Sistem otomatik olarak eskisinin üzerine
+        Upload the ZPP (weekly) and ZPP_DAILY (daily) net requirement reports
+        from SAP here every day — negative values represent the shortfall that
+        must be produced. Each upload automatically replaces
         yazar.
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <p className="mb-2 text-sm font-medium text-foreground">Haftalık (ZPP.xlsx)</p>
+          <p className="mb-2 text-sm font-medium text-foreground">Weekly (ZPP.xlsx)</p>
           <ExcelUpload
-            expectedColumns={['Material', 'Stock in storage', 'Overdue Requirements', '...haftalık kolonlar']}
+            expectedColumns={['Material', 'Stock in storage', 'Overdue Requirements', '...weekly columns']}
             onRows={async (raw) => {
               const parsed = parseSnapshotRows(raw)
               const result = await replaceWeekly({ rows: parsed })
-              return { message: `${result.count} materyal güncellendi (haftalık).` }
+              return { message: `${result.count} materials updated (weekly).` }
             }}
           />
         </div>
         <div>
-          <p className="mb-2 text-sm font-medium text-foreground">Günlük (ZPP_DAILY.xlsx)</p>
+          <p className="mb-2 text-sm font-medium text-foreground">Daily (ZPP_DAILY.xlsx)</p>
           <ExcelUpload
-            expectedColumns={['Material', 'Stock in storage', 'Overdue Requirements', '...günlük kolonlar']}
+            expectedColumns={['Material', 'Stock in storage', 'Overdue Requirements', '...daily columns']}
             onRows={async (raw) => {
               const parsed = parseSnapshotRows(raw)
               const result = await replaceDaily({ rows: parsed })
-              return { message: `${result.count} materyal güncellendi (günlük).` }
+              return { message: `${result.count} materials updated (daily).` }
             }}
           />
         </div>
@@ -100,17 +100,17 @@ function SiparislerPage() {
             onClick={() => setView('weekly')}
             className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'weekly' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
           >
-            Haftalık görünüm
+            Weekly view
           </button>
           <button
             onClick={() => setView('daily')}
             className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'daily' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
           >
-            Günlük görünüm
+            Daily view
           </button>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <label className="text-muted-foreground">High Runner eşiği (haftalık ort. adet):</label>
+          <label className="text-muted-foreground">High runner threshold (weekly avg. qty):</label>
           <input
             type="number"
             className="w-24 rounded-md border border-input bg-background px-2 py-1"
@@ -126,8 +126,8 @@ function SiparislerPage() {
             <tr>
               <th className="sticky left-0 bg-muted px-3 py-2 font-medium">Materyal</th>
               <th className="px-3 py-2 font-medium">Stok</th>
-              <th className="px-3 py-2 font-medium">Gecikmiş</th>
-              {view === 'weekly' && <th className="px-3 py-2 font-medium">Sınıf</th>}
+              <th className="px-3 py-2 font-medium">Overdue</th>
+              {view === 'weekly' && <th className="px-3 py-2 font-medium">Class</th>}
               {periodLabels.map((label) => (
                 <th key={label} className="whitespace-nowrap px-3 py-2 font-medium">
                   {label}
@@ -139,14 +139,14 @@ function SiparislerPage() {
             {loading && (
               <tr>
                 <td className="px-3 py-3 text-muted-foreground" colSpan={4 + periodLabels.length}>
-                  Yükleniyor…
+                  Loading…
                 </td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr>
                 <td className="px-3 py-3 text-muted-foreground" colSpan={4 + periodLabels.length}>
-                  Henüz veri yüklenmedi.
+                  No data uploaded yet.
                 </td>
               </tr>
             )}

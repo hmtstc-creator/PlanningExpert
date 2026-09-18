@@ -25,7 +25,7 @@ export const upsert = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const name = args.name.trim()
-    if (!name) throw new Error('Pres adı zorunludur')
+    if (!name) throw new Error('Press name is required')
     const existing = await ctx.db
       .query('presses')
       .withIndex('by_name', (q) => q.eq('name', name))

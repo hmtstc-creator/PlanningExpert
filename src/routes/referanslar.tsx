@@ -76,7 +76,7 @@ function ReferanslarPage() {
       })
       setForm(emptyForm)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bir hata oluştu.')
+      setError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
       setSubmitting(false)
     }
@@ -127,16 +127,16 @@ function ReferanslarPage() {
     const validRows = parsed.filter((r) => r.code)
     const result = await bulkUpsert({ rows: validRows })
     return {
-      message: `${result.inserted} referans eklendi, ${result.updated} referans güncellendi.`,
+      message: `${result.inserted} materials added, ${result.updated} materials updated.`,
     }
   }
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-16">
-      <h1 className="text-3xl font-bold text-foreground">Referanslar</h1>
+      <h1 className="text-3xl font-bold text-foreground">Master Data</h1>
       <p className="mt-2 text-muted-foreground">
-        Referans (Material), varsa eş ürünü (Co-Product), kalıp gözü, SPM,
-        hammadde/rulo bilgileri, setup süreleri ve ana/alternatif makineler.
+        Material code, co-product if any, cavities, SPM, raw material and coil
+        data, setup times, mold shot limit and main/alternative machines.
       </p>
 
       <div className="mt-6">
@@ -161,27 +161,27 @@ function ReferanslarPage() {
 
       <details className="mt-4 rounded-lg border border-border">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
-          Ya da tek tek manuel ekle
+          Or add entries manually
         </summary>
         <form
           onSubmit={handleSubmit}
           className="grid grid-cols-1 gap-4 border-t border-border p-4 sm:grid-cols-3"
         >
-          <Field label="Material (referans kodu)" value={form.code} onChange={(v) => update('code', v)} placeholder="M250SP001RO" />
-          <Field label="Co-Product (eş ürün)" value={form.coProduct} onChange={(v) => update('coProduct', v)} placeholder="M250SP002RO" />
-          <Field label="Cavity (kalıp gözü)" value={form.moldCavities} onChange={(v) => update('moldCavities', v)} type="number" placeholder="1" />
+          <Field label="Material (code)" value={form.code} onChange={(v) => update('code', v)} placeholder="M250SP001RO" />
+          <Field label="Co-Product" value={form.coProduct} onChange={(v) => update('coProduct', v)} placeholder="M250SP002RO" />
+          <Field label="Cavity" value={form.moldCavities} onChange={(v) => update('moldCavities', v)} type="number" placeholder="1" />
           <Field label="SPM" value={form.spm} onChange={(v) => update('spm', v)} type="number" placeholder="16" />
           <Field label="Raw Material Code" value={form.rawMaterialCode} onChange={(v) => update('rawMaterialCode', v)} placeholder="SD51-100-0976" />
           <Field label="Coil Weight (Kg)" value={form.coilWeight} onChange={(v) => update('coilWeight', v)} type="number" placeholder="8000" />
           <Field label="Gross Weight (Kg/Shot)" value={form.grossWeight} onChange={(v) => update('grossWeight', v)} type="number" placeholder="1.465" />
-          <Field label="Setup Time (dk)" value={form.setupMinutes} onChange={(v) => update('setupMinutes', v)} type="number" placeholder="30" />
-          <Field label="Coil Setup Time (dk)" value={form.coilSetupMinutes} onChange={(v) => update('coilSetupMinutes', v)} type="number" placeholder="15" />
+          <Field label="Setup Time (min)" value={form.setupMinutes} onChange={(v) => update('setupMinutes', v)} type="number" placeholder="30" />
+          <Field label="Coil Setup Time (min)" value={form.coilSetupMinutes} onChange={(v) => update('coilSetupMinutes', v)} type="number" placeholder="15" />
           <Field label="Main Machine" value={form.mainMachine} onChange={(v) => update('mainMachine', v)} placeholder="PRS-107" />
           <Field label="Alternative 1" value={form.altMachine1} onChange={(v) => update('altMachine1', v)} placeholder="" />
           <Field label="Alternative 2" value={form.altMachine2} onChange={(v) => update('altMachine2', v)} placeholder="" />
           <Field label="Alternative 3" value={form.altMachine3} onChange={(v) => update('altMachine3', v)} placeholder="" />
           <Field label="Alternative 4" value={form.altMachine4} onChange={(v) => update('altMachine4', v)} placeholder="" />
-          <Field label="Kalıp Max Shot limiti" value={form.maxShots} onChange={(v) => update('maxShots', v)} type="number" placeholder="500000" />
+          <Field label="Max Shot limit" value={form.maxShots} onChange={(v) => update('maxShots', v)} type="number" placeholder="500000" />
 
           {error && <p className="text-sm text-destructive sm:col-span-3">{error}</p>}
           <button
@@ -189,7 +189,7 @@ function ReferanslarPage() {
             disabled={submitting}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 sm:col-span-3"
           >
-            {submitting ? 'Ekleniyor…' : 'Referans ekle'}
+            {submitting ? 'Adding…' : 'Add material'}
           </button>
         </form>
       </details>
@@ -202,13 +202,13 @@ function ReferanslarPage() {
               <th className="px-3 py-2 font-medium">Co-Product</th>
               <th className="px-3 py-2 font-medium">Cavity</th>
               <th className="px-3 py-2 font-medium">SPM</th>
-              <th className="px-3 py-2 font-medium">Hammadde</th>
+              <th className="px-3 py-2 font-medium">Raw Material</th>
               <th className="px-3 py-2 font-medium">Coil Wt</th>
               <th className="px-3 py-2 font-medium">Gross Wt</th>
               <th className="px-3 py-2 font-medium">Setup</th>
               <th className="px-3 py-2 font-medium">Coil Setup</th>
-              <th className="px-3 py-2 font-medium">Ana Makine</th>
-              <th className="px-3 py-2 font-medium">Alternatifler</th>
+              <th className="px-3 py-2 font-medium">Main Machine</th>
+              <th className="px-3 py-2 font-medium">Alternatives</th>
               <th className="px-3 py-2 font-medium">Max Shot</th>
               <th className="px-3 py-2" />
             </tr>
@@ -217,14 +217,14 @@ function ReferanslarPage() {
             {status === 'LoadingFirstPage' && (
               <tr>
                 <td className="px-3 py-3 text-muted-foreground" colSpan={13}>
-                  Yükleniyor…
+                  Loading…
                 </td>
               </tr>
             )}
             {status !== 'LoadingFirstPage' && products.length === 0 && (
               <tr>
                 <td className="px-3 py-3 text-muted-foreground" colSpan={13}>
-                  Henüz referans eklenmedi.
+                  No materials added yet.
                 </td>
               </tr>
             )}
@@ -246,7 +246,7 @@ function ReferanslarPage() {
                   <td className="px-3 py-2 text-foreground">{p.mainMachine ?? '—'}</td>
                   <td className="px-3 py-2 text-muted-foreground">{alternatives || '—'}</td>
                   <td className="px-3 py-2 text-foreground">
-                    {p.maxShots ? p.maxShots.toLocaleString('tr-TR') : '—'}
+                    {p.maxShots ? p.maxShots.toLocaleString('en-GB') : '—'}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button

@@ -33,7 +33,7 @@ export const create = mutation({
   returns: v.id('changeLog'),
   handler: async (ctx, args) => {
     const title = args.title.trim()
-    if (!title) throw new Error('Başlık zorunludur')
+    if (!title) throw new Error('Title is required')
     return ctx.db.insert('changeLog', { ...args, title, createdAt: Date.now() })
   },
 })

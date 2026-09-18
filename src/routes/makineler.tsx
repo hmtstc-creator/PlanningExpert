@@ -48,7 +48,7 @@ function MakinelerPage() {
   const halls = useMemo(() => {
     const map = new Map<string, Press[]>()
     for (const p of presses) {
-      const key = p.hall || '(hol tanımsız)'
+      const key = p.hall || '(no hall assigned)'
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(p)
     }
@@ -78,18 +78,18 @@ function MakinelerPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Makine (Pres) Tanımları</h1>
+      <h1 className="text-3xl font-bold text-foreground">Press Definitions</h1>
       <p className="mt-2 text-muted-foreground">
-        Her presin hangi holde olduğunu tanımla. Aynı holdeki presler aynı anda
-        setup yapamaz (vinç kısıtı) — planlama bu tanımı kullanır. Çalışma
-        takvimindeki pres listesi de buradan gelir.
+        Define which hall each press sits in. Presses in the same hall cannot
+        set up at the same time (crane constraint) — planning relies on this.
+        The press list on the Work Calendar page comes from here too.
       </p>
 
       <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
 
       <div className="mt-6 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Pres adı</span>
+          <span className="block text-xs text-muted-foreground">Press name</span>
           <input
             className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
             placeholder="PRS-107"
@@ -101,7 +101,7 @@ function MakinelerPage() {
           />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Hol</span>
+          <span className="block text-xs text-muted-foreground">Hall</span>
           <input
             className="mt-1 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm"
             placeholder="Hol 1"
@@ -110,7 +110,7 @@ function MakinelerPage() {
           />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Tonaj (ops.)</span>
+          <span className="block text-xs text-muted-foreground">Tonnage (opt.)</span>
           <input
             type="number"
             className="mt-1 w-28 rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -124,14 +124,14 @@ function MakinelerPage() {
           disabled={!name.trim() || saving}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
-          Pres ekle
+          Add press
         </button>
       </div>
 
       {undefinedPresses.length > 0 && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-medium text-amber-900">
-            Referanslarda geçen ama tanımlanmamış presler
+            Presses referenced in master data but not yet defined
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {undefinedPresses.map((p) => (
@@ -145,14 +145,14 @@ function MakinelerPage() {
             ))}
           </div>
           <p className="mt-2 text-xs text-amber-800">
-            Tıklayınca yukarıdaki "Hol" kutusundaki hol ile eklenir.
+            Clicking adds the press with the hall entered in the "Hall" box above.
           </p>
         </div>
       )}
 
       {presses.length === 0 ? (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          Henüz pres tanımlanmadı.
+          No presses defined yet.
         </p>
       ) : (
         <div className="mt-8 space-y-6">
@@ -161,16 +161,16 @@ function MakinelerPage() {
               <h2 className="text-sm font-semibold text-foreground">
                 {hallName}{' '}
                 <span className="font-normal text-muted-foreground">
-                  ({list.length} pres — aynı anda tek setup)
+                  ({list.length} presses — one setup at a time)
                 </span>
               </h2>
               <div className="mt-2 overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-muted text-muted-foreground">
                     <tr>
-                      <th className="px-3 py-2 font-medium">Pres</th>
-                      <th className="px-3 py-2 font-medium">Hol</th>
-                      <th className="px-3 py-2 font-medium">Tonaj</th>
+                      <th className="px-3 py-2 font-medium">Press</th>
+                      <th className="px-3 py-2 font-medium">Hall</th>
+                      <th className="px-3 py-2 font-medium">Tonnage</th>
                       <th className="px-3 py-2" />
                     </tr>
                   </thead>
@@ -216,7 +216,7 @@ function MakinelerPage() {
                               className="text-xs text-destructive hover:underline"
                               onClick={() => void remove({ id: p._id as never })}
                             >
-                              Sil
+                              Delete
                             </button>
                           </td>
                         </tr>

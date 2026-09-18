@@ -68,11 +68,11 @@ function GerceklesenPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-16">
-      <h1 className="text-3xl font-bold text-foreground">Gerçekleşen Üretim</h1>
+      <h1 className="text-3xl font-bold text-foreground">Actual Production</h1>
       <p className="mt-2 text-muted-foreground">
-        SAP MB51 hareket raporunu buraya yükle. Planlama, gerçekleşen üretimi
-        plan ile karşılaştırmak ve preslerin gerçek performansını (OEE) ölçmek
-        için bu veriyi kullanır. Her yükleme öncekinin üzerine yazar.
+        Upload the SAP MB51 movement report here. This data is used to compare
+        actual production against the plan and to measure real press
+        performance. Each upload replaces the previous one.
       </p>
 
       <div className="mt-6">
@@ -118,7 +118,7 @@ function GerceklesenPage() {
               }))
               .filter((r) => r.material)
             const result = await replaceAll({ rows: parsed })
-            return { message: `${result.count} hareket satırı yüklendi.` }
+            return { message: `${result.count} movement rows uploaded.` }
           }}
         />
       </div>
@@ -131,7 +131,7 @@ function GerceklesenPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
         <span className="text-sm text-muted-foreground">
-          {byMaterial.length} materyal · {rows.length} hareket satırı
+          {byMaterial.length} materials · {rows.length} movement rows
         </span>
       </div>
 
@@ -140,7 +140,7 @@ function GerceklesenPage() {
           <thead className="bg-muted text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">Materyal</th>
-              <th className="px-3 py-2 font-medium">Toplam gerçekleşen</th>
+              <th className="px-3 py-2 font-medium">Total produced</th>
               <th className="px-3 py-2 font-medium">Son hareket</th>
             </tr>
           </thead>
@@ -148,14 +148,14 @@ function GerceklesenPage() {
             {status === 'LoadingFirstPage' && (
               <tr>
                 <td className="px-3 py-3 text-muted-foreground" colSpan={3}>
-                  Yükleniyor…
+                  Loading…
                 </td>
               </tr>
             )}
             {status !== 'LoadingFirstPage' && filtered.length === 0 && (
               <tr>
                 <td className="px-3 py-3 text-muted-foreground" colSpan={3}>
-                  Henüz MB51 verisi yüklenmedi.
+                  No MB51 data uploaded yet.
                 </td>
               </tr>
             )}
@@ -163,10 +163,10 @@ function GerceklesenPage() {
               <tr key={r.material} className="border-t border-border">
                 <td className="px-3 py-2 font-medium text-foreground">{r.material}</td>
                 <td className="px-3 py-2 text-foreground">
-                  {r.qty.toLocaleString('tr-TR')}
+                  {r.qty.toLocaleString('en-GB')}
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">
-                  {r.lastDate ? new Date(r.lastDate).toLocaleDateString('tr-TR') : '—'}
+                  {r.lastDate ? new Date(r.lastDate).toLocaleDateString('en-GB') : '—'}
                 </td>
               </tr>
             ))}

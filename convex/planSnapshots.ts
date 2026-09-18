@@ -62,12 +62,12 @@ export const approve = mutation({
       jobs: truncated ? args.jobs.slice(0, MAX_STORED_JOBS) : args.jobs,
     })
     await ctx.db.insert('changeLog', {
-      title: `Plan onaylandı — ${args.jobs.length} iş`,
+      title: `Plan approved — ${args.jobs.length} jobs`,
       detail:
-        `${args.horizonStart} tarihinden itibaren ${args.jobs.length} iş planlandı, ` +
-        `${args.unplannedCount} kalem planlanamadı.` +
-        (truncated ? ` (Kayıtta ilk ${MAX_STORED_JOBS} iş saklandı.)` : ''),
-      category: 'karar',
+        `${args.jobs.length} jobs planned from ${args.horizonStart} onwards, ` +
+        `${args.unplannedCount} items could not be planned.` +
+        (truncated ? ` (Only the first ${MAX_STORED_JOBS} jobs were stored.)` : ''),
+      category: 'decision',
       author: args.approvedBy,
       createdAt: Date.now(),
     })

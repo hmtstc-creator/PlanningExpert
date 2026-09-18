@@ -108,7 +108,7 @@ export function buildDemandSchedule(
         qty: overdue,
         dueDate: baseIso,
         earliestDate: baseIso,
-        bucketLabel: 'Bakiye',
+        bucketLabel: 'Backlog',
         phase: 'backlog',
         urgency: 100,
         daysOfCover,

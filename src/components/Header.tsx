@@ -2,22 +2,22 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 
 const LINKS = [
-  { to: '/', label: 'Özet' },
-  { to: '/siparisler', label: 'Siparişler' },
-  { to: '/stoklar', label: 'Stoklar' },
-  { to: '/gerceklesen', label: 'Gerçekleşen' },
-  { to: '/referanslar', label: 'Referanslar' },
-  { to: '/planlama', label: 'Planlama' },
-  { to: '/performans', label: 'Performans' },
+  { to: '/', label: 'Overview' },
+  { to: '/siparisler', label: 'Demand' },
+  { to: '/stoklar', label: 'Stock' },
+  { to: '/gerceklesen', label: 'Actuals' },
+  { to: '/referanslar', label: 'Master Data' },
+  { to: '/planlama', label: 'Planning' },
+  { to: '/performans', label: 'Performance' },
 ] as const
 
 const SETTINGS_LINKS = [
-  { to: '/makineler', label: 'Makine Tanımları' },
-  { to: '/kaliplar', label: 'Kalıp Ömrü' },
-  { to: '/depolar', label: 'Depo Tanımları' },
-  { to: '/takvim', label: 'Çalışma Takvimi' },
-  { to: '/kayitlar', label: 'Değişiklik Kayıtları' },
-  { to: '/tani', label: 'Bağlantı Teşhisi' },
+  { to: '/makineler', label: 'Presses' },
+  { to: '/kaliplar', label: 'Mold Life' },
+  { to: '/depolar', label: 'Storage Locations' },
+  { to: '/takvim', label: 'Work Calendar' },
+  { to: '/kayitlar', label: 'Change Log' },
+  { to: '/tani', label: 'Connection Diagnostics' },
 ] as const
 
 export function Header() {
@@ -49,7 +49,7 @@ export function Header() {
               onBlur={() => setTimeout(() => setOpen(false), 150)}
               className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              Ayarlar ▾
+              Settings ▾
             </button>
             {open && (
               <div className="absolute right-0 top-full mt-1 w-48 overflow-hidden rounded-md border border-border bg-background shadow-lg">

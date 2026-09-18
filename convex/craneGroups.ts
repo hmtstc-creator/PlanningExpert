@@ -26,8 +26,8 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const groupName = args.groupName.trim()
     const machines = args.machines.map((m) => m.trim()).filter(Boolean)
-    if (!groupName) throw new Error('Grup adı zorunludur')
-    if (machines.length < 2) throw new Error('En az 2 makine girilmelidir')
+    if (!groupName) throw new Error('Group name is required')
+    if (machines.length < 2) throw new Error('At least 2 machines are required')
     return ctx.db.insert('craneGroups', { groupName, machines })
   },
 })

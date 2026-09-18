@@ -23,16 +23,16 @@ export class QueryCatcher extends Component<
       return (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4">
           <p className="text-sm font-medium text-destructive">
-            {this.props.label} okunamadı
+            {this.props.label} could not be loaded
           </p>
           <p className="mt-1 break-words text-xs text-destructive/90">
             {this.state.error}
           </p>
           {missingFunction && (
             <p className="mt-2 text-xs text-destructive/90">
-              Bu fonksiyon veritabanına henüz yüklenmemiş. Site yeni sürüme
-              güncellendi ama Convex fonksiyonları deploy edilmemiş demektir —
-              Vercel build komutunda <code>npx convex deploy</code> çalışmalı.
+              This function has not been pushed to the database yet. The site was
+              updated to a new version but the Convex functions were not deployed —
+              the Vercel build command must run <code>npx convex deploy</code>.
             </p>
           )}
         </div>

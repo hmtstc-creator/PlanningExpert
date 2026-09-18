@@ -56,7 +56,7 @@ describe('schedule', () => {
     expect(result.jobs).toHaveLength(1)
     expect(result.jobs[0].press).toBe('PRS-1')
     expect(result.jobs[0].date).toBe('2026-09-14')
-    expect(result.jobs[0].reason).toContain('Bakiye')
+    expect(result.jobs[0].reason).toContain('Backlog')
   })
 
   it('aynı holde iki setupu en az bir saat arayla planlar', () => {
@@ -159,7 +159,7 @@ describe('schedule', () => {
       options,
     )
     expect(result.jobs[0].late).toBe(true)
-    expect(result.jobs[0].reason).toContain('geç')
+    expect(result.jobs[0].reason).toContain('later than required week')
   })
 
   it('kalıp limitini aşan üretimi partilere bölerek planlar', () => {
@@ -186,7 +186,7 @@ describe('schedule', () => {
       options,
     )
     expect(result.jobs).toHaveLength(0)
-    expect(result.unplanned[0].reason).toContain('pres yok')
+    expect(result.unplanned[0].reason).toContain('No eligible press')
   })
 
   it('kapasite yetmezse planlanamadı listesine gerekçe yazar', () => {
@@ -200,7 +200,7 @@ describe('schedule', () => {
       options,
     )
     expect(result.jobs).toHaveLength(0)
-    expect(result.unplanned[0].reason).toContain('kapasite')
+    expect(result.unplanned[0].reason).toContain('capacity')
   })
 
   it('eş ürün miktarını işte taşır', () => {
@@ -228,7 +228,7 @@ describe('schedule', () => {
       { ...options, overrides },
     )
     expect(result.jobs).toHaveLength(0)
-    expect(result.unplanned[0].reason).toContain('hariç tuttu')
+    expect(result.unplanned[0].reason).toContain('Excluded from planning')
   })
 
   it('sabitlenen malzemeyi yalnızca o preste planlar', () => {
@@ -247,7 +247,7 @@ describe('schedule', () => {
     )
     expect(result.jobs[0].press).toBe('PRS-2')
     expect(result.jobs[0].pinned).toBe(true)
-    expect(result.jobs[0].reason).toContain('sabitledi')
+    expect(result.jobs[0].reason).toContain('pinned by user')
   })
 
   it('sabitlenen gün dışına taşmaz', () => {
@@ -276,7 +276,7 @@ describe('schedule', () => {
       { ...options, overrides },
     )
     expect(result.jobs).toHaveLength(0)
-    expect(result.unplanned[0].reason).toContain('Sabitlenen pres tanımlı değil')
+    expect(result.unplanned[0].reason).toContain('Pinned press is not defined')
   })
 
   it('öne alınan malzemeyi faz sırasından bağımsız olarak ilk sıraya koyar', () => {

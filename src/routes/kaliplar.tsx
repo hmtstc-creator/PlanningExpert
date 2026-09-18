@@ -13,10 +13,10 @@ export const Route = createFileRoute('/kaliplar')({
 })
 
 const STATUS_LABEL: Record<MoldStatus, string> = {
-  exceeded: 'limit aşıldı',
-  warning: 'limite yaklaştı',
-  ok: 'uygun',
-  unknown: 'limit tanımsız',
+  exceeded: 'limit exceeded',
+  warning: 'near limit',
+  ok: 'ok',
+  unknown: 'no limit set',
 }
 
 const STATUS_STYLE: Record<MoldStatus, string> = {
@@ -101,34 +101,34 @@ function KaliplarPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Kalıp Ömrü</h1>
+      <h1 className="text-3xl font-bold text-foreground">Mold Life</h1>
       <p className="mt-2 text-muted-foreground">
-        Her kalıbın son bakımdan bu yana yaptığı vuruş, MB51'den yüklenen
-        gerçekleşen üretimden hesaplanır (adet ÷ göz sayısı) ve referans
-        kartındaki maksimum baskı limitiyle karşılaştırılır. Bakım
-        kaydettiğinde sayaç o tarihten yeniden başlar.
+        The shots each mold has made since its last maintenance are calculated
+        from the actual production uploaded via MB51 (quantity ÷ cavities) and
+        compared with the maximum shot limit on the material's master data
+        record. Recording maintenance restarts the counter from that date.
       </p>
 
       <ErrorBanner message={addError ?? removeError} onDismiss={clearError} />
 
       <div className="mt-6 grid grid-cols-3 gap-3">
-        <Stat label="Limit aşıldı" value={exceeded.toString()} warn={exceeded > 0} />
-        <Stat label="Limite yaklaştı" value={warning.toString()} warn={warning > 0} />
-        <Stat label="Limit tanımsız" value={unknown.toString()} />
+        <Stat label="Limit exceeded" value={exceeded.toString()} warn={exceeded > 0} />
+        <Stat label="Near limit" value={warning.toString()} warn={warning > 0} />
+        <Stat label="No limit set" value={unknown.toString()} />
       </div>
 
       <div className="mt-6 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Malzeme</span>
+          <span className="block text-xs text-muted-foreground">Material</span>
           <input
             className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={material}
             onChange={(e) => setMaterial(e.target.value)}
-            placeholder="Malzeme kodu"
+            placeholder="Material code"
           />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Bakım tarihi</span>
+          <span className="block text-xs text-muted-foreground">Maintenance date</span>
           <input
             type="date"
             className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -137,12 +137,12 @@ function KaliplarPage() {
           />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Not (ops.)</span>
+          <span className="block text-xs text-muted-foreground">Note (opt.)</span>
           <input
             className="mt-1 w-56 rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Kesici değişti"
+            placeholder="Cutter replaced"
           />
         </label>
         <button
@@ -150,31 +150,31 @@ function KaliplarPage() {
           disabled={!material.trim()}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
-          Bakım kaydet
+          Record maintenance
         </button>
       </div>
 
       {actualStatus === 'LoadingFirstPage' && (
-        <p className="mt-6 text-sm text-muted-foreground">Gerçekleşen üretim yükleniyor…</p>
+        <p className="mt-6 text-sm text-muted-foreground">Loading actual production…</p>
       )}
 
       {rows.length === 0 ? (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          Gerçekleşen üretim verisi yüklenmediği için kalıp vuruşu
-          hesaplanamıyor. Gerçekleşen sayfasından MB51 raporunu yükle.
+          No actual production data has been uploaded, so mold shots cannot be
+          calculated. Upload the MB51 report on the Actuals page.
         </p>
       ) : (
         <div className="mt-8 overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-left text-sm">
             <thead className="bg-muted text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 font-medium">Malzeme</th>
-                <th className="px-3 py-2 font-medium">Durum</th>
-                <th className="px-3 py-2 font-medium">Vuruş</th>
+                <th className="px-3 py-2 font-medium">Material</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium">Shots</th>
                 <th className="px-3 py-2 font-medium">Limit</th>
-                <th className="px-3 py-2 font-medium">Kalan</th>
-                <th className="px-3 py-2 font-medium">Kullanım</th>
-                <th className="px-3 py-2 font-medium">Son bakım</th>
+                <th className="px-3 py-2 font-medium">Remaining</th>
+                <th className="px-3 py-2 font-medium">Usage</th>
+                <th className="px-3 py-2 font-medium">Last maintenance</th>
               </tr>
             </thead>
             <tbody>
@@ -185,19 +185,19 @@ function KaliplarPage() {
                     <span className={STATUS_STYLE[r.status]}>{STATUS_LABEL[r.status]}</span>
                   </td>
                   <td className="px-3 py-2 text-foreground">
-                    {r.cumulativeShots.toLocaleString('tr-TR')}
+                    {r.cumulativeShots.toLocaleString('en-GB')}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">
-                    {r.maxShots ? r.maxShots.toLocaleString('tr-TR') : '—'}
+                    {r.maxShots ? r.maxShots.toLocaleString('en-GB') : '—'}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">
-                    {r.remainingShots !== null ? r.remainingShots.toLocaleString('tr-TR') : '—'}
+                    {r.remainingShots !== null ? r.remainingShots.toLocaleString('en-GB') : '—'}
                   </td>
                   <td className="px-3 py-2 text-muted-foreground">
                     {r.usageRatio !== null ? `${(r.usageRatio * 100).toFixed(0)}%` : '—'}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {r.lastMaintenance ?? 'kayıt yok'}
+                    {r.lastMaintenance ?? 'none'}
                   </td>
                 </tr>
               ))}
@@ -209,7 +209,7 @@ function KaliplarPage() {
       {maintenance.length > 0 && (
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-foreground">
-            Bakım kayıtları ({maintenance.length})
+            Maintenance records ({maintenance.length})
           </h2>
           <ul className="mt-2 space-y-1 text-sm">
             {maintenance
@@ -231,7 +231,7 @@ function KaliplarPage() {
                     onClick={() => void removeMaintenance({ id: m._id })}
                     className="text-xs text-destructive hover:underline"
                   >
-                    Sil
+                    Delete
                   </button>
                 </li>
               ))}

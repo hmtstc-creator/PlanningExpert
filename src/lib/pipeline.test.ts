@@ -239,7 +239,7 @@ describe('planlama hattı (uçtan uca)', () => {
     expect(result.jobs.some((j) => j.material === 'MAM-C')).toBe(false)
     expect(
       result.unplanned.some(
-        (u) => u.material === 'MAM-C' && u.reason.includes('hariç tuttu'),
+        (u) => u.material === 'MAM-C' && u.reason.includes('Excluded from planning'),
       ),
     ).toBe(true)
     const aJobs = result.jobs.filter((j) => j.material === 'MAM-A')

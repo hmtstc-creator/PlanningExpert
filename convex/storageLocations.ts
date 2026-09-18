@@ -30,7 +30,7 @@ export const upsert = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const code = args.code.trim()
-    if (!code) throw new Error('Depo kodu zorunludur')
+    if (!code) throw new Error('Storage location code is required')
     const existing = await ctx.db
       .query('storageLocations')
       .withIndex('by_code', (q) => q.eq('code', code))

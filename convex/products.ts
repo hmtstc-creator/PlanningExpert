@@ -82,7 +82,7 @@ export const create = mutation({
   returns: v.id('products'),
   handler: async (ctx, args) => {
     const code = args.code.trim()
-    if (!code) throw new Error('Referans kodu zorunludur')
+    if (!code) throw new Error('Material code is required')
     const { name: _n, material: _m, cycleTimeSeconds: _c, ...rest } = args
     return ctx.db.insert('products', { ...rest, code })
   },

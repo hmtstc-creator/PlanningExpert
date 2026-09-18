@@ -63,9 +63,9 @@ function StoklarPage() {
     <div className="mx-auto max-w-6xl px-6 py-16">
       <h1 className="text-3xl font-bold text-foreground">Stoklar</h1>
       <p className="mt-2 text-muted-foreground">
-        SAP MB52 stok raporunu her gün buraya yükle. Sistem materyal
-        bazında toplam kullanılabilir stoku hesaplar; detay görünümde depo
-        yeri bazlı kırılımı görebilirsin.
+        Upload the SAP MB52 stock report here every day. Total available stock
+        is calculated per material; the detail view breaks it down by storage
+        location.
       </p>
 
       <div className="mt-6">
@@ -94,7 +94,7 @@ function StoklarPage() {
               transit: num(row['Transit and Transfer']),
             })).filter((r) => r.material)
             const result = await replaceAll({ rows: parsed })
-            return { message: `${result.count} stok satırı güncellendi.` }
+            return { message: `${result.count} stock rows updated.` }
           }}
         />
       </div>
@@ -105,13 +105,13 @@ function StoklarPage() {
             onClick={() => setView('summary')}
             className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'summary' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
           >
-            Özet (materyal bazlı)
+            Summary (by material)
           </button>
           <button
             onClick={() => setView('detail')}
             className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'detail' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
           >
-            Detay (depo bazlı)
+            Detail (by storage location)
           </button>
         </div>
         <input
@@ -128,21 +128,21 @@ function StoklarPage() {
             <thead className="bg-muted text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Materyal</th>
-                <th className="px-3 py-2 font-medium">Kullanılabilir</th>
+                <th className="px-3 py-2 font-medium">Unrestricted</th>
                 <th className="px-3 py-2 font-medium">Kalite Kontrolde</th>
-                <th className="px-3 py-2 font-medium">Kısıtlı</th>
+                <th className="px-3 py-2 font-medium">Restricted</th>
                 <th className="px-3 py-2 font-medium">Bloke</th>
-                <th className="px-3 py-2 font-medium">İade</th>
+                <th className="px-3 py-2 font-medium">Returns</th>
                 <th className="px-3 py-2 font-medium">Transit</th>
-                <th className="px-3 py-2 font-medium">Depo sayısı</th>
+                <th className="px-3 py-2 font-medium">Locations</th>
               </tr>
             </thead>
             <tbody>
               {status === 'LoadingFirstPage' && (
-                <tr><td className="px-3 py-3 text-muted-foreground" colSpan={8}>Yükleniyor…</td></tr>
+                <tr><td className="px-3 py-3 text-muted-foreground" colSpan={8}>Loading…</td></tr>
               )}
               {status !== 'LoadingFirstPage' && filteredSummary.length === 0 && (
-                <tr><td className="px-3 py-3 text-muted-foreground" colSpan={8}>Henüz stok verisi yüklenmedi.</td></tr>
+                <tr><td className="px-3 py-3 text-muted-foreground" colSpan={8}>No stock data uploaded yet.</td></tr>
               )}
               {filteredSummary.map((s) => (
                 <tr key={s.material} className="border-t border-border">
@@ -167,9 +167,9 @@ function StoklarPage() {
                 <th className="px-3 py-2 font-medium">Materyal</th>
                 <th className="px-3 py-2 font-medium">Fabrika</th>
                 <th className="px-3 py-2 font-medium">Depo Yeri</th>
-                <th className="px-3 py-2 font-medium">Kullanılabilir</th>
+                <th className="px-3 py-2 font-medium">Unrestricted</th>
                 <th className="px-3 py-2 font-medium">Kalite</th>
-                <th className="px-3 py-2 font-medium">Kısıtlı</th>
+                <th className="px-3 py-2 font-medium">Restricted</th>
                 <th className="px-3 py-2 font-medium">Bloke</th>
               </tr>
             </thead>

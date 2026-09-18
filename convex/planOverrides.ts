@@ -34,12 +34,12 @@ export const set = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const material = args.material.trim()
-    if (!material) throw new Error('Malzeme kodu zorunludur')
+    if (!material) throw new Error('Material code is required')
     if (!['exclude', 'pin', 'priority'].includes(args.kind)) {
-      throw new Error(`Bilinmeyen müdahale türü: ${args.kind}`)
+      throw new Error(`Unknown override type: ${args.kind}`)
     }
     if (args.kind === 'pin' && !args.press?.trim()) {
-      throw new Error('Sabitleme için pres seçilmelidir')
+      throw new Error('A press must be selected to pin a material')
     }
 
     const existing = await ctx.db
@@ -58,14 +58,14 @@ export const set = mutation({
     })
 
     await ctx.db.insert('changeLog', {
-      title: `Plan müdahalesi — ${material}`,
+      title: `Plan override — ${material}`,
       detail:
         args.kind === 'exclude'
-          ? 'Planlamadan hariç tutuldu'
+          ? 'Excluded from planning'
           : args.kind === 'priority'
-            ? 'Sıranın başına alındı'
-            : `${args.press} presine sabitlendi${args.date ? ` (${args.date})` : ''}`,
-      category: 'karar',
+            ? 'Moved to the front of the queue'
+            : `Pinned to press ${args.press}${args.date ? ` (${args.date})` : ''}`,
+      category: 'decision',
       createdAt: Date.now(),
     })
     return null

@@ -16,35 +16,35 @@ function deploymentName(url: string): string {
   try {
     return new URL(url).hostname.split('.')[0]
   } catch {
-    return '(okunamadı)'
+    return '(unreadable)'
   }
 }
 
 function formatTime(ms: number | null): string {
   if (ms === null) return '—'
-  return new Date(ms).toLocaleString('tr-TR')
+  return new Date(ms).toLocaleString('en-GB')
 }
 
 const TABLE_LABELS: Record<string, string> = {
-  presses: 'Presler',
-  products: 'Referanslar',
-  pressTemplates: 'Pres takvim şablonları',
-  pressWeekOverrides: 'Hafta istisnaları',
-  globalShiftSettings: 'Vardiya ayarları',
-  workCalendar: 'Çalışma takvimi',
-  storageLocations: 'Depo tanımları',
-  demandWeekly: 'ZPP haftalık talep',
-  demandDaily: 'ZPP günlük talep',
-  stock: 'MB52 stok',
-  actualProduction: 'MB51 gerçekleşen',
-  planSnapshots: 'Onaylı planlar',
-  changeLog: 'Değişiklik kayıtları',
-  moldMaintenance: 'Kalıp bakım kayıtları',
-  planOverrides: 'Plan müdahaleleri',
-  officialHolidays: 'Resmi tatiller',
-  machines: 'Makineler (kullanımdan kalktı)',
-  machinePriorities: 'Makine öncelikleri (kullanımdan kalktı)',
-  craneGroups: 'Vinç grupları (kullanımdan kalktı)',
+  presses: 'Presses',
+  products: 'Materials',
+  pressTemplates: 'Press calendar templates',
+  pressWeekOverrides: 'Week overrides',
+  globalShiftSettings: 'Shift settings',
+  workCalendar: 'Work calendar',
+  storageLocations: 'Storage locations',
+  demandWeekly: 'ZPP weekly demand',
+  demandDaily: 'ZPP daily demand',
+  stock: 'MB52 stock',
+  actualProduction: 'MB51 actuals',
+  planSnapshots: 'Approved plans',
+  changeLog: 'Change log',
+  moldMaintenance: 'Mold maintenance',
+  planOverrides: 'Plan overrides',
+  officialHolidays: 'Public holidays',
+  machines: 'Machines (deprecated)',
+  machinePriorities: 'Machine priorities (deprecated)',
+  craneGroups: 'Crane groups (deprecated)',
 }
 
 const DEPRECATED = new Set(['machines', 'machinePriorities', 'craneGroups'])
@@ -115,11 +115,11 @@ function TaniPage() {
   if (!CONVEX_URL) {
     verdict = {
       tone: 'bad',
-      title: 'Site hiçbir veritabanına bağlı değil',
+      title: 'The site is not connected to any database',
       body: (
         <>
-          <code>VITE_CONVEX_URL</code> tanımsız. Bu bir ağ sorunu değil, Vercel
-          build ayarı eksik. Build komutu şu olmalı:{' '}
+          <code>VITE_CONVEX_URL</code> is not set. This is not a network problem
+          but a missing Vercel build setting. The build command must be:{' '}
           <code className="break-all">
             npx convex codegen &amp;&amp; npx convex deploy --cmd 'npm run build'
             --cmd-url-env-var-name VITE_CONVEX_URL
@@ -130,50 +130,49 @@ function TaniPage() {
   } else if (ws?.isWebSocketConnected) {
     verdict = {
       tone: 'ok',
-      title: 'Bağlantı sağlıklı',
-      body: <>Bu cihaz veritabanına canlı bağlı. Aşağıdaki kayıt sayıları anlık.</>,
+      title: 'Connection healthy',
+      body: <>This device has a live connection. The row counts below are current.</>,
     }
   } else if (mode === 'http' && https === 'ok') {
     verdict = {
       tone: 'wait',
-      title: 'Yedek mod çalışıyor — WebSocket engelli ama uygulama kullanılabilir',
+      title: 'Fallback mode active — WebSocket is blocked but the app works',
       body: (
         <>
           <p>
-            Canlı bağlantı (WebSocket) kurulamadı, bu yüzden uygulama saf
-            HTTPS'e geçti. <strong>Veri okuma ve kaydetme çalışıyor</strong>;
-            tek fark verilerin anlık değil, yaklaşık 20 saniyede bir
-            tazelenmesi.
+            The live WebSocket connection could not be established, so the app
+            switched to plain HTTPS. <strong>Reading and saving both work</strong>;
+            the only difference is that data refreshes about every 20 seconds
+            instead of instantly.
           </p>
           <p className="mt-2">
-            Kalıcı çözüm için BT'den <code>*.convex.cloud</code> alan adına 443
-            portundan <strong>WebSocket (wss://)</strong> izni iste.
+            For a permanent fix, ask IT to allow <strong>WebSocket (wss://)</strong>
+            traffic to <code>*.convex.cloud</code> on port 443.
           </p>
         </>
       ),
     }
   } else if (https === 'checking' || ws === null) {
-    verdict = { tone: 'wait', title: 'Kontrol ediliyor…', body: <>Birkaç saniye sürebilir.</> }
+    verdict = { tone: 'wait', title: 'Checking…', body: <>This may take a few seconds.</> }
   } else if (https === 'ok') {
     verdict = {
       tone: 'bad',
-      title: 'WebSocket engelleniyor — büyük ihtimalle şirket ağı',
+      title: 'WebSocket is blocked — most likely the corporate network',
       body: (
         <>
           <p>
-            <code>{deployment}.convex.cloud</code> adresine HTTPS ile
-            ulaşılıyor, ama <strong>WebSocket bağlantısı kurulamıyor</strong>.
-            Uygulama canlı veriyi WebSocket üzerinden alır; bu yüzden sayfa
-            açılıyor ama veri gelmiyor.
+            <code>{deployment}.convex.cloud</code> is reachable over HTTPS, but
+            the <strong>WebSocket connection cannot be established</strong>. The
+            app receives live data over WebSocket, which is why the page loads
+            but no data arrives.
           </p>
           <p className="mt-2">
-            Bu neredeyse kesin olarak şirket güvenlik duvarı / proxy kaynaklı.
-            Telefonda mobil veriyle çalışması da bunu doğrular.
+            This is almost certainly a corporate firewall or proxy. The app
+            working on a phone over mobile data confirms it.
           </p>
           <p className="mt-2">
-            <strong>BT'ye iletilecek talep:</strong> <code>*.convex.cloud</code>{' '}
-            alan adına 443 portundan <strong>WebSocket (wss://)</strong>{' '}
-            trafiğine izin verilmesi.
+            <strong>Request for IT:</strong> allow <strong>WebSocket (wss://)</strong>
+            traffic to <code>*.convex.cloud</code> on port 443.
           </p>
         </>
       ),
@@ -181,17 +180,16 @@ function TaniPage() {
   } else {
     verdict = {
       tone: 'bad',
-      title: 'convex.cloud adresine hiç ulaşılamıyor',
+      title: 'convex.cloud cannot be reached at all',
       body: (
         <>
           <p>
-            Bu cihaz <code>{deployment}.convex.cloud</code> adresine HTTPS ile
-            bile ulaşamıyor. Alan adı tamamen engellenmiş ya da proxy
-            arkasında.
+            This device cannot reach <code>{deployment}.convex.cloud</code> even
+            over HTTPS. The domain is fully blocked or sits behind a proxy.
           </p>
           <p className="mt-2">
-            <strong>BT'ye iletilecek talep:</strong> <code>*.convex.cloud</code>{' '}
-            alan adının beyaz listeye alınması (443 portu, HTTPS ve WebSocket).
+            <strong>Request for IT:</strong> whitelist <code>*.convex.cloud</code>
+            (port 443, HTTPS and WebSocket).
           </p>
         </>
       ),
@@ -207,10 +205,10 @@ function TaniPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Bağlantı Teşhisi</h1>
+      <h1 className="text-3xl font-bold text-foreground">Connection Diagnostics</h1>
       <p className="mt-2 text-muted-foreground">
-        Bu sayfa, cihazın veritabanına gerçekten bağlanıp bağlanamadığını ve
-        bağlanamıyorsa nerede tıkandığını gösterir.
+        This page shows whether the device can actually reach the database and,
+        if not, exactly where the connection is blocked.
       </p>
 
       <div className={`mt-6 rounded-lg border p-4 ${toneClass}`}>
@@ -219,7 +217,7 @@ function TaniPage() {
       </div>
 
       <div className="mt-6 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Bağlantı adımları</h2>
+        <h2 className="text-sm font-semibold text-foreground">Connection steps</h2>
         <dl className="mt-3 space-y-2 text-sm">
           <Row label="Deployment">
             <span className="font-mono text-base font-semibold text-foreground">
@@ -227,46 +225,46 @@ function TaniPage() {
             </span>
           </Row>
           <Row label="Convex URL">
-            <span className="break-all font-mono text-xs">{CONVEX_URL || '(tanımsız!)'}</span>
+            <span className="break-all font-mono text-xs">{CONVEX_URL || '(not set!)'}</span>
           </Row>
-          <Row label="1) HTTPS erişimi">
+          <Row label="1) HTTPS reachability">
             {https === 'checking' ? (
-              <span className="text-muted-foreground">kontrol ediliyor…</span>
+              <span className="text-muted-foreground">checking…</span>
             ) : https === 'ok' ? (
-              <span className="text-emerald-600">ulaşılıyor ✓</span>
+              <span className="text-emerald-600">reachable ✓</span>
             ) : https === 'no-url' ? (
-              <span className="text-destructive">adres tanımsız ✗</span>
+              <span className="text-destructive">no address ✗</span>
             ) : (
-              <span className="text-destructive">engelleniyor ✗</span>
+              <span className="text-destructive">blocked ✗</span>
             )}
           </Row>
-          <Row label="Aktif mod">
+          <Row label="Active mode">
             <span className="font-medium text-foreground">
               {mode === 'websocket'
-                ? 'Canlı (WebSocket)'
+                ? 'Live (WebSocket)'
                 : mode === 'http'
-                  ? 'Yedek (HTTPS — 20 saniyede bir tazelenir)'
-                  : 'belirleniyor…'}
+                  ? 'Fallback (HTTPS — refreshes every 20 seconds)'
+                  : 'determining…'}
             </span>
           </Row>
-          <Row label="2) WebSocket (canlı veri)">
+          <Row label="2) WebSocket (live data)">
             {ws === null ? (
-              <span className="text-muted-foreground">kontrol ediliyor…</span>
+              <span className="text-muted-foreground">checking…</span>
             ) : ws.isWebSocketConnected ? (
-              <span className="text-emerald-600">bağlı ✓</span>
+              <span className="text-emerald-600">connected ✓</span>
             ) : (
               <span className="text-destructive">
-                bağlanamıyor ✗
-                {ws.connectionRetries > 0 && ` (${ws.connectionRetries} deneme)`}
+                cannot connect ✗
+                {ws.connectionRetries > 0 && ` (${ws.connectionRetries} attempts)`}
               </span>
             )}
           </Row>
-          <Row label="Daha önce bağlandı mı">
+          <Row label="Ever connected">
             <span className="text-muted-foreground">
-              {ws === null ? '—' : ws.hasEverConnected ? 'evet' : 'hayır'}
+              {ws === null ? '—' : ws.hasEverConnected ? 'yes' : 'no'}
             </span>
           </Row>
-          <Row label="Site adresi">
+          <Row label="Site address">
             <span className="break-all font-mono text-xs">
               {typeof window !== 'undefined' ? window.location.origin : '—'}
             </span>
@@ -277,35 +275,35 @@ function TaniPage() {
           onClick={() => window.location.reload()}
           className="mt-3 rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted"
         >
-          Yeniden dene
+          Retry
         </button>
       </div>
 
-      <QueryCatcher label="Veritabanı kayıtları">
+      <QueryCatcher label="Database records">
         <TableCounts />
       </QueryCatcher>
 
-      <QueryCatcher label="Çift kayıt kontrolü">
+      <QueryCatcher label="Duplicate check">
         <DuplicateList />
       </QueryCatcher>
 
       <div className="mt-6 rounded-lg border border-border p-4 text-sm text-muted-foreground">
         <h2 className="text-sm font-semibold text-foreground">
-          İki cihazda farklı sonuç çıkıyorsa
+          If the two devices show different results
         </h2>
         <ol className="mt-2 list-inside list-decimal space-y-1">
           <li>
-            Bir cihaz bağlı diğeri değilse: bağlanamayan cihazın ağı engelliyordur
-            (yukarıdaki teşhis hangi katman olduğunu söylüyor).
+            One device connected and the other not: the failing device's network
+            is blocking it (the diagnosis above names the layer).
           </li>
           <li>
-            İkisi de bağlı ama <strong>Deployment</strong> adları farklıysa: Vercel'deki{' '}
-            <code>CONVEX_DEPLOY_KEY</code> bir <code>preview:</code> anahtarıdır.
-            Convex panelinden <code>prod:</code> anahtarını alıp değiştir.
+            Both connected but the <strong>Deployment</strong> names differ: the
+            <code>CONVEX_DEPLOY_KEY</code> in Vercel is a <code>preview:</code> key.
+            Replace it with the <code>prod:</code> key from the Convex dashboard.
           </li>
           <li>
-            Deployment aynı ama kayıt sayıları farklıysa: tarayıcı önbelleği —
-            sayfayı yenile.
+            Same deployment but different row counts: browser cache — reload the
+            page.
           </li>
         </ol>
       </div>
@@ -318,22 +316,22 @@ function TableCounts() {
 
   return (
     <div className="mt-6 rounded-lg border border-border p-4">
-      <h2 className="text-sm font-semibold text-foreground">Veritabanındaki kayıtlar</h2>
+      <h2 className="text-sm font-semibold text-foreground">Records in the database</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        İki cihazda bu sayılar aynıysa aynı veritabanındasın.
+        If these counts match on both devices, they share the same database.
       </p>
       {summary === undefined ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          Yükleniyor… (bağlantı kurulamıyorsa bu satır kalıcı olarak kalır)
+          Loading… (if the connection fails this line stays here)
         </p>
       ) : (
         <div className="mt-3 overflow-x-auto rounded-md border border-border">
           <table className="w-full text-left text-sm">
             <thead className="bg-muted text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 font-medium">Tablo</th>
-                <th className="px-3 py-2 font-medium">Kayıt</th>
-                <th className="px-3 py-2 font-medium">Son yazma</th>
+                <th className="px-3 py-2 font-medium">Table</th>
+                <th className="px-3 py-2 font-medium">Rows</th>
+                <th className="px-3 py-2 font-medium">Last write</th>
               </tr>
             </thead>
             <tbody>
@@ -351,7 +349,7 @@ function TableCounts() {
                       t.count === 0 ? 'text-muted-foreground' : 'text-foreground'
                     }`}
                   >
-                    {t.count.toLocaleString('tr-TR')}
+                    {t.count.toLocaleString('en-GB')}
                     {t.capped && '+'}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">
@@ -373,15 +371,15 @@ function DuplicateList() {
 
   return (
     <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-      <h2 className="text-sm font-semibold text-amber-900">Çift kayıtlar</h2>
+      <h2 className="text-sm font-semibold text-amber-900">Duplicate rows</h2>
       <p className="mt-1 text-xs text-amber-800">
-        Tekil olması gereken alanlarda birden fazla kayıt var. İlgili sayfadan
-        fazlalıkları sil.
+        Fields that should be unique have more than one row. Delete the extras
+        on the relevant page.
       </p>
       <ul className="mt-2 list-inside list-disc text-sm text-amber-900">
         {duplicates.map((d) => (
           <li key={`${d.table}-${d.key}`}>
-            {TABLE_LABELS[d.table] ?? d.table}: <code>{d.key}</code> — {d.count} kayıt
+            {TABLE_LABELS[d.table] ?? d.table}: <code>{d.key}</code> — {d.count} rows
           </li>
         ))}
       </ul>

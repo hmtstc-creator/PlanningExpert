@@ -104,7 +104,7 @@ export const saveTemplate = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new Error('Pres adı zorunludur')
+    if (!press) throw new Error('Press name is required')
     const existing = await ctx.db
       .query('pressTemplates')
       .withIndex('by_press', (q) => q.eq('press', press))
@@ -153,7 +153,7 @@ export const saveOverride = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new Error('Pres adı zorunludur')
+    if (!press) throw new Error('Press name is required')
     const existing = await ctx.db
       .query('pressWeekOverrides')
       .withIndex('by_press_week', (q) =>
@@ -197,7 +197,7 @@ export const setCapacityFactor = mutation({
   returns: v.null(),
   handler: async (ctx, { capacityFactor }) => {
     if (capacityFactor <= 0 || capacityFactor > 2) {
-      throw new Error('Kapasite katsayısı 0 ile 2 arasında olmalıdır')
+      throw new Error('Capacity factor must be between 0 and 2')
     }
     const existing = await ctx.db
       .query('globalShiftSettings')
@@ -215,9 +215,9 @@ export const setCapacityFactor = mutation({
       })
     }
     await ctx.db.insert('changeLog', {
-      title: `Kapasite katsayısı ${(capacityFactor * 100).toFixed(0)}% olarak ayarlandı`,
-      detail: 'Planlama kapasiteyi bu oranla çarpar.',
-      category: 'karar',
+      title: `Capacity factor set to ${(capacityFactor * 100).toFixed(0)}%`,
+      detail: 'Planning multiplies available capacity by this factor.',
+      category: 'decision',
       createdAt: Date.now(),
     })
     return null

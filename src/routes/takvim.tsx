@@ -10,37 +10,37 @@ export const Route = createFileRoute('/takvim')({
 })
 
 const DAYS = [
-  { key: 'MO', label: 'Pazartesi', short: 'Pzt' },
-  { key: 'TU', label: 'Salı', short: 'Sal' },
-  { key: 'WE', label: 'Çarşamba', short: 'Çar' },
-  { key: 'TH', label: 'Perşembe', short: 'Per' },
-  { key: 'FR', label: 'Cuma', short: 'Cum' },
-  { key: 'SA', label: 'Cumartesi', short: 'Cmt' },
-  { key: 'SU', label: 'Pazar', short: 'Paz' },
+  { key: 'MO', label: 'Monday', short: 'Mon' },
+  { key: 'TU', label: 'Tuesday', short: 'Tue' },
+  { key: 'WE', label: 'Wednesday', short: 'Wed' },
+  { key: 'TH', label: 'Thursday', short: 'Thu' },
+  { key: 'FR', label: 'Friday', short: 'Fri' },
+  { key: 'SA', label: 'Saturday', short: 'Sat' },
+  { key: 'SU', label: 'Sunday', short: 'Sun' },
 ]
 
 
 const FALLBACK_COUNTRIES = [
   { countryCode: 'TR', name: 'Türkiye' },
-  { countryCode: 'DE', name: 'Almanya' },
+  { countryCode: 'DE', name: 'Germany' },
   { countryCode: 'US', name: 'ABD' },
-  { countryCode: 'GB', name: 'Birleşik Krallık' },
-  { countryCode: 'FR', name: 'Fransa' },
-  { countryCode: 'IT', name: 'İtalya' },
-  { countryCode: 'ES', name: 'İspanya' },
-  { countryCode: 'NL', name: 'Hollanda' },
-  { countryCode: 'PL', name: 'Polonya' },
-  { countryCode: 'RO', name: 'Romanya' },
+  { countryCode: 'GB', name: 'United Kingdom' },
+  { countryCode: 'FR', name: 'France' },
+  { countryCode: 'IT', name: 'Italy' },
+  { countryCode: 'ES', name: 'Spain' },
+  { countryCode: 'NL', name: 'Netherlands' },
+  { countryCode: 'PL', name: 'Poland' },
+  { countryCode: 'RO', name: 'Romania' },
 ]
 
 function TakvimPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Çalışma Takvimi</h1>
+      <h1 className="text-3xl font-bold text-foreground">Work Calendar</h1>
       <p className="mt-2 text-muted-foreground">
-        Planlamanın gerçekçi olması için fabrikanın ne zaman ve ne kadar
-        çalıştığını tanımla. Vardiya süresi, çalışma günleri ve tatiller tüm
-        presler için ortaktır; her presin haftalık düzeni ayrıca tanımlanır.
+        Define when and how much the plant runs so planning stays realistic.
+        Shift length, working days and holidays are shared by all presses; each
+        press then gets its own weekly pattern.
       </p>
 
       <PressCalendarSection />
@@ -77,7 +77,7 @@ function isoDate(date: Date): string {
 
 function formatWeekLabel(monday: Date): string {
   const sunday = addDays(monday, 6)
-  const fmt = (d: Date) => d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })
+  const fmt = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
   return `${fmt(monday)} – ${fmt(sunday)} ${sunday.getFullYear()}`
 }
 
@@ -386,18 +386,17 @@ function PressCalendarSection() {
 
   return (
     <section className="mt-6 rounded-lg border border-border p-5">
-      <h2 className="font-semibold text-foreground">Pres Bazlı Detaylı Takvim</h2>
+      <h2 className="font-semibold text-foreground">Per-press Calendar</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Vardiya süresi tüm presler için ortaktır. Her pres için haftalık
-        standart çalışma düzenini (kaç gün, gün başına kaç vardiya, kaç fazla
-        mesai vardiyası) tanımla — 30 haftalık takvim bu standardı otomatik
-        uygular, hafta ilerledikçe elle yeniden girmen gerekmez. Belirli bir
-        haftada plan değişirse o haftayı ayrıca düzenleyip kaydedebilirsin.
+        Define each press's standard weekly pattern (how many days, how many
+        shifts per day, how many overtime shifts). The 30-week calendar applies
+        that standard automatically and rolls forward on its own. If a specific
+        week differs, edit and save just that week.
       </p>
 
       <div className="mt-4 rounded-md border border-border p-3">
         <h3 className="text-xs font-medium text-muted-foreground">
-          Çalışma günleri — normal vardiyalar yalnızca bu günlere yerleşir
+          Working days — normal shifts are only placed on these days
         </h3>
         <div className="mt-2 flex flex-wrap gap-2">
           {DAYS.map((d) => {
@@ -418,15 +417,15 @@ function PressCalendarSection() {
           })}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Mesai vardiyaları bu günlerin dışına da yerleşebilir (ör. Cumartesi).
+          Overtime shifts may also fall outside these days (e.g. Saturday).
         </p>
 
         <h3 className="mt-4 text-xs font-medium text-muted-foreground">
-          Elle tatil / duruş günü
+          Manual holiday / shutdown day
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Resmi tatiller yukarıdaki ülke seçimine göre otomatik gelir. Buraya
-          yalnızca fabrikaya özel duruşları ekle (ör. yıllık bakım kapanışı).
+          Public holidays arrive automatically from the country selected below.
+          Add only plant-specific shutdowns here (e.g. annual maintenance).
         </p>
         <div className="mt-2 flex gap-2">
           <input
@@ -446,7 +445,7 @@ function PressCalendarSection() {
             disabled={!newHoliday}
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            Ekle
+            Add
           </button>
         </div>
         {manualHolidays.length > 0 && (
@@ -456,7 +455,7 @@ function PressCalendarSection() {
                 key={h}
                 className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-sm text-foreground"
               >
-                {new Date(h).toLocaleDateString('tr-TR')}
+                {new Date(h).toLocaleDateString('en-GB')}
                 <button
                   className="text-destructive"
                   onClick={() => {
@@ -476,7 +475,7 @@ function PressCalendarSection() {
       <div className="mt-4 flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
-            Vardiya süresi (dk) — tüm presler için ortak
+            Shift length (min) — shared by all presses
           </span>
           <input
             type="number"
@@ -488,7 +487,7 @@ function PressCalendarSection() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
-            Fazla mesai vardiya süresi (dk) — tüm presler için ortak
+            Overtime shift length (min) — shared by all presses
           </span>
           <input
             type="number"
@@ -500,7 +499,7 @@ function PressCalendarSection() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
-            Vardiya başına mola/duruş (dk)
+            Break / planned stop per shift (min)
           </span>
           <input
             type="number"
@@ -517,7 +516,7 @@ function PressCalendarSection() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
-            Plan ufku (hafta)
+            Planning horizon (weeks)
           </span>
           <input
             type="number"
@@ -537,7 +536,7 @@ function PressCalendarSection() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
-            1. vardiya başlangıcı
+            1st shift starts at
           </span>
           <input
             type="time"
@@ -555,7 +554,7 @@ function PressCalendarSection() {
           />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Tatil ülkesi</span>
+          <span className="block text-xs text-muted-foreground">Holiday country</span>
           <select
             className="mt-1 w-48 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={country}
@@ -573,7 +572,7 @@ function PressCalendarSection() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
-            Setuplar arası min. ara (dk)
+            Min. gap between setups (min)
           </span>
           <input
             type="number"
@@ -586,7 +585,7 @@ function PressCalendarSection() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
-            Hol başına eşzamanlı setup
+            Concurrent setups per hall
           </span>
           <input
             type="number"
@@ -599,15 +598,15 @@ function PressCalendarSection() {
         </label>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Vinç kısıtı: aynı holdeki presler aynı anda en fazla{' '}
-        {concurrentSetupsPerHall} setup yapabilir ve ardışık setuplar arasında en
-        az {setupGapMinutes} dk olmalıdır. Hol tanımları Makine Tanımları
-        sayfasından gelir.
+        Crane constraint: presses in the same hall can run at most{' '}
+        {concurrentSetupsPerHall} setup(s) at a time, with at least{' '}
+        {setupGapMinutes} min between consecutive setups. Hall definitions come
+        from the Press Definitions page.
       </p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Pres</span>
+          <span className="block text-xs text-muted-foreground">Press</span>
           <select
             className="mt-1 w-48 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={press}
@@ -623,21 +622,21 @@ function PressCalendarSection() {
           </select>
         </label>
         <p className="text-xs text-muted-foreground">
-          Pres eklemek/hol tanımlamak için{' '}
+          To add presses or define halls, use{' '}
           <Link to="/makineler" className="font-medium underline">
-            Makine Tanımları
+            Press Definitions
           </Link>{' '}
-          sayfasını kullan.
+          .
         </p>
       </div>
 
       {press && (
         <>
           <div className="mt-4 rounded-md border border-border p-3">
-            <p className="text-sm font-medium text-foreground">Standart haftalık düzen</p>
+            <p className="text-sm font-medium text-foreground">Standard weekly pattern</p>
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <label className="text-sm">
-                <span className="block text-xs text-muted-foreground">Normal çalışma günü</span>
+                <span className="block text-xs text-muted-foreground">Normal working days</span>
                 <input
                   type="number"
                   min={0}
@@ -651,7 +650,7 @@ function PressCalendarSection() {
 
               <div className="text-sm">
                 <span className="block text-xs text-muted-foreground">
-                  Normal çalışma günü vardiya sayısı
+                  Shifts per normal working day
                 </span>
                 <div className="mt-1 flex items-center gap-1">
                   {[1, 2, 3].map((n) => (
@@ -680,7 +679,7 @@ function PressCalendarSection() {
 
               <label className="text-sm">
                 <span className="block text-xs text-muted-foreground">
-                  Fazla mesai vardiya sayısı
+                  Overtime shifts per week
                 </span>
                 <input
                   type="number"
@@ -696,14 +695,14 @@ function PressCalendarSection() {
                 onClick={() => void saveTemplate()}
                 className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
               >
-                Pres Kaydet
+                Save press pattern
               </button>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
-              Toplam: <strong className="text-foreground">{templateTotalShifts} vardiya</strong>{' '}
+              Total: <strong className="text-foreground">{templateTotalShifts} shifts</strong>{' '}
               · <strong className="text-foreground">{templateTotalHours.toFixed(1)} saat</strong>
-              /hafta ({workingDays} gün × {shiftsPerDay} vardiya + {overtimeShifts} fazla mesai
-              vardiyası)
+              /week ({workingDays} days × {shiftsPerDay} shifts + {overtimeShifts} overtime
+              shifts)
             </p>
           </div>
 
@@ -712,12 +711,12 @@ function PressCalendarSection() {
               <table className="w-full border-collapse text-left text-sm">
                 <thead className="bg-muted text-muted-foreground">
                   <tr>
-                    <th className="px-2 py-2 font-medium">Hafta</th>
-                    <th className="px-2 py-2 text-center font-medium">Normal gün</th>
-                    <th className="px-2 py-2 text-center font-medium">Vardiya/gün</th>
-                    <th className="px-2 py-2 text-center font-medium">Fazla mesai vardiya</th>
-                    <th className="px-2 py-2 text-center font-medium">Toplam vardiya</th>
-                    <th className="px-2 py-2 text-center font-medium">Toplam saat</th>
+                    <th className="px-2 py-2 font-medium">Week</th>
+                    <th className="px-2 py-2 text-center font-medium">Normal days</th>
+                    <th className="px-2 py-2 text-center font-medium">Shifts/day</th>
+                    <th className="px-2 py-2 text-center font-medium">Overtime shifts</th>
+                    <th className="px-2 py-2 text-center font-medium">Total shifts</th>
+                    <th className="px-2 py-2 text-center font-medium">Total hours</th>
                     <th className="px-2 py-2 font-medium" />
                   </tr>
                 </thead>
@@ -741,14 +740,14 @@ function PressCalendarSection() {
             <aside className="rounded-md border border-border p-3">
               <h3 className="text-sm font-semibold text-foreground">
                 {countries.find((c) => c.countryCode === country)?.name ?? country} — Resmi
-                Tatiller
+                Holidays
               </h3>
               {holidaysError && (
-                <p className="mt-2 text-xs text-destructive">Tatil listesi yüklenemedi.</p>
+                <p className="mt-2 text-xs text-destructive">Could not load the holiday list.</p>
               )}
               {!holidaysError && visibleHolidays.length === 0 && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Görünen 30 haftalık aralıkta tatil bulunamadı.
+                  No holidays found in the visible 30-week range.
                 </p>
               )}
               <ul className="mt-2 space-y-1.5">
@@ -758,7 +757,7 @@ function PressCalendarSection() {
                     className="rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-900"
                   >
                     <span className="font-medium">
-                      {new Date(h.date).toLocaleDateString('tr-TR', {
+                      {new Date(h.date).toLocaleDateString('en-GB', {
                         day: '2-digit',
                         month: 'short',
                         weekday: 'short',
@@ -833,7 +832,7 @@ function WeekRow({
         {formatWeekLabel(monday)}
         {isOverridden && (
           <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
-            özel
+            custom
           </span>
         )}
         {weekHolidays.length > 0 && (
@@ -893,7 +892,7 @@ function WeekRow({
               onClick={() => void handleSave()}
               className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:opacity-90"
             >
-              Kaydet
+              Save
             </button>
             <button
               onClick={() => {
@@ -902,7 +901,7 @@ function WeekRow({
               }}
               className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
             >
-              Vazgeç
+              Cancel
             </button>
           </div>
         ) : (
@@ -911,14 +910,14 @@ function WeekRow({
               onClick={() => setEditing(true)}
               className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
             >
-              Düzenle
+              Edit
             </button>
             {isOverridden && (
               <button
                 onClick={() => void handleRevert()}
                 className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
               >
-                Şablona dön
+                Reset to template
               </button>
             )}
           </div>

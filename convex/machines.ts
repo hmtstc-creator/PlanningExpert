@@ -35,7 +35,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const name = args.name.trim()
     const hall = args.hall.trim()
-    if (!name || !hall) throw new Error('Bu özellik artık kullanılmıyor')
+    if (!name || !hall) throw new Error('This feature is no longer in use')
     return ctx.db.insert('machines', { name, hall, hasCrane: args.hasCrane, tonnage: 0 })
   },
 })

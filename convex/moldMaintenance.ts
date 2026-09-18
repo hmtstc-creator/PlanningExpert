@@ -26,9 +26,9 @@ export const add = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const material = args.material.trim()
-    if (!material) throw new Error('Malzeme kodu zorunludur')
+    if (!material) throw new Error('Material code is required')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) {
-      throw new Error('Bakım tarihi YYYY-AA-GG biçiminde olmalıdır')
+      throw new Error('Maintenance date must be in YYYY-MM-DD format')
     }
     await ctx.db.insert('moldMaintenance', {
       material,
@@ -37,9 +37,9 @@ export const add = mutation({
       createdAt: Date.now(),
     })
     await ctx.db.insert('changeLog', {
-      title: `Kalıp bakımı — ${material}`,
-      detail: `${args.date} tarihinde bakım kaydedildi; vuruş sayacı sıfırlandı.`,
-      category: 'bakım',
+      title: `Mold maintenance — ${material}`,
+      detail: `Maintenance recorded on ${args.date}; the shot counter restarts from that date.`,
+      category: 'maintenance',
       createdAt: Date.now(),
     })
     return null

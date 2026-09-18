@@ -303,25 +303,25 @@ function PlanlamaPage() {
 
   const warnings = useMemo(() => {
     const list: string[] = []
-    if (presses.length === 0) list.push('Hiç pres tanımlı değil — Makine Tanımları sayfasından ekle.')
+    if (presses.length === 0) list.push('No presses defined — add them on the Press Definitions page.')
     if (templates.length === 0)
-      list.push('Hiçbir pres için çalışma takvimi tanımlanmamış — varsayılan 1 vardiya kullanılıyor.')
-    if (weeklyDemand.length === 0) list.push('ZPP haftalık talep verisi yüklenmemiş.')
-    if (stockRows.length === 0) list.push('MB52 stok verisi yüklenmemiş — stok düşülmeden planlanıyor.')
+      list.push('No work calendar defined for any press — defaulting to 1 shift.')
+    if (weeklyDemand.length === 0) list.push('No ZPP weekly demand data uploaded.')
+    if (stockRows.length === 0) list.push('No MB52 stock data uploaded — planning without deducting stock.')
     const missingMaxShots = products.filter((p) => !p.maxShots).length
     if (missingMaxShots > 0)
-      list.push(`${missingMaxShots} referansta kalıp max shot limiti tanımsız — limit kontrol edilmiyor.`)
+      list.push(`${missingMaxShots} materials have no max shot limit — the limit is not enforced.`)
     if (holidays.size === 0)
       list.push(
-        'Hiç resmi tatil kayıtlı değil — Çalışma Takvimi sayfasını bir kez aç ki tatiller kaydedilsin.',
+        'No public holidays stored — open the Work Calendar page once so they are saved.',
       )
     if (rawShortages.length > 0)
       list.push(
-        `${rawShortages.length} hammaddede stok yetmiyor — planlanan işler için rulo tedariki gerekiyor.`,
+        `${rawShortages.length} raw materials are short — coils must be sourced for the planned jobs.`,
       )
     if (missingRawSpec.length > 0)
       list.push(
-        `${missingRawSpec.length} mamulde hammadde kodu veya brüt ağırlık tanımsız — hammadde kontrolü yapılamıyor.`,
+        `${missingRawSpec.length} materials have no raw material code or gross weight — the raw material check cannot run.`,
       )
     return list
   }, [
@@ -359,7 +359,7 @@ function PlanlamaPage() {
           reason: j.reason,
         })),
       })
-      setApprovedAt(new Date().toLocaleString('tr-TR'))
+      setApprovedAt(new Date().toLocaleString('en-GB'))
     } finally {
       setApproving(false)
     }
@@ -367,26 +367,26 @@ function PlanlamaPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Planlama</h1>
+      <h1 className="text-3xl font-bold text-foreground">Planning</h1>
       <p className="mt-2 text-muted-foreground">
-        Plan otomatik oluşturulur: bakiyeler önce, sonra stoğu en çabuk bitecek
-        (en acil) malzemeler, kalan kapasite de diğer ihtiyaçlarla doldurulur.
-        Vinç kısıtı, kalıp limiti ve rulo hesabı dikkate alınır. Sen sadece
-        kontrol edip onaylarsın. Plan ufku {horizonWeeks} hafta (Çalışma
-        Takvimi sayfasından değiştirilebilir).
+        The plan is generated automatically: backlog first, then the materials
+        whose stock runs out soonest, and the remaining capacity is filled with
+        the rest of the demand. Crane constraints, mold limits and coil
+        calculations are all applied. You only review and approve. Planning
+        horizon is {horizonWeeks} weeks (change it on the Work Calendar page).
       </p>
 
       {capacityFactor !== 1 && (
         <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-          Kapasite, ölçülen gerçekleşme oranıyla düzeltiliyor:{' '}
+          Capacity is adjusted by the measured attainment rate:{' '}
           <strong className="text-foreground">%{Math.round(capacityFactor * 100)}</strong>.
-          Bu oranı Performans sayfasından güncelleyebilirsin.
+          You can update this factor on the Performance page.
         </p>
       )}
 
       {warnings.length > 0 && (
         <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-900">Kontrol edilmesi gerekenler</p>
+          <p className="text-sm font-medium text-amber-900">Needs attention</p>
           <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-800">
             {warnings.map((w) => (
               <li key={w}>{w}</li>
@@ -396,16 +396,16 @@ function PlanlamaPage() {
       )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Planlanan iş" value={result.jobs.length.toLocaleString('tr-TR')} />
-        <Stat label="Planlanan adet" value={totalPlannedQty.toLocaleString('tr-TR')} />
+        <Stat label="Planned jobs" value={result.jobs.length.toLocaleString('en-GB')} />
+        <Stat label="Planned qty" value={totalPlannedQty.toLocaleString('en-GB')} />
         <Stat
-          label="Planlanamayan"
-          value={result.unplanned.length.toLocaleString('tr-TR')}
+          label="Unplanned"
+          value={result.unplanned.length.toLocaleString('en-GB')}
           warn={result.unplanned.length > 0}
         />
         <Stat
-          label="Geciken iş"
-          value={lateCount.toLocaleString('tr-TR')}
+          label="Late jobs"
+          value={lateCount.toLocaleString('en-GB')}
           warn={lateCount > 0}
         />
       </div>
@@ -416,13 +416,13 @@ function PlanlamaPage() {
           disabled={approving || result.jobs.length === 0}
           className="rounded-md bg-foreground px-5 py-2.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
         >
-          {approving ? 'Onaylanıyor…' : 'Planı Onayla'}
+          {approving ? 'Approving…' : 'Approve plan'}
         </button>
-        {approvedAt && <span className="text-sm text-emerald-600">Onaylandı ✓ {approvedAt}</span>}
+        {approvedAt && <span className="text-sm text-emerald-600">Approved ✓ {approvedAt}</span>}
         {latestSnapshot && !approvedAt && (
           <span className="text-sm text-muted-foreground">
-            Son onaylı plan: {new Date(latestSnapshot.createdAt).toLocaleString('tr-TR')} ·{' '}
-            {latestSnapshot.jobCount} iş
+            Last approved plan: {new Date(latestSnapshot.createdAt).toLocaleString('en-GB')} ·{' '}
+            {latestSnapshot.jobCount} jobs
           </span>
         )}
       </div>
@@ -430,22 +430,22 @@ function PlanlamaPage() {
       {planDiff && planDiff.changes.length > 0 && (
         <div className="mt-6 rounded-lg border border-border p-4">
           <h2 className="text-sm font-semibold text-foreground">
-            Onaylı plana göre değişenler
+            Changes since the approved plan
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Son onay: {new Date(latestSnapshot!.createdAt).toLocaleString('tr-TR')} ·{' '}
-            {planDiff.addedCount} yeni, {planDiff.removedCount} düşen,{' '}
-            {planDiff.movedCount} yer değiştiren, {planDiff.quantityCount} miktarı değişen,{' '}
-            {planDiff.sameCount} aynı.
+            Approved: {new Date(latestSnapshot!.createdAt).toLocaleString('en-GB')} ·{' '}
+            {planDiff.addedCount} new, {planDiff.removedCount} dropped,{' '}
+            {planDiff.movedCount} moved, {planDiff.quantityCount} quantity changed,{' '}
+            {planDiff.sameCount} unchanged.
           </p>
           <div className="mt-2 max-h-80 overflow-auto rounded-md border border-border">
             <table className="w-full text-left text-sm">
               <thead className="sticky top-0 bg-muted text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Malzeme</th>
-                  <th className="px-3 py-2 font-medium">Değişim</th>
-                  <th className="px-3 py-2 font-medium">Onaylı</th>
-                  <th className="px-3 py-2 font-medium">Şimdi</th>
+                  <th className="px-3 py-2 font-medium">Material</th>
+                  <th className="px-3 py-2 font-medium">Change</th>
+                  <th className="px-3 py-2 font-medium">Approved</th>
+                  <th className="px-3 py-2 font-medium">Now</th>
                 </tr>
               </thead>
               <tbody>
@@ -458,7 +458,7 @@ function PlanlamaPage() {
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {c.approvedSlots.length > 0 ? (
                         <>
-                          {Math.round(c.approvedQty).toLocaleString('tr-TR')} adet
+                          {Math.round(c.approvedQty).toLocaleString('en-GB')} pcs
                           <br />
                           {c.approvedSlots.join(', ')}
                         </>
@@ -469,7 +469,7 @@ function PlanlamaPage() {
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {c.currentSlots.length > 0 ? (
                         <>
-                          {Math.round(c.currentQty).toLocaleString('tr-TR')} adet
+                          {Math.round(c.currentQty).toLocaleString('en-GB')} pcs
                           <br />
                           {c.currentSlots.join(', ')}
                         </>
@@ -486,44 +486,45 @@ function PlanlamaPage() {
       )}
 
       <div className="mt-6 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Plana müdahale</h2>
+        <h2 className="text-sm font-semibold text-foreground">Plan overrides</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Plan otomatik hesaplanır; buradaki kurallar hesaba girdi olarak
-          katılır, yani müdahalen kalıcıdır ama plan yine motordan çıkar.
+          The plan is always computed by the engine; the rules below are fed in
+          as input, so your override persists but the plan still comes out of
+          the engine.
         </p>
 
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <label className="text-sm">
-            <span className="block text-xs text-muted-foreground">Malzeme</span>
+            <span className="block text-xs text-muted-foreground">Material</span>
             <input
               className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={ovMaterial}
               onChange={(e) => setOvMaterial(e.target.value)}
-              placeholder="Malzeme kodu"
+              placeholder="Material code"
             />
           </label>
           <label className="text-sm">
-            <span className="block text-xs text-muted-foreground">Kural</span>
+            <span className="block text-xs text-muted-foreground">Rule</span>
             <select
               className="mt-1 w-44 rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={ovKind}
               onChange={(e) => setOvKind(e.target.value)}
             >
-              <option value="priority">Öne al</option>
-              <option value="pin">Prese sabitle</option>
-              <option value="exclude">Planlama dışı bırak</option>
+              <option value="priority">Move to front</option>
+              <option value="pin">Pin to press</option>
+              <option value="exclude">Exclude from planning</option>
             </select>
           </label>
           {ovKind === 'pin' && (
             <>
               <label className="text-sm">
-                <span className="block text-xs text-muted-foreground">Pres</span>
+                <span className="block text-xs text-muted-foreground">Press</span>
                 <select
                   className="mt-1 w-36 rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={ovPress}
                   onChange={(e) => setOvPress(e.target.value)}
                 >
-                  <option value="">Seç…</option>
+                  <option value="">Select…</option>
                   {presses.map((p) => (
                     <option key={p.name} value={p.name}>
                       {p.name}
@@ -532,7 +533,7 @@ function PlanlamaPage() {
                 </select>
               </label>
               <label className="text-sm">
-                <span className="block text-xs text-muted-foreground">Gün (ops.)</span>
+                <span className="block text-xs text-muted-foreground">Day (opt.)</span>
                 <input
                   type="date"
                   className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -559,7 +560,7 @@ function PlanlamaPage() {
             disabled={!ovMaterial.trim() || (ovKind === 'pin' && !ovPress)}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            Kuralı ekle
+            Add rule
           </button>
         </div>
 
@@ -574,17 +575,17 @@ function PlanlamaPage() {
                   <strong>{o.material}</strong>{' '}
                   <span className="text-muted-foreground">
                     {o.kind === 'exclude'
-                      ? '— planlama dışı'
+                      ? '— excluded from planning'
                       : o.kind === 'priority'
-                        ? '— öne alındı'
-                        : `— ${o.press} presine sabit${o.date ? ` (${o.date})` : ''}`}
+                        ? '— moved to front'
+                        : `— pinned to ${o.press}${o.date ? ` (${o.date})` : ''}`}
                   </span>
                 </span>
                 <button
                   onClick={() => void clearOverride({ material: o.material })}
                   className="text-xs text-destructive hover:underline"
                 >
-                  Kaldır
+                  Remove
                 </button>
               </li>
             ))}
@@ -593,16 +594,16 @@ function PlanlamaPage() {
       </div>
 
       {productStatus === 'LoadingFirstPage' && (
-        <p className="mt-8 text-sm text-muted-foreground">Veriler yükleniyor…</p>
+        <p className="mt-8 text-sm text-muted-foreground">Loading data…</p>
       )}
 
       {byDate.length === 0 && productStatus !== 'LoadingFirstPage' && (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          Planlanacak iş bulunamadı. ZPP talebi, MB52 stoğu ve{' '}
+          No jobs to plan. Make sure ZPP demand, MB52 stock and{' '}
           <Link to="/makineler" className="underline">
-            pres tanımlarının
+            press definitions
           </Link>{' '}
-          yüklü olduğundan emin ol.
+          have been uploaded.
         </p>
       )}
 
@@ -610,27 +611,27 @@ function PlanlamaPage() {
         {byDate.map(([date, jobs]) => (
           <div key={date}>
             <h2 className="text-sm font-semibold text-foreground">
-              {new Date(date).toLocaleDateString('tr-TR', {
+              {new Date(date).toLocaleDateString('en-GB', {
                 weekday: 'long',
                 day: '2-digit',
                 month: 'long',
               })}{' '}
-              <span className="font-normal text-muted-foreground">({jobs.length} iş)</span>
+              <span className="font-normal text-muted-foreground">({jobs.length} jobs)</span>
             </h2>
             <div className="mt-2 overflow-x-auto rounded-lg border border-border">
               <table className="w-full text-left text-sm">
                 <thead className="bg-muted text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2 font-medium">Pres</th>
-                    <th className="px-3 py-2 font-medium">Hol</th>
-                    <th className="px-3 py-2 font-medium">Malzeme</th>
-                    <th className="px-3 py-2 font-medium">İhtiyaç</th>
-                    <th className="px-3 py-2 font-medium">Adet</th>
-                    <th className="px-3 py-2 font-medium">Vuruş</th>
-                    <th className="px-3 py-2 font-medium">Rulo</th>
-                    <th className="px-3 py-2 font-medium">Setup başlangıç</th>
-                    <th className="px-3 py-2 font-medium">Bitiş</th>
-                    <th className="px-3 py-2 font-medium">Gerekçe</th>
+                    <th className="px-3 py-2 font-medium">Press</th>
+                    <th className="px-3 py-2 font-medium">Hall</th>
+                    <th className="px-3 py-2 font-medium">Material</th>
+                    <th className="px-3 py-2 font-medium">Required</th>
+                    <th className="px-3 py-2 font-medium">Qty</th>
+                    <th className="px-3 py-2 font-medium">Shots</th>
+                    <th className="px-3 py-2 font-medium">Coils</th>
+                    <th className="px-3 py-2 font-medium">Setup start</th>
+                    <th className="px-3 py-2 font-medium">End</th>
+                    <th className="px-3 py-2 font-medium">Reason</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -651,10 +652,10 @@ function PlanlamaPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2 text-foreground">
-                        {job.quantity.toLocaleString('tr-TR')}
+                        {job.quantity.toLocaleString('en-GB')}
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
-                        {job.shots.toLocaleString('tr-TR')}
+                        {job.shots.toLocaleString('en-GB')}
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{job.coilsNeeded}</td>
                       <td className="px-3 py-2 text-muted-foreground">
@@ -676,21 +677,21 @@ function PlanlamaPage() {
       {rawNeeds.length > 0 && (
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-foreground">
-            Hammadde ihtiyacı ({rawNeeds.length} kalem)
+            Raw material requirement ({rawNeeds.length} items)
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Planlanan vuruşların brüt ağırlığından hesaplanır; Hammadde
-            deposundaki serbest stokla karşılaştırılır.
+            Calculated from the gross weight of the planned shots and compared
+            with unrestricted stock in raw material locations.
           </p>
           <div className="mt-2 overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-left text-sm">
               <thead className="bg-muted text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Hammadde</th>
-                  <th className="px-3 py-2 font-medium">Gereken (kg)</th>
-                  <th className="px-3 py-2 font-medium">Stok (kg)</th>
-                  <th className="px-3 py-2 font-medium">Eksik (kg)</th>
-                  <th className="px-3 py-2 font-medium">Kullanan mamuller</th>
+                  <th className="px-3 py-2 font-medium">Raw material</th>
+                  <th className="px-3 py-2 font-medium">Required (kg)</th>
+                  <th className="px-3 py-2 font-medium">Stock (kg)</th>
+                  <th className="px-3 py-2 font-medium">Short (kg)</th>
+                  <th className="px-3 py-2 font-medium">Used by</th>
                 </tr>
               </thead>
               <tbody>
@@ -698,10 +699,10 @@ function PlanlamaPage() {
                   <tr key={r.rawMaterial} className="border-t border-border">
                     <td className="px-3 py-2 font-medium text-foreground">{r.rawMaterial}</td>
                     <td className="px-3 py-2 text-foreground">
-                      {Math.round(r.requiredKg).toLocaleString('tr-TR')}
+                      {Math.round(r.requiredKg).toLocaleString('en-GB')}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
-                      {Math.round(r.availableKg).toLocaleString('tr-TR')}
+                      {Math.round(r.availableKg).toLocaleString('en-GB')}
                     </td>
                     <td
                       className={`px-3 py-2 font-medium ${
@@ -709,8 +710,8 @@ function PlanlamaPage() {
                       }`}
                     >
                       {r.shortageKg > 0
-                        ? Math.round(r.shortageKg).toLocaleString('tr-TR')
-                        : 'yeterli'}
+                        ? Math.round(r.shortageKg).toLocaleString('en-GB')
+                        : 'sufficient'}
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {r.materials.join(', ')}
@@ -726,17 +727,17 @@ function PlanlamaPage() {
       {result.unplanned.length > 0 && (
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-destructive">
-            Planlanamayanlar ({result.unplanned.length})
+            Unplanned ({result.unplanned.length})
           </h2>
           <div className="mt-2 overflow-x-auto rounded-lg border border-destructive/30">
             <table className="w-full text-left text-sm">
               <thead className="bg-destructive/10 text-destructive">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Malzeme</th>
-                  <th className="px-3 py-2 font-medium">Adet</th>
-                  <th className="px-3 py-2 font-medium">Faz</th>
-                  <th className="px-3 py-2 font-medium">İhtiyaç haftası</th>
-                  <th className="px-3 py-2 font-medium">Neden</th>
+                  <th className="px-3 py-2 font-medium">Material</th>
+                  <th className="px-3 py-2 font-medium">Qty</th>
+                  <th className="px-3 py-2 font-medium">Phase</th>
+                  <th className="px-3 py-2 font-medium">Required week</th>
+                  <th className="px-3 py-2 font-medium">Reason</th>
                 </tr>
               </thead>
               <tbody>
@@ -744,7 +745,7 @@ function PlanlamaPage() {
                   <tr key={`${u.material}-${i}`} className="border-t border-border">
                     <td className="px-3 py-2 font-medium text-foreground">{u.material}</td>
                     <td className="px-3 py-2 text-foreground">
-                      {Math.round(u.quantity).toLocaleString('tr-TR')}
+                      {Math.round(u.quantity).toLocaleString('en-GB')}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{u.phase}</td>
                     <td className="px-3 py-2 text-muted-foreground">{u.dueDate}</td>
@@ -761,11 +762,11 @@ function PlanlamaPage() {
 }
 
 const CHANGE_LABEL: Record<string, string> = {
-  added: 'yeni',
-  removed: 'düştü',
-  moved: 'yer değişti',
-  quantity: 'miktar değişti',
-  same: 'aynı',
+  added: 'new',
+  removed: 'dropped',
+  moved: 'moved',
+  quantity: 'qty changed',
+  same: 'unchanged',
 }
 
 const CHANGE_STYLE: Record<string, string> = {

@@ -187,7 +187,7 @@ export function schedule(
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
-        reason: 'Tanımlı pres yok',
+        reason: 'No presses defined',
       })),
     }
   }
@@ -230,7 +230,7 @@ export function schedule(
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
-        reason: 'Kullanıcı planlamadan hariç tuttu',
+        reason: 'Excluded from planning by the user',
       })
       continue
     }
@@ -242,7 +242,7 @@ export function schedule(
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
-        reason: 'Referans kartı bulunamadı',
+        reason: 'No master data record found',
       })
       continue
     }
@@ -264,7 +264,7 @@ export function schedule(
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
-        reason: 'Uygun/tanımlı pres yok (ana ve alternatif makineler tanımsız)',
+        reason: 'No eligible press (main and alternative machines are undefined)',
       })
       continue
     }
@@ -280,7 +280,7 @@ export function schedule(
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
-        reason: `Sabitlenen pres tanımlı değil: ${pin.press}`,
+        reason: `Pinned press is not defined: ${pin.press}`,
       })
       continue
     }
@@ -310,8 +310,8 @@ export function schedule(
           phase: entry.phase,
           dueDate: entry.dueDate,
           reason: pin
-            ? 'Sabitlenen pres/günde yeterli boş kapasite yok'
-            : 'Görünen takvimde yeterli boş kapasite yok',
+            ? 'Not enough free capacity on the pinned press/day'
+            : 'Not enough free capacity in the visible calendar',
         })
       }
     }
@@ -441,15 +441,15 @@ function placeRun(
 
   const reasonParts = [
     entry.phase === 'backlog'
-      ? `Bakiye ${Math.round(entry.qty)} adet`
+      ? `Backlog ${Math.round(entry.qty)} pcs`
       : entry.phase === 'urgent'
-        ? `Stok ${entry.daysOfCover === Number.POSITIVE_INFINITY ? '∞' : entry.daysOfCover.toFixed(1)} gün yetiyor`
-        : `${entry.bucketLabel} ihtiyacı`,
-    `${run.coilsNeeded} rulo`,
-    sameMaterial ? 'setup tekrarlanmadı' : `setup ${run.setupMinutes} dk`,
+        ? `Stock covers ${entry.daysOfCover === Number.POSITIVE_INFINITY ? '∞' : entry.daysOfCover.toFixed(1)} days`
+        : `${entry.bucketLabel} requirement`,
+    `${run.coilsNeeded} coils`,
+    sameMaterial ? 'setup not repeated' : `setup ${run.setupMinutes} min`,
   ]
-  if (late) reasonParts.push(`⚠ ${entry.dueDate} haftasından geç`)
-  if (pinned) reasonParts.push('kullanıcı sabitledi')
+  if (late) reasonParts.push(`⚠ later than required week ${entry.dueDate}`)
+  if (pinned) reasonParts.push('pinned by user')
 
   return {
     material: entry.material,
