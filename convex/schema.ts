@@ -128,6 +128,19 @@ export default defineSchema({
     overtimeShifts: v.number(),
   }).index('by_press_week', ['press', 'weekStart']),
 
+  // Otomatik plana kullanıcı müdahaleleri. Plan her zaman otomatik
+  // hesaplanır; burada tutulan kurallar hesaba girdi olarak katılır, yani
+  // müdahale kalıcıdır ama planın kendisi yine motordan çıkar.
+  planOverrides: defineTable({
+    material: v.string(),
+    // 'exclude' | 'pin' | 'priority'
+    kind: v.string(),
+    press: v.optional(v.string()),
+    date: v.optional(v.string()),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index('by_material', ['material']),
+
   // Nager.Date'ten çekilen resmi tatiller. Takvim ekranı bunları yazar,
   // planlama motoru okur — aksi halde tatiller sadece ekranda görünür,
   // kapasite hesabına girmezdi.
@@ -149,6 +162,9 @@ export default defineSchema({
     horizonStart: v.string(),
     jobCount: v.number(),
     unplannedCount: v.number(),
+    // jobCount, planlanan toplam iş sayısıdır; jobs dizisi Convex doküman
+    // boyut sınırı nedeniyle kırpılmış olabilir.
+    truncated: v.optional(v.boolean()),
     jobs: v.array(
       v.object({
         material: v.string(),

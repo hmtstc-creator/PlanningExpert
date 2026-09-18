@@ -12,7 +12,8 @@ import {
   type DemandInput,
   type ProductSpec,
 } from '../lib/planning'
-import { schedule, type ScheduledJob } from '../lib/scheduler'
+import { diffPlans } from '../lib/planDiff'
+import { schedule, type PlanOverride, type ScheduledJob } from '../lib/scheduler'
 
 export const Route = createFileRoute('/planlama')({
   component: PlanlamaPage,
@@ -80,9 +81,23 @@ function PlanlamaPage() {
   const workCalendar = useQuery(api.workCalendar.get)
   const latestSnapshot = useQuery(api.planSnapshots.latest)
   const approve = useMutation(api.planSnapshots.approve)
+  const overrideRows = (useQuery(api.planOverrides.list) ?? []) as {
+    _id: string
+    material: string
+    kind: string
+    press?: string
+    date?: string
+    note?: string
+  }[]
+  const setOverride = useMutation(api.planOverrides.set)
+  const clearOverride = useMutation(api.planOverrides.clear)
 
   const [approving, setApproving] = useState(false)
   const [approvedAt, setApprovedAt] = useState<string | null>(null)
+  const [ovMaterial, setOvMaterial] = useState('')
+  const [ovKind, setOvKind] = useState('priority')
+  const [ovPress, setOvPress] = useState('')
+  const [ovDate, setOvDate] = useState('')
 
   const shiftMinutes = globalSettings?.shiftMinutes ?? 480
   const overtimeShiftMinutes = globalSettings?.overtimeShiftMinutes ?? 480
@@ -197,14 +212,42 @@ function PlanlamaPage() {
     horizonMonday,
   ])
 
+  const overrides = useMemo<PlanOverride[]>(
+    () =>
+      overrideRows.map((o) => ({
+        material: o.material,
+        kind: o.kind as PlanOverride['kind'],
+        press: o.press,
+        date: o.date,
+      })),
+    [overrideRows],
+  )
+
   const result = useMemo(
     () =>
       schedule(demand, productByCode, presses, buckets, { shiftMinutes, overtimeShiftMinutes }, {
         setupGapMinutes,
         concurrentSetupsPerHall,
+        overrides,
       }),
-    [demand, productByCode, presses, buckets, shiftMinutes, overtimeShiftMinutes, setupGapMinutes, concurrentSetupsPerHall],
+    [
+      demand,
+      productByCode,
+      presses,
+      buckets,
+      shiftMinutes,
+      overtimeShiftMinutes,
+      setupGapMinutes,
+      concurrentSetupsPerHall,
+      overrides,
+    ],
   )
+
+  // Onaylı planla canlı planın farkı — "onayladığımdan bu yana ne değişti".
+  const planDiff = useMemo(() => {
+    if (!latestSnapshot) return null
+    return diffPlans(latestSnapshot.jobs, result.jobs)
+  }, [latestSnapshot, result])
 
   const rawNeeds = useMemo(
     () => buildRawMaterialPlan(result.jobs, productByCode, rawStockByMaterial),
@@ -342,6 +385,171 @@ function PlanlamaPage() {
             Son onaylı plan: {new Date(latestSnapshot.createdAt).toLocaleString('tr-TR')} ·{' '}
             {latestSnapshot.jobCount} iş
           </span>
+        )}
+      </div>
+
+      {planDiff && planDiff.changes.length > 0 && (
+        <div className="mt-6 rounded-lg border border-border p-4">
+          <h2 className="text-sm font-semibold text-foreground">
+            Onaylı plana göre değişenler
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Son onay: {new Date(latestSnapshot!.createdAt).toLocaleString('tr-TR')} ·{' '}
+            {planDiff.addedCount} yeni, {planDiff.removedCount} düşen,{' '}
+            {planDiff.movedCount} yer değiştiren, {planDiff.quantityCount} miktarı değişen,{' '}
+            {planDiff.sameCount} aynı.
+          </p>
+          <div className="mt-2 max-h-80 overflow-auto rounded-md border border-border">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 bg-muted text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Malzeme</th>
+                  <th className="px-3 py-2 font-medium">Değişim</th>
+                  <th className="px-3 py-2 font-medium">Onaylı</th>
+                  <th className="px-3 py-2 font-medium">Şimdi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {planDiff.changes.map((c) => (
+                  <tr key={c.material} className="border-t border-border align-top">
+                    <td className="px-3 py-2 font-medium text-foreground">{c.material}</td>
+                    <td className="px-3 py-2">
+                      <span className={CHANGE_STYLE[c.kind]}>{CHANGE_LABEL[c.kind]}</span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {c.approvedSlots.length > 0 ? (
+                        <>
+                          {Math.round(c.approvedQty).toLocaleString('tr-TR')} adet
+                          <br />
+                          {c.approvedSlots.join(', ')}
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {c.currentSlots.length > 0 ? (
+                        <>
+                          {Math.round(c.currentQty).toLocaleString('tr-TR')} adet
+                          <br />
+                          {c.currentSlots.join(', ')}
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold text-foreground">Plana müdahale</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Plan otomatik hesaplanır; buradaki kurallar hesaba girdi olarak
+          katılır, yani müdahalen kalıcıdır ama plan yine motordan çıkar.
+        </p>
+
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <label className="text-sm">
+            <span className="block text-xs text-muted-foreground">Malzeme</span>
+            <input
+              className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={ovMaterial}
+              onChange={(e) => setOvMaterial(e.target.value)}
+              placeholder="Malzeme kodu"
+            />
+          </label>
+          <label className="text-sm">
+            <span className="block text-xs text-muted-foreground">Kural</span>
+            <select
+              className="mt-1 w-44 rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={ovKind}
+              onChange={(e) => setOvKind(e.target.value)}
+            >
+              <option value="priority">Öne al</option>
+              <option value="pin">Prese sabitle</option>
+              <option value="exclude">Planlama dışı bırak</option>
+            </select>
+          </label>
+          {ovKind === 'pin' && (
+            <>
+              <label className="text-sm">
+                <span className="block text-xs text-muted-foreground">Pres</span>
+                <select
+                  className="mt-1 w-36 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={ovPress}
+                  onChange={(e) => setOvPress(e.target.value)}
+                >
+                  <option value="">Seç…</option>
+                  {presses.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm">
+                <span className="block text-xs text-muted-foreground">Gün (ops.)</span>
+                <input
+                  type="date"
+                  className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={ovDate}
+                  onChange={(e) => setOvDate(e.target.value)}
+                />
+              </label>
+            </>
+          )}
+          <button
+            onClick={() => {
+              const material = ovMaterial.trim()
+              if (!material) return
+              void setOverride({
+                material,
+                kind: ovKind,
+                press: ovKind === 'pin' ? ovPress || undefined : undefined,
+                date: ovKind === 'pin' && ovDate ? ovDate : undefined,
+              }).then(() => {
+                setOvMaterial('')
+                setOvDate('')
+              })
+            }}
+            disabled={!ovMaterial.trim() || (ovKind === 'pin' && !ovPress)}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            Kuralı ekle
+          </button>
+        </div>
+
+        {overrideRows.length > 0 && (
+          <ul className="mt-3 space-y-1 text-sm">
+            {overrideRows.map((o) => (
+              <li
+                key={o._id}
+                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+              >
+                <span className="text-foreground">
+                  <strong>{o.material}</strong>{' '}
+                  <span className="text-muted-foreground">
+                    {o.kind === 'exclude'
+                      ? '— planlama dışı'
+                      : o.kind === 'priority'
+                        ? '— öne alındı'
+                        : `— ${o.press} presine sabit${o.date ? ` (${o.date})` : ''}`}
+                  </span>
+                </span>
+                <button
+                  onClick={() => void clearOverride({ material: o.material })}
+                  className="text-xs text-destructive hover:underline"
+                >
+                  Kaldır
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
@@ -511,6 +719,22 @@ function PlanlamaPage() {
       )}
     </div>
   )
+}
+
+const CHANGE_LABEL: Record<string, string> = {
+  added: 'yeni',
+  removed: 'düştü',
+  moved: 'yer değişti',
+  quantity: 'miktar değişti',
+  same: 'aynı',
+}
+
+const CHANGE_STYLE: Record<string, string> = {
+  added: 'rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800',
+  removed: 'rounded bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive',
+  moved: 'rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900',
+  quantity: 'rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900',
+  same: 'text-xs text-muted-foreground',
 }
 
 function Stat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {

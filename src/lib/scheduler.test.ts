@@ -6,7 +6,7 @@ import {
   type DemandEntry,
   type ProductSpec,
 } from './planning'
-import { schedule } from './scheduler'
+import { schedule, type PlanOverride } from './scheduler'
 
 const settings = { shiftMinutes: 480, overtimeShiftMinutes: 480 }
 const options = { setupGapMinutes: 60, concurrentSetupsPerHall: 1 }
@@ -215,5 +215,96 @@ describe('schedule', () => {
     )
     expect(result.jobs[0].coProduct).toBe('B')
     expect(result.jobs[0].coProductQuantity).toBe(500)
+  })
+
+  it('hariç tutulan malzemeyi planlamaz ve gerekçesini yazar', () => {
+    const overrides: PlanOverride[] = [{ material: 'A', kind: 'exclude' }]
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      bucketsFor(['PRS-1']),
+      settings,
+      { ...options, overrides },
+    )
+    expect(result.jobs).toHaveLength(0)
+    expect(result.unplanned[0].reason).toContain('hariç tuttu')
+  })
+
+  it('sabitlenen malzemeyi yalnızca o preste planlar', () => {
+    const product = { ...baseProduct, altMachine1: 'PRS-2' }
+    const overrides: PlanOverride[] = [{ material: 'A', kind: 'pin', press: 'PRS-2' }]
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', product]]),
+      [
+        { name: 'PRS-1', hall: 'Hol 1' },
+        { name: 'PRS-2', hall: 'Hol 2' },
+      ],
+      bucketsFor(['PRS-1', 'PRS-2']),
+      settings,
+      { ...options, overrides },
+    )
+    expect(result.jobs[0].press).toBe('PRS-2')
+    expect(result.jobs[0].pinned).toBe(true)
+    expect(result.jobs[0].reason).toContain('sabitledi')
+  })
+
+  it('sabitlenen gün dışına taşmaz', () => {
+    const overrides: PlanOverride[] = [
+      { material: 'A', kind: 'pin', press: 'PRS-1', date: '2026-09-16' },
+    ]
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      bucketsFor(['PRS-1']),
+      settings,
+      { ...options, overrides },
+    )
+    expect(result.jobs[0].date).toBe('2026-09-16')
+  })
+
+  it('sabitlenen pres tanımsızsa gerekçesiyle planlanamadıya düşer', () => {
+    const overrides: PlanOverride[] = [{ material: 'A', kind: 'pin', press: 'YOK' }]
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      bucketsFor(['PRS-1']),
+      settings,
+      { ...options, overrides },
+    )
+    expect(result.jobs).toHaveLength(0)
+    expect(result.unplanned[0].reason).toContain('Sabitlenen pres tanımlı değil')
+  })
+
+  it('öne alınan malzemeyi faz sırasından bağımsız olarak ilk sıraya koyar', () => {
+    const fill: DemandEntry = {
+      material: 'B',
+      qty: 500,
+      dueDate: '2026-09-14',
+      earliestDate: '2026-09-14',
+      bucketLabel: 'W38',
+      phase: 'fill',
+      urgency: 0,
+      daysOfCover: 30,
+    }
+    const products = new Map<string, ProductSpec & { mainMachine?: string }>([
+      ['A', { ...baseProduct, mainMachine: 'PRS-1' }],
+      ['B', { ...baseProduct, code: 'B', mainMachine: 'PRS-1' }],
+    ])
+    const overrides: PlanOverride[] = [{ material: 'B', kind: 'priority' }]
+    const result = schedule(
+      [backlogEntry, fill],
+      products,
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      bucketsFor(['PRS-1']),
+      settings,
+      { ...options, overrides },
+    )
+    // Bakiye normalde önce gelirdi; öne alma kuralı B'yi başa taşır.
+    expect(result.jobs[0].material).toBe('B')
+    expect(result.jobs[0].setupStartMinute).toBe(0)
   })
 })

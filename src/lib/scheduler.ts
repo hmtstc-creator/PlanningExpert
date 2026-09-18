@@ -16,11 +16,26 @@ export interface PressSpec {
   hall: string
 }
 
+/**
+ * Kullanıcının otomatik plana elle müdahalesi.
+ * - `exclude`: bu malzeme hiç planlanmaz (ör. kalıp bakımda).
+ * - `pin`: bu malzeme yalnızca verilen preste (ve verilmişse o günde) planlanır.
+ * - `priority`: bu malzeme sıranın en başına alınır.
+ */
+export interface PlanOverride {
+  material: string
+  kind: 'exclude' | 'pin' | 'priority'
+  press?: string
+  date?: string
+}
+
 export interface SchedulerOptions {
   /** Ardışık setuplar arasında bırakılacak minimum dakika (vinç kısıtı). */
   setupGapMinutes: number
   /** Aynı holde aynı anda yapılabilecek setup sayısı. */
   concurrentSetupsPerHall: number
+  /** Kullanıcının elle müdahaleleri. */
+  overrides?: PlanOverride[]
 }
 
 export interface ScheduledJob {
@@ -39,6 +54,8 @@ export interface ScheduledJob {
   quantity: number
   shots: number
   coilsNeeded: number
+  /** Bu iş bir kullanıcı müdahalesiyle mi konumlandı? */
+  pinned: boolean
   coProduct?: string
   coProductQuantity: number
   setupStartMinute: number
@@ -142,10 +159,30 @@ export function schedule(
   const jobs: ScheduledJob[] = []
   const unplanned: UnplannedItem[] = []
 
+  const overrides = options.overrides ?? []
+  const excluded = new Set(
+    overrides.filter((o) => o.kind === 'exclude').map((o) => o.material),
+  )
+  const pinned = new Map(
+    overrides.filter((o) => o.kind === 'pin').map((o) => [o.material, o]),
+  )
+  const prioritised = new Set(
+    overrides.filter((o) => o.kind === 'priority').map((o) => o.material),
+  )
+
+  // Öne alınan malzemeler faz sırasından bağımsız olarak en başa geçer.
+  const ordered =
+    prioritised.size === 0
+      ? demand
+      : [
+          ...demand.filter((e) => prioritised.has(e.material)),
+          ...demand.filter((e) => !prioritised.has(e.material)),
+        ]
+
   if (presses.length === 0) {
     return {
       jobs,
-      unplanned: demand.map((entry) => ({
+      unplanned: ordered.map((entry) => ({
         material: entry.material,
         quantity: entry.qty,
         phase: entry.phase,
@@ -186,7 +223,18 @@ export function schedule(
   // farklı preslerde ardışık olarak çalışabilir.
   const moldUsage: MoldUsage = new Map()
 
-  for (const entry of demand) {
+  for (const entry of ordered) {
+    if (excluded.has(entry.material)) {
+      unplanned.push({
+        material: entry.material,
+        quantity: entry.qty,
+        phase: entry.phase,
+        dueDate: entry.dueDate,
+        reason: 'Kullanıcı planlamadan hariç tuttu',
+      })
+      continue
+    }
+
     const product = products.get(entry.material)
     if (!product) {
       unplanned.push({
@@ -221,6 +269,22 @@ export function schedule(
       continue
     }
 
+    // Kullanıcı bu malzemeyi belirli bir prese (ve güne) sabitlediyse
+    // yalnızca orası denenir.
+    const pin = pinned.get(entry.material)
+    const allowedPresses =
+      pin?.press && pressByName.has(pin.press) ? [pin.press] : candidates
+    if (pin?.press && !pressByName.has(pin.press)) {
+      unplanned.push({
+        material: entry.material,
+        quantity: entry.qty,
+        phase: entry.phase,
+        dueDate: entry.dueDate,
+        reason: `Sabitlenen pres tanımlı değil: ${pin.press}`,
+      })
+      continue
+    }
+
     // Kalıp limitine göre partilere böl.
     const runs = splitByMoldLimit(product, entry.qty)
     for (const run of runs) {
@@ -228,13 +292,14 @@ export function schedule(
         entry,
         product,
         run,
-        candidates,
+        allowedPresses,
         pressByName,
         state,
         hallSetups,
-        dates,
+        pin?.date ? dates.filter((d) => d === pin.date) : dates,
         moldUsage,
         options,
+        !!pin,
       )
       if (placed) {
         jobs.push(placed)
@@ -244,7 +309,9 @@ export function schedule(
           quantity: run.quantity,
           phase: entry.phase,
           dueDate: entry.dueDate,
-          reason: 'Görünen takvimde yeterli boş kapasite yok',
+          reason: pin
+            ? 'Sabitlenen pres/günde yeterli boş kapasite yok'
+            : 'Görünen takvimde yeterli boş kapasite yok',
         })
       }
     }
@@ -314,6 +381,7 @@ function placeRun(
   dates: string[],
   moldUsage: MoldUsage,
   options: SchedulerOptions,
+  pinned = false,
 ): ScheduledJob | null {
   let best: Placement | null = null
 
@@ -381,6 +449,7 @@ function placeRun(
     sameMaterial ? 'setup tekrarlanmadı' : `setup ${run.setupMinutes} dk`,
   ]
   if (late) reasonParts.push(`⚠ ${entry.dueDate} haftasından geç`)
+  if (pinned) reasonParts.push('kullanıcı sabitledi')
 
   return {
     material: entry.material,
@@ -395,6 +464,7 @@ function placeRun(
     quantity: run.quantity,
     shots: run.shots,
     coilsNeeded: run.coilsNeeded,
+    pinned,
     coProduct: product.coProduct,
     coProductQuantity: run.coProductQuantity,
     setupStartMinute: best.setupStart,
