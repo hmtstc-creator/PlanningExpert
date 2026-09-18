@@ -27,6 +27,32 @@ export const list = query({
     ctx.db.query('actualProduction').order('desc').paginate(args.paginationOpts),
 })
 
+/** Tek sorguda okunacak en fazla satır — bkz. products.listAll. */
+const PLANNING_ROW_LIMIT = 20000
+
+/**
+ * Gerçekleşen üretimin tamamı.
+ *
+ * Kalıp ömrü ve gerçekleşme oranı bu satırların TOPLAMINDAN çıkıyor.
+ * Sayfalı okumak toplamı eksik bırakır: kalıp limitine yaklaşmış bir kalıp
+ * güvenli görünür, gerçekleşme oranı olduğundan yüksek çıkar ve o oran tüm
+ * planın kapasitesini çarpar. Eksiklik saklanmaz, bildirilir.
+ */
+export const listAll = query({
+  args: {},
+  returns: v.object({
+    rows: v.array(rowValidator),
+    complete: v.boolean(),
+  }),
+  handler: async (ctx) => {
+    const rows = await ctx.db.query('actualProduction').take(PLANNING_ROW_LIMIT + 1)
+    return {
+      rows: rows.slice(0, PLANNING_ROW_LIMIT),
+      complete: rows.length <= PLANNING_ROW_LIMIT,
+    }
+  },
+})
+
 export const replaceAll = mutation({
   args: {
     rows: v.array(

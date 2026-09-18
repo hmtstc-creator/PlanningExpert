@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport'
+import { useMutation, useQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -31,16 +31,15 @@ function PerformansPage() {
   const [to, setTo] = useState(() => isoDate(today))
 
   const snapshot = useQuery(api.planSnapshots.latest)
-  const { results: actualRows, status: actualStatus } = usePaginatedQuery(
-    api.actualProduction.list,
-    {},
-    { initialNumItems: 2000 },
-  )
-  const { results: products } = usePaginatedQuery(
-    api.products.list,
-    {},
-    { initialNumItems: 500 },
-  )
+  // Kalıp ömrü ve gerçekleşme oranı bu satırların toplamından çıkar;
+  // sayfalı okumak toplamı eksik bırakır ve iki sayıyı da yanıltıcı yapar.
+  const actualResult = useQuery(api.actualProduction.listAll)
+  const actualRows = useMemo(() => actualResult?.rows ?? [], [actualResult])
+  const actualStatus = actualResult === undefined ? 'LoadingFirstPage' : 'Exhausted'
+  const actualIncomplete = actualResult !== undefined && !actualResult.complete
+  // Malzeme kartları da eksiksiz okunur: kartı görülmeyen bir malzemenin
+  // göz sayısı ve kalıp limiti bilinmez, vuruş hesabı da yanlış çıkar.
+  const products = useQuery(api.products.listAll)?.rows ?? []
   const presses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string }[]
   const templates = (useQuery(api.pressCalendar.listTemplates) ?? []) as {
     press: string
@@ -224,9 +223,25 @@ function PerformansPage() {
           <button
             onClick={() => {
               const value = Math.min(2, Math.max(0.05, Number(factor.toFixed(3))))
+              // Bu çarpan her presin kapasitesini ölçekler; eksik veriden
+              // çıkmış bir oranı plana yazmak tüm planı bozar.
+              if (
+                !window.confirm(
+                  `Set the capacity factor to ${Math.round(value * 100)}%? ` +
+                    'This scales the available capacity of every press in the plan.',
+                )
+              ) {
+                return
+              }
               void setCapacityFactor({ capacityFactor: value }).then(() => setApplied(true))
             }}
-            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
+            disabled={actualIncomplete}
+            title={
+              actualIncomplete
+                ? 'The attainment rate is computed from incomplete data'
+                : undefined
+            }
+            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
           >
             Apply {Math.round(factor * 100)}%
           </button>
@@ -268,6 +283,15 @@ function PerformansPage() {
 
       {actualStatus === 'LoadingFirstPage' && (
         <p className="mt-6 text-sm text-muted-foreground">Loading actual production…</p>
+      )}
+
+      {actualIncomplete && (
+        <p className="mt-6 rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm text-foreground">
+          <strong className="text-destructive">This attainment rate is unreliable.</strong>{' '}
+          There is more actual production than one query can read, so it is
+          computed from part of the data. Do not write it into the capacity
+          factor — that factor scales the capacity of every press in the plan.
+        </p>
       )}
 
       {worst.length > 0 && (

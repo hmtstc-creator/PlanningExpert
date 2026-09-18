@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
+import { useQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -27,16 +27,15 @@ const STATUS_STYLE: Record<MoldStatus, string> = {
 }
 
 function KaliplarPage() {
-  const { results: products } = usePaginatedQuery(
-    api.products.list,
-    {},
-    { initialNumItems: 500 },
-  )
-  const { results: actualRows, status: actualStatus } = usePaginatedQuery(
-    api.actualProduction.list,
-    {},
-    { initialNumItems: 5000 },
-  )
+  // Malzeme kartları da eksiksiz okunur: kartı görülmeyen bir malzemenin
+  // göz sayısı ve kalıp limiti bilinmez, vuruş hesabı da yanlış çıkar.
+  const products = useQuery(api.products.listAll)?.rows ?? []
+  // Kalıp ömrü ve gerçekleşme oranı bu satırların toplamından çıkar;
+  // sayfalı okumak toplamı eksik bırakır ve iki sayıyı da yanıltıcı yapar.
+  const actualResult = useQuery(api.actualProduction.listAll)
+  const actualRows = useMemo(() => actualResult?.rows ?? [], [actualResult])
+  const actualStatus = actualResult === undefined ? 'LoadingFirstPage' : 'Exhausted'
+  const actualIncomplete = actualResult !== undefined && !actualResult.complete
   const maintenance = (useQuery(api.moldMaintenance.list) ?? []) as {
     _id: string
     material: string
@@ -156,6 +155,15 @@ function KaliplarPage() {
 
       {actualStatus === 'LoadingFirstPage' && (
         <p className="mt-6 text-sm text-muted-foreground">Loading actual production…</p>
+      )}
+
+      {actualIncomplete && (
+        <p className="mt-6 rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm text-foreground">
+          <strong className="text-destructive">These shot counts are too low.</strong>{' '}
+          There is more actual production than one query can read, so part of it
+          is missing from the totals below. A mould close to its limit may look
+          safe here. Upload a shorter MB51 period.
+        </p>
       )}
 
       {rows.length === 0 ? (
