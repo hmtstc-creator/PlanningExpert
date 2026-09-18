@@ -194,15 +194,46 @@ function buildTimeline(buckets: DayBucket[]): PressTimeline {
   return { days, total: offset, bookings: [] }
 }
 
-/** `[start, end)` aralığıyla çakışan ilk dolu aralık. */
-function firstOverlap(timeline: PressTimeline, start: number, end: number): Booking | null {
-  let found: Booking | null = null
-  for (const booking of timeline.bookings) {
-    if (booking.start < end && start < booking.end) {
-      if (!found || booking.end < found.end) found = booking
-    }
+/**
+ * Dolu aralıklar `start`'a göre sıralı tutulur.
+ *
+ * Bir preste iki iş aynı anda olamaz, yani aralıklar çakışmaz; çakışmayan
+ * ve başlangıca göre sıralı bir dizi aynı zamanda bitişe göre de sıralıdır.
+ * Aramaların ikili arama yapabilmesi buna dayanıyor — liste uzadıkça her
+ * yerleştirmenin tüm listeyi taraması, iş sayısıyla birlikte süreyi karesel
+ * büyütüyordu.
+ */
+function insertBooking(timeline: PressTimeline, booking: Booking): void {
+  let low = 0
+  let high = timeline.bookings.length
+  while (low < high) {
+    const mid = (low + high) >> 1
+    if (timeline.bookings[mid].start < booking.start) low = mid + 1
+    else high = mid
   }
-  return found
+  timeline.bookings.splice(low, 0, booking)
+}
+
+/** `end` değeri `value`'dan büyük olan ilk aralığın indeksi. */
+function firstEndAfter(bookings: Booking[], value: number): number {
+  let low = 0
+  let high = bookings.length
+  while (low < high) {
+    const mid = (low + high) >> 1
+    if (bookings[mid].end <= value) low = mid + 1
+    else high = mid
+  }
+  return low
+}
+
+/** `[start, end)` aralığıyla çakışan, en erken biten dolu aralık. */
+function firstOverlap(timeline: PressTimeline, start: number, end: number): Booking | null {
+  const bookings = timeline.bookings
+  for (let i = firstEndAfter(bookings, start); i < bookings.length; i++) {
+    if (bookings[i].start >= end) return null
+    if (bookings[i].end > start) return bookings[i]
+  }
+  return null
 }
 
 /**
@@ -214,11 +245,13 @@ function firstOverlap(timeline: PressTimeline, start: number, end: number): Book
  * gereksiz yere tekrarlanır.
  */
 function firstFreePoint(timeline: PressTimeline, from: number): number {
+  const bookings = timeline.bookings
   let point = Math.max(0, from)
-  for (let guard = 0; guard <= timeline.bookings.length; guard++) {
-    const inside = timeline.bookings.find((b) => b.start <= point && point < b.end)
-    if (!inside) return point
-    point = inside.end
+  // Aralıklar sıralı ve çakışmıyor: noktayı içeren aralığın sonuna atlamak
+  // en fazla bitişik aralıklar boyunca ilerler.
+  for (let i = firstEndAfter(bookings, point); i < bookings.length; i++) {
+    if (bookings[i].start > point) break
+    point = bookings[i].end
   }
   return point
 }
@@ -231,20 +264,32 @@ function firstFreePoint(timeline: PressTimeline, from: number): number {
  * yüzden bitişiklik değil sıra aranır.
  */
 function materialBefore(timeline: PressTimeline, at: number): string | null {
-  let latest: Booking | null = null
-  for (const booking of timeline.bookings) {
-    if (booking.end > at) continue
-    if (!latest || booking.end > latest.end) latest = booking
+  const index = firstEndAfter(timeline.bookings, at) - 1
+  return index >= 0 ? timeline.bookings[index].material : null
+}
+
+/**
+ * Eksendeki dakikayı içeren (ya da ondan sonraki ilk) günün indeksi.
+ *
+ * Günler eksende ardışık ve sıralı, bu yüzden ikili arama yapılabilir.
+ * Baştan taramak, plan doldukça her yerleştirmenin ufkun başından itibaren
+ * yürümesi demekti — iş sayısıyla birlikte süre karesele yaklaşıyordu.
+ */
+function dayIndexAt(timeline: PressTimeline, minute: number): number {
+  let low = 0
+  let high = timeline.days.length
+  while (low < high) {
+    const mid = (low + high) >> 1
+    const day = timeline.days[mid]
+    if (minute >= day.offset + day.capacity) low = mid + 1
+    else high = mid
   }
-  return latest?.material ?? null
+  return low
 }
 
 /** Eksendeki dakikayı içeren gün. */
 function dayAt(timeline: PressTimeline, minute: number): DayWindow | null {
-  for (const day of timeline.days) {
-    if (minute < day.offset + day.capacity) return day
-  }
-  return null
+  return timeline.days[dayIndexAt(timeline, minute)] ?? null
 }
 
 /** Eksendeki dakikanın takvim karşılığı: hangi gün, o günün kaçıncı dakikası. */
@@ -256,10 +301,15 @@ function locate(timeline: PressTimeline, minute: number): { date: string; minute
 
 /** Verilen tarihin (veya ondan sonraki ilk günün) eksendeki başlangıcı. */
 function offsetOfDate(timeline: PressTimeline, date: string): number {
-  for (const day of timeline.days) {
-    if (day.date >= date) return day.offset
+  // Günler tarihe göre de sıralı.
+  let low = 0
+  let high = timeline.days.length
+  while (low < high) {
+    const mid = (low + high) >> 1
+    if (timeline.days[mid].date < date) low = mid + 1
+    else high = mid
   }
-  return timeline.total
+  return timeline.days[low]?.offset ?? timeline.total
 }
 
 /**
@@ -273,10 +323,12 @@ function toDatedSegments(
   end: number,
 ): JobSegment[] {
   const out: JobSegment[] = []
-  for (const day of timeline.days) {
-    const dayEnd = day.offset + day.capacity
+  // Parçanın başladığı günden başla; ufkun başından taramanın anlamı yok.
+  for (let i = dayIndexAt(timeline, start); i < timeline.days.length; i++) {
+    const day = timeline.days[i]
+    if (day.offset >= end) break
     const from = Math.max(start, day.offset)
-    const to = Math.min(end, dayEnd)
+    const to = Math.min(end, day.offset + day.capacity)
     if (to <= from) continue
     out.push({ kind, date: day.date, start: from - day.offset, end: to - day.offset })
     if (to >= end) break
@@ -608,7 +660,7 @@ function applyFixedJobs(
     }
 
     if (min === Number.POSITIVE_INFINITY) continue
-    timeline.bookings.push({ start: min, end: max, material: job.material })
+    insertBooking(timeline, { start: min, end: max, material: job.material })
     for (const [date, span] of perDate) {
       recordMoldInterval(moldUsage, job.material, date, {
         press: job.press,
@@ -699,9 +751,7 @@ function reserveSlot(
 
   let cursor = from
   for (let guard = 0; guard < timeline.days.length * 4 + 8; guard++) {
-    const day = timeline.days.find(
-      (d) => cursor < d.offset + d.capacity && d.offset + d.capacity > 0,
-    )
+    const day = timeline.days[dayIndexAt(timeline, cursor)]
     if (!day) return null
     if (cursor < day.offset) cursor = day.offset
 
@@ -726,9 +776,9 @@ function reserveSlot(
     }
     cursor = day.offset + shiftEnd
     if (cursor >= day.offset + day.capacity) {
-      const next = timeline.days.find((d) => d.offset >= day.offset + day.capacity)
+      const next = timeline.days[dayIndexAt(timeline, day.offset + day.capacity)]
       if (!next) return null
-      cursor = next.offset
+      cursor = Math.max(cursor, next.offset)
     }
   }
   return null
@@ -949,7 +999,9 @@ function placeRun(
       earliest = Math.max(earliest, day.offset)
       limit = day.offset + day.capacity
     }
-    if (earliest >= timeline.total) continue
+    // Presin ufku doluysa hiç denemeye girme: tıkanmış bir tesiste her
+    // kalem için tüm ufku yeniden taramak, aramanın en pahalı hâli.
+    if (firstFreePoint(timeline, earliest) >= timeline.total) continue
 
     const placement = tryPlaceOnPress(
       entry,
@@ -984,7 +1036,7 @@ function placeRun(
   const timeline = timelines.get(best.press)!
   const sameMaterial = best.sameMaterial
 
-  timeline.bookings.push({
+  insertBooking(timeline, {
     start: best.startGlobal,
     end: best.endGlobal,
     material: entry.material,
