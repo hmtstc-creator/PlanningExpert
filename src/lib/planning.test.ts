@@ -5,6 +5,7 @@ import {
   buildRawMaterialPlan,
   buildWeekBuckets,
   materialsMissingRawSpec,
+  piecesPerCoil,
   computeRunPlan,
   type ProductSpec,
   splitByMoldLimit,
@@ -523,5 +524,119 @@ describe('vardiya bazlı planlı duruşlar', () => {
         { shiftMinutes: 480, overtimeShiftMinutes: 480, stopMinutesByShift: [60, 0] },
       ),
     ).toBe(5 * (420 + 480))
+  })
+})
+
+describe('rulo lotu (minimum üretim miktarı)', () => {
+  const baseMonday = new Date('2026-09-14T00:00:00Z')
+  // Rulodan 3000 adet çıkıyor: 3000 kg rulo / 1 kg brüt × 1 göz.
+  const coilProduct: ProductSpec = {
+    code: 'A',
+    moldCavities: 1,
+    grossWeight: 1,
+    coilWeight: 3000,
+  }
+
+  it('bir ruloya sığan adedi hesaplar', () => {
+    expect(piecesPerCoil(coilProduct)).toBe(3000)
+    expect(piecesPerCoil({ ...coilProduct, moldCavities: 2 })).toBe(6000)
+    expect(piecesPerCoil({ code: 'X' })).toBe(0)
+  })
+
+  it('bakiye için rulo bağlanınca artan gelecek haftayı karşılar', () => {
+    // Kullanıcının örneği: 200 bakiye, gelecek hafta 2000 sipariş, rulo 3000.
+    // Tek rulo bağlanır, 3000 basılır; 2800 artar, gelecek haftanın 2000'i
+    // bundan karşılanır. Sonuç: tek iş, tek setup.
+    const entries = buildDemandSchedule(
+      [
+        {
+          material: 'A',
+          overdue: 200,
+          periods: [
+            { label: 'W1', qty: 0 },
+            { label: 'W2', qty: 2000 },
+          ],
+          stock: 0,
+        },
+      ],
+      new Map([['A', coilProduct]]),
+      { baseMonday },
+    )
+    expect(entries).toHaveLength(1)
+    expect(entries[0].qty).toBe(3000)
+    expect(entries[0].dueDate).toBe('2026-09-14')
+  })
+
+  it('ihtiyaç bir ruloyu aşarsa tam rulo katına yuvarlar', () => {
+    const entries = buildDemandSchedule(
+      [{ material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 3500 }], stock: 0 }],
+      new Map([['A', coilProduct]]),
+      { baseMonday },
+    )
+    expect(entries[0].qty).toBe(6000) // 2 rulo
+  })
+
+  it('artan tükendiğinde yeni rulo bağlar, hepsini öne çekmez', () => {
+    // Her hafta 2500 ihtiyaç: 1. hafta 3000 (500 artar), 2. hafta 2000 kalan
+    // ihtiyaç için 3000 daha. Üretim haftalara yayılır.
+    const entries = buildDemandSchedule(
+      [
+        {
+          material: 'A',
+          overdue: 0,
+          periods: [
+            { label: 'W1', qty: 2500 },
+            { label: 'W2', qty: 2500 },
+            { label: 'W3', qty: 2500 },
+          ],
+          stock: 0,
+        },
+      ],
+      new Map([['A', coilProduct]]),
+      { baseMonday },
+    )
+    const total = entries.reduce((sum, e) => sum + e.qty, 0)
+    expect(total).toBe(9000) // 3 rulo, 7500 ihtiyaç için
+    expect(entries.every((e) => e.qty % 3000 === 0)).toBe(true)
+    // Hepsi ilk haftaya yığılmadı.
+    expect(entries.length).toBeGreaterThan(1)
+  })
+
+  it('rulo ya da brüt ağırlık tanımsızsa yuvarlama yapmaz', () => {
+    const entries = buildDemandSchedule(
+      [{ material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 1234 }], stock: 0 }],
+      new Map([['A', { code: 'A' }]]),
+      { baseMonday },
+    )
+    expect(entries[0].qty).toBe(1234)
+  })
+
+  it('eş ürünlerde rulo lotu ikisine birden uygulanır', () => {
+    const products = new Map<string, ProductSpec>([
+      ['A', { ...coilProduct, coProduct: 'B' }],
+      ['B', { ...coilProduct, code: 'B' }],
+    ])
+    const entries = buildDemandSchedule(
+      [
+        { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 700 },
+        { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: 1500 }], stock: 300 },
+      ],
+      products,
+      { baseMonday },
+    )
+    const qty = (m: string) =>
+      entries.filter((e) => e.material === m).reduce((sum, e) => sum + e.qty, 0)
+    // Max(300, 1200) = 1200 ihtiyaç → tam rulo 3000, ikisi de 3000.
+    expect(qty('A')).toBe(3000)
+    expect(qty('B')).toBe(3000)
+  })
+
+  it('stok ruloyu gereksiz yere bağlatmaz', () => {
+    const entries = buildDemandSchedule(
+      [{ material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 500 }], stock: 900 }],
+      new Map([['A', coilProduct]]),
+      { baseMonday },
+    )
+    expect(entries).toHaveLength(0)
   })
 })

@@ -216,6 +216,11 @@ export function buildDemandSchedule(
   }
 
 
+  // Rulo lotu: bağlanan rulo sonuna kadar basılır, bu yüzden ihtiyaç tam
+  // ruloya yuvarlanır ve fazlası EN ERKEN kaleme eklenir — rulo tek seferde
+  // bitirilir, haftaya bölünmez.
+  roundMaterialsToCoilLot(entriesByMaterial, products, pairedWith)
+
   return Array.from(entriesByMaterial.values())
     .flat()
     .filter((entry) => entry.qty > 0)
@@ -264,8 +269,110 @@ function levelToRequired(
   entriesByMaterial.set(material, list)
 }
 
+/**
+ * İhtiyacı rulo lotlarına çevirir.
+ *
+ * Bağlanan rulo yarıda sökülmez: bir rulo bağlandıysa sonuna kadar basılır.
+ * Bu yüzden her kalem tam ruloya yuvarlanır ve ARTAN adet sonraki haftalara
+ * taşınır — o haftalar artandan karşılanıyorsa yeni rulo bağlanmaz.
+ *
+ * Kullanıcının örneği: 200 bakiye + gelecek hafta 2000 sipariş, rulodan 3000
+ * adet çıkıyor. Bakiye için rulo bağlanır ve 3000 basılır; 2800 artar,
+ * gelecek haftanın 2000'i bu artandan karşılanır. Sonuç tek iş, tek setup.
+ * Hafta hafta yuvarlansaydı iki ayrı rulo (6000 adet) çıkardı.
+ */
+function roundMaterialsToCoilLot(
+  entriesByMaterial: Map<string, DemandEntry[]>,
+  products: Map<string, ProductSpec>,
+  pairedWith: Map<string, string>,
+): void {
+  const done = new Set<string>()
+
+  for (const [material] of entriesByMaterial) {
+    if (done.has(material)) continue
+    const partner = pairedWith.get(material)
+    done.add(material)
+    if (partner) done.add(partner)
+
+    const own = sortedByDue(entriesByMaterial.get(material) ?? [])
+    const other = partner ? sortedByDue(entriesByMaterial.get(partner) ?? []) : []
+    const product = products.get(material)
+    const partnerProduct = partner ? products.get(partner) : undefined
+
+    const lot = Math.max(
+      product ? piecesPerCoil(product) : 0,
+      partnerProduct ? piecesPerCoil(partnerProduct) : 0,
+    )
+    if (lot <= 0) continue
+
+    // Eş ürünler aynı vuruştan çıktığı için haftalar birlikte yürütülür.
+    const weeks = Array.from(new Set([...own, ...other].map((e) => e.dueDate))).sort()
+    let carry = 0
+    let partnerCarry = 0
+
+    for (const week of weeks) {
+      const ownWeek = own.filter((e) => e.dueDate === week)
+      const otherWeek = other.filter((e) => e.dueDate === week)
+      const ownQty = ownWeek.reduce((sum, e) => sum + e.qty, 0)
+      const otherQty = otherWeek.reduce((sum, e) => sum + e.qty, 0)
+
+      // Önceki rulodan artan, bu haftanın ihtiyacını karşılıyor mu?
+      const ownNeed = Math.max(0, ownQty - carry)
+      const otherNeed = Math.max(0, otherQty - partnerCarry)
+      const need = Math.max(ownNeed, otherNeed)
+
+      const produce = need > 0 ? Math.ceil(need / lot) * lot : 0
+      carry += produce - ownQty
+      partnerCarry += produce - otherQty
+
+      setWeekQuantity(ownWeek, produce)
+      setWeekQuantity(otherWeek, produce)
+    }
+  }
+}
+
+function sortedByDue(entries: DemandEntry[]): DemandEntry[] {
+  return [...entries].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+}
+
+/**
+ * Bir haftanın toplamını verilen miktara getirir. Rulo lotu tek işte
+ * basıldığı için miktar ilk kaleme yazılır, diğerleri sıfırlanır — aksi
+ * halde aynı rulo için birden fazla setup planlanırdı.
+ */
+function setWeekQuantity(weekEntries: DemandEntry[], quantity: number): void {
+  if (weekEntries.length === 0) return
+  weekEntries[0].qty = quantity
+  for (let i = 1; i < weekEntries.length; i++) weekEntries[i].qty = 0
+}
+
 function phaseRank(phase: DemandEntry['phase']): number {
   return phase === 'backlog' ? 0 : phase === 'urgent' ? 1 : 2
+}
+
+/**
+ * Bir ruloya sığan adet: rulo ağırlığı ÷ brüt ağırlık = vuruş, × göz sayısı.
+ * Rulo ya da brüt ağırlık tanımsızsa lot kısıtı yoktur (0 döner).
+ */
+export function piecesPerCoil(product: ProductSpec): number {
+  const grossWeight = product.grossWeight ?? 0
+  const coilWeight = product.coilWeight ?? 0
+  if (grossWeight <= 0 || coilWeight <= 0) return 0
+  const cavities = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
+  return Math.floor(coilWeight / grossWeight) * cavities
+}
+
+/**
+ * İhtiyacı tam ruloya yuvarlar.
+ *
+ * Bağlanan rulo yarıda sökülmez; preste bir rulo bağlandıysa sonuna kadar
+ * basılır. Bu yüzden minimum üretim lotu sipariş miktarı değil, rulodan
+ * çıkan adettir.
+ */
+export function roundUpToCoilLot(quantity: number, product: ProductSpec): number {
+  const lot = piecesPerCoil(product)
+  if (lot <= 0 || quantity <= 0) return quantity
+  return Math.ceil(quantity / lot) * lot
 }
 
 // ---- 2) Rulo / parti hesabı ----------------------------------------------

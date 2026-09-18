@@ -466,7 +466,7 @@ function placeRun(
       : entry.phase === 'urgent'
         ? `Stock covers ${entry.daysOfCover === Number.POSITIVE_INFINITY ? '∞' : entry.daysOfCover.toFixed(1)} days`
         : `${entry.bucketLabel} requirement`,
-    `${run.coilsNeeded} coils`,
+    run.coilsNeeded === 1 ? '1 full coil' : `${run.coilsNeeded} full coils`,
     sameMaterial ? 'setup not repeated' : `setup ${run.setupMinutes} min`,
   ]
   if (run.qualityApprovalMinutes > 0) {

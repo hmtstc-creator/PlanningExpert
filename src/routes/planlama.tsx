@@ -546,6 +546,13 @@ function PlanlamaPage() {
         horizon is {horizonWeeks} weeks (change it on the Work Calendar page).
       </p>
 
+      <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+        <strong className="text-foreground">Minimum lot is one full coil.</strong> A coil
+        that is mounted is run out, so quantities are rounded up to whole coils and the
+        surplus covers the following weeks rather than triggering a second coil. Materials
+        with no coil or gross weight in master data are planned to the exact requirement.
+      </p>
+
       {thisWeekCapacity.full > 0 && (
         <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
           This week ({isoWeekLabel(horizonMonday)}):{' '}
