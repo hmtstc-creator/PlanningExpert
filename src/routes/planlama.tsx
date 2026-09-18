@@ -24,6 +24,7 @@ import {
   remainingCapacityMinutes,
 } from '../lib/shiftTimeline'
 import { diffPlans } from '../lib/planDiff'
+import { fixForUnplanned } from '../lib/unplannedFix'
 import { schedule, type PlanOverride, type ScheduledJob } from '../lib/scheduler'
 
 export const Route = createFileRoute('/planlama')({
@@ -211,7 +212,10 @@ function PlanlamaPage() {
   // Re-read once a minute rather than on every render.
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000)
+    // Beş dakikada bir yeter. Dakikada bir tazelemek tüm planı yeniden
+    // hesaplatıyordu: planlamacı bakarken işler yerinden oynuyordu ve
+    // kapasite zaten dakika hassasiyetinde bir şey değil.
+    const id = setInterval(() => setNow(new Date()), 300_000)
     return () => clearInterval(id)
   }, [])
   // The plan day runs from the first shift's start, not from midnight: at
@@ -906,7 +910,7 @@ function PlanlamaPage() {
         </div>
       )}
 
-      <div className="mt-6 rounded-lg border border-border p-4">
+      <div id="plan-overrides" className="mt-6 scroll-mt-20 rounded-lg border border-border p-4">
         <h2 className="text-sm font-semibold text-foreground">Plan overrides</h2>
         <p className="mt-1 text-xs text-muted-foreground">
           The plan is always computed by the engine; the rules below are fed in
@@ -1052,6 +1056,9 @@ function PlanlamaPage() {
           <div className="mt-2">
             <WeekGantt
               dates={week.dates}
+              // `nowClockMinute` gece yarısından itibaren sayar (gece
+              // vardiyasında 1440'ı aşar), grafiğin ekseni de öyle.
+              now={{ date: todayIso, clockMinute: nowClockMinute }}
               stops={plannedStops}
               shiftStartMinute={shiftStartMinute}
               shiftMinutes={shiftMinutes}
@@ -1231,20 +1238,49 @@ function PlanlamaPage() {
                   <th className="px-3 py-2 font-medium">Phase</th>
                   <th className="px-3 py-2 font-medium">Required week</th>
                   <th className="px-3 py-2 font-medium">Reason</th>
+                  <th className="px-3 py-2 font-medium">Fix</th>
                 </tr>
               </thead>
               <tbody>
-                {result.unplanned.map((u, i) => (
-                  <tr key={`${u.material}-${i}`} className="border-t border-border">
-                    <td className="px-3 py-2 font-medium text-foreground">{u.material}</td>
-                    <td className="px-3 py-2 text-foreground">
-                      {Math.round(u.quantity).toLocaleString('en-GB')}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">{u.phase}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{u.dueDate}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{u.reason}</td>
-                  </tr>
-                ))}
+                {result.unplanned.map((u, i) => {
+                  // Her sebebin somut bir çaresi var; listeyi okuyup ne
+                  // yapacağını aramak planlamacının işi olmamalı.
+                  const fix = fixForUnplanned(u.reason)
+                  return (
+                    <tr key={`${u.material}-${i}`} className="border-t border-border">
+                      <td className="px-3 py-2 font-medium text-foreground">{u.material}</td>
+                      <td className="px-3 py-2 text-foreground">
+                        {Math.round(u.quantity).toLocaleString('en-GB')}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{u.phase}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{u.dueDate}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{u.reason}</td>
+                      <td className="px-3 py-2 text-xs whitespace-nowrap">
+                        {fix.to ? (
+                          <Link
+                            to={fix.to}
+                            className="text-foreground underline hover:no-underline"
+                          >
+                            {fix.label}
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setOvMaterial(u.material)
+                              setOvKind('priority')
+                              document
+                                .getElementById('plan-overrides')
+                                ?.scrollIntoView({ behavior: 'smooth' })
+                            }}
+                            className="text-foreground underline hover:no-underline"
+                          >
+                            {fix.label}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

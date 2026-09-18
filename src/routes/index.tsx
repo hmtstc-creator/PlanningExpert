@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
+import { useQuery } from '../lib/convexTransport'
 import { useMemo } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -9,10 +9,25 @@ export const Route = createFileRoute('/')({
 })
 
 function HomePage() {
-  const { results: products } = usePaginatedQuery(api.products.list, {}, { initialNumItems: 300 })
-  const { results: weekly } = usePaginatedQuery(api.demand.listWeekly, {}, { initialNumItems: 300 })
-  const { results: stockRows } = usePaginatedQuery(api.stock.list, {}, { initialNumItems: 500 })
-  const { results: locations } = usePaginatedQuery(api.storageLocations.list, {}, { initialNumItems: 100 })
+  // Bu sayfa sayı sayar ve uyarı üretir ("N malzemenin ana makinesi yok").
+  // Sayfalı sorguyla bu sayılar sessizce yanlış çıkar: sınırın ötesindeki
+  // malzeme hiç görülmez ve uyarı verilmez. Eksiksiz sorgular kullanılır.
+  const productsResult = useQuery(api.products.listAll)
+  const demandResult = useQuery(api.demand.listAllWeekly)
+  const stockResult = useQuery(api.stock.listAll)
+  const products = useMemo(() => productsResult?.rows ?? [], [productsResult])
+  const weekly = useMemo(() => demandResult?.rows ?? [], [demandResult])
+  const stockRows = useMemo(() => stockResult?.rows ?? [], [stockResult])
+  const locations = (useQuery(api.storageLocations.listAll) ?? []) as {
+    code: string
+    category: string
+  }[]
+
+  const truncatedInputs = [
+    productsResult && !productsResult.complete ? 'master data' : null,
+    demandResult && !demandResult.complete ? 'demand' : null,
+    stockResult && !stockResult.complete ? 'stock' : null,
+  ].filter((v): v is string => v !== null)
   const calendar = useQuery(api.workCalendar.get)
   const presses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string }[]
   const snapshot = useQuery(api.planSnapshots.latest)
@@ -159,6 +174,14 @@ function HomePage() {
       <p className="mt-2 text-muted-foreground">
         Press shop production planning — daily status overview
       </p>
+
+      {truncatedInputs.length > 0 && (
+        <p className="mt-4 rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm text-foreground">
+          <strong className="text-destructive">These numbers are incomplete.</strong>{' '}
+          There are more rows in {truncatedInputs.join(', ')} than one query can
+          read, so the counts and warnings below leave part of the data out.
+        </p>
+      )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard label="Materials" value={products.length} hint="with a master data record" to="/referanslar" />

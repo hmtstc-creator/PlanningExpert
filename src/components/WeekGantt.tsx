@@ -96,6 +96,12 @@ interface Props {
   stops: PlannedStop[]
   shiftStartMinute: number
   shiftMinutes: number
+  /**
+   * Şu an: üretim günü ve o gün içindeki dakika. Grafikte dikey bir çizgi
+   * olarak çizilir — planlamacı sahanın nerede olduğunu görmeden hangi işin
+   * geçtiğini, hangisinin sırada olduğunu okuyamaz.
+   */
+  now?: { date: string; clockMinute: number }
 }
 
 interface PlacedBlock extends Segment {
@@ -134,6 +140,7 @@ export function WeekGantt({
   stops,
   shiftStartMinute,
   shiftMinutes,
+  now,
 }: Props) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [dayFilter, setDayFilter] = useState<string | null>(null)
@@ -242,6 +249,18 @@ export function WeekGantt({
     return { rows, dayWidthMinutes, clashKeys }
   }, [visibleDates, presses, jobs, stops, shiftStartMinute, shiftMinutes])
 
+  /**
+   * "Şimdi" çizgisinin eksendeki yeri. Gün, gösterilen günler arasında
+   * değilse çizgi çizilmez — dünün ya da gelecek haftanın grafiğine
+   * bugünün saatini koymak yanlış olur.
+   */
+  const nowOffset = useMemo(() => {
+    if (!now) return null
+    const index = visibleDates.indexOf(now.date)
+    if (index === -1) return null
+    return index * dayWidthMinutes + (now.clockMinute - shiftStartMinute)
+  }, [now, visibleDates, dayWidthMinutes, shiftStartMinute])
+
   const byCategory = useMemo(() => {
     const map = new Map<string, typeof rows>()
     for (const row of rows) {
@@ -288,6 +307,24 @@ export function WeekGantt({
               {COLORS[kind].label}
             </span>
           ))}
+        {jobs.some((j) => j.frozen) && (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              className="inline-block h-3 w-3 rounded-sm bg-muted-foreground"
+              style={{
+                backgroundImage:
+                  'repeating-linear-gradient(45deg, rgba(255,255,255,0.5) 0 2px, transparent 2px 5px)',
+              }}
+            />
+            Frozen (from the approved plan)
+          </span>
+        )}
+        {nowOffset !== null && (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="inline-block h-3 w-0.5 bg-red-600/80" />
+            Now
+          </span>
+        )}
         {clashKeys.size > 0 && (
           <span className="flex items-center gap-1.5 text-xs font-medium text-destructive">
             <span className="inline-block h-3 w-3 rounded-sm border-2 border-dashed border-destructive" />
@@ -420,6 +457,14 @@ export function WeekGantt({
                         title={date}
                       />
                     ))}
+
+                    {nowOffset !== null && (
+                      <span
+                        className="pointer-events-none absolute top-0 z-10 h-full w-0.5 bg-red-600/80"
+                        style={{ left: px(nowOffset) }}
+                        title="Now"
+                      />
+                    )}
 
                     {blocks.map((b, idx) => {
                       const id = `${press.name}-${idx}`
