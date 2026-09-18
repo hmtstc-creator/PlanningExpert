@@ -68,8 +68,8 @@ function GerceklesenPage() {
   )
 
   return (
-    <div className="w-full px-6 py-16">
-      <h1 className="text-3xl font-bold text-foreground">Actual Production</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-16">
+      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Actual Production</h1>
       <p className="mt-2 text-muted-foreground">
         Upload the SAP MB51 movement report here. This data is used to compare
         actual production against the plan and to measure real press

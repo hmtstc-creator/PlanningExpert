@@ -118,3 +118,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Horizontal scrollers (wide tables, the Gantt) need momentum scrolling on
+   touch, and a visible hint that there is more to the right. */
+@layer utilities {
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+}

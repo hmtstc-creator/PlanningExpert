@@ -1,0 +1,64 @@
+// Single definition of the navigation, shared by the desktop bar and the
+// mobile drawer so the two can never drift apart.
+//
+// Grouping follows how the work is actually done rather than the order the
+// pages were built: the plan is the destination, data feeds it, the shop
+// floor definitions constrain it, and analysis checks it afterwards.
+
+export interface NavItem {
+  to: string
+  label: string
+  /** Shown in the mobile drawer, where there is room for a line of context. */
+  hint?: string
+}
+
+export interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+/** Always visible, never inside a menu — these are the daily destinations. */
+export const PRIMARY_LINKS: NavItem[] = [
+  { to: '/planlama', label: 'Plan', hint: 'The weekly production plan' },
+  { to: '/', label: 'Overview', hint: 'Daily status and warnings' },
+]
+
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Data',
+    items: [
+      { to: '/siparisler', label: 'Demand', hint: 'ZPP and ZPP_DAILY uploads' },
+      { to: '/stoklar', label: 'Stock', hint: 'MB52 upload' },
+      { to: '/gerceklesen', label: 'Actuals', hint: 'MB51 upload' },
+      { to: '/referanslar', label: 'Master Data', hint: 'Cavities, SPM, weights, machines' },
+    ],
+  },
+  {
+    label: 'Shop floor',
+    items: [
+      { to: '/makineler', label: 'Presses', hint: 'Halls, categories, tonnage' },
+      { to: '/takvim', label: 'Work Calendar', hint: 'Shifts, stops, capacity' },
+      { to: '/depolar', label: 'Storage Locations', hint: 'Which stock counts' },
+    ],
+  },
+  {
+    label: 'Analysis',
+    items: [
+      { to: '/performans', label: 'Performance', hint: 'Plan versus actual' },
+      { to: '/kaliplar', label: 'Mold Life', hint: 'Shots since last maintenance' },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { to: '/kayitlar', label: 'Change Log', hint: 'Decisions and rules' },
+      { to: '/tani', label: 'Connection Diagnostics', hint: 'Is this device connected?' },
+    ],
+  },
+]
+
+/** Every route in the navigation, for the mobile drawer's flat rendering. */
+export const ALL_GROUPS: NavGroup[] = [
+  { label: 'Planning', items: PRIMARY_LINKS },
+  ...NAV_GROUPS,
+]

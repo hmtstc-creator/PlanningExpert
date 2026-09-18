@@ -14,7 +14,7 @@ export function MutationErrorToast() {
   if (!message) return null
 
   return (
-    <div className="fixed inset-x-4 bottom-4 z-[100] mx-auto max-w-lg rounded-lg border border-destructive/40 bg-background p-4 shadow-lg">
+    <div className="fixed inset-x-3 bottom-3 z-[100] mx-auto max-w-lg rounded-lg border border-destructive/40 bg-background p-4 shadow-lg sm:inset-x-4 sm:bottom-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-destructive">Could not save</p>

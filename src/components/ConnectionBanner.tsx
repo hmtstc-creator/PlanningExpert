@@ -17,7 +17,7 @@ export function ConnectionBanner() {
   if (mode === 'websocket' || mode === 'connecting') return null
 
   return (
-    <div className="sticky top-[57px] z-40 border-b border-amber-300 bg-amber-100 px-6 py-2 text-sm text-amber-900">
+    <div className="border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm text-amber-900 sm:px-6">
       <div className="flex w-full flex-wrap items-center gap-2">
         <span>
           <strong>Fallback connection mode.</strong> The live connection (WebSocket) could not

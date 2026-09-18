@@ -127,7 +127,7 @@ export function CapacityGrid(props: CapacityGridProps) {
 
   return (
     <div className="rounded-lg border border-border bg-card">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-border px-4 py-2.5">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>Shifts per week</span>
           <span className="flex items-center gap-0.5">
@@ -158,6 +158,9 @@ export function CapacityGrid(props: CapacityGridProps) {
         </div>
       </div>
 
+      <p className="px-4 pt-2 text-[11px] text-muted-foreground lg:hidden">
+        Scroll sideways for later weeks.
+      </p>
       <div className="overflow-x-auto">
         <table className="border-collapse text-xs">
           <thead>

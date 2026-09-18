@@ -39,8 +39,8 @@ const FALLBACK_COUNTRIES = [
 
 function TakvimPage() {
   return (
-    <div className="w-full px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Work Calendar</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
+      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Work Calendar</h1>
       <p className="mt-2 text-muted-foreground">
         Define when and how much the plant runs so planning stays realistic.
         Shift length, working days and holidays are shared by all presses; each

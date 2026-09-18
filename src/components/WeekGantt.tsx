@@ -217,7 +217,7 @@ export function WeekGantt({
 
   return (
     <div className="rounded-lg border border-border bg-card">
-      <div className="flex flex-wrap items-center gap-4 border-b border-border px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border px-4 py-2.5">
         {(Object.keys(COLORS) as BlockKind[]).map((kind) => (
           <span key={kind} className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
@@ -235,6 +235,9 @@ export function WeekGantt({
         )}
       </div>
 
+      <p className="px-4 pt-2 text-[11px] text-muted-foreground lg:hidden">
+        Scroll sideways to see the whole week.
+      </p>
       <div className="overflow-x-auto">
         <div className="min-w-[900px] px-4 py-3">
           <div className="relative mb-1 h-5" style={{ marginLeft: LABEL_WIDTH }}>

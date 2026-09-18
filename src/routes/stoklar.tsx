@@ -61,8 +61,8 @@ function StoklarPage() {
   const filteredRows = rows.filter((r) => r.material.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div className="w-full px-6 py-16">
-      <h1 className="text-3xl font-bold text-foreground">Stoklar</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-16">
+      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Stoklar</h1>
       <p className="mt-2 text-muted-foreground">
         Upload the SAP MB52 stock report here every day. Total available stock
         is calculated per material; the detail view breaks it down by storage

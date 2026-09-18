@@ -33,8 +33,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <AppConvexProvider>
-          <Header />
-          <ConnectionBanner />
+          {/* One sticky stack: the banner sits under the header without a
+              hard-coded offset, which broke when the header changed height
+              between breakpoints. */}
+          <div className="sticky top-0 z-50">
+            <Header />
+            <ConnectionBanner />
+          </div>
           {children}
           <MutationErrorToast />
         </AppConvexProvider>

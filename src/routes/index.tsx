@@ -154,13 +154,13 @@ function HomePage() {
   const dataReady = products.length > 0 && weekly.length > 0 && stockRows.length > 0
 
   return (
-    <div className="w-full px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Production Planning</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
+      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Production Planning</h1>
       <p className="mt-2 text-muted-foreground">
         Press shop production planning — daily status overview
       </p>
 
-      <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard label="Materials" value={products.length} hint="with a master data record" to="/referanslar" />
         <StatCard label="Presses" value={presses.length} hint={`${new Set(presses.map((p) => p.hall)).size} halls`} to="/makineler" />
         <StatCard
@@ -179,7 +179,7 @@ function HomePage() {
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard label="Demand records" value={weekly.length} hint="ZPP materials" to="/siparisler" />
         <StatCard
           label="Demand in horizon"

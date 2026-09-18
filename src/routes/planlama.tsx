@@ -536,8 +536,8 @@ function PlanlamaPage() {
   }
 
   return (
-    <div className="w-full px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Production Plan</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
+      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Production Plan</h1>
       <p className="mt-2 text-muted-foreground">
         The plan is generated automatically: backlog first, then the materials
         whose stock runs out soonest, and the remaining capacity is filled with

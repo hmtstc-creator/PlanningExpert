@@ -100,8 +100,8 @@ function KaliplarPage() {
   }
 
   return (
-    <div className="w-full px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Mold Life</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
+      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Mold Life</h1>
       <p className="mt-2 text-muted-foreground">
         The shots each mold has made since its last maintenance are calculated
         from the actual production uploaded via MB51 (quantity ÷ cavities) and
@@ -111,7 +111,7 @@ function KaliplarPage() {
 
       <ErrorBanner message={addError ?? removeError} onDismiss={clearError} />
 
-      <div className="mt-6 grid grid-cols-3 gap-3">
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label="Limit exceeded" value={exceeded.toString()} warn={exceeded > 0} />
         <Stat label="Near limit" value={warning.toString()} warn={warning > 0} />
         <Stat label="No limit set" value={unknown.toString()} />

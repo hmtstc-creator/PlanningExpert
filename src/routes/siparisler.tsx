@@ -61,8 +61,8 @@ function SiparislerPage() {
   const threshold = Number(highRunnerThreshold) || 0
 
   return (
-    <div className="w-full px-6 py-16">
-      <h1 className="text-3xl font-bold text-foreground">Demand</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-16">
+      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Demand</h1>
       <p className="mt-2 text-muted-foreground">
         Upload the ZPP (weekly) and ZPP_DAILY (daily) net requirement reports
         from SAP here every day — negative values represent the shortfall that
