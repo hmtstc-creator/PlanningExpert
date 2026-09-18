@@ -3,6 +3,7 @@ import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport
 import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { useSyncedFields } from '../lib/useSyncedFields'
 
 export const Route = createFileRoute('/takvim')({
   component: TakvimPage,
@@ -47,13 +48,20 @@ function TakvimPage() {
   const [newHoliday, setNewHoliday] = useState('')
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => {
-    if (calendar) {
-      setShiftMinutes(calendar.shiftMinutesPerDay)
-      setWorkingDays(calendar.workingDays)
-      setHolidays(calendar.holidays)
-    }
-  }, [calendar])
+  useSyncedFields(
+    calendar
+      ? {
+          shiftMinutesPerDay: calendar.shiftMinutesPerDay,
+          workingDays: calendar.workingDays.join(','),
+          holidays: calendar.holidays.join(','),
+        }
+      : undefined,
+    {
+      shiftMinutesPerDay: setShiftMinutes,
+      workingDays: (v: string) => setWorkingDays(v === '' ? [] : v.split(',')),
+      holidays: (v: string) => setHolidays(v === '' ? [] : v.split(',')),
+    },
+  )
 
   function toggleDay(key: string) {
     setWorkingDays((prev) =>
@@ -281,18 +289,32 @@ function PressCalendarSection() {
   const [shiftStartMinute, setShiftStartMinute] = useState(480)
   const [planningHorizonWeeks, setPlanningHorizonWeeks] = useState(4)
   const [breakMinutesPerShift, setBreakMinutesPerShift] = useState(0)
-  useEffect(() => {
-    if (globalSettings) {
-      setShiftMinutes(globalSettings.shiftMinutes)
-      setOvertimeShiftMinutes(globalSettings.overtimeShiftMinutes)
-      setCountry(globalSettings.country)
-      setSetupGapMinutes(globalSettings.setupGapMinutes ?? 60)
-      setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? 1)
-      setShiftStartMinute(globalSettings.shiftStartMinute ?? 480)
-      setPlanningHorizonWeeks(globalSettings.planningHorizonWeeks ?? 4)
-      setBreakMinutesPerShift(globalSettings.breakMinutesPerShift ?? 0)
-    }
-  }, [globalSettings])
+  // Sunucu değerlerini forma yalnızca sunucuda değiştiklerinde yansıt.
+  // Aksi halde sorgu her tazelendiğinde kullanıcının yazdığı değer siliniyor.
+  useSyncedFields(
+    globalSettings
+      ? {
+          shiftMinutes: globalSettings.shiftMinutes,
+          overtimeShiftMinutes: globalSettings.overtimeShiftMinutes,
+          country: globalSettings.country,
+          setupGapMinutes: globalSettings.setupGapMinutes ?? 60,
+          concurrentSetupsPerHall: globalSettings.concurrentSetupsPerHall ?? 1,
+          shiftStartMinute: globalSettings.shiftStartMinute ?? 480,
+          planningHorizonWeeks: globalSettings.planningHorizonWeeks ?? 4,
+          breakMinutesPerShift: globalSettings.breakMinutesPerShift ?? 0,
+        }
+      : undefined,
+    {
+      shiftMinutes: setShiftMinutes,
+      overtimeShiftMinutes: setOvertimeShiftMinutes,
+      country: setCountry,
+      setupGapMinutes: setSetupGapMinutes,
+      concurrentSetupsPerHall: setConcurrentSetupsPerHall,
+      shiftStartMinute: setShiftStartMinute,
+      planningHorizonWeeks: setPlanningHorizonWeeks,
+      breakMinutesPerShift: setBreakMinutesPerShift,
+    },
+  )
 
   async function persistGlobalSettings(
     next?: Partial<{
@@ -326,18 +348,20 @@ function PressCalendarSection() {
   const [shiftsPerDay, setShiftsPerDay] = useState(1)
   const [overtimeShifts, setOvertimeShifts] = useState(0)
 
-  useEffect(() => {
-    if (template) {
-      setWorkingDays(template.workingDays)
-      setShiftsPerDay(template.shiftsPerDay)
-      setOvertimeShifts(template.overtimeShifts)
-    } else {
-      setWorkingDays(defaultWorkingDays)
-      setShiftsPerDay(1)
-      setOvertimeShifts(0)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [press, template?.workingDays, template?.shiftsPerDay, template?.overtimeShifts])
+  useSyncedFields(
+    template
+      ? {
+          workingDays: template.workingDays,
+          shiftsPerDay: template.shiftsPerDay,
+          overtimeShifts: template.overtimeShifts,
+        }
+      : undefined,
+    {
+      workingDays: setWorkingDays,
+      shiftsPerDay: setShiftsPerDay,
+      overtimeShifts: setOvertimeShifts,
+    },
+  )
 
   async function saveTemplate(next?: Partial<WeekPattern>) {
     if (!press) return
@@ -506,8 +530,12 @@ function PressCalendarSection() {
             min={0}
             className="mt-1 w-28 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={breakMinutesPerShift}
-            onChange={(e) => setBreakMinutesPerShift(Math.max(0, Number(e.target.value) || 0))}
-            onBlur={() => void persistGlobalSettings()}
+            onChange={(e) => setBreakMinutesPerShift(Number(e.target.value))}
+            onBlur={() => {
+              const clamped = Math.max(0, Math.round(breakMinutesPerShift) || 0)
+              setBreakMinutesPerShift(clamped)
+              void persistGlobalSettings({ breakMinutesPerShift: clamped })
+            }}
           />
         </label>
         <label className="text-sm">
@@ -520,10 +548,14 @@ function PressCalendarSection() {
             max={30}
             className="mt-1 w-28 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={planningHorizonWeeks}
-            onChange={(e) =>
-              setPlanningHorizonWeeks(Math.min(30, Math.max(1, Number(e.target.value) || 1)))
-            }
-            onBlur={() => void persistGlobalSettings()}
+            onChange={(e) => setPlanningHorizonWeeks(Number(e.target.value))}
+            onBlur={() => {
+              // Kırpma yazarken değil, alandan çıkınca yapılır; aksi halde
+              // kutuyu silip yeni sayı yazmak imkânsız hale geliyor.
+              const clamped = Math.min(30, Math.max(1, Math.round(planningHorizonWeeks) || 4))
+              setPlanningHorizonWeeks(clamped)
+              void persistGlobalSettings({ planningHorizonWeeks: clamped })
+            }}
           />
         </label>
         <label className="text-sm">
@@ -542,7 +574,7 @@ function PressCalendarSection() {
                 setShiftStartMinute(h * 60 + m)
               }
             }}
-            onBlur={() => void persistGlobalSettings()}
+            onBlur={() => void persistGlobalSettings({ shiftStartMinute })}
           />
         </label>
         <label className="text-sm">

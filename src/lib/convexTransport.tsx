@@ -137,7 +137,12 @@ function useHttpQuery<T>(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await (http as any).query(fn, args)
         if (!cancelled && ticket === latest.current) {
-          setData(result as T)
+          // Aynı veri tekrar geldiyse state'e dokunma: yeni nesne kimliği
+          // tüm sayfalarda gereksiz yeniden render ve form sıfırlaması
+          // tetikliyordu.
+          setData((current) =>
+            JSON.stringify(current) === JSON.stringify(result) ? current : (result as T),
+          )
           setError(null)
         }
       } catch (e) {

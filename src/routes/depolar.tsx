@@ -56,6 +56,7 @@ function DepolarPage() {
     { initialNumItems: 500 },
   )
   const upsert = useMutation(api.storageLocations.upsert)
+  const removeLocation = useMutation(api.storageLocations.remove)
 
   const [saving, setSaving] = useState<string | null>(null)
   const [newCode, setNewCode] = useState('')
@@ -100,6 +101,27 @@ function DepolarPage() {
     }
     return map
   }, [stockRows])
+
+  /**
+   * Depo tanımını siler. MB52 stoğunda hâlâ görünen bir depo listeden
+   * kaybolmaz — sadece tanımı (kategorisi/notu) silinir ve varsayılana
+   * döner, çünkü stok verisi o depo kodunu üretmeye devam eder.
+   */
+  async function deleteLocation(code: string) {
+    const record = byCode.get(code)
+    if (!record) return
+    const stillInStock = stockRows.some((s) => s.storageLocation === code)
+    const message = stillInStock
+      ? `${code} deposunun tanımı silinsin mi? MB52 stoğunda göründüğü için listede kalmaya devam edecek, sadece kategorisi varsayılana dönecek.`
+      : `${code} deposu listeden tamamen kaldırılsın mı?`
+    if (!window.confirm(message)) return
+    setSaving(code)
+    try {
+      await removeLocation({ id: record._id })
+    } finally {
+      setSaving(null)
+    }
+  }
 
   async function setCategory(code: string, category: string, description?: string) {
     setSaving(code)
@@ -187,7 +209,7 @@ function DepolarPage() {
                     }
                   />
                 </div>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   {CATEGORIES.map((c) => {
                     const active = current?.category === c.value
                     return (
@@ -205,6 +227,16 @@ function DepolarPage() {
                       </button>
                     )
                   })}
+                  {current && (
+                    <button
+                      disabled={saving === code}
+                      onClick={() => void deleteLocation(code)}
+                      title="Depo tanımını sil"
+                      className="ml-1 rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    >
+                      Sil
+                    </button>
+                  )}
                 </div>
               </div>
             )
