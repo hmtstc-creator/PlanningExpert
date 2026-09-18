@@ -276,19 +276,33 @@ function PressCalendarSection() {
   const [shiftMinutes, setShiftMinutes] = useState(480)
   const [overtimeShiftMinutes, setOvertimeShiftMinutes] = useState(480)
   const [country, setCountry] = useState('TR')
+  const [setupGapMinutes, setSetupGapMinutes] = useState(60)
+  const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
   useEffect(() => {
     if (globalSettings) {
       setShiftMinutes(globalSettings.shiftMinutes)
       setOvertimeShiftMinutes(globalSettings.overtimeShiftMinutes)
       setCountry(globalSettings.country)
+      setSetupGapMinutes(globalSettings.setupGapMinutes ?? 60)
+      setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? 1)
     }
   }, [globalSettings])
 
-  async function persistGlobalSettings(next?: Partial<{ shiftMinutes: number; overtimeShiftMinutes: number; country: string }>) {
+  async function persistGlobalSettings(
+    next?: Partial<{
+      shiftMinutes: number
+      overtimeShiftMinutes: number
+      country: string
+      setupGapMinutes: number
+      concurrentSetupsPerHall: number
+    }>,
+  ) {
     await saveGlobalSettingsMutation({
       shiftMinutes: next?.shiftMinutes ?? shiftMinutes,
       overtimeShiftMinutes: next?.overtimeShiftMinutes ?? overtimeShiftMinutes,
       country: next?.country ?? country,
+      setupGapMinutes: next?.setupGapMinutes ?? setupGapMinutes,
+      concurrentSetupsPerHall: next?.concurrentSetupsPerHall ?? concurrentSetupsPerHall,
     })
   }
 
@@ -467,7 +481,39 @@ function PressCalendarSection() {
             ))}
           </select>
         </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
+            Setuplar arası min. ara (dk)
+          </span>
+          <input
+            type="number"
+            min={0}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={setupGapMinutes}
+            onChange={(e) => setSetupGapMinutes(Number(e.target.value) || 0)}
+            onBlur={() => void persistGlobalSettings()}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
+            Hol başına eşzamanlı setup
+          </span>
+          <input
+            type="number"
+            min={1}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={concurrentSetupsPerHall}
+            onChange={(e) => setConcurrentSetupsPerHall(Number(e.target.value) || 1)}
+            onBlur={() => void persistGlobalSettings()}
+          />
+        </label>
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Vinç kısıtı: aynı holdeki presler aynı anda en fazla{' '}
+        {concurrentSetupsPerHall} setup yapabilir ve ardışık setuplar arasında en
+        az {setupGapMinutes} dk olmalıdır. Hol tanımları Makine Tanımları
+        sayfasından gelir.
+      </p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="text-sm">

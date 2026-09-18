@@ -5,6 +5,7 @@ const LINKS = [
   { to: '/', label: 'Özet' },
   { to: '/siparisler', label: 'Siparişler' },
   { to: '/stoklar', label: 'Stoklar' },
+  { to: '/gerceklesen', label: 'Gerçekleşen' },
   { to: '/referanslar', label: 'Referanslar' },
   { to: '/planlama', label: 'Planlama' },
 ] as const

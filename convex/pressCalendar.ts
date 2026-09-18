@@ -10,6 +10,8 @@ const globalSettingsValidator = v.union(
     shiftMinutes: v.number(),
     overtimeShiftMinutes: v.number(),
     country: v.string(),
+    setupGapMinutes: v.optional(v.number()),
+    concurrentSetupsPerHall: v.optional(v.number()),
   }),
   v.null(),
 )
@@ -29,6 +31,8 @@ export const saveGlobalSettings = mutation({
     shiftMinutes: v.number(),
     overtimeShiftMinutes: v.number(),
     country: v.string(),
+    setupGapMinutes: v.optional(v.number()),
+    concurrentSetupsPerHall: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

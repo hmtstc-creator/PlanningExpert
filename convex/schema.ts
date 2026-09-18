@@ -95,12 +95,16 @@ export default defineSchema({
   }).index('by_key', ['key']),
 
   // Vardiya süresi tüm presler için ortaktır (dakika); tatil ülkesi de
-  // tek bir global seçimdir.
+  // tek bir global seçimdir. Setup kısıtları da burada: aynı holde aynı
+  // anda kaç setup yapılabilir ve ardışık setuplar arasında en az kaç
+  // dakika olmalı.
   globalShiftSettings: defineTable({
     key: v.string(),
     shiftMinutes: v.number(),
     overtimeShiftMinutes: v.number(),
     country: v.string(),
+    setupGapMinutes: v.optional(v.number()),
+    concurrentSetupsPerHall: v.optional(v.number()),
   }).index('by_key', ['key']),
 
   // Her presin "standart" haftalık düzeni: kaç gün çalışılır, gün başına
@@ -123,6 +127,21 @@ export default defineSchema({
     shiftsPerDay: v.number(),
     overtimeShifts: v.number(),
   }).index('by_press_week', ['press', 'weekStart']),
+
+  // MB51'den yüklenen gerçekleşen üretim hareketleri. Plan/gerçek
+  // karşılaştırması ve performans faktörü buradan beslenir.
+  actualProduction: defineTable({
+    material: v.string(),
+    postingDate: v.string(),
+    quantity: v.number(),
+    plant: v.optional(v.string()),
+    storageLocation: v.optional(v.string()),
+    movementType: v.optional(v.string()),
+    orderNumber: v.optional(v.string()),
+    uploadedAt: v.number(),
+  })
+    .index('by_material', ['material'])
+    .index('by_date', ['postingDate']),
 
   changeLog: defineTable({
     title: v.string(),
