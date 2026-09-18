@@ -128,6 +128,32 @@ export default defineSchema({
     overtimeShifts: v.number(),
   }).index('by_press_week', ['press', 'weekStart']),
 
+  // Onaylanan plan anlık görüntüleri. Otomatik plan her zaman canlı
+  // veriden yeniden hesaplanır; onaylandığında buraya versiyonlanarak
+  // yazılır ki "hangi planı onayladık" kaydı kalsın.
+  planSnapshots: defineTable({
+    createdAt: v.number(),
+    approvedBy: v.optional(v.string()),
+    horizonStart: v.string(),
+    jobCount: v.number(),
+    unplannedCount: v.number(),
+    jobs: v.array(
+      v.object({
+        material: v.string(),
+        press: v.string(),
+        hall: v.string(),
+        date: v.string(),
+        phase: v.string(),
+        quantity: v.number(),
+        shots: v.number(),
+        coilsNeeded: v.number(),
+        setupStartMinute: v.number(),
+        endMinute: v.number(),
+        reason: v.string(),
+      }),
+    ),
+  }).index('by_created', ['createdAt']),
+
   // MB51'den yüklenen gerçekleşen üretim hareketleri. Plan/gerçek
   // karşılaştırması ve performans faktörü buradan beslenir.
   actualProduction: defineTable({
