@@ -278,6 +278,7 @@ function PressCalendarSection() {
   const [country, setCountry] = useState('TR')
   const [setupGapMinutes, setSetupGapMinutes] = useState(60)
   const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
+  const [shiftStartMinute, setShiftStartMinute] = useState(480)
   useEffect(() => {
     if (globalSettings) {
       setShiftMinutes(globalSettings.shiftMinutes)
@@ -285,6 +286,7 @@ function PressCalendarSection() {
       setCountry(globalSettings.country)
       setSetupGapMinutes(globalSettings.setupGapMinutes ?? 60)
       setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? 1)
+      setShiftStartMinute(globalSettings.shiftStartMinute ?? 480)
     }
   }, [globalSettings])
 
@@ -295,6 +297,7 @@ function PressCalendarSection() {
       country: string
       setupGapMinutes: number
       concurrentSetupsPerHall: number
+      shiftStartMinute: number
     }>,
   ) {
     await saveGlobalSettingsMutation({
@@ -303,6 +306,8 @@ function PressCalendarSection() {
       country: next?.country ?? country,
       setupGapMinutes: next?.setupGapMinutes ?? setupGapMinutes,
       concurrentSetupsPerHall: next?.concurrentSetupsPerHall ?? concurrentSetupsPerHall,
+      shiftStartMinute: next?.shiftStartMinute ?? shiftStartMinute,
+      capacityFactor: globalSettings?.capacityFactor,
     })
   }
 
@@ -481,6 +486,25 @@ function PressCalendarSection() {
             className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={overtimeShiftMinutes}
             onChange={(e) => setOvertimeShiftMinutes(Number(e.target.value) || 0)}
+            onBlur={() => void persistGlobalSettings()}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
+            1. vardiya başlangıcı
+          </span>
+          <input
+            type="time"
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={`${String(Math.floor(shiftStartMinute / 60)).padStart(2, '0')}:${String(
+              shiftStartMinute % 60,
+            ).padStart(2, '0')}`}
+            onChange={(e) => {
+              const [h, m] = e.target.value.split(':').map(Number)
+              if (Number.isFinite(h) && Number.isFinite(m)) {
+                setShiftStartMinute(h * 60 + m)
+              }
+            }}
             onBlur={() => void persistGlobalSettings()}
           />
         </label>

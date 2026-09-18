@@ -41,12 +41,17 @@ function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10)
 }
 
-function formatClock(minute: number, shiftMinutes: number): string {
+/**
+ * Gün içi dakikayı gerçek saate çevirir. `shiftStartMinute` birinci
+ * vardiyanın başlangıcıdır (gece yarısından dakika, ör. 480 = 08:00).
+ * Vardiya numarası da ayrıca gösterilir.
+ */
+function formatClock(minute: number, shiftMinutes: number, shiftStartMinute: number): string {
   const shiftIndex = Math.floor(minute / shiftMinutes) + 1
-  const within = Math.round(minute % shiftMinutes)
-  const h = Math.floor(within / 60)
-  const m = within % 60
-  return `${shiftIndex}. vardiya ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  const absolute = (shiftStartMinute + minute) % (24 * 60)
+  const h = Math.floor(absolute / 60)
+  const m = Math.round(absolute % 60)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${shiftIndex}. vardiya)`
 }
 
 function PlanlamaPage() {
@@ -103,6 +108,10 @@ function PlanlamaPage() {
   const overtimeShiftMinutes = globalSettings?.overtimeShiftMinutes ?? 480
   const setupGapMinutes = globalSettings?.setupGapMinutes ?? 60
   const concurrentSetupsPerHall = globalSettings?.concurrentSetupsPerHall ?? 1
+  const shiftStartMinute = globalSettings?.shiftStartMinute ?? 480
+  // Kapasite düzeltme katsayısı: ölçülen gerçekleşme oranı (Performans
+  // sayfasından yazılır). Tanımsızsa kapasite olduğu gibi kullanılır.
+  const capacityFactor = globalSettings?.capacityFactor ?? 1
 
   const locCategory = useMemo(
     () => new Map(locations.map((l) => [l.code, l.category])),
@@ -198,7 +207,13 @@ function PlanlamaPage() {
           ),
         )
       }
-      map.set(press.name, all)
+      // Ölçülen gerçekleşme oranıyla kapasiteyi düzelt — plan gerçekçi olsun.
+      map.set(
+        press.name,
+        capacityFactor === 1
+          ? all
+          : all.map((b) => ({ ...b, minutes: Math.floor(b.minutes * capacityFactor) })),
+      )
     }
     return map
   }, [
@@ -210,6 +225,7 @@ function PlanlamaPage() {
     workingDaysPerWeek,
     workingDayKeys,
     horizonMonday,
+    capacityFactor,
   ])
 
   const overrides = useMemo<PlanOverride[]>(
@@ -344,6 +360,14 @@ function PlanlamaPage() {
         Vinç kısıtı, kalıp limiti ve rulo hesabı dikkate alınır. Sen sadece
         kontrol edip onaylarsın.
       </p>
+
+      {capacityFactor !== 1 && (
+        <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+          Kapasite, ölçülen gerçekleşme oranıyla düzeltiliyor:{' '}
+          <strong className="text-foreground">%{Math.round(capacityFactor * 100)}</strong>.
+          Bu oranı Performans sayfasından güncelleyebilirsin.
+        </p>
+      )}
 
       {warnings.length > 0 && (
         <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -619,10 +643,10 @@ function PlanlamaPage() {
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{job.coilsNeeded}</td>
                       <td className="px-3 py-2 text-muted-foreground">
-                        {formatClock(job.setupStartMinute, shiftMinutes)}
+                        {formatClock(job.setupStartMinute, shiftMinutes, shiftStartMinute)}
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
-                        {formatClock(job.endMinute, shiftMinutes)}
+                        {formatClock(job.endMinute, shiftMinutes, shiftStartMinute)}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{job.reason}</td>
                     </tr>

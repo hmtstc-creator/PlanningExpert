@@ -8,6 +8,7 @@ const LINKS = [
   { to: '/gerceklesen', label: 'Gerçekleşen' },
   { to: '/referanslar', label: 'Referanslar' },
   { to: '/planlama', label: 'Planlama' },
+  { to: '/performans', label: 'Performans' },
 ] as const
 
 const SETTINGS_LINKS = [

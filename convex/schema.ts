@@ -105,6 +105,13 @@ export default defineSchema({
     country: v.string(),
     setupGapMinutes: v.optional(v.number()),
     concurrentSetupsPerHall: v.optional(v.number()),
+    // Birinci vardiyanın başlangıç saati (gece yarısından dakika).
+    // Planda gerçek saat göstermek için kullanılır.
+    shiftStartMinute: v.optional(v.number()),
+    // Kapasite düzeltme katsayısı (0–1). Performans sayfasında ölçülen
+    // gerçekleşme oranı buraya yazılabilir; planlama kapasiteyi bu oranla
+    // çarpar, böylece plan gerçekçi olur.
+    capacityFactor: v.optional(v.number()),
   }).index('by_key', ['key']),
 
   // Her presin "standart" haftalık düzeni: kaç gün çalışılır, gün başına

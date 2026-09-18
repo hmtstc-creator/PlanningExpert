@@ -12,6 +12,8 @@ const globalSettingsValidator = v.union(
     country: v.string(),
     setupGapMinutes: v.optional(v.number()),
     concurrentSetupsPerHall: v.optional(v.number()),
+    shiftStartMinute: v.optional(v.number()),
+    capacityFactor: v.optional(v.number()),
   }),
   v.null(),
 )
@@ -33,6 +35,8 @@ export const saveGlobalSettings = mutation({
     country: v.string(),
     setupGapMinutes: v.optional(v.number()),
     concurrentSetupsPerHall: v.optional(v.number()),
+    shiftStartMinute: v.optional(v.number()),
+    capacityFactor: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -176,6 +180,42 @@ export const clearOverride = mutation({
       )
       .first()
     if (existing) await ctx.db.delete(existing._id)
+    return null
+  },
+})
+
+/**
+ * Yalnızca kapasite düzeltme katsayısını günceller. Performans sayfası
+ * ölçülen gerçekleşme oranını buraya yazar; diğer ayarlar korunur.
+ */
+export const setCapacityFactor = mutation({
+  args: { capacityFactor: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { capacityFactor }) => {
+    if (capacityFactor <= 0 || capacityFactor > 2) {
+      throw new Error('Kapasite katsayısı 0 ile 2 arasında olmalıdır')
+    }
+    const existing = await ctx.db
+      .query('globalShiftSettings')
+      .withIndex('by_key', (q) => q.eq('key', 'default'))
+      .first()
+    if (existing) {
+      await ctx.db.patch(existing._id, { capacityFactor })
+    } else {
+      await ctx.db.insert('globalShiftSettings', {
+        key: 'default',
+        shiftMinutes: 480,
+        overtimeShiftMinutes: 480,
+        country: 'TR',
+        capacityFactor,
+      })
+    }
+    await ctx.db.insert('changeLog', {
+      title: `Kapasite katsayısı ${(capacityFactor * 100).toFixed(0)}% olarak ayarlandı`,
+      detail: 'Planlama kapasiteyi bu oranla çarpar.',
+      category: 'karar',
+      createdAt: Date.now(),
+    })
     return null
   },
 })

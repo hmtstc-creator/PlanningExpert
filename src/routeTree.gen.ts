@@ -14,6 +14,7 @@ import { Route as DepolarRouteImport } from './routes/depolar'
 import { Route as GerceklesenRouteImport } from './routes/gerceklesen'
 import { Route as KayitlarRouteImport } from './routes/kayitlar'
 import { Route as MakinelerRouteImport } from './routes/makineler'
+import { Route as PerformansRouteImport } from './routes/performans'
 import { Route as PlanlamaRouteImport } from './routes/planlama'
 import { Route as ReferanslarRouteImport } from './routes/referanslar'
 import { Route as SiparislerRouteImport } from './routes/siparisler'
@@ -44,6 +45,11 @@ const KayitlarRoute = KayitlarRouteImport.update({
 const MakinelerRoute = MakinelerRouteImport.update({
   id: '/makineler',
   path: '/makineler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PerformansRoute = PerformansRouteImport.update({
+  id: '/performans',
+  path: '/performans',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlanlamaRoute = PlanlamaRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/gerceklesen': typeof GerceklesenRoute
   '/kayitlar': typeof KayitlarRoute
   '/makineler': typeof MakinelerRoute
+  '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
   '/referanslar': typeof ReferanslarRoute
   '/siparisler': typeof SiparislerRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/gerceklesen': typeof GerceklesenRoute
   '/kayitlar': typeof KayitlarRoute
   '/makineler': typeof MakinelerRoute
+  '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
   '/referanslar': typeof ReferanslarRoute
   '/siparisler': typeof SiparislerRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/gerceklesen': typeof GerceklesenRoute
   '/kayitlar': typeof KayitlarRoute
   '/makineler': typeof MakinelerRoute
+  '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
   '/referanslar': typeof ReferanslarRoute
   '/siparisler': typeof SiparislerRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/gerceklesen'
     | '/kayitlar'
     | '/makineler'
+    | '/performans'
     | '/planlama'
     | '/referanslar'
     | '/siparisler'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/gerceklesen'
     | '/kayitlar'
     | '/makineler'
+    | '/performans'
     | '/planlama'
     | '/referanslar'
     | '/siparisler'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/gerceklesen'
     | '/kayitlar'
     | '/makineler'
+    | '/performans'
     | '/planlama'
     | '/referanslar'
     | '/siparisler'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   GerceklesenRoute: typeof GerceklesenRoute
   KayitlarRoute: typeof KayitlarRoute
   MakinelerRoute: typeof MakinelerRoute
+  PerformansRoute: typeof PerformansRoute
   PlanlamaRoute: typeof PlanlamaRoute
   ReferanslarRoute: typeof ReferanslarRoute
   SiparislerRoute: typeof SiparislerRoute
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       path: '/makineler'
       fullPath: '/makineler'
       preLoaderRoute: typeof MakinelerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/performans': {
+      id: '/performans'
+      path: '/performans'
+      fullPath: '/performans'
+      preLoaderRoute: typeof PerformansRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/planlama': {
@@ -261,6 +281,7 @@ const rootRouteChildren: RootRouteChildren = {
   GerceklesenRoute: GerceklesenRoute,
   KayitlarRoute: KayitlarRoute,
   MakinelerRoute: MakinelerRoute,
+  PerformansRoute: PerformansRoute,
   PlanlamaRoute: PlanlamaRoute,
   ReferanslarRoute: ReferanslarRoute,
   SiparislerRoute: SiparislerRoute,
