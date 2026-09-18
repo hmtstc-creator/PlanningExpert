@@ -2,12 +2,12 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 
 const LINKS = [
+  { to: '/planlama', label: 'Plan' },
   { to: '/', label: 'Overview' },
   { to: '/siparisler', label: 'Demand' },
   { to: '/stoklar', label: 'Stock' },
   { to: '/gerceklesen', label: 'Actuals' },
   { to: '/referanslar', label: 'Master Data' },
-  { to: '/planlama', label: 'Planning' },
   { to: '/performans', label: 'Performance' },
 ] as const
 

@@ -1,3 +1,5 @@
+import { addDays, isoDate } from './dates'
+
 // Planlama motorunun saf hesaplama katmanı.
 // Buradaki fonksiyonlar Convex'ten veya React'ten bağımsızdır; girdi olarak
 // düz veri alır, çıktı olarak düz veri verir — böylece test edilebilir ve
@@ -293,15 +295,6 @@ export interface DayBucket {
 
 export const DAY_KEYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const
 
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
-
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
-}
 
 /**
  * Bir haftanın gün bazlı kapasitesini çıkarır.

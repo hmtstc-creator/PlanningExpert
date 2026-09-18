@@ -3,6 +3,7 @@ import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { addDays, isoDate, mondayOf } from '../lib/dates'
 import {
   buildDemandSchedule,
   buildRawMaterialPlan,
@@ -12,6 +13,7 @@ import {
   type DemandInput,
   type ProductSpec,
 } from '../lib/planning'
+import { PressGantt, type GanttJob, type GanttPress } from '../components/PressGantt'
 import { diffPlans } from '../lib/planDiff'
 import { schedule, type PlanOverride, type ScheduledJob } from '../lib/scheduler'
 
@@ -23,27 +25,9 @@ const COUNTED_STOCK = new Set(['finished_goods', 'production_area'])
 const RAW_STOCK = new Set(['raw_material'])
 const DEFAULT_HORIZON_WEEKS = 4
 
-function mondayOf(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay()
-  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
-}
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
-
 /**
  * Gün içi dakikayı gerçek saate çevirir. `shiftStartMinute` birinci
- * vardiyanın başlangıcıdır (gece yarısından dakika, ör. 480 = 08:00).
+ * the start of the first shift (minutes from midnight, e.g. 480 = 08:00).
  * Vardiya numarası da ayrıca gösterilir.
  */
 function formatClock(minute: number, shiftMinutes: number, shiftStartMinute: number): string {
@@ -51,7 +35,7 @@ function formatClock(minute: number, shiftMinutes: number, shiftStartMinute: num
   const absolute = (shiftStartMinute + minute) % (24 * 60)
   const h = Math.floor(absolute / 60)
   const m = Math.round(absolute % 60)
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (${shiftIndex}. vardiya)`
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (shift ${shiftIndex})`
 }
 
 function PlanlamaPage() {
@@ -289,6 +273,20 @@ function PlanlamaPage() {
     [result, productByCode],
   )
 
+  // Gantt needs each press's net capacity on the shown day.
+  const capacityByPressDate = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const [pressName, list] of buckets) {
+      for (const b of list) map.set(`${pressName}|${b.date}`, b.minutes)
+    }
+    return map
+  }, [buckets])
+
+  const shiftLayout = useMemo(
+    () => ({ shiftStartMinute, shiftMinutes, breakMinutesPerShift }),
+    [shiftStartMinute, shiftMinutes, breakMinutesPerShift],
+  )
+
   const byDate = useMemo(() => {
     const map = new Map<string, ScheduledJob[]>()
     for (const job of result.jobs) {
@@ -300,6 +298,8 @@ function PlanlamaPage() {
     }
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   }, [result])
+
+  const lateCount = result.jobs.filter((j) => j.late).length
 
   const warnings = useMemo(() => {
     const list: string[] = []
@@ -319,6 +319,10 @@ function PlanlamaPage() {
       list.push(
         `${rawShortages.length} raw materials are short — coils must be sourced for the planned jobs.`,
       )
+    if (lateCount > 0)
+      list.push(
+        `${lateCount} jobs are scheduled after the week they are needed — capacity is short.`,
+      )
     if (missingRawSpec.length > 0)
       list.push(
         `${missingRawSpec.length} materials have no raw material code or gross weight — the raw material check cannot run.`,
@@ -333,10 +337,10 @@ function PlanlamaPage() {
     holidays,
     rawShortages,
     missingRawSpec,
+    lateCount,
   ])
 
   const totalPlannedQty = result.jobs.reduce((s, j) => s + j.quantity, 0)
-  const lateCount = result.jobs.filter((j) => j.late).length
   const horizonStart = isoDate(horizonMonday)
 
   async function handleApprove() {
@@ -367,7 +371,7 @@ function PlanlamaPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-foreground">Planning</h1>
+      <h1 className="text-3xl font-bold text-foreground">Production Plan</h1>
       <p className="mt-2 text-muted-foreground">
         The plan is generated automatically: backlog first, then the materials
         whose stock runs out soonest, and the remaining capacity is filled with
@@ -611,13 +615,44 @@ function PlanlamaPage() {
         {byDate.map(([date, jobs]) => (
           <div key={date}>
             <h2 className="text-sm font-semibold text-foreground">
-              {new Date(date).toLocaleDateString('en-GB', {
+              {new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', {
                 weekday: 'long',
                 day: '2-digit',
                 month: 'long',
               })}{' '}
               <span className="font-normal text-muted-foreground">({jobs.length} jobs)</span>
             </h2>
+
+            <div className="mt-2">
+              <PressGantt
+                date={date}
+                layout={shiftLayout}
+                presses={presses.map(
+                  (p): GanttPress => ({
+                    name: p.name,
+                    hall: p.hall,
+                    capacityMinutes: capacityByPressDate.get(`${p.name}|${date}`) ?? 0,
+                  }),
+                )}
+                jobs={jobs.map(
+                  (j): GanttJob => ({
+                    press: j.press,
+                    hall: j.hall,
+                    material: j.material,
+                    setupStartMinute: j.setupStartMinute,
+                    setupEndMinute: j.setupEndMinute,
+                    endMinute: j.endMinute,
+                    quantity: j.quantity,
+                    late: j.late,
+                  }),
+                )}
+              />
+            </div>
+
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                Show job list ({jobs.length})
+              </summary>
             <div className="mt-2 overflow-x-auto rounded-lg border border-border">
               <table className="w-full text-left text-sm">
                 <thead className="bg-muted text-muted-foreground">
@@ -670,6 +705,7 @@ function PlanlamaPage() {
                 </tbody>
               </table>
             </div>
+            </details>
           </div>
         ))}
       </div>

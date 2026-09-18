@@ -3,6 +3,7 @@ import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport
 import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { addDays, isoDate, mondayOf } from '../lib/dates'
 import { useSyncedFields } from '../lib/useSyncedFields'
 
 export const Route = createFileRoute('/takvim')({
@@ -54,25 +55,6 @@ interface WeekPattern {
   workingDays: number
   shiftsPerDay: number
   overtimeShifts: number
-}
-
-function mondayOf(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay() // 0 = Pazar
-  const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + diff)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
-}
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10)
 }
 
 function formatWeekLabel(monday: Date): string {

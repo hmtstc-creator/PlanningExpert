@@ -3,6 +3,7 @@ import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { addDays, isoDate, mondayOf } from '../lib/dates'
 import {
   buildAdherence,
   capacityUtilisation,
@@ -18,24 +19,6 @@ import {
 export const Route = createFileRoute('/performans')({
   component: PerformansPage,
 })
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10)
-}
-
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
-}
-
-function mondayOf(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay()
-  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
-  d.setHours(0, 0, 0, 0)
-  return d
-}
 
 function percent(v: number | null): string {
   if (v === null) return '—'
