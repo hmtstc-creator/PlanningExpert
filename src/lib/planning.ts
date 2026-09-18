@@ -183,6 +183,8 @@ export interface ProductSpec {
   grossWeight?: number
   /** Ortalama rulo ağırlığı (kg). */
   coilWeight?: number
+  /** Hammadde (sac rulo) malzeme kodu. */
+  rawMaterialCode?: string
   setupMinutes?: number
   coilSetupMinutes?: number
   /** Kalıbın bakım öncesi maksimum baskı sayısı. */
@@ -301,10 +303,20 @@ export function buildWeekBuckets(
   pattern: WeekPattern,
   settings: ShiftSettings,
   holidays: Set<string> = new Set(),
+  /**
+   * Normal vardiyaların yerleşebileceği hafta günleri (MO..SU). Şirket
+   * Salı–Cumartesi çalışıyorsa normal vardiyalar Pazartesi'ye konmamalı.
+   * Verilmezse tüm günler uygundur (eski davranış).
+   */
+  workingDayKeys?: readonly string[],
 ): DayBucket[] {
   const buckets: DayBucket[] = []
   let normalDaysLeft = pattern.workingDays
   let overtimeShiftsLeft = pattern.overtimeShifts
+  const allowed =
+    workingDayKeys && workingDayKeys.length > 0
+      ? new Set(workingDayKeys)
+      : new Set<string>(DAY_KEYS)
 
   for (let i = 0; i < 7; i++) {
     const date = addDays(weekStart, i)
@@ -317,7 +329,7 @@ export function buildWeekBuckets(
       continue
     }
 
-    if (normalDaysLeft > 0) {
+    if (allowed.has(dayKey) && normalDaysLeft > 0) {
       normalDaysLeft--
       buckets.push({
         date: dateStr,
@@ -355,4 +367,70 @@ export function weekTotalMinutes(pattern: WeekPattern, settings: ShiftSettings):
 
 export function weekTotalShifts(pattern: WeekPattern): number {
   return pattern.workingDays * pattern.shiftsPerDay + pattern.overtimeShifts
+}
+
+// ---- 4) Hammadde (rulo) ihtiyacı ------------------------------------------
+
+export interface RawMaterialNeed {
+  rawMaterial: string
+  /** Bu hammaddeden üretilen mamuller. */
+  materials: string[]
+  requiredKg: number
+  availableKg: number
+  /** Eksik kilo — 0 ise hammadde yeterli. */
+  shortageKg: number
+}
+
+/**
+ * Planlanan işlerin hammadde (sac rulo) ihtiyacını çıkarır ve eldeki
+ * hammadde stoğuyla karşılaştırır. Vuruş başına brüt ağırlık üzerinden
+ * hesaplanır; referans kartında hammadde kodu tanımlı olmayan mamuller
+ * atlanır (uyarı olarak ayrıca listelenir).
+ */
+export function buildRawMaterialPlan(
+  jobs: { material: string; shots: number }[],
+  products: Map<string, ProductSpec>,
+  rawStockKg: Map<string, number>,
+): RawMaterialNeed[] {
+  const byRaw = new Map<string, { kg: number; materials: Set<string> }>()
+
+  for (const job of jobs) {
+    const product = products.get(job.material)
+    const raw = product?.rawMaterialCode?.trim()
+    const grossWeight = product?.grossWeight ?? 0
+    if (!raw || grossWeight <= 0) continue
+
+    const entry = byRaw.get(raw) ?? { kg: 0, materials: new Set<string>() }
+    entry.kg += job.shots * grossWeight
+    entry.materials.add(job.material)
+    byRaw.set(raw, entry)
+  }
+
+  return Array.from(byRaw.entries())
+    .map(([rawMaterial, entry]) => {
+      const availableKg = rawStockKg.get(rawMaterial) ?? 0
+      return {
+        rawMaterial,
+        materials: Array.from(entry.materials).sort(),
+        requiredKg: entry.kg,
+        availableKg,
+        shortageKg: Math.max(0, entry.kg - availableKg),
+      }
+    })
+    .sort((a, b) => b.shortageKg - a.shortageKg || a.rawMaterial.localeCompare(b.rawMaterial))
+}
+
+/** Referans kartında hammadde kodu ya da brüt ağırlık eksik olan mamuller. */
+export function materialsMissingRawSpec(
+  jobs: { material: string }[],
+  products: Map<string, ProductSpec>,
+): string[] {
+  const missing = new Set<string>()
+  for (const job of jobs) {
+    const product = products.get(job.material)
+    if (!product?.rawMaterialCode?.trim() || !(product.grossWeight ?? 0)) {
+      missing.add(job.material)
+    }
+  }
+  return Array.from(missing).sort()
 }

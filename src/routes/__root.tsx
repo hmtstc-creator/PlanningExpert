@@ -3,6 +3,7 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import '../styles.css'
 import siteMetadata from '../metadata.json'
 import { Header } from '../components/Header'
+import { MutationErrorToast } from '../components/MutationErrorToast'
 import AppConvexProvider from '@/components/convex-client-provider'
 
 const rootMeta = siteMetadata['/']
@@ -33,6 +34,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <AppConvexProvider>
           <Header />
           {children}
+          <MutationErrorToast />
         </AppConvexProvider>
         <Scripts />
       </body>

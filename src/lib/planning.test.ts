@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildDemandSchedule,
+  buildRawMaterialPlan,
   buildWeekBuckets,
+  materialsMissingRawSpec,
   computeRunPlan,
   type ProductSpec,
   splitByMoldLimit,
@@ -232,6 +234,102 @@ describe('buildWeekBuckets', () => {
     expect(holiday.minutes).toBe(0)
     // tatil bir çalışma gününü tüketmez, gün Cumaya kayar
     expect(buckets.filter((b) => b.shifts === 3)).toHaveLength(5)
+  })
+})
+
+describe('çalışma günleri (workingDays) kısıtı', () => {
+  const settings = { shiftMinutes: 480, overtimeShiftMinutes: 480 }
+  const monday = new Date('2026-09-14T00:00:00Z')
+
+  it('normal vardiyaları yalnızca tanımlı çalışma günlerine koyar', () => {
+    // Şirket Salı–Cumartesi çalışıyor: Pazartesi normal vardiya almamalı.
+    const buckets = buildWeekBuckets(
+      monday,
+      { workingDays: 5, shiftsPerDay: 2, overtimeShifts: 0 },
+      settings,
+      new Set(),
+      ['TU', 'WE', 'TH', 'FR', 'SA'],
+    )
+    const normal = buckets.filter((b) => b.shifts > 0 && !b.isOvertime)
+    expect(normal.map((b) => b.dayKey)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA'])
+    expect(buckets.find((b) => b.dayKey === 'MO')!.minutes).toBe(0)
+  })
+
+  it('çalışma günü verilmezse tüm günler uygundur (eski davranış)', () => {
+    const buckets = buildWeekBuckets(
+      monday,
+      { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 },
+      settings,
+    )
+    expect(buckets.slice(0, 5).every((b) => b.shifts === 3 && !b.isOvertime)).toBe(true)
+    expect(buckets[5].isOvertime).toBe(true)
+  })
+
+  it('mesai vardiyaları çalışma günü olmayan güne de konabilir', () => {
+    const buckets = buildWeekBuckets(
+      monday,
+      { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 },
+      settings,
+      new Set(),
+      ['MO', 'TU', 'WE', 'TH', 'FR'],
+    )
+    const saturday = buckets.find((b) => b.dayKey === 'SA')!
+    expect(saturday.isOvertime).toBe(true)
+    expect(saturday.shifts).toBe(2)
+  })
+})
+
+describe('buildRawMaterialPlan', () => {
+  const products = new Map<string, ProductSpec>([
+    ['A', { code: 'A', rawMaterialCode: 'SAC-1', grossWeight: 2 }],
+    ['B', { code: 'B', rawMaterialCode: 'SAC-1', grossWeight: 1 }],
+    ['C', { code: 'C', rawMaterialCode: 'SAC-2', grossWeight: 3 }],
+    ['D', { code: 'D' }],
+  ])
+
+  it('vuruş × brüt ağırlıktan hammadde ihtiyacını hammadde bazında toplar', () => {
+    const needs = buildRawMaterialPlan(
+      [
+        { material: 'A', shots: 1000 },
+        { material: 'B', shots: 500 },
+        { material: 'C', shots: 100 },
+      ],
+      products,
+      new Map(),
+    )
+    const sac1 = needs.find((n) => n.rawMaterial === 'SAC-1')!
+    expect(sac1.requiredKg).toBe(2500) // 1000×2 + 500×1
+    expect(sac1.materials).toEqual(['A', 'B'])
+    expect(needs.find((n) => n.rawMaterial === 'SAC-2')!.requiredKg).toBe(300)
+  })
+
+  it('stokla karşılaştırıp eksiği hesaplar', () => {
+    const needs = buildRawMaterialPlan(
+      [{ material: 'A', shots: 1000 }],
+      products,
+      new Map([['SAC-1', 1500]]),
+    )
+    expect(needs[0].availableKg).toBe(1500)
+    expect(needs[0].shortageKg).toBe(500)
+  })
+
+  it('stok yeterliyse eksik sıfırdır', () => {
+    const needs = buildRawMaterialPlan(
+      [{ material: 'A', shots: 100 }],
+      products,
+      new Map([['SAC-1', 5000]]),
+    )
+    expect(needs[0].shortageKg).toBe(0)
+  })
+
+  it('hammadde kodu tanımsız mamulü atlar ve ayrıca raporlar', () => {
+    const jobs = [
+      { material: 'A', shots: 100 },
+      { material: 'D', shots: 100 },
+    ]
+    const needs = buildRawMaterialPlan(jobs, products, new Map())
+    expect(needs.map((n) => n.rawMaterial)).toEqual(['SAC-1'])
+    expect(materialsMissingRawSpec(jobs, products)).toEqual(['D'])
   })
 })
 

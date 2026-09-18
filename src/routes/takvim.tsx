@@ -382,22 +382,35 @@ function PressCalendarSection() {
 
   const [holidays, setHolidays] = useState<{ date: string; name: string }[]>([])
   const [holidaysError, setHolidaysError] = useState(false)
+  const replaceHolidayYear = useMutation(api.holidays.replaceYear)
+  // Kayıtlı tatiller: internet erişimi olmasa da planlama bunları kullanır.
+  const storedHolidays = (useQuery(api.holidays.listByCountry, { country }) ??
+    []) as { date: string; name: string; year: number }[]
+
   useEffect(() => {
     let cancelled = false
     setHolidaysError(false)
     Promise.all(
       years.map((y) =>
-        fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/${country}`).then((r) =>
-          r.ok ? r.json() : [],
-        ),
+        fetch(`https://date.nager.at/api/v3/PublicHolidays/${y}/${country}`)
+          .then((r) => (r.ok ? r.json() : []))
+          .then((data: any[]) => ({
+            year: y,
+            days: (Array.isArray(data) ? data : []).map((h: any) => ({
+              date: h.date as string,
+              name: h.localName as string,
+            })),
+          })),
       ),
     )
-      .then((results) => {
+      .then(async (results) => {
         if (cancelled) return
-        const all = results
-          .flat()
-          .map((h: any) => ({ date: h.date as string, name: h.localName as string }))
-        setHolidays(all)
+        setHolidays(results.flatMap((r) => r.days))
+        // Tatilleri veritabanına yaz — planlama motoru oradan okuyor.
+        for (const r of results) {
+          if (r.days.length === 0) continue
+          await replaceHolidayYear({ country, year: r.year, days: r.days })
+        }
       })
       .catch(() => {
         if (!cancelled) setHolidaysError(true)
@@ -407,6 +420,13 @@ function PressCalendarSection() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [country, years.join(',')])
+
+  // İnternetten çekilemediyse kayıtlı tatillerle devam et.
+  useEffect(() => {
+    if (holidays.length === 0 && storedHolidays.length > 0) {
+      setHolidays(storedHolidays.map((h) => ({ date: h.date, name: h.name })))
+    }
+  }, [holidays.length, storedHolidays])
 
   const holidaySet = useMemo(() => new Set(holidays.map((h) => h.date)), [holidays])
 

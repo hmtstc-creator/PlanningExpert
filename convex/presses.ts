@@ -29,7 +29,7 @@ export const upsert = mutation({
     const existing = await ctx.db
       .query('presses')
       .withIndex('by_name', (q) => q.eq('name', name))
-      .unique()
+      .first()
     if (existing) {
       await ctx.db.patch(existing._id, { hall: args.hall, tonnage: args.tonnage })
     } else {

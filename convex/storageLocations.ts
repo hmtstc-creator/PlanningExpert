@@ -34,7 +34,7 @@ export const upsert = mutation({
     const existing = await ctx.db
       .query('storageLocations')
       .withIndex('by_code', (q) => q.eq('code', code))
-      .unique()
+      .first()
     if (existing) {
       await ctx.db.patch(existing._id, {
         description: args.description,

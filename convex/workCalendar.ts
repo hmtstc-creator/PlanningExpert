@@ -18,7 +18,7 @@ export const get = query({
     ctx.db
       .query('workCalendar')
       .withIndex('by_key', (q) => q.eq('key', 'default'))
-      .unique(),
+      .first(),
 })
 
 export const save = mutation({
@@ -32,7 +32,7 @@ export const save = mutation({
     const existing = await ctx.db
       .query('workCalendar')
       .withIndex('by_key', (q) => q.eq('key', 'default'))
-      .unique()
+      .first()
     if (existing) {
       await ctx.db.patch(existing._id, args)
     } else {

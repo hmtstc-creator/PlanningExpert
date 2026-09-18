@@ -23,7 +23,7 @@ export const getGlobalSettings = query({
     ctx.db
       .query('globalShiftSettings')
       .withIndex('by_key', (q) => q.eq('key', 'default'))
-      .unique(),
+      .first(),
 })
 
 export const saveGlobalSettings = mutation({
@@ -39,7 +39,7 @@ export const saveGlobalSettings = mutation({
     const existing = await ctx.db
       .query('globalShiftSettings')
       .withIndex('by_key', (q) => q.eq('key', 'default'))
-      .unique()
+      .first()
     if (existing) {
       await ctx.db.patch(existing._id, args)
     } else {
@@ -68,7 +68,7 @@ export const getTemplate = query({
     ctx.db
       .query('pressTemplates')
       .withIndex('by_press', (q) => q.eq('press', press))
-      .unique(),
+      .first(),
 })
 
 export const listTemplates = query({
@@ -100,7 +100,7 @@ export const saveTemplate = mutation({
     const existing = await ctx.db
       .query('pressTemplates')
       .withIndex('by_press', (q) => q.eq('press', press))
-      .unique()
+      .first()
     if (existing) {
       await ctx.db.patch(existing._id, {
         workingDays: args.workingDays,
@@ -151,7 +151,7 @@ export const saveOverride = mutation({
       .withIndex('by_press_week', (q) =>
         q.eq('press', press).eq('weekStart', args.weekStart),
       )
-      .unique()
+      .first()
     if (existing) {
       await ctx.db.patch(existing._id, {
         workingDays: args.workingDays,
@@ -174,7 +174,7 @@ export const clearOverride = mutation({
       .withIndex('by_press_week', (q) =>
         q.eq('press', press).eq('weekStart', weekStart),
       )
-      .unique()
+      .first()
     if (existing) await ctx.db.delete(existing._id)
     return null
   },

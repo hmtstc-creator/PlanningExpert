@@ -15,6 +15,7 @@ const SETTINGS_LINKS = [
   { to: '/depolar', label: 'Depo Tanımları' },
   { to: '/takvim', label: 'Çalışma Takvimi' },
   { to: '/kayitlar', label: 'Değişiklik Kayıtları' },
+  { to: '/tani', label: 'Bağlantı Teşhisi' },
 ] as const
 
 export function Header() {

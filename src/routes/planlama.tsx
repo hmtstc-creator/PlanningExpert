@@ -5,7 +5,9 @@ import { useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import {
   buildDemandSchedule,
+  buildRawMaterialPlan,
   buildWeekBuckets,
+  materialsMissingRawSpec,
   type DayBucket,
   type DemandInput,
   type ProductSpec,
@@ -17,6 +19,7 @@ export const Route = createFileRoute('/planlama')({
 })
 
 const COUNTED_STOCK = new Set(['finished_goods', 'production_area'])
+const RAW_STOCK = new Set(['raw_material'])
 const HORIZON_WEEKS = 4
 
 function mondayOf(date: Date): Date {
@@ -103,16 +106,43 @@ function PlanlamaPage() {
     return map
   }, [stockRows, locCategory])
 
+  const rawStockByMaterial = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const s of stockRows) {
+      const cat = s.storageLocation ? locCategory.get(s.storageLocation) : undefined
+      if (!cat || !RAW_STOCK.has(cat)) continue
+      map.set(s.material, (map.get(s.material) ?? 0) + (s.unrestricted ?? 0))
+    }
+    return map
+  }, [stockRows, locCategory])
+
   const productByCode = useMemo(() => {
     const map = new Map<string, ProductSpec>()
     for (const p of products) map.set(p.code, p as ProductSpec)
     return map
   }, [products])
 
-  const workingDaysPerWeek = workCalendar?.workingDays.length ?? 5
-  const holidays = useMemo(
-    () => new Set<string>((workCalendar?.holidays ?? []) as string[]),
+  const workingDayKeys = useMemo(
+    () => (workCalendar?.workingDays ?? ['MO', 'TU', 'WE', 'TH', 'FR']) as string[],
     [workCalendar],
+  )
+  const workingDaysPerWeek = workingDayKeys.length || 5
+
+  const country = globalSettings?.country ?? 'TR'
+  const officialHolidays = (useQuery(api.holidays.listByCountry, { country }) ??
+    []) as { date: string; name: string }[]
+
+  // Resmi tatiller (Nager.Date'ten takvim ekranınca kaydedilir) + elle
+  // girilen tatiller birlikte kapasiteyi sıfırlar.
+  const holidays = useMemo(() => {
+    const set = new Set<string>((workCalendar?.holidays ?? []) as string[])
+    for (const h of officialHolidays) set.add(h.date)
+    return set
+  }, [workCalendar, officialHolidays])
+
+  const holidayNames = useMemo(
+    () => new Map(officialHolidays.map((h) => [h.date, h.name])),
+    [officialHolidays],
   )
 
   const horizonMonday = useMemo(() => mondayOf(new Date()), [])
@@ -149,13 +179,23 @@ function PlanlamaPage() {
             pattern,
             { shiftMinutes, overtimeShiftMinutes },
             holidays,
+            workingDayKeys,
           ),
         )
       }
       map.set(press.name, all)
     }
     return map
-  }, [presses, templates, shiftMinutes, overtimeShiftMinutes, holidays, workingDaysPerWeek, horizonMonday])
+  }, [
+    presses,
+    templates,
+    shiftMinutes,
+    overtimeShiftMinutes,
+    holidays,
+    workingDaysPerWeek,
+    workingDayKeys,
+    horizonMonday,
+  ])
 
   const result = useMemo(
     () =>
@@ -164,6 +204,16 @@ function PlanlamaPage() {
         concurrentSetupsPerHall,
       }),
     [demand, productByCode, presses, buckets, shiftMinutes, overtimeShiftMinutes, setupGapMinutes, concurrentSetupsPerHall],
+  )
+
+  const rawNeeds = useMemo(
+    () => buildRawMaterialPlan(result.jobs, productByCode, rawStockByMaterial),
+    [result, productByCode, rawStockByMaterial],
+  )
+  const rawShortages = useMemo(() => rawNeeds.filter((r) => r.shortageKg > 0), [rawNeeds])
+  const missingRawSpec = useMemo(
+    () => materialsMissingRawSpec(result.jobs, productByCode),
+    [result, productByCode],
   )
 
   const byDate = useMemo(() => {
@@ -188,8 +238,29 @@ function PlanlamaPage() {
     const missingMaxShots = products.filter((p) => !p.maxShots).length
     if (missingMaxShots > 0)
       list.push(`${missingMaxShots} referansta kalıp max shot limiti tanımsız — limit kontrol edilmiyor.`)
+    if (holidays.size === 0)
+      list.push(
+        'Hiç resmi tatil kayıtlı değil — Çalışma Takvimi sayfasını bir kez aç ki tatiller kaydedilsin.',
+      )
+    if (rawShortages.length > 0)
+      list.push(
+        `${rawShortages.length} hammaddede stok yetmiyor — planlanan işler için rulo tedariki gerekiyor.`,
+      )
+    if (missingRawSpec.length > 0)
+      list.push(
+        `${missingRawSpec.length} mamulde hammadde kodu veya brüt ağırlık tanımsız — hammadde kontrolü yapılamıyor.`,
+      )
     return list
-  }, [presses, templates, weeklyDemand, stockRows, products])
+  }, [
+    presses,
+    templates,
+    weeklyDemand,
+    stockRows,
+    products,
+    holidays,
+    rawShortages,
+    missingRawSpec,
+  ])
 
   const totalPlannedQty = result.jobs.reduce((s, j) => s + j.quantity, 0)
   const lateCount = result.jobs.filter((j) => j.late).length
@@ -354,6 +425,56 @@ function PlanlamaPage() {
           </div>
         ))}
       </div>
+
+      {rawNeeds.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-sm font-semibold text-foreground">
+            Hammadde ihtiyacı ({rawNeeds.length} kalem)
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Planlanan vuruşların brüt ağırlığından hesaplanır; Hammadde
+            deposundaki serbest stokla karşılaştırılır.
+          </p>
+          <div className="mt-2 overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Hammadde</th>
+                  <th className="px-3 py-2 font-medium">Gereken (kg)</th>
+                  <th className="px-3 py-2 font-medium">Stok (kg)</th>
+                  <th className="px-3 py-2 font-medium">Eksik (kg)</th>
+                  <th className="px-3 py-2 font-medium">Kullanan mamuller</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rawNeeds.map((r) => (
+                  <tr key={r.rawMaterial} className="border-t border-border">
+                    <td className="px-3 py-2 font-medium text-foreground">{r.rawMaterial}</td>
+                    <td className="px-3 py-2 text-foreground">
+                      {Math.round(r.requiredKg).toLocaleString('tr-TR')}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {Math.round(r.availableKg).toLocaleString('tr-TR')}
+                    </td>
+                    <td
+                      className={`px-3 py-2 font-medium ${
+                        r.shortageKg > 0 ? 'text-destructive' : 'text-emerald-600'
+                      }`}
+                    >
+                      {r.shortageKg > 0
+                        ? Math.round(r.shortageKg).toLocaleString('tr-TR')
+                        : 'yeterli'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {r.materials.join(', ')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {result.unplanned.length > 0 && (
         <div className="mt-8">

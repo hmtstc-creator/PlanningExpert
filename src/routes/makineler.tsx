@@ -1,7 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery, useQuery } from 'convex/react'
+import { usePaginatedQuery, useQuery } from 'convex/react'
 import { useMemo, useState } from 'react'
 
+import { ErrorBanner } from '../components/ErrorBanner'
+import { useSafeMutation } from '../lib/useSafeMutation'
 import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/makineler')({
@@ -12,8 +14,12 @@ type Press = { _id: string; name: string; hall: string; tonnage?: number }
 
 function MakinelerPage() {
   const presses = (useQuery(api.presses.list) ?? []) as Press[]
-  const upsert = useMutation(api.presses.upsert)
-  const remove = useMutation(api.presses.remove)
+  const {
+    run: upsert,
+    error: upsertError,
+    clearError,
+  } = useSafeMutation(api.presses.upsert)
+  const { run: remove, error: removeError } = useSafeMutation(api.presses.remove)
   const { results: products } = usePaginatedQuery(
     api.products.list,
     {},
@@ -53,16 +59,20 @@ function MakinelerPage() {
     const n = name.trim()
     if (!n) return
     setSaving(true)
+    let ok = false
     try {
-      await upsert({
+      ok = await upsert({
         name: n,
         hall: hall.trim() || 'Hol 1',
         tonnage: tonnage.trim() === '' ? undefined : Number(tonnage),
       })
-      setName('')
-      setTonnage('')
     } finally {
       setSaving(false)
+    }
+    // Girdileri yalnızca kayıt gerçekten başarılıysa temizle.
+    if (ok) {
+      setName('')
+      setTonnage('')
     }
   }
 
@@ -74,6 +84,8 @@ function MakinelerPage() {
         setup yapamaz (vinç kısıtı) — planlama bu tanımı kullanır. Çalışma
         takvimindeki pres listesi de buradan gelir.
       </p>
+
+      <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
 
       <div className="mt-6 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
         <label className="text-sm">

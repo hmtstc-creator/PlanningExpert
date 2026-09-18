@@ -128,6 +128,18 @@ export default defineSchema({
     overtimeShifts: v.number(),
   }).index('by_press_week', ['press', 'weekStart']),
 
+  // Nager.Date'ten çekilen resmi tatiller. Takvim ekranı bunları yazar,
+  // planlama motoru okur — aksi halde tatiller sadece ekranda görünür,
+  // kapasite hesabına girmezdi.
+  officialHolidays: defineTable({
+    country: v.string(),
+    year: v.number(),
+    date: v.string(),
+    name: v.string(),
+  })
+    .index('by_country_year', ['country', 'year'])
+    .index('by_country', ['country']),
+
   // Onaylanan plan anlık görüntüleri. Otomatik plan her zaman canlı
   // veriden yeniden hesaplanır; onaylandığında buraya versiyonlanarak
   // yazılır ki "hangi planı onayladık" kaydı kalsın.
