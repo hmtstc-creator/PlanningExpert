@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useConvex, useQuery } from 'convex/react'
+import { useConvex, useQuery, useTransport } from '../lib/convexTransport'
 import { useEffect, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -59,6 +59,7 @@ interface WsState {
 
 function TaniPage() {
   const convex = useConvex()
+  const { mode } = useTransport()
   const [https, setHttps] = useState<HttpsState>(CONVEX_URL ? 'checking' : 'no-url')
   const [ws, setWs] = useState<WsState | null>(null)
 
@@ -130,7 +131,26 @@ function TaniPage() {
     verdict = {
       tone: 'ok',
       title: 'Bağlantı sağlıklı',
-      body: <>Bu cihaz veritabanına bağlı. Aşağıdaki kayıt sayıları canlı.</>,
+      body: <>Bu cihaz veritabanına canlı bağlı. Aşağıdaki kayıt sayıları anlık.</>,
+    }
+  } else if (mode === 'http' && https === 'ok') {
+    verdict = {
+      tone: 'wait',
+      title: 'Yedek mod çalışıyor — WebSocket engelli ama uygulama kullanılabilir',
+      body: (
+        <>
+          <p>
+            Canlı bağlantı (WebSocket) kurulamadı, bu yüzden uygulama saf
+            HTTPS'e geçti. <strong>Veri okuma ve kaydetme çalışıyor</strong>;
+            tek fark verilerin anlık değil, yaklaşık 20 saniyede bir
+            tazelenmesi.
+          </p>
+          <p className="mt-2">
+            Kalıcı çözüm için BT'den <code>*.convex.cloud</code> alan adına 443
+            portundan <strong>WebSocket (wss://)</strong> izni iste.
+          </p>
+        </>
+      ),
     }
   } else if (https === 'checking' || ws === null) {
     verdict = { tone: 'wait', title: 'Kontrol ediliyor…', body: <>Birkaç saniye sürebilir.</> }
@@ -219,6 +239,15 @@ function TaniPage() {
             ) : (
               <span className="text-destructive">engelleniyor ✗</span>
             )}
+          </Row>
+          <Row label="Aktif mod">
+            <span className="font-medium text-foreground">
+              {mode === 'websocket'
+                ? 'Canlı (WebSocket)'
+                : mode === 'http'
+                  ? 'Yedek (HTTPS — 20 saniyede bir tazelenir)'
+                  : 'belirleniyor…'}
+            </span>
           </Row>
           <Row label="2) WebSocket (canlı veri)">
             {ws === null ? (

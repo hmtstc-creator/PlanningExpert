@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery } from 'convex/react'
+import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
 import { useState } from 'react'
 
 import { api } from '../../convex/_generated/api'

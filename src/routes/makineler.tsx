@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { usePaginatedQuery, useQuery } from 'convex/react'
+import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { ErrorBanner } from '../components/ErrorBanner'
