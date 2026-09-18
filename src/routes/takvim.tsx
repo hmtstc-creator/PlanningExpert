@@ -19,11 +19,6 @@ const DAYS = [
   { key: 'SU', label: 'Pazar', short: 'Paz' },
 ]
 
-const SHIFT_PRESETS = [
-  { label: '1 vardiya (8 saat)', minutes: 480 },
-  { label: '2 vardiya (16 saat)', minutes: 960 },
-  { label: '3 vardiya (24 saat)', minutes: 1440 },
-]
 
 const FALLBACK_COUNTRIES = [
   { countryCode: 'TR', name: 'Türkiye' },
@@ -39,160 +34,14 @@ const FALLBACK_COUNTRIES = [
 ]
 
 function TakvimPage() {
-  const calendar = useQuery(api.workCalendar.get)
-  const save = useMutation(api.workCalendar.save)
-
-  const [shiftMinutes, setShiftMinutes] = useState(480)
-  const [workingDays, setWorkingDays] = useState<string[]>(['MO', 'TU', 'WE', 'TH', 'FR'])
-  const [holidays, setHolidays] = useState<string[]>([])
-  const [newHoliday, setNewHoliday] = useState('')
-  const [saved, setSaved] = useState(false)
-
-  useSyncedFields(
-    calendar
-      ? {
-          shiftMinutesPerDay: calendar.shiftMinutesPerDay,
-          workingDays: calendar.workingDays.join(','),
-          holidays: calendar.holidays.join(','),
-        }
-      : undefined,
-    {
-      shiftMinutesPerDay: setShiftMinutes,
-      workingDays: (v: string) => setWorkingDays(v === '' ? [] : v.split(',')),
-      holidays: (v: string) => setHolidays(v === '' ? [] : v.split(',')),
-    },
-  )
-
-  function toggleDay(key: string) {
-    setWorkingDays((prev) =>
-      prev.includes(key) ? prev.filter((d) => d !== key) : [...prev, key],
-    )
-  }
-
-  async function handleSave() {
-    await save({ shiftMinutesPerDay: shiftMinutes, workingDays, holidays })
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
-  }
-
-  const weeklyMinutes = shiftMinutes * workingDays.length
-
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Çalışma Takvimi</h1>
       <p className="mt-2 text-muted-foreground">
         Planlamanın gerçekçi olması için fabrikanın ne zaman ve ne kadar
-        çalıştığını tanımla. Bu ayarlar plan sürelerinin gün/saate
-        çevrilmesinde kullanılır.
+        çalıştığını tanımla. Vardiya süresi, çalışma günleri ve tatiller tüm
+        presler için ortaktır; her presin haftalık düzeni ayrıca tanımlanır.
       </p>
-
-      <section className="mt-8 rounded-lg border border-border p-5">
-        <h2 className="font-semibold text-foreground">
-          Genel varsayılan (Planlama sayfasında kullanılır)
-        </h2>
-
-        <h3 className="mt-4 text-sm font-medium text-foreground">Günlük çalışma süresi</h3>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {SHIFT_PRESETS.map((p) => (
-            <button
-              key={p.minutes}
-              onClick={() => setShiftMinutes(p.minutes)}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                shiftMinutes === p.minutes
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-muted/70'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              className="w-24 rounded-md border border-input bg-background px-2 py-2 text-sm"
-              value={shiftMinutes}
-              onChange={(e) => setShiftMinutes(Number(e.target.value) || 0)}
-            />
-            <span className="text-sm text-muted-foreground">dk/gün</span>
-          </div>
-        </div>
-
-        <h3 className="mt-5 text-sm font-medium text-foreground">Çalışma günleri</h3>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {DAYS.map((d) => {
-            const active = workingDays.includes(d.key)
-            return (
-              <button
-                key={d.key}
-                onClick={() => toggleDay(d.key)}
-                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  active
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/70'
-                }`}
-              >
-                {d.label}
-              </button>
-            )
-          })}
-        </div>
-        <p className="mt-3 text-sm text-muted-foreground">
-          Haftalık toplam kapasite:{' '}
-          <strong className="text-foreground">
-            {(weeklyMinutes / 60).toFixed(0)} saat
-          </strong>{' '}
-          ({workingDays.length} gün × {shiftMinutes} dk)
-        </p>
-
-        <h3 className="mt-5 text-sm font-medium text-foreground">Tatiller / duruş günleri</h3>
-        <div className="mt-3 flex gap-2">
-          <input
-            type="date"
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={newHoliday}
-            onChange={(e) => setNewHoliday(e.target.value)}
-          />
-          <button
-            onClick={() => {
-              if (newHoliday && !holidays.includes(newHoliday)) {
-                setHolidays((prev) => [...prev, newHoliday].sort())
-                setNewHoliday('')
-              }
-            }}
-            className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            Ekle
-          </button>
-        </div>
-        {holidays.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {holidays.map((h) => (
-              <span
-                key={h}
-                className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-sm text-foreground"
-              >
-                {new Date(h).toLocaleDateString('tr-TR')}
-                <button
-                  className="text-destructive"
-                  onClick={() => setHolidays((prev) => prev.filter((d) => d !== h))}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-5 flex items-center gap-3">
-          <button
-            onClick={() => void handleSave()}
-            className="rounded-md bg-foreground px-5 py-2.5 text-sm font-medium text-background hover:opacity-90"
-          >
-            Genel Takvimi Kaydet
-          </button>
-          {saved && <span className="text-sm text-emerald-600">Kaydedildi ✓</span>}
-        </div>
-      </section>
 
       <PressCalendarSection />
     </div>
@@ -247,6 +96,7 @@ function PressCalendarSection() {
     { initialNumItems: 500 },
   )
   const globalCalendar = useQuery(api.workCalendar.get)
+  const saveWorkCalendar = useMutation(api.workCalendar.save)
   const globalSettings = useQuery(api.pressCalendar.getGlobalSettings)
   const saveGlobalSettingsMutation = useMutation(api.pressCalendar.saveGlobalSettings)
   const templatesList = useQuery(api.pressCalendar.listTemplates) ?? []
@@ -268,6 +118,19 @@ function PressCalendarSection() {
     for (const t of templatesList) set.add(t.press)
     return Array.from(set).sort()
   }, [definedPresses, products, templatesList])
+
+  // Çalışma günleri ve elle girilen tatiller planlama motorunun doğrudan
+  // okuduğu ayarlardır: hangi günlere normal vardiya konabileceğini ve
+  // hangi günlerin kapasitesinin sıfırlanacağını belirler.
+  const [workingDayKeys, setWorkingDayKeys] = useState<string[]>([
+    'MO',
+    'TU',
+    'WE',
+    'TH',
+    'FR',
+  ])
+  const [manualHolidays, setManualHolidays] = useState<string[]>([])
+  const [newHoliday, setNewHoliday] = useState('')
 
   const [press, setPress] = useState('')
 
@@ -339,6 +202,42 @@ function PressCalendarSection() {
       breakMinutesPerShift: next?.breakMinutesPerShift ?? breakMinutesPerShift,
       capacityFactor: globalSettings?.capacityFactor,
     })
+  }
+
+  useSyncedFields(
+    globalCalendar
+      ? {
+          workingDays: globalCalendar.workingDays.join(','),
+          holidays: globalCalendar.holidays.join(','),
+        }
+      : undefined,
+    {
+      workingDays: (v: string) => setWorkingDayKeys(v === '' ? [] : v.split(',')),
+      holidays: (v: string) => setManualHolidays(v === '' ? [] : v.split(',')),
+    },
+  )
+
+  async function persistWorkCalendar(next?: {
+    workingDays?: string[]
+    holidays?: string[]
+  }) {
+    await saveWorkCalendar({
+      // Günlük süre artık vardiya ayarlarından gelir; kayıt tutarlı kalsın
+      // diye aynı değer yazılır.
+      shiftMinutesPerDay: shiftMinutes,
+      workingDays: next?.workingDays ?? workingDayKeys,
+      holidays: next?.holidays ?? manualHolidays,
+    })
+  }
+
+  function toggleWorkingDay(key: string) {
+    const next = workingDayKeys.includes(key)
+      ? workingDayKeys.filter((d) => d !== key)
+      : [...workingDayKeys, key]
+    // Hafta sırası korunsun ki planlama günleri doğru sırada değerlendirsin.
+    const ordered = DAYS.map((d) => d.key).filter((k) => next.includes(k))
+    setWorkingDayKeys(ordered)
+    void persistWorkCalendar({ workingDays: ordered })
   }
 
   const template = templatesList.find((t) => t.press === press)
@@ -495,6 +394,84 @@ function PressCalendarSection() {
         uygular, hafta ilerledikçe elle yeniden girmen gerekmez. Belirli bir
         haftada plan değişirse o haftayı ayrıca düzenleyip kaydedebilirsin.
       </p>
+
+      <div className="mt-4 rounded-md border border-border p-3">
+        <h3 className="text-xs font-medium text-muted-foreground">
+          Çalışma günleri — normal vardiyalar yalnızca bu günlere yerleşir
+        </h3>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {DAYS.map((d) => {
+            const active = workingDayKeys.includes(d.key)
+            return (
+              <button
+                key={d.key}
+                onClick={() => toggleWorkingDay(d.key)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  active
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                }`}
+              >
+                {d.label}
+              </button>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Mesai vardiyaları bu günlerin dışına da yerleşebilir (ör. Cumartesi).
+        </p>
+
+        <h3 className="mt-4 text-xs font-medium text-muted-foreground">
+          Elle tatil / duruş günü
+        </h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Resmi tatiller yukarıdaki ülke seçimine göre otomatik gelir. Buraya
+          yalnızca fabrikaya özel duruşları ekle (ör. yıllık bakım kapanışı).
+        </p>
+        <div className="mt-2 flex gap-2">
+          <input
+            type="date"
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+            value={newHoliday}
+            onChange={(e) => setNewHoliday(e.target.value)}
+          />
+          <button
+            onClick={() => {
+              if (!newHoliday || manualHolidays.includes(newHoliday)) return
+              const next = [...manualHolidays, newHoliday].sort()
+              setManualHolidays(next)
+              setNewHoliday('')
+              void persistWorkCalendar({ holidays: next })
+            }}
+            disabled={!newHoliday}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            Ekle
+          </button>
+        </div>
+        {manualHolidays.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {manualHolidays.map((h) => (
+              <span
+                key={h}
+                className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-sm text-foreground"
+              >
+                {new Date(h).toLocaleDateString('tr-TR')}
+                <button
+                  className="text-destructive"
+                  onClick={() => {
+                    const next = manualHolidays.filter((d) => d !== h)
+                    setManualHolidays(next)
+                    void persistWorkCalendar({ holidays: next })
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
         <label className="text-sm">
