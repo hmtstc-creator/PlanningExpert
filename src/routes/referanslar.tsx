@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { useSafeMutation } from '../lib/useSafeMutation'
+import { piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
 import { ExcelUpload } from '../components/ExcelUpload'
 
 export const Route = createFileRoute('/referanslar')({
@@ -183,9 +184,12 @@ function ReferanslarPage() {
         data, setup times, mold shot limit and main/alternative machines.
         Upload an Excel file to load them in bulk, then click any cell in the
         table below to correct a value — changes save as soon as you leave the
-        cell. The performance factor (availability × performance, quality taken
-        as 100%) sets each job's total window: setup and quality approval come
-        out of that window and the rest is production time.
+        cell. Gross weight is per shot, not per piece, so a coil yields
+        coil weight ÷ gross weight shots and that many × cavities pieces — the
+        Pcs/coil column shows the resulting minimum lot. The performance factor
+        (availability × performance, quality taken as 100%) sets each job's
+        total window: setup and quality approval come out of that window and the
+        rest is production time.
       </p>
 
       <div className="mt-6">
@@ -271,7 +275,15 @@ function ReferanslarPage() {
               <th className="px-3 py-2 font-medium">SPM</th>
               <th className="px-3 py-2 font-medium">Raw Material</th>
               <th className="px-3 py-2 font-medium">Coil Wt</th>
-              <th className="px-3 py-2 font-medium">Gross Wt</th>
+              <th className="px-3 py-2 font-medium" title="Gross weight is per shot, not per piece">
+                Gross Wt/shot
+              </th>
+              <th
+                className="px-3 py-2 font-medium"
+                title="Minimum production lot: shots per coil × cavities"
+              >
+                Pcs/coil
+              </th>
               <th className="px-3 py-2 font-medium">Setup</th>
               <th className="px-3 py-2 font-medium">Coil Setup</th>
               <th className="px-3 py-2 font-medium">Main Machine</th>
@@ -285,14 +297,14 @@ function ReferanslarPage() {
           <tbody>
             {status === 'LoadingFirstPage' && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={15}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={16}>
                   Loading…
                 </td>
               </tr>
             )}
             {status !== 'LoadingFirstPage' && visibleProducts.length === 0 && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={15}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={16}>
                   No materials added yet.
                 </td>
               </tr>
@@ -306,6 +318,15 @@ function ReferanslarPage() {
                 <EditableCell product={p} field="rawMaterialCode" value={p.rawMaterialCode} onSave={updateField} />
                 <EditableCell product={p} field="coilWeight" value={p.coilWeight} numeric onSave={updateField} />
                 <EditableCell product={p} field="grossWeight" value={p.grossWeight} numeric onSave={updateField} />
+                <td className="px-3 py-2 text-xs text-muted-foreground">
+                  {piecesPerCoil(p as ProductSpec) > 0 ? (
+                    <span title={`${shotsPerCoil(p as ProductSpec).toLocaleString('en-GB')} shots per coil`}>
+                      {piecesPerCoil(p as ProductSpec).toLocaleString('en-GB')}
+                    </span>
+                  ) : (
+                    '—'
+                  )}
+                </td>
                 <EditableCell product={p} field="setupMinutes" value={p.setupMinutes} numeric onSave={updateField} />
                 <EditableCell product={p} field="coilSetupMinutes" value={p.coilSetupMinutes} numeric onSave={updateField} />
                 <EditableCell product={p} field="mainMachine" value={p.mainMachine} onSave={updateField} />

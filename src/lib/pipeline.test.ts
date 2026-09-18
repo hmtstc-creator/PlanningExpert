@@ -153,8 +153,11 @@ describe('planlama hattı (uçtan uca)', () => {
     expect(new Set(result.jobs.map((j) => j.press)).size).toBeGreaterThan(1)
   })
 
-  it('eş ürünlerin ihtiyacı hafta bazında maksimuma eşitlenir', () => {
+  it('eş ürünler aynı vuruştan çıkar, adetleri göz sayısı oranındadır', () => {
     const { demand } = runPipeline()
+    // MAM-A 2 gözlü, MAM-B 1 gözlü: aynı rulodan A'dan iki katı parça çıkar.
+    const cavitiesA = products.get('MAM-A')!.moldCavities!
+    const cavitiesB = products.get('MAM-B')!.moldCavities!
     const weeks = new Set(demand.map((e) => e.dueDate))
     for (const week of weeks) {
       const a = demand
@@ -163,10 +166,13 @@ describe('planlama hattı (uçtan uca)', () => {
       const b = demand
         .filter((e) => e.material === 'MAM-B' && e.dueDate === week)
         .reduce((s, e) => s + e.qty, 0)
-      // Aynı kalıptan çıktıkları için ikisi de aynı miktarda üretilir.
-      if (a > 0 || b > 0) expect(a).toBe(b)
+      if (a > 0 || b > 0) {
+        // Aynı vuruş sayısı: adet / göz sayısı ikisinde de eşit olmalı.
+        expect(a / cavitiesA).toBe(b / cavitiesB)
+      }
     }
   })
+
 
 
   it('tatil gününe hiçbir iş yerleştirilmez', () => {

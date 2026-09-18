@@ -273,13 +273,16 @@ function levelToRequired(
  * İhtiyacı rulo lotlarına çevirir.
  *
  * Bağlanan rulo yarıda sökülmez: bir rulo bağlandıysa sonuna kadar basılır.
- * Bu yüzden her kalem tam ruloya yuvarlanır ve ARTAN adet sonraki haftalara
- * taşınır — o haftalar artandan karşılanıyorsa yeni rulo bağlanmaz.
+ * Kısıt VURUŞ üzerindedir — rulo vuruşla tükenir — ve üretilen parça adedi
+ * her ürünün kendi göz sayısından çıkar. Eş ürünlerde göz sayıları farklı
+ * olabileceği için bu ayrım şarttır: 3000 vuruşluk rulo, 2 gözlü A'dan 6000,
+ * 1 gözlü B'den 3000 parça verir.
  *
- * Kullanıcının örneği: 200 bakiye + gelecek hafta 2000 sipariş, rulodan 3000
- * adet çıkıyor. Bakiye için rulo bağlanır ve 3000 basılır; 2800 artar,
- * gelecek haftanın 2000'i bu artandan karşılanır. Sonuç tek iş, tek setup.
- * Hafta hafta yuvarlansaydı iki ayrı rulo (6000 adet) çıkardı.
+ * Fazla üretilen parça sonraki haftalara taşınır; o haftalar artandan
+ * karşılanıyorsa yeni rulo bağlanmaz. Kullanıcının örneği: 200 bakiye +
+ * gelecek hafta 2000 sipariş, rulodan 3000 adet. Bakiye için rulo bağlanır
+ * ve 3000 basılır; 2800 artar, gelecek haftanın 2000'i bundan karşılanır.
+ * Sonuç tek iş, tek setup. Hafta hafta yuvarlansaydı iki rulo çıkardı.
  */
 function roundMaterialsToCoilLot(
   entriesByMaterial: Map<string, DemandEntry[]>,
@@ -294,19 +297,24 @@ function roundMaterialsToCoilLot(
     done.add(material)
     if (partner) done.add(partner)
 
-    const own = sortedByDue(entriesByMaterial.get(material) ?? [])
-    const other = partner ? sortedByDue(entriesByMaterial.get(partner) ?? []) : []
+    const own = entriesByMaterial.get(material) ?? []
+    const other = partner ? (entriesByMaterial.get(partner) ?? []) : []
     const product = products.get(material)
     const partnerProduct = partner ? products.get(partner) : undefined
 
-    const lot = Math.max(
-      product ? piecesPerCoil(product) : 0,
-      partnerProduct ? piecesPerCoil(partnerProduct) : 0,
+    // Eş ürünler aynı ruloyu paylaşır; biri tanımsızsa diğerininki kullanılır.
+    const lotShots = Math.max(
+      product ? shotsPerCoil(product) : 0,
+      partnerProduct ? shotsPerCoil(partnerProduct) : 0,
     )
-    if (lot <= 0) continue
+    if (lotShots <= 0) continue
 
-    // Eş ürünler aynı vuruştan çıktığı için haftalar birlikte yürütülür.
+    const ownCavities = cavitiesOf(product)
+    const partnerCavities = cavitiesOf(partnerProduct)
+
     const weeks = Array.from(new Set([...own, ...other].map((e) => e.dueDate))).sort()
+    // Artan, üretilmiş PARÇA cinsindendir ve ürün başına ayrı tutulur —
+    // göz sayıları farklıysa artanlar da farklı olur.
     let carry = 0
     let partnerCarry = 0
 
@@ -316,23 +324,27 @@ function roundMaterialsToCoilLot(
       const ownQty = ownWeek.reduce((sum, e) => sum + e.qty, 0)
       const otherQty = otherWeek.reduce((sum, e) => sum + e.qty, 0)
 
-      // Önceki rulodan artan, bu haftanın ihtiyacını karşılıyor mu?
       const ownNeed = Math.max(0, ownQty - carry)
       const otherNeed = Math.max(0, otherQty - partnerCarry)
-      const need = Math.max(ownNeed, otherNeed)
 
-      const produce = need > 0 ? Math.ceil(need / lot) * lot : 0
-      carry += produce - ownQty
-      partnerCarry += produce - otherQty
+      // Her ürünün ihtiyacı kendi göz sayısıyla vuruşa çevrilir; rulo
+      // ikisini birden beslediği için büyük olan belirler.
+      const requiredShots = Math.max(
+        Math.ceil(ownNeed / ownCavities),
+        Math.ceil(otherNeed / partnerCavities),
+      )
+      const produceShots =
+        requiredShots > 0 ? Math.ceil(requiredShots / lotShots) * lotShots : 0
 
-      setWeekQuantity(ownWeek, produce)
-      setWeekQuantity(otherWeek, produce)
+      const producedOwn = produceShots * ownCavities
+      const producedPartner = produceShots * partnerCavities
+      carry += producedOwn - ownQty
+      partnerCarry += producedPartner - otherQty
+
+      setWeekQuantity(ownWeek, producedOwn)
+      setWeekQuantity(otherWeek, producedPartner)
     }
   }
-}
-
-function sortedByDue(entries: DemandEntry[]): DemandEntry[] {
-  return [...entries].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
 }
 
 /**
@@ -351,28 +363,32 @@ function phaseRank(phase: DemandEntry['phase']): number {
 }
 
 /**
- * Bir ruloya sığan adet: rulo ağırlığı ÷ brüt ağırlık = vuruş, × göz sayısı.
- * Rulo ya da brüt ağırlık tanımsızsa lot kısıtı yoktur (0 döner).
+ * Bir rulodan çıkan VURUŞ sayısı.
+ *
+ * Brüt ağırlık vuruş başına tüketilen kilodur (master data'da "Gross Weight
+ * (Kg/Shot)"), yani rulo vuruşla tükenir — parça ile değil. Kısıtın birimi
+ * budur; parça adedi buradan türetilir.
  */
-export function piecesPerCoil(product: ProductSpec): number {
+export function shotsPerCoil(product: ProductSpec): number {
   const grossWeight = product.grossWeight ?? 0
   const coilWeight = product.coilWeight ?? 0
   if (grossWeight <= 0 || coilWeight <= 0) return 0
-  const cavities = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
-  return Math.floor(coilWeight / grossWeight) * cavities
+  return Math.floor(coilWeight / grossWeight)
+}
+
+function cavitiesOf(product: ProductSpec | undefined): number {
+  return product?.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
 }
 
 /**
- * İhtiyacı tam ruloya yuvarlar.
+ * Bir rulodan çıkan PARÇA adedi: vuruş × göz sayısı.
  *
- * Bağlanan rulo yarıda sökülmez; preste bir rulo bağlandıysa sonuna kadar
- * basılır. Bu yüzden minimum üretim lotu sipariş miktarı değil, rulodan
- * çıkan adettir.
+ * Eş ürünlerde göz sayısı farklı olabilir — aynı rulodan A'dan 2, B'den 1
+ * parça çıkabilir. Bu yüzden lot hesabı vuruş üzerinden yapılır, adet
+ * üzerinden değil; bu fonksiyon yalnızca gösterim içindir.
  */
-export function roundUpToCoilLot(quantity: number, product: ProductSpec): number {
-  const lot = piecesPerCoil(product)
-  if (lot <= 0 || quantity <= 0) return quantity
-  return Math.ceil(quantity / lot) * lot
+export function piecesPerCoil(product: ProductSpec): number {
+  return shotsPerCoil(product) * cavitiesOf(product)
 }
 
 // ---- 2) Rulo / parti hesabı ----------------------------------------------

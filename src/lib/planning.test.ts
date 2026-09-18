@@ -6,6 +6,7 @@ import {
   buildWeekBuckets,
   materialsMissingRawSpec,
   piecesPerCoil,
+  shotsPerCoil,
   computeRunPlan,
   type ProductSpec,
   splitByMoldLimit,
@@ -638,5 +639,49 @@ describe('rulo lotu (minimum üretim miktarı)', () => {
       { baseMonday },
     )
     expect(entries).toHaveLength(0)
+  })
+})
+
+describe('rulo lotu — vuruş bazlı kısıt', () => {
+  const baseMonday = new Date('2026-09-14T00:00:00Z')
+
+  it('brüt ağırlığı vuruş başına kabul eder', () => {
+    // 8000 kg rulo, vuruş başına 1.465 kg → 5460 vuruş.
+    const spec: ProductSpec = { code: 'A', grossWeight: 1.465, coilWeight: 8000 }
+    expect(shotsPerCoil(spec)).toBe(5460)
+    expect(piecesPerCoil({ ...spec, moldCavities: 2 })).toBe(10_920)
+  })
+
+  it('göz sayısı farklı eş ürünlerde her ürün kendi adedini alır', () => {
+    // Aynı rulo: 3000 vuruş. A 2 gözlü → 6000 parça, B 1 gözlü → 3000 parça.
+    // Lot adet üzerinden hesaplansaydı ikisi de aynı sayıya yuvarlanır,
+    // A'nın yarısı kaybolurdu.
+    const products = new Map<string, ProductSpec>([
+      ['A', { code: 'A', coProduct: 'B', moldCavities: 2, grossWeight: 1, coilWeight: 3000 }],
+      ['B', { code: 'B', moldCavities: 1, grossWeight: 1, coilWeight: 3000 }],
+    ])
+    const entries = buildDemandSchedule(
+      [
+        { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 300 }], stock: 0 },
+        { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: 1200 }], stock: 0 },
+      ],
+      products,
+      { baseMonday },
+    )
+    const qty = (m: string) =>
+      entries.filter((e) => e.material === m).reduce((sum, e) => sum + e.qty, 0)
+    expect(qty('A')).toBe(6000)
+    expect(qty('B')).toBe(3000)
+  })
+
+  it('çok gözlü kalıpta ihtiyacı vuruşa çevirerek yuvarlar', () => {
+    // 4 gözlü, rulo 1000 vuruş → 4000 parça/rulo. 5000 ihtiyaç 2 rulo eder.
+    const spec: ProductSpec = { code: 'A', moldCavities: 4, grossWeight: 1, coilWeight: 1000 }
+    const entries = buildDemandSchedule(
+      [{ material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 5000 }], stock: 0 }],
+      new Map([['A', spec]]),
+      { baseMonday },
+    )
+    expect(entries[0].qty).toBe(8000)
   })
 })
