@@ -82,6 +82,7 @@ function StoklarPage() {
             'Returns',
             'Transit and Transfer',
           ]}
+          replaces="all stock rows"
           onRows={async (raw) => {
             const parsed = raw.map((row) => ({
               material: str(row['Material']) ?? '',
@@ -117,7 +118,7 @@ function StoklarPage() {
         </div>
         <input
           className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-          placeholder="Materyal ara..."
+          placeholder="Search material…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

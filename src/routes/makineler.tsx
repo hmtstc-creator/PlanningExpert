@@ -1,14 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { ErrorBanner } from '../components/ErrorBanner'
-import {
-  draftOf,
-  pressPayload,
-  sameDraft,
-  type PressDraft as Draft,
-} from '../lib/pressDraft'
+import { SaveStatus } from '../components/SaveStatus'
+import { UnsavedBar } from '../components/UnsavedBar'
+import { draftOf, pressPayload, sameDraft } from '../lib/pressDraft'
+import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { api } from '../../convex/_generated/api'
 
@@ -57,96 +55,16 @@ function MakinelerPage() {
   const [tonnage, setTonnage] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
-  const [savingId, setSavingId] = useState<string | null>(null)
-  const [justSaved, setJustSaved] = useState<Record<string, boolean>>({})
-
   const byName = useMemo(() => new Map(presses.map((p) => [p.name, p])), [presses])
 
-  const serverDrafts = useMemo(() => {
-    const map: Record<string, Draft> = {}
-    for (const p of presses) map[p._id] = draftOf(p)
-    return map
-  }, [presses])
-  const signature = JSON.stringify(serverDrafts)
+  const rows = useDraftRows(presses, (p) => p._id, draftOf, sameDraft)
 
-  // Son görülen sunucu hâli. Kullanıcının yazdığını silmemek için: yerel
-  // değer sunucudan farklıysa ve sunucu tarafı bu arada değişmediyse yerel
-  // düzenleme korunur; başka bir cihaz kaydı değiştirdiyse o kazanır.
-  const baseline = useRef<Record<string, Draft>>({})
-  useEffect(() => {
-    setDrafts((current) => {
-      const next: Record<string, Draft> = {}
-      for (const [id, server] of Object.entries(serverDrafts)) {
-        const local = current[id]
-        const base = baseline.current[id]
-        const locallyEdited = local && base && !sameDraft(local, base)
-        const serverChanged = !base || !sameDraft(base, server)
-        next[id] = locallyEdited && !serverChanged ? local : server
-      }
-      baseline.current = serverDrafts
-      return next
-    })
-    // serverDrafts her render'da yeni nesne olur; içerik imzasına bağlanıyor.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature])
-
-  const dirtyIds = useMemo(
-    () =>
-      Object.keys(serverDrafts).filter(
-        (id) => drafts[id] && !sameDraft(drafts[id], serverDrafts[id]),
-      ),
-    [drafts, serverDrafts],
-  )
-
-  // Kaydedilmemiş değişiklikle sayfadan çıkılırsa tarayıcı uyarsın.
-  useEffect(() => {
-    if (dirtyIds.length === 0) return
-    const handler = (e: BeforeUnloadEvent) => e.preventDefault()
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
-  }, [dirtyIds.length])
-
-  function editDraft(id: string, patch: Partial<Draft>) {
-    setDrafts((current) => ({ ...current, [id]: { ...current[id], ...patch } }))
-    setJustSaved((s) => (s[id] ? { ...s, [id]: false } : s))
-  }
-
-  const saveRow = useCallback(
-    async (press: Press, draft: Draft): Promise<boolean> => {
-      setSavingId(press._id)
-      let ok = false
-      try {
-        // Kayıt her zaman eksiksiz gönderilir: sunucu tarafı gelmeyen alanı
-        // silinmiş sayar, bu yüzden kısmi gönderim diğer alanları uçurur.
-        ok = await upsert(pressPayload(press.name, draft))
-      } finally {
-        setSavingId(null)
-      }
-      if (ok) {
-        setJustSaved((s) => ({ ...s, [press._id]: true }))
-        setTimeout(
-          () => setJustSaved((s) => ({ ...s, [press._id]: false })),
-          3000,
-        )
-      }
-      return ok
-    },
-    [upsert],
-  )
-
-  async function saveAll() {
-    for (const id of dirtyIds) {
-      const press = presses.find((p) => p._id === id)
-      const draft = drafts[id]
-      if (!press || !draft) continue
-      const ok = await saveRow(press, draft)
-      if (!ok) return
-    }
-  }
-
-  function discardAll() {
-    setDrafts(serverDrafts)
+  const savePress = (id: string) => async (draft: ReturnType<typeof draftOf>) => {
+    const press = presses.find((p) => p._id === id)
+    if (!press) return false
+    // Kayıt her zaman eksiksiz gönderilir: sunucu tarafı gelmeyen alanı
+    // silinmiş sayar, bu yüzden kısmi gönderim diğer alanları uçurur.
+    return upsert(pressPayload(press.name, draft))
   }
 
   // Referanslardaki ana/alternatif makine alanlarında geçen ama henüz
@@ -357,18 +275,16 @@ function MakinelerPage() {
                       .slice()
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map((p) => {
-                        const draft = drafts[p._id] ?? draftOf(p)
-                        const dirty = !sameDraft(draft, draftOf(p))
-                        const busy = savingId === p._id
+                        const draft = rows.draftFor(p)
+                        const dirty = rows.isDirty(p)
+                        const busy = rows.savingKey === p._id
                         const saveThisRow = () => {
-                          if (dirty && !busy) void saveRow(p, draft)
+                          if (dirty && !busy) void rows.commit(p._id, savePress(p._id))
                         }
                         return (
                           <tr
                             key={p._id}
-                            className={`border-t border-border ${
-                              dirty ? 'bg-amber-50' : ''
-                            }`}
+                            className={`border-t border-border ${dirty ? 'bg-amber-50' : ''}`}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') saveThisRow()
                             }}
@@ -378,7 +294,7 @@ function MakinelerPage() {
                               <input
                                 className={`w-32 ${inputClass}`}
                                 value={draft.hall}
-                                onChange={(e) => editDraft(p._id, { hall: e.target.value })}
+                                onChange={(e) => rows.edit(p._id, { hall: e.target.value })}
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -387,7 +303,7 @@ function MakinelerPage() {
                                 list="press-categories"
                                 placeholder="—"
                                 value={draft.category}
-                                onChange={(e) => editDraft(p._id, { category: e.target.value })}
+                                onChange={(e) => rows.edit(p._id, { category: e.target.value })}
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -396,7 +312,7 @@ function MakinelerPage() {
                                 className="h-4 w-4"
                                 checked={draft.feedsCoil}
                                 onChange={(e) =>
-                                  editDraft(p._id, { feedsCoil: e.target.checked })
+                                  rows.edit(p._id, { feedsCoil: e.target.checked })
                                 }
                               />
                             </td>
@@ -406,7 +322,7 @@ function MakinelerPage() {
                                 className={`w-24 ${inputClass}`}
                                 placeholder="—"
                                 value={draft.tonnage}
-                                onChange={(e) => editDraft(p._id, { tonnage: e.target.value })}
+                                onChange={(e) => rows.edit(p._id, { tonnage: e.target.value })}
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -416,25 +332,15 @@ function MakinelerPage() {
                                 className={`w-20 ${inputClass}`}
                                 placeholder="—"
                                 value={draft.frozenDays}
-                                onChange={(e) =>
-                                  editDraft(p._id, { frozenDays: e.target.value })
-                                }
+                                onChange={(e) => rows.edit(p._id, { frozenDays: e.target.value })}
                               />
                             </td>
-                            <td className="px-3 py-2 text-xs whitespace-nowrap">
-                              {busy ? (
-                                <span className="text-muted-foreground">Saving…</span>
-                              ) : dirty ? (
-                                <span className="font-medium text-amber-700">
-                                  ● Unsaved
-                                </span>
-                              ) : justSaved[p._id] ? (
-                                <span className="font-medium text-emerald-700">
-                                  ✓ Saved
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">Saved</span>
-                              )}
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              <SaveStatus
+                                dirty={dirty}
+                                saving={busy}
+                                justSaved={!!rows.justSaved[p._id]}
+                              />
                             </td>
                             <td className="px-3 py-2 text-right whitespace-nowrap">
                               <button
@@ -470,31 +376,13 @@ function MakinelerPage() {
         </div>
       )}
 
-      {dirtyIds.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-amber-300 bg-amber-50 px-4 py-3 shadow-lg">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-amber-900">
-              {dirtyIds.length === 1
-                ? '1 press has unsaved changes'
-                : `${dirtyIds.length} presses have unsaved changes`}
-            </span>
-            <button
-              onClick={() => void saveAll()}
-              disabled={savingId !== null}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-            >
-              {savingId !== null ? 'Saving…' : 'Save all'}
-            </button>
-            <button
-              onClick={discardAll}
-              disabled={savingId !== null}
-              className="text-sm text-amber-900 underline hover:no-underline disabled:opacity-50"
-            >
-              Discard changes
-            </button>
-          </div>
-        </div>
-      )}
+      <UnsavedBar
+        count={rows.dirtyKeys.length}
+        saving={rows.savingKey !== null}
+        noun="press"
+        onSaveAll={() => void rows.commitAll((id, draft) => savePress(id)(draft))}
+        onDiscard={rows.discardAll}
+      />
     </div>
   )
 }

@@ -66,8 +66,8 @@ function SiparislerPage() {
       <p className="mt-2 text-muted-foreground">
         Upload the ZPP (weekly) and ZPP_DAILY (daily) net requirement reports
         from SAP here every day — negative values represent the shortfall that
-        must be produced. Each upload automatically replaces
-        yazar.
+        must be produced. Each upload replaces the previous one entirely, so
+        you are asked to confirm before the file is read.
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -75,6 +75,7 @@ function SiparislerPage() {
           <p className="mb-2 text-sm font-medium text-foreground">Weekly (ZPP.xlsx)</p>
           <ExcelUpload
             expectedColumns={['Material', 'Stock in storage', 'Overdue Requirements', '...weekly columns']}
+            replaces="all weekly demand rows"
             onRows={async (raw) => {
               const parsed = parseSnapshotRows(raw)
               const result = await replaceWeekly({ rows: parsed })
@@ -86,6 +87,7 @@ function SiparislerPage() {
           <p className="mb-2 text-sm font-medium text-foreground">Daily (ZPP_DAILY.xlsx)</p>
           <ExcelUpload
             expectedColumns={['Material', 'Stock in storage', 'Overdue Requirements', '...daily columns']}
+            replaces="all daily demand rows"
             onRows={async (raw) => {
               const parsed = parseSnapshotRows(raw)
               const result = await replaceDaily({ rows: parsed })

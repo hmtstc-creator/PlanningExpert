@@ -1,8 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
+import { usePaginatedQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { ErrorBanner } from '../components/ErrorBanner'
+import { SaveStatus } from '../components/SaveStatus'
+import { UnsavedBar } from '../components/UnsavedBar'
+import { useDraftRows } from '../lib/useDraftRows'
+import { useSafeMutation } from '../lib/useSafeMutation'
 
 export const Route = createFileRoute('/depolar')({
   component: DepolarPage,
@@ -55,11 +60,36 @@ function DepolarPage() {
     {},
     { initialNumItems: 500 },
   )
-  const upsert = useMutation(api.storageLocations.upsert)
-  const removeLocation = useMutation(api.storageLocations.remove)
+  const {
+    run: upsert,
+    error: upsertError,
+    clearError,
+  } = useSafeMutation(api.storageLocations.upsert)
+  const { run: removeLocation, error: removeError } = useSafeMutation(
+    api.storageLocations.remove,
+  )
 
   const [saving, setSaving] = useState<string | null>(null)
   const [newCode, setNewCode] = useState('')
+
+  // Kategori ve not birlikte kaydedilir: `upsert` kaydı tümüyle değiştirir,
+  // bu yüzden yalnızca birini göndermek diğerini siler.
+  const rows = useDraftRows(
+    locations,
+    (l) => l.code,
+    (l) => ({ category: l.category ?? DEFAULT_CATEGORY, description: l.description ?? '' }),
+    (a, b) => a.category === b.category && a.description === b.description,
+  )
+
+  const saveLocation = (code: string) => (draft: {
+    category: string
+    description: string
+  }) =>
+    upsert({
+      code,
+      category: draft.category,
+      description: draft.description.trim() || undefined,
+    })
 
   const byCode = useMemo(
     () => new Map(locations.map((l) => [l.code, l])),
@@ -78,12 +108,14 @@ function DepolarPage() {
     const code = newCode.trim()
     if (!code) return
     setSaving(code)
+    let ok = false
     try {
-      await upsert({ code, category: DEFAULT_CATEGORY })
-      setNewCode('')
+      ok = await upsert({ code, category: DEFAULT_CATEGORY })
     } finally {
       setSaving(null)
     }
+    // Kutu yalnızca kayıt gerçekten başarılıysa temizlenir.
+    if (ok) setNewCode('')
   }
 
   const stockByLocation = useMemo(() => {
@@ -120,17 +152,8 @@ function DepolarPage() {
     }
   }
 
-  async function setCategory(code: string, category: string, description?: string) {
-    setSaving(code)
-    try {
-      await upsert({ code, category, description })
-    } finally {
-      setSaving(null)
-    }
-  }
-
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
+    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-12">
       <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Storage Locations</h1>
       <p className="mt-2 text-muted-foreground">
         Define the storage locations you care about and choose how each one is
@@ -166,9 +189,16 @@ function DepolarPage() {
           disabled={!newCode.trim() || saving === newCode.trim()}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
-          Depo ekle
+          Add location
         </button>
       </div>
+
+      <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
+      <p className="mt-3 text-sm text-muted-foreground">
+        Changing the category or the note marks the location{' '}
+        <strong className="text-foreground">Unsaved</strong> — press Save on that
+        card, or Save all at the bottom of the page.
+      </p>
 
       {allCodes.length === 0 ? (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -180,39 +210,53 @@ function DepolarPage() {
           {allCodes.map((code) => {
             const current = byCode.get(code)
             const qty = stockByLocation.get(code) ?? 0
+            const draft = current
+              ? rows.draftFor(current)
+              : { category: DEFAULT_CATEGORY, description: '' }
+            const dirty = current ? rows.isDirty(current) : false
+            const busy = rows.savingKey === code || saving === code
+            const saveCard = () => {
+              if (dirty && !busy) void rows.commit(code, saveLocation(code))
+            }
             return (
               <div
                 key={code}
-                className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
+                className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${
+                  dirty ? 'border-amber-300 bg-amber-50' : 'border-border'
+                }`}
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-semibold text-foreground">{code}</span>
                     <span className="text-xs text-muted-foreground">
-                      {qty.toLocaleString('en-GB')} adet stok
+                      {qty.toLocaleString('en-GB')} pcs in stock
                     </span>
+                    <SaveStatus
+                      dirty={dirty}
+                      saving={busy}
+                      justSaved={!!rows.justSaved[code]}
+                    />
                   </div>
                   <input
                     className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm sm:w-72"
-                    placeholder="Bu depo ne anlama geliyor? (opsiyonel not)"
-                    defaultValue={current?.description ?? ''}
-                    onBlur={(e) =>
-                      void setCategory(
-                        code,
-                        current?.category ?? DEFAULT_CATEGORY,
-                        e.target.value,
-                      )
+                    placeholder="What is this location for? (optional note)"
+                    value={draft.description}
+                    onChange={(e) =>
+                      rows.edit(code, { description: e.target.value })
                     }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveCard()
+                    }}
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-1">
                   {CATEGORIES.map((c) => {
-                    const active = current?.category === c.value
+                    const active = draft.category === c.value
                     return (
                       <button
                         key={c.value}
-                        disabled={saving === code}
-                        onClick={() => void setCategory(code, c.value, current?.description)}
+                        disabled={busy}
+                        onClick={() => rows.edit(code, { category: c.value })}
                         className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                           active
                             ? c.color
@@ -223,14 +267,21 @@ function DepolarPage() {
                       </button>
                     )
                   })}
+                  <button
+                    onClick={saveCard}
+                    disabled={!dirty || busy}
+                    className="ml-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+                  >
+                    Save
+                  </button>
                   {current && (
                     <button
-                      disabled={saving === code}
+                      disabled={busy}
                       onClick={() => void deleteLocation(code)}
                       title="Delete this storage location definition"
-                      className="ml-1 rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                      className="rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
                     >
-                      Sil
+                      Delete
                     </button>
                   )}
                 </div>
@@ -243,6 +294,14 @@ function DepolarPage() {
       <p className="mt-6 text-xs text-muted-foreground">
         Undefined storage locations are treated as "Finished Goods" by default.
       </p>
+
+      <UnsavedBar
+        count={rows.dirtyKeys.length}
+        saving={rows.savingKey !== null}
+        noun="location"
+        onSaveAll={() => void rows.commitAll((code, draft) => saveLocation(code)(draft))}
+        onDiscard={rows.discardAll}
+      />
     </div>
   )
 }

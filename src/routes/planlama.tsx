@@ -803,7 +803,11 @@ function PlanlamaPage() {
                   </span>
                 </span>
                 <button
-                  onClick={() => void clearOverride({ material: o.material })}
+                  onClick={() => {
+                    if (window.confirm(`Remove the planning rule for ${o.material}?`)) {
+                      void clearOverride({ material: o.material })
+                    }
+                  }}
                   className="text-xs text-destructive hover:underline"
                 >
                   Remove

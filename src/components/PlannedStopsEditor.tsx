@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { ErrorBanner } from './ErrorBanner'
+import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { stopMinutesInShift, type PlannedStop } from '../lib/shiftTimeline'
 
@@ -60,6 +61,25 @@ export function PlannedStopsEditor({
   const { run: update } = useSafeMutation(updateStop as never)
   const { run: remove, error: removeError } = useSafeMutation(removeStop as never)
 
+  // Saat ve süre birlikte düzenlenir ve açıkça kaydedilir: değiştirip
+  // kaydettiğini görememek bu programda bildirilen bir sorundu.
+  const rows = useDraftRows(
+    stops,
+    (s) => s._id,
+    (s) => ({ start: clockLabel(s.startMinute), duration: String(s.durationMinutes) }),
+    (a, b) => a.start === b.start && a.duration === b.duration,
+  )
+
+  const saveStop = (id: string) => (draft: { start: string; duration: string }) => {
+    const startMinute = parseClock(draft.start)
+    if (startMinute === null) return Promise.resolve(false)
+    return update({
+      id,
+      startMinute,
+      durationMinutes: Math.max(1, Math.round(Number(draft.duration)) || 1),
+    })
+  }
+
   const [shiftIndex, setShiftIndex] = useState(1)
   const [name, setName] = useState('')
   const [kind, setKind] = useState<string>('handover')
@@ -99,6 +119,7 @@ export function PlannedStopsEditor({
         Enter the real clock time of each handover, tea and meal break for every
         shift. They are the same for all presses. Capacity is reduced shift by
         shift, so shifts with different stops are worth different amounts.
+        Changing a time or a duration marks that stop until you press Save.
       </p>
 
       <ErrorBanner message={addError ?? removeError} onDismiss={clearError} />
@@ -202,8 +223,22 @@ export function PlannedStopsEditor({
                 <ul className="mt-2 space-y-1">
                   {list.map((s) => {
                     const preset = KINDS.find((k) => k.value === s.kind)
+                    const draft = rows.draftFor(s)
+                    const dirty = rows.isDirty(s)
+                    const busy = rows.savingKey === s._id
+                    const saveThisStop = () => {
+                      if (dirty && !busy) void rows.commit(s._id, saveStop(s._id))
+                    }
                     return (
-                      <li key={s._id} className="flex items-center gap-1 text-[11px]">
+                      <li
+                        key={s._id}
+                        className={`flex items-center gap-1 rounded text-[11px] ${
+                          dirty ? 'bg-amber-50' : ''
+                        }`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveThisStop()
+                        }}
+                      >
                         <span className="flex items-center gap-1">
                           <span
                             className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
@@ -214,29 +249,36 @@ export function PlannedStopsEditor({
                         <input
                           type="time"
                           className="w-[72px] rounded border border-transparent bg-background px-1 py-0.5 hover:border-input"
-                          defaultValue={clockLabel(s.startMinute)}
-                          onBlur={(e) => {
-                            const parsed = parseClock(e.target.value)
-                            if (parsed !== null && parsed !== s.startMinute) {
-                              void update({ id: s._id, startMinute: parsed })
-                            }
-                          }}
+                          value={draft.start}
+                          onChange={(e) => rows.edit(s._id, { start: e.target.value })}
                         />
                         <input
                           type="number"
                           min={1}
                           className="w-14 rounded border border-transparent bg-background px-1 py-0.5 hover:border-input"
-                          defaultValue={s.durationMinutes}
-                          onBlur={(e) => {
-                            const next = Math.max(1, Number(e.target.value) || 1)
-                            if (next !== s.durationMinutes) {
-                              void update({ id: s._id, durationMinutes: next })
-                            }
-                          }}
+                          value={draft.duration}
+                          onChange={(e) => rows.edit(s._id, { duration: e.target.value })}
                         />
                         <button
-                          onClick={() => void remove({ id: s._id })}
-                          className="ml-auto text-destructive hover:underline"
+                          onClick={saveThisStop}
+                          disabled={!dirty || busy}
+                          title={dirty ? 'Save this stop' : 'Saved'}
+                          className={`ml-auto rounded px-1.5 py-0.5 font-medium ${
+                            dirty
+                              ? 'bg-primary text-primary-foreground hover:opacity-90'
+                              : 'text-muted-foreground'
+                          }`}
+                        >
+                          {busy ? '…' : dirty ? 'Save' : '✓'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete the planned stop "${s.name}"?`)) {
+                              void remove({ id: s._id })
+                            }
+                          }}
+                          title="Delete this stop"
+                          className="text-destructive hover:underline"
                         >
                           ×
                         </button>

@@ -6,6 +6,7 @@ import { api } from '../../convex/_generated/api'
 import { addDays, isoDate, mondayOf } from '../lib/dates'
 import { useSyncedFields } from '../lib/useSyncedFields'
 import { CapacityGrid } from '../components/CapacityGrid'
+import { UnsavedBar } from '../components/UnsavedBar'
 import { PlannedStopsEditor, type StopRow } from '../components/PlannedStopsEditor'
 import type { WeekPattern as GridPattern } from '../lib/capacityGrid'
 
@@ -39,7 +40,7 @@ const FALLBACK_COUNTRIES = [
 
 function TakvimPage() {
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
+    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-12">
       <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Work Calendar</h1>
       <p className="mt-2 text-muted-foreground">
         Define when and how much the plant runs so planning stays realistic.
@@ -86,7 +87,8 @@ function PressCalendarSection() {
   const saveWorkCalendar = useMutation(api.workCalendar.save)
   const globalSettings = useQuery(api.pressCalendar.getGlobalSettings)
   const saveGlobalSettingsMutation = useMutation(api.pressCalendar.saveGlobalSettings)
-  const templatesList = useQuery(api.pressCalendar.listTemplates) ?? []
+  const templatesQuery = useQuery(api.pressCalendar.listTemplates)
+  const templatesList = templatesQuery ?? []
   const saveTemplateMutation = useMutation(api.pressCalendar.saveTemplate)
   const allOverrides = (useQuery(api.pressCalendar.listAllOverrides) ?? []) as {
     press: string
@@ -211,22 +213,6 @@ function PressCalendarSection() {
     setSavedAt(new Date().toLocaleTimeString('en-GB'))
   }
 
-  /**
-   * Writes every shared setting at once, including the work-calendar record.
-   * Individual fields auto-save on change, but a setting the user never
-   * touched (typically Monday–Friday working days) would never be written,
-   * leaving the Overview page reporting "no work calendar defined".
-   */
-  async function saveAllSettings() {
-    setSavingAll(true)
-    try {
-      await persistGlobalSettings()
-      await persistWorkCalendar()
-    } finally {
-      setSavingAll(false)
-    }
-  }
-
   useSyncedFields(
     globalCalendar
       ? {
@@ -261,7 +247,6 @@ function PressCalendarSection() {
     // Hafta sırası korunsun ki planlama günleri doğru sırada değerlendirsin.
     const ordered = DAYS.map((d) => d.key).filter((k) => next.includes(k))
     setWorkingDayKeys(ordered)
-    void persistWorkCalendar({ workingDays: ordered })
   }
 
   const template = templatesList.find((t) => t.press === press)
@@ -298,7 +283,80 @@ function PressCalendarSection() {
 
   function pickShiftsPerDay(n: number) {
     setShiftsPerDay(n)
-    void saveTemplate({ shiftsPerDay: n })
+  }
+
+  // Ekrandaki değer sunucudakinden farklıysa kaydedilmemiş demektir.
+  // Kullanıcı "kaydettim mi?" diye tahmin etmek zorunda kalmamalı.
+  const settingsDirty =
+    !!globalSettings &&
+    (globalSettings.shiftMinutes !== shiftMinutes ||
+      globalSettings.overtimeShiftMinutes !== overtimeShiftMinutes ||
+      globalSettings.country !== country ||
+      (globalSettings.setupGapMinutes ?? 60) !== setupGapMinutes ||
+      (globalSettings.coilSetupGapMinutes ?? 30) !== coilSetupGapMinutes ||
+      (globalSettings.concurrentSetupsPerHall ?? 1) !== concurrentSetupsPerHall ||
+      (globalSettings.shiftStartMinute ?? 420) !== shiftStartMinute ||
+      (globalSettings.planningHorizonWeeks ?? 4) !== planningHorizonWeeks)
+
+  const calendarDirty =
+    !!globalCalendar &&
+    (globalCalendar.workingDays.join(',') !== workingDayKeys.join(',') ||
+      globalCalendar.holidays.join(',') !== manualHolidays.join(','))
+
+  // `undefined` sorgunun henüz yüklenmediği, `null` kaydın hiç olmadığı
+  // anlamına gelir. Yüklenirken "kaydedilmemiş" demek yanlış olur; kayıt hiç
+  // yoksa gerçekten kaydedilmemiştir — Overview o zaman "no work calendar
+  // defined" diyor.
+  const sharedDirty =
+    (globalSettings !== undefined && (globalSettings === null || settingsDirty)) ||
+    (globalCalendar !== undefined && (globalCalendar === null || calendarDirty))
+
+  const templateDirty =
+    !!press &&
+    templatesQuery !== undefined &&
+    (!template ||
+      template.workingDays !== workingDays ||
+      template.shiftsPerDay !== shiftsPerDay ||
+      template.overtimeShifts !== overtimeShifts)
+
+  /** Kaydedilmemiş düzenlemeleri atıp sunucudaki hâle döner. */
+  function discardSharedSettings() {
+    if (globalSettings) {
+      setShiftMinutes(globalSettings.shiftMinutes)
+      setOvertimeShiftMinutes(globalSettings.overtimeShiftMinutes)
+      setCountry(globalSettings.country)
+      setSetupGapMinutes(globalSettings.setupGapMinutes ?? 60)
+      setCoilSetupGapMinutes(globalSettings.coilSetupGapMinutes ?? 30)
+      setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? 1)
+      setShiftStartMinute(globalSettings.shiftStartMinute ?? 420)
+      setPlanningHorizonWeeks(globalSettings.planningHorizonWeeks ?? 4)
+    }
+    if (globalCalendar) {
+      setWorkingDayKeys(globalCalendar.workingDays)
+      setManualHolidays(globalCalendar.holidays)
+    }
+    if (template) {
+      setWorkingDays(template.workingDays)
+      setShiftsPerDay(template.shiftsPerDay)
+      setOvertimeShifts(template.overtimeShifts)
+    }
+  }
+
+  /**
+   * Paylaşılan ayarları, çalışma takvimini ve seçili presin haftalık
+   * şablonunu tek seferde yazar. Kullanıcının hiç dokunmadığı bir ayar da
+   * (tipik olarak Pazartesi–Cuma çalışma günleri) böylece kaydedilir; aksi
+   * halde Overview sayfası "no work calendar defined" demeye devam eder.
+   */
+  async function saveEverything() {
+    setSavingAll(true)
+    try {
+      await persistGlobalSettings()
+      await persistWorkCalendar()
+      if (press) await saveTemplate()
+    } finally {
+      setSavingAll(false)
+    }
   }
 
   const currentTemplate: WeekPattern = { workingDays, shiftsPerDay, overtimeShifts }
@@ -413,11 +471,15 @@ function PressCalendarSection() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold text-foreground">Per-press Calendar</h2>
         <div className="flex items-center gap-3">
-          {savedAt && (
+          {sharedDirty ? (
+            <span className="text-sm font-medium text-amber-700">● Unsaved changes</span>
+          ) : savedAt ? (
             <span className="text-sm text-emerald-600">Saved ✓ {savedAt}</span>
+          ) : (
+            <span className="text-sm text-muted-foreground">Saved</span>
           )}
           <button
-            onClick={() => void saveAllSettings()}
+            onClick={() => void saveEverything()}
             disabled={savingAll}
             className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
           >
@@ -429,8 +491,17 @@ function PressCalendarSection() {
         Define each press's standard weekly pattern (how many days, how many
         shifts per day, how many overtime shifts). The 30-week calendar applies
         that standard automatically and rolls forward on its own. If a specific
-        week differs, edit and save just that week.
+        week differs, edit and save just that week. Nothing in this block is
+        written until you press Save — an edited field is marked Unsaved.
       </p>
+
+      <UnsavedBar
+        count={(sharedDirty ? 1 : 0) + (templateDirty ? 1 : 0)}
+        saving={savingAll}
+        noun="section"
+        onSaveAll={() => void saveEverything()}
+        onDiscard={discardSharedSettings}
+      />
 
       <div className="mt-4">
         <PlannedStopsEditor
@@ -537,7 +608,6 @@ function PressCalendarSection() {
               const next = [...manualHolidays, newHoliday].sort()
               setManualHolidays(next)
               setNewHoliday('')
-              void persistWorkCalendar({ holidays: next })
             }}
             disabled={!newHoliday}
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
@@ -556,9 +626,7 @@ function PressCalendarSection() {
                 <button
                   className="text-destructive"
                   onClick={() => {
-                    const next = manualHolidays.filter((d) => d !== h)
-                    setManualHolidays(next)
-                    void persistWorkCalendar({ holidays: next })
+                    setManualHolidays(manualHolidays.filter((d) => d !== h))
                   }}
                 >
                   ×
@@ -579,7 +647,6 @@ function PressCalendarSection() {
             className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={shiftMinutes}
             onChange={(e) => setShiftMinutes(Number(e.target.value) || 0)}
-            onBlur={() => void persistGlobalSettings()}
           />
         </label>
         <label className="text-sm">
@@ -591,7 +658,6 @@ function PressCalendarSection() {
             className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={overtimeShiftMinutes}
             onChange={(e) => setOvertimeShiftMinutes(Number(e.target.value) || 0)}
-            onBlur={() => void persistGlobalSettings()}
           />
         </label>
         <label className="text-sm">
@@ -608,9 +674,9 @@ function PressCalendarSection() {
             onBlur={() => {
               // Kırpma yazarken değil, alandan çıkınca yapılır; aksi halde
               // kutuyu silip yeni sayı yazmak imkânsız hale geliyor.
-              const clamped = Math.min(30, Math.max(1, Math.round(planningHorizonWeeks) || 4))
-              setPlanningHorizonWeeks(clamped)
-              void persistGlobalSettings({ planningHorizonWeeks: clamped })
+              setPlanningHorizonWeeks(
+                Math.min(30, Math.max(1, Math.round(planningHorizonWeeks) || 4)),
+              )
             }}
           />
         </label>
@@ -630,7 +696,6 @@ function PressCalendarSection() {
                 setShiftStartMinute(h * 60 + m)
               }
             }}
-            onBlur={() => void persistGlobalSettings({ shiftStartMinute })}
           />
         </label>
         <label className="text-sm">
@@ -640,7 +705,6 @@ function PressCalendarSection() {
             value={country}
             onChange={(e) => {
               setCountry(e.target.value)
-              void persistGlobalSettings({ country: e.target.value })
             }}
           >
             {countries.map((c) => (
@@ -660,7 +724,6 @@ function PressCalendarSection() {
             className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={setupGapMinutes}
             onChange={(e) => setSetupGapMinutes(Number(e.target.value) || 0)}
-            onBlur={() => void persistGlobalSettings()}
           />
         </label>
         <label className="text-sm">
@@ -673,11 +736,9 @@ function PressCalendarSection() {
             className="mt-1 w-28 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={coilSetupGapMinutes}
             onChange={(e) => setCoilSetupGapMinutes(Number(e.target.value))}
-            onBlur={() => {
-              const clamped = Math.max(0, Math.round(coilSetupGapMinutes) || 0)
-              setCoilSetupGapMinutes(clamped)
-              void persistGlobalSettings({ coilSetupGapMinutes: clamped })
-            }}
+            onBlur={() =>
+              setCoilSetupGapMinutes(Math.max(0, Math.round(coilSetupGapMinutes) || 0))
+            }
           />
         </label>
         <label className="text-sm">
@@ -690,7 +751,6 @@ function PressCalendarSection() {
             className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={concurrentSetupsPerHall}
             onChange={(e) => setConcurrentSetupsPerHall(Number(e.target.value) || 1)}
-            onBlur={() => void persistGlobalSettings()}
           />
         </label>
       </div>
@@ -743,7 +803,6 @@ function PressCalendarSection() {
                   className="mt-1 w-24 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                   value={workingDays}
                   onChange={(e) => setWorkingDays(Number(e.target.value) || 0)}
-                  onBlur={() => void saveTemplate()}
                 />
               </label>
 
@@ -771,7 +830,6 @@ function PressCalendarSection() {
                     className="w-16 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                     value={shiftsPerDay}
                     onChange={(e) => setShiftsPerDay(Number(e.target.value) || 0)}
-                    onBlur={() => void saveTemplate()}
                   />
                 </div>
               </div>
@@ -786,20 +844,23 @@ function PressCalendarSection() {
                   className="mt-1 w-24 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                   value={overtimeShifts}
                   onChange={(e) => setOvertimeShifts(Number(e.target.value) || 0)}
-                  onBlur={() => void saveTemplate()}
                 />
               </label>
 
               <button
                 onClick={() => void saveTemplate()}
-                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90"
+                disabled={!templateDirty}
+                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-40"
               >
                 Save press pattern
               </button>
+              {templateDirty && (
+                <span className="pb-2 text-xs font-medium text-amber-700">● Unsaved</span>
+              )}
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
               Total: <strong className="text-foreground">{templateTotalShifts} shifts</strong>{' '}
-              · <strong className="text-foreground">{templateTotalHours.toFixed(1)} saat</strong>
+              · <strong className="text-foreground">{templateTotalHours.toFixed(1)} h</strong>
               /week ({workingDays} days × {shiftsPerDay} shifts + {overtimeShifts} overtime
               shifts)
             </p>

@@ -87,6 +87,7 @@ function GerceklesenPage() {
             'Storage Location',
             'Order',
           ]}
+          replaces="all actual production rows"
           onRows={async (raw) => {
             const parsed = raw
               .map((row) => ({
@@ -127,7 +128,7 @@ function GerceklesenPage() {
       <div className="mt-6 flex items-center gap-3">
         <input
           className="w-64 rounded-md border border-input bg-background px-3 py-2 text-sm"
-          placeholder="Materyal ara…"
+          placeholder="Search material…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />

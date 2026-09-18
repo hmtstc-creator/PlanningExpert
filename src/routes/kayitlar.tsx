@@ -164,7 +164,11 @@ function KayitlarPage() {
                 </div>
                 <button
                   className="text-xs text-destructive hover:underline"
-                  onClick={() => void remove({ id: log._id })}
+                  onClick={() => {
+                    if (window.confirm('Delete this log entry? This cannot be undone.')) {
+                      void remove({ id: log._id })
+                    }
+                  }}
                 >
                   Delete
                 </button>

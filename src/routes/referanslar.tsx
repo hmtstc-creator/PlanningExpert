@@ -4,6 +4,17 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { ErrorBanner } from '../components/ErrorBanner'
+import { SaveStatus } from '../components/SaveStatus'
+import { UnsavedBar } from '../components/UnsavedBar'
+import {
+  changedProductFields,
+  productDraftOf,
+  sameProductDraft,
+  PRODUCT_FIELDS,
+  type ProductDraft,
+  type ProductField,
+} from '../lib/productDraft'
+import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
 import { ExcelUpload } from '../components/ExcelUpload'
@@ -67,6 +78,22 @@ function ReferanslarPage() {
       ].some((v) => v && String(v).toLowerCase().includes(q)),
     )
   }, [products, search])
+
+  // Satır bazlı taslak: bir hücreyi düzenlemek satırı "Unsaved" yapar ve
+  // kayıt açık bir eylemdir. Alanlar tek tek yazıldığı için (updateField)
+  // kısmi kayıt riski yok, ama kullanıcının kaydettiğini görmesi gerekiyor.
+  const rows = useDraftRows(products, (p) => String(p._id), productDraftOf, sameProductDraft)
+
+  const saveRow = (id: string) => async (draft: ProductDraft): Promise<boolean> => {
+    const product = products.find((p) => String(p._id) === id)
+    if (!product) return false
+    const server = productDraftOf(product)
+    for (const field of changedProductFields(draft, server)) {
+      const ok = await onSaveField(updateField, id, field.name, draft[field.name], field.numeric)
+      if (!ok) return false
+    }
+    return true
+  }
 
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState<string | null>(null)
@@ -291,7 +318,7 @@ function ReferanslarPage() {
               <th className="px-3 py-2 font-medium">Main Machine</th>
               <th className="px-3 py-2 font-medium">Alternatives</th>
               <th className="px-3 py-2 font-medium">Max Shot</th>
-              <th className="px-3 py-2 font-medium" title="Setup sonrası ilk parça onayı">Approval</th>
+              <th className="px-3 py-2 font-medium" title="First-piece approval after setup">Approval</th>
               <th className="px-3 py-2 font-medium" title="Availability × performance; quality assumed 100%">Perf.</th>
               <th className="px-3 py-2" />
             </tr>
@@ -311,60 +338,111 @@ function ReferanslarPage() {
                 </td>
               </tr>
             )}
-            {visibleProducts.map((p) => (
-              <tr key={p._id} className="border-t border-border">
-                <EditableCell product={p} field="code" value={p.code} onSave={updateField} />
-                <EditableCell product={p} field="coProduct" value={p.coProduct} onSave={updateField} />
-                <EditableCell product={p} field="moldCavities" value={p.moldCavities} numeric onSave={updateField} />
-                <EditableCell product={p} field="spm" value={p.spm} numeric onSave={updateField} />
-                <EditableCell product={p} field="rawMaterialCode" value={p.rawMaterialCode} onSave={updateField} />
-                <EditableCell product={p} field="coilWeight" value={p.coilWeight} numeric onSave={updateField} />
-                <EditableCell product={p} field="grossWeight" value={p.grossWeight} numeric onSave={updateField} />
-                <td className="px-3 py-2 text-xs text-muted-foreground">
-                  {piecesPerCoil(p as ProductSpec) > 0 ? (
-                    <span
-                      title={`${shotsPerCoil(p as ProductSpec).toLocaleString('en-GB')} shots — the cavities decide how many strokes this takes`}
+            {visibleProducts.map((p) => {
+              const draft = rows.draftFor(p)
+              const dirty = rows.isDirty(p)
+              const rowId = String(p._id)
+              const busy = rows.savingKey === rowId
+              const saveThisRow = () => {
+                if (dirty && !busy) void rows.commit(rowId, saveRow(rowId))
+              }
+              const cell = (field: ProductField, width: string) => (
+                <CellInput
+                  key={field.name}
+                  value={draft[field.name]}
+                  title={field.name}
+                  className={width}
+                  numeric={field.numeric}
+                  onChange={(next) => rows.edit(rowId, { [field.name]: next } as Partial<ProductDraft>)}
+                  onCommit={saveThisRow}
+                  changed={draft[field.name] !== productDraftOf(p)[field.name]}
+                />
+              )
+              const field = (name: ProductField['name']) =>
+                PRODUCT_FIELDS.find((f) => f.name === name)!
+              return (
+                <tr
+                  key={p._id}
+                  className={`border-t border-border ${dirty ? 'bg-amber-50' : ''}`}
+                >
+                  <td className="px-1 py-1">{cell(field('code'), 'w-28')}</td>
+                  <td className="px-1 py-1">{cell(field('coProduct'), 'w-28')}</td>
+                  <td className="px-1 py-1">{cell(field('moldCavities'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('spm'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('rawMaterialCode'), 'w-28')}</td>
+                  <td className="px-1 py-1">{cell(field('coilWeight'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('grossWeight'), 'w-20')}</td>
+                  <td className="px-3 py-2 text-muted-foreground" title="Coil weight ÷ gross weight per piece">
+                    {(() => {
+                      const spec = { ...p } as unknown as ProductSpec
+                      const pieces = piecesPerCoil(spec)
+                      const shots = shotsPerCoil(spec)
+                      if (!pieces) return '—'
+                      return (
+                        <span>
+                          {Math.round(pieces).toLocaleString('en-GB')}
+                          <span className="block text-[10px]">
+                            {shots ? `${Math.round(shots).toLocaleString('en-GB')} shots` : ''}
+                          </span>
+                        </span>
+                      )
+                    })()}
+                  </td>
+                  <td className="px-1 py-1">{cell(field('setupMinutes'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('coilSetupMinutes'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('mainMachine'), 'w-28')}</td>
+                  <td className="px-1 py-1">
+                    <div className="flex gap-1">
+                      {(['altMachine1', 'altMachine2', 'altMachine3', 'altMachine4'] as const).map(
+                        (name) => cell(field(name), 'w-20'),
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-1 py-1">{cell(field('maxShots'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('qualityApprovalMinutes'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('performanceFactor'), 'w-20')}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <SaveStatus
+                      dirty={dirty}
+                      saving={busy}
+                      justSaved={!!rows.justSaved[rowId]}
+                    />
+                    <button
+                      onClick={saveThisRow}
+                      disabled={!dirty || busy}
+                      className="ml-2 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
                     >
-                      {piecesPerCoil(p as ProductSpec).toLocaleString('en-GB')}
-                    </span>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <EditableCell product={p} field="setupMinutes" value={p.setupMinutes} numeric onSave={updateField} />
-                <EditableCell product={p} field="coilSetupMinutes" value={p.coilSetupMinutes} numeric onSave={updateField} />
-                <EditableCell product={p} field="mainMachine" value={p.mainMachine} onSave={updateField} />
-                <td className="px-1 py-1">
-                  <div className="flex gap-1">
-                    {(['altMachine1', 'altMachine2', 'altMachine3', 'altMachine4'] as const).map(
-                      (field) => (
-                        <CellInput
-                          key={field}
-                          value={p[field]}
-                          title={field}
-                          className="w-20"
-                          onSave={(next) => onSaveField(updateField, p._id, field, next, false)}
-                        />
-                      ),
-                    )}
-                  </div>
-                </td>
-                <EditableCell product={p} field="maxShots" value={p.maxShots} numeric onSave={updateField} />
-                <EditableCell product={p} field="qualityApprovalMinutes" value={p.qualityApprovalMinutes} numeric onSave={updateField} />
-                <EditableCell product={p} field="performanceFactor" value={p.performanceFactor} numeric onSave={updateField} />
-                <td className="px-3 py-2 text-right">
-                  <button
-                    className="text-xs text-destructive hover:underline"
-                    onClick={() => void removeProduct({ id: p._id })}
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
+                      Save
+                    </button>
+                    <button
+                      className="ml-2 text-xs text-destructive hover:underline"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Delete material ${p.code}? This cannot be undone.`,
+                          )
+                        ) {
+                          void removeProduct({ id: p._id })
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
+
+      <UnsavedBar
+        count={rows.dirtyKeys.length}
+        saving={rows.savingKey !== null}
+        noun="material"
+        onSaveAll={() => void rows.commitAll((id, draft) => saveRow(id)(draft))}
+        onDiscard={rows.discardAll}
+      />
     </div>
   )
 }
@@ -418,91 +496,43 @@ async function onSaveField(
   return save({ id, field, value: text })
 }
 
-/** A table cell that turns into an input on click and saves on blur. */
+/**
+ * Tablo hücresi. Değer satırın taslağında durur: yazmak satırı "Unsaved"
+ * yapar, kayıt Save (ya da Enter) ile olur. Eskiden hücre alandan çıkınca
+ * sessizce kaydediliyordu ve kullanıcı kaydettiğini göremiyordu.
+ */
 function CellInput({
   value,
   title,
   className = 'w-24',
   numeric = false,
-  onSave,
+  changed,
+  onChange,
+  onCommit,
 }: {
-  value: string | number | undefined
+  value: string
   title?: string
   className?: string
   numeric?: boolean
-  onSave: (next: string) => Promise<boolean>
+  /** Sunucudaki değerden farklı mı? */
+  changed: boolean
+  onChange: (next: string) => void
+  onCommit: () => void
 }) {
-  const initial = value === undefined || value === null ? '' : String(value)
-  const [draft, setDraft] = useState(initial)
-  const [dirty, setDirty] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  // Keep in step with the server unless the user is mid-edit.
-  useEffect(() => {
-    if (!dirty) setDraft(initial)
-  }, [initial, dirty])
-
   return (
     <input
       title={title}
-      value={draft}
+      value={value}
       inputMode={numeric ? 'decimal' : undefined}
-      onChange={(e) => {
-        setDraft(e.target.value)
-        setDirty(true)
-        setSaved(false)
-      }}
-      onBlur={async () => {
-        if (!dirty) return
-        const ok = await onSave(draft)
-        setDirty(false)
-        if (ok) {
-          setSaved(true)
-          setTimeout(() => setSaved(false), 1200)
-        } else {
-          setDraft(initial)
-        }
-      }}
+      onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-        if (e.key === 'Escape') {
-          setDraft(initial)
-          setDirty(false)
-        }
+        if (e.key === 'Enter') onCommit()
       }}
       className={`${className} rounded border bg-background px-1.5 py-1 text-sm transition-colors ${
-        saved
-          ? 'border-emerald-400 bg-emerald-50'
-          : dirty
-            ? 'border-amber-400'
-            : 'border-transparent hover:border-input focus:border-input'
+        changed
+          ? 'border-amber-400'
+          : 'border-transparent hover:border-input focus:border-input'
       }`}
     />
-  )
-}
-
-function EditableCell({
-  product,
-  field,
-  value,
-  numeric = false,
-  onSave,
-}: {
-  product: { _id: string }
-  field: string
-  value: string | number | undefined
-  numeric?: boolean
-  onSave: (args: unknown) => Promise<boolean>
-}) {
-  return (
-    <td className="px-1 py-1">
-      <CellInput
-        value={value}
-        title={field}
-        numeric={numeric}
-        className={numeric ? 'w-20' : 'w-28'}
-        onSave={(next) => onSaveField(onSave, product._id, field, next, numeric)}
-      />
-    </td>
   )
 }

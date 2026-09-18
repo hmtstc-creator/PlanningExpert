@@ -90,6 +90,14 @@ export function CapacityGrid(props: CapacityGridProps) {
 
   const editingCell = editing ? byKey.get(`${editing.press}|${editing.weekStart}`) : null
 
+  // Kutudaki değer o haftanın mevcut deseninden farklıysa kaydedilmemiş
+  // demektir; kullanıcı kaydettiğini tahmin etmek zorunda kalmamalı.
+  const draftDirty =
+    !!editingCell &&
+    (editingCell.pattern.workingDays !== draft.workingDays ||
+      editingCell.pattern.shiftsPerDay !== draft.shiftsPerDay ||
+      editingCell.pattern.overtimeShifts !== draft.overtimeShifts)
+
   function openCell(cell: GridCell) {
     setEditing({ press: cell.press, weekStart: cell.weekStart })
     setDraft(cell.pattern)
@@ -326,9 +334,20 @@ export function CapacityGrid(props: CapacityGridProps) {
           >
             {saving ? 'Saving…' : 'Save this week'}
           </button>
+          {draftDirty && (
+            <span className="pb-2 text-xs font-medium text-amber-700">● Unsaved</span>
+          )}
           {editingCell.overridden && (
             <button
-              onClick={() => void clear()}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Reset ${editingCell.press} week of ${editingCell.weekStart} back to the press template?`,
+                  )
+                ) {
+                  void clear()
+                }
+              }}
               disabled={saving}
               className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground hover:bg-muted"
             >
@@ -336,7 +355,15 @@ export function CapacityGrid(props: CapacityGridProps) {
             </button>
           )}
           <button
-            onClick={() => setEditing(null)}
+            onClick={() => {
+              if (
+                draftDirty &&
+                !window.confirm('Close without saving? Your changes to this week are lost.')
+              ) {
+                return
+              }
+              setEditing(null)
+            }}
             className="rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-muted"
           >
             Close

@@ -4,9 +4,15 @@ import { useState } from 'react'
 interface ExcelUploadProps {
   expectedColumns: string[]
   onRows: (rows: Record<string, unknown>[]) => Promise<{ message: string }>
+  /**
+   * Bu yükleme mevcut kayıtların yerine geçiyorsa, neyin silineceğinin adı
+   * (ör. "all stock rows"). Verilirse dosya seçildikten sonra onay sorulur —
+   * yanlış dosya tek tıkla bütün veriyi siliyordu.
+   */
+  replaces?: string
 }
 
-export function ExcelUpload({ expectedColumns, onRows }: ExcelUploadProps) {
+export function ExcelUpload({ expectedColumns, onRows, replaces }: ExcelUploadProps) {
   const [status, setStatus] = useState<
     { kind: 'idle' } | { kind: 'loading' } | { kind: 'success'; message: string } | { kind: 'error'; message: string }
   >({ kind: 'idle' })
@@ -15,6 +21,15 @@ export function ExcelUpload({ expectedColumns, onRows }: ExcelUploadProps) {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+
+    if (
+      replaces &&
+      !window.confirm(
+        `Upload "${file.name}"? This replaces ${replaces} with the contents of this file.`,
+      )
+    ) {
+      return
+    }
 
     setStatus({ kind: 'loading' })
     try {
@@ -45,6 +60,11 @@ export function ExcelUpload({ expectedColumns, onRows }: ExcelUploadProps) {
         The first row must be the header. Expected columns:{' '}
         <span className="font-mono">{expectedColumns.join(', ')}</span>
       </p>
+      {replaces && (
+        <p className="mt-1 text-xs font-medium text-amber-700">
+          This upload replaces {replaces}.
+        </p>
+      )}
       <input
         type="file"
         accept=".xlsx,.xls,.csv"

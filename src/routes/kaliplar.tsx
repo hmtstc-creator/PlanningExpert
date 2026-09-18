@@ -228,7 +228,15 @@ function KaliplarPage() {
                     </span>
                   </span>
                   <button
-                    onClick={() => void removeMaintenance({ id: m._id })}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Delete the maintenance record for ${m.material} on ${m.date}?`,
+                        )
+                      ) {
+                        void removeMaintenance({ id: m._id })
+                      }
+                    }}
                     className="text-xs text-destructive hover:underline"
                   >
                     Delete
