@@ -6,7 +6,7 @@ import {
   type GridCell,
   type WeekPattern,
 } from '../lib/capacityGrid'
-import { addDays, isoDate } from '../lib/dates'
+import { addDays, isoDate, isoWeek, isoWeekYear } from '../lib/dates'
 
 /**
  * Press × week capacity overview.
@@ -152,6 +152,9 @@ export function CapacityGrid(props: CapacityGridProps) {
             Holiday in week
           </span>
           <span>Click a cell to edit that week</span>
+          <span className="italic">
+            Cells show configured capacity; the plan also deducts hours already gone by
+          </span>
         </div>
       </div>
 
@@ -164,16 +167,23 @@ export function CapacityGrid(props: CapacityGridProps) {
               </th>
               {props.weekStarts.map((w) => {
                 const iso = isoDate(w)
+                const week = isoWeek(w)
                 return (
                   <th
                     key={iso}
-                    className={`min-w-[62px] px-1 py-2 text-center font-medium ${
+                    title={`ISO week ${week} of ${isoWeekYear(w)}`}
+                    className={`min-w-[64px] px-1 py-2 text-center font-medium ${
                       iso === thisWeek ? 'text-foreground' : 'text-muted-foreground'
                     }`}
                   >
-                    {iso === thisWeek && (
-                      <span className="mr-0.5 text-[9px] uppercase text-primary">now</span>
-                    )}
+                    <span className="block text-[11px] font-semibold">
+                      W{String(week).padStart(2, '0')}
+                      {iso === thisWeek && (
+                        <span className="ml-1 rounded bg-primary px-1 text-[8px] uppercase text-primary-foreground">
+                          now
+                        </span>
+                      )}
+                    </span>
                     <span className="block text-[10px] font-normal">{weekLabel(iso)}</span>
                   </th>
                 )
@@ -242,7 +252,9 @@ export function CapacityGrid(props: CapacityGridProps) {
         <div className="flex flex-wrap items-end gap-3 border-t border-border bg-muted/30 px-4 py-3">
           <div className="text-sm">
             <p className="font-medium text-foreground">
-              {editingCell.press} · {weekLabel(editingCell.weekStart)}
+              {editingCell.press} · W
+            {String(isoWeek(new Date(`${editingCell.weekStart}T00:00:00`))).padStart(2, '0')} ·{' '}
+            {weekLabel(editingCell.weekStart)}
             </p>
             <p className="text-xs text-muted-foreground">
               {editingCell.overridden

@@ -163,3 +163,39 @@ export function formatClockMinute(minute: number): string {
   const m = Math.round(wrapped % 60)
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
+
+/**
+ * Productive minutes already elapsed today, measured in the scheduler's net
+ * minutes (breaks excluded). The inverse of netMinuteToClock.
+ */
+export function elapsedNetMinutes(clockMinute: number, layout: ShiftLayout): number {
+  const perShift = netShiftMinutes(layout)
+  const sinceStart = clockMinute - layout.shiftStartMinute
+  if (sinceStart <= 0) return 0
+
+  const shiftIndex = Math.floor(sinceStart / layout.shiftMinutes)
+  const withinShift = sinceStart - shiftIndex * layout.shiftMinutes
+  // Time spent inside a break is not productive time.
+  return shiftIndex * perShift + Math.min(withinShift, perShift)
+}
+
+/**
+ * Capacity a press still has today.
+ *
+ * Planning always starts from Monday of the current week, so without this the
+ * engine would fill days that have already passed and the hours of today that
+ * are already gone — capacity that does not exist. Past days get nothing,
+ * today gets only what is left, future days are untouched.
+ */
+export function remainingCapacityMinutes(
+  bucketDate: string,
+  todayIso: string,
+  nowClockMinute: number,
+  fullCapacityMinutes: number,
+  layout: ShiftLayout,
+): number {
+  if (bucketDate < todayIso) return 0
+  if (bucketDate > todayIso) return fullCapacityMinutes
+  const elapsed = elapsedNetMinutes(nowClockMinute, layout)
+  return Math.max(0, fullCapacityMinutes - elapsed)
+}

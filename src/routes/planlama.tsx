@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
-import { addDays, isoDate, mondayOf } from '../lib/dates'
+import { addDays, isoDate, isoWeekLabel, mondayOf } from '../lib/dates'
 import {
   buildDemandSchedule,
   buildRawMaterialPlan,
@@ -14,6 +14,7 @@ import {
   type ProductSpec,
 } from '../lib/planning'
 import { PressGantt, type GanttJob, type GanttPress } from '../components/PressGantt'
+import { remainingCapacityMinutes } from '../lib/gantt'
 import { diffPlans } from '../lib/planDiff'
 import { schedule, type PlanOverride, type ScheduledJob } from '../lib/scheduler'
 
@@ -160,6 +161,16 @@ function PlanlamaPage() {
 
   const horizonMonday = useMemo(() => mondayOf(new Date()), [])
 
+  // Capacity shrinks as the day passes, so the clock is part of the input.
+  // Re-read once a minute rather than on every render.
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const todayIso = isoDate(now)
+  const nowClockMinute = now.getHours() * 60 + now.getMinutes()
+
   const demand = useMemo(() => {
     const rows: DemandInput[] = weeklyDemand.map((d) => ({
       material: d.material,
@@ -203,12 +214,26 @@ function PlanlamaPage() {
           ),
         )
       }
-      // Ölçülen gerçekleşme oranıyla kapasiteyi düzelt — plan gerçekçi olsun.
+      // Two corrections, in order: the measured attainment rate, then the
+      // hours that have already gone by. Planning starts from Monday of the
+      // current week, so without the second one the engine fills days that
+      // have passed and the part of today that is already over.
       map.set(
         press.name,
-        capacityFactor === 1
-          ? all
-          : all.map((b) => ({ ...b, minutes: Math.floor(b.minutes * capacityFactor) })),
+        all.map((b) => {
+          const adjusted =
+            capacityFactor === 1 ? b.minutes : Math.floor(b.minutes * capacityFactor)
+          return {
+            ...b,
+            minutes: remainingCapacityMinutes(
+              b.date,
+              todayIso,
+              nowClockMinute,
+              adjusted,
+              { shiftStartMinute, shiftMinutes, breakMinutesPerShift },
+            ),
+          }
+        }),
       )
     }
     return map
@@ -224,6 +249,9 @@ function PlanlamaPage() {
     capacityFactor,
     horizonWeeks,
     breakMinutesPerShift,
+    shiftStartMinute,
+    todayIso,
+    nowClockMinute,
   ])
 
   const overrides = useMemo<PlanOverride[]>(
@@ -300,6 +328,58 @@ function PlanlamaPage() {
   }, [result])
 
   const lateCount = result.jobs.filter((j) => j.late).length
+
+  // How much of this week is actually still available. The engine already
+  // works with this figure; showing it stops the plan looking short when the
+  // real reason is that half the week has gone.
+  const thisWeekCapacity = useMemo(() => {
+    const weekEnd = isoDate(addDays(horizonMonday, 6))
+    const layout = { shiftStartMinute, shiftMinutes, breakMinutesPerShift }
+    let full = 0
+    let remaining = 0
+    const templateByPress = new Map(templates.map((t) => [t.press, t]))
+    for (const press of presses) {
+      const pattern = templateByPress.get(press.name) ?? {
+        workingDays: workingDaysPerWeek,
+        shiftsPerDay: 1,
+        overtimeShifts: 0,
+      }
+      for (const bucket of buildWeekBuckets(
+        horizonMonday,
+        pattern,
+        { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift },
+        holidays,
+        workingDayKeys,
+      )) {
+        if (bucket.date > weekEnd) continue
+        const adjusted =
+          capacityFactor === 1 ? bucket.minutes : Math.floor(bucket.minutes * capacityFactor)
+        full += adjusted
+        remaining += remainingCapacityMinutes(
+          bucket.date,
+          todayIso,
+          nowClockMinute,
+          adjusted,
+          layout,
+        )
+      }
+    }
+    return { full, remaining, elapsed: full - remaining }
+  }, [
+    presses,
+    templates,
+    horizonMonday,
+    shiftMinutes,
+    overtimeShiftMinutes,
+    breakMinutesPerShift,
+    shiftStartMinute,
+    holidays,
+    workingDayKeys,
+    workingDaysPerWeek,
+    capacityFactor,
+    todayIso,
+    nowClockMinute,
+  ])
 
   const warnings = useMemo(() => {
     const list: string[] = []
@@ -379,6 +459,19 @@ function PlanlamaPage() {
         calculations are all applied. You only review and approve. Planning
         horizon is {horizonWeeks} weeks (change it on the Work Calendar page).
       </p>
+
+      {thisWeekCapacity.full > 0 && (
+        <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+          This week ({isoWeekLabel(horizonMonday)}):{' '}
+          <strong className="text-foreground">
+            {Math.round(thisWeekCapacity.remaining / 60).toLocaleString('en-GB')} h
+          </strong>{' '}
+          still available of {Math.round(thisWeekCapacity.full / 60).toLocaleString('en-GB')} h —{' '}
+          {Math.round(thisWeekCapacity.elapsed / 60).toLocaleString('en-GB')} h have already
+          gone by. Days that have passed and the hours already elapsed today are excluded
+          from the plan.
+        </p>
+      )}
 
       {capacityFactor !== 1 && (
         <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
@@ -620,7 +713,9 @@ function PlanlamaPage() {
                 day: '2-digit',
                 month: 'long',
               })}{' '}
-              <span className="font-normal text-muted-foreground">({jobs.length} jobs)</span>
+              <span className="font-normal text-muted-foreground">
+                · {isoWeekLabel(new Date(`${date}T00:00:00`))} · {jobs.length} jobs
+              </span>
             </h2>
 
             <div className="mt-2">

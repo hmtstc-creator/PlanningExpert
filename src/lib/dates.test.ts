@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { addDays, isoDate, mondayOf } from './dates'
+import { addDays, isoDate, isoWeek, isoWeekLabel, isoWeekYear, mondayOf } from './dates'
 
 describe('isoDate', () => {
   it('uses the local calendar date, not UTC', () => {
@@ -43,5 +43,35 @@ describe('addDays', () => {
     const d = new Date(2026, 8, 14)
     addDays(d, 5)
     expect(isoDate(d)).toBe('2026-09-14')
+  })
+})
+
+describe('isoWeek', () => {
+  it('numbers a mid-year week', () => {
+    // Monday 14 September 2026 is in ISO week 38.
+    expect(isoWeek(new Date(2026, 8, 14))).toBe(38)
+    expect(isoWeek(new Date(2026, 8, 20))).toBe(38) // Sunday, same week
+    expect(isoWeek(new Date(2026, 8, 21))).toBe(39)
+  })
+
+  it('puts 1 January in the previous year week when it falls late in the week', () => {
+    // 1 January 2027 is a Friday, so it belongs to week 53 of 2026.
+    expect(isoWeek(new Date(2027, 0, 1))).toBe(53)
+    expect(isoWeekYear(new Date(2027, 0, 1))).toBe(2026)
+  })
+
+  it('puts late December in week 1 when the week has its Thursday in January', () => {
+    // 31 December 2025 is a Wednesday; its Thursday is 1 January 2026.
+    expect(isoWeek(new Date(2025, 11, 31))).toBe(1)
+    expect(isoWeekYear(new Date(2025, 11, 31))).toBe(2026)
+  })
+
+  it('starts the year at week 1 when 1 January is a Thursday', () => {
+    expect(isoWeek(new Date(2026, 0, 1))).toBe(1)
+  })
+
+  it('formats a padded label', () => {
+    expect(isoWeekLabel(new Date(2026, 8, 14))).toBe('2026-W38')
+    expect(isoWeekLabel(new Date(2026, 0, 5))).toBe('2026-W02')
   })
 })

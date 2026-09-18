@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   breakBlocks,
+  elapsedNetMinutes,
+  remainingCapacityMinutes,
   formatClockMinute,
   netMinuteToClock,
   netShiftMinutes,
@@ -162,5 +164,55 @@ describe('formatClockMinute', () => {
 
   it('wraps past midnight', () => {
     expect(formatClockMinute(1500)).toBe('01:00')
+  })
+})
+
+describe('elapsedNetMinutes', () => {
+  it('is zero before the shift starts', () => {
+    expect(elapsedNetMinutes(400, layout)).toBe(0) // 06:40, before 08:00
+    expect(elapsedNetMinutes(480, layout)).toBe(0) // exactly 08:00
+  })
+
+  it('counts productive minutes inside the first shift', () => {
+    expect(elapsedNetMinutes(600, layout)).toBe(120) // 10:00
+  })
+
+  it('does not count time spent inside the break', () => {
+    // 15:30 is the end of productive time in shift 1 (450 net minutes).
+    expect(elapsedNetMinutes(930, layout)).toBe(450)
+    // 15:45 is inside the break, so still 450.
+    expect(elapsedNetMinutes(945, layout)).toBe(450)
+    // 16:00 starts shift 2 and productive time resumes.
+    expect(elapsedNetMinutes(960, layout)).toBe(450)
+    expect(elapsedNetMinutes(1020, layout)).toBe(510) // 17:00
+  })
+
+  it('is a straight offset when there is no break', () => {
+    expect(elapsedNetMinutes(960, noBreak)).toBe(480)
+  })
+})
+
+describe('remainingCapacityMinutes', () => {
+  const today = '2026-09-18'
+
+  it('gives a past day no capacity at all', () => {
+    expect(remainingCapacityMinutes('2026-09-17', today, 600, 900, layout)).toBe(0)
+  })
+
+  it('gives a future day its full capacity', () => {
+    expect(remainingCapacityMinutes('2026-09-21', today, 600, 900, layout)).toBe(900)
+  })
+
+  it('gives today only the hours that are left', () => {
+    // 10:00: two productive hours gone out of a 900-minute day.
+    expect(remainingCapacityMinutes(today, today, 600, 900, layout)).toBe(780)
+  })
+
+  it('gives today full capacity before the shift starts', () => {
+    expect(remainingCapacityMinutes(today, today, 300, 900, layout)).toBe(900)
+  })
+
+  it('never returns negative capacity once the day is over', () => {
+    expect(remainingCapacityMinutes(today, today, 1439, 450, layout)).toBe(0)
   })
 })

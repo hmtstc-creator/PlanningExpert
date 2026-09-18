@@ -27,3 +27,36 @@ export function mondayOf(date: Date): Date {
   d.setHours(0, 0, 0, 0)
   return d
 }
+
+/**
+ * ISO 8601 week number.
+ *
+ * Week 1 is the week containing the first Thursday of the year, so the week
+ * number is derived from that week's Thursday rather than from 1 January.
+ * A date in early January can therefore belong to week 52 or 53 of the
+ * previous year, and late December can belong to week 1 of the next.
+ */
+export function isoWeek(date: Date): number {
+  const thursday = isoThursdayOf(date)
+  const firstThursday = isoThursdayOf(new Date(thursday.getFullYear(), 0, 4))
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000
+  return 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / msPerWeek)
+}
+
+/** The year the ISO week belongs to, which can differ from the calendar year. */
+export function isoWeekYear(date: Date): number {
+  return isoThursdayOf(date).getFullYear()
+}
+
+/** "2026-W38" */
+export function isoWeekLabel(date: Date): string {
+  return `${isoWeekYear(date)}-W${String(isoWeek(date)).padStart(2, '0')}`
+}
+
+/** Thursday of the ISO week containing `date`, at local midnight. */
+function isoThursdayOf(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const mondayBased = (d.getDay() + 6) % 7 // Monday = 0
+  d.setDate(d.getDate() - mondayBased + 3)
+  return d
+}
