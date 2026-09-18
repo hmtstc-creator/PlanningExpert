@@ -14,6 +14,8 @@ function HomePage() {
   const { results: stockRows } = usePaginatedQuery(api.stock.list, {}, { initialNumItems: 500 })
   const { results: locations } = usePaginatedQuery(api.storageLocations.list, {}, { initialNumItems: 100 })
   const calendar = useQuery(api.workCalendar.get)
+  const presses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string }[]
+  const snapshot = useQuery(api.planSnapshots.latest)
 
   const locCategory = useMemo(
     () => new Map(locations.map((l) => [l.code, l.category])),
@@ -32,6 +34,22 @@ function HomePage() {
   }, [stockRows, locCategory])
 
   const productCodes = useMemo(() => new Set(products.map((p) => p.code)), [products])
+
+  // Toplam bakiye (gecikmiş talep) — planın ilk önceliği budur.
+  const backlogQty = useMemo(
+    () => weekly.reduce((sum, w) => sum + Math.abs(w.overdue ?? 0), 0),
+    [weekly],
+  )
+
+  // Ufuktaki toplam talep (ZPP kovalarının toplamı).
+  const horizonDemandQty = useMemo(
+    () =>
+      weekly.reduce(
+        (sum, w) => sum + w.periods.reduce((s, p) => s + Math.abs(p.qty), 0),
+        0,
+      ),
+    [weekly],
+  )
 
   const warnings = useMemo(() => {
     const list: { level: 'high' | 'medium'; text: string; link?: string }[] = []
@@ -74,6 +92,23 @@ function HomePage() {
       })
     }
 
+    if (presses.length === 0) {
+      list.push({
+        level: 'high',
+        text: 'Hiç pres tanımlı değil — plan üretilemez.',
+        link: '/makineler',
+      })
+    }
+
+    const missingMaxShots = products.filter((p) => !p.maxShots).length
+    if (missingMaxShots > 0) {
+      list.push({
+        level: 'medium',
+        text: `${missingMaxShots} referansta kalıp max shot limiti tanımsız — kalıp ömrü izlenemiyor.`,
+        link: '/kaliplar',
+      })
+    }
+
     const overdueCount = weekly.filter((w) => (w.overdue ?? 0) < 0).length
     if (overdueCount > 0) {
       list.push({
@@ -84,7 +119,7 @@ function HomePage() {
     }
 
     return list
-  }, [products, weekly, stockRows, locCategory, calendar, productCodes])
+  }, [products, weekly, stockRows, locCategory, calendar, productCodes, presses])
 
   const dataReady = products.length > 0 && weekly.length > 0 && stockRows.length > 0
 
@@ -97,19 +132,46 @@ function HomePage() {
 
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Tanımlı referans" value={products.length} hint="kalıp/makine kaydı olan" to="/referanslar" />
-        <StatCard label="Talep kaydı" value={weekly.length} hint="ZPP materyali" to="/siparisler" />
+        <StatCard label="Tanımlı pres" value={presses.length} hint={`${new Set(presses.map((p) => p.hall)).size} hol`} to="/makineler" />
         <StatCard
-          label="Kullanılabilir stok"
-          value={availableStock.toLocaleString('tr-TR')}
-          hint="planlamaya dahil depolar"
-          to="/stoklar"
+          label="Bakiye"
+          value={Math.round(backlogQty).toLocaleString('tr-TR')}
+          hint="gecikmiş talep, planın ilk önceliği"
+          to="/siparisler"
+          danger={backlogQty > 0}
         />
         <StatCard
           label="Uyarı"
           value={warnings.length}
           hint={warnings.some((w) => w.level === 'high') ? 'kritik var' : 'kontrol et'}
-          to="/depolar"
+          to="/planlama"
           danger={warnings.some((w) => w.level === 'high')}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Talep kaydı" value={weekly.length} hint="ZPP materyali" to="/siparisler" />
+        <StatCard
+          label="Ufuktaki talep"
+          value={Math.round(horizonDemandQty).toLocaleString('tr-TR')}
+          hint="ZPP kovalarının toplamı"
+          to="/siparisler"
+        />
+        <StatCard
+          label="Kullanılabilir stok"
+          value={Math.round(availableStock).toLocaleString('tr-TR')}
+          hint="planlamaya dahil depolar"
+          to="/stoklar"
+        />
+        <StatCard
+          label="Onaylı plan"
+          value={snapshot ? `${snapshot.jobCount} iş` : 'yok'}
+          hint={
+            snapshot
+              ? new Date(snapshot.createdAt).toLocaleDateString('tr-TR')
+              : 'henüz onaylanmadı'
+          }
+          to="/planlama"
         />
       </div>
 
@@ -138,8 +200,10 @@ function HomePage() {
         <ol className="mt-3 space-y-2">
           <StepItem n={1} done={weekly.length > 0} title="SAP verilerini yükle" desc="ZPP ve ZPP_DAILY → Siparişler, MB52 → Stoklar" to="/siparisler" />
           <StepItem n={2} done={locations.length > 0} title="Depo tanımlarını kontrol et" desc="Hangi stok gerçekten elimizde?" to="/depolar" />
-          <StepItem n={3} done={!!calendar} title="Çalışma takvimini doğrula" desc="Vardiya, çalışma günleri, tatiller" to="/takvim" />
-          <StepItem n={4} done={false} title="Planı oluştur" desc="ZPP'den otomatik doldur → makine ataması ve sıralama" to="/planlama" />
+          <StepItem n={3} done={presses.length > 0} title="Presleri tanımla" desc="Hangi pres hangi holde — vinç kısıtı buradan gelir" to="/makineler" />
+          <StepItem n={4} done={!!calendar} title="Çalışma takvimini doğrula" desc="Vardiya, çalışma günleri, mola, tatiller" to="/takvim" />
+          <StepItem n={5} done={!!snapshot} title="Planı kontrol et ve onayla" desc="Plan otomatik oluşur; sen kontrol edip onaylarsın" to="/planlama" />
+          <StepItem n={6} done={false} title="Gerçekleşeni yükle ve karşılaştır" desc="MB51 → performans faktörü ve kalıp ömrü" to="/performans" />
         </ol>
       </section>
 

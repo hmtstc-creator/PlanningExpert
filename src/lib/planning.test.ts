@@ -333,6 +333,49 @@ describe('buildRawMaterialPlan', () => {
   })
 })
 
+describe('vardiya molası', () => {
+  const monday = new Date('2026-09-14T00:00:00Z')
+
+  it('her vardiyadan mola süresini düşer', () => {
+    const buckets = buildWeekBuckets(
+      monday,
+      { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 0 },
+      { shiftMinutes: 480, overtimeShiftMinutes: 480, breakMinutesPerShift: 30 },
+    )
+    // 3 vardiya × (480 − 30) = 1350
+    expect(buckets[0].minutes).toBe(1350)
+  })
+
+  it('mesai vardiyalarından da düşer', () => {
+    const buckets = buildWeekBuckets(
+      monday,
+      { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 },
+      { shiftMinutes: 480, overtimeShiftMinutes: 480, breakMinutesPerShift: 30 },
+    )
+    expect(buckets[5].minutes).toBe(900) // 2 × 450
+  })
+
+  it('mola vardiyadan uzunsa kapasite negatife düşmez', () => {
+    const buckets = buildWeekBuckets(
+      monday,
+      { workingDays: 5, shiftsPerDay: 1, overtimeShifts: 0 },
+      { shiftMinutes: 60, overtimeShiftMinutes: 60, breakMinutesPerShift: 120 },
+    )
+    expect(buckets[0].minutes).toBe(0)
+  })
+
+  it('haftalık toplam da moladan arındırılmış olur', () => {
+    const pattern = { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 }
+    expect(
+      weekTotalMinutes(pattern, {
+        shiftMinutes: 480,
+        overtimeShiftMinutes: 480,
+        breakMinutesPerShift: 30,
+      }),
+    ).toBe(17 * 450)
+  })
+})
+
 describe('haftalık toplamlar', () => {
   it('5 gün × 3 vardiya + 2 mesai = 17 vardiya', () => {
     const pattern = { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 }

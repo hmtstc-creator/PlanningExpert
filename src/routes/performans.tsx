@@ -72,6 +72,7 @@ function PerformansPage() {
 
   const shiftMinutes = globalSettings?.shiftMinutes ?? 480
   const overtimeShiftMinutes = globalSettings?.overtimeShiftMinutes ?? 480
+  const breakMinutesPerShift = globalSettings?.breakMinutesPerShift ?? 0
 
   const productByCode = useMemo(() => {
     const map = new Map<string, ProductSpec>()
@@ -142,7 +143,7 @@ function PerformansPage() {
           ...buildWeekBuckets(
             week,
             pattern,
-            { shiftMinutes, overtimeShiftMinutes },
+            { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift },
             holidays,
             workingDayKeys,
           ),
@@ -154,7 +155,16 @@ function PerformansPage() {
       }
     }
     return total
-  }, [presses, templates, workCalendar, from, to, shiftMinutes, overtimeShiftMinutes])
+  }, [
+    presses,
+    templates,
+    workCalendar,
+    from,
+    to,
+    shiftMinutes,
+    overtimeShiftMinutes,
+    breakMinutesPerShift,
+  ])
 
   const utilisation = capacityUtilisation(theoretical, availableMinutes)
 

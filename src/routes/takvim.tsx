@@ -280,6 +280,7 @@ function PressCalendarSection() {
   const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
   const [shiftStartMinute, setShiftStartMinute] = useState(480)
   const [planningHorizonWeeks, setPlanningHorizonWeeks] = useState(4)
+  const [breakMinutesPerShift, setBreakMinutesPerShift] = useState(0)
   useEffect(() => {
     if (globalSettings) {
       setShiftMinutes(globalSettings.shiftMinutes)
@@ -289,6 +290,7 @@ function PressCalendarSection() {
       setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? 1)
       setShiftStartMinute(globalSettings.shiftStartMinute ?? 480)
       setPlanningHorizonWeeks(globalSettings.planningHorizonWeeks ?? 4)
+      setBreakMinutesPerShift(globalSettings.breakMinutesPerShift ?? 0)
     }
   }, [globalSettings])
 
@@ -301,6 +303,7 @@ function PressCalendarSection() {
       concurrentSetupsPerHall: number
       shiftStartMinute: number
       planningHorizonWeeks: number
+      breakMinutesPerShift: number
     }>,
   ) {
     await saveGlobalSettingsMutation({
@@ -311,6 +314,7 @@ function PressCalendarSection() {
       concurrentSetupsPerHall: next?.concurrentSetupsPerHall ?? concurrentSetupsPerHall,
       shiftStartMinute: next?.shiftStartMinute ?? shiftStartMinute,
       planningHorizonWeeks: next?.planningHorizonWeeks ?? planningHorizonWeeks,
+      breakMinutesPerShift: next?.breakMinutesPerShift ?? breakMinutesPerShift,
       capacityFactor: globalSettings?.capacityFactor,
     })
   }
@@ -490,6 +494,19 @@ function PressCalendarSection() {
             className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={overtimeShiftMinutes}
             onChange={(e) => setOvertimeShiftMinutes(Number(e.target.value) || 0)}
+            onBlur={() => void persistGlobalSettings()}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
+            Vardiya başına mola/duruş (dk)
+          </span>
+          <input
+            type="number"
+            min={0}
+            className="mt-1 w-28 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={breakMinutesPerShift}
+            onChange={(e) => setBreakMinutesPerShift(Math.max(0, Number(e.target.value) || 0))}
             onBlur={() => void persistGlobalSettings()}
           />
         </label>

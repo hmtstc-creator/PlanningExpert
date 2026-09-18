@@ -109,6 +109,7 @@ function PlanlamaPage() {
   const setupGapMinutes = globalSettings?.setupGapMinutes ?? 60
   const concurrentSetupsPerHall = globalSettings?.concurrentSetupsPerHall ?? 1
   const shiftStartMinute = globalSettings?.shiftStartMinute ?? 480
+  const breakMinutesPerShift = globalSettings?.breakMinutesPerShift ?? 0
   // Kapasite düzeltme katsayısı: ölçülen gerçekleşme oranı (Performans
   // sayfasından yazılır). Tanımsızsa kapasite olduğu gibi kullanılır.
   const capacityFactor = globalSettings?.capacityFactor ?? 1
@@ -212,7 +213,7 @@ function PlanlamaPage() {
           ...buildWeekBuckets(
             addDays(start, w * 7),
             pattern,
-            { shiftMinutes, overtimeShiftMinutes },
+            { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift },
             holidays,
             workingDayKeys,
           ),
@@ -238,6 +239,7 @@ function PlanlamaPage() {
     horizonMonday,
     capacityFactor,
     horizonWeeks,
+    breakMinutesPerShift,
   ])
 
   const overrides = useMemo<PlanOverride[]>(

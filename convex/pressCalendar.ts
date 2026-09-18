@@ -15,6 +15,7 @@ const globalSettingsValidator = v.union(
     shiftStartMinute: v.optional(v.number()),
     capacityFactor: v.optional(v.number()),
     planningHorizonWeeks: v.optional(v.number()),
+    breakMinutesPerShift: v.optional(v.number()),
   }),
   v.null(),
 )
@@ -39,6 +40,7 @@ export const saveGlobalSettings = mutation({
     shiftStartMinute: v.optional(v.number()),
     capacityFactor: v.optional(v.number()),
     planningHorizonWeeks: v.optional(v.number()),
+    breakMinutesPerShift: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

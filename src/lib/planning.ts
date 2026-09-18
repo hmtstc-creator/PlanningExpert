@@ -12,6 +12,16 @@ export interface WeekPattern {
 export interface ShiftSettings {
   shiftMinutes: number
   overtimeShiftMinutes: number
+  /**
+   * Vardiya başına planlı duruş (mola, vardiya devri, günlük bakım).
+   * Her vardiyanın süresinden düşülür — kapasite gerçekçi olsun.
+   */
+  breakMinutesPerShift?: number
+}
+
+/** Bir vardiyanın moladan arındırılmış net süresi (negatif olamaz). */
+function netShiftMinutes(shiftLength: number, settings: ShiftSettings): number {
+  return Math.max(0, shiftLength - (settings.breakMinutesPerShift ?? 0))
 }
 
 // ---- 1) Talep havuzu ve aciliyet -----------------------------------------
@@ -337,7 +347,7 @@ export function buildWeekBuckets(
         shifts: pattern.shiftsPerDay,
         isOvertime: false,
         isHoliday: false,
-        minutes: pattern.shiftsPerDay * settings.shiftMinutes,
+        minutes: pattern.shiftsPerDay * netShiftMinutes(settings.shiftMinutes, settings),
       })
     } else if (overtimeShiftsLeft > 0) {
       const shifts = Math.min(overtimeShiftsLeft, 3)
@@ -348,7 +358,7 @@ export function buildWeekBuckets(
         shifts,
         isOvertime: true,
         isHoliday: false,
-        minutes: shifts * settings.overtimeShiftMinutes,
+        minutes: shifts * netShiftMinutes(settings.overtimeShiftMinutes, settings),
       })
     } else {
       buckets.push({ date: dateStr, dayKey, shifts: 0, isOvertime: false, isHoliday: false, minutes: 0 })
@@ -360,8 +370,8 @@ export function buildWeekBuckets(
 
 export function weekTotalMinutes(pattern: WeekPattern, settings: ShiftSettings): number {
   return (
-    pattern.workingDays * pattern.shiftsPerDay * settings.shiftMinutes +
-    pattern.overtimeShifts * settings.overtimeShiftMinutes
+    pattern.workingDays * pattern.shiftsPerDay * netShiftMinutes(settings.shiftMinutes, settings) +
+    pattern.overtimeShifts * netShiftMinutes(settings.overtimeShiftMinutes, settings)
   )
 }
 

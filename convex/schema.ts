@@ -115,6 +115,8 @@ export default defineSchema({
     // Planlamanın kaç haftalık ufka baktığı. Çalışma takvimi 30 hafta
     // gösterir; plan ufku bundan bağımsız ve ayarlanabilirdir.
     planningHorizonWeeks: v.optional(v.number()),
+    // Vardiya başına planlı duruş (mola, vardiya devri, günlük bakım).
+    breakMinutesPerShift: v.optional(v.number()),
   }).index('by_key', ['key']),
 
   // Her presin "standart" haftalık düzeni: kaç gün çalışılır, gün başına
