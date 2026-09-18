@@ -209,16 +209,18 @@ describe('computeRunPlan', () => {
     const plan = computeRunPlan(product, 10_000)
     expect(plan.shots).toBe(5000) // 10.000 adet / 2 göz
     expect(plan.runMinutes).toBe(250) // 5000 vuruş / 20 spm
-    expect(plan.kgNeeded).toBe(7500) // 5000 × 1.5
-    expect(plan.shotsPerCoil).toBe(5333) // floor(8000 / 1.5)
-    expect(plan.coilsNeeded).toBe(1)
-    expect(plan.totalMinutes).toBe(30 + 15 + 250)
+    // Brüt ağırlık parça başına: 10.000 adet × 1.5 kg.
+    expect(plan.kgNeeded).toBe(15_000)
+    // Rulodan 5333 parça çıkar; 2 gözlü kalıpta bu 2666 vuruştur.
+    expect(plan.shotsPerCoil).toBe(2666)
+    expect(plan.coilsNeeded).toBe(2) // ceil(10.000 / 5333)
+    expect(plan.totalMinutes).toBe(30 + 15 * 2 + 250)
   })
 
   it('birden fazla rulo gerektiğinde her rulo için setup ekler', () => {
-    const plan = computeRunPlan(product, 40_000) // 20.000 vuruş
-    expect(plan.coilsNeeded).toBe(4) // ceil(20000 / 5333)
-    expect(plan.coilSetupMinutes).toBe(60) // 4 × 15
+    const plan = computeRunPlan(product, 40_000)
+    expect(plan.coilsNeeded).toBe(8) // ceil(40.000 adet / 5333 adet-per-rulo)
+    expect(plan.coilSetupMinutes).toBe(120) // 8 × 15
   })
 
   it('eş ürün miktarını aynı vuruştan üretilen adet olarak verir', () => {
@@ -279,7 +281,7 @@ describe('computeRunPlan', () => {
 
   it('kalite onayı toplam süreye dahildir', () => {
     const plan = computeRunPlan({ ...product, qualityApprovalMinutes: 20 }, 10_000)
-    expect(plan.totalMinutes).toBe(30 + 15 + 20 + plan.runMinutes)
+    expect(plan.totalMinutes).toBe(30 + plan.coilSetupMinutes + 20 + plan.runMinutes)
   })
 
   it('kalıp max shot limitini işaretler', () => {
@@ -393,12 +395,12 @@ describe('buildRawMaterialPlan', () => {
     ['D', { code: 'D' }],
   ])
 
-  it('vuruş × brüt ağırlıktan hammadde ihtiyacını hammadde bazında toplar', () => {
+  it('adet × brüt ağırlıktan hammadde ihtiyacını hammadde bazında toplar', () => {
     const needs = buildRawMaterialPlan(
       [
-        { material: 'A', shots: 1000 },
-        { material: 'B', shots: 500 },
-        { material: 'C', shots: 100 },
+        { material: 'A', quantity: 1000 },
+        { material: 'B', quantity: 500 },
+        { material: 'C', quantity: 100 },
       ],
       products,
       new Map(),
@@ -411,7 +413,7 @@ describe('buildRawMaterialPlan', () => {
 
   it('stokla karşılaştırıp eksiği hesaplar', () => {
     const needs = buildRawMaterialPlan(
-      [{ material: 'A', shots: 1000 }],
+      [{ material: 'A', quantity: 1000 }],
       products,
       new Map([['SAC-1', 1500]]),
     )
@@ -421,7 +423,7 @@ describe('buildRawMaterialPlan', () => {
 
   it('stok yeterliyse eksik sıfırdır', () => {
     const needs = buildRawMaterialPlan(
-      [{ material: 'A', shots: 100 }],
+      [{ material: 'A', quantity: 100 }],
       products,
       new Map([['SAC-1', 5000]]),
     )
@@ -430,14 +432,46 @@ describe('buildRawMaterialPlan', () => {
 
   it('hammadde kodu tanımsız mamulü atlar ve ayrıca raporlar', () => {
     const jobs = [
-      { material: 'A', shots: 100 },
-      { material: 'D', shots: 100 },
+      { material: 'A', quantity: 100 },
+      { material: 'D', quantity: 100 },
     ]
     const needs = buildRawMaterialPlan(jobs, products, new Map())
     expect(needs.map((n) => n.rawMaterial)).toEqual(['SAC-1'])
     expect(materialsMissingRawSpec(jobs, products)).toEqual(['D'])
   })
+
+  it('eş ürünü ikinci kez saymaz — aynı gramajın içinden çıkar', () => {
+    const paired = new Map<string, ProductSpec>([
+      ['A', { code: 'A', coProduct: 'B', rawMaterialCode: 'SAC-1', grossWeight: 2 }],
+      ['B', { code: 'B', rawMaterialCode: 'SAC-1', grossWeight: 1 }],
+    ])
+    const needs = buildRawMaterialPlan(
+      [
+        { material: 'A', quantity: 1000 },
+        { material: 'B', quantity: 1000 },
+      ],
+      paired,
+      new Map(),
+    )
+    // Yalnızca A'nın tükettiği sac sayılır: 1000 × 2 = 2000.
+    expect(needs).toHaveLength(1)
+    expect(needs[0].requiredKg).toBe(2000)
+  })
+
+  it('eş ürünün hammadde kodu eksik diye uyarmaz', () => {
+    const paired = new Map<string, ProductSpec>([
+      ['A', { code: 'A', coProduct: 'B', rawMaterialCode: 'SAC-1', grossWeight: 2 }],
+      ['B', { code: 'B' }],
+    ])
+    expect(
+      materialsMissingRawSpec(
+        [{ material: 'A' }, { material: 'B' }],
+        paired,
+      ),
+    ).toEqual([])
+  })
 })
+
 
 describe('vardiya molası', () => {
   const monday = new Date('2026-09-14T00:00:00Z')
@@ -540,7 +574,9 @@ describe('rulo lotu (minimum üretim miktarı)', () => {
 
   it('bir ruloya sığan adedi hesaplar', () => {
     expect(piecesPerCoil(coilProduct)).toBe(3000)
-    expect(piecesPerCoil({ ...coilProduct, moldCavities: 2 })).toBe(6000)
+    // Göz sayısı adedi değiştirmez, vuruşu değiştirir.
+    expect(piecesPerCoil({ ...coilProduct, moldCavities: 2 })).toBe(3000)
+    expect(shotsPerCoil({ ...coilProduct, moldCavities: 2 })).toBe(1500)
     expect(piecesPerCoil({ code: 'X' })).toBe(0)
   })
 
@@ -645,11 +681,13 @@ describe('rulo lotu (minimum üretim miktarı)', () => {
 describe('rulo lotu — vuruş bazlı kısıt', () => {
   const baseMonday = new Date('2026-09-14T00:00:00Z')
 
-  it('brüt ağırlığı vuruş başına kabul eder', () => {
-    // 8000 kg rulo, vuruş başına 1.465 kg → 5460 vuruş.
+  it('brüt ağırlığı parça başına kabul eder', () => {
+    // 8000 kg rulo, parça başına 1.465 kg → 5460 parça.
     const spec: ProductSpec = { code: 'A', grossWeight: 1.465, coilWeight: 8000 }
-    expect(shotsPerCoil(spec)).toBe(5460)
-    expect(piecesPerCoil({ ...spec, moldCavities: 2 })).toBe(10_920)
+    expect(piecesPerCoil(spec)).toBe(5460)
+    // Aynı rulo, 2 gözlü kalıpta yarı vuruşta biter; adet değişmez.
+    expect(piecesPerCoil({ ...spec, moldCavities: 2 })).toBe(5460)
+    expect(shotsPerCoil({ ...spec, moldCavities: 2 })).toBe(2730)
   })
 
   it('göz sayısı farklı eş ürünlerde her ürün kendi adedini alır', () => {
@@ -670,18 +708,20 @@ describe('rulo lotu — vuruş bazlı kısıt', () => {
     )
     const qty = (m: string) =>
       entries.filter((e) => e.material === m).reduce((sum, e) => sum + e.qty, 0)
-    expect(qty('A')).toBe(6000)
-    expect(qty('B')).toBe(3000)
+    // Rulo A'nın gramajından 3000 parça verir = 1500 vuruş (A 2 gözlü).
+    // Aynı 1500 vuruştan B'den 1500 parça çıkar — bedavaya.
+    expect(qty('A')).toBe(3000)
+    expect(qty('B')).toBe(1500)
   })
 
   it('çok gözlü kalıpta ihtiyacı vuruşa çevirerek yuvarlar', () => {
-    // 4 gözlü, rulo 1000 vuruş → 4000 parça/rulo. 5000 ihtiyaç 2 rulo eder.
+    // 4 gözlü, rulodan 1000 parça = 250 vuruş. 5000 ihtiyaç tam 5 rulo eder.
     const spec: ProductSpec = { code: 'A', moldCavities: 4, grossWeight: 1, coilWeight: 1000 }
     const entries = buildDemandSchedule(
       [{ material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 5000 }], stock: 0 }],
       new Map([['A', spec]]),
       { baseMonday },
     )
-    expect(entries[0].qty).toBe(8000)
+    expect(entries[0].qty).toBe(5000)
   })
 })

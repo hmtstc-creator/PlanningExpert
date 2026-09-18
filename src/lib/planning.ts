@@ -302,15 +302,16 @@ function roundMaterialsToCoilLot(
     const product = products.get(material)
     const partnerProduct = partner ? products.get(partner) : undefined
 
-    // Eş ürünler aynı ruloyu paylaşır; biri tanımsızsa diğerininki kullanılır.
-    const lotShots = Math.max(
-      product ? shotsPerCoil(product) : 0,
-      partnerProduct ? shotsPerCoil(partnerProduct) : 0,
-    )
+    // Rulo tüketimi yalnızca asıl ürünün gramajından hesaplanır; eş ürün
+    // aynı gramajın içinden bedavaya çıkar.
+    const primary = primaryOfPair(material, partner, products)
+    const lotShots = primary ? shotsPerCoil(primary) : 0
     if (lotShots <= 0) continue
 
     const ownCavities = cavitiesOf(product)
     const partnerCavities = cavitiesOf(partnerProduct)
+    void product
+    void partnerProduct
 
     const weeks = Array.from(new Set([...own, ...other].map((e) => e.dueDate))).sort()
     // Artan, üretilmiş PARÇA cinsindendir ve ürün başına ayrı tutulur —
@@ -363,13 +364,13 @@ function phaseRank(phase: DemandEntry['phase']): number {
 }
 
 /**
- * Bir rulodan çıkan VURUŞ sayısı.
+ * Bir rulodan çıkan PARÇA adedi.
  *
- * Brüt ağırlık vuruş başına tüketilen kilodur (master data'da "Gross Weight
- * (Kg/Shot)"), yani rulo vuruşla tükenir — parça ile değil. Kısıtın birimi
- * budur; parça adedi buradan türetilir.
+ * Brüt ağırlık parça başına tüketilen kilodur, bu yüzden rulo ağırlığını ona
+ * bölmek doğrudan adedi verir. Göz sayısı bu adedi değiştirmez — göz sayısı
+ * o adedin kaç vuruşta basılacağını belirler.
  */
-export function shotsPerCoil(product: ProductSpec): number {
+export function piecesPerCoil(product: ProductSpec): number {
   const grossWeight = product.grossWeight ?? 0
   const coilWeight = product.coilWeight ?? 0
   if (grossWeight <= 0 || coilWeight <= 0) return 0
@@ -381,17 +382,37 @@ function cavitiesOf(product: ProductSpec | undefined): number {
 }
 
 /**
- * Bir rulodan çıkan PARÇA adedi: vuruş × göz sayısı.
- *
- * Eş ürünlerde göz sayısı farklı olabilir — aynı rulodan A'dan 2, B'den 1
- * parça çıkabilir. Bu yüzden lot hesabı vuruş üzerinden yapılır, adet
- * üzerinden değil; bu fonksiyon yalnızca gösterim içindir.
+ * Bir rulodan çıkan VURUŞ sayısı: adet ÷ göz sayısı.
+ * 4 gözlü kalıpta aynı rulo dörtte bir vuruşta biter.
  */
-export function piecesPerCoil(product: ProductSpec): number {
-  return shotsPerCoil(product) * cavitiesOf(product)
+export function shotsPerCoil(product: ProductSpec): number {
+  const pieces = piecesPerCoil(product)
+  if (pieces <= 0) return 0
+  return Math.floor(pieces / cavitiesOf(product))
 }
 
-// ---- 2) Rulo / parti hesabı ----------------------------------------------
+/**
+ * Eş ürün çiftinde rulo tüketimini belirleyen ürün.
+ *
+ * Eş ürün aynı gramajın içinden çıkar — ayrıca malzeme yemez, bedavaya
+ * gelir. Bu yüzden rulo hesabı yalnızca asıl ürünün brüt ağırlığından
+ * yapılır; eş ürünün ağırlığı hiç kullanılmaz.
+ */
+function primaryOfPair(
+  material: string,
+  partner: string | undefined,
+  products: Map<string, ProductSpec>,
+): ProductSpec | undefined {
+  const own = products.get(material)
+  if (!partner) return own
+  const other = products.get(partner)
+  // Eş ürünü tanımlayan taraf asıldır; tanımsızsa geçerli spesi olan kullanılır.
+  if (own?.coProduct?.trim() === partner) return own
+  if (other?.coProduct?.trim() === material) return other
+  return piecesPerCoil(own ?? { code: material }) > 0 ? own : other
+}
+
+// ---- 2) Rulo / parti hesabı ----------------------------------------------// ---- 2) Rulo / parti hesabı ----------------------------------------------
 
 export interface ProductSpec {
   code: string
@@ -463,9 +484,11 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
 
   const grossWeight = product.grossWeight ?? 0
   const coilWeight = product.coilWeight ?? 0
-  const kgNeeded = shots * grossWeight
-  const shotsPerCoil = grossWeight > 0 && coilWeight > 0 ? Math.floor(coilWeight / grossWeight) : 0
-  const coilsNeeded = shotsPerCoil > 0 ? Math.ceil(shots / shotsPerCoil) : 0
+  // Brüt ağırlık parça başına olduğu için tüketim adetten hesaplanır.
+  const kgNeeded = quantity * grossWeight
+  const piecesInCoil = grossWeight > 0 && coilWeight > 0 ? Math.floor(coilWeight / grossWeight) : 0
+  const shotsPerCoil = piecesInCoil > 0 ? Math.floor(piecesInCoil / cavities) : 0
+  const coilsNeeded = piecesInCoil > 0 ? Math.ceil(quantity / piecesInCoil) : 0
 
   const setupMinutes = product.setupMinutes ?? 0
   const coilSetupMinutes = (product.coilSetupMinutes ?? 0) * coilsNeeded
@@ -638,20 +661,30 @@ export interface RawMaterialNeed {
  * atlanır (uyarı olarak ayrıca listelenir).
  */
 export function buildRawMaterialPlan(
-  jobs: { material: string; shots: number }[],
+  jobs: { material: string; quantity: number }[],
   products: Map<string, ProductSpec>,
   rawStockKg: Map<string, number>,
 ): RawMaterialNeed[] {
   const byRaw = new Map<string, { kg: number; materials: Set<string> }>()
 
+  // Eş ürün aynı gramajın içinden çıkar: asıl ürünün tükettiği sacın içinde
+  // zaten sayılmıştır. İkinci kez saymak hammadde ihtiyacını şişirirdi.
+  const secondary = new Set<string>()
+  for (const product of products.values()) {
+    const co = product.coProduct?.trim()
+    if (co && co !== product.code) secondary.add(co)
+  }
+
   for (const job of jobs) {
+    if (secondary.has(job.material)) continue
     const product = products.get(job.material)
     const raw = product?.rawMaterialCode?.trim()
     const grossWeight = product?.grossWeight ?? 0
     if (!raw || grossWeight <= 0) continue
 
     const entry = byRaw.get(raw) ?? { kg: 0, materials: new Set<string>() }
-    entry.kg += job.shots * grossWeight
+    // Brüt ağırlık parça başına.
+    entry.kg += job.quantity * grossWeight
     entry.materials.add(job.material)
     byRaw.set(raw, entry)
   }
@@ -675,8 +708,15 @@ export function materialsMissingRawSpec(
   jobs: { material: string }[],
   products: Map<string, ProductSpec>,
 ): string[] {
+  const secondary = new Set<string>()
+  for (const product of products.values()) {
+    const co = product.coProduct?.trim()
+    if (co && co !== product.code) secondary.add(co)
+  }
+
   const missing = new Set<string>()
   for (const job of jobs) {
+    if (secondary.has(job.material)) continue
     const product = products.get(job.material)
     if (!product?.rawMaterialCode?.trim() || !(product.grossWeight ?? 0)) {
       missing.add(job.material)

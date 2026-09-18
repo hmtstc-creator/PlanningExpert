@@ -184,9 +184,11 @@ function ReferanslarPage() {
         data, setup times, mold shot limit and main/alternative machines.
         Upload an Excel file to load them in bulk, then click any cell in the
         table below to correct a value — changes save as soon as you leave the
-        cell. Gross weight is per shot, not per piece, so a coil yields
-        coil weight ÷ gross weight shots and that many × cavities pieces — the
-        Pcs/coil column shows the resulting minimum lot. The performance factor
+        cell. Gross weight is per piece, so a coil yields coil weight ÷ gross
+        weight pieces — that is the minimum lot, shown in the Pcs/coil column.
+        Cavities do not change that number; they decide how many strokes it
+        takes. A co-product comes out of the same grams, so it costs no extra
+        material. The performance factor
         (availability × performance, quality taken as 100%) sets each job's
         total window: setup and quality approval come out of that window and the
         rest is production time.
@@ -201,7 +203,7 @@ function ReferanslarPage() {
             'SPM',
             'Raw Material Code',
             'Coil Weight (Kg)',
-            'Gross Weight (Kg/Shot)',
+            'Gross Weight (Kg/piece)',
             'Setup Time',
             'Coil Setup Time',
             'Main Machine',
@@ -228,7 +230,7 @@ function ReferanslarPage() {
           <Field label="SPM" value={form.spm} onChange={(v) => update('spm', v)} type="number" placeholder="16" />
           <Field label="Raw Material Code" value={form.rawMaterialCode} onChange={(v) => update('rawMaterialCode', v)} placeholder="SD51-100-0976" />
           <Field label="Coil Weight (Kg)" value={form.coilWeight} onChange={(v) => update('coilWeight', v)} type="number" placeholder="8000" />
-          <Field label="Gross Weight (Kg/Shot)" value={form.grossWeight} onChange={(v) => update('grossWeight', v)} type="number" placeholder="1.465" />
+          <Field label="Gross Weight (Kg/piece)" value={form.grossWeight} onChange={(v) => update('grossWeight', v)} type="number" placeholder="1.465" />
           <Field label="Setup Time (min)" value={form.setupMinutes} onChange={(v) => update('setupMinutes', v)} type="number" placeholder="30" />
           <Field label="Coil Setup Time (min)" value={form.coilSetupMinutes} onChange={(v) => update('coilSetupMinutes', v)} type="number" placeholder="15" />
           <Field label="Main Machine" value={form.mainMachine} onChange={(v) => update('mainMachine', v)} placeholder="PRS-107" />
@@ -275,12 +277,12 @@ function ReferanslarPage() {
               <th className="px-3 py-2 font-medium">SPM</th>
               <th className="px-3 py-2 font-medium">Raw Material</th>
               <th className="px-3 py-2 font-medium">Coil Wt</th>
-              <th className="px-3 py-2 font-medium" title="Gross weight is per shot, not per piece">
-                Gross Wt/shot
+              <th className="px-3 py-2 font-medium" title="Gross weight is per piece">
+                Gross Wt/pc
               </th>
               <th
                 className="px-3 py-2 font-medium"
-                title="Minimum production lot: shots per coil × cavities"
+                title="Minimum production lot: coil weight ÷ gross weight"
               >
                 Pcs/coil
               </th>
@@ -320,7 +322,9 @@ function ReferanslarPage() {
                 <EditableCell product={p} field="grossWeight" value={p.grossWeight} numeric onSave={updateField} />
                 <td className="px-3 py-2 text-xs text-muted-foreground">
                   {piecesPerCoil(p as ProductSpec) > 0 ? (
-                    <span title={`${shotsPerCoil(p as ProductSpec).toLocaleString('en-GB')} shots per coil`}>
+                    <span
+                      title={`${shotsPerCoil(p as ProductSpec).toLocaleString('en-GB')} shots — the cavities decide how many strokes this takes`}
+                    >
                       {piecesPerCoil(p as ProductSpec).toLocaleString('en-GB')}
                     </span>
                   ) : (

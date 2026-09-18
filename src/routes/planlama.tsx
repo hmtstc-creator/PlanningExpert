@@ -926,8 +926,10 @@ function PlanlamaPage() {
             Raw material requirement ({rawNeeds.length} items)
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Calculated from the gross weight of the planned shots and compared
-            with unrestricted stock in raw material locations.
+            Calculated from the planned quantity × gross weight per piece, and
+            compared with unrestricted stock in raw material locations.
+            Co-products are not counted twice — they come out of the same grams
+            as the part they fall with.
           </p>
           <div className="mt-2 overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-left text-sm">
