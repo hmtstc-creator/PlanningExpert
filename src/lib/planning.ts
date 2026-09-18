@@ -122,6 +122,11 @@ export interface ProductSpec {
   coilSetupMinutes?: number
   /** Kalıbın bakım öncesi maksimum baskı sayısı. */
   maxShots?: number
+  mainMachine?: string
+  altMachine1?: string
+  altMachine2?: string
+  altMachine3?: string
+  altMachine4?: string
 }
 
 export interface RunPlan {

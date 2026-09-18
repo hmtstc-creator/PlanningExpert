@@ -214,13 +214,7 @@ export function schedule(
 
 function placeRun(
   item: DemandPoolItem,
-  product: ProductSpec & {
-    mainMachine?: string
-    altMachine1?: string
-    altMachine2?: string
-    altMachine3?: string
-    altMachine4?: string
-  },
+  product: ProductSpec,
   run: RunPlan,
   candidates: string[],
   pressByName: Map<string, PressSpec>,
