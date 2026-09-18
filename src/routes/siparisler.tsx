@@ -3,6 +3,7 @@ import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { uploadMessage } from '../lib/uploadMessage'
 import { ExcelUpload } from '../components/ExcelUpload'
 
 export const Route = createFileRoute('/siparisler')({
@@ -60,7 +61,7 @@ function SiparislerPage() {
   const threshold = Number(highRunnerThreshold) || 0
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-16">
+    <div className="w-full px-6 py-16">
       <h1 className="text-3xl font-bold text-foreground">Demand</h1>
       <p className="mt-2 text-muted-foreground">
         Upload the ZPP (weekly) and ZPP_DAILY (daily) net requirement reports
@@ -77,7 +78,7 @@ function SiparislerPage() {
             onRows={async (raw) => {
               const parsed = parseSnapshotRows(raw)
               const result = await replaceWeekly({ rows: parsed })
-              return { message: `${result.count} materials updated (weekly).` }
+              return { message: uploadMessage('weekly demand rows', result) }
             }}
           />
         </div>
@@ -88,7 +89,7 @@ function SiparislerPage() {
             onRows={async (raw) => {
               const parsed = parseSnapshotRows(raw)
               const result = await replaceDaily({ rows: parsed })
-              return { message: `${result.count} materials updated (daily).` }
+              return { message: uploadMessage('daily demand rows', result) }
             }}
           />
         </div>

@@ -154,7 +154,7 @@ function HomePage() {
   const dataReady = products.length > 0 && weekly.length > 0 && stockRows.length > 0
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12">
+    <div className="w-full px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Production Planning</h1>
       <p className="mt-2 text-muted-foreground">
         Press shop production planning — daily status overview

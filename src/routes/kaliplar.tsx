@@ -100,7 +100,7 @@ function KaliplarPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12">
+    <div className="w-full px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Mold Life</h1>
       <p className="mt-2 text-muted-foreground">
         The shots each mold has made since its last maintenance are calculated

@@ -223,3 +223,16 @@ export const setCapacityFactor = mutation({
     return null
   },
 })
+
+/**
+ * Every press's week overrides at once.
+ *
+ * The per-press view needed one press at a time; the capacity grid shows all
+ * presses across all weeks, so fetching per press would mean one query per
+ * row.
+ */
+export const listAllOverrides = query({
+  args: {},
+  returns: v.array(overrideValidator),
+  handler: async (ctx) => ctx.db.query('pressWeekOverrides').collect(),
+})

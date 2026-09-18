@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { addDays, isoDate, mondayOf } from '../lib/dates'
 import { useSyncedFields } from '../lib/useSyncedFields'
+import { CapacityGrid } from '../components/CapacityGrid'
+import type { WeekPattern as GridPattern } from '../lib/capacityGrid'
 
 export const Route = createFileRoute('/takvim')({
   component: TakvimPage,
@@ -36,7 +38,7 @@ const FALLBACK_COUNTRIES = [
 
 function TakvimPage() {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
+    <div className="w-full px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Work Calendar</h1>
       <p className="mt-2 text-muted-foreground">
         Define when and how much the plant runs so planning stays realistic.
@@ -83,6 +85,15 @@ function PressCalendarSection() {
   const saveGlobalSettingsMutation = useMutation(api.pressCalendar.saveGlobalSettings)
   const templatesList = useQuery(api.pressCalendar.listTemplates) ?? []
   const saveTemplateMutation = useMutation(api.pressCalendar.saveTemplate)
+  const allOverrides = (useQuery(api.pressCalendar.listAllOverrides) ?? []) as {
+    press: string
+    weekStart: string
+    workingDays: number
+    shiftsPerDay: number
+    overtimeShifts: number
+  }[]
+  const saveOverrideForGrid = useMutation(api.pressCalendar.saveOverride)
+  const clearOverrideForGrid = useMutation(api.pressCalendar.clearOverride)
 
   // Pres listesi artık kalıcı `presses` tablosundan gelir (Makine Tanımları
   // sayfası). Referanslarda geçen ama tanımlanmamış presler de listelenir ki
@@ -412,6 +423,53 @@ function PressCalendarSection() {
         week differs, edit and save just that week.
       </p>
 
+      <div className="mt-4">
+        <h3 className="mb-2 text-sm font-semibold text-foreground">
+          Capacity overview — all presses, all weeks
+        </h3>
+        <CapacityGrid
+          presses={definedPresses}
+          templates={
+            new Map(
+              templatesList.map((t) => [
+                t.press,
+                {
+                  workingDays: t.workingDays,
+                  shiftsPerDay: t.shiftsPerDay,
+                  overtimeShifts: t.overtimeShifts,
+                } as GridPattern,
+              ]),
+            )
+          }
+          overrides={
+            new Map(
+              allOverrides.map((o) => [
+                `${o.press}|${o.weekStart}`,
+                {
+                  workingDays: o.workingDays,
+                  shiftsPerDay: o.shiftsPerDay,
+                  overtimeShifts: o.overtimeShifts,
+                } as GridPattern,
+              ]),
+            )
+          }
+          weekStarts={weekStarts}
+          holidays={new Set([...holidaySet, ...manualHolidays])}
+          workingDayKeys={workingDayKeys}
+          shiftMinutes={shiftMinutes}
+          overtimeShiftMinutes={overtimeShiftMinutes}
+          defaultPattern={{
+            workingDays: workingDayKeys.length,
+            shiftsPerDay: 1,
+            overtimeShifts: 0,
+          }}
+          onSaveOverride={(press, weekStart, pattern) =>
+            saveOverrideForGrid({ press, weekStart, ...pattern })
+          }
+          onClearOverride={(press, weekStart) => clearOverrideForGrid({ press, weekStart })}
+        />
+      </div>
+
       <div className="mt-4 rounded-md border border-border p-3">
         <h3 className="text-xs font-medium text-muted-foreground">
           Working days — normal shifts are only placed on these days
@@ -724,7 +782,11 @@ function PressCalendarSection() {
             </p>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
+          <details className="mt-4">
+            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+              Week-by-week detail for {press} (the grid above covers all presses)
+            </summary>
+          <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
             <div className="overflow-x-auto rounded-md border border-border">
               <table className="w-full border-collapse text-left text-sm">
                 <thead className="bg-muted text-muted-foreground">
@@ -787,6 +849,7 @@ function PressCalendarSection() {
               </ul>
             </aside>
           </div>
+          </details>
         </>
       )}
     </section>

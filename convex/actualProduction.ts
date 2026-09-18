@@ -5,6 +5,7 @@ import {
 import { v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
+import { filterRows, knownMaterialCodes } from './uploadFilter'
 
 const rowValidator = v.object({
   _id: v.id('actualProduction'),
@@ -40,17 +41,27 @@ export const replaceAll = mutation({
       }),
     ),
   },
-  returns: v.object({ count: v.number() }),
+  returns: v.object({
+    count: v.number(),
+    skippedUnknownMaterial: v.number(),
+    skippedUnknownLocation: v.number(),
+    unknownMaterials: v.array(v.string()),
+    unknownLocations: v.array(v.string()),
+  }),
   handler: async (ctx, { rows }) => {
+    // MB51 covers every movement in the plant; keep only our own materials.
+    const { kept, report } = filterRows<(typeof rows)[number]>({
+      rows,
+      materialOf: (r) => r.material,
+      knownMaterials: await knownMaterialCodes(ctx),
+    })
+
     const existing = await ctx.db.query('actualProduction').collect()
     await Promise.all(existing.map((doc) => ctx.db.delete(doc._id)))
     const now = Date.now()
-    const validRows = rows.filter((row) => row.material.trim())
     await Promise.all(
-      validRows.map((row) =>
-        ctx.db.insert('actualProduction', { ...row, uploadedAt: now }),
-      ),
+      kept.map((row) => ctx.db.insert('actualProduction', { ...row, uploadedAt: now })),
     )
-    return { count: validRows.length }
+    return { count: kept.length, ...report }
   },
 })

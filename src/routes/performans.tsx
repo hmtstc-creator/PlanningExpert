@@ -164,7 +164,7 @@ function PerformansPage() {
   const totalActual = adherence.reduce((s, r) => s + r.actualQty, 0)
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
+    <div className="w-full px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Performance</h1>
       <p className="mt-2 text-muted-foreground">
         Compares the approved plan with the actual production uploaded from

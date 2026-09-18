@@ -25,7 +25,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
+      <nav className="flex w-full items-center justify-between gap-4 px-6 py-3">
         <Link to="/" className="shrink-0 text-base font-semibold text-foreground">
           Ahmet Saatci
         </Link>

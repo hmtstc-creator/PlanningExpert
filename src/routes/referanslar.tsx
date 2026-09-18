@@ -160,7 +160,7 @@ function ReferanslarPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-16">
+    <div className="w-full px-6 py-16">
       <h1 className="text-3xl font-bold text-foreground">Master Data</h1>
       <p className="mt-2 text-muted-foreground">
         Material code, co-product if any, cavities, SPM, raw material and coil

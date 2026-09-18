@@ -3,6 +3,7 @@ import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { uploadMessage } from '../lib/uploadMessage'
 import { ExcelUpload } from '../components/ExcelUpload'
 
 export const Route = createFileRoute('/gerceklesen')({
@@ -67,7 +68,7 @@ function GerceklesenPage() {
   )
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-16">
+    <div className="w-full px-6 py-16">
       <h1 className="text-3xl font-bold text-foreground">Actual Production</h1>
       <p className="mt-2 text-muted-foreground">
         Upload the SAP MB51 movement report here. This data is used to compare
@@ -118,7 +119,7 @@ function GerceklesenPage() {
               }))
               .filter((r) => r.material)
             const result = await replaceAll({ rows: parsed })
-            return { message: `${result.count} movement rows uploaded.` }
+            return { message: uploadMessage('movement rows', result) }
           }}
         />
       </div>

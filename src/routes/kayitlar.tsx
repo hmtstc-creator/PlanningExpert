@@ -62,7 +62,7 @@ function KayitlarPage() {
     : logs
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12">
+    <div className="w-full px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Change Log</h1>
       <p className="mt-2 text-muted-foreground">
         Decisions, business rules, improvements and open issues are recorded

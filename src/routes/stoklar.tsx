@@ -3,6 +3,7 @@ import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { uploadMessage } from '../lib/uploadMessage'
 import { ExcelUpload } from '../components/ExcelUpload'
 
 export const Route = createFileRoute('/stoklar')({
@@ -60,7 +61,7 @@ function StoklarPage() {
   const filteredRows = rows.filter((r) => r.material.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-16">
+    <div className="w-full px-6 py-16">
       <h1 className="text-3xl font-bold text-foreground">Stoklar</h1>
       <p className="mt-2 text-muted-foreground">
         Upload the SAP MB52 stock report here every day. Total available stock
@@ -94,7 +95,7 @@ function StoklarPage() {
               transit: num(row['Transit and Transfer']),
             })).filter((r) => r.material)
             const result = await replaceAll({ rows: parsed })
-            return { message: `${result.count} stock rows updated.` }
+            return { message: uploadMessage('stock rows', result) }
           }}
         />
       </div>

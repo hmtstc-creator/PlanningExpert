@@ -370,7 +370,7 @@ function PlanlamaPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-12">
+    <div className="w-full px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Production Plan</h1>
       <p className="mt-2 text-muted-foreground">
         The plan is generated automatically: backlog first, then the materials

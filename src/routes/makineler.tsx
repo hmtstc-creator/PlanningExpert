@@ -77,7 +77,7 @@ function MakinelerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12">
+    <div className="w-full px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Press Definitions</h1>
       <p className="mt-2 text-muted-foreground">
         Define which hall each press sits in. Presses in the same hall cannot

@@ -18,7 +18,7 @@ export function ConnectionBanner() {
 
   return (
     <div className="sticky top-[57px] z-40 border-b border-amber-300 bg-amber-100 px-6 py-2 text-sm text-amber-900">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
+      <div className="flex w-full flex-wrap items-center gap-2">
         <span>
           <strong>Fallback connection mode.</strong> The live connection (WebSocket) could not
           be established, so data is fetched over HTTPS at regular intervals.

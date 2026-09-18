@@ -66,17 +66,13 @@ function DepolarPage() {
     [locations],
   )
 
-  // Liste artık sadece MB52'de görülen depolarla sınırlı değil: elle
-  // tanımlanmış depolar da (henüz stok verisi gelmemiş olsa bile) burada
-  // görünür, çünkü planlama hesaplaması bu tanımlara göre çalışır.
-  const allCodes = useMemo(() => {
-    const set = new Set<string>()
-    for (const s of stockRows) {
-      if (s.storageLocation) set.add(s.storageLocation)
-    }
-    for (const l of locations) set.add(l.code)
-    return Array.from(set).sort()
-  }, [stockRows, locations])
+  // Only locations the user has defined. MB52 no longer seeds this list:
+  // stock in an undefined location is explicitly not our concern, and the
+  // upload now rejects those rows and names them in its result message.
+  const allCodes = useMemo(
+    () => locations.map((l) => l.code).sort(),
+    [locations],
+  )
 
   async function addManualLocation() {
     const code = newCode.trim()
@@ -134,11 +130,12 @@ function DepolarPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12">
+    <div className="w-full px-6 py-12">
       <h1 className="text-3xl font-bold text-foreground">Storage Locations</h1>
       <p className="mt-2 text-muted-foreground">
-        Add storage location codes manually or let them arrive automatically
-        with an MB52 upload, then choose how each one is treated in planning.
+        Define the storage locations you care about and choose how each one is
+        treated in planning. MB52 rows in any location that is not defined here
+        are ignored on upload — stock you have not declared is not your stock.
         This setting answers "which stock do I really have?" and directly
         affects the quantity to be produced.
       </p>
@@ -175,8 +172,8 @@ function DepolarPage() {
 
       {allCodes.length === 0 ? (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          No storage locations defined yet. Add one manually above, or upload an
-          MB52 file on the Stock page and let the codes appear automatically.
+          No storage locations defined yet. Add the codes you care about above —
+          MB52 rows in any other location are ignored on upload.
         </p>
       ) : (
         <div className="mt-4 space-y-2">

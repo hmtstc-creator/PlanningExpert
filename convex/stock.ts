@@ -5,6 +5,7 @@ import {
 import { v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
+import { filterRows, knownLocationCodes, knownMaterialCodes } from './uploadFilter'
 
 const stockValidator = v.object({
   _id: v.id('stock'),
@@ -44,15 +45,28 @@ export const replaceAll = mutation({
       }),
     ),
   },
-  returns: v.object({ count: v.number() }),
+  returns: v.object({
+    count: v.number(),
+    skippedUnknownMaterial: v.number(),
+    skippedUnknownLocation: v.number(),
+    unknownMaterials: v.array(v.string()),
+    unknownLocations: v.array(v.string()),
+  }),
   handler: async (ctx, { rows }) => {
+    // MB52 covers the whole plant. Only materials in master data and storage
+    // locations the user has defined are relevant here.
+    const { kept, report } = filterRows<(typeof rows)[number]>({
+      rows,
+      materialOf: (r) => r.material,
+      locationOf: (r) => r.storageLocation,
+      knownMaterials: await knownMaterialCodes(ctx),
+      knownLocations: await knownLocationCodes(ctx),
+    })
+
     const existing = await ctx.db.query('stock').collect()
-    for (const doc of existing) await ctx.db.delete(doc._id)
+    await Promise.all(existing.map((doc) => ctx.db.delete(doc._id)))
     const now = Date.now()
-    for (const row of rows) {
-      if (!row.material.trim()) continue
-      await ctx.db.insert('stock', { ...row, uploadedAt: now })
-    }
-    return { count: rows.length }
+    await Promise.all(kept.map((row) => ctx.db.insert('stock', { ...row, uploadedAt: now })))
+    return { count: kept.length, ...report }
   },
 })
