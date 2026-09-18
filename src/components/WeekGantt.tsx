@@ -10,24 +10,33 @@ import {
 /**
  * One week of production across every press.
  *
- * A planner schedules a week, not a day, so the whole week is one continuous
- * strip: days sit side by side in equal bands with a separator between them,
- * and each press keeps a single row throughout. Rows group by press category,
- * which is what the shop calls its machines; hall stays a scheduling
- * constraint rather than a display grouping.
- *
- * Each job is drawn as setup → quality approval → production, and the planned
- * stops are drawn too, so a bar that stops for the meal break looks like it
- * stops for the meal break.
+ * The layout is in pixels rather than percentages so that zooming means
+ * something: at a week-wide fit a job is a sliver, and the planner cannot read
+ * which coil to mount. Zooming in widens the minute, the labels appear, and
+ * the strip scrolls; the press column stays pinned so the row is still
+ * identifiable when scrolled far to the right.
  */
 const COLORS = {
   setup: { fill: '#3b6fd4', label: 'Setup' },
-  quality: { fill: '#9a6fb0', label: 'Quality approval' },
+  quality: { fill: '#a259a8', label: 'Quality approval' },
   run: { fill: '#5aa97b', label: 'Production' },
-  stop: { fill: '#dd8030', label: 'Planned stop' },
+  meeting: { fill: '#d1ad33', label: 'Meeting / handover' },
+  stop: { fill: '#a8460f', label: 'Tea / meal break' },
+  other: { fill: '#64748b', label: 'Other stop' },
 } as const
 
 type BlockKind = keyof typeof COLORS
+
+/** Handover is the start-of-shift meeting; tea and meals are the breaks. */
+function kindOfStop(stopKind: string): BlockKind {
+  if (stopKind === 'handover') return 'meeting'
+  if (stopKind === 'tea' || stopKind === 'meal') return 'stop'
+  return 'other'
+}
+
+/** Zoom steps in pixels per hour. */
+const ZOOM_STEPS = [3, 5, 8, 14, 24, 40, 70, 120] as const
+const DEFAULT_ZOOM = 4
 
 export interface WeekGanttJob {
   date: string
@@ -35,7 +44,6 @@ export interface WeekGanttJob {
   material: string
   quantity: number
   late: boolean
-  /** Net production minutes within the day. */
   setupStartMinute: number
   setupEndMinute: number
   qualityEndMinute: number
@@ -68,13 +76,12 @@ interface PlacedBlock extends Segment {
   kind: BlockKind
   press: string
   hall: string
-  date: string
   label?: string
   title: string
 }
 
-const ROW_HEIGHT = 30
-const LABEL_WIDTH = 108
+const ROW_HEIGHT = 32
+const LABEL_WIDTH = 96
 
 function clockLabel(minute: number): string {
   const wrapped = ((minute % 1440) + 1440) % 1440
@@ -98,17 +105,21 @@ export function WeekGantt({
   shiftStartMinute,
   shiftMinutes,
 }: Props) {
-  const [hovered, setHovered] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
+  const [dayFilter, setDayFilter] = useState<string | null>(null)
 
-  const { rows, dayWidth, totalWidth, clashKeys } = useMemo(() => {
-    // Every day gets the same width so the axis stays readable; the width is
-    // set by the busiest press so nothing is ever clipped.
-    const maxShifts = Math.max(
-      1,
-      ...presses.flatMap((p) => p.days.map((d) => d.shifts)),
-    )
-    const dayWidth = maxShifts * shiftMinutes
-    const dayIndex = new Map(dates.map((d, i) => [d, i]))
+  const visibleDates = useMemo(
+    () => (dayFilter && dates.includes(dayFilter) ? [dayFilter] : dates),
+    [dates, dayFilter],
+  )
+
+  const pxPerHour = ZOOM_STEPS[zoom]
+  const pxPerMinute = pxPerHour / 60
+
+  const { rows, dayWidthMinutes, clashKeys } = useMemo(() => {
+    const maxShifts = Math.max(1, ...presses.flatMap((p) => p.days.map((d) => d.shifts)))
+    const dayWidthMinutes = maxShifts * shiftMinutes
+    const dayIndex = new Map(visibleDates.map((d, i) => [d, i]))
 
     const jobsByPressDate = new Map<string, WeekGanttJob[]>()
     for (const job of jobs) {
@@ -124,17 +135,17 @@ export function WeekGantt({
       for (const day of press.days) {
         const index = dayIndex.get(day.date)
         if (index === undefined || day.shifts <= 0) continue
-        const base = index * dayWidth - shiftStartMinute
+        const base = index * dayWidthMinutes - shiftStartMinute
         const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, day.shifts, stops)
 
         for (const stop of timeline.stops) {
           blocks.push({
-            kind: 'stop',
+            kind: kindOfStop(stop.kind),
             press: press.name,
             hall: press.hall,
-            date: day.date,
             start: base + stop.start,
             end: base + stop.end,
+            label: stop.name,
             title: `${stop.name} · ${clockLabel(stop.start)}–${clockLabel(stop.end)}`,
           })
         }
@@ -151,10 +162,9 @@ export function WeekGantt({
                 kind,
                 press: press.name,
                 hall: press.hall,
-                date: day.date,
                 start: base + seg.start,
                 end: base + seg.end,
-                label: kind === 'run' ? job.material : undefined,
+                label: job.material,
                 title:
                   `${job.material} · ${COLORS[kind].label} · ` +
                   `${clockLabel(seg.start)}–${clockLabel(seg.end)}` +
@@ -170,8 +180,6 @@ export function WeekGantt({
       return { press, blocks }
     })
 
-    // Two setups overlapping in the same hall means the crane is double
-    // booked — a planning error the chart must show rather than smooth over.
     const setups = rows.flatMap((r) => r.blocks.filter((b) => b.kind === 'setup'))
     const clashKeys = new Set<string>()
     for (let i = 0; i < setups.length; i++) {
@@ -186,8 +194,8 @@ export function WeekGantt({
       }
     }
 
-    return { rows, dayWidth, totalWidth: dates.length * dayWidth, clashKeys }
-  }, [dates, presses, jobs, stops, shiftStartMinute, shiftMinutes])
+    return { rows, dayWidthMinutes, clashKeys }
+  }, [visibleDates, presses, jobs, stops, shiftStartMinute, shiftMinutes])
 
   const byCategory = useMemo(() => {
     const map = new Map<string, typeof rows>()
@@ -198,7 +206,6 @@ export function WeekGantt({
       map.set(key, list)
     }
     return Array.from(map.entries()).sort((a, b) => {
-      // Keep the catch-all last; it is where setup work is still needed.
       if (a[0] === 'Uncategorised') return 1
       if (b[0] === 'Uncategorised') return -1
       return a[0].localeCompare(b[0])
@@ -213,20 +220,29 @@ export function WeekGantt({
     )
   }
 
-  const pct = (x: number) => (x / totalWidth) * 100
+  const totalMinutes = visibleDates.length * dayWidthMinutes
+  const totalPx = Math.max(240, totalMinutes * pxPerMinute)
+  const px = (minute: number) => minute * pxPerMinute
+
+  // Hour ticks only once they are far enough apart to read.
+  const tickHours = pxPerHour >= 40 ? 1 : pxPerHour >= 20 ? 2 : pxPerHour >= 10 ? 4 : 0
+
+  const usedKinds = new Set(rows.flatMap((r) => r.blocks.map((b) => b.kind)))
 
   return (
     <div className="rounded-lg border border-border bg-card">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border px-4 py-2.5">
-        {(Object.keys(COLORS) as BlockKind[]).map((kind) => (
-          <span key={kind} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span
-              className="inline-block h-3 w-3 rounded-sm"
-              style={{ backgroundColor: COLORS[kind].fill }}
-            />
-            {COLORS[kind].label}
-          </span>
-        ))}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border px-3 py-2.5">
+        {(Object.keys(COLORS) as BlockKind[])
+          .filter((kind) => usedKinds.has(kind) || kind === 'setup' || kind === 'run')
+          .map((kind) => (
+            <span key={kind} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span
+                className="inline-block h-3 w-3 rounded-sm"
+                style={{ backgroundColor: COLORS[kind].fill }}
+              />
+              {COLORS[kind].label}
+            </span>
+          ))}
         {clashKeys.size > 0 && (
           <span className="flex items-center gap-1.5 text-xs font-medium text-destructive">
             <span className="inline-block h-3 w-3 rounded-sm border-2 border-dashed border-destructive" />
@@ -235,72 +251,144 @@ export function WeekGantt({
         )}
       </div>
 
-      <p className="px-4 pt-2 text-[11px] text-muted-foreground lg:hidden">
-        Scroll sideways to see the whole week.
-      </p>
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setZoom((z) => Math.max(0, z - 1))}
+            disabled={zoom === 0}
+            aria-label="Zoom out"
+            className="h-8 w-8 rounded-md border border-border text-base leading-none text-foreground hover:bg-muted disabled:opacity-40"
+          >
+            −
+          </button>
+          <button
+            onClick={() => setZoom((z) => Math.min(ZOOM_STEPS.length - 1, z + 1))}
+            disabled={zoom === ZOOM_STEPS.length - 1}
+            aria-label="Zoom in"
+            className="h-8 w-8 rounded-md border border-border text-base leading-none text-foreground hover:bg-muted disabled:opacity-40"
+          >
+            +
+          </button>
+          <button
+            onClick={() => {
+              setZoom(DEFAULT_ZOOM)
+              setDayFilter(null)
+            }}
+            className="ml-1 h-8 rounded-md border border-border px-2 text-xs text-muted-foreground hover:bg-muted"
+          >
+            Reset
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            onClick={() => setDayFilter(null)}
+            className={`h-8 rounded-md px-2 text-xs ${
+              dayFilter === null
+                ? 'bg-foreground text-background'
+                : 'border border-border text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            Whole week
+          </button>
+          {dates.map((date) => (
+            <button
+              key={date}
+              onClick={() => {
+                setDayFilter(date)
+                // One day on screen deserves a readable scale.
+                setZoom((z) => Math.max(z, 5))
+              }}
+              className={`h-8 rounded-md px-2 text-xs ${
+                dayFilter === date
+                  ? 'bg-foreground text-background'
+                  : 'border border-border text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              {dayLabel(date)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
-        <div className="min-w-[900px] px-4 py-3">
-          <div className="relative mb-1 h-5" style={{ marginLeft: LABEL_WIDTH }}>
-            {dates.map((date, i) => (
-              <span
-                key={date}
-                className="absolute text-[11px] font-medium text-muted-foreground"
-                style={{ left: `${pct(i * dayWidth)}%`, width: `${pct(dayWidth)}%` }}
-              >
-                {dayLabel(date)}
-              </span>
-            ))}
+        <div className="py-3" style={{ width: LABEL_WIDTH + totalPx + 24 }}>
+          <div className="flex">
+            <div className="sticky left-0 z-20 shrink-0 bg-card" style={{ width: LABEL_WIDTH }} />
+            <div className="relative h-8" style={{ width: totalPx }}>
+              {visibleDates.map((date, i) => (
+                <Fragment key={date}>
+                  <span
+                    className="absolute top-0 truncate text-[11px] font-medium text-foreground"
+                    style={{ left: px(i * dayWidthMinutes) + 3, maxWidth: px(dayWidthMinutes) - 6 }}
+                  >
+                    {dayLabel(date)}
+                  </span>
+                  {tickHours > 0 &&
+                    Array.from(
+                      { length: Math.floor(dayWidthMinutes / 60 / tickHours) + 1 },
+                      (_, t) => t * tickHours * 60,
+                    ).map((offset) => (
+                      <span
+                        key={offset}
+                        className="absolute bottom-0 -translate-x-1/2 text-[10px] tabular-nums text-muted-foreground"
+                        style={{ left: px(i * dayWidthMinutes + offset) }}
+                      >
+                        {clockLabel(shiftStartMinute + offset)}
+                      </span>
+                    ))}
+                </Fragment>
+              ))}
+            </div>
           </div>
 
           {byCategory.map(([category, catRows]) => (
-            <div key={category} className="mb-3 last:mb-0">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div key={category} className="mt-2 first:mt-0">
+              <p className="sticky left-0 z-20 mb-1 bg-card pl-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {category}
               </p>
               {catRows.map(({ press, blocks }) => (
                 <div key={press.name} className="flex items-center">
                   <span
-                    className="shrink-0 truncate pr-2 text-xs font-medium text-foreground"
+                    className="sticky left-0 z-20 shrink-0 truncate bg-card pr-2 text-xs font-medium text-foreground"
                     style={{ width: LABEL_WIDTH }}
                     title={`${press.name} · ${press.hall}`}
                   >
                     {press.name}
                   </span>
                   <div
-                    className="relative flex-1 rounded border border-border bg-muted/30"
-                    style={{ height: ROW_HEIGHT }}
+                    className="relative rounded border border-border bg-muted/30"
+                    style={{ height: ROW_HEIGHT, width: totalPx }}
                   >
-                    {dates.map((date, i) => (
+                    {visibleDates.map((date, i) => (
                       <span
                         key={date}
                         className="absolute top-0 h-full w-px bg-border"
-                        style={{ left: `${pct(i * dayWidth)}%` }}
+                        style={{ left: px(i * dayWidthMinutes) }}
                         title={date}
                       />
                     ))}
 
                     {blocks.map((b, idx) => {
                       const id = `${press.name}-${idx}`
-                      const width = Math.max(0.05, pct(b.end) - pct(b.start))
+                      const width = Math.max(1, px(b.end - b.start))
                       const clashing =
                         b.kind === 'setup' && clashKeys.has(`${b.press}|${b.start}`)
                       return (
                         <div
                           key={id}
                           title={b.title}
-                          onMouseEnter={() => setHovered(id)}
-                          onMouseLeave={() => setHovered(null)}
-                          className={`absolute top-1 flex items-center overflow-hidden rounded-sm px-0.5 text-[9px] font-medium text-white ${
+                          className={`absolute top-1 flex items-center overflow-hidden rounded-sm px-0.5 text-[10px] font-medium text-white ${
                             clashing ? 'ring-2 ring-dashed ring-red-600' : ''
-                          } ${hovered && hovered !== id ? 'opacity-70' : ''}`}
+                          }`}
                           style={{
-                            left: `${pct(b.start)}%`,
-                            width: `${width}%`,
+                            left: px(b.start),
+                            width,
                             height: ROW_HEIGHT - 8,
                             backgroundColor: COLORS[b.kind].fill,
                           }}
                         >
-                          {width > 3 && b.label && <span className="truncate">{b.label}</span>}
+                          {width > 34 && b.label && <span className="truncate">{b.label}</span>}
                         </div>
                       )
                     })}

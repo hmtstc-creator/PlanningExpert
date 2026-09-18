@@ -11,12 +11,14 @@ import { stopMinutesInShift, type PlannedStop } from '../lib/shiftTimeline'
  * hands over and eats at fixed hours and the three shifts do not mirror each
  * other. Production is never planned into these intervals.
  */
+// Swatches match the plan's Gantt so a stop is recognisable in both places:
+// meetings and handovers yellow, tea and meals orange, the rest neutral.
 const KINDS = [
-  { value: 'handover', label: 'Shift handover', color: 'bg-orange-100 text-orange-900' },
-  { value: 'tea', label: 'Tea break', color: 'bg-amber-100 text-amber-900' },
-  { value: 'meal', label: 'Meal break', color: 'bg-amber-100 text-amber-900' },
-  { value: 'maintenance', label: 'Daily maintenance', color: 'bg-slate-200 text-slate-700' },
-  { value: 'other', label: 'Other', color: 'bg-slate-200 text-slate-700' },
+  { value: 'handover', label: 'Shift handover / meeting', swatch: '#d1ad33' },
+  { value: 'tea', label: 'Tea break', swatch: '#a8460f' },
+  { value: 'meal', label: 'Meal break', swatch: '#a8460f' },
+  { value: 'maintenance', label: 'Daily maintenance', swatch: '#64748b' },
+  { value: 'other', label: 'Other', swatch: '#64748b' },
 ] as const
 
 function clockLabel(minute: number): string {
@@ -202,8 +204,12 @@ export function PlannedStopsEditor({
                     const preset = KINDS.find((k) => k.value === s.kind)
                     return (
                       <li key={s._id} className="flex items-center gap-1 text-[11px]">
-                        <span className={`rounded px-1 py-0.5 ${preset?.color ?? 'bg-muted'}`}>
-                          {s.name}
+                        <span className="flex items-center gap-1">
+                          <span
+                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                            style={{ backgroundColor: preset?.swatch ?? '#64748b' }}
+                          />
+                          <span className="truncate">{s.name}</span>
                         </span>
                         <input
                           type="time"
