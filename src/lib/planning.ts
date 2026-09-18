@@ -15,15 +15,40 @@ export interface ShiftSettings {
   shiftMinutes: number
   overtimeShiftMinutes: number
   /**
-   * Vardiya başına planlı duruş (mola, vardiya devri, günlük bakım).
-   * Her vardiyanın süresinden düşülür — kapasite gerçekçi olsun.
+   * @deprecated stopMinutesByShift bunun yerini aldı. Duruş tanımı yoksa
+   * geriye dönük olarak her vardiyadan bu kadar dakika düşülür.
    */
   breakMinutesPerShift?: number
+  /**
+   * Vardiya bazında planlı duruş dakikası; index 0 = birinci vardiya.
+   * Vardiya devri, çay ve yemek her vardiyada farklı olabilir.
+   */
+  stopMinutesByShift?: number[]
 }
 
-/** Bir vardiyanın moladan arındırılmış net süresi (negatif olamaz). */
-function netShiftMinutes(shiftLength: number, settings: ShiftSettings): number {
-  return Math.max(0, shiftLength - (settings.breakMinutesPerShift ?? 0))
+/** Bir vardiyanın planlı duruşlardan arındırılmış net süresi. */
+function netShiftMinutes(
+  shiftLength: number,
+  settings: ShiftSettings,
+  shiftIndex: number,
+): number {
+  const stops =
+    settings.stopMinutesByShift?.[shiftIndex] ?? settings.breakMinutesPerShift ?? 0
+  return Math.max(0, shiftLength - stops)
+}
+
+/** Bir günün net kapasitesi: her vardiyanın kendi duruşları düşülerek. */
+function dayMinutes(
+  shifts: number,
+  shiftLength: number,
+  settings: ShiftSettings,
+  firstShiftIndex = 0,
+): number {
+  let total = 0
+  for (let i = 0; i < shifts; i++) {
+    total += netShiftMinutes(shiftLength, settings, firstShiftIndex + i)
+  }
+  return total
 }
 
 // ---- 1) Talep havuzu ve aciliyet -----------------------------------------
@@ -151,23 +176,45 @@ export function buildDemandSchedule(
     entriesByMaterial.set(row.material, list)
   }
 
-  // Eş ürün düşümü: A üretilirken aynı vuruştan B de çıkar, B'nin talebinden
-  // düşülmelidir.
-  for (const [material, list] of entriesByMaterial) {
-    const product = products.get(material)
-    const coProduct = product?.coProduct?.trim()
-    if (!coProduct) continue
-    const coList = entriesByMaterial.get(coProduct)
-    if (!coList) continue
+  // Eş ürün: A ve B aynı kalıptan aynı vuruşta çıkar, tek tek üretilemez.
+  // Bu yüzden ihtiyaç DÜŞÜLMEZ, İKİSİNİN MAKSİMUMU alınır.
+  //
+  // Örnek: A siparişi 1000, stok 700 → net 300. B siparişi 1500, stok 300 →
+  // net 1200. B için 1200 gerektiğinden A'dan da zorunlu 1200 üretilir
+  // (900'ü fazla stok olur). Eskiden A'nın 300'ü B'den düşülüyor, B'ye ayrıca
+  // 900 planlanıyordu — hem miktar hem setup sayısı yanlıştı.
+  const pairedWith = new Map<string, string>()
+  for (const [material] of entriesByMaterial) {
+    const co = products.get(material)?.coProduct?.trim()
+    if (!co || co === material) continue
+    pairedWith.set(material, co)
+    if (!pairedWith.has(co)) pairedWith.set(co, material)
+  }
 
-    let byproduct = list.reduce((s, e) => s + e.qty, 0)
-    for (const entry of coList) {
-      if (byproduct <= 0) break
-      const used = Math.min(byproduct, entry.qty)
-      entry.qty -= used
-      byproduct -= used
+  const levelled = new Set<string>()
+  for (const [material, partner] of pairedWith) {
+    if (levelled.has(material)) continue
+    const own = entriesByMaterial.get(material) ?? []
+    const other = entriesByMaterial.get(partner) ?? []
+    levelled.add(material)
+    levelled.add(partner)
+
+    // Hafta bazında eşitle: her iki ürünün o haftaki ihtiyacının büyüğü
+    // ikisi için de üretilecek miktardır.
+    const weeks = new Set<string>([...own, ...other].map((e) => e.dueDate))
+    for (const week of weeks) {
+      const ownWeek = own.filter((e) => e.dueDate === week)
+      const otherWeek = other.filter((e) => e.dueDate === week)
+      const ownQty = ownWeek.reduce((sum, e) => sum + e.qty, 0)
+      const otherQty = otherWeek.reduce((sum, e) => sum + e.qty, 0)
+      const required = Math.max(ownQty, otherQty)
+      if (required <= 0) continue
+
+      levelToRequired(entriesByMaterial, material, week, ownWeek, ownQty, required, baseIso)
+      levelToRequired(entriesByMaterial, partner, week, otherWeek, otherQty, required, baseIso)
     }
   }
+
 
   return Array.from(entriesByMaterial.values())
     .flat()
@@ -178,6 +225,43 @@ export function buildDemandSchedule(
         a.dueDate.localeCompare(b.dueDate) ||
         b.urgency - a.urgency,
     )
+}
+
+/**
+ * Bir eş ürünün belirli haftadaki miktarını gereken seviyeye çıkarır.
+ * Kalem yoksa (o hafta hiç ihtiyacı yoksa ama eşi üretiliyorsa) yeni bir
+ * kalem açılır — zorunlu birlikte üretim budur.
+ */
+function levelToRequired(
+  entriesByMaterial: Map<string, DemandEntry[]>,
+  material: string,
+  week: string,
+  weekEntries: DemandEntry[],
+  currentQty: number,
+  required: number,
+  baseIso: string,
+): void {
+  if (currentQty >= required) return
+  const extra = required - currentQty
+
+  if (weekEntries.length > 0) {
+    // Mevcut kalemin üzerine ekle; faz ve aciliyet korunur.
+    weekEntries[0].qty += extra
+    return
+  }
+
+  const list = entriesByMaterial.get(material) ?? []
+  list.push({
+    material,
+    qty: extra,
+    dueDate: week,
+    earliestDate: week < baseIso ? baseIso : week,
+    bucketLabel: 'Co-product',
+    phase: 'fill',
+    urgency: 0,
+    daysOfCover: Number.POSITIVE_INFINITY,
+  })
+  entriesByMaterial.set(material, list)
 }
 
 function phaseRank(phase: DemandEntry['phase']): number {
@@ -201,6 +285,14 @@ export interface ProductSpec {
   coilSetupMinutes?: number
   /** Kalıbın bakım öncesi maksimum baskı sayısı. */
   maxShots?: number
+  /** Setup sonrası ilk parça / kalite onayı süresi (dk). */
+  qualityApprovalMinutes?: number
+  /**
+   * Kalıp bazlı OEE çarpanı (0–1). Kalite %100 kabul edildiği için
+   * kullanılabilirlik × performans demektir. 0.5 girilirse işin toplam
+   * penceresi teorik sürenin iki katı olur.
+   */
+  performanceFactor?: number
   mainMachine?: string
   altMachine1?: string
   altMachine2?: string
@@ -216,10 +308,21 @@ export interface RunPlan {
   kgNeeded: number
   shotsPerCoil: number
   coilsNeeded: number
+  /** İdeal hızda üretim süresi (dk) — çarpan uygulanmamış. */
+  theoreticalRunMinutes: number
+  /** Gantt'ta çizilecek üretim süresi (dk) — çarpan uygulanmış. */
   runMinutes: number
   setupMinutes: number
   coilSetupMinutes: number
+  /** Setup sonrası kalite onayı (dk). */
+  qualityApprovalMinutes: number
+  /** İşin toplam penceresi: setup + rulo setup + kalite onayı + üretim. */
   totalMinutes: number
+  /**
+   * Toplam pencere, çarpanın öngördüğünden uzun oldu: setup ve onay
+   * süreleri pencereye sığmadığı için üretim teorik süreye çekildi.
+   */
+  clampedToTheoretical: boolean
   /** Kalıp limiti aşılıyorsa true — üretim bölünmeli veya bakım gerekir. */
   exceedsMoldLimit: boolean
 }
@@ -233,7 +336,7 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   const cavities = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
   const shots = Math.ceil(quantity / cavities)
   const spm = product.spm && product.spm > 0 ? product.spm : 0
-  const runMinutes = spm > 0 ? shots / spm : 0
+  const theoreticalRunMinutes = spm > 0 ? shots / spm : 0
 
   const grossWeight = product.grossWeight ?? 0
   const coilWeight = product.coilWeight ?? 0
@@ -243,6 +346,24 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
 
   const setupMinutes = product.setupMinutes ?? 0
   const coilSetupMinutes = (product.coilSetupMinutes ?? 0) * coilsNeeded
+  const qualityApprovalMinutes = product.qualityApprovalMinutes ?? 0
+  const nonProductive = setupMinutes + coilSetupMinutes + qualityApprovalMinutes
+
+  // Kalıp bazlı OEE çarpanı işin TOPLAM penceresini belirler; setup, rulo
+  // setup ve kalite onayı bu pencerenin içinden düşülür. Örnek: 2000 parça
+  // için teorik 60 dk, çarpan %50 → pencere 120 dk; 30 dk setup + 10 dk
+  // onay düşülünce üretim 80 dk kalır.
+  const factor =
+    product.performanceFactor && product.performanceFactor > 0
+      ? Math.min(1, product.performanceFactor)
+      : 1
+  const window = factor < 1 ? theoreticalRunMinutes / factor : theoreticalRunMinutes + nonProductive
+
+  // Pencere setup+onayı karşılamıyorsa üretim negatife düşemez; makine
+  // teorik süreden hızlı da olamaz, bu yüzden teorik süreye çekilir.
+  const runFromWindow = window - nonProductive
+  const clampedToTheoretical = runFromWindow < theoreticalRunMinutes
+  const runMinutes = clampedToTheoretical ? theoreticalRunMinutes : runFromWindow
 
   return {
     quantity,
@@ -251,10 +372,13 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
     kgNeeded,
     shotsPerCoil,
     coilsNeeded,
+    theoreticalRunMinutes,
     runMinutes,
     setupMinutes,
     coilSetupMinutes,
-    totalMinutes: setupMinutes + coilSetupMinutes + runMinutes,
+    qualityApprovalMinutes,
+    totalMinutes: nonProductive + runMinutes,
+    clampedToTheoretical,
     exceedsMoldLimit: !!product.maxShots && product.maxShots > 0 && shots > product.maxShots,
   }
 }
@@ -340,7 +464,7 @@ export function buildWeekBuckets(
         shifts: pattern.shiftsPerDay,
         isOvertime: false,
         isHoliday: false,
-        minutes: pattern.shiftsPerDay * netShiftMinutes(settings.shiftMinutes, settings),
+        minutes: dayMinutes(pattern.shiftsPerDay, settings.shiftMinutes, settings),
       })
     } else if (overtimeShiftsLeft > 0) {
       const shifts = Math.min(overtimeShiftsLeft, 3)
@@ -351,7 +475,7 @@ export function buildWeekBuckets(
         shifts,
         isOvertime: true,
         isHoliday: false,
-        minutes: shifts * netShiftMinutes(settings.overtimeShiftMinutes, settings),
+        minutes: dayMinutes(shifts, settings.overtimeShiftMinutes, settings),
       })
     } else {
       buckets.push({ date: dateStr, dayKey, shifts: 0, isOvertime: false, isHoliday: false, minutes: 0 })
@@ -363,8 +487,8 @@ export function buildWeekBuckets(
 
 export function weekTotalMinutes(pattern: WeekPattern, settings: ShiftSettings): number {
   return (
-    pattern.workingDays * pattern.shiftsPerDay * netShiftMinutes(settings.shiftMinutes, settings) +
-    pattern.overtimeShifts * netShiftMinutes(settings.overtimeShiftMinutes, settings)
+    pattern.workingDays * dayMinutes(pattern.shiftsPerDay, settings.shiftMinutes, settings) +
+    dayMinutes(pattern.overtimeShifts, settings.overtimeShiftMinutes, settings)
   )
 }
 

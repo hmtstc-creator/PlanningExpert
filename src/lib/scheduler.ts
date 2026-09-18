@@ -32,6 +32,12 @@ export interface PlanOverride {
 export interface SchedulerOptions {
   /** Ardışık setuplar arasında bırakılacak minimum dakika (vinç kısıtı). */
   setupGapMinutes: number
+  /**
+   * Bir vardiyanın net üretim dakikası. Verilirse setup vardiya sınırını
+   * aşamaz: bitişe yetmeyen setup sonraki vardiyaya atılır, çünkü sahada
+   * bitiremeyeceği setup'ı başlatan ekip yoktur.
+   */
+  netShiftMinutes?: number
   /** Aynı holde aynı anda yapılabilecek setup sayısı. */
   concurrentSetupsPerHall: number
   /** Kullanıcının elle müdahaleleri. */
@@ -60,9 +66,12 @@ export interface ScheduledJob {
   coProductQuantity: number
   setupStartMinute: number
   setupEndMinute: number
+  /** Kalite onayının bittiği, üretimin başladığı dakika. */
+  qualityEndMinute: number
   endMinute: number
   runMinutes: number
   setupMinutes: number
+  qualityApprovalMinutes: number
   reason: string
 }
 
@@ -325,6 +334,7 @@ interface Placement {
   date: string
   setupStart: number
   setupEnd: number
+  qualityEnd: number
   end: number
 }
 
@@ -349,11 +359,22 @@ function tryPlaceOnPress(
   const intervals = moldIntervalsFor(moldUsage, entry.material, date)
 
   let start = dayState.cursor
-  for (let guard = 0; guard < intervals.length + 2; guard++) {
-    const setupStart =
+  for (let guard = 0; guard < intervals.length + 4; guard++) {
+    let setupStart =
       setupMinutes > 0 ? earliestSetupStart(hallLog, hall, start, options) : start
+
+    // Setup vardiya sınırını aşamaz.
+    const perShift = options.netShiftMinutes
+    if (perShift && perShift > 0 && setupMinutes + coilSetup > 0) {
+      const duration = setupMinutes + coilSetup
+      const shiftIndex = Math.floor(setupStart / perShift)
+      const shiftEnd = (shiftIndex + 1) * perShift
+      if (setupStart + duration > shiftEnd) setupStart = shiftEnd
+    }
+
     const setupEnd = setupStart + setupMinutes + coilSetup
-    const end = setupEnd + run.runMinutes
+    const qualityEnd = setupEnd + run.qualityApprovalMinutes
+    const end = qualityEnd + run.runMinutes
 
     // Kalıp çakışması: aynı kalıp başka bir preste bu aralıkta meşgulse
     // işi o işin bitişine ötele.
@@ -362,7 +383,7 @@ function tryPlaceOnPress(
     )
     if (conflicts.length === 0) {
       if (end > dayState.capacity) return null
-      return { press: pressName, date, setupStart, setupEnd, end }
+      return { press: pressName, date, setupStart, setupEnd, qualityEnd, end }
     }
     start = Math.max(...conflicts.map((c) => c.end))
     if (start >= dayState.capacity) return null
@@ -448,6 +469,12 @@ function placeRun(
     `${run.coilsNeeded} coils`,
     sameMaterial ? 'setup not repeated' : `setup ${run.setupMinutes} min`,
   ]
+  if (run.qualityApprovalMinutes > 0) {
+    reasonParts.push(`approval ${run.qualityApprovalMinutes} min`)
+  }
+  if (run.clampedToTheoretical) {
+    reasonParts.push('⚠ window too short for setup + approval')
+  }
   if (late) reasonParts.push(`⚠ later than required week ${entry.dueDate}`)
   if (pinned) reasonParts.push('pinned by user')
 
@@ -469,9 +496,11 @@ function placeRun(
     coProductQuantity: run.coProductQuantity,
     setupStartMinute: best.setupStart,
     setupEndMinute: best.setupEnd,
+    qualityEndMinute: best.qualityEnd,
     endMinute: best.end,
     runMinutes: run.runMinutes,
     setupMinutes: sameMaterial ? 0 : run.setupMinutes,
+    qualityApprovalMinutes: run.qualityApprovalMinutes,
     reason: reasonParts.join(' · '),
   }
 }

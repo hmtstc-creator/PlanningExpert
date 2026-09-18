@@ -153,20 +153,21 @@ describe('planlama hattı (uçtan uca)', () => {
     expect(new Set(result.jobs.map((j) => j.press)).size).toBeGreaterThan(1)
   })
 
-  it('eş üründen çıkan miktar eş ürünün talebinden düşülür', () => {
+  it('eş ürünlerin ihtiyacı hafta bazında maksimuma eşitlenir', () => {
     const { demand } = runPipeline()
-    const plannedA = demand
-      .filter((e) => e.material === 'MAM-A')
-      .reduce((s, e) => s + e.qty, 0)
-    const plannedB = demand
-      .filter((e) => e.material === 'MAM-B')
-      .reduce((s, e) => s + e.qty, 0)
-    const rawBDemand = 8000 // 4000 + 4000
-
-    expect(plannedA).toBeGreaterThan(rawBDemand)
-    // A'dan çıkan eş ürün B'nin tüm talebini karşılar.
-    expect(plannedB).toBe(0)
+    const weeks = new Set(demand.map((e) => e.dueDate))
+    for (const week of weeks) {
+      const a = demand
+        .filter((e) => e.material === 'MAM-A' && e.dueDate === week)
+        .reduce((s, e) => s + e.qty, 0)
+      const b = demand
+        .filter((e) => e.material === 'MAM-B' && e.dueDate === week)
+        .reduce((s, e) => s + e.qty, 0)
+      // Aynı kalıptan çıktıkları için ikisi de aynı miktarda üretilir.
+      if (a > 0 || b > 0) expect(a).toBe(b)
+    }
   })
+
 
   it('tatil gününe hiçbir iş yerleştirilmez', () => {
     const holiday = '2026-09-16'

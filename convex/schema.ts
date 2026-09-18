@@ -34,6 +34,11 @@ export default defineSchema({
     altMachine4: v.optional(v.string()),
     // Kalıbın bakım öncesi maksimum baskı (shot) limiti — kullanıcı tanımlar.
     maxShots: v.optional(v.number()),
+    // Setup sonrası ilk parça / kalite onayı süresi (dk).
+    qualityApprovalMinutes: v.optional(v.number()),
+    // Kalıp bazlı OEE çarpanı (0–1): kullanılabilirlik × performans.
+    // İşin toplam penceresini belirler; setup ve onay bu pencereden düşülür.
+    performanceFactor: v.optional(v.number()),
     name: v.optional(v.string()),
     material: v.optional(v.string()),
     cycleTimeSeconds: v.optional(v.number()),
@@ -48,8 +53,15 @@ export default defineSchema({
   // setup yapamaz (vinç kısıtı) — planlama motoru bunu buradan okur.
   presses: defineTable({
     name: v.string(),
+    // Hol vinç kısıtıdır: aynı holde eşzamanlı setup sınırlıdır.
     hall: v.string(),
+    // Kategori yalnızca gruplama/görüntüleme içindir; makine uygunluğu
+    // master data'daki ana/alternatif makinelerden gelir.
+    category: v.optional(v.string()),
     tonnage: v.optional(v.number()),
+    // Bu presin planı kaç gün ileriye kadar dondurulmuş sayılsın.
+    // Tanımsızsa global ayar geçerlidir.
+    frozenDays: v.optional(v.number()),
   }).index('by_name', ['name']),
 
   demandWeekly: defineTable({
@@ -115,9 +127,26 @@ export default defineSchema({
     // Planlamanın kaç haftalık ufka baktığı. Çalışma takvimi 30 hafta
     // gösterir; plan ufku bundan bağımsız ve ayarlanabilirdir.
     planningHorizonWeeks: v.optional(v.number()),
-    // Vardiya başına planlı duruş (mola, vardiya devri, günlük bakım).
+    // @deprecated plannedStops tablosu bunun yerini aldı; eski kayıtlarla
+    // uyum için tutuluyor.
     breakMinutesPerShift: v.optional(v.number()),
+    // Planın ilk kaç günü dondurulmuş sayılsın (0 = kapalı).
+    frozenDays: v.optional(v.number()),
   }).index('by_key', ['key']),
+
+  // Planlı duruşlar: vardiya devri, çay, yemek, günlük bakım. Her vardiya
+  // için elle tanımlanır ve tüm presler için ortaktır. Üretim bu aralıklara
+  // yerleştirilmez.
+  plannedStops: defineTable({
+    // 1 = birinci vardiya, 2 = ikinci, 3 = üçüncü.
+    shiftIndex: v.number(),
+    name: v.string(),
+    // 'handover' | 'tea' | 'meal' | 'maintenance' | 'other'
+    kind: v.string(),
+    // Gerçek saat (gece yarısından dakika), ör. 720 = 12:00.
+    startMinute: v.number(),
+    durationMinutes: v.number(),
+  }).index('by_shift', ['shiftIndex']),
 
   // Her presin "standart" haftalık düzeni: kaç gün çalışılır, gün başına
   // kaç vardiya, haftalık kaç fazla mesai vardiyası. 30 haftalık takvimde

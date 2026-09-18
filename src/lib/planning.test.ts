@@ -114,32 +114,81 @@ describe('buildDemandSchedule', () => {
     expect(entries[0].earliestDate).toBe('2026-10-05')
   })
 
-  it('eş üründen çıkan miktarı eş ürünün talebinden düşer', () => {
+  it('eş ürünlerde ihtiyacı düşmez, ikisinin maksimumunu alır', () => {
+    // Kullanıcının verdiği örnek: A siparişi 1000 / stok 700 → net 300.
+    // B siparişi 1500 / stok 300 → net 1200. Aynı kalıptan çıktıkları için
+    // ikisinden de 1200 üretilir; A'nın 900'ü fazla stok olur.
     const products = new Map<string, ProductSpec>([['A', { code: 'A', coProduct: 'B' }]])
     const entries = buildDemandSchedule(
       [
-        { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 0 },
-        { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: 800 }], stock: 0 },
+        { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 700 },
+        { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: 1500 }], stock: 300 },
       ],
       products,
       { baseMonday },
     )
-    // A üretilirken B de çıkar => B'nin 800'ü karşılanır, listede kalmaz.
-    expect(entries.map((e) => e.material)).toEqual(['A'])
+    const qty = (m: string) =>
+      entries.filter((e) => e.material === m).reduce((sum, e) => sum + e.qty, 0)
+    expect(qty('A')).toBe(1200)
+    expect(qty('B')).toBe(1200)
   })
 
-  it('eş üründen artan talep listede kalır', () => {
+  it('eşi olmayan hafta için eş üründe yeni kalem açar', () => {
+    // B'nin 2. haftada ihtiyacı var, A'nın yok. A yine de üretilmek zorunda.
     const products = new Map<string, ProductSpec>([['A', { code: 'A', coProduct: 'B' }]])
     const entries = buildDemandSchedule(
       [
-        { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 600 }], stock: 0 },
-        { material: 'B', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 0 },
+        { material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 500 }], stock: 0 },
+        {
+          material: 'B',
+          overdue: 0,
+          periods: [
+            { label: 'W1', qty: 500 },
+            { label: 'W2', qty: 800 },
+          ],
+          stock: 0,
+        },
       ],
       products,
       { baseMonday },
     )
-    const b = entries.find((e) => e.material === 'B')!
-    expect(b.qty).toBe(400)
+    const aWeek2 = entries.filter((e) => e.material === 'A' && e.dueDate === '2026-09-21')
+    expect(aWeek2.reduce((sum, e) => sum + e.qty, 0)).toBe(800)
+  })
+
+  it('eş ürün eşitlemesini hafta bazında yapar', () => {
+    const products = new Map<string, ProductSpec>([['A', { code: 'A', coProduct: 'B' }]])
+    const entries = buildDemandSchedule(
+      [
+        {
+          material: 'A',
+          overdue: 0,
+          periods: [
+            { label: 'W1', qty: 1000 },
+            { label: 'W2', qty: 200 },
+          ],
+          stock: 0,
+        },
+        {
+          material: 'B',
+          overdue: 0,
+          periods: [
+            { label: 'W1', qty: 400 },
+            { label: 'W2', qty: 900 },
+          ],
+          stock: 0,
+        },
+      ],
+      products,
+      { baseMonday },
+    )
+    const at = (m: string, d: string) =>
+      entries.filter((e) => e.material === m && e.dueDate === d).reduce((s, e) => s + e.qty, 0)
+    // 1. hafta A baskın (1000), 2. hafta B baskın (900).
+    expect(at('A', '2026-09-14')).toBe(1000)
+    expect(at('B', '2026-09-14')).toBe(1000)
+    expect(at('A', '2026-09-21')).toBe(900)
+    expect(at('B', '2026-09-21')).toBe(900)
   })
 })
 
@@ -174,6 +223,61 @@ describe('computeRunPlan', () => {
     const withCo = computeRunPlan({ ...product, coProduct: 'M2' }, 10_000)
     expect(withCo.coProductQuantity).toBe(10_000)
     expect(computeRunPlan(product, 10_000).coProductQuantity).toBe(0)
+  })
+
+  it('performans çarpanı işin toplam penceresini belirler', () => {
+    // Kullanıcının örneği: 2000 parça, teorik 60 dk, çarpan %50 → pencere
+    // 120 dk. 30 dk setup + 10 dk kalite onayı düşülünce üretim 80 dk.
+    const spec: ProductSpec = {
+      code: 'M1',
+      moldCavities: 1,
+      spm: 2000 / 60,
+      setupMinutes: 30,
+      coilSetupMinutes: 0,
+      qualityApprovalMinutes: 10,
+      performanceFactor: 0.5,
+    }
+    const plan = computeRunPlan(spec, 2000)
+    expect(plan.theoreticalRunMinutes).toBeCloseTo(60)
+    expect(plan.totalMinutes).toBeCloseTo(120)
+    expect(plan.runMinutes).toBeCloseTo(80)
+    expect(plan.qualityApprovalMinutes).toBe(10)
+    expect(plan.clampedToTheoretical).toBe(false)
+  })
+
+  it('çarpan tanımsızsa süreler teorik kalır', () => {
+    const spec: ProductSpec = {
+      code: 'M1',
+      moldCavities: 1,
+      spm: 2000 / 60,
+      setupMinutes: 30,
+      qualityApprovalMinutes: 10,
+    }
+    const plan = computeRunPlan(spec, 2000)
+    expect(plan.runMinutes).toBeCloseTo(60)
+    expect(plan.totalMinutes).toBeCloseTo(100)
+  })
+
+  it('pencere setup ve onayı karşılamıyorsa üretimi teorik süreye çeker', () => {
+    // Küçük parti: teorik 2 dk, çarpan %50 → pencere 4 dk. Ama setup 30 dk.
+    // Üretim negatife düşemez, teorik süreye çekilir ve işaretlenir.
+    const spec: ProductSpec = {
+      code: 'M1',
+      moldCavities: 1,
+      spm: 50,
+      setupMinutes: 30,
+      qualityApprovalMinutes: 10,
+      performanceFactor: 0.5,
+    }
+    const plan = computeRunPlan(spec, 100)
+    expect(plan.clampedToTheoretical).toBe(true)
+    expect(plan.runMinutes).toBeCloseTo(2)
+    expect(plan.totalMinutes).toBeCloseTo(42)
+  })
+
+  it('kalite onayı toplam süreye dahildir', () => {
+    const plan = computeRunPlan({ ...product, qualityApprovalMinutes: 20 }, 10_000)
+    expect(plan.totalMinutes).toBe(30 + 15 + 20 + plan.runMinutes)
   })
 
   it('kalıp max shot limitini işaretler', () => {
@@ -383,5 +487,41 @@ describe('haftalık toplamlar', () => {
     expect(weekTotalMinutes(pattern, { shiftMinutes: 480, overtimeShiftMinutes: 480 })).toBe(
       17 * 480,
     )
+  })
+})
+
+describe('vardiya bazlı planlı duruşlar', () => {
+  const monday = new Date(2026, 8, 14)
+
+  it('her vardiyadan kendi duruş süresini düşer', () => {
+    // 1. vardiya 45 dk duruş, 2. vardiya 15 dk, 3. vardiya 30 dk.
+    const buckets = buildWeekBuckets(
+      monday,
+      { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 0 },
+      {
+        shiftMinutes: 480,
+        overtimeShiftMinutes: 480,
+        stopMinutesByShift: [45, 15, 30],
+      },
+    )
+    expect(buckets[0].minutes).toBe(435 + 465 + 450)
+  })
+
+  it('tanımsız vardiya için eski tek sayıya düşer', () => {
+    const buckets = buildWeekBuckets(
+      monday,
+      { workingDays: 5, shiftsPerDay: 2, overtimeShifts: 0 },
+      { shiftMinutes: 480, overtimeShiftMinutes: 480, breakMinutesPerShift: 30 },
+    )
+    expect(buckets[0].minutes).toBe(900)
+  })
+
+  it('haftalık toplam da vardiya bazlı duruşu yansıtır', () => {
+    expect(
+      weekTotalMinutes(
+        { workingDays: 5, shiftsPerDay: 2, overtimeShifts: 0 },
+        { shiftMinutes: 480, overtimeShiftMinutes: 480, stopMinutesByShift: [60, 0] },
+      ),
+    ).toBe(5 * (420 + 480))
   })
 })
