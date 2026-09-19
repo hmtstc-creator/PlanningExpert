@@ -6,6 +6,7 @@ import { ErrorBanner } from '../components/ErrorBanner'
 import { useMutation, useQuery } from '../lib/convexTransport'
 import { useCurrentUser } from '../lib/currentUser'
 import { isoDate } from '../lib/dates'
+import { downscaleImage } from '../lib/imageResize'
 import {
   byMold,
   byOperation,
@@ -97,14 +98,17 @@ function MoldProblemPage() {
       // kimlikleri alır. Büyük dosyayı mutasyonun içinden geçirmek boyut
       // sınırına takılırdı.
       const photos: string[] = []
-      for (const file of files) {
+      for (const original of files) {
+        // Telefon karesi 3–5 MB; kusuru göstermek için gereken çok altı.
+        // Küçültme başarısız olursa özgün dosya yüklenir — kayıt kaybolmaz.
+        const file = await downscaleImage(original)
         const url = await generateUploadUrl()
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': file.type },
           body: file,
         })
-        if (!response.ok) throw new Error(`${file.name} could not be uploaded`)
+        if (!response.ok) throw new Error(`${original.name} could not be uploaded`)
         const { storageId } = (await response.json()) as { storageId: string }
         photos.push(storageId)
       }
@@ -227,6 +231,9 @@ function MoldProblemPage() {
               className="mt-1 w-full text-sm text-foreground file:mr-2 file:rounded-md file:border-0 file:bg-muted file:px-2 file:py-1.5 file:text-xs"
               onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
             />
+            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+              Shrunk to 1600px before upload
+            </span>
           </label>
           <label className="text-sm sm:col-span-3">
             <span className="block text-xs text-muted-foreground">What happened?</span>
