@@ -265,7 +265,7 @@ function ReferanslarPage() {
           <Field label="Alternative 2" value={form.altMachine2} onChange={(v) => update('altMachine2', v)} placeholder="" />
           <Field label="Alternative 3" value={form.altMachine3} onChange={(v) => update('altMachine3', v)} placeholder="" />
           <Field label="Alternative 4" value={form.altMachine4} onChange={(v) => update('altMachine4', v)} placeholder="" />
-          <Field label="Max Shot limit" value={form.maxShots} onChange={(v) => update('maxShots', v)} type="number" placeholder="500000" />
+          <Field label="Periodic maintenance limit (shots)" value={form.maxShots} onChange={(v) => update('maxShots', v)} type="number" placeholder="500000" />
           <Field label="Quality Approval (min)" value={form.qualityApprovalMinutes} onChange={(v) => update('qualityApprovalMinutes', v)} type="number" placeholder="10" />
           <Field label="Performance factor (0–1)" value={form.performanceFactor} onChange={(v) => update('performanceFactor', v)} type="number" placeholder="0.8" />
 
@@ -317,7 +317,9 @@ function ReferanslarPage() {
               <th className="px-3 py-2 font-medium">Coil Setup</th>
               <th className="px-3 py-2 font-medium">Main Machine</th>
               <th className="px-3 py-2 font-medium">Alternatives</th>
-              <th className="px-3 py-2 font-medium">Max Shot</th>
+              <th className="px-3 py-2 font-medium" title="Shots after which periodic (heavy) maintenance is due">
+                    Periodic limit
+                  </th>
               <th className="px-3 py-2 font-medium" title="First-piece approval after setup">Approval</th>
               <th className="px-3 py-2 font-medium" title="Availability × performance; quality assumed 100%">Perf.</th>
               <th className="px-3 py-2" />

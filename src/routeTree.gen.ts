@@ -13,15 +13,18 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DepolarRouteImport } from './routes/depolar'
 import { Route as GerceklesenRouteImport } from './routes/gerceklesen'
 import { Route as KaliplarRouteImport } from './routes/kaliplar'
+import { Route as KalipproblemRouteImport } from './routes/kalipproblem'
 import { Route as KayitlarRouteImport } from './routes/kayitlar'
 import { Route as MakinelerRouteImport } from './routes/makineler'
 import { Route as PerformansRouteImport } from './routes/performans'
 import { Route as PlanlamaRouteImport } from './routes/planlama'
+import { Route as PresbakimRouteImport } from './routes/presbakim'
 import { Route as ReferanslarRouteImport } from './routes/referanslar'
 import { Route as SiparislerRouteImport } from './routes/siparisler'
 import { Route as StoklarRouteImport } from './routes/stoklar'
 import { Route as TakvimRouteImport } from './routes/takvim'
 import { Route as TaniRouteImport } from './routes/tani'
+import { Route as YonetimRouteImport } from './routes/yonetim'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -43,6 +46,11 @@ const KaliplarRoute = KaliplarRouteImport.update({
   path: '/kaliplar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KalipproblemRoute = KalipproblemRouteImport.update({
+  id: '/kalipproblem',
+  path: '/kalipproblem',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KayitlarRoute = KayitlarRouteImport.update({
   id: '/kayitlar',
   path: '/kayitlar',
@@ -61,6 +69,11 @@ const PerformansRoute = PerformansRouteImport.update({
 const PlanlamaRoute = PlanlamaRouteImport.update({
   id: '/planlama',
   path: '/planlama',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PresbakimRoute = PresbakimRouteImport.update({
+  id: '/presbakim',
+  path: '/presbakim',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReferanslarRoute = ReferanslarRouteImport.update({
@@ -88,36 +101,47 @@ const TaniRoute = TaniRouteImport.update({
   path: '/tani',
   getParentRoute: () => rootRouteImport,
 } as any)
+const YonetimRoute = YonetimRouteImport.update({
+  id: '/yonetim',
+  path: '/yonetim',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
+  '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
+  '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/siparisler': typeof SiparislerRoute
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
   '/tani': typeof TaniRoute
+  '/yonetim': typeof YonetimRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
+  '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
+  '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/siparisler': typeof SiparislerRoute
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
   '/tani': typeof TaniRoute
+  '/yonetim': typeof YonetimRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,15 +149,18 @@ export interface FileRoutesById {
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
+  '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
+  '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/siparisler': typeof SiparislerRoute
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
   '/tani': typeof TaniRoute
+  '/yonetim': typeof YonetimRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -142,45 +169,54 @@ export interface FileRouteTypes {
     | '/depolar'
     | '/gerceklesen'
     | '/kaliplar'
+    | '/kalipproblem'
     | '/kayitlar'
     | '/makineler'
     | '/performans'
     | '/planlama'
+    | '/presbakim'
     | '/referanslar'
     | '/siparisler'
     | '/stoklar'
     | '/takvim'
     | '/tani'
+    | '/yonetim'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/depolar'
     | '/gerceklesen'
     | '/kaliplar'
+    | '/kalipproblem'
     | '/kayitlar'
     | '/makineler'
     | '/performans'
     | '/planlama'
+    | '/presbakim'
     | '/referanslar'
     | '/siparisler'
     | '/stoklar'
     | '/takvim'
     | '/tani'
+    | '/yonetim'
   id:
     | '__root__'
     | '/'
     | '/depolar'
     | '/gerceklesen'
     | '/kaliplar'
+    | '/kalipproblem'
     | '/kayitlar'
     | '/makineler'
     | '/performans'
     | '/planlama'
+    | '/presbakim'
     | '/referanslar'
     | '/siparisler'
     | '/stoklar'
     | '/takvim'
     | '/tani'
+    | '/yonetim'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -188,15 +224,18 @@ export interface RootRouteChildren {
   DepolarRoute: typeof DepolarRoute
   GerceklesenRoute: typeof GerceklesenRoute
   KaliplarRoute: typeof KaliplarRoute
+  KalipproblemRoute: typeof KalipproblemRoute
   KayitlarRoute: typeof KayitlarRoute
   MakinelerRoute: typeof MakinelerRoute
   PerformansRoute: typeof PerformansRoute
   PlanlamaRoute: typeof PlanlamaRoute
+  PresbakimRoute: typeof PresbakimRoute
   ReferanslarRoute: typeof ReferanslarRoute
   SiparislerRoute: typeof SiparislerRoute
   StoklarRoute: typeof StoklarRoute
   TakvimRoute: typeof TakvimRoute
   TaniRoute: typeof TaniRoute
+  YonetimRoute: typeof YonetimRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -229,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KaliplarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kalipproblem': {
+      id: '/kalipproblem'
+      path: '/kalipproblem'
+      fullPath: '/kalipproblem'
+      preLoaderRoute: typeof KalipproblemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kayitlar': {
       id: '/kayitlar'
       path: '/kayitlar'
@@ -255,6 +301,13 @@ declare module '@tanstack/react-router' {
       path: '/planlama'
       fullPath: '/planlama'
       preLoaderRoute: typeof PlanlamaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/presbakim': {
+      id: '/presbakim'
+      path: '/presbakim'
+      fullPath: '/presbakim'
+      preLoaderRoute: typeof PresbakimRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/referanslar': {
@@ -292,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TaniRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/yonetim': {
+      id: '/yonetim'
+      path: '/yonetim'
+      fullPath: '/yonetim'
+      preLoaderRoute: typeof YonetimRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -300,15 +360,18 @@ const rootRouteChildren: RootRouteChildren = {
   DepolarRoute: DepolarRoute,
   GerceklesenRoute: GerceklesenRoute,
   KaliplarRoute: KaliplarRoute,
+  KalipproblemRoute: KalipproblemRoute,
   KayitlarRoute: KayitlarRoute,
   MakinelerRoute: MakinelerRoute,
   PerformansRoute: PerformansRoute,
   PlanlamaRoute: PlanlamaRoute,
+  PresbakimRoute: PresbakimRoute,
   ReferanslarRoute: ReferanslarRoute,
   SiparislerRoute: SiparislerRoute,
   StoklarRoute: StoklarRoute,
   TakvimRoute: TakvimRoute,
   TaniRoute: TaniRoute,
+  YonetimRoute: YonetimRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -29,6 +29,10 @@ const COLORS = {
   run: { fill: '#5aa97b', label: 'Production' },
   meeting: { fill: '#d1ad33', label: 'Meeting / handover' },
   stop: { fill: '#a8460f', label: 'Tea / meal break' },
+  // Bakım kategorik paletten renk almıyor: nötr gri + çapraz tarama. Presin
+  // kapalı olması bir üretim türü değil, üretimin yokluğudur; renkli olsaydı
+  // grafikte bir iş gibi okunurdu.
+  maintenance: { fill: '#475569', label: 'Press maintenance' },
   other: { fill: '#475569', label: 'Other stop' },
 } as const
 
@@ -46,7 +50,7 @@ const ZOOM_STEPS = [3, 5, 8, 14, 24, 40, 70, 120] as const
 const DEFAULT_ZOOM = 4
 
 export interface WeekGanttSegment {
-  kind: 'setup' | 'quality' | 'run' | 'coil'
+  kind: 'setup' | 'quality' | 'run' | 'coil' | 'maintenance'
   /**
    * The segment's own day. A job is not confined to one day: production that
    * does not fit before the shift closes continues the next morning, so each
@@ -217,13 +221,17 @@ export function WeekGantt({
               longLabel:
                 kind === 'coil'
                   ? undefined
-                  : `${job.material} (${job.quantity.toLocaleString('en-GB')})${
-                      carriedOver ? ' ↻' : ''
-                    }`,
+                  : kind === 'maintenance'
+                    ? job.material
+                    : `${job.material} (${job.quantity.toLocaleString('en-GB')})${
+                        carriedOver ? ' ↻' : ''
+                      }`,
               title:
                 `${job.material} · ${COLORS[kind].label} · ` +
                 `${clockLabel(seg.start)}–${clockLabel(seg.end)}` +
-                ` · ${job.quantity.toLocaleString('en-GB')} pcs` +
+                (kind === 'maintenance'
+                  ? ''
+                  : ` · ${job.quantity.toLocaleString('en-GB')} pcs`) +
                 (carriedOver ? ` · continued from ${job.date}` : '') +
                 (job.frozen ? ' · FROZEN (from the approved plan)' : '') +
                 (job.late ? ' · LATE' : ''),
@@ -535,9 +543,15 @@ export function WeekGantt({
                               // Dondurulmuş iş taralı çizilir: rengi korur
                               // (hangi iş olduğu belli kalsın) ama dokusundan
                               // yeniden planlanmayacağı anlaşılır.
-                              backgroundImage: b.frozen
-                                ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.35) 0 3px, transparent 3px 7px)'
-                                : undefined,
+                              backgroundImage:
+                                b.kind === 'maintenance'
+                                  ? // Bakım taraması dondurulmuş işinkinden
+                                    // daha sık ve belirgin: makine kapalı,
+                                    // yapılacak bir iş değil.
+                                    'repeating-linear-gradient(45deg, rgba(255,255,255,0.45) 0 4px, transparent 4px 8px)'
+                                  : b.frozen
+                                    ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.35) 0 3px, transparent 3px 7px)'
+                                    : undefined,
                             }}
                           >
                             {width > 34 && b.label && (

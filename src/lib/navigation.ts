@@ -42,15 +42,23 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'Maintenance',
+    items: [
+      { to: '/presbakim', label: 'Press Maintenance', hint: 'Which press is down, and when' },
+      { to: '/kaliplar', label: 'Mold Maintenance', hint: 'Readiness, bookings, shot limits' },
+      { to: '/kalipproblem', label: 'Mold Problems', hint: 'Report, solve, and report on faults' },
+    ],
+  },
+  {
     label: 'Analysis',
     items: [
       { to: '/performans', label: 'Performance', hint: 'Plan versus actual' },
-      { to: '/kaliplar', label: 'Mold Life', hint: 'Shots since last maintenance' },
     ],
   },
   {
     label: 'System',
     items: [
+      { to: '/yonetim', label: 'Admin', hint: 'Users, lists, who changed what' },
       { to: '/kayitlar', label: 'Change Log', hint: 'Decisions and rules' },
       { to: '/tani', label: 'Connection Diagnostics', hint: 'Is this device connected?' },
     ],

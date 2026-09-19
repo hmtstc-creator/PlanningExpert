@@ -936,3 +936,69 @@ describe('dondurulmuş ufuk', () => {
     expect(result.jobs[0].setupStartMinute).toBe(0)
   })
 })
+
+describe('gün içinde geçmiş saatler', () => {
+  it('bugünün işi geçip gitmiş saate çizilmez', () => {
+    // Gün 1385 dk; 300 dakikası geçmiş, geriye 1085 var. İş bu günün
+    // 300. dakikasından SONRA başlamalı — 0'dan değil, yoksa grafikte
+    // sabaha, yani geçmişe çizilir.
+    const buckets = new Map<string, DayBucket[]>([
+      [
+        'PRS-1',
+        [
+          {
+            date: '2026-09-14',
+            dayKey: 'MO',
+            shifts: 3,
+            isOvertime: false,
+            isHoliday: false,
+            minutes: 1085,
+            startMinute: 300,
+          },
+        ],
+      ],
+    ])
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      buckets,
+      settings,
+      options,
+    )
+    expect(result.unplanned).toHaveLength(0)
+    const [job] = result.jobs
+    expect(job.setupStartMinute).toBeGreaterThanOrEqual(300)
+    for (const seg of job.segments) {
+      expect(seg.start).toBeGreaterThanOrEqual(300)
+      expect(seg.end).toBeLessThanOrEqual(1385)
+    }
+  })
+
+  it('geçmiş saat yoksa gün sıfırdan başlar', () => {
+    const buckets = new Map<string, DayBucket[]>([
+      [
+        'PRS-1',
+        [
+          {
+            date: '2026-09-14',
+            dayKey: 'MO',
+            shifts: 3,
+            isOvertime: false,
+            isHoliday: false,
+            minutes: 1385,
+          },
+        ],
+      ],
+    ])
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      buckets,
+      settings,
+      options,
+    )
+    expect(result.jobs[0].setupStartMinute).toBe(0)
+  })
+})

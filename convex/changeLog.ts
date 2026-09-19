@@ -23,6 +23,23 @@ export const list = query({
     ctx.db.query('changeLog').order('desc').paginate(args.paginationOpts),
 })
 
+/**
+ * En son kayıtlar, yeniden eskiye.
+ *
+ * Denetim izi için: "kim neyi ne zaman değiştirdi" sorusu son olaylarla
+ * ilgilidir, sayfalamayla değil.
+ */
+export const recent = query({
+  args: { limit: v.optional(v.number()) },
+  returns: v.array(logValidator),
+  handler: async (ctx, { limit }) =>
+    ctx.db
+      .query('changeLog')
+      .withIndex('by_created')
+      .order('desc')
+      .take(Math.min(200, Math.max(1, limit ?? 50))),
+})
+
 export const create = mutation({
   args: {
     title: v.string(),

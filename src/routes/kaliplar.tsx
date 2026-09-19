@@ -6,6 +6,9 @@ import { api } from '../../convex/_generated/api'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { buildMoldLife, type MoldStatus } from '../lib/moldLife'
+import { useCurrentUser } from '../lib/currentUser'
+import { isoDate } from '../lib/dates'
+import { maintenanceDates } from '../lib/maintenance'
 import type { ProductSpec } from '../lib/planning'
 
 export const Route = createFileRoute('/kaliplar')({
@@ -36,11 +39,22 @@ function KaliplarPage() {
   const actualRows = useMemo(() => actualResult?.rows ?? [], [actualResult])
   const actualStatus = actualResult === undefined ? 'LoadingFirstPage' : 'Exhausted'
   const actualIncomplete = actualResult !== undefined && !actualResult.complete
+  const { name: currentUser } = useCurrentUser()
   const maintenance = (useQuery(api.moldMaintenance.list) ?? []) as {
     _id: string
     material: string
     date: string
+    dateTo?: string
+    kind?: string
     note?: string
+  }[]
+  const readiness = (useQuery(api.moldReadiness.list) ?? []) as {
+    _id: string
+    material: string
+    ready: boolean
+    readyDate?: string
+    reason?: string
+    updatedBy?: string
   }[]
   const { run: addMaintenance, error: addError, clearError } = useSafeMutation(
     api.moldMaintenance.add,
@@ -48,10 +62,20 @@ function KaliplarPage() {
   const { run: removeMaintenance, error: removeError } = useSafeMutation(
     api.moldMaintenance.remove,
   )
+  const { run: setReadiness, error: readinessError } = useSafeMutation(
+    api.moldReadiness.set,
+  )
 
   const [material, setMaterial] = useState('')
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(() => isoDate(new Date()))
+  const [dateTo, setDateTo] = useState('')
+  const [kind, setKind] = useState('periodic')
   const [note, setNote] = useState('')
+
+  // Hazır/hazır değil kutusu.
+  const [readyMaterial, setReadyMaterial] = useState('')
+  const [readyDate, setReadyDate] = useState('')
+  const [readyReason, setReadyReason] = useState('')
 
   const productByCode = useMemo(() => {
     const map = new Map<string, ProductSpec>()
@@ -59,15 +83,43 @@ function KaliplarPage() {
     return map
   }, [products])
 
-  // Her malzeme için en son bakım tarihi.
+  /**
+   * Her malzeme için en son PERİYODİK bakım tarihi.
+   *
+   * Shot sayacını yalnızca ağır (periyodik) bakım sıfırlar. Bir arıza
+   * onarımını sayaç sıfırlaması saymak kalıbı olduğundan taze gösterir ve
+   * periyodik bakımı sonsuza kadar öteler.
+   */
   const lastMaintenance = useMemo(() => {
     const map = new Map<string, string>()
     for (const m of maintenance) {
+      if (m.kind === 'repair') continue
       const current = map.get(m.material)
       if (!current || m.date > current) map.set(m.material, m.date)
     }
     return map
   }, [maintenance])
+
+  const readinessByMaterial = useMemo(
+    () => new Map(readiness.map((r) => [r.material, r])),
+    [readiness],
+  )
+
+  const today = isoDate(new Date())
+
+  /** Bugün ve sonrası için planlanmış bakımlar — plana giden kayıtlar. */
+  const upcomingMaintenance = useMemo(
+    () =>
+      maintenance
+        .filter((m) => (m.dateTo ?? m.date) >= today)
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [maintenance, today],
+  )
+
+  const heldMolds = useMemo(
+    () => readiness.filter((r) => !r.ready).sort((a, b) => a.material.localeCompare(b.material)),
+    [readiness],
+  )
 
   const actual = useMemo(
     () =>
@@ -88,51 +140,303 @@ function KaliplarPage() {
   const warning = rows.filter((r) => r.status === 'warning').length
   const unknown = rows.filter((r) => r.status === 'unknown').length
 
+  /**
+   * Ağır bakımı gelmiş ya da yaklaşmış kalıplar, en acili başta.
+   *
+   * Limiti olmayan kalıplar burada yok: limit tanımlı değilse "yaklaştı"
+   * demek uydurma olur — o eksiklik ayrı bir sayaçla bildiriliyor.
+   */
+  const dueList = useMemo(
+    () =>
+      rows
+        .filter((r) => r.status === 'exceeded' || r.status === 'warning')
+        .sort((a, b) => (b.usageRatio ?? 0) - (a.usageRatio ?? 0)),
+    [rows],
+  )
+
   async function submit() {
     const m = material.trim()
     if (!m) return
-    const ok = await addMaintenance({ material: m, date, note: note || undefined })
+    const ok = await addMaintenance({
+      material: m,
+      date,
+      dateTo: dateTo || undefined,
+      kind,
+      note: note || undefined,
+      createdBy: currentUser ?? undefined,
+    })
     if (ok) {
       setMaterial('')
       setNote('')
+      setDateTo('')
+    }
+  }
+
+  async function submitReadiness(ready: boolean) {
+    const m = readyMaterial.trim()
+    if (!m) return
+    const ok = await setReadiness({
+      material: m,
+      ready,
+      readyDate: ready ? undefined : readyDate || undefined,
+      reason: ready ? undefined : readyReason || undefined,
+      updatedBy: currentUser ?? undefined,
+    })
+    if (ok) {
+      setReadyMaterial('')
+      setReadyReason('')
     }
   }
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Mold Life</h1>
+      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Mold Maintenance</h1>
       <p className="mt-2 text-muted-foreground">
-        The shots each mold has made since its last maintenance are calculated
-        from the actual production uploaded via MB51 (quantity ÷ cavities) and
-        compared with the maximum shot limit on the material's master data
-        record. Recording maintenance restarts the counter from that date.
+        Everything the plan needs to know about a mold. Mark whether it is
+        ready for production — a mold that is not ready is held out of the plan
+        until its ready date. Book maintenance as a date range and the plan
+        keeps those days free. The shot counter runs from the last periodic
+        maintenance, using the actual production uploaded via MB51 (quantity ÷
+        cavities), against the periodic maintenance limit on the material's
+        master data record; a repair does not reset it.
       </p>
 
-      <ErrorBanner message={addError ?? removeError} onDismiss={clearError} />
+      <ErrorBanner
+        message={addError ?? removeError ?? readinessError}
+        onDismiss={clearError}
+      />
 
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat label="Limit exceeded" value={exceeded.toString()} warn={exceeded > 0} />
-        <Stat label="Near limit" value={warning.toString()} warn={warning > 0} />
+        <Stat label="Periodic maintenance due" value={exceeded.toString()} warn={exceeded > 0} />
+        <Stat label="Approaching" value={warning.toString()} warn={warning > 0} />
         <Stat label="No limit set" value={unknown.toString()} />
       </div>
 
-      <div className="mt-6 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
+      {dueList.length > 0 && (
+        <div className="mt-4 rounded-lg border-2 border-destructive/40 bg-destructive/5 p-4">
+          <h2 className="text-sm font-semibold text-destructive">
+            Periodic (heavy) maintenance — due or approaching ({dueList.length})
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Shots since the last periodic maintenance, against the limit on the
+            material's master data record. A mold over its limit keeps running
+            in the plan until someone books maintenance or holds it — the plan
+            does not stop it on its own.
+          </p>
+          <div className="mt-2 overflow-x-auto rounded-md border border-border bg-card">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Mold</th>
+                  <th className="px-3 py-2 font-medium">Shots</th>
+                  <th className="px-3 py-2 font-medium">Limit</th>
+                  <th className="px-3 py-2 font-medium">Used</th>
+                  <th className="px-3 py-2 font-medium">Last periodic</th>
+                  <th className="px-3 py-2 font-medium">Booked?</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {dueList.map((row) => {
+                  const booked = upcomingMaintenance.find(
+                    (m) => m.material === row.material && m.kind !== 'repair',
+                  )
+                  const held = readinessByMaterial.get(row.material)
+                  return (
+                    <tr key={row.material} className="border-t border-border">
+                      <td className="px-3 py-2 font-medium text-foreground">{row.material}</td>
+                      <td className="px-3 py-2 text-foreground">
+                        {Math.round(row.cumulativeShots).toLocaleString('en-GB')}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {row.maxShots?.toLocaleString('en-GB') ?? '—'}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={STATUS_STYLE[row.status]}>
+                          {row.usageRatio === null
+                            ? STATUS_LABEL[row.status]
+                            : `${Math.round(row.usageRatio * 100)}%`}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {row.lastMaintenance ?? 'never'}
+                      </td>
+                      <td className="px-3 py-2 text-xs">
+                        {booked ? (
+                          <span className="text-emerald-700">
+                            {booked.date}
+                            {booked.dateTo ? ` → ${booked.dateTo}` : ''}
+                          </span>
+                        ) : held && !held.ready ? (
+                          <span className="text-amber-700">held</span>
+                        ) : (
+                          <span className="text-destructive">not booked</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          onClick={() => {
+                            setMaterial(row.material)
+                            setKind('periodic')
+                            window.scrollTo({ top: 0, behavior: 'smooth' })
+                          }}
+                          className="text-xs text-foreground underline hover:no-underline"
+                        >
+                          Book it
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <h2 className="mt-8 text-sm font-semibold text-foreground">
+        Is the mold ready for production?
+      </h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        A mold that is not ready is not planned at all. Give the date it will
+        be ready and the plan resumes from that day; leave the date empty and
+        it stays out of the plan until someone releases it.
+      </p>
+      <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Material</span>
           <input
             className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            value={material}
-            onChange={(e) => setMaterial(e.target.value)}
+            list="mold-materials"
+            value={readyMaterial}
+            onChange={(e) => setReadyMaterial(e.target.value)}
             placeholder="Material code"
           />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Maintenance date</span>
+          <span className="block text-xs text-muted-foreground">Ready on (opt.)</span>
+          <input
+            type="date"
+            className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={readyDate}
+            onChange={(e) => setReadyDate(e.target.value)}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Reason (opt.)</span>
+          <input
+            className="mt-1 w-56 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={readyReason}
+            onChange={(e) => setReadyReason(e.target.value)}
+            placeholder="Punch being reground"
+          />
+        </label>
+        <button
+          onClick={() => void submitReadiness(false)}
+          disabled={!readyMaterial.trim()}
+          className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+        >
+          Hold — not ready
+        </button>
+        <button
+          onClick={() => void submitReadiness(true)}
+          disabled={!readyMaterial.trim()}
+          className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+        >
+          Release — ready
+        </button>
+      </div>
+
+      {heldMolds.length > 0 && (
+        <div className="mt-3 overflow-x-auto rounded-lg border border-amber-200">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-amber-50 text-amber-900">
+              <tr>
+                <th className="px-3 py-2 font-medium">Held mold</th>
+                <th className="px-3 py-2 font-medium">Ready on</th>
+                <th className="px-3 py-2 font-medium">Reason</th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {heldMolds.map((r) => (
+                <tr key={r._id} className="border-t border-border">
+                  <td className="px-3 py-2 font-medium text-foreground">{r.material}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {r.readyDate ?? (
+                      <span className="text-destructive">no date — held indefinitely</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{r.reason ?? '—'}</td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      onClick={() =>
+                        void setReadiness({
+                          material: r.material,
+                          ready: true,
+                          updatedBy: currentUser ?? undefined,
+                        })
+                      }
+                      className="text-xs text-foreground underline hover:no-underline"
+                    >
+                      Release
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h2 className="mt-8 text-sm font-semibold text-foreground">Book mold maintenance</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        The mold cannot run on any day in the range. Periodic maintenance also
+        restarts the shot counter from the start date; a repair does not.
+      </p>
+      <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Material</span>
+          <input
+            className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            list="mold-materials"
+            value={material}
+            onChange={(e) => setMaterial(e.target.value)}
+            placeholder="Material code"
+          />
+          <datalist id="mold-materials">
+            {products.map((p) => (
+              <option key={p.code} value={p.code} />
+            ))}
+          </datalist>
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Type</span>
+          <select
+            className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={kind}
+            onChange={(e) => setKind(e.target.value)}
+          >
+            <option value="periodic">Periodic (heavy) — resets the counter</option>
+            <option value="repair">Repair — does not reset</option>
+          </select>
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">From</span>
           <input
             type="date"
             className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
             value={date}
             onChange={(e) => setDate(e.target.value)}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">To (opt.)</span>
+          <input
+            type="date"
+            className="mt-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
           />
         </label>
         <label className="text-sm">
@@ -149,9 +453,60 @@ function KaliplarPage() {
           disabled={!material.trim()}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
-          Record maintenance
+          Book maintenance
         </button>
       </div>
+
+      {upcomingMaintenance.length > 0 && (
+        <div className="mt-3 overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Mold</th>
+                <th className="px-3 py-2 font-medium">Type</th>
+                <th className="px-3 py-2 font-medium">Days closed</th>
+                <th className="px-3 py-2 font-medium">Note</th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {upcomingMaintenance.map((m) => (
+                <tr key={m._id} className="border-t border-border">
+                  <td className="px-3 py-2 font-medium text-foreground">{m.material}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {m.kind === 'repair' ? 'Repair' : 'Periodic'}
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {m.date}
+                    {m.dateTo ? ` → ${m.dateTo}` : ''}{' '}
+                    <span className="text-xs">
+                      ({maintenanceDates(m).length} day
+                      {maintenanceDates(m).length > 1 ? 's' : ''})
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-muted-foreground">{m.note ?? '—'}</td>
+                  <td className="px-3 py-2 text-right">
+                    <button
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Delete the maintenance booked for ${m.material} on ${m.date}?`,
+                          )
+                        ) {
+                          void removeMaintenance({ id: m._id })
+                        }
+                      }}
+                      className="text-xs text-destructive hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {actualStatus === 'LoadingFirstPage' && (
         <p className="mt-6 text-sm text-muted-foreground">Loading actual production…</p>

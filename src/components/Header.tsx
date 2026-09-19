@@ -1,6 +1,7 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
+import { useCurrentUser } from '../lib/currentUser'
 import { ALL_GROUPS, NAV_GROUPS, PRIMARY_LINKS } from '../lib/navigation'
 
 /**
@@ -17,6 +18,7 @@ export function Header() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const navRef = useRef<HTMLDivElement>(null)
+  const { name: currentUser } = useCurrentUser()
 
   // Navigating away should always leave the menus closed, however it happened.
   useEffect(() => {
@@ -122,6 +124,26 @@ export function Header() {
               )
             })}
           </div>
+
+          {/*
+            Kayıtların üzerine hangi ismin yazıldığı her ekranda görünmeli:
+            yanlış kişiyle çalışıldığı fark edilmeden saatler geçebilir.
+            Kimlik doğrulama değil, atıf — bu yüzden mütevazı duruyor.
+          */}
+          <Link
+            to="/yonetim"
+            className="ml-auto hidden shrink-0 text-xs text-muted-foreground hover:text-foreground lg:block"
+            title="Who is recorded as making changes on this device"
+          >
+            {currentUser ? (
+              <>
+                <span className="text-muted-foreground/70">Saving as </span>
+                <span className="font-medium text-foreground">{currentUser}</span>
+              </>
+            ) : (
+              <span className="text-amber-700">No user selected</span>
+            )}
+          </Link>
         </nav>
       </header>
 

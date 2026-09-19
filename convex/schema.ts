@@ -178,10 +178,102 @@ export default defineSchema({
   // üretimi sayar; bakım kaydı yoksa eldeki tüm gerçekleşen üretim sayılır.
   moldMaintenance: defineTable({
     material: v.string(),
+    // Bakımın ilk günü. Tek günlük bakımda `dateTo` ile aynıdır.
     date: v.string(),
+    // Bakımın son günü — çok günlü bakım için. Eski kayıtlarda yok.
+    dateTo: v.optional(v.string()),
+    // 'periodic' = ağır/periyodik bakım (shot sayacını sıfırlar),
+    // 'repair' = arıza onarımı. Eski kayıtlar periyodik sayılır.
+    kind: v.optional(v.string()),
     note: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
     createdAt: v.number(),
   }).index('by_material', ['material']),
+
+  // Kalıbın imalata hazır olup olmadığı. Hazır değilse plan o kalıbı
+  // hazır olacağı tarihe kadar hiç kullanmaz — bakım bölümü burayı yönetir.
+  moldReadiness: defineTable({
+    material: v.string(),
+    ready: v.boolean(),
+    // Hazır değilse üretime hazır olacağı tarih (YYYY-MM-DD).
+    readyDate: v.optional(v.string()),
+    reason: v.optional(v.string()),
+    updatedBy: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index('by_material', ['material']),
+
+  // Pres bakımı: bakım departmanı hangi presin hangi gün hangi saatler
+  // arasında kapalı olacağını buraya yazar. Plan bu aralığı doldurulmuş
+  // kabul eder — o saatlerde o prese iş konmaz.
+  pressMaintenance: defineTable({
+    press: v.string(),
+    // Planlanan gün ve saat aralığı (gece yarısından dakika).
+    date: v.string(),
+    startMinute: v.number(),
+    endMinute: v.number(),
+    reason: v.string(),
+    note: v.optional(v.string()),
+    // 'planned' | 'done' | 'cancelled'
+    status: v.string(),
+    // Bakım bittikten sonra girilen GERÇEKLEŞEN saatler. Planla farkı
+    // bakım performansını verir; kayıt geçmişe dönük saklanır.
+    actualDate: v.optional(v.string()),
+    actualStartMinute: v.optional(v.number()),
+    actualEndMinute: v.optional(v.number()),
+    createdBy: v.optional(v.string()),
+    completedBy: v.optional(v.string()),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index('by_press', ['press'])
+    .index('by_date', ['date']),
+
+  // Kalıp problem takibi: hangi kalıp, hangi operasyonda, hangi tarihte,
+  // hangi problemi yaşadı; nasıl çözüldü.
+  moldProblems: defineTable({
+    material: v.string(),
+    // OP10, OP20 … — tanım listesinden seçilir.
+    operation: v.string(),
+    // Çapak, yırtık, zımba kırılması … — tanım listesinden seçilir.
+    problemType: v.string(),
+    description: v.optional(v.string()),
+    occurredAt: v.string(),
+    reportedBy: v.optional(v.string()),
+    reportedAt: v.number(),
+    // 'open' | 'solved'
+    status: v.string(),
+    solution: v.optional(v.string()),
+    solvedBy: v.optional(v.string()),
+    solvedAt: v.optional(v.number()),
+    /** Bu problem yüzünden kaybedilen üretim süresi (dk). */
+    downtimeMinutes: v.optional(v.number()),
+    /** Convex dosya deposundaki fotoğraf kimlikleri. */
+    photos: v.optional(v.array(v.id('_storage'))),
+  })
+    .index('by_material', ['material'])
+    .index('by_status', ['status']),
+
+  // Kullanıcı tanımlı seçim listeleri: operasyonlar ve problem tipleri.
+  // Admin sayfası yönetir; problem ekranı buradan okur.
+  lookups: defineTable({
+    // 'operation' | 'problemType' | 'maintenanceReason'
+    kind: v.string(),
+    value: v.string(),
+    sortOrder: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index('by_kind', ['kind']),
+
+  // Kullanıcılar. DİKKAT: burada parola yok ve bu bir kimlik DOĞRULAMA
+  // değildir — kimin ne yaptığını kaydetmek (atıf) içindir. Gerçek giriş
+  // ayrı bir iştir; bkz. README.
+  users: defineTable({
+    name: v.string(),
+    email: v.optional(v.string()),
+    // 'admin' | 'planner' | 'maintenance' | 'viewer'
+    role: v.string(),
+    active: v.boolean(),
+    createdAt: v.number(),
+  }).index('by_name', ['name']),
 
   // Otomatik plana kullanıcı müdahaleleri. Plan her zaman otomatik
   // hesaplanır; burada tutulan kurallar hesaba girdi olarak katılır, yani
@@ -269,7 +361,8 @@ export default defineSchema({
     title: v.string(),
     detail: v.optional(v.string()),
     category: v.string(),
+    // Kaydı kimin yaptığı. Kullanıcı seçili değilse boş kalır.
     author: v.optional(v.string()),
     createdAt: v.number(),
-  }),
+  }).index('by_created', ['createdAt']),
 })

@@ -23,7 +23,13 @@ import {
   productionDayOf,
   remainingCapacityMinutes,
 } from '../lib/shiftTimeline'
+import { useCurrentUser } from '../lib/currentUser'
 import { diffPlans } from '../lib/planDiff'
+import {
+  moldBlackouts as buildMoldBlackouts,
+  pressMaintenanceBlock,
+  type PressMaintenanceRow,
+} from '../lib/maintenance'
 import { fixForUnplanned } from '../lib/unplannedFix'
 import { schedule, type PlanOverride, type ScheduledJob } from '../lib/scheduler'
 
@@ -111,11 +117,21 @@ function PlanlamaPage() {
   const maintenanceRows = (useQuery(api.moldMaintenance.list) ?? []) as {
     material: string
     date: string
+    dateTo?: string
     note?: string
   }[]
+  const readinessRows = (useQuery(api.moldReadiness.list) ?? []) as {
+    material: string
+    ready: boolean
+    readyDate?: string
+    reason?: string
+  }[]
+  const pressMaintenanceRows = (useQuery(api.pressMaintenance.list) ??
+    []) as PressMaintenanceRow[]
   const setOverride = useMutation(api.planOverrides.set)
   const clearOverride = useMutation(api.planOverrides.clear)
 
+  const { name: currentUser } = useCurrentUser()
   const [approving, setApproving] = useState(false)
   const [approvedAt, setApprovedAt] = useState<string | null>(null)
   const [ovMaterial, setOvMaterial] = useState('')
@@ -326,15 +342,21 @@ function PlanlamaPage() {
             b.shifts,
             plannedStops,
           )
+          const remaining = remainingCapacityMinutes(
+            b.date,
+            todayIso,
+            nowClockMinute,
+            adjusted,
+            timeline,
+          )
           return {
             ...b,
-            minutes: remainingCapacityMinutes(
-              b.date,
-              todayIso,
-              nowClockMinute,
-              adjusted,
-              timeline,
-            ),
+            minutes: remaining,
+            // Bugünün penceresi sıfırdan değil, geçip gitmiş dakikadan
+            // başlar. Sadece kısaltmak yetmez: motor günü [0, süre) kabul
+            // eder ve işi sabaha, yani geçmişe koyardı.
+            startMinute:
+              b.date === todayIso && remaining > 0 ? adjusted - remaining : 0,
           }
         }),
       )
@@ -370,10 +392,57 @@ function PlanlamaPage() {
     [overrideRows],
   )
 
-  const moldBlackouts = useMemo(
-    () => maintenanceRows.map((m) => ({ material: m.material, date: m.date })),
-    [maintenanceRows],
+  const shiftsByPressDate = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const [pressName, list] of buckets) {
+      for (const b of list) map.set(`${pressName}|${b.date}`, b.shifts)
+    }
+    return map
+  }, [buckets])
+
+  /** Ufkun tüm günleri — "şu tarihe kadar hazır değil" bunlara yayılır. */
+  const horizonDates = useMemo(() => {
+    const set = new Set<string>()
+    for (const list of buckets.values()) {
+      for (const b of list) set.add(b.date)
+    }
+    return Array.from(set).sort()
+  }, [buckets])
+
+  const { blackouts: moldBlackouts, unavailable: unavailableMolds } = useMemo(
+    () => buildMoldBlackouts(maintenanceRows, readinessRows, horizonDates),
+    [maintenanceRows, readinessRows, horizonDates],
   )
+
+  /**
+   * Pres bakımı, motorun yerleştiremeyeceği dolu bir aralık olarak geçer.
+   * Kapasiteyi kısmak yanlış olurdu: gün kısalmıyor, günün belli bir saati
+   * kapanıyor — iş o saatin etrafından akmalı.
+   */
+  const pressMaintenanceBlocks = useMemo(() => {
+    const out: {
+      material: string
+      press: string
+      date: string
+      segments: { kind: string; date: string; start: number; end: number }[]
+      label: string
+    }[] = []
+    for (const row of pressMaintenanceRows) {
+      const shifts = shiftsByPressDate.get(`${row.press}|${row.date}`) ?? 0
+      if (shifts <= 0) continue
+      const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, shifts, plannedStops)
+      const block = pressMaintenanceBlock(row, timeline)
+      if (!block) continue
+      out.push({
+        material: `⚙ ${row.press} maintenance`,
+        press: row.press,
+        date: row.date,
+        label: block.label,
+        segments: [{ kind: 'maintenance', date: block.date, start: block.start, end: block.end }],
+      })
+    }
+    return out
+  }, [pressMaintenanceRows, shiftsByPressDate, shiftStartMinute, shiftMinutes, plannedStops])
 
   const result = useMemo(
     () =>
@@ -383,12 +452,15 @@ function PlanlamaPage() {
         concurrentSetupsPerHall,
         overrides,
         moldBlackouts,
-        fixedJobs: frozenJobs.map((job) => ({
-          material: job.material,
-          press: job.press,
-          date: job.date,
-          segments: job.segments ?? [],
-        })),
+        fixedJobs: [
+          ...frozenJobs.map((job) => ({
+            material: job.material,
+            press: job.press,
+            date: job.date,
+            segments: job.segments ?? [],
+          })),
+          ...pressMaintenanceBlocks,
+        ],
         // Her vardiyanın kendi net dakikası verilir: devir toplantısı, çay ve
         // yemek vardiyadan vardiyaya değişir, tek bir uzunlukla bölmek 2. ve
         // 3. vardiyanın sınırını kaydırırdı.
@@ -409,6 +481,7 @@ function PlanlamaPage() {
       overrides,
       moldBlackouts,
       frozenJobs,
+      pressMaintenanceBlocks,
       stopMinutesByShift,
     ],
   )
@@ -459,6 +532,31 @@ function PlanlamaPage() {
     return [...fixed, ...result.jobs]
   }, [frozenJobs, result.jobs, latestSnapshot])
 
+  /**
+   * Pres bakımları grafikte ayrı çizilir. Motora dolu aralık olarak gidiyor
+   * ama bir "iş" değil: adet, gecikme, kalıp gibi alanları yok, bu yüzden
+   * iş listesine karışmadan yalnızca grafiğe ekleniyor.
+   */
+  const ganttMaintenance = useMemo<WeekGanttJob[]>(
+    () =>
+      pressMaintenanceBlocks.map((block) => ({
+        date: block.date,
+        press: block.press,
+        material: `${block.label}`,
+        quantity: 0,
+        late: false,
+        setupStartMinute: block.segments[0]?.start ?? 0,
+        endMinute: block.segments[0]?.end ?? 0,
+        segments: block.segments.map((seg) => ({
+          kind: 'maintenance' as const,
+          date: seg.date,
+          start: seg.start,
+          end: seg.end,
+        })),
+      })),
+    [pressMaintenanceBlocks],
+  )
+
   // Onaylı planla canlı planın farkı — "onayladığımdan bu yana ne değişti".
   const planDiff = useMemo(() => {
     if (!latestSnapshot) return null
@@ -490,14 +588,6 @@ function PlanlamaPage() {
 
   // How many shifts each press runs on each day — the Gantt needs this to
   // lay out the day's shift windows and place the planned stops.
-  const shiftsByPressDate = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const [pressName, list] of buckets) {
-      for (const b of list) map.set(`${pressName}|${b.date}`, b.shifts)
-    }
-    return map
-  }, [buckets])
-
   /**
    * The plan grouped by calendar week, with a reason for every press that has
    * no work. An idle row is ambiguous on its own — no demand, nothing it can
@@ -656,6 +746,22 @@ function PlanlamaPage() {
       )
     // Ufkun içindeki bakım günleri planı doğrudan değiştirdiği için
     // görünür olmalı — iş neden o güne konmadı sorusunun cevabı budur.
+    if (unavailableMolds.length > 0) {
+      list.push(
+        `${unavailableMolds.length} mold(s) are marked not ready with no date, ` +
+          `so they are held out of the plan entirely: ` +
+          `${unavailableMolds.slice(0, 6).join(', ')}${unavailableMolds.length > 6 ? '…' : ''}.`,
+      )
+    }
+    const pressDown = pressMaintenanceBlocks.filter((b) => b.date >= todayIso)
+    if (pressDown.length > 0) {
+      const presses = Array.from(new Set(pressDown.map((b) => b.press)))
+      list.push(
+        `${presses.length} press(es) have maintenance booked in the horizon and ` +
+          `are unavailable for those hours: ${presses.slice(0, 6).join(', ')}` +
+          `${presses.length > 6 ? '…' : ''}.`,
+      )
+    }
     const upcomingMaintenance = moldBlackouts.filter((b) => b.date >= todayIso)
     if (upcomingMaintenance.length > 0) {
       const moulds = Array.from(new Set(upcomingMaintenance.map((b) => b.material)))
@@ -677,6 +783,8 @@ function PlanlamaPage() {
     missingRawSpec,
     lateCount,
     moldBlackouts,
+    unavailableMolds,
+    pressMaintenanceBlocks,
     todayIso,
   ])
 
@@ -688,6 +796,7 @@ function PlanlamaPage() {
     try {
       await approve({
         horizonStart,
+        approvedBy: currentUser ?? undefined,
         unplannedCount: result.unplanned.length,
         // Onay, ekranda görünen planın tamamını kaydeder: dondurulmuş
         // taahhütler de bir sonraki onayın temeli olmalı.
@@ -1074,19 +1183,22 @@ function PlanlamaPage() {
                   })),
                 }),
               )}
-              jobs={week.jobs.map(
-                (j): WeekGanttJob => ({
-                  date: j.date,
-                  press: j.press,
-                  material: j.material,
-                  quantity: j.quantity,
-                  late: j.late,
-                  frozen: j.frozen,
-                  setupStartMinute: j.setupStartMinute,
-                  endMinute: j.endMinute,
-                  segments: j.segments,
-                }),
-              )}
+              jobs={[
+                ...week.jobs.map(
+                  (j): WeekGanttJob => ({
+                    date: j.date,
+                    press: j.press,
+                    material: j.material,
+                    quantity: j.quantity,
+                    late: j.late,
+                    frozen: j.frozen,
+                    setupStartMinute: j.setupStartMinute,
+                    endMinute: j.endMinute,
+                    segments: j.segments,
+                  }),
+                ),
+                ...ganttMaintenance.filter((m) => week.dates.includes(m.date)),
+              ]}
             />
           </div>
 

@@ -88,6 +88,8 @@ describe('girdi sayfaları', () => {
       'src/routes/makineler.tsx',
       'src/routes/referanslar.tsx',
       'src/routes/depolar.tsx',
+      'src/routes/presbakim.tsx',
+      'src/routes/yonetim.tsx',
       'src/components/PlannedStopsEditor.tsx',
     ]
     for (const path of editablePages) {

@@ -592,7 +592,17 @@ export interface DayBucket {
   shifts: number
   isOvertime: boolean
   isHoliday: boolean
+  /** Bu günde kullanılabilir net üretim dakikası. */
   minutes: number
+  /**
+   * Kapasitenin gün içinde BAŞLADIĞI net dakika. Neredeyse her gün 0'dır;
+   * bugün için geçip gitmiş saatler kadardır.
+   *
+   * Geçen süreyi günü kısaltarak ifade etmek yetmiyor: motor günü [0, süre)
+   * kabul ettiği için işi sabahın ilk dakikasına, yani geçmişe koyuyordu.
+   * Pencerenin nerede başladığı da taşınmalı.
+   */
+  startMinute?: number
 }
 
 export const DAY_KEYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const

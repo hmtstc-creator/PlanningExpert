@@ -7,7 +7,10 @@ const recordValidator = v.object({
   _creationTime: v.number(),
   material: v.string(),
   date: v.string(),
+  dateTo: v.optional(v.string()),
+  kind: v.optional(v.string()),
   note: v.optional(v.string()),
+  createdBy: v.optional(v.string()),
   createdAt: v.number(),
 })
 
@@ -21,7 +24,12 @@ export const add = mutation({
   args: {
     material: v.string(),
     date: v.string(),
+    // Çok günlü bakım için son gün. Verilmezse tek günlük sayılır.
+    dateTo: v.optional(v.string()),
+    // 'periodic' (ağır bakım — shot sayacını sıfırlar) | 'repair'.
+    kind: v.optional(v.string()),
     note: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -30,16 +38,31 @@ export const add = mutation({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) {
       throw new Error('Maintenance date must be in YYYY-MM-DD format')
     }
+    if (args.dateTo && !/^\d{4}-\d{2}-\d{2}$/.test(args.dateTo)) {
+      throw new Error('The end date must be in YYYY-MM-DD format')
+    }
+    if (args.dateTo && args.dateTo < args.date) {
+      throw new Error('The end date cannot be before the start date')
+    }
+    const kind = args.kind === 'repair' ? 'repair' : 'periodic'
     await ctx.db.insert('moldMaintenance', {
       material,
       date: args.date,
+      dateTo: args.dateTo && args.dateTo > args.date ? args.dateTo : undefined,
+      kind,
       note: args.note?.trim() || undefined,
+      createdBy: args.createdBy,
       createdAt: Date.now(),
     })
     await ctx.db.insert('changeLog', {
       title: `Mold maintenance — ${material}`,
-      detail: `Maintenance recorded on ${args.date}; the shot counter restarts from that date.`,
+      detail:
+        `${kind === 'periodic' ? 'Periodic maintenance' : 'Repair'} on ${args.date}` +
+        `${args.dateTo && args.dateTo > args.date ? ` to ${args.dateTo}` : ''}. ` +
+        `The mold cannot run on those days` +
+        `${kind === 'periodic' ? ' and the shot counter restarts from the start date.' : '.'}`,
       category: 'maintenance',
+      author: args.createdBy,
       createdAt: Date.now(),
     })
     return null

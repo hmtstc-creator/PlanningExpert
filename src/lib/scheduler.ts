@@ -155,6 +155,12 @@ interface DayWindow {
   offset: number
   /** Günün net üretim dakikası. */
   capacity: number
+  /**
+   * Kapasitenin gün İÇİNDE başladığı net dakika — bugün için geçmiş saatler
+   * kadar, diğer günler için 0. Gün içi dakikalar buna eklenerek yazılır,
+   * yoksa bugünün işi sabaha, yani geçmişe düşer.
+   */
+  startNet: number
 }
 
 /** Presin ekseninde dolu bir aralık ve o sırada takılı olan kalıp. */
@@ -188,7 +194,12 @@ function buildTimeline(buckets: DayBucket[]): PressTimeline {
   let offset = 0
   for (const bucket of buckets) {
     if (bucket.minutes <= 0) continue
-    days.push({ date: bucket.date, offset, capacity: bucket.minutes })
+    days.push({
+      date: bucket.date,
+      offset,
+      capacity: bucket.minutes,
+      startNet: bucket.startMinute ?? 0,
+    })
     offset += bucket.minutes
   }
   return { days, total: offset, bookings: [] }
@@ -296,7 +307,8 @@ function dayAt(timeline: PressTimeline, minute: number): DayWindow | null {
 function locate(timeline: PressTimeline, minute: number): { date: string; minute: number } {
   const day = dayAt(timeline, Math.max(0, minute - 1)) ?? timeline.days[timeline.days.length - 1]
   if (!day) return { date: '', minute: 0 }
-  return { date: day.date, minute: Math.max(0, Math.min(day.capacity, minute - day.offset)) }
+  const within = Math.max(0, Math.min(day.capacity, minute - day.offset))
+  return { date: day.date, minute: day.startNet + within }
 }
 
 /** Verilen tarihin (veya ondan sonraki ilk günün) eksendeki başlangıcı. */
@@ -330,7 +342,12 @@ function toDatedSegments(
     const from = Math.max(start, day.offset)
     const to = Math.min(end, day.offset + day.capacity)
     if (to <= from) continue
-    out.push({ kind, date: day.date, start: from - day.offset, end: to - day.offset })
+    out.push({
+      kind,
+      date: day.date,
+      start: day.startNet + (from - day.offset),
+      end: day.startNet + (to - day.offset),
+    })
     if (to >= end) break
   }
   return out
@@ -635,8 +652,9 @@ function applyFixedJobs(
     for (const segment of job.segments) {
       const day = timeline.days.find((d) => d.date === segment.date)
       if (!day) continue
-      const start = day.offset + Math.max(0, segment.start)
-      const end = day.offset + Math.min(day.capacity, segment.end)
+      // Gün içi dakikadan eksene: pencerenin başlangıcı çıkarılır.
+      const start = day.offset + Math.max(0, segment.start - day.startNet)
+      const end = day.offset + Math.min(day.capacity, segment.end - day.startNet)
       if (end <= start) continue
       min = Math.min(min, start)
       max = Math.max(max, end)
@@ -746,7 +764,11 @@ function reserveSlot(
   if (duration <= 0) {
     const day = dayAt(timeline, from)
     if (!day) return null
-    return { global: from, date: day.date, start: Math.max(0, from - day.offset) }
+    return {
+      global: from,
+      date: day.date,
+      start: day.startNet + Math.max(0, from - day.offset),
+    }
   }
 
   let cursor = from
@@ -755,9 +777,12 @@ function reserveSlot(
     if (!day) return null
     if (cursor < day.offset) cursor = day.offset
 
-    const within = cursor - day.offset
+    // Gün içi dakika: hol defteri ve vardiya sınırı bu eksende konuşur, bu
+    // yüzden pencerenin gün içindeki gerçek yeri (startNet) eklenir.
+    const within = day.startNet + (cursor - day.offset)
+    const dayEnd = day.startNet + day.capacity
     // Vardiya sınırı: gün içinde vardiya sonuna sığmıyorsa sonrakine geç.
-    const shiftEnd = shiftEndAfter(within, shiftNetMinutes, day.capacity)
+    const shiftEnd = shiftEndAfter(within, shiftNetMinutes, dayEnd)
 
     const resources = hallSetups.get(day.date)?.get(hall) ?? { mold: [], coil: [] }
     const own = pending.filter((r) => r.date === day.date)
@@ -772,9 +797,13 @@ function reserveSlot(
     const candidate = earliestFreeStart(same, gap, others, within, duration, concurrent)
 
     if (candidate + duration <= shiftEnd) {
-      return { global: day.offset + candidate, date: day.date, start: candidate }
+      return {
+        global: day.offset + (candidate - day.startNet),
+        date: day.date,
+        start: candidate,
+      }
     }
-    cursor = day.offset + shiftEnd
+    cursor = day.offset + (shiftEnd - day.startNet)
     if (cursor >= day.offset + day.capacity) {
       const next = timeline.days[dayIndexAt(timeline, day.offset + day.capacity)]
       if (!next) return null

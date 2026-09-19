@@ -2,6 +2,7 @@ import { ConvexAuthProvider } from '@convex-dev/auth/react'
 import { ConvexReactClient } from 'convex/react'
 
 import { reportMutationError } from '../lib/mutationErrors'
+import { CurrentUserProvider } from '../lib/currentUser'
 import { TransportProvider } from '../lib/convexTransport'
 
 const CONVEX_URL = (import.meta as any).env.VITE_CONVEX_URL
@@ -27,7 +28,9 @@ export default function AppConvexProvider({
 }) {
   return (
     <ConvexAuthProvider client={convex}>
-      <TransportProvider>{children}</TransportProvider>
+      <TransportProvider>
+        <CurrentUserProvider>{children}</CurrentUserProvider>
+      </TransportProvider>
     </ConvexAuthProvider>
   )
 }
