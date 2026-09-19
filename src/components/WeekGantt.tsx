@@ -118,6 +118,10 @@ interface PlacedBlock extends Segment {
 
 const ROW_HEIGHT = 32
 const LABEL_WIDTH = 96
+/** Gün adları ve saat çentiklerinin şeridi. */
+const HEADER_HEIGHT = 32
+/** Kategori başlığı satırı — iki sütunda da aynı olmalı, yoksa hiza kayar. */
+const CATEGORY_HEIGHT = 20
 
 function clockLabel(minute: number): string {
   const wrapped = ((minute % 1440) + 1440) % 1440
@@ -393,11 +397,61 @@ export function WeekGantt({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="py-3" style={{ width: LABEL_WIDTH + totalPx + 24 }}>
-          <div className="flex">
-            <div className="sticky left-0 z-20 shrink-0 bg-card" style={{ width: LABEL_WIDTH }} />
-            <div className="relative h-8" style={{ width: totalPx }}>
+      {/*
+        Pres adı sütunu kaydırma alanının DIŞINDA.
+
+        Önce her şey tek bir yatay kaydırma kutusundaydı ve adlar `sticky`
+        ile solda tutuluyordu: kaydırınca ad kutusu grafiğin üstüne binip
+        altındaki çubukları örtüyordu. Günün ilk saatlerindeki iş hiç
+        görünmüyor, ilk saat etiketi de yarıdan kesiliyordu. Artık iki ayrı
+        sütun var; hizanın bozulmaması için satır yükseklikleri iki tarafta
+        da aynı sabitlerden geliyor.
+      */}
+      <div className="flex">
+        <div
+          className="relative z-10 shrink-0 border-r border-border bg-card"
+          style={{ width: LABEL_WIDTH }}
+        >
+          <div className="py-3">
+            {/* Grafikteki başlık şeridiyle aynı yükseklik. */}
+            <div style={{ height: HEADER_HEIGHT }} />
+            {byCategory.map(([category, catRows]) => (
+              <div key={category} className="mt-2 first:mt-0">
+                {/*
+                  Kategori adı ad sütununa sığmaz ("Progressive 800 t" 96
+                  piksele girmiyor) ve kısaltılırsa hangi grup olduğu
+                  okunmaz. Taşmasına izin veriliyor: karşısındaki satır
+                  grafikte boş bırakılmış bir ayraç, yani üstüne bindiği bir
+                  şey yok.
+                */}
+                <p
+                  className="mb-1 whitespace-nowrap pl-1 text-[11px] font-semibold uppercase leading-5 tracking-wide text-muted-foreground"
+                  style={{ height: CATEGORY_HEIGHT }}
+                >
+                  {category}
+                </p>
+                {catRows.map(({ press }) => (
+                  <div
+                    key={press.name}
+                    className="flex items-center"
+                    style={{ height: ROW_HEIGHT }}
+                  >
+                    <span
+                      className="truncate pl-1 pr-2 text-xs font-medium text-foreground"
+                      title={`${press.name} · ${press.hall}`}
+                    >
+                      {press.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1 overflow-x-auto">
+          <div className="py-3" style={{ width: totalPx + 24 }}>
+            <div className="relative" style={{ height: HEADER_HEIGHT, width: totalPx }}>
               {visibleDates.map((date, i) => (
                 <Fragment key={date}>
                   <span
@@ -411,8 +465,8 @@ export function WeekGantt({
                       { length: Math.floor(dayWidthMinutes / 60 / tickHours) + 1 },
                       (_, t) => t * tickHours * 60,
                     ).map((offset) => {
-                      // The first label of the first day would be cut in half
-                      // by the pinned press column, so it is left-aligned.
+                      // Ortalanan ilk etiket kaydırma kutusunun sol kenarında
+                      // yarıya kesilirdi; o yüzden sola dayanıyor.
                       const atStart = i === 0 && offset === 0
                       return (
                         <span
@@ -429,81 +483,77 @@ export function WeekGantt({
                 </Fragment>
               ))}
             </div>
-          </div>
 
-          {byCategory.map(([category, catRows]) => (
-            <div key={category} className="mt-2 first:mt-0">
-              <p className="sticky left-0 z-20 mb-1 bg-card pl-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {category}
-              </p>
-              {catRows.map(({ press, blocks }) => (
-                <div key={press.name} className="flex items-center">
-                  <span
-                    className="sticky left-0 z-20 shrink-0 truncate bg-card pr-2 text-xs font-medium text-foreground"
-                    style={{ width: LABEL_WIDTH }}
-                    title={`${press.name} · ${press.hall}`}
-                  >
-                    {press.name}
-                  </span>
+            {byCategory.map(([category, catRows]) => (
+              <div key={category} className="mt-2 first:mt-0">
+                {/* Soldaki kategori başlığının karşılığı — hiza için. */}
+                <div className="mb-1" style={{ height: CATEGORY_HEIGHT }} />
+                {catRows.map(({ press, blocks }) => (
                   <div
-                    className="relative rounded border border-border bg-muted/30"
-                    style={{ height: ROW_HEIGHT, width: totalPx }}
+                    key={press.name}
+                    className="flex items-center"
+                    style={{ height: ROW_HEIGHT }}
                   >
-                    {visibleDates.map((date, i) => (
-                      <span
-                        key={date}
-                        className="absolute top-0 h-full w-px bg-border"
-                        style={{ left: px(i * dayWidthMinutes) }}
-                        title={date}
-                      />
-                    ))}
+                    <div
+                      className="relative rounded border border-border bg-muted/30"
+                      style={{ height: ROW_HEIGHT, width: totalPx }}
+                    >
+                      {visibleDates.map((date, i) => (
+                        <span
+                          key={date}
+                          className="absolute top-0 h-full w-px bg-border"
+                          style={{ left: px(i * dayWidthMinutes) }}
+                          title={date}
+                        />
+                      ))}
 
-                    {nowOffset !== null && (
-                      <span
-                        className="pointer-events-none absolute top-0 z-10 h-full w-0.5 bg-red-600/80"
-                        style={{ left: px(nowOffset) }}
-                        title="Now"
-                      />
-                    )}
+                      {nowOffset !== null && (
+                        <span
+                          className="pointer-events-none absolute top-0 z-10 h-full w-0.5 bg-red-600/80"
+                          style={{ left: px(nowOffset) }}
+                          title="Now"
+                        />
+                      )}
 
-                    {blocks.map((b, idx) => {
-                      const id = `${press.name}-${idx}`
-                      const width = Math.max(1, px(b.end - b.start))
-                      const clashing =
-                        b.kind === 'setup' && clashKeys.has(`${b.press}|${b.start}`)
-                      return (
-                        <div
-                          key={id}
-                          title={b.title}
-                          className={`absolute top-1 flex items-center overflow-hidden rounded-sm px-0.5 text-[10px] font-medium text-white ${
-                            clashing ? 'ring-2 ring-dashed ring-red-600' : ''
-                          }`}
-                          style={{
-                            left: px(b.start),
-                            width,
-                            height: ROW_HEIGHT - 8,
-                            backgroundColor: COLORS[b.kind].fill,
-                            // Dondurulmuş iş taralı çizilir: rengi korur
-                            // (hangi iş olduğu belli kalsın) ama dokusundan
-                            // yeniden planlanmayacağı anlaşılır.
-                            backgroundImage: b.frozen
-                              ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.35) 0 3px, transparent 3px 7px)'
-                              : undefined,
-                          }}
-                        >
-                          {width > 34 && b.label && (
-                            <span className="truncate">
-                              {width > 96 && b.longLabel ? b.longLabel : b.label}
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })}
+                      {blocks.map((b, idx) => {
+                        const id = `${press.name}-${idx}`
+                        const width = Math.max(1, px(b.end - b.start))
+                        const clashing =
+                          b.kind === 'setup' && clashKeys.has(`${b.press}|${b.start}`)
+                        return (
+                          <div
+                            key={id}
+                            title={b.title}
+                            className={`absolute top-1 flex items-center overflow-hidden rounded-sm px-0.5 text-[10px] font-medium text-white ${
+                              clashing ? 'ring-2 ring-dashed ring-red-600' : ''
+                            }`}
+                            style={{
+                              left: px(b.start),
+                              width,
+                              height: ROW_HEIGHT - 8,
+                              backgroundColor: COLORS[b.kind].fill,
+                              // Dondurulmuş iş taralı çizilir: rengi korur
+                              // (hangi iş olduğu belli kalsın) ama dokusundan
+                              // yeniden planlanmayacağı anlaşılır.
+                              backgroundImage: b.frozen
+                                ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.35) 0 3px, transparent 3px 7px)'
+                                : undefined,
+                            }}
+                          >
+                            {width > 34 && b.label && (
+                              <span className="truncate">
+                                {width > 96 && b.longLabel ? b.longLabel : b.label}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ))}
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
