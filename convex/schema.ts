@@ -292,8 +292,28 @@ export default defineSchema({
     // 'admin' | 'planner' | 'maintenance' | 'viewer'
     role: v.string(),
     active: v.boolean(),
+    /**
+     * PBKDF2-SHA512 karması ve tuzu. Parolanın kendisi hiçbir yerde
+     * saklanmaz; karma Node tarafında (action) üretilir.
+     * Eski kayıtlarda yok — parolası olmayan kullanıcı giriş yapamaz.
+     */
+    passwordHash: v.optional(v.string()),
+    passwordSalt: v.optional(v.string()),
+    /** Varsayılan parolayla oluşturuldu; değiştirmeden uygulamaya giremez. */
+    mustChangePassword: v.optional(v.boolean()),
     createdAt: v.number(),
   }).index('by_name', ['name']),
+
+  // Açık oturumlar. Jeton tarayıcıda saklanır; süresi dolunca yeniden
+  // giriş istenir.
+  sessions: defineTable({
+    token: v.string(),
+    userId: v.id('users'),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index('by_token', ['token'])
+    .index('by_user', ['userId']),
 
   // Otomatik plana kullanıcı müdahaleleri. Plan her zaman otomatik
   // hesaplanır; burada tutulan kurallar hesaba girdi olarak katılır, yani

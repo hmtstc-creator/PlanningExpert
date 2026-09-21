@@ -4,6 +4,7 @@ import '../styles.css'
 import siteMetadata from '../metadata.json'
 import { ConnectionBanner } from '../components/ConnectionBanner'
 import { Header } from '../components/Header'
+import { LoginGate } from '../components/LoginGate'
 import { MutationErrorToast } from '../components/MutationErrorToast'
 import AppConvexProvider from '@/components/convex-client-provider'
 
@@ -33,15 +34,19 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <AppConvexProvider>
-          {/* One sticky stack: the banner sits under the header without a
-              hard-coded offset, which broke when the header changed height
-              between breakpoints. */}
-          <div className="sticky top-0 z-50">
-            <Header />
-            <ConnectionBanner />
-          </div>
-          {children}
-          <MutationErrorToast />
+          {/* Nothing of the app renders until somebody is signed in — the
+              header included, since it names the current user. */}
+          <LoginGate>
+            {/* One sticky stack: the banner sits under the header without a
+                hard-coded offset, which broke when the header changed height
+                between breakpoints. */}
+            <div className="sticky top-0 z-50">
+              <Header />
+              <ConnectionBanner />
+            </div>
+            {children}
+            <MutationErrorToast />
+          </LoginGate>
         </AppConvexProvider>
         <Scripts />
       </body>

@@ -87,6 +87,16 @@ export const update = mutation({
       role: args.role,
       active: args.active,
     })
+
+    // Pasife alınan kullanıcının oturumu hemen bitmeli. `me` zaten pasifi
+    // tanımıyor, ama jetonu ortada bırakmanın bir sebebi yok.
+    if (!args.active) {
+      const sessions = await ctx.db
+        .query('sessions')
+        .withIndex('by_user', (q) => q.eq('userId', args.id))
+        .collect()
+      for (const session of sessions) await ctx.db.delete(session._id)
+    }
     return null
   },
 })
@@ -96,11 +106,22 @@ export const remove = mutation({
   returns: v.null(),
   handler: async (ctx, { id }) => {
     const row = await ctx.db.get(id)
+
+    // Açık oturumları da kapat. Silinen kullanıcının jetonu süresi dolana
+    // kadar çalışmaya devam etseydi, silmek hiçbir şey ifade etmezdi.
+    const sessions = await ctx.db
+      .query('sessions')
+      .withIndex('by_user', (q) => q.eq('userId', id))
+      .collect()
+    for (const session of sessions) await ctx.db.delete(session._id)
+
     await ctx.db.delete(id)
     if (row) {
       await ctx.db.insert('changeLog', {
         title: `User removed — ${row.name}`,
-        detail: 'Their earlier entries keep their name; only the account is gone.',
+        detail:
+          'Their earlier entries keep their name; only the account is gone. ' +
+          `${sessions.length} open session(s) were signed out.`,
         category: 'system',
         createdAt: Date.now(),
       })

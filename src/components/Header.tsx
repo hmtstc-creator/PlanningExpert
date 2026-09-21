@@ -133,16 +133,10 @@ export function Header() {
           <Link
             to="/yonetim"
             className="ml-auto hidden shrink-0 text-xs text-muted-foreground hover:text-foreground lg:block"
-            title="Who is recorded as making changes on this device"
+            title="Signed-in user — manage accounts on the Admin page"
           >
-            {currentUser ? (
-              <>
-                <span className="text-muted-foreground/70">Saving as </span>
-                <span className="font-medium text-foreground">{currentUser}</span>
-              </>
-            ) : (
-              <span className="text-amber-700">No user selected</span>
-            )}
+            <span className="text-muted-foreground/70">Signed in as </span>
+            <span className="font-medium text-foreground">{currentUser}</span>
           </Link>
         </nav>
       </header>

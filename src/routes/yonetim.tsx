@@ -5,7 +5,8 @@ import { api } from '../../convex/_generated/api'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { SaveStatus } from '../components/SaveStatus'
 import { UnsavedBar } from '../components/UnsavedBar'
-import { useMutation, useQuery } from '../lib/convexTransport'
+import { useAction, useMutation, useQuery } from '../lib/convexTransport'
+import { validatePassword } from '../lib/authRules'
 import { useCurrentUser } from '../lib/currentUser'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
@@ -20,6 +21,8 @@ type User = {
   email?: string
   role: string
   active: boolean
+  hasPassword: boolean
+  mustChangePassword: boolean
 }
 
 const ROLES = [
@@ -51,8 +54,12 @@ function sameDraft(a: Draft, b: Draft): boolean {
 }
 
 function AdminPage() {
-  const { name: currentUser, setName: setCurrentUser } = useCurrentUser()
-  const users = (useQuery(api.users.list) ?? []) as User[]
+  const { name: currentUser, user: session, token, setToken } = useCurrentUser()
+  const users = (useQuery(api.authInternal.listWithPasswordState) ?? []) as User[]
+  const setPasswordAsAdmin = useAction(api.auth.setPasswordAsAdmin)
+  const [passwordFor, setPasswordFor] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const lookups = (useQuery(api.lookups.list) ?? []) as {
     _id: string
     kind: string
@@ -128,54 +135,52 @@ function AdminPage() {
 
       <div className="mt-4 rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
         <p className="text-sm font-semibold text-amber-900">
-          This is not a login. It records who did something; it does not stop
-          anyone doing it.
+          What this login does, and what it does not
         </p>
         <p className="mt-1 text-sm text-amber-900">
-          There are no passwords and no sessions yet: a person picks their name
-          below and it is stamped on everything they save from this device.
-          Anyone can pick any name, and the role only changes what is
-          suggested on screen — it does not protect any data. Real sign-in is a
-          separate piece of work and would build on this same user list.
+          Passwords are real: stored as a salted PBKDF2 hash, never in plain
+          text, and a session expires after twelve hours. Changing a password
+          signs that user out everywhere else. This keeps someone who finds the
+          address out of the plan.
+        </p>
+        <p className="mt-1 text-sm text-amber-900">
+          It guards the <strong>screen</strong>, not yet the data. The database
+          functions can still be called directly by anyone who knows the
+          deployment address; making every one of them check the session is the
+          next step. Roles change what is offered on screen — they do not
+          protect data either.
         </p>
       </div>
 
       <ErrorBanner
-        message={addError ?? updateError ?? removeError ?? lookupError}
+        message={addError ?? updateError ?? removeError ?? lookupError ?? passwordError}
         onDismiss={clearError}
       />
 
       <div className="mt-6 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Who is using this device?</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Everything saved from this browser is recorded under this name.
-        </p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <select
-            className={`w-52 ${inputClass}`}
-            value={currentUser ?? ''}
-            onChange={(e) => setCurrentUser(e.target.value || null)}
+        <h2 className="text-sm font-semibold text-foreground">Signed in</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+          <span className="text-foreground">
+            <strong>{currentUser}</strong>
+            <span className="text-muted-foreground"> · {session?.role}</span>
+          </span>
+          <button
+            onClick={() => setToken(null)}
+            className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
           >
-            <option value="">Nobody selected</option>
-            {activeUsers.map((u) => (
-              <option key={u._id} value={u.name}>
-                {u.name} ({u.role})
-              </option>
-            ))}
-          </select>
-          {currentUser ? (
-            <span className="text-sm text-emerald-700">
-              Recording changes as <strong>{currentUser}</strong>
-            </span>
-          ) : (
-            <span className="text-sm text-muted-foreground">
-              Changes are being saved without a name.
-            </span>
-          )}
+            Sign out
+          </button>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Everything you save is recorded under this name.
+        </p>
       </div>
 
       <h2 className="mt-8 text-sm font-semibold text-foreground">Users</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        A new user cannot sign in until you set a password for them. They are
+        asked to replace it the first time they sign in.
+      </p>
       <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Name</span>
@@ -234,6 +239,7 @@ function AdminPage() {
                 <th className="px-3 py-2 font-medium">Email</th>
                 <th className="px-3 py-2 font-medium">Role</th>
                 <th className="px-3 py-2 font-medium">Active</th>
+                <th className="px-3 py-2 font-medium">Password</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 <th className="px-3 py-2" />
               </tr>
@@ -289,6 +295,75 @@ function AdminPage() {
                         onChange={(e) => drafts.edit(user._id, { active: e.target.checked })}
                       />
                     </td>
+                    <td className="px-3 py-2 text-xs">
+                      {passwordFor === user._id ? (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <input
+                            type="password"
+                            className="w-36 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                            placeholder="New password"
+                            autoComplete="new-password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                          />
+                          <button
+                            onClick={async () => {
+                              const problem = validatePassword(newPassword)
+                              if (problem) {
+                                setPasswordError(problem)
+                                return
+                              }
+                              setPasswordError(null)
+                              try {
+                                await setPasswordAsAdmin({
+                                  token: token ?? '',
+                                  userId: user._id,
+                                  newPassword,
+                                })
+                                setPasswordFor(null)
+                                setNewPassword('')
+                              } catch (e) {
+                                setPasswordError(
+                                  e instanceof Error ? e.message : 'Could not set the password',
+                                )
+                              }
+                            }}
+                            className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:opacity-90"
+                          >
+                            Set
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPasswordFor(null)
+                              setPasswordError(null)
+                            }}
+                            className="text-xs text-muted-foreground underline"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {!user.hasPassword ? (
+                            <span className="text-destructive">cannot sign in</span>
+                          ) : user.mustChangePassword ? (
+                            <span className="text-amber-700">must change</span>
+                          ) : (
+                            <span className="text-muted-foreground">set</span>
+                          )}
+                          <button
+                            onClick={() => {
+                              setPasswordFor(user._id)
+                              setNewPassword('')
+                              setPasswordError(null)
+                            }}
+                            className="text-foreground underline hover:no-underline"
+                          >
+                            {user.hasPassword ? 'Reset' : 'Set password'}
+                          </button>
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <SaveStatus
                         dirty={dirty}
@@ -312,7 +387,8 @@ function AdminPage() {
                             )
                           ) {
                             void removeUser({ id: user._id })
-                            if (currentUser === user.name) setCurrentUser(null)
+                            // Kendini silen kullanıcı oturumda kalmamalı.
+                            if (currentUser === user.name) setToken(null)
                           }
                         }}
                         className="ml-2 text-xs text-destructive hover:underline"

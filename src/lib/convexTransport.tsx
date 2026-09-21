@@ -11,6 +11,7 @@
 
 import { ConvexHttpClient } from 'convex/browser'
 import {
+  useAction as useConvexAction,
   useConvex,
   useMutation as useConvexMutation,
   usePaginatedQuery as useConvexPaginatedQuery,
@@ -237,6 +238,32 @@ export function useMutation(fn: any): (args?: any) => Promise<any> {
       }
     },
     [mode, http, wsMutation, fn, bumpRevision],
+  )
+}
+
+/**
+ * `useAction` yerine. Action'lar sorgu değil, sonuç döndüren çağrılardır;
+ * iki taşıma modunda da aynı şekilde çalışırlar.
+ *
+ * Hata burada `reportMutationError`'a GİTMEZ: giriş hatası ("kullanıcı adı
+ * ya da parola yanlış") kullanıcının okuması gereken normal bir cevaptır,
+ * ekranın köşesinde beliren bir sistem hatası değil. Çağıran taraf ne
+ * yapacağını kendi bilir.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function useAction(fn: any): (args?: any) => Promise<any> {
+  const { mode, http } = useTransport()
+  const wsAction = useConvexAction(fn)
+
+  return useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async (args?: any) => {
+      if (mode !== 'http') return wsAction(args ?? {})
+      if (!http) throw new Error('Veritabanı adresi tanımlı değil')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (http as any).action(fn, args ?? {})
+    },
+    [mode, http, wsAction, fn],
   )
 }
 

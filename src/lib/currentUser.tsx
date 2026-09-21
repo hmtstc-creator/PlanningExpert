@@ -1,54 +1,100 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
+
+import { api } from '../../convex/_generated/api'
+import { useQuery } from './convexTransport'
 
 /**
- * Ekranda seçili olan kişi.
+ * Giriş yapmış kullanıcı.
  *
- * DİKKAT — bu bir kimlik DOĞRULAMA değildir. Parola yok, oturum yok; kişi
- * bir listeden seçilir ve seçim bu tarayıcıda saklanır. Tek işi kayıtların
- * üzerine "bunu kim yaptı" yazmaktır. Kimseyi hiçbir şeyden alıkoymaz ve
- * öyleymiş gibi sunulmamalıdır; gerçek giriş ayrı bir iştir.
+ * Oturum jetonu bu tarayıcıda saklanır ve her açılışta sunucuya sorulur;
+ * kullanıcı adı, rolü ve "parolasını değiştirmeli mi" bilgisi oradan gelir.
+ * Kayıtların üzerine yazılan isim artık bir listeden seçilen değil, giriş
+ * yapan kişidir.
  */
-const STORAGE_KEY = 'planningexpert.currentUser'
+const TOKEN_KEY = 'planningexpert.sessionToken'
+
+function readToken(): string | null {
+  try {
+    return window.localStorage.getItem(TOKEN_KEY)
+  } catch {
+    // Gizli sekme ya da engellenmiş site verisi: oturum hatırlanmaz.
+    return null
+  }
+}
+
+function writeToken(token: string | null): void {
+  try {
+    if (token) window.localStorage.setItem(TOKEN_KEY, token)
+    else window.localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    /* bu tarayıcıda hatırlanmayacak */
+  }
+}
+
+export interface SessionUser {
+  name: string
+  role: string
+  mustChangePassword: boolean
+}
 
 interface CurrentUserValue {
+  /** Kayıtlara yazılacak isim; giriş yoksa null. */
   name: string | null
-  setName: (name: string | null) => void
+  user: SessionUser | null
+  token: string | null
+  /** Oturum sunucuya sorulurken true. */
+  loading: boolean
+  setToken: (token: string | null) => void
 }
 
 const CurrentUserContext = createContext<CurrentUserValue>({
   name: null,
-  setName: () => {},
+  user: null,
+  token: null,
+  loading: true,
+  setToken: () => {},
 })
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
-  const [name, setNameState] = useState<string | null>(null)
+  const [token, setTokenState] = useState<string | null>(null)
+  // Jeton tarayıcıdan okunana kadar "giriş yok" demek, her açılışta giriş
+  // ekranını bir an gösterirdi.
+  const [tokenRead, setTokenRead] = useState(false)
 
-  // Tarayıcı deposu okunamayabilir (gizli sekme, engellenmiş site verisi);
-  // okunamaması uygulamayı durdurmamalı, sadece kişi seçilmemiş olur.
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY)
-      if (stored) setNameState(stored)
-    } catch {
-      /* seçim hatırlanmaz, sorun değil */
-    }
+    setTokenState(readToken())
+    setTokenRead(true)
   }, [])
 
-  const setName = useCallback((next: string | null) => {
-    setNameState(next)
-    try {
-      if (next) window.localStorage.setItem(STORAGE_KEY, next)
-      else window.localStorage.removeItem(STORAGE_KEY)
-    } catch {
-      /* bu tarayıcıda hatırlanmayacak */
-    }
+  const setToken = useCallback((next: string | null) => {
+    setTokenState(next)
+    writeToken(next)
   }, [])
 
-  return (
-    <CurrentUserContext.Provider value={{ name, setName }}>
-      {children}
-    </CurrentUserContext.Provider>
+  const result = useQuery(api.authInternal.me, tokenRead ? { token: token ?? undefined } : 'skip')
+  const loading = !tokenRead || result === undefined
+  const user = (result ?? null) as SessionUser | null
+
+  // Jeton var ama sunucu tanımıyorsa (süresi dolmuş, kullanıcı silinmiş)
+  // saklamanın anlamı yok.
+  useEffect(() => {
+    if (!loading && token && user === null) writeToken(null)
+  }, [loading, token, user])
+
+  const value = useMemo(
+    () => ({ name: user?.name ?? null, user, token, loading, setToken }),
+    [user, token, loading, setToken],
   )
+
+  return <CurrentUserContext.Provider value={value}>{children}</CurrentUserContext.Provider>
 }
 
 export function useCurrentUser(): CurrentUserValue {
