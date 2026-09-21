@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
+import { runSync } from './moldAlarms'
 
 const recordValidator = v.object({
   _id: v.id('moldMaintenance'),
@@ -65,6 +66,11 @@ export const add = mutation({
       author: args.createdBy,
       createdAt: Date.now(),
     })
+
+    // Periyodik bakım vuruş sayacını sıfırlar; açık bir ömür alarmı varsa
+    // kendiliğinden düşmeli, elle kapatılmayı beklememeli.
+    if (kind === 'periodic') await runSync(ctx)
+
     return null
   },
 })

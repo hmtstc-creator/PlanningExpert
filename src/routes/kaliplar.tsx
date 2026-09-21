@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '../lib/convexTransport'
+import { useMutation, useQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -64,6 +64,32 @@ function KaliplarPage() {
   )
   const { run: setReadiness, error: readinessError } = useSafeMutation(
     api.moldReadiness.set,
+  )
+  const alarms = (useQuery(api.moldAlarms.list) ?? []) as {
+    _id: string
+    material: string
+    status: string
+    shotsAtAlarm: number
+    limitAtAlarm: number
+    openedAt: number
+    closedAt?: number
+    closedBy?: string
+    closeReason?: string
+  }[]
+  const { run: closeAlarm, error: alarmError } = useSafeMutation(api.moldAlarms.close)
+  const { run: reopenAlarm } = useSafeMutation(api.moldAlarms.reopen)
+  const syncAlarms = useMutation(api.moldAlarms.sync)
+  const [closingAlarm, setClosingAlarm] = useState<string | null>(null)
+  const [closeReason, setCloseReason] = useState('')
+  const [syncing, setSyncing] = useState(false)
+
+  const openAlarms = useMemo(
+    () => alarms.filter((a) => a.status === 'open').sort((a, b) => b.openedAt - a.openedAt),
+    [alarms],
+  )
+  const acknowledgedAlarms = useMemo(
+    () => alarms.filter((a) => a.status !== 'open'),
+    [alarms],
   )
 
   const [material, setMaterial] = useState('')
@@ -202,9 +228,138 @@ function KaliplarPage() {
       </p>
 
       <ErrorBanner
-        message={addError ?? removeError ?? readinessError}
+        message={addError ?? removeError ?? readinessError ?? alarmError}
         onDismiss={clearError}
       />
+
+      {openAlarms.length > 0 && (
+        <div className="mt-6 rounded-lg border-2 border-destructive bg-destructive/10 p-4">
+          <h2 className="text-sm font-semibold text-destructive">
+            Shot limit alarms — {openAlarms.length} mold(s) held out of the plan
+          </h2>
+          <p className="mt-1 text-sm text-foreground">
+            These molds passed their periodic maintenance limit. They were not
+            stopped mid-run, but they are not being planned into new work until
+            each alarm is closed. Recording periodic maintenance closes an alarm
+            by itself; closing it by hand means "I have seen this, let it keep
+            running".
+          </p>
+          <div className="mt-3 overflow-x-auto rounded-md border border-border bg-card">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Mold</th>
+                  <th className="px-3 py-2 font-medium">Shots at alarm</th>
+                  <th className="px-3 py-2 font-medium">Limit</th>
+                  <th className="px-3 py-2 font-medium">Since</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {openAlarms.map((alarm) => (
+                  <tr key={alarm._id} className="border-t border-border">
+                    <td className="px-3 py-2 font-medium text-foreground">{alarm.material}</td>
+                    <td className="px-3 py-2 text-foreground">
+                      {alarm.shotsAtAlarm.toLocaleString('en-GB')}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {alarm.limitAtAlarm.toLocaleString('en-GB')}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      {new Date(alarm.openedAt).toLocaleString('en-GB')}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {closingAlarm === alarm._id ? (
+                        <div className="flex flex-wrap items-center justify-end gap-1">
+                          <input
+                            className="w-56 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                            placeholder="Why may it keep running?"
+                            value={closeReason}
+                            onChange={(e) => setCloseReason(e.target.value)}
+                          />
+                          <button
+                            onClick={async () => {
+                              const ok = await closeAlarm({
+                                id: alarm._id,
+                                reason: closeReason,
+                                closedBy: currentUser ?? undefined,
+                              })
+                              if (ok) {
+                                setClosingAlarm(null)
+                                setCloseReason('')
+                              }
+                            }}
+                            disabled={!closeReason.trim()}
+                            className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+                          >
+                            Close alarm
+                          </button>
+                          <button
+                            onClick={() => setClosingAlarm(null)}
+                            className="text-xs text-muted-foreground underline"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setMaterial(alarm.material)
+                              setKind('periodic')
+                              window.scrollTo({ top: 0, behavior: 'smooth' })
+                            }}
+                            className="text-xs text-foreground underline hover:no-underline"
+                          >
+                            Book maintenance
+                          </button>
+                          <button
+                            onClick={() => {
+                              setClosingAlarm(alarm._id)
+                              setCloseReason('')
+                            }}
+                            className="text-xs text-destructive underline hover:no-underline"
+                          >
+                            Let it keep running
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {acknowledgedAlarms.length > 0 && (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-medium text-amber-900">
+            {acknowledgedAlarms.length} mold(s) are running past their limit by
+            decision
+          </p>
+          <ul className="mt-1 space-y-1 text-xs text-amber-900">
+            {acknowledgedAlarms.map((alarm) => (
+              <li key={alarm._id} className="flex flex-wrap items-center gap-2">
+                <strong>{alarm.material}</strong>
+                <span>
+                  {alarm.closeReason}
+                  {alarm.closedBy ? ` — ${alarm.closedBy}` : ''}
+                </span>
+                <button
+                  onClick={() =>
+                    void reopenAlarm({ id: alarm._id, reopenedBy: currentUser ?? undefined })
+                  }
+                  className="underline hover:no-underline"
+                >
+                  Hold it again
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label="Periodic maintenance due" value={exceeded.toString()} warn={exceeded > 0} />
@@ -219,10 +374,25 @@ function KaliplarPage() {
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Shots since the last periodic maintenance, against the limit on the
-            material's master data record. A mold over its limit keeps running
-            in the plan until someone books maintenance or holds it — the plan
-            does not stop it on its own.
+            material's master data record. Passing the limit is allowed — a mold
+            is never stopped mid-run — but it raises an alarm, and from then on
+            it is not planned into new work until the alarm is closed.
           </p>
+          <button
+            onClick={async () => {
+              setSyncing(true)
+              try {
+                await syncAlarms()
+              } finally {
+                setSyncing(false)
+              }
+            }}
+            disabled={syncing}
+            className="mt-2 rounded-md border border-border bg-card px-3 py-1.5 text-xs text-foreground hover:bg-muted disabled:opacity-50"
+            title="Alarms are raised automatically when MB51 is uploaded; use this to re-check now"
+          >
+            {syncing ? 'Checking…' : 'Re-check alarms now'}
+          </button>
           <div className="mt-2 overflow-x-auto rounded-md border border-border bg-card">
             <table className="w-full text-left text-sm">
               <thead className="bg-muted text-muted-foreground">

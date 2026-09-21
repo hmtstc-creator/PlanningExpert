@@ -89,9 +89,15 @@ export function moldBlackouts(
   maintenance: MoldMaintenanceRow[],
   readiness: MoldReadinessRow[],
   horizonDates: string[],
+  /**
+   * Ömür alarmı açık olan kalıplar. Limit aşılmasına izin verilir ama
+   * aşıldıktan sonra alarm kapanana kadar kalıp plana alınmaz — süresiz
+   * bir kapalılıktır, gün listesiyle ifade edilemez.
+   */
+  alarmed: string[] = [],
 ): { blackouts: { material: string; date: string }[]; unavailable: string[] } {
   const blackouts: { material: string; date: string }[] = []
-  const unavailable: string[] = []
+  const unavailable: string[] = [...alarmed]
 
   for (const row of maintenance) {
     for (const date of maintenanceDates(row)) {
@@ -102,7 +108,7 @@ export function moldBlackouts(
   for (const row of readiness) {
     if (row.ready) continue
     if (!row.readyDate) {
-      unavailable.push(row.material)
+      if (!unavailable.includes(row.material)) unavailable.push(row.material)
       continue
     }
     for (const date of horizonDates) {

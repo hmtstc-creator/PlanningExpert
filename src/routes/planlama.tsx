@@ -30,6 +30,7 @@ import {
   pressMaintenanceBlock,
   type PressMaintenanceRow,
 } from '../lib/maintenance'
+import { alarmedMaterials } from '../lib/moldAlarm'
 import { fixForUnplanned } from '../lib/unplannedFix'
 import { schedule, type PlanOverride, type ScheduledJob } from '../lib/scheduler'
 
@@ -128,6 +129,14 @@ function PlanlamaPage() {
   }[]
   const pressMaintenanceRows = (useQuery(api.pressMaintenance.list) ??
     []) as PressMaintenanceRow[]
+  // Ömür alarmı açık olan kalıp plana alınmaz: limitin aşılmasına izin
+  // verilir ama aşıldıktan sonra alarm kapanana kadar o kalıp beklemede.
+  const alarmRows = (useQuery(api.moldAlarms.list) ?? []) as {
+    material: string
+    status: string
+    shotsAtAlarm: number
+    limitAtAlarm: number
+  }[]
   const setOverride = useMutation(api.planOverrides.set)
   const clearOverride = useMutation(api.planOverrides.clear)
 
@@ -409,9 +418,14 @@ function PlanlamaPage() {
     return Array.from(set).sort()
   }, [buckets])
 
+  const alarmedMolds = useMemo(
+    () => alarmedMaterials(alarmRows),
+    [alarmRows],
+  )
+
   const { blackouts: moldBlackouts, unavailable: unavailableMolds } = useMemo(
-    () => buildMoldBlackouts(maintenanceRows, readinessRows, horizonDates),
-    [maintenanceRows, readinessRows, horizonDates],
+    () => buildMoldBlackouts(maintenanceRows, readinessRows, horizonDates, alarmedMolds),
+    [maintenanceRows, readinessRows, horizonDates, alarmedMolds],
   )
 
   /**
@@ -450,7 +464,16 @@ function PlanlamaPage() {
         setupGapMinutes,
         coilSetupGapMinutes,
         concurrentSetupsPerHall,
-        overrides,
+        // Süresiz kapalı kalıplar (ömür alarmı açık, ya da tarihsiz
+        // tutuluyor) motora `exclude` olarak geçer. Yalnızca uyarı yazmak
+        // yetmiyordu: kalıp uyarıya rağmen planlanmaya devam ediyordu.
+        overrides: [
+          ...overrides,
+          ...unavailableMolds.map((material) => ({
+            material,
+            kind: 'exclude' as const,
+          })),
+        ],
         moldBlackouts,
         fixedJobs: [
           ...frozenJobs.map((job) => ({
@@ -479,6 +502,7 @@ function PlanlamaPage() {
       concurrentSetupsPerHall,
       coilSetupGapMinutes,
       overrides,
+      unavailableMolds,
       moldBlackouts,
       frozenJobs,
       pressMaintenanceBlocks,
@@ -746,11 +770,19 @@ function PlanlamaPage() {
       )
     // Ufkun içindeki bakım günleri planı doğrudan değiştirdiği için
     // görünür olmalı — iş neden o güne konmadı sorusunun cevabı budur.
-    if (unavailableMolds.length > 0) {
+    if (alarmedMolds.length > 0) {
       list.push(
-        `${unavailableMolds.length} mold(s) are marked not ready with no date, ` +
+        `${alarmedMolds.length} mold(s) passed their periodic maintenance limit ` +
+          `and are held out of the plan until the alarm is closed: ` +
+          `${alarmedMolds.slice(0, 6).join(', ')}${alarmedMolds.length > 6 ? '…' : ''}.`,
+      )
+    }
+    const heldWithoutDate = unavailableMolds.filter((m) => !alarmedMolds.includes(m))
+    if (heldWithoutDate.length > 0) {
+      list.push(
+        `${heldWithoutDate.length} mold(s) are marked not ready with no date, ` +
           `so they are held out of the plan entirely: ` +
-          `${unavailableMolds.slice(0, 6).join(', ')}${unavailableMolds.length > 6 ? '…' : ''}.`,
+          `${heldWithoutDate.slice(0, 6).join(', ')}${heldWithoutDate.length > 6 ? '…' : ''}.`,
       )
     }
     const pressDown = pressMaintenanceBlocks.filter((b) => b.date >= todayIso)
@@ -784,6 +816,7 @@ function PlanlamaPage() {
     lateCount,
     moldBlackouts,
     unavailableMolds,
+    alarmedMolds,
     pressMaintenanceBlocks,
     todayIso,
   ])

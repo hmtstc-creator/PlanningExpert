@@ -159,3 +159,34 @@ describe('bakım performansı', () => {
     expect(p.measured).toBe(0)
   })
 })
+
+describe('ömür alarmı olan kalıplar', () => {
+  const horizon = ['2026-09-21', '2026-09-22']
+
+  it('alarmı açık kalıp plana hiç alınmaz', () => {
+    const { blackouts, unavailable } = moldBlackouts([], [], horizon, ['A'])
+    // Süresiz kapalılık: gün listesiyle ifade edilemez, ayrıca bildirilir.
+    expect(blackouts).toEqual([])
+    expect(unavailable).toEqual(['A'])
+  })
+
+  it('hem alarmlı hem tarihsiz tutulan kalıp iki kere sayılmaz', () => {
+    const { unavailable } = moldBlackouts(
+      [],
+      [{ material: 'A', ready: false }],
+      horizon,
+      ['A'],
+    )
+    expect(unavailable).toEqual(['A'])
+  })
+
+  it('alarm listesi boşken davranış değişmez', () => {
+    const { blackouts, unavailable } = moldBlackouts(
+      [{ material: 'B', date: '2026-09-21' }],
+      [],
+      horizon,
+    )
+    expect(blackouts).toEqual([{ material: 'B', date: '2026-09-21' }])
+    expect(unavailable).toEqual([])
+  })
+})

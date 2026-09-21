@@ -190,6 +190,26 @@ export default defineSchema({
     createdAt: v.number(),
   }).index('by_material', ['material']),
 
+  // Kalıp ömrü alarmı. Kalıbın periyodik bakım limitini aşmasına izin
+  // verilir — üretim ortasında kendiliğinden durdurmak sahayı durdurmak
+  // olurdu — ama aşıldığı anda burada bir alarm doğar ve alarm açık olduğu
+  // sürece o kalıp plana hiç alınmaz.
+  moldAlarms: defineTable({
+    material: v.string(),
+    // 'open' = plana alınmaz | 'closed' = elle onaylandı, çalışmaya devam
+    status: v.string(),
+    /** Alarm doğduğu andaki vuruş ve limit — sonradan değişse de kayıt kalır. */
+    shotsAtAlarm: v.number(),
+    limitAtAlarm: v.number(),
+    openedAt: v.number(),
+    closedAt: v.optional(v.number()),
+    closedBy: v.optional(v.string()),
+    /** Elle kapatılırken yazılan gerekçe. */
+    closeReason: v.optional(v.string()),
+  })
+    .index('by_material', ['material'])
+    .index('by_status', ['status']),
+
   // Kalıbın imalata hazır olup olmadığı. Hazır değilse plan o kalıbı
   // hazır olacağı tarihe kadar hiç kullanmaz — bakım bölümü burayı yönetir.
   moldReadiness: defineTable({

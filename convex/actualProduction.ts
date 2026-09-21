@@ -5,6 +5,7 @@ import {
 import { v } from 'convex/values'
 
 import { mutation, query } from './_generated/server'
+import { runSync } from './moldAlarms'
 import { filterRows, knownMaterialCodes } from './uploadFilter'
 
 const rowValidator = v.object({
@@ -88,6 +89,11 @@ export const replaceAll = mutation({
     await Promise.all(
       kept.map((row) => ctx.db.insert('actualProduction', { ...row, uploadedAt: now })),
     )
+    // Gerçekleşen üretim vuruş sayısını artıran tek şey. Limiti aşan kalıp
+    // varsa alarmı yüklemeyle birlikte doğsun; kimsenin bir ekranı açmasını
+    // beklemek alarmı günlerce geciktirirdi.
+    await runSync(ctx)
+
     return { count: kept.length, ...report }
   },
 })

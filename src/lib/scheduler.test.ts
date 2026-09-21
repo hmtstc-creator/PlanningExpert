@@ -1002,3 +1002,38 @@ describe('gün içinde geçmiş saatler', () => {
     expect(result.jobs[0].setupStartMinute).toBe(0)
   })
 })
+
+describe('ömür alarmı planı durdurur', () => {
+  it('alarmlı kalıp plandan çıkar, sebebi yazılır', () => {
+    // Alarm süresiz bir kapalılık olduğu için motora `exclude` gelir.
+    const result = schedule(
+      [backlogEntry, { ...backlogEntry, material: 'B' }],
+      new Map([
+        ['A', baseProduct],
+        ['B', { ...baseProduct, code: 'B' }],
+      ]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      bucketsFor(['PRS-1']),
+      settings,
+      { ...options, overrides: [{ material: 'A', kind: 'exclude' }] },
+    )
+    expect(result.jobs.map((j) => j.material)).toEqual(['B'])
+    const held = result.unplanned.find((u) => u.material === 'A')!
+    expect(held.reason).toContain('Excluded from planning')
+    // Miktar kaybolmaz: ne kadarının beklediği görünür.
+    expect(held.quantity).toBe(backlogEntry.qty)
+  })
+
+  it('alarm kapanınca kalıp plana geri döner', () => {
+    const result = schedule(
+      [backlogEntry],
+      new Map([['A', baseProduct]]),
+      [{ name: 'PRS-1', hall: 'Hol 1' }],
+      bucketsFor(['PRS-1']),
+      settings,
+      options,
+    )
+    expect(result.unplanned).toHaveLength(0)
+    expect(result.jobs[0].material).toBe('A')
+  })
+})
