@@ -153,8 +153,8 @@ function DepolarPage() {
   }
 
   return (
-    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Storage Locations</h1>
+    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Storage Locations</h1>
       <p className="mt-2 text-muted-foreground">
         Define the storage locations you care about and choose how each one is
         treated in planning. MB52 rows in any location that is not defined here

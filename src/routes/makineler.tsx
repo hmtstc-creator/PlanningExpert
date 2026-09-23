@@ -116,8 +116,8 @@ function MakinelerPage() {
     'rounded-md border border-input bg-background px-2 py-1 text-sm'
 
   return (
-    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Press Definitions</h1>
+    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Press Definitions</h1>
       <p className="mt-2 text-muted-foreground">
         Define which hall each press sits in — presses in the same hall cannot
         set up at the same time, which is the crane constraint the planner

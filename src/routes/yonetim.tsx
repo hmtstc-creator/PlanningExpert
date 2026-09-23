@@ -127,8 +127,8 @@ function AdminPage() {
   const activeUsers = users.filter((u) => u.active)
 
   return (
-    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Admin</h1>
+    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Admin</h1>
       <p className="mt-2 text-muted-foreground">
         People, the lists they choose from, and a record of who changed what.
       </p>

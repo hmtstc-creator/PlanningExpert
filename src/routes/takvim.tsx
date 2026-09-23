@@ -40,8 +40,8 @@ const FALLBACK_COUNTRIES = [
 
 function TakvimPage() {
   return (
-    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Work Calendar</h1>
+    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Work Calendar</h1>
       <p className="mt-2 text-muted-foreground">
         Define when and how much the plant runs so planning stays realistic.
         Shifts run back to back from the start time — 07:00 with 8-hour shifts

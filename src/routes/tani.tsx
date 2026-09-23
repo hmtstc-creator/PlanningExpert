@@ -204,8 +204,8 @@ function TaniPage() {
         : 'border-destructive/40 bg-destructive/10 text-destructive'
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Connection Diagnostics</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Connection Diagnostics</h1>
       <p className="mt-2 text-muted-foreground">
         This page shows whether the device can actually reach the database and,
         if not, exactly where the connection is blocked.

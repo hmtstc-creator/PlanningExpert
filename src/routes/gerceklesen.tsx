@@ -1,44 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { usePaginatedQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
-import { uploadMessage } from '../lib/uploadMessage'
-import { ExcelUpload } from '../components/ExcelUpload'
 
 export const Route = createFileRoute('/gerceklesen')({
   component: GerceklesenPage,
 })
-
-const str = (v: unknown) => {
-  const t = String(v ?? '').trim()
-  return t === '' || t === '#N/A' ? undefined : t
-}
-
-const num = (v: unknown) => {
-  const t = String(v ?? '').trim().replace(/\./g, '').replace(',', '.')
-  if (t === '' || t === '#N/A') return undefined
-  const parsed = Number(t)
-  return Number.isNaN(parsed) ? undefined : parsed
-}
-
-// MB51'de tarih hem Excel seri numarası hem de metin olarak gelebilir.
-function parseDate(value: unknown): string {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    const ms = (value - 25569) * 86400 * 1000
-    return new Date(ms).toISOString().slice(0, 10)
-  }
-  const t = String(value ?? '').trim()
-  if (!t) return ''
-  const dotted = t.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/)
-  if (dotted) {
-    const [, d, m, y] = dotted
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
-  }
-  const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/)
-  if (iso) return iso[0]
-  return ''
-}
 
 function GerceklesenPage() {
   const { results: rows, status } = usePaginatedQuery(
@@ -46,7 +14,6 @@ function GerceklesenPage() {
     {},
     { initialNumItems: 500 },
   )
-  const replaceAll = useMutation(api.actualProduction.replaceAll)
   const [search, setSearch] = useState('')
 
   const byMaterial = useMemo(() => {
@@ -68,62 +35,21 @@ function GerceklesenPage() {
   )
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-16">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Actual Production</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Actual Production</h1>
       <p className="mt-2 text-muted-foreground">
-        Upload the SAP MB51 movement report here. This data is used to compare
+        Movements from the SAP MB51 report. This data is used to compare
         actual production against the plan and to measure real press
-        performance. Each upload replaces the previous one.
+        performance.
       </p>
 
-      <div className="mt-6">
-        <ExcelUpload
-          expectedColumns={[
-            'Material',
-            'Posting Date',
-            'Quantity',
-            'Movement Type',
-            'Plant',
-            'Storage Location',
-            'Order',
-          ]}
-          replaces="all actual production rows"
-          onRows={async (raw) => {
-            const parsed = raw
-              .map((row) => ({
-                material:
-                  str(row['Material'] ?? row['Malzeme'] ?? row['material']) ?? '',
-                postingDate: parseDate(
-                  row['Posting Date'] ??
-                    row['Pstng Date'] ??
-                    row['Kayıt Tarihi'] ??
-                    row['postingDate'],
-                ),
-                quantity:
-                  num(
-                    row['Quantity'] ??
-                      row['Qty in Un. of Entry'] ??
-                      row['Miktar'] ??
-                      row['quantity'],
-                  ) ?? 0,
-                plant: str(row['Plant'] ?? row['Üretim Yeri'] ?? row['plant']),
-                storageLocation: str(
-                  row['Storage Location'] ?? row['Depo Yeri'] ?? row['storageLocation'],
-                ),
-                movementType: str(
-                  row['Movement Type'] ??
-                    row['Movement type'] ??
-                    row['Hareket Türü'] ??
-                    row['movementType'],
-                ),
-                orderNumber: str(row['Order'] ?? row['Sipariş'] ?? row['orderNumber']),
-              }))
-              .filter((r) => r.material)
-            const result = await replaceAll({ rows: parsed })
-            return { message: uploadMessage('movement rows', result) }
-          }}
-        />
-      </div>
+      <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+        The MB51 movement report is uploaded on the{' '}
+        <Link to="/sapdata" className="font-medium text-foreground underline hover:no-underline">
+          SAP Data
+        </Link>{' '}
+        page.
+      </p>
 
       <div className="mt-6 flex items-center gap-3">
         <input

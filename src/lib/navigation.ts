@@ -23,13 +23,23 @@ export const PRIMARY_LINKS: NavItem[] = [
   { to: '/', label: 'Overview', hint: 'Daily status and warnings' },
 ]
 
+/** Planlama başlığının geri kalanı: veri girişi ve motorun açıklaması. */
+export const PLANNING_LINKS: NavItem[] = [
+  { to: '/sapdata', label: 'SAP Data', hint: 'Upload ZPP, ZPP_DAILY, MB52 and MB51' },
+  { to: '/planlogic', label: 'Planning Logic', hint: 'How the plan is calculated' },
+]
+
 export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Planning',
+    items: [{ to: '/planlama', label: 'Production Plan', hint: 'The weekly production plan' }, ...PLANNING_LINKS],
+  },
   {
     label: 'Data',
     items: [
-      { to: '/siparisler', label: 'Demand', hint: 'ZPP and ZPP_DAILY uploads' },
-      { to: '/stoklar', label: 'Stock', hint: 'MB52 upload' },
-      { to: '/gerceklesen', label: 'Actuals', hint: 'MB51 upload' },
+      { to: '/siparisler', label: 'Demand', hint: 'Weekly and daily net requirements' },
+      { to: '/stoklar', label: 'Stock', hint: 'Stock by material and location' },
+      { to: '/gerceklesen', label: 'Actuals', hint: 'Posted production movements' },
       { to: '/referanslar', label: 'Master Data', hint: 'Cavities, SPM, weights, machines' },
     ],
   },
@@ -67,6 +77,6 @@ export const NAV_GROUPS: NavGroup[] = [
 
 /** Every route in the navigation, for the mobile drawer's flat rendering. */
 export const ALL_GROUPS: NavGroup[] = [
-  { label: 'Planning', items: PRIMARY_LINKS },
-  ...NAV_GROUPS,
+  { label: 'Planning', items: [...PRIMARY_LINKS, ...PLANNING_LINKS] },
+  ...NAV_GROUPS.filter((group) => group.label !== 'Planning'),
 ]

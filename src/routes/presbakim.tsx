@@ -163,8 +163,8 @@ function PressMaintenancePage() {
   const inputClass = 'rounded-md border border-input bg-background px-2 py-1 text-sm'
 
   return (
-    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Press Maintenance</h1>
+    <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Press Maintenance</h1>
       <p className="mt-2 text-muted-foreground">
         The maintenance department books which press is down, on which day and
         between which hours. The planner does not enter this and cannot plan

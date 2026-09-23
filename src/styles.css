@@ -111,6 +111,20 @@
 }
 
 @layer base {
+  /*
+   * Masaüstünde daha sıkı ölçek. Tailwind ölçüleri rem cinsinden olduğu için
+   * kök yazı boyutu her şeyi (yazı, boşluk, düğme) birlikte küçültür — 15 inç
+   * bir dizüstünde tarayıcıyı %80'e uzaklaştırmakla aynı etki, ama zoom
+   * gerekmeden. Telefonda dokunma hedefleri küçülmesin diye 16px kalır.
+   */
+  html {
+    font-size: 16px;
+  }
+  @media (min-width: 1024px) {
+    html {
+      font-size: 13px;
+    }
+  }
   * {
     @apply border-border outline-ring/50;
   }

@@ -62,8 +62,8 @@ function KayitlarPage() {
     : logs
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Change Log</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Change Log</h1>
       <p className="mt-2 text-muted-foreground">
         Decisions, business rules, improvements and open issues are recorded
         here, so the answer to "why did we do it this way?" is never lost.

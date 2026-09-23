@@ -1,23 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { usePaginatedQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
-import { uploadMessage } from '../lib/uploadMessage'
-import { ExcelUpload } from '../components/ExcelUpload'
 
 export const Route = createFileRoute('/stoklar')({
   component: StoklarPage,
 })
-
-function num(v: unknown) {
-  const n = Number(v)
-  return Number.isNaN(n) ? 0 : n
-}
-function str(v: unknown) {
-  const s = String(v ?? '').trim()
-  return s === '' ? undefined : s
-}
 
 function StoklarPage() {
   const { results: rows, status } = usePaginatedQuery(
@@ -25,7 +14,6 @@ function StoklarPage() {
     {},
     { initialNumItems: 500 },
   )
-  const replaceAll = useMutation(api.stock.replaceAll)
   const [view, setView] = useState<'summary' | 'detail'>('summary')
   const [search, setSearch] = useState('')
 
@@ -61,45 +49,20 @@ function StoklarPage() {
   const filteredRows = rows.filter((r) => r.material.toLowerCase().includes(search.toLowerCase()))
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-16">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Stoklar</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Stock</h1>
       <p className="mt-2 text-muted-foreground">
-        Upload the SAP MB52 stock report here every day. Total available stock
-        is calculated per material; the detail view breaks it down by storage
-        location.
+        Stock from the SAP MB52 report. Total available stock is calculated
+        per material; the detail view breaks it down by storage location.
       </p>
 
-      <div className="mt-6">
-        <ExcelUpload
-          expectedColumns={[
-            'Material',
-            'Plant',
-            'Storage Location',
-            'Unrestricted',
-            'Quality Inspection',
-            'Restricted-Use Stock',
-            'Blocked Stock',
-            'Returns',
-            'Transit and Transfer',
-          ]}
-          replaces="all stock rows"
-          onRows={async (raw) => {
-            const parsed = raw.map((row) => ({
-              material: str(row['Material']) ?? '',
-              plant: str(row['Plant']),
-              storageLocation: str(row['Storage Location']),
-              unrestricted: num(row['Unrestricted']),
-              qualityInspection: num(row['Quality Inspection']),
-              restricted: num(row['Restricted-Use Stock']),
-              blocked: num(row['Blocked Stock']),
-              returns: num(row['Returns']),
-              transit: num(row['Transit and Transfer']),
-            })).filter((r) => r.material)
-            const result = await replaceAll({ rows: parsed })
-            return { message: uploadMessage('stock rows', result) }
-          }}
-        />
-      </div>
+      <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+        The MB52 stock report is uploaded on the{' '}
+        <Link to="/sapdata" className="font-medium text-foreground underline hover:no-underline">
+          SAP Data
+        </Link>{' '}
+        page.
+      </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <div className="flex gap-2">

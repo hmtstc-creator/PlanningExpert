@@ -225,8 +225,8 @@ function KaliplarPage() {
   }
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Mold Maintenance</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Mold Maintenance</h1>
       <p className="mt-2 text-muted-foreground">
         Everything the plan needs to know about a mold. Mark whether it is
         ready for production — a mold that is not ready is held out of the plan

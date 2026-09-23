@@ -145,8 +145,8 @@ function MoldProblemPage() {
   const inputClass = 'rounded-md border border-input bg-background px-3 py-2 text-sm'
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-12">
-      <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Mold Problems</h1>
+    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
+      <h1 className="text-2xl font-bold text-foreground">Mold Problems</h1>
       <p className="mt-2 text-muted-foreground">
         Report what went wrong on a mold, record how it was solved, and see
         which molds and which faults keep coming back. Photographs can be

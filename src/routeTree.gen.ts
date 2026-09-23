@@ -18,8 +18,10 @@ import { Route as KayitlarRouteImport } from './routes/kayitlar'
 import { Route as MakinelerRouteImport } from './routes/makineler'
 import { Route as PerformansRouteImport } from './routes/performans'
 import { Route as PlanlamaRouteImport } from './routes/planlama'
+import { Route as PlanlogicRouteImport } from './routes/planlogic'
 import { Route as PresbakimRouteImport } from './routes/presbakim'
 import { Route as ReferanslarRouteImport } from './routes/referanslar'
+import { Route as SapdataRouteImport } from './routes/sapdata'
 import { Route as SiparislerRouteImport } from './routes/siparisler'
 import { Route as StoklarRouteImport } from './routes/stoklar'
 import { Route as TakvimRouteImport } from './routes/takvim'
@@ -71,6 +73,11 @@ const PlanlamaRoute = PlanlamaRouteImport.update({
   path: '/planlama',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlanlogicRoute = PlanlogicRouteImport.update({
+  id: '/planlogic',
+  path: '/planlogic',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PresbakimRoute = PresbakimRouteImport.update({
   id: '/presbakim',
   path: '/presbakim',
@@ -79,6 +86,11 @@ const PresbakimRoute = PresbakimRouteImport.update({
 const ReferanslarRoute = ReferanslarRouteImport.update({
   id: '/referanslar',
   path: '/referanslar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SapdataRoute = SapdataRouteImport.update({
+  id: '/sapdata',
+  path: '/sapdata',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SiparislerRoute = SiparislerRouteImport.update({
@@ -117,8 +129,10 @@ export interface FileRoutesByFullPath {
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
+  '/planlogic': typeof PlanlogicRoute
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
+  '/sapdata': typeof SapdataRoute
   '/siparisler': typeof SiparislerRoute
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
@@ -135,8 +149,10 @@ export interface FileRoutesByTo {
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
+  '/planlogic': typeof PlanlogicRoute
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
+  '/sapdata': typeof SapdataRoute
   '/siparisler': typeof SiparislerRoute
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
@@ -154,8 +170,10 @@ export interface FileRoutesById {
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
+  '/planlogic': typeof PlanlogicRoute
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
+  '/sapdata': typeof SapdataRoute
   '/siparisler': typeof SiparislerRoute
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
@@ -174,8 +192,10 @@ export interface FileRouteTypes {
     | '/makineler'
     | '/performans'
     | '/planlama'
+    | '/planlogic'
     | '/presbakim'
     | '/referanslar'
+    | '/sapdata'
     | '/siparisler'
     | '/stoklar'
     | '/takvim'
@@ -192,8 +212,10 @@ export interface FileRouteTypes {
     | '/makineler'
     | '/performans'
     | '/planlama'
+    | '/planlogic'
     | '/presbakim'
     | '/referanslar'
+    | '/sapdata'
     | '/siparisler'
     | '/stoklar'
     | '/takvim'
@@ -210,8 +232,10 @@ export interface FileRouteTypes {
     | '/makineler'
     | '/performans'
     | '/planlama'
+    | '/planlogic'
     | '/presbakim'
     | '/referanslar'
+    | '/sapdata'
     | '/siparisler'
     | '/stoklar'
     | '/takvim'
@@ -229,8 +253,10 @@ export interface RootRouteChildren {
   MakinelerRoute: typeof MakinelerRoute
   PerformansRoute: typeof PerformansRoute
   PlanlamaRoute: typeof PlanlamaRoute
+  PlanlogicRoute: typeof PlanlogicRoute
   PresbakimRoute: typeof PresbakimRoute
   ReferanslarRoute: typeof ReferanslarRoute
+  SapdataRoute: typeof SapdataRoute
   SiparislerRoute: typeof SiparislerRoute
   StoklarRoute: typeof StoklarRoute
   TakvimRoute: typeof TakvimRoute
@@ -303,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanlamaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/planlogic': {
+      id: '/planlogic'
+      path: '/planlogic'
+      fullPath: '/planlogic'
+      preLoaderRoute: typeof PlanlogicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/presbakim': {
       id: '/presbakim'
       path: '/presbakim'
@@ -315,6 +348,13 @@ declare module '@tanstack/react-router' {
       path: '/referanslar'
       fullPath: '/referanslar'
       preLoaderRoute: typeof ReferanslarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sapdata': {
+      id: '/sapdata'
+      path: '/sapdata'
+      fullPath: '/sapdata'
+      preLoaderRoute: typeof SapdataRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/siparisler': {
@@ -365,8 +405,10 @@ const rootRouteChildren: RootRouteChildren = {
   MakinelerRoute: MakinelerRoute,
   PerformansRoute: PerformansRoute,
   PlanlamaRoute: PlanlamaRoute,
+  PlanlogicRoute: PlanlogicRoute,
   PresbakimRoute: PresbakimRoute,
   ReferanslarRoute: ReferanslarRoute,
+  SapdataRoute: SapdataRoute,
   SiparislerRoute: SiparislerRoute,
   StoklarRoute: StoklarRoute,
   TakvimRoute: TakvimRoute,
