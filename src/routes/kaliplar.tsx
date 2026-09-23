@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { ErrorBanner } from '../components/ErrorBanner'
+import { MaterialPicker } from '../components/MaterialPicker'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { buildMoldLife, type MoldStatus } from '../lib/moldLife'
 import { useCurrentUser } from '../lib/currentUser'
@@ -102,6 +103,15 @@ function KaliplarPage() {
   const [readyMaterial, setReadyMaterial] = useState('')
   const [readyDate, setReadyDate] = useState('')
   const [readyReason, setReadyReason] = useState('')
+
+  // Hazırlık ve bakım kayıtları master data listesinden seçilir: elle
+  // yazılan bir kod plana hiç ulaşmaz.
+  const materialOptions = useMemo(
+    () =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (products as any[]).map((p) => ({ code: p.code as string, coProduct: p.coProduct })),
+    [products],
+  )
 
   const productByCode = useMemo(() => {
     const map = new Map<string, ProductSpec>()
@@ -475,13 +485,14 @@ function KaliplarPage() {
       <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Material</span>
-          <input
-            className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            list="mold-materials"
-            value={readyMaterial}
-            onChange={(e) => setReadyMaterial(e.target.value)}
-            placeholder="Material code"
-          />
+          <div className="mt-1 w-56">
+            <MaterialPicker
+              options={materialOptions}
+              value={readyMaterial}
+              onChange={setReadyMaterial}
+              placeholder="Search master data"
+            />
+          </div>
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Ready on (opt.)</span>
@@ -567,18 +578,14 @@ function KaliplarPage() {
       <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Material</span>
-          <input
-            className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            list="mold-materials"
-            value={material}
-            onChange={(e) => setMaterial(e.target.value)}
-            placeholder="Material code"
-          />
-          <datalist id="mold-materials">
-            {products.map((p) => (
-              <option key={p.code} value={p.code} />
-            ))}
-          </datalist>
+          <div className="mt-1 w-56">
+            <MaterialPicker
+              options={materialOptions}
+              value={material}
+              onChange={setMaterial}
+              placeholder="Search master data"
+            />
+          </div>
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Type</span>

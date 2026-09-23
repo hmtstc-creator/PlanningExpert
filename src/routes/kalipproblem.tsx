@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { ErrorBanner } from '../components/ErrorBanner'
+import { MaterialPicker } from '../components/MaterialPicker'
 import { useMutation, useQuery } from '../lib/convexTransport'
 import { useCurrentUser } from '../lib/currentUser'
 import { isoDate } from '../lib/dates'
@@ -42,6 +43,14 @@ function MoldProblemPage() {
   const problems = (useQuery(api.moldProblems.list) ?? []) as Problem[]
   const lookups = (useQuery(api.lookups.list) ?? []) as { kind: string; value: string }[]
   const products = useQuery(api.products.listAll)?.rows ?? []
+  // Kod yazmak yerine listeden seçilsin: kodlar uzun ve birbirine benziyor,
+  // bir harf şaşarsa kayıt master data'da olmayan bir koda gider.
+  const materialOptions = useMemo(
+    () =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (products as any[]).map((p) => ({ code: p.code as string, coProduct: p.coProduct })),
+    [products],
+  )
 
   const { run: report, error: reportError, clearError } = useSafeMutation(api.moldProblems.report)
   const { run: solve, error: solveError } = useSafeMutation(api.moldProblems.solve)
@@ -159,18 +168,14 @@ function MoldProblemPage() {
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className="text-sm">
             <span className="block text-xs text-muted-foreground">Mold (material)</span>
-            <input
-              className={`mt-1 w-full ${inputClass}`}
-              list="problem-materials"
-              value={material}
-              onChange={(e) => setMaterial(e.target.value)}
-              placeholder="M250SP001RO"
-            />
-            <datalist id="problem-materials">
-              {products.map((p) => (
-                <option key={p.code} value={p.code} />
-              ))}
-            </datalist>
+            <div className="mt-1">
+              <MaterialPicker
+                options={materialOptions}
+                value={material}
+                onChange={setMaterial}
+                placeholder="Search master data"
+              />
+            </div>
           </label>
           <label className="text-sm">
             <span className="block text-xs text-muted-foreground">Operation</span>
@@ -287,12 +292,14 @@ function MoldProblemPage() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Mold</span>
-          <input
-            className={`mt-1 w-40 ${inputClass}`}
-            placeholder="Filter by material"
-            value={filterMaterial}
-            onChange={(e) => setFilterMaterial(e.target.value)}
-          />
+          <div className="mt-1 w-52">
+            <MaterialPicker
+              options={materialOptions}
+              value={filterMaterial}
+              onChange={setFilterMaterial}
+              placeholder="Filter by material"
+            />
+          </div>
         </label>
       </div>
 
@@ -366,9 +373,10 @@ function MoldProblemPage() {
                 {p.status === 'open' ? (
                   solving === p._id ? (
                     <>
-                      <input
+                      <textarea
+                        rows={2}
                         className={`w-72 ${inputClass}`}
-                        placeholder="What was done?"
+                        placeholder="What was done to fix it? (required)"
                         value={solution}
                         onChange={(e) => setSolution(e.target.value)}
                       />
@@ -403,8 +411,9 @@ function MoldProblemPage() {
                         setSolution('')
                       }}
                       className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                      title="A problem cannot be closed without saying what was done"
                     >
-                      Solve
+                      Solve — write what was done
                     </button>
                   )
                 ) : (
