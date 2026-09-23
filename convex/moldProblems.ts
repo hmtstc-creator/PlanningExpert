@@ -44,12 +44,14 @@ export const list = guardedQuery({
 
 /** Fotoğrafın doğrudan tarayıcıdan yükleneceği tek kullanımlık adres. */
 export const generateUploadUrl = guardedMutation({
+  affectsPlan: false,
   args: {},
   returns: v.string(),
   handler: async (ctx) => ctx.storage.generateUploadUrl(),
 })
 
 export const report = guardedMutation({
+  affectsPlan: false,
   args: {
     material: v.string(),
     operation: v.string(),
@@ -99,6 +101,7 @@ export const report = guardedMutation({
 })
 
 export const solve = guardedMutation({
+  affectsPlan: false,
   args: {
     id: v.id('moldProblems'),
     solution: v.string(),
@@ -129,6 +132,7 @@ export const solve = guardedMutation({
 })
 
 export const reopen = guardedMutation({
+  affectsPlan: false,
   args: { id: v.id('moldProblems') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -142,6 +146,7 @@ export const reopen = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  affectsPlan: false,
   args: { id: v.id('moldProblems') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

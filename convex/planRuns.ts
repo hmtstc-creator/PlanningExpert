@@ -1,0 +1,256 @@
+import { v } from 'convex/values'
+
+import { internal } from './_generated/api'
+import { internalMutation, internalQuery } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
+import { planStatusDoc, requestRecompute } from './planQueue'
+import { withDefaults } from './products'
+
+/**
+ * Sunucuda hesaplanan planın veritabanı tarafı.
+ *
+ * Hesabın kendisi `planEngine.ts` içindeki action'da (Node, 10 dakika
+ * süre). Buradakiler o action'ın girdiyi okuduğu, sonucu yazdığı iç işlevler
+ * ve sayfanın okuduğu genel sorgular.
+ */
+
+// Convex'in üretilen tipleri bu ortamda yok; gevşek tiplenmiş.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Ctx = any
+
+/** Kaç hazır hesap saklansın. Eskileri silinir. */
+const KEEP_RUNS = 3
+/** Yarım kalmış (çökmüş) bir yazma bu kadar sonra temizlenir. */
+const STALE_WRITE_MS = 15 * 60_000
+/** Bu süreden uzun "çalışıyor" kaydı takılmış sayılır. */
+const RUN_TIMEOUT_MS = 10 * 60_000
+
+// ---- Girdi -------------------------------------------------------------------
+
+/** Planın okuduğu küçük tablolar, tek seferde. */
+export const smallInputs = internalQuery({
+  args: {},
+  returns: v.any(),
+  handler: async (ctx: Ctx) => {
+    const settings = await ctx.db
+      .query('globalShiftSettings')
+      .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
+      .first()
+    const country = settings?.country ?? 'TR'
+    return {
+      settings,
+      presses: await ctx.db.query('presses').collect(),
+      templates: await ctx.db.query('pressTemplates').collect(),
+      workCalendar: await ctx.db
+        .query('workCalendar')
+        .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
+        .first(),
+      officialHolidays: await ctx.db
+        .query('officialHolidays')
+        .withIndex('by_country', (q: Ctx) => q.eq('country', country))
+        .collect(),
+      latestSnapshot: await ctx.db
+        .query('planSnapshots')
+        .withIndex('by_created')
+        .order('desc')
+        .first(),
+      plannedStops: await ctx.db.query('plannedStops').collect(),
+      overrides: await ctx.db.query('planOverrides').collect(),
+      moldMaintenance: await ctx.db.query('moldMaintenance').collect(),
+      readiness: await ctx.db.query('moldReadiness').collect(),
+      pressMaintenance: await ctx.db.query('pressMaintenance').collect(),
+      alarms: await ctx.db.query('moldAlarms').collect(),
+      locations: await ctx.db.query('storageLocations').collect(),
+    }
+  },
+})
+
+const BIG_TABLES = ['products', 'demandWeekly', 'stock'] as const
+
+/**
+ * Büyük tablolar sayfa sayfa. Sayfanın eski `listAll` sorgusu 8000 satırda
+ * duruyordu; action birden çok sorgu çalıştırabildiği için burada öyle bir
+ * sınır yok.
+ */
+export const inputPage = internalQuery({
+  args: {
+    table: v.union(...BIG_TABLES.map((t) => v.literal(t))),
+    cursor: v.union(v.string(), v.null()),
+    numItems: v.number(),
+  },
+  returns: v.any(),
+  handler: async (ctx: Ctx, { table, cursor, numItems }: Ctx) => {
+    const result = await ctx.db.query(table).paginate({ cursor, numItems })
+    return {
+      page: table === 'products' ? result.page.map(withDefaults) : result.page,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    }
+  },
+})
+
+// ---- Kuyruk ------------------------------------------------------------------
+
+/**
+ * Hesap başlıyor. Başka bir hesap sürüyorsa bu hesap biraz sonraya
+ * ertelenir — iki hesabın aynı anda yazması boşa iş olur.
+ */
+export const beginRun = internalMutation({
+  args: { trigger: v.optional(v.string()) },
+  returns: v.object({ proceed: v.boolean() }),
+  handler: async (ctx: Ctx, { trigger }: Ctx) => {
+    const now = Date.now()
+    const status = await planStatusDoc(ctx)
+    if (status?.runningSince && now - status.runningSince < RUN_TIMEOUT_MS) {
+      if (!status.scheduledFor || status.scheduledFor < now) {
+        await ctx.scheduler.runAfter(15_000, internal.planEngine.recompute, { trigger })
+        await ctx.db.patch(status._id, { scheduledFor: now + 15_000 })
+      }
+      return { proceed: false }
+    }
+    if (status) {
+      await ctx.db.patch(status._id, { runningSince: now, scheduledFor: undefined })
+    } else {
+      await ctx.db.insert('planStatus', { key: 'default', runningSince: now })
+    }
+    return { proceed: true }
+  },
+})
+
+export const finishRun = internalMutation({
+  args: { startedAt: v.number(), error: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx: Ctx, { startedAt, error }: Ctx) => {
+    const now = Date.now()
+    const status = await planStatusDoc(ctx)
+    if (!status) return null
+    await ctx.db.patch(status._id, {
+      runningSince: undefined,
+      ...(error
+        ? { lastError: error.slice(0, 2000), lastErrorAt: now }
+        : { lastRunAt: now, lastDurationMs: now - startedAt, lastError: undefined }),
+    })
+    return null
+  },
+})
+
+// ---- Sonucun yazılması --------------------------------------------------------
+
+export const createRun = internalMutation({
+  args: {
+    startedAt: v.number(),
+    computedAt: v.number(),
+    trigger: v.optional(v.string()),
+    summary: v.any(),
+  },
+  returns: v.id('planRuns'),
+  handler: async (ctx: Ctx, args: Ctx) =>
+    ctx.db.insert('planRuns', { ...args, status: 'writing' }),
+})
+
+export const addChunk = internalMutation({
+  args: { runId: v.id('planRuns'), index: v.number(), kind: v.string(), items: v.any() },
+  returns: v.null(),
+  handler: async (ctx: Ctx, args: Ctx) => {
+    await ctx.db.insert('planRunChunks', args)
+    return null
+  },
+})
+
+async function deleteRun(ctx: Ctx, runId: Ctx) {
+  const chunks = await ctx.db
+    .query('planRunChunks')
+    .withIndex('by_run', (q: Ctx) => q.eq('runId', runId))
+    .collect()
+  for (const chunk of chunks) await ctx.db.delete(chunk._id)
+  await ctx.db.delete(runId)
+}
+
+/** Hesap tamamlandı: yayınla, eskileri temizle. */
+export const completeRun = internalMutation({
+  args: { runId: v.id('planRuns'), chunkCount: v.number(), durationMs: v.number() },
+  returns: v.null(),
+  handler: async (ctx: Ctx, { runId, chunkCount, durationMs }: Ctx) => {
+    await ctx.db.patch(runId, { status: 'ready', chunkCount, durationMs })
+
+    const ready = await ctx.db
+      .query('planRuns')
+      .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))
+      .order('desc')
+      .take(KEEP_RUNS + 5)
+    for (const old of ready.slice(KEEP_RUNS)) await deleteRun(ctx, old._id)
+
+    const writing = await ctx.db
+      .query('planRuns')
+      .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'writing'))
+      .take(20)
+    for (const run of writing) {
+      if (Date.now() - run.startedAt > STALE_WRITE_MS) await deleteRun(ctx, run._id)
+    }
+    return null
+  },
+})
+
+// ---- Sayfanın okudukları --------------------------------------------------------
+
+/**
+ * Son hazır plan, parçaları birleştirilmiş olarak — `PlanRun` biçiminde
+ * (src/lib/planPipeline.ts). Henüz hiç hesap yoksa null.
+ */
+export const latest = guardedQuery({
+  args: {},
+  returns: v.any(),
+  handler: async (ctx: Ctx) => {
+    const run = await ctx.db
+      .query('planRuns')
+      .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))
+      .order('desc')
+      .first()
+    if (!run) return null
+    const chunks = await ctx.db
+      .query('planRunChunks')
+      .withIndex('by_run', (q: Ctx) => q.eq('runId', run._id))
+      .collect()
+    const lists: Record<string, unknown[]> = {
+      jobs: [],
+      unplanned: [],
+      days: [],
+      rawNeeds: [],
+      maintenance: [],
+    }
+    for (const chunk of chunks) {
+      const list = lists[chunk.kind] ?? (lists[chunk.kind] = [])
+      for (const item of chunk.items) list.push(item)
+    }
+    return {
+      ...run.summary,
+      ...lists,
+      runId: run._id,
+      durationMs: run.durationMs,
+      trigger: run.trigger,
+    }
+  },
+})
+
+/** Kuyruğun durumu: hesap sürüyor mu, bekliyor mu, son hata ne. */
+export const status = guardedQuery({
+  args: {},
+  returns: v.any(),
+  handler: async (ctx: Ctx) => {
+    const doc = await planStatusDoc(ctx)
+    if (!doc) return null
+    const { _id, _creationTime, key, ...rest } = doc
+    return rest
+  },
+})
+
+/** "Şimdi yeniden hesapla" düğmesi. */
+export const requestNow = guardedMutation({
+  args: {},
+  returns: v.null(),
+  affectsPlan: false,
+  handler: async (ctx: Ctx) => {
+    await requestRecompute(ctx, 0, 'manual')
+    return null
+  },
+})

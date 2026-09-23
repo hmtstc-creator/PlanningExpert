@@ -60,3 +60,44 @@ function isoThursdayOf(date: Date): Date {
   d.setDate(d.getDate() - mondayBased + 3)
   return d
 }
+
+/** Tesisin saat dilimi. Ayarda başka bir dilim yazılmadıkça bu kullanılır. */
+export const DEFAULT_PLANT_TIME_ZONE = 'Europe/Istanbul'
+
+/**
+ * `ms` anında tesisteki DUVAR SAATİNİ taşıyan bir Date.
+ *
+ * Plan katmanı tarihleri yerel alanlarla (getDate, getHours…) okur. Tarayıcı
+ * tesiste olduğu için bu doğruydu; ama plan artık sunucuda hesaplanıyor ve
+ * sunucu UTC'de çalışır — 02:30'da İstanbul'da gün değişmişken sunucu hâlâ
+ * önceki günde olurdu. Bu fonksiyon tesis saatinin parçalarını alıp yerel
+ * alanları onlar olan bir Date kurar; böylece aynı kod her iki tarafta da
+ * aynı günü, aynı saati görür.
+ */
+export function plantClock(ms: number, timeZone: string = DEFAULT_PLANT_TIME_ZONE): Date {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).formatToParts(new Date(ms))
+    const get = (type: string) => Number(parts.find((p) => p.type === type)?.value)
+    const d = new Date(
+      get('year'),
+      get('month') - 1,
+      get('day'),
+      get('hour') % 24,
+      get('minute'),
+      get('second'),
+    )
+    return Number.isNaN(d.getTime()) ? new Date(ms) : d
+  } catch {
+    // Bilinmeyen bir saat dilimi adı planı durdurmamalı.
+    return new Date(ms)
+  }
+}

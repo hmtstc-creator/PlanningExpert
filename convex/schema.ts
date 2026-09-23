@@ -137,6 +137,9 @@ export default defineSchema({
     breakMinutesPerShift: v.optional(v.number()),
     // Planın ilk kaç günü dondurulmuş sayılsın (0 = kapalı).
     frozenDays: v.optional(v.number()),
+    // Tesisin saat dilimi (IANA adı). Plan sunucuda hesaplanıyor ve sunucu
+    // UTC'de çalışıyor; gün ve vardiya tesis saatine göre değişmeli.
+    timeZone: v.optional(v.string()),
   }).index('by_key', ['key']),
 
   // Planlı duruşlar: vardiya devri, çay, yemek, günlük bakım. Her vardiya
@@ -343,6 +346,40 @@ export default defineSchema({
   // Onaylanan plan anlık görüntüleri. Otomatik plan her zaman canlı
   // veriden yeniden hesaplanır; onaylandığında buraya versiyonlanarak
   // yazılır ki "hangi planı onayladık" kaydı kalsın.
+  // Sunucuda hesaplanan plan. Plan artık tarayıcıda değil burada hesaplanır
+  // (convex/planEngine.ts); sayfa hazır sonucu okur. Büyük listeler
+  // `planRunChunks` içinde parça parça durur — tek doküman ~1 MB ile sınırlı.
+  planRuns: defineTable({
+    status: v.string(), // 'writing' | 'ready'
+    startedAt: v.number(),
+    computedAt: v.number(),
+    durationMs: v.optional(v.number()),
+    trigger: v.optional(v.string()),
+    chunkCount: v.optional(v.number()),
+    // PlanRun'ın büyük listeler dışındaki alanları (src/lib/planPipeline.ts).
+    summary: v.any(),
+  }).index('by_status_computed', ['status', 'computedAt']),
+
+  planRunChunks: defineTable({
+    runId: v.id('planRuns'),
+    index: v.number(),
+    // 'jobs' | 'unplanned' | 'days' | 'rawNeeds' | 'maintenance'
+    kind: v.string(),
+    items: v.any(),
+  }).index('by_run', ['runId', 'index']),
+
+  // Yeniden hesaplama kuyruğunun durumu — tek kayıt (key = 'default').
+  planStatus: defineTable({
+    key: v.string(),
+    requestedAt: v.optional(v.number()),
+    scheduledFor: v.optional(v.number()),
+    runningSince: v.optional(v.number()),
+    lastRunAt: v.optional(v.number()),
+    lastDurationMs: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    lastErrorAt: v.optional(v.number()),
+  }).index('by_key', ['key']),
+
   planSnapshots: defineTable({
     createdAt: v.number(),
     approvedBy: v.optional(v.string()),

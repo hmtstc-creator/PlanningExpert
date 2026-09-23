@@ -13,11 +13,8 @@ import { action } from './_generated/server'
  * Düz parola hiçbir yere yazılmaz ve tarayıcıya geri dönmez. Karma işlemi
  * Node kriptosu gerektirdiği için bu dosya action olarak çalışıyor.
  *
- * SINIRI AÇIKÇA: bu, EKRANI korur. Convex işlevleri deploy adresini bilen
- * herkes tarafından doğrudan çağrılabilir; her sorgu ve mutasyonun jetonu
- * kendisi denetlemesi ayrı bir iştir. Yani bu giriş, siteyi bulan birinin
- * planı görmesini ve değiştirmesini engeller, kararlı bir saldırganı
- * engellemez.
+ * Oturum jetonu her sorgu ve mutasyonda sunucuda denetlenir (guarded.ts);
+ * yani deploy adresini bilen biri de jetonsuz veri okuyamaz ya da yazamaz.
  */
 const ITERATIONS = 120_000
 const KEY_LENGTH = 64

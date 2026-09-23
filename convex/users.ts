@@ -31,6 +31,7 @@ export const list = guardedQuery({
 })
 
 export const add = adminMutation({
+  affectsPlan: false,
   args: { name: v.string(), email: v.optional(v.string()), role: v.string() },
   returns: v.id('users'),
   handler: async (ctx, args) => {
@@ -62,6 +63,7 @@ export const add = adminMutation({
 })
 
 export const update = adminMutation({
+  affectsPlan: false,
   args: {
     id: v.id('users'),
     name: v.string(),
@@ -102,6 +104,7 @@ export const update = adminMutation({
 })
 
 export const remove = adminMutation({
+  affectsPlan: false,
   args: { id: v.id('users') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

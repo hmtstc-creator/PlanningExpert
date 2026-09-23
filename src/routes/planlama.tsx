@@ -1,46 +1,23 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery } from '../lib/convexTransport'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
-import { addDays, isoDate, isoWeekLabel, mondayOf } from '../lib/dates'
-import {
-  buildDemandSchedule,
-  buildRawMaterialPlan,
-  buildWeekBuckets,
-  materialsMissingRawSpec,
-  type DayBucket,
-  type DemandInput,
-  type ProductSpec,
-} from '../lib/planning'
+import { isoWeekLabel, plantClock } from '../lib/dates'
 import {
   WeekGantt,
   type WeekGanttJob,
   type WeekGanttPress,
 } from '../components/WeekGantt'
-import {
-  buildDayTimeline,
-  productionDayOf,
-  remainingCapacityMinutes,
-} from '../lib/shiftTimeline'
+import { productionDayOf } from '../lib/shiftTimeline'
 import { useCurrentUser } from '../lib/currentUser'
 import { diffPlans } from '../lib/planDiff'
-import {
-  moldBlackouts as buildMoldBlackouts,
-  pressMaintenanceBlock,
-  type PressMaintenanceRow,
-} from '../lib/maintenance'
-import { alarmedMaterials } from '../lib/moldAlarm'
+import { groupPlanWeeks, type PlanRun, type SnapshotJob } from '../lib/planPipeline'
 import { fixForUnplanned } from '../lib/unplannedFix'
-import { schedule, type PlanOverride, type ScheduledJob } from '../lib/scheduler'
 
 export const Route = createFileRoute('/planlama')({
   component: PlanlamaPage,
 })
-
-const COUNTED_STOCK = new Set(['finished_goods', 'production_area'])
-const RAW_STOCK = new Set(['raw_material'])
-const DEFAULT_HORIZON_WEEKS = 4
 
 /**
  * Gün içi dakikayı gerçek saate çevirir. `shiftStartMinute` birinci
@@ -55,56 +32,35 @@ function formatClock(minute: number, shiftMinutes: number, shiftStartMinute: num
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} (shift ${shiftIndex})`
 }
 
+function minutesAgo(ms: number, now: number): string {
+  const minutes = Math.max(0, Math.round((now - ms) / 60_000))
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  return `${hours} h ${minutes % 60} min ago`
+}
+
+interface PlanStatus {
+  requestedAt?: number
+  scheduledFor?: number
+  runningSince?: number
+  lastRunAt?: number
+  lastError?: string
+  lastErrorAt?: number
+}
+
 function PlanlamaPage() {
-  // Planlama sayfalı sorgu KULLANMAZ. Sayfalı sorgu ilk sayfada durur ve
-  // sınırın ötesindeki malzemeler plana hiç girmez — üstelik hiçbir uyarı
-  // çıkmaz. Bu sorgular ya hepsini verir ya da eksik olduğunu söyler.
-  const productsResult = useQuery(api.products.listAll)
-  const demandResult = useQuery(api.demand.listAllWeekly)
-  const stockResult = useQuery(api.stock.listAll)
-  const products = useMemo(() => productsResult?.rows ?? [], [productsResult])
-  const weeklyDemand = useMemo(() => demandResult?.rows ?? [], [demandResult])
-  const stockRows = useMemo(() => stockResult?.rows ?? [], [stockResult])
-  const locations = (useQuery(api.storageLocations.listAll) ?? []) as {
-    code: string
-    category: string
-  }[]
-
-  /** Plan girdisi eksikse hangi tablodan kaynaklandığı. */
-  const truncatedInputs = [
-    productsResult && !productsResult.complete ? 'master data' : null,
-    demandResult && !demandResult.complete ? 'demand' : null,
-    stockResult && !stockResult.complete ? 'stock' : null,
-  ].filter((v): v is string => v !== null)
-
-  const inputsLoading =
-    productsResult === undefined ||
-    demandResult === undefined ||
-    stockResult === undefined
-  const presses = (useQuery(api.presses.list) ?? []) as {
-    name: string
-    hall: string
-    category?: string
-    feedsCoil?: boolean
-    frozenDays?: number
-  }[]
-  const templates = (useQuery(api.pressCalendar.listTemplates) ?? []) as {
-    press: string
-    workingDays: number
-    shiftsPerDay: number
-    overtimeShifts: number
-  }[]
-  const globalSettings = useQuery(api.pressCalendar.getGlobalSettings)
-  const workCalendar = useQuery(api.workCalendar.get)
-  const latestSnapshot = useQuery(api.planSnapshots.latest)
+  // Plan sunucuda hesaplanıyor (convex/planEngine.ts) ve saklanıyor; sayfa
+  // yalnızca son hesabı okur. Girdi değişince sunucu birkaç saniye içinde
+  // yeniden hesaplar, yeni sonuç buraya kendiliğinden gelir.
+  const run = useQuery(api.planRuns.latest) as PlanRun | null | undefined
+  const planStatus = useQuery(api.planRuns.status) as PlanStatus | null | undefined
+  const requestNow = useMutation(api.planRuns.requestNow)
+  const latestSnapshot = useQuery(api.planSnapshots.latest) as
+    | { createdAt: number; truncated?: boolean; jobCount: number; jobs: SnapshotJob[] }
+    | null
+    | undefined
   const approve = useMutation(api.planSnapshots.approve)
-  const plannedStops = (useQuery(api.plannedStops.list) ?? []) as {
-    shiftIndex: number
-    name: string
-    kind: string
-    startMinute: number
-    durationMinutes: number
-  }[]
   const overrideRows = (useQuery(api.planOverrides.list) ?? []) as {
     _id: string
     material: string
@@ -112,30 +68,6 @@ function PlanlamaPage() {
     press?: string
     date?: string
     note?: string
-  }[]
-  // Kalıp bakım kayıtları plana doğrudan girer: bakım günü o kalıp
-  // çalışamaz. Kullanıcının ayrıca "exclude" yazması gerekmemeli.
-  const maintenanceRows = (useQuery(api.moldMaintenance.list) ?? []) as {
-    material: string
-    date: string
-    dateTo?: string
-    note?: string
-  }[]
-  const readinessRows = (useQuery(api.moldReadiness.list) ?? []) as {
-    material: string
-    ready: boolean
-    readyDate?: string
-    reason?: string
-  }[]
-  const pressMaintenanceRows = (useQuery(api.pressMaintenance.list) ??
-    []) as PressMaintenanceRow[]
-  // Ömür alarmı açık olan kalıp plana alınmaz: limitin aşılmasına izin
-  // verilir ama aşıldıktan sonra alarm kapanana kadar o kalıp beklemede.
-  const alarmRows = (useQuery(api.moldAlarms.list) ?? []) as {
-    material: string
-    status: string
-    shotsAtAlarm: number
-    limitAtAlarm: number
   }[]
   const setOverride = useMutation(api.planOverrides.set)
   const clearOverride = useMutation(api.planOverrides.clear)
@@ -148,692 +80,109 @@ function PlanlamaPage() {
   const [ovPress, setOvPress] = useState('')
   const [ovDate, setOvDate] = useState('')
 
-  const shiftMinutes = globalSettings?.shiftMinutes ?? 480
-  const overtimeShiftMinutes = globalSettings?.overtimeShiftMinutes ?? 480
-  const setupGapMinutes = globalSettings?.setupGapMinutes ?? 60
-  const concurrentSetupsPerHall = globalSettings?.concurrentSetupsPerHall ?? 1
-  const coilSetupGapMinutes = globalSettings?.coilSetupGapMinutes ?? 30
-  const shiftStartMinute = globalSettings?.shiftStartMinute ?? 420 // 07:00
-  const breakMinutesPerShift = globalSettings?.breakMinutesPerShift ?? 0
-
-  // Planned stops replace the old single break figure; capacity is reduced
-  // shift by shift so a shift with a handover and a meal is worth less than
-  // one with only a tea break.
-  const stopMinutesByShift = useMemo(() => {
-    const perShift = [0, 0, 0]
-    for (const stop of plannedStops) {
-      const i = stop.shiftIndex - 1
-      if (i >= 0 && i < 3) perShift[i] += stop.durationMinutes
-    }
-    return perShift
-  }, [plannedStops])
-  // Kapasite düzeltme katsayısı: ölçülen gerçekleşme oranı (Performans
-  // sayfasından yazılır). Tanımsızsa kapasite olduğu gibi kullanılır.
-  const capacityFactor = globalSettings?.capacityFactor ?? 1
-  const horizonWeeks = Math.min(
-    30,
-    Math.max(1, globalSettings?.planningHorizonWeeks ?? DEFAULT_HORIZON_WEEKS),
-  )
-
-  const locCategory = useMemo(
-    () => new Map(locations.map((l) => [l.code, l.category])),
-    [locations],
-  )
-
-  const stockByMaterial = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const s of stockRows) {
-      const cat = s.storageLocation
-        ? locCategory.get(s.storageLocation) ?? 'finished_goods'
-        : 'finished_goods'
-      if (!COUNTED_STOCK.has(cat)) continue
-      map.set(s.material, (map.get(s.material) ?? 0) + (s.unrestricted ?? 0))
-    }
-    return map
-  }, [stockRows, locCategory])
-
-  const rawStockByMaterial = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const s of stockRows) {
-      const cat = s.storageLocation ? locCategory.get(s.storageLocation) : undefined
-      if (!cat || !RAW_STOCK.has(cat)) continue
-      map.set(s.material, (map.get(s.material) ?? 0) + (s.unrestricted ?? 0))
-    }
-    return map
-  }, [stockRows, locCategory])
-
-  const productByCode = useMemo(() => {
-    const map = new Map<string, ProductSpec>()
-    for (const p of products) map.set(p.code, p as ProductSpec)
-    return map
-  }, [products])
-
-  const workingDayKeys = useMemo(
-    () => (workCalendar?.workingDays ?? ['MO', 'TU', 'WE', 'TH', 'FR']) as string[],
-    [workCalendar],
-  )
-  const workingDaysPerWeek = workingDayKeys.length || 5
-
-  const country = globalSettings?.country ?? 'TR'
-  const officialHolidays = (useQuery(api.holidays.listByCountry, { country }) ??
-    []) as { date: string; name: string }[]
-
-  // Resmi tatiller (Nager.Date'ten takvim ekranınca kaydedilir) + elle
-  // girilen tatiller birlikte kapasiteyi sıfırlar.
-  const holidays = useMemo(() => {
-    const set = new Set<string>((workCalendar?.holidays ?? []) as string[])
-    for (const h of officialHolidays) set.add(h.date)
-    return set
-  }, [workCalendar, officialHolidays])
-
-  const holidayNames = useMemo(
-    () => new Map(officialHolidays.map((h) => [h.date, h.name])),
-    [officialHolidays],
-  )
-
-  const horizonMonday = useMemo(() => mondayOf(new Date()), [])
-
-  // Capacity shrinks as the day passes, so the clock is part of the input.
-  // Re-read once a minute rather than on every render.
-  const [now, setNow] = useState(() => new Date())
+  // Henüz hiç hesap yoksa (ilk kurulum) bir kere iste.
+  const askedFirstRun = useRef(false)
   useEffect(() => {
-    // Beş dakikada bir yeter. Dakikada bir tazelemek tüm planı yeniden
-    // hesaplatıyordu: planlamacı bakarken işler yerinden oynuyordu ve
-    // kapasite zaten dakika hassasiyetinde bir şey değil.
-    const id = setInterval(() => setNow(new Date()), 300_000)
+    if (run === null && !askedFirstRun.current) {
+      askedFirstRun.current = true
+      void requestNow({})
+    }
+  }, [run, requestNow])
+
+  // Şimdiki zaman çizgisi canlı kalır; plan saat başı ve her değişiklikte
+  // sunucuda yenilenir.
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000)
     return () => clearInterval(id)
   }, [])
-  // The plan day runs from the first shift's start, not from midnight: at
-  // 02:00 the shop is still on the previous day's third shift.
-  const { date: todayIso, clockMinute: nowClockMinute } = productionDayOf(now, shiftStartMinute)
 
-  // ---- Dondurulmuş ufuk ---------------------------------------------------
-  //
-  // Sahadaki ekip yarın kuracağı kalıbı bugünden hazırlar. Plan her açılışta
-  // sıfırdan hesaplandığı için, hiçbir şey değişmese bile iş başka bir prese
-  // kayabilir. Dondurulmuş gün sayısı kadar ileriyi ONAYLI plandan alıyoruz:
-  // o işler yeniden hesaplanmaz, motor kalan boşluğu planlar.
-  const globalFrozenDays = Math.max(0, globalSettings?.frozenDays ?? 0)
-  const frozenUntilByPress = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const press of presses) {
-      const days = press.frozenDays ?? globalFrozenDays
-      if (days <= 0) continue
-      // `days` gün ileri: bugün dahil, o yüzden days - 1.
-      map.set(press.name, isoDate(addDays(new Date(`${todayIso}T00:00:00`), days - 1)))
-    }
-    return map
-  }, [presses, globalFrozenDays, todayIso])
+  const inputsLoading = run === undefined
+  const shiftMinutes = run?.shiftMinutes ?? 480
+  const shiftStartMinute = run?.shiftStartMinute ?? 420
+  const capacityFactor = run?.capacityFactor ?? 1
+  const horizonWeeks = run?.horizonWeeks ?? 4
+  const globalFrozenDays = run?.globalFrozenDays ?? 0
+  const truncatedInputs = run?.truncatedInputs ?? []
+  const presses = run?.presses ?? []
+  const plannedStops = run?.plannedStops ?? []
+  const warnings = run?.warnings ?? []
+  const rawNeeds = run?.rawNeeds ?? []
+  const unplanned = run?.unplanned ?? []
+  const frozenCount = run?.frozenCount ?? 0
+  const thisWeekCapacity = run?.thisWeekCapacity ?? { full: 0, remaining: 0, elapsed: 0 }
+  const horizonMonday = new Date(`${run?.horizonStart ?? '1970-01-05'}T00:00:00`)
+  const horizonStart = run?.horizonStart ?? ''
 
-  const frozenJobs = useMemo(() => {
-    if (!latestSnapshot || frozenUntilByPress.size === 0) return []
-    // Kırpılmış bir anlık görüntü eksiktir; onunla dondurmak sahada olmayan
-    // bir planı dondurmak olur.
-    if (latestSnapshot.truncated) return []
-    return latestSnapshot.jobs.filter((job) => {
-      const until = frozenUntilByPress.get(job.press)
-      if (!until) return false
-      if (job.date < todayIso) return false
-      return job.date <= until && (job.segments?.length ?? 0) > 0
-    })
-  }, [latestSnapshot, frozenUntilByPress, todayIso])
-
-  /**
-   * Dondurulmuş işlerin ürettiği adet, o malzemenin talebini karşılar.
-   * Taahhüt edilmiş arz stok gibi davranır: FIFO olarak en yakın haftadan
-   * düşülür, kalanı motor planlar. Sayılmazsa aynı iş iki kere planlanır.
-   */
-  const committedByMaterial = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const job of frozenJobs) {
-      map.set(job.material, (map.get(job.material) ?? 0) + job.quantity)
-    }
-    return map
-  }, [frozenJobs])
-
-  const demand = useMemo(() => {
-    const rows: DemandInput[] = weeklyDemand.map((d) => ({
-      material: d.material,
-      overdue: d.overdue ?? 0,
-      periods: d.periods,
-      stock:
-        (stockByMaterial.get(d.material) ?? 0) + (committedByMaterial.get(d.material) ?? 0),
-    }))
-    return buildDemandSchedule(rows, productByCode, {
-      baseMonday: horizonMonday,
-      horizonWeeks,
-      workingDaysPerWeek,
-    })
-  }, [
-    weeklyDemand,
-    stockByMaterial,
-    committedByMaterial,
-    workingDaysPerWeek,
-    productByCode,
-    horizonMonday,
-    horizonWeeks,
-  ])
-
-  const buckets = useMemo(() => {
-    const map = new Map<string, DayBucket[]>()
-    const start = horizonMonday
-    const templateByPress = new Map(templates.map((t) => [t.press, t]))
-    for (const press of presses) {
-      const pattern = templateByPress.get(press.name) ?? {
-        workingDays: workingDaysPerWeek,
-        shiftsPerDay: 1,
-        overtimeShifts: 0,
-      }
-      const all: DayBucket[] = []
-      for (let w = 0; w < horizonWeeks; w++) {
-        all.push(
-          ...buildWeekBuckets(
-            addDays(start, w * 7),
-            pattern,
-            { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift, stopMinutesByShift },
-            holidays,
-            workingDayKeys,
-          ),
-        )
-      }
-      // Two corrections, in order: the measured attainment rate, then the
-      // hours that have already gone by. Elapsed time is measured against the
-      // day's real timeline, so minutes spent in a handover or a meal break
-      // are not counted as production that was lost.
-      map.set(
-        press.name,
-        all.map((b) => {
-          const adjusted =
-            capacityFactor === 1 ? b.minutes : Math.floor(b.minutes * capacityFactor)
-          const timeline = buildDayTimeline(
-            shiftStartMinute,
-            shiftMinutes,
-            b.shifts,
-            plannedStops,
-          )
-          const remaining = remainingCapacityMinutes(
-            b.date,
-            todayIso,
-            nowClockMinute,
-            adjusted,
-            timeline,
-          )
-          return {
-            ...b,
-            minutes: remaining,
-            // Bugünün penceresi sıfırdan değil, geçip gitmiş dakikadan
-            // başlar. Sadece kısaltmak yetmez: motor günü [0, süre) kabul
-            // eder ve işi sabaha, yani geçmişe koyardı.
-            startMinute:
-              b.date === todayIso && remaining > 0 ? adjusted - remaining : 0,
-          }
-        }),
-      )
-    }
-    return map
-  }, [
-    presses,
-    templates,
-    shiftMinutes,
-    overtimeShiftMinutes,
-    holidays,
-    workingDaysPerWeek,
-    workingDayKeys,
-    horizonMonday,
-    capacityFactor,
-    horizonWeeks,
-    breakMinutesPerShift,
-    stopMinutesByShift,
-    plannedStops,
+  const { date: todayIso, clockMinute: nowClockMinute } = productionDayOf(
+    plantClock(nowMs, run?.timeZone),
     shiftStartMinute,
-    todayIso,
-    nowClockMinute,
-  ])
-
-  const overrides = useMemo<PlanOverride[]>(
-    () =>
-      overrideRows.map((o) => ({
-        material: o.material,
-        kind: o.kind as PlanOverride['kind'],
-        press: o.press,
-        date: o.date,
-      })),
-    [overrideRows],
   )
 
-  const shiftsByPressDate = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const [pressName, list] of buckets) {
-      for (const b of list) map.set(`${pressName}|${b.date}`, b.shifts)
+  /** Motorun yeni planı — dondurulmuş taahhütler hariç. */
+  const engineJobs = useMemo(() => (run?.jobs ?? []).filter((j) => !j.frozen), [run])
+  const weeks = useMemo(() => (run ? groupPlanWeeks(run) : []), [run])
+
+  const { shiftsByPressDate, capacityByPressDate } = useMemo(() => {
+    const shifts = new Map<string, number>()
+    const capacity = new Map<string, number>()
+    for (const day of run?.days ?? []) {
+      shifts.set(`${day.press}|${day.date}`, day.shifts)
+      capacity.set(`${day.press}|${day.date}`, day.minutes)
     }
-    return map
-  }, [buckets])
+    return { shiftsByPressDate: shifts, capacityByPressDate: capacity }
+  }, [run])
 
-  /** Ufkun tüm günleri — "şu tarihe kadar hazır değil" bunlara yayılır. */
-  const horizonDates = useMemo(() => {
-    const set = new Set<string>()
-    for (const list of buckets.values()) {
-      for (const b of list) set.add(b.date)
-    }
-    return Array.from(set).sort()
-  }, [buckets])
-
-  const alarmedMolds = useMemo(
-    () => alarmedMaterials(alarmRows),
-    [alarmRows],
-  )
-
-  const { blackouts: moldBlackouts, unavailable: unavailableMolds } = useMemo(
-    () => buildMoldBlackouts(maintenanceRows, readinessRows, horizonDates, alarmedMolds),
-    [maintenanceRows, readinessRows, horizonDates, alarmedMolds],
-  )
-
-  /**
-   * Pres bakımı, motorun yerleştiremeyeceği dolu bir aralık olarak geçer.
-   * Kapasiteyi kısmak yanlış olurdu: gün kısalmıyor, günün belli bir saati
-   * kapanıyor — iş o saatin etrafından akmalı.
-   */
-  const pressMaintenanceBlocks = useMemo(() => {
-    const out: {
-      material: string
-      press: string
-      date: string
-      segments: { kind: string; date: string; start: number; end: number }[]
-      label: string
-    }[] = []
-    for (const row of pressMaintenanceRows) {
-      const shifts = shiftsByPressDate.get(`${row.press}|${row.date}`) ?? 0
-      if (shifts <= 0) continue
-      const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, shifts, plannedStops)
-      const block = pressMaintenanceBlock(row, timeline)
-      if (!block) continue
-      out.push({
-        material: `⚙ ${row.press} maintenance`,
-        press: row.press,
-        date: row.date,
-        label: block.label,
-        segments: [{ kind: 'maintenance', date: block.date, start: block.start, end: block.end }],
-      })
-    }
-    return out
-  }, [pressMaintenanceRows, shiftsByPressDate, shiftStartMinute, shiftMinutes, plannedStops])
-
-  const result = useMemo(
-    () =>
-      schedule(demand, productByCode, presses, buckets, { shiftMinutes, overtimeShiftMinutes }, {
-        setupGapMinutes,
-        coilSetupGapMinutes,
-        concurrentSetupsPerHall,
-        // Süresiz kapalı kalıplar (ömür alarmı açık, ya da tarihsiz
-        // tutuluyor) motora `exclude` olarak geçer. Yalnızca uyarı yazmak
-        // yetmiyordu: kalıp uyarıya rağmen planlanmaya devam ediyordu.
-        overrides: [
-          ...overrides,
-          ...unavailableMolds.map((material) => ({
-            material,
-            kind: 'exclude' as const,
-          })),
-        ],
-        moldBlackouts,
-        fixedJobs: [
-          ...frozenJobs.map((job) => ({
-            material: job.material,
-            press: job.press,
-            date: job.date,
-            segments: job.segments ?? [],
-          })),
-          ...pressMaintenanceBlocks,
-        ],
-        // Her vardiyanın kendi net dakikası verilir: devir toplantısı, çay ve
-        // yemek vardiyadan vardiyaya değişir, tek bir uzunlukla bölmek 2. ve
-        // 3. vardiyanın sınırını kaydırırdı.
-        shiftNetMinutes: stopMinutesByShift.map((stopped) =>
-          Math.max(1, shiftMinutes - stopped),
-        ),
-      }),
-    [
-      demand,
-      productByCode,
-      presses,
-      buckets,
-      shiftMinutes,
-      overtimeShiftMinutes,
-      setupGapMinutes,
-      concurrentSetupsPerHall,
-      coilSetupGapMinutes,
-      overrides,
-      unavailableMolds,
-      moldBlackouts,
-      frozenJobs,
-      pressMaintenanceBlocks,
-      stopMinutesByShift,
-    ],
-  )
-
-
-  /**
-   * Ekranda gösterilen işler: dondurulmuş ufuktaki taahhütler + yeni plan.
-   *
-   * Dondurulmuş işler motorun çıktısında yoktur (yeniden hesaplanmadılar),
-   * ama sahada o presler o saatlerde onları yapacak — grafikte olmazlarsa
-   * pres boş görünür.
-   */
-  const displayJobs = useMemo<(ScheduledJob & { frozen?: boolean })[]>(() => {
-    if (frozenJobs.length === 0) return result.jobs
-    const fixed = frozenJobs.map(
-      (job): ScheduledJob & { frozen: boolean } => ({
-        material: job.material,
-        press: job.press,
-        hall: job.hall,
-        date: job.date,
-        endDate: job.endDate ?? job.date,
-        spansDays: (job.endDate ?? job.date) !== job.date,
-        phase: job.phase as ScheduledJob['phase'],
-        urgency: 0,
-        dueDate: job.date,
-        bucketLabel: 'Frozen',
-        late: false,
-        quantity: job.quantity,
-        shots: job.shots,
-        coilsNeeded: job.coilsNeeded,
-        coilChanges: 0,
-        segments: (job.segments ?? []) as ScheduledJob['segments'],
-        pinned: false,
-        coProductQuantity: 0,
-        setupStartMinute: job.setupStartMinute,
-        setupEndMinute: job.setupStartMinute,
-        qualityEndMinute: job.setupStartMinute,
-        endMinute: job.endMinute,
-        runMinutes: 0,
-        setupMinutes: 0,
-        qualityApprovalMinutes: 0,
-        reason: `Frozen — from the plan approved on ${
-          latestSnapshot ? new Date(latestSnapshot.createdAt).toLocaleDateString('en-GB') : ''
-        }`,
-        frozen: true,
-      }),
-    )
-    return [...fixed, ...result.jobs]
-  }, [frozenJobs, result.jobs, latestSnapshot])
-
-  /**
-   * Pres bakımları grafikte ayrı çizilir. Motora dolu aralık olarak gidiyor
-   * ama bir "iş" değil: adet, gecikme, kalıp gibi alanları yok, bu yüzden
-   * iş listesine karışmadan yalnızca grafiğe ekleniyor.
-   */
+  /** Pres bakımları grafikte ayrı çizilir — iş listesine karışmaz. */
   const ganttMaintenance = useMemo<WeekGanttJob[]>(
     () =>
-      pressMaintenanceBlocks.map((block) => ({
+      (run?.maintenance ?? []).map((block) => ({
         date: block.date,
         press: block.press,
-        material: `${block.label}`,
+        material: block.label,
         quantity: 0,
         late: false,
-        setupStartMinute: block.segments[0]?.start ?? 0,
-        endMinute: block.segments[0]?.end ?? 0,
-        segments: block.segments.map((seg) => ({
-          kind: 'maintenance' as const,
-          date: seg.date,
-          start: seg.start,
-          end: seg.end,
-        })),
+        setupStartMinute: block.start,
+        endMinute: block.end,
+        segments: [
+          { kind: 'maintenance' as const, date: block.date, start: block.start, end: block.end },
+        ],
       })),
-    [pressMaintenanceBlocks],
+    [run],
   )
 
   // Onaylı planla canlı planın farkı — "onayladığımdan bu yana ne değişti".
   const planDiff = useMemo(() => {
-    if (!latestSnapshot) return null
-    // Kırpılmış bir anlık görüntüyle karşılaştırmak yalan söyler: saklanmayan
-    // işler "plandan düştü" gibi görünür. Böyle bir karşılaştırma yapmaktansa
-    // hiç yapmamak doğrudur.
+    if (!latestSnapshot || !run) return null
+    // Kırpılmış bir onaylı planla karşılaştırmak yalan söyler: saklanmayan
+    // işler "plandan düştü" gibi görünür.
     if (latestSnapshot.truncated) return null
-    return diffPlans(latestSnapshot.jobs, result.jobs)
-  }, [latestSnapshot, result])
+    return diffPlans(latestSnapshot.jobs, engineJobs)
+  }, [latestSnapshot, run, engineJobs])
 
-  const rawNeeds = useMemo(
-    () => buildRawMaterialPlan(result.jobs, productByCode, rawStockByMaterial),
-    [result, productByCode, rawStockByMaterial],
-  )
-  const rawShortages = useMemo(() => rawNeeds.filter((r) => r.shortageKg > 0), [rawNeeds])
-  const missingRawSpec = useMemo(
-    () => materialsMissingRawSpec(result.jobs, productByCode),
-    [result, productByCode],
-  )
+  const lateCount = engineJobs.filter((j) => j.late).length
+  const totalPlannedQty = engineJobs.reduce((s, j) => s + j.quantity, 0)
 
-  // Gantt needs each press's net capacity on the shown day.
-  const capacityByPressDate = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const [pressName, list] of buckets) {
-      for (const b of list) map.set(`${pressName}|${b.date}`, b.minutes)
-    }
-    return map
-  }, [buckets])
-
-  // How many shifts each press runs on each day — the Gantt needs this to
-  // lay out the day's shift windows and place the planned stops.
-  /**
-   * The plan grouped by calendar week, with a reason for every press that has
-   * no work. An idle row is ambiguous on its own — no demand, nothing it can
-   * run, or no capacity are three different problems.
-   */
-  const weeks = useMemo(() => {
-    const byWeek = new Map<string, { dates: Set<string>; jobs: typeof displayJobs }>()
-    for (const [pressName, list] of buckets) {
-      void pressName
-      for (const b of list) {
-        if (b.minutes <= 0) continue
-        const weekStart = isoDate(mondayOf(new Date(`${b.date}T00:00:00`)))
-        const entry = byWeek.get(weekStart) ?? { dates: new Set<string>(), jobs: [] }
-        entry.dates.add(b.date)
-        byWeek.set(weekStart, entry)
-      }
-    }
-    for (const job of displayJobs) {
-      // A job that does not fit before the week closes carries on into the
-      // next one, so it belongs to every week its pieces actually run in —
-      // otherwise the continuation would be missing from that week's chart.
-      const jobDates = new Set<string>([job.date, ...job.segments.map((s) => s.date)])
-      const weeksTouched = new Set<string>()
-      for (const date of jobDates) {
-        if (!date) continue
-        weeksTouched.add(isoDate(mondayOf(new Date(`${date}T00:00:00`))))
-      }
-      for (const weekStart of weeksTouched) {
-        const entry = byWeek.get(weekStart) ?? { dates: new Set<string>(), jobs: [] }
-        for (const date of jobDates) {
-          if (date && isoDate(mondayOf(new Date(`${date}T00:00:00`))) === weekStart) {
-            entry.dates.add(date)
-          }
-        }
-        entry.jobs.push(job)
-        byWeek.set(weekStart, entry)
-      }
-    }
-
-    const eligiblePresses = new Set<string>()
-    for (const product of productByCode.values()) {
-      for (const m of [
-        product.mainMachine,
-        product.altMachine1,
-        product.altMachine2,
-        product.altMachine3,
-        product.altMachine4,
-      ]) {
-        if (m && m.trim()) eligiblePresses.add(m.trim())
-      }
-    }
-
-    return Array.from(byWeek.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([weekStart, entry]) => {
-        const dates = Array.from(entry.dates).sort()
-        const busy = new Set(entry.jobs.map((j) => j.press))
-        const idlePresses = presses
-          .filter((p) => !busy.has(p.name))
-          .map((p) => {
-            const capacity = dates.reduce(
-              (sum, d) => sum + (capacityByPressDate.get(`${p.name}|${d}`) ?? 0),
-              0,
-            )
-            const reason =
-              capacity <= 0
-                ? 'no capacity'
-                : !eligiblePresses.has(p.name)
-                  ? 'no material lists it'
-                  : 'no demand for its materials'
-            return { name: p.name, reason }
-          })
-        return { weekStart, dates, jobs: entry.jobs, idlePresses }
-      })
-  }, [buckets, displayJobs, presses, productByCode, capacityByPressDate])
-
-  const lateCount = result.jobs.filter((j) => j.late).length
-
-  // How much of this week is actually still available. The engine already
-  // works with this figure; showing it stops the plan looking short when the
-  // real reason is that half the week has gone.
-  const thisWeekCapacity = useMemo(() => {
-    const weekEnd = isoDate(addDays(horizonMonday, 6))
-    let full = 0
-    let remaining = 0
-    const templateByPress = new Map(templates.map((t) => [t.press, t]))
-    for (const press of presses) {
-      const pattern = templateByPress.get(press.name) ?? {
-        workingDays: workingDaysPerWeek,
-        shiftsPerDay: 1,
-        overtimeShifts: 0,
-      }
-      for (const bucket of buildWeekBuckets(
-        horizonMonday,
-        pattern,
-        { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift },
-        holidays,
-        workingDayKeys,
-      )) {
-        if (bucket.date > weekEnd) continue
-        const adjusted =
-          capacityFactor === 1 ? bucket.minutes : Math.floor(bucket.minutes * capacityFactor)
-        full += adjusted
-        remaining += remainingCapacityMinutes(
-          bucket.date,
-          todayIso,
-          nowClockMinute,
-          adjusted,
-          buildDayTimeline(shiftStartMinute, shiftMinutes, bucket.shifts, plannedStops),
-        )
-      }
-    }
-    return { full, remaining, elapsed: full - remaining }
-  }, [
-    presses,
-    templates,
-    horizonMonday,
-    shiftMinutes,
-    overtimeShiftMinutes,
-    breakMinutesPerShift,
-    shiftStartMinute,
-    holidays,
-    workingDayKeys,
-    workingDaysPerWeek,
-    capacityFactor,
-    plannedStops,
-    todayIso,
-    nowClockMinute,
-  ])
-
-  const warnings = useMemo(() => {
-    const list: string[] = []
-    if (presses.length === 0) list.push('No presses defined — add them on the Press Definitions page.')
-    if (templates.length === 0)
-      list.push('No work calendar defined for any press — defaulting to 1 shift.')
-    if (weeklyDemand.length === 0) list.push('No ZPP weekly demand data uploaded.')
-    if (stockRows.length === 0) list.push('No MB52 stock data uploaded — planning without deducting stock.')
-    const missingMaxShots = products.filter((p) => !p.maxShots).length
-    if (missingMaxShots > 0)
-      list.push(`${missingMaxShots} materials have no max shot limit — the limit is not enforced.`)
-    if (holidays.size === 0)
-      list.push(
-        'No public holidays stored — open the Work Calendar page once so they are saved.',
-      )
-    if (rawShortages.length > 0)
-      list.push(
-        `${rawShortages.length} raw materials are short — coils must be sourced for the planned jobs.`,
-      )
-    if (lateCount > 0)
-      list.push(
-        `${lateCount} jobs are scheduled after the week they are needed — capacity is short.`,
-      )
-    if (missingRawSpec.length > 0)
-      list.push(
-        `${missingRawSpec.length} materials have no raw material code or gross weight — the raw material check cannot run.`,
-      )
-    // Ufkun içindeki bakım günleri planı doğrudan değiştirdiği için
-    // görünür olmalı — iş neden o güne konmadı sorusunun cevabı budur.
-    if (alarmedMolds.length > 0) {
-      list.push(
-        `${alarmedMolds.length} mold(s) passed their periodic maintenance limit ` +
-          `and are held out of the plan until the alarm is closed: ` +
-          `${alarmedMolds.slice(0, 6).join(', ')}${alarmedMolds.length > 6 ? '…' : ''}.`,
-      )
-    }
-    const heldWithoutDate = unavailableMolds.filter((m) => !alarmedMolds.includes(m))
-    if (heldWithoutDate.length > 0) {
-      list.push(
-        `${heldWithoutDate.length} mold(s) are marked not ready with no date, ` +
-          `so they are held out of the plan entirely: ` +
-          `${heldWithoutDate.slice(0, 6).join(', ')}${heldWithoutDate.length > 6 ? '…' : ''}.`,
-      )
-    }
-    const pressDown = pressMaintenanceBlocks.filter((b) => b.date >= todayIso)
-    if (pressDown.length > 0) {
-      const presses = Array.from(new Set(pressDown.map((b) => b.press)))
-      list.push(
-        `${presses.length} press(es) have maintenance booked in the horizon and ` +
-          `are unavailable for those hours: ${presses.slice(0, 6).join(', ')}` +
-          `${presses.length > 6 ? '…' : ''}.`,
-      )
-    }
-    const upcomingMaintenance = moldBlackouts.filter((b) => b.date >= todayIso)
-    if (upcomingMaintenance.length > 0) {
-      const moulds = Array.from(new Set(upcomingMaintenance.map((b) => b.material)))
-      list.push(
-        `${moulds.length} mould${moulds.length > 1 ? 's are' : ' is'} in maintenance on ` +
-          `${upcomingMaintenance.length} day(s) and cannot run then: ` +
-          `${moulds.slice(0, 6).join(', ')}${moulds.length > 6 ? '…' : ''}.`,
-      )
-    }
-    return list
-  }, [
-    presses,
-    templates,
-    weeklyDemand,
-    stockRows,
-    products,
-    holidays,
-    rawShortages,
-    missingRawSpec,
-    lateCount,
-    moldBlackouts,
-    unavailableMolds,
-    alarmedMolds,
-    pressMaintenanceBlocks,
-    todayIso,
-  ])
-
-  const totalPlannedQty = result.jobs.reduce((s, j) => s + j.quantity, 0)
-  const horizonStart = isoDate(horizonMonday)
+  // Girdi değişti ama yeni hesap henüz gelmedi: ekrandaki plan eskidir.
+  const recalculating =
+    planStatus != null &&
+    ((planStatus.runningSince !== undefined && nowMs - planStatus.runningSince < 10 * 60_000) ||
+      (planStatus.scheduledFor !== undefined && planStatus.scheduledFor > nowMs - 60_000))
+  const failedLast =
+    planStatus?.lastError !== undefined &&
+    (planStatus.lastErrorAt ?? 0) > (planStatus.lastRunAt ?? 0)
 
   async function handleApprove() {
+    if (!run) return
     setApproving(true)
     try {
       await approve({
         horizonStart,
         approvedBy: currentUser ?? undefined,
-        unplannedCount: result.unplanned.length,
+        unplannedCount: unplanned.length,
         // Onay, ekranda görünen planın tamamını kaydeder: dondurulmuş
         // taahhütler de bir sonraki onayın temeli olmalı.
-        jobs: displayJobs.map((j) => ({
+        jobs: run.jobs.map((j) => ({
           material: j.material,
           press: j.press,
           hall: j.hall,
@@ -845,6 +194,12 @@ function PlanlamaPage() {
           setupStartMinute: j.setupStartMinute,
           endMinute: j.endMinute,
           endDate: j.endDate,
+          segments: j.segments.map((seg) => ({
+            kind: seg.kind,
+            date: seg.date,
+            start: seg.start,
+            end: seg.end,
+          })),
           reason: j.reason,
         })),
       })
@@ -864,6 +219,37 @@ function PlanlamaPage() {
         calculations are all applied. You only review and approve. Planning
         horizon is {horizonWeeks} weeks (change it on the Work Calendar page).
       </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-border p-3 text-sm">
+        {run ? (
+          <span className="text-muted-foreground">
+            Calculated on the server{' '}
+            <strong className="text-foreground">{minutesAgo(run.computedAt, nowMs)}</strong>{' '}
+            ({new Date(run.computedAt).toLocaleString('en-GB')})
+          </span>
+        ) : run === null ? (
+          <span className="text-muted-foreground">The first plan is being calculated…</span>
+        ) : (
+          <span className="text-muted-foreground">Loading the plan…</span>
+        )}
+        {recalculating && (
+          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+            Data changed — recalculating…
+          </span>
+        )}
+        {failedLast && (
+          <span className="text-xs text-destructive">
+            Last calculation failed: {planStatus?.lastError}
+          </span>
+        )}
+        <button
+          onClick={() => void requestNow({})}
+          disabled={recalculating}
+          className="ml-auto rounded-md border border-input px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+        >
+          Recalculate now
+        </button>
+      </div>
 
       <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
         <strong className="text-foreground">Minimum lot is one full coil.</strong> A coil
@@ -907,13 +293,11 @@ function PlanlamaPage() {
         </div>
       )}
 
-      {frozenJobs.length > 0 && (
+      {frozenCount > 0 && (
         <p className="mt-6 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-          <strong className="text-foreground">{frozenJobs.length} jobs are frozen</strong> —
+          <strong className="text-foreground">{frozenCount} jobs are frozen</strong> —
           taken from the plan approved on{' '}
-          {latestSnapshot
-            ? new Date(latestSnapshot.createdAt).toLocaleString('en-GB')
-            : ''}{' '}
+          {run?.frozenFrom ? new Date(run.frozenFrom).toLocaleString('en-GB') : ''}{' '}
           instead of being recalculated, so the shop floor's preparation is not
           disturbed. They are drawn hatched below and the quantity they produce
           is deducted from the requirement. Change the frozen day count on the
@@ -921,7 +305,7 @@ function PlanlamaPage() {
         </p>
       )}
 
-      {globalFrozenDays > 0 && frozenJobs.length === 0 && !latestSnapshot && (
+      {globalFrozenDays > 0 && frozenCount === 0 && latestSnapshot === null && (
         <p className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           Frozen days are set to {globalFrozenDays}, but no plan has been
           approved yet, so there is nothing to freeze. Approve a plan once and
@@ -941,12 +325,12 @@ function PlanlamaPage() {
       )}
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Planned jobs" value={result.jobs.length.toLocaleString('en-GB')} />
+        <Stat label="Planned jobs" value={engineJobs.length.toLocaleString('en-GB')} />
         <Stat label="Planned qty" value={totalPlannedQty.toLocaleString('en-GB')} />
         <Stat
           label="Unplanned"
-          value={result.unplanned.length.toLocaleString('en-GB')}
-          warn={result.unplanned.length > 0}
+          value={unplanned.length.toLocaleString('en-GB')}
+          warn={unplanned.length > 0}
         />
         <Stat
           label="Late jobs"
@@ -960,16 +344,19 @@ function PlanlamaPage() {
           onClick={() => void handleApprove()}
           disabled={
             approving ||
-            result.jobs.length === 0 ||
+            engineJobs.length === 0 ||
             inputsLoading ||
+            recalculating ||
             truncatedInputs.length > 0
           }
           title={
             truncatedInputs.length > 0
               ? 'Part of the data did not reach the planner'
               : inputsLoading
-                ? 'Still loading the plan inputs'
-                : undefined
+                ? 'Still loading the plan'
+                : recalculating
+                  ? 'The data changed — wait for the plan to be recalculated'
+                  : undefined
           }
           className="rounded-md bg-foreground px-5 py-2.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
         >
@@ -1369,10 +756,10 @@ function PlanlamaPage() {
         </div>
       )}
 
-      {result.unplanned.length > 0 && (
+      {unplanned.length > 0 && (
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-destructive">
-            Unplanned ({result.unplanned.length})
+            Unplanned ({unplanned.length})
           </h2>
           <div className="mt-2 overflow-x-auto rounded-lg border border-destructive/30">
             <table className="w-full text-left text-sm">
@@ -1387,7 +774,7 @@ function PlanlamaPage() {
                 </tr>
               </thead>
               <tbody>
-                {result.unplanned.map((u, i) => {
+                {unplanned.map((u, i) => {
                   // Her sebebin somut bir çaresi var; listeyi okuyup ne
                   // yapacağını aramak planlamacının işi olmamalı.
                   const fix = fixForUnplanned(u.reason)

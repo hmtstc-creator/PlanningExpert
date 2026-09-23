@@ -26,6 +26,7 @@ export const list = guardedQuery({
 })
 
 export const add = adminMutation({
+  affectsPlan: false,
   args: { kind: v.string(), value: v.string(), sortOrder: v.optional(v.number()) },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -51,6 +52,7 @@ export const add = adminMutation({
 })
 
 export const remove = adminMutation({
+  affectsPlan: false,
   args: { id: v.id('lookups') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -66,6 +68,7 @@ export const remove = adminMutation({
  * Boş bir seçim listesiyle problem bildirilemeyeceği için bir kere çalışır.
  */
 export const seedDefaults = adminMutation({
+  affectsPlan: false,
   args: {},
   returns: v.number(),
   handler: async (ctx) => {

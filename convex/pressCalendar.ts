@@ -18,6 +18,7 @@ const globalSettingsValidator = v.union(
     planningHorizonWeeks: v.optional(v.number()),
     breakMinutesPerShift: v.optional(v.number()),
     frozenDays: v.optional(v.number()),
+    timeZone: v.optional(v.string()),
   }),
   v.null(),
 )
@@ -45,6 +46,7 @@ export const saveGlobalSettings = guardedMutation({
     planningHorizonWeeks: v.optional(v.number()),
     breakMinutesPerShift: v.optional(v.number()),
     frozenDays: v.optional(v.number()),
+    timeZone: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

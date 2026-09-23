@@ -61,7 +61,7 @@ const productArgs = {
  */
 const PLANNING_ROW_LIMIT = 8000
 
-function withDefaults<T extends Record<string, unknown>>(doc: T) {
+export function withDefaults<T extends Record<string, unknown>>(doc: T) {
   return {
     ...doc,
     moldCavities: (doc.moldCavities as number | undefined) ?? 0,

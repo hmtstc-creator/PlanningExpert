@@ -41,6 +41,7 @@ export const recent = guardedQuery({
 })
 
 export const create = guardedMutation({
+  affectsPlan: false,
   args: {
     title: v.string(),
     detail: v.optional(v.string()),
@@ -56,6 +57,7 @@ export const create = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  affectsPlan: false,
   args: { id: v.id('changeLog') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
