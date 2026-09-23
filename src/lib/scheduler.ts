@@ -8,6 +8,7 @@ import {
   type ProductSpec,
   type RunPlan,
   type ShiftSettings,
+  eligiblePressesOf,
   splitByMoldLimit,
 } from './planning'
 
@@ -503,17 +504,7 @@ export function schedule(
     const product = products.get(material)
     const count = pinned.get(material)?.press
       ? 1
-      : new Set(
-          [
-            product?.mainMachine,
-            product?.altMachine1,
-            product?.altMachine2,
-            product?.altMachine3,
-            product?.altMachine4,
-          ]
-            .map((m) => m?.trim())
-            .filter((m): m is string => !!m && pressNames.has(m)),
-        ).size
+      : eligiblePressesOf(product).filter((m) => pressNames.has(m)).length
     eligibleCount.set(material, count)
     return count
   }
@@ -615,24 +606,26 @@ export function schedule(
       continue
     }
 
-    const candidates = [
-      product.mainMachine,
-      product.altMachine1,
-      product.altMachine2,
-      product.altMachine3,
-      product.altMachine4,
-    ]
-      .filter((m): m is string => !!m && m.trim() !== '')
-      .map((m) => m.trim())
-      .filter((m) => pressByName.has(m))
+    // Ana pres; alternatifler yalnızca parça "esnek" işaretliyse.
+    const candidates = eligiblePressesOf(product).filter((m) => pressByName.has(m))
 
-    if (candidates.length === 0) {
+    const pinnedPress = pinned.get(entry.material)?.press
+    if (candidates.length === 0 && !pinnedPress) {
+      const hasAlternatives = [
+        product.altMachine1,
+        product.altMachine2,
+        product.altMachine3,
+        product.altMachine4,
+      ].some((m) => m && m.trim())
       unplanned.push({
         material: entry.material,
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
-        reason: 'No eligible press (main and alternative machines are undefined)',
+        reason:
+          !product.flexiblePress && hasAlternatives
+            ? 'No main press defined — alternatives are used only when "Flexible press" is ticked'
+            : 'No eligible press (main and alternative machines are undefined)',
       })
       continue
     }

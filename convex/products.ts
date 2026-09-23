@@ -23,6 +23,7 @@ const productValidator = v.object({
   altMachine2: v.optional(v.string()),
   altMachine3: v.optional(v.string()),
   altMachine4: v.optional(v.string()),
+  flexiblePress: v.optional(v.boolean()),
   maxShots: v.optional(v.number()),
   qualityApprovalMinutes: v.optional(v.number()),
   performanceFactor: v.optional(v.number()),
@@ -46,6 +47,7 @@ const productArgs = {
   altMachine2: v.optional(v.string()),
   altMachine3: v.optional(v.string()),
   altMachine4: v.optional(v.string()),
+  flexiblePress: v.optional(v.boolean()),
   maxShots: v.optional(v.number()),
   qualityApprovalMinutes: v.optional(v.number()),
   performanceFactor: v.optional(v.number()),
@@ -132,7 +134,10 @@ export const bulkUpsert = guardedMutation({
       const code = row.code.trim()
       if (!code) continue
       const { name: _n, material: _m, cycleTimeSeconds: _c, ...rest } = row
-      const data = { ...rest, code }
+      const data: Record<string, unknown> = { ...rest, code }
+      // "Flexible press" SAP'den gelmez, burada işaretlenir. Dosyada sütun
+      // yoksa mevcut işaret korunur — yeniden yükleme onu silmemeli.
+      if (data.flexiblePress === undefined) delete data.flexiblePress
       const existing = await ctx.db
         .query('products')
         .withIndex('by_code', (q) => q.eq('code', code))
@@ -141,7 +146,7 @@ export const bulkUpsert = guardedMutation({
         await ctx.db.patch(existing._id, data)
         updated++
       } else {
-        await ctx.db.insert('products', data)
+        await ctx.db.insert('products', data as typeof rest & { code: string })
         inserted++
       }
     }
@@ -195,6 +200,12 @@ export const updateField = guardedMutation({
       'qualityApprovalMinutes',
       'performanceFactor',
     ]
+
+    if (field === 'flexiblePress') {
+      const on = value === true || value === 1 || ['yes', 'true', '1', 'x'].includes(String(value).toLowerCase())
+      await ctx.db.patch(id, { flexiblePress: on ? true : undefined })
+      return null
+    }
 
     if (!textFields.includes(field) && !numberFields.includes(field)) {
       throw new Error(`Unknown field: ${field}`)

@@ -136,7 +136,7 @@ function PlanLogicPage() {
             ],
             [
               'Master data',
-              'Cavities, strokes per minute (SPM), setup and coil change times, quality approval time, coil and gross weight, mould shot limit, main and alternative presses, co-product, performance factor',
+              'Cavities, strokes per minute (SPM), setup and coil change times, quality approval time, coil and gross weight, mould shot limit, main and alternative presses, Flexible press tick, co-product, performance factor',
               '/referanslar',
             ],
             ['Presses', 'Hall (for the crane rule) and whether the press is coil-fed', '/makineler'],
@@ -282,8 +282,11 @@ function PlanLogicPage() {
 
       <Step n={6} id="place" title="Place each job">
         <p>
-          The candidates are the material's main press and its alternatives
-          (or only the pinned press). On each candidate the engine looks for
+          The candidates are the material's main press — plus its
+          alternatives <b>only if the part is ticked Flexible press</b> in
+          master data (or only the pinned press). A part that is not flexible
+          always runs on its main press, even if that makes it late: its
+          quality approval belongs to that press. On each candidate the engine looks for
           the earliest free time — also in gaps left earlier — and builds the
           job:
         </p>
@@ -498,8 +501,9 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
             equal → the part with the fewest eligible presses goes first.
           </Box>
           <Down label="take the next item from the top" />
-          <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · Try EVERY press that can make it">
-            Main press and all alternatives (e.g. 104, 105, 108, 110). On each
+          <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · Try EVERY press it is allowed on">
+            Not ticked Flexible press → only the main press (quality). Ticked →
+            main press and all alternatives (e.g. 104, 105, 108, 110). On each
             one, find the earliest free slot that respects all the rules: shift
             ends, crane, mould, maintenance.
           </Box>
@@ -530,7 +534,8 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
         <div className="rounded-lg border border-border p-4">
           <p className="text-sm font-semibold text-foreground">Example — decision #12</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Part A has a backlog and can run on 104 (main), 105 and 108. Eleven
+            Part A has a backlog, is ticked Flexible press and can run on 104
+            (main), 105 and 108. Eleven
             jobs are already booked. Grey = already booked, coloured = where A
             would go.
           </p>
@@ -581,7 +586,8 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
             <li>
               <b className="text-foreground">Plan check</b> (Production Plan page): after
               every calculation, checking code that is separate from the engine goes
-              through every job again and checks each rule — one job per press
+              through every job again and checks each rule — parts that are not
+              flexible only on their main press, one job per press
               at a time, earliest press chosen, crane gaps, one mould on one
               press, maintenance, no lot before its safety date, nothing in the past. A
               broken rule shows in red with the job named.

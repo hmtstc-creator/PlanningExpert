@@ -39,3 +39,12 @@ describe('planlanamayan kalemin çaresi', () => {
     expect(fixForUnplanned('something unexpected').label).toBe('Move to front')
   })
 })
+
+describe('flexible press', () => {
+  it('sends a part with no main press to master data', () => {
+    expect(
+      fixForUnplanned('No main press defined — alternatives are used only when "Flexible press" is ticked'),
+    ).toEqual({ label: 'Set main press or tick Flexible', to: '/referanslar' })
+  })
+})
+

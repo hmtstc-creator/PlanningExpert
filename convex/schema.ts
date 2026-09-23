@@ -32,6 +32,9 @@ export default defineSchema({
     altMachine2: v.optional(v.string()),
     altMachine3: v.optional(v.string()),
     altMachine4: v.optional(v.string()),
+    // İşaretliyse alternatif preslerde de planlanabilir. İşaretsizse (varsayılan)
+    // kalite gereği HER ZAMAN ana preste çalışır; alternatifler kullanılmaz.
+    flexiblePress: v.optional(v.boolean()),
     // Kalıbın bakım öncesi maksimum baskı (shot) limiti — kullanıcı tanımlar.
     maxShots: v.optional(v.number()),
     // Setup sonrası ilk parça / kalite onayı süresi (dk).

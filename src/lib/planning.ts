@@ -654,6 +654,27 @@ export interface ProductSpec {
   altMachine2?: string
   altMachine3?: string
   altMachine4?: string
+  /**
+   * İşaretliyse alternatif preslerde de planlanabilir. İşaretsizse kalite
+   * gereği yalnızca ana preste çalışır.
+   */
+  flexiblePress?: boolean
+}
+
+/**
+ * Parçanın planlanabileceği presler: ana pres, ve yalnızca "esnek" işaretliyse
+ * alternatifler. Kalite onayı bir prese bağlı parçalar, alternatifi tanımlı
+ * olsa bile başka prese kaydırılmaz.
+ */
+export function eligiblePressesOf(product: ProductSpec | undefined): string[] {
+  if (!product) return []
+  const list = [product.mainMachine]
+  if (product.flexiblePress) {
+    list.push(product.altMachine1, product.altMachine2, product.altMachine3, product.altMachine4)
+  }
+  return Array.from(
+    new Set(list.map((m) => m?.trim()).filter((m): m is string => !!m)),
+  )
 }
 
 export interface RunPlan {

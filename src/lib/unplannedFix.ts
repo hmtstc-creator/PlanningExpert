@@ -10,6 +10,9 @@ export interface UnplannedFix {
 }
 
 export function fixForUnplanned(reason: string): UnplannedFix {
+  if (reason.includes('No main press')) {
+    return { label: 'Set main press or tick Flexible', to: '/referanslar' }
+  }
   if (reason.includes('master data')) {
     return { label: 'Add master data', to: '/referanslar' }
   }

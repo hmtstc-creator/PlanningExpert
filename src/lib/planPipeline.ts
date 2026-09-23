@@ -12,6 +12,7 @@
 import { addDays, DEFAULT_PLANT_TIME_ZONE, isoDate, mondayOf, plantClock } from './dates'
 import {
   buildDemandSchedule,
+  eligiblePressesOf,
   piecesPerCoil,
   buildRawMaterialPlan,
   buildWeekBuckets,
@@ -474,17 +475,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     for (const lj of late) {
       boost.add(lotKey(lj))
       const product = productByCode.get(lj.material)
-      const eligible = new Set(
-        [
-          product?.mainMachine,
-          product?.altMachine1,
-          product?.altMachine2,
-          product?.altMachine3,
-          product?.altMachine4,
-        ]
-          .map((m) => m?.trim())
-          .filter((m): m is string => !!m),
-      )
+      const eligible = new Set(eligiblePressesOf(product))
       for (const j of best.result.jobs) {
         if (j.material === lj.material || !eligible.has(j.press) || j.date > lj.date) continue
         const spec = productByCode.get(j.material)
@@ -583,15 +574,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
 
   const eligible = new Set<string>()
   for (const product of productByCode.values()) {
-    for (const m of [
-      product.mainMachine,
-      product.altMachine1,
-      product.altMachine2,
-      product.altMachine3,
-      product.altMachine4,
-    ]) {
-      if (m && m.trim()) eligible.add(m.trim())
-    }
+    for (const m of eligiblePressesOf(product)) eligible.add(m)
   }
 
   const days: PlanDay[] = []
@@ -636,7 +619,20 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     )
   }
 
+  const pinnedPress = new Map(
+    inputs.overrides.filter((o) => o.kind === 'pin' && o.press).map((o) => [o.material, o.press!]),
+  )
+  const pressRules = new Map<string, { main: string; flexible: boolean; pinned?: string }>()
+  for (const product of productByCode.values()) {
+    pressRules.set(product.code, {
+      main: product.mainMachine?.trim() ?? '',
+      flexible: !!product.flexiblePress,
+      pinned: pinnedPress.get(product.code),
+    })
+  }
+
   const audit = auditPlan({
+    pressRules,
     jobs,
     maintenance,
     moldBlackouts,

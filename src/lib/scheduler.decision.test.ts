@@ -20,8 +20,16 @@ function buckets(presses: string[]): Map<string, DayBucket[]> {
   )
 }
 
-function product(code: string, main: string, alt?: string): ProductSpec {
-  return { code, moldCavities: 1, spm: 10, setupMinutes: 30, mainMachine: main, altMachine1: alt }
+function product(code: string, main: string, alt?: string, flexible = !!alt): ProductSpec {
+  return {
+    code,
+    moldCavities: 1,
+    spm: 10,
+    setupMinutes: 30,
+    mainMachine: main,
+    altMachine1: alt,
+    flexiblePress: flexible,
+  }
 }
 
 function backlog(material: string, qty: number): DemandEntry {
@@ -119,5 +127,42 @@ describe('placement decision', () => {
     expect(x.press).toBe('105')
     expect(x.setupStartMinute).toBe(0)
     expect(y.setupStartMinute).toBe(0)
+  })
+
+  it('keeps a part that is not marked flexible on its main press, even when late', () => {
+    // A'nın alternatifi 105 tanımlı ama "esnek" işaretli değil: kalite
+    // gereği yalnızca 104. 104 dolu olsa bile 105'e gitmez.
+    const products = new Map([
+      ['BIG', product('BIG', '104')],
+      ['A', product('A', '104', '105', false)],
+    ])
+    const result = schedule(
+      [backlog('BIG', 6000), backlog('A', 1000)],
+      products,
+      [
+        { name: '104', hall: 'H1' },
+        { name: '105', hall: 'H1' },
+      ],
+      buckets(['104', '105']),
+      settings,
+      { setupGapMinutes: 60, concurrentSetupsPerHall: 1 },
+    )
+    const a = result.jobs.find((j) => j.material === 'A')!
+    expect(a.press).toBe('104')
+    expect(a.decision?.candidates.map((c) => c.press)).toEqual(['104'])
+  })
+
+  it('explains a part with only alternatives and no flexible mark', () => {
+    const products = new Map([['A', { ...product('A', '', '105', false) }]])
+    const result = schedule(
+      [backlog('A', 500)],
+      products,
+      [{ name: '105', hall: 'H1' }],
+      buckets(['105']),
+      settings,
+      { setupGapMinutes: 60, concurrentSetupsPerHall: 1 },
+    )
+    expect(result.jobs).toHaveLength(0)
+    expect(result.unplanned[0].reason).toContain('Flexible press')
   })
 })

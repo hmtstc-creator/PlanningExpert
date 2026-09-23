@@ -39,6 +39,11 @@ export interface AuditInputs {
   setupGapMinutes: number
   coilSetupGapMinutes: number
   concurrentSetupsPerHall: number
+  /**
+   * Parça → ana pres ve esneklik. Esnek olmayan parça yalnız ana preste
+   * (ya da kullanıcının sabitlediği preste) çalışabilir.
+   */
+  pressRules?: Map<string, { main: string; flexible: boolean; pinned?: string }>
 }
 
 export interface AuditRule {
@@ -94,6 +99,10 @@ export function auditPlan(input: AuditInputs): PlanAudit {
   const crane = rule('crane', 'Crane: setup gaps and simultaneous setups per hall')
   const fillEarly = rule('fill-early', 'No lot starts before its stock reaches the safety level')
   const past = rule('past', 'Nothing is planned in the past')
+  const mainPress = rule(
+    'main-press',
+    'Parts not marked "Flexible press" run only on their main press',
+  )
   const earliest = rule(
     'earliest-press',
     'Each job went to the eligible press that finished it earliest at that moment',
@@ -111,6 +120,14 @@ export function auditPlan(input: AuditInputs): PlanAudit {
   const blackout = new Set(input.moldBlackouts.map((b) => `${b.material}|${b.date}`))
 
   for (const job of input.jobs) {
+    const pressRule = input.pressRules?.get(job.material)
+    if (pressRule && !job.frozen) {
+      mainPress.check()
+      const allowed = pressRule.flexible || job.press === pressRule.main || job.press === pressRule.pinned
+      if (!allowed) {
+        mainPress.fail(`${job.material} is on ${job.press}, but its main press is ${pressRule.main} and it is not flexible`)
+      }
+    }
     if (job.decision && job.endDate !== undefined && job.endMinute !== undefined) {
       earliest.check()
       const chosen = { date: job.endDate, minute: job.endMinute }
@@ -242,7 +259,7 @@ export function auditPlan(input: AuditInputs): PlanAudit {
     }
   }
 
-  const rules = [earliest, pressOverlap, maintenance, mouldTwice, mouldBlackout, crane, fillEarly, past].map(
+  const rules = [mainPress, earliest, pressOverlap, maintenance, mouldTwice, mouldBlackout, crane, fillEarly, past].map(
     (x) => x.r,
   )
   return { rules, ok: rules.every((r) => r.violationCount === 0) }

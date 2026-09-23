@@ -38,6 +38,7 @@ const emptyForm = {
   altMachine2: '',
   altMachine3: '',
   altMachine4: '',
+  flexiblePress: '',
   maxShots: '',
   qualityApprovalMinutes: '',
   performanceFactor: '',
@@ -130,6 +131,7 @@ function ReferanslarPage() {
         altMachine2: str(form.altMachine2),
         altMachine3: str(form.altMachine3),
         altMachine4: str(form.altMachine4),
+        flexiblePress: form.flexiblePress === 'yes' ? true : undefined,
         maxShots: num(form.maxShots),
         qualityApprovalMinutes: num(form.qualityApprovalMinutes),
         performanceFactor: num(form.performanceFactor),
@@ -152,6 +154,11 @@ function ReferanslarPage() {
       if (t === '' || t === '#N/A') return undefined
       const parsed = Number(t)
       return Number.isNaN(parsed) ? undefined : parsed
+    }
+    const flag = (v: unknown) => {
+      const t = String(v ?? '').trim().toLowerCase()
+      if (t === '' || t === '#n/a') return undefined
+      return ['x', 'yes', 'y', 'true', '1', 'evet', 'da'].includes(t)
     }
     const parsed = rows.map((row) => ({
       code: s(row['Material'] ?? row['Kod'] ?? row['code']) ?? '',
@@ -177,6 +184,8 @@ function ReferanslarPage() {
       altMachine2: s(row['Alternative 2'] ?? row['Alternatif Makine 2'] ?? row['altMachine2']),
       altMachine3: s(row['Alternative 3'] ?? row['Alternatif Makine 3'] ?? row['altMachine3']),
       altMachine4: s(row['Alternative 4'] ?? row['Alternatif Makine 4'] ?? row['altMachine4']),
+      // Sütun yoksa undefined kalır ve mevcut işaret korunur.
+      flexiblePress: flag(row['Flexible'] ?? row['Flexible Press'] ?? row['Esnek'] ?? row['flexiblePress']),
       maxShots: n(
         row['Max Shot'] ??
           row['Max Shots'] ??
@@ -210,8 +219,7 @@ function ReferanslarPage() {
         Material code, co-product if any, cavities, SPM, raw material and coil
         data, setup times, mold shot limit and main/alternative machines.
         Upload an Excel file to load them in bulk, then click any cell in the
-        table below to correct a value — changes save as soon as you leave the
-        cell. Gross weight is per piece, so a coil yields coil weight ÷ gross
+        table below to correct a value, then press Save on the row. Gross weight is per piece, so a coil yields coil weight ÷ gross
         weight pieces — that is the minimum lot, shown in the Pcs/coil column.
         Cavities do not change that number; they decide how many strokes it
         takes. A co-product comes out of the same grams, so it costs no extra
@@ -219,6 +227,14 @@ function ReferanslarPage() {
         (availability × performance, quality taken as 100%) sets each job's
         total window: setup and quality approval come out of that window and the
         rest is production time.
+      </p>
+
+      <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <strong>Flexible press.</strong> A part runs only on its <strong>main press</strong>{' '}
+        unless it is ticked <strong>Flexible</strong> — quality approval is usually tied to
+        one press, so the alternatives are used only for parts you mark. Ticked parts may
+        go to whichever of their presses finishes them first. The Excel upload keeps the
+        ticks unless the file has a Flexible column.
       </p>
 
       <div className="mt-6">
@@ -238,6 +254,7 @@ function ReferanslarPage() {
             'Max Shot',
             'Quality Approval',
             'Performance Factor',
+            'Flexible (optional: x / yes)',
           ]}
           onRows={handleExcelRows}
         />
@@ -265,6 +282,14 @@ function ReferanslarPage() {
           <Field label="Alternative 2" value={form.altMachine2} onChange={(v) => update('altMachine2', v)} placeholder="" />
           <Field label="Alternative 3" value={form.altMachine3} onChange={(v) => update('altMachine3', v)} placeholder="" />
           <Field label="Alternative 4" value={form.altMachine4} onChange={(v) => update('altMachine4', v)} placeholder="" />
+          <label className="flex items-center gap-2 self-end pb-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={form.flexiblePress === 'yes'}
+              onChange={(e) => update('flexiblePress', e.target.checked ? 'yes' : '')}
+            />
+            Flexible press — may run on the alternatives
+          </label>
           <Field label="Periodic maintenance limit (shots)" value={form.maxShots} onChange={(v) => update('maxShots', v)} type="number" placeholder="500000" />
           <Field label="Quality Approval (min)" value={form.qualityApprovalMinutes} onChange={(v) => update('qualityApprovalMinutes', v)} type="number" placeholder="10" />
           <Field label="Performance factor (0–1)" value={form.performanceFactor} onChange={(v) => update('performanceFactor', v)} type="number" placeholder="0.8" />
@@ -288,7 +313,8 @@ function ReferanslarPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
         <span className="text-xs text-muted-foreground">
-          {visibleProducts.length} of {products.length} materials · click any cell to edit
+          {visibleProducts.length} of {products.length} materials · click any cell to edit ·{' '}
+          {products.filter((p) => p.flexiblePress).length} flexible
         </span>
       </div>
 
@@ -317,6 +343,12 @@ function ReferanslarPage() {
               <th className="px-3 py-2 font-medium">Coil Setup</th>
               <th className="px-3 py-2 font-medium">Main Machine</th>
               <th className="px-3 py-2 font-medium">Alternatives</th>
+              <th
+                className="px-3 py-2 font-medium"
+                title="Ticked: the plan may use the alternative presses. Not ticked: always the main press (quality)."
+              >
+                Flexible
+              </th>
               <th className="px-3 py-2 font-medium" title="Shots after which periodic (heavy) maintenance is due">
                     Periodic limit
                   </th>
@@ -328,14 +360,14 @@ function ReferanslarPage() {
           <tbody>
             {status === 'LoadingFirstPage' && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={16}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={17}>
                   Loading…
                 </td>
               </tr>
             )}
             {status !== 'LoadingFirstPage' && visibleProducts.length === 0 && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={16}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={17}>
                   No materials added yet.
                 </td>
               </tr>
@@ -399,6 +431,21 @@ function ReferanslarPage() {
                         (name) => cell(field(name), 'w-20'),
                       )}
                     </div>
+                  </td>
+                  <td className="px-3 py-1 text-center">
+                    <input
+                      type="checkbox"
+                      aria-label={`Flexible press for ${p.code}`}
+                      checked={draft.flexiblePress === 'yes'}
+                      onChange={(e) =>
+                        rows.edit(rowId, { flexiblePress: e.target.checked ? 'yes' : '' })
+                      }
+                      className={
+                        draft.flexiblePress !== productDraftOf(p).flexiblePress
+                          ? 'outline outline-2 outline-amber-400'
+                          : undefined
+                      }
+                    />
                   </td>
                   <td className="px-1 py-1">{cell(field('maxShots'), 'w-20')}</td>
                   <td className="px-1 py-1">{cell(field('qualityApprovalMinutes'), 'w-20')}</td>

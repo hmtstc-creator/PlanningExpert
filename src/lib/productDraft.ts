@@ -25,6 +25,8 @@ export interface ProductDraft {
   altMachine2: string
   altMachine3: string
   altMachine4: string
+  /** 'yes' ya da '' — işaretliyse alternatif presler kullanılabilir. */
+  flexiblePress: string
   maxShots: string
   qualityApprovalMinutes: string
   performanceFactor: string
@@ -45,6 +47,7 @@ export const PRODUCT_FIELDS: ProductField[] = [
   { name: 'altMachine2', numeric: false },
   { name: 'altMachine3', numeric: false },
   { name: 'altMachine4', numeric: false },
+  { name: 'flexiblePress', numeric: false },
   { name: 'maxShots', numeric: true },
   { name: 'qualityApprovalMinutes', numeric: true },
   { name: 'performanceFactor', numeric: true },
@@ -57,6 +60,7 @@ function text(value: unknown): string {
 export function productDraftOf(product: Record<string, unknown>): ProductDraft {
   const draft = {} as ProductDraft
   for (const field of PRODUCT_FIELDS) draft[field.name] = text(product[field.name])
+  draft.flexiblePress = product.flexiblePress ? 'yes' : ''
   return draft
 }
 

@@ -55,6 +55,17 @@ describe('auditPlan catches each broken rule', () => {
     expect(broken({ ...base, jobs: [j] })).toEqual(['earliest-press'])
   })
 
+  it('a part that is not flexible running off its main press', () => {
+    const pressRules = new Map([
+      ['A', { main: '104', flexible: false }],
+      ['B', { main: '104', flexible: true }],
+      ['C', { main: '104', flexible: false, pinned: '105' }],
+    ])
+    expect(broken({ ...base, pressRules, jobs: [job('A', '105', 0, 100)] })).toEqual(['main-press'])
+    expect(broken({ ...base, pressRules, jobs: [job('B', '105', 0, 100)] })).toEqual([])
+    expect(broken({ ...base, pressRules, jobs: [job('C', '105', 0, 100)] })).toEqual([])
+  })
+
   it('two jobs on one press at once', () => {
     expect(broken({ ...base, jobs: [job('A', '104', 0, 100), job('B', '104', 90, 300)] })).toContain(
       'press-overlap',
@@ -129,6 +140,8 @@ function randomPlant(seed: number): PlanInputs {
       altMachine1: alts[0],
       altMachine2: alts[1],
       altMachine3: alts[2],
+      // Çoğu parça esnek, bazıları kalite gereği yalnız ana preste.
+      flexiblePress: r() < 0.7,
     }
   })
   const weeklyDemand = products.map((p) => ({

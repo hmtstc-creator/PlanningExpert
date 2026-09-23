@@ -967,7 +967,7 @@ function LateJobs({
                     <Link to="/takvim" className="underline">
                       Work Calendar
                     </Link>
-                    ), another press in its{' '}
+                    ), tick Flexible press or add another press in its{' '}
                     <Link to="/referanslar" className="underline">
                       master data
                     </Link>
