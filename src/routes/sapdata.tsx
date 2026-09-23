@@ -50,12 +50,13 @@ function SapDataPage() {
 
         <UploadCard
           title="Daily demand — ZPP_DAILY"
-          feeds="Net requirement per day, for the daily view of the demand page."
+          feeds="Sales day per column. The plan uses these dates for the days the file covers; the weekly ZPP only beyond them."
           view={{ to: '/siparisler', label: 'View demand' }}
         >
           <ExcelUpload
             expectedColumns={['Material', 'Stock in storage', 'Overdue Requirements', '...daily columns']}
             replaces="all daily demand rows"
+            isoDateHeaders
             onRows={async (raw) => {
               const result = await replaceDaily({ rows: parseDemandRows(raw) })
               return { message: uploadMessage('daily demand rows', result) }

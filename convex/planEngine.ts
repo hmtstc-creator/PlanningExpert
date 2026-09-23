@@ -34,7 +34,7 @@ const CHUNK_ITEMS = 4000
 
 async function readTable(
   ctx: Ctx,
-  table: 'products' | 'demandWeekly' | 'stock',
+  table: 'products' | 'demandWeekly' | 'demandDaily' | 'stock',
 ): Promise<{ rows: Ctx[]; complete: boolean }> {
   const rows: Ctx[] = []
   let cursor: string | null = null
@@ -52,20 +52,23 @@ async function readTable(
 }
 
 async function loadInputs(ctx: Ctx): Promise<PlanInputs> {
-  const [small, products, demand, stock] = await Promise.all([
+  const [small, products, demand, daily, stock] = await Promise.all([
     ctx.runQuery(internal.planRuns.smallInputs, {}),
     readTable(ctx, 'products'),
     readTable(ctx, 'demandWeekly'),
+    readTable(ctx, 'demandDaily'),
     readTable(ctx, 'stock'),
   ])
   return {
     ...small,
     products: products.rows,
     weeklyDemand: demand.rows,
+    dailyDemand: daily.rows,
     stock: stock.rows,
     truncatedInputs: [
       products.complete ? null : 'master data',
       demand.complete ? null : 'demand',
+      daily.complete ? null : 'daily demand',
       stock.complete ? null : 'stock',
     ].filter((name): name is string => name !== null),
   }

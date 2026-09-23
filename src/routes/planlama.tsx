@@ -258,6 +258,8 @@ function PlanlamaPage() {
         that is mounted is run out, so quantities are rounded up to whole coils and the
         surplus covers the following weeks rather than triggering a second coil. Materials
         with no coil or gross weight in master data are planned to the exact requirement.
+        Exception: when a whole coil would make another part late, that coil is cut to the
+        exact need (see Late jobs).
       </p>
 
       {thisWeekCapacity.full > 0 && (
@@ -312,6 +314,22 @@ function PlanlamaPage() {
           Frozen days are set to {globalFrozenDays}, but no plan has been
           approved yet, so there is nothing to freeze. Approve a plan once and
           the near term will stop moving.
+        </p>
+      )}
+
+      {run && (run.lateRepair?.rounds ?? 0) > 0 && (
+        <LateJobs
+          run={run}
+          jobs={engineJobs.filter((j) => j.late)}
+          shiftMinutes={shiftMinutes}
+          shiftStartMinute={shiftStartMinute}
+        />
+      )}
+
+      {run?.dailyUntil && (
+        <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+          Sales days come from <strong className="text-foreground">ZPP_DAILY</strong> up to{' '}
+          {run.dailyUntil}; after that the weekly ZPP is spread over working days.
         </p>
       )}
 
@@ -859,6 +877,110 @@ const CHANGE_STYLE: Record<string, string> = {
   moved: 'rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900',
   quantity: 'rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900',
   same: 'text-xs text-muted-foreground',
+}
+
+/**
+ * Geç işler: stok bittikten sonra başlayan iş müşteriyi durdurur. Motor bunu
+ * bırakmadan önce planı yeniden kurar; burada ne denendiği ve kalan her geç
+ * iş için ne yapılabileceği yazar.
+ */
+function LateJobs({
+  run,
+  jobs,
+  shiftMinutes,
+  shiftStartMinute,
+}: {
+  run: PlanRun
+  jobs: PlanRun['jobs']
+  shiftMinutes: number
+  shiftStartMinute: number
+}) {
+  const repair = run.lateRepair
+  const fixed = repair.lateBefore - repair.lateAfter
+  const dayName = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+    })
+  const daysLate = (start: string, due: string) =>
+    Math.max(0, Math.round((Date.parse(start) - Date.parse(due)) / 86_400_000))
+  return (
+    <div
+      className={`mt-6 rounded-lg border p-4 ${
+        jobs.length > 0 ? 'border-destructive bg-destructive/10' : 'border-emerald-200 bg-emerald-50/60'
+      }`}
+    >
+      <h2 className="text-sm font-semibold text-foreground">
+        {jobs.length > 0
+          ? `Late jobs — ${jobs.length} would stop the customer`
+          : 'Late jobs — none left'}
+      </h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        The first plan had {repair.lateBefore} job(s) starting after their stock runs
+        out. The engine re-planned {repair.rounds} time(s)
+        {repair.boosted.length > 0 && `: moved ${repair.boosted.length} part(s) forward`}
+        {repair.trimmed.length > 0 &&
+          `, cut the surplus coil of ${repair.trimmed.length} part(s) to the exact need`}
+        . Every moved job tried all of its presses again.{' '}
+        {fixed > 0 ? `${fixed} fixed` : 'None could be fixed this way'}
+        {jobs.length > 0 ? `, ${jobs.length} still late.` : '.'}
+        {repair.trimmed.length > 0 && (
+          <> Cut coils: {repair.trimmed.slice(0, 8).join(', ')}{repair.trimmed.length > 8 ? '…' : ''}.</>
+        )}
+      </p>
+      {jobs.length > 0 && (
+        <div className="mt-3 overflow-x-auto rounded-md border border-destructive/30 bg-background">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-destructive/10 text-destructive">
+              <tr>
+                <th className="px-3 py-2 font-medium">Material</th>
+                <th className="px-3 py-2 font-medium">Stock runs out</th>
+                <th className="px-3 py-2 font-medium">Starts</th>
+                <th className="px-3 py-2 font-medium">Late</th>
+                <th className="px-3 py-2 font-medium">Presses tried (finish)</th>
+                <th className="px-3 py-2 font-medium">What would fix it</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.map((j, i) => (
+                <tr key={`${j.material}-${i}`} className="border-t border-border align-top">
+                  <td className="px-3 py-2 font-medium text-foreground">{j.material}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{dayName(j.dueDate)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
+                    {dayName(j.date)} on {j.press}
+                  </td>
+                  <td className="px-3 py-2 font-medium text-destructive">
+                    {daysLate(j.date, j.dueDate)} day(s)
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    <DecisionCell
+                      decision={j.decision}
+                      chosen={j.press}
+                      shiftMinutes={shiftMinutes}
+                      shiftStartMinute={shiftStartMinute}
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    Capacity on {j.press} before {dayName(j.dueDate)}: an overtime or
+                    weekend shift (
+                    <Link to="/takvim" className="underline">
+                      Work Calendar
+                    </Link>
+                    ), another press in its{' '}
+                    <Link to="/referanslar" className="underline">
+                      master data
+                    </Link>
+                    , or move a less urgent part off {j.press} (Plan overrides).
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
 }
 
 /**

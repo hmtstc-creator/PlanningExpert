@@ -526,6 +526,7 @@ export function schedule(
   const ordered = [...demand].sort(
     (a, b) =>
       Number(!prioritised.has(a.material)) - Number(!prioritised.has(b.material)) ||
+      Number(!a.boost) - Number(!b.boost) ||
       phaseOrder(a.phase) - phaseOrder(b.phase) ||
       a.dueDate.localeCompare(b.dueDate) ||
       b.urgency - a.urgency ||
@@ -1223,6 +1224,8 @@ function placeRun(
   if (spansDays) reasonParts.push(`continues until ${best.endDate}`)
   if (late) reasonParts.push(`⚠ starts after the stock runs out (${entry.dueDate})`)
   if (pinned) reasonParts.push('pinned by user')
+  if (entry.boost) reasonParts.push('moved forward so it is not late')
+  if (entry.exactLot) reasonParts.push('exact quantity — coil not run out, so another job is not late')
 
   const setupEnd = locate(timeline, best.startGlobal + (sameMaterial ? 0 : run.setupMinutes))
   const qualityEnd = locate(timeline, best.qualityEndGlobal)

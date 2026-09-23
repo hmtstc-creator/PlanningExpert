@@ -65,7 +65,7 @@ export const smallInputs = internalQuery({
   },
 })
 
-const BIG_TABLES = ['products', 'demandWeekly', 'stock'] as const
+const BIG_TABLES = ['products', 'demandWeekly', 'demandDaily', 'stock'] as const
 
 /**
  * Büyük tablolar sayfa sayfa. Sayfanın eski `listAll` sorgusu 8000 satırda

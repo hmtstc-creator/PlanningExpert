@@ -128,6 +128,7 @@ function PlanLogicPage() {
         <Table
           rows={[
             ['Demand', 'ZPP weekly net requirements and the overdue quantity', '/sapdata'],
+            ['Sales days', 'ZPP_DAILY: one column per day — the day each quantity is sold', '/sapdata'],
             [
               'Stock',
               'MB52 unrestricted stock. Only finished goods and production area locations count as stock; raw material locations are used for the coil check',
@@ -162,11 +163,17 @@ function PlanLogicPage() {
             produced.
           </li>
           <li>
-            <b>Timing — projected stock.</b> Each week's demand is spread
-            evenly over that week's working days (this week: only the days
-            that are left); the backlog is due today. Walking day by day, the
-            engine finds the day the stock — plus every lot planned before —
-            would drop below zero. That is the lot's <b>stock-out day</b>.
+            <b>Sales days — ZPP_DAILY.</b> For every day the ZPP_DAILY file
+            covers, demand falls on the exact date in the file: 5 000 shipped
+            on Wednesday is 5 000 on Wednesday, not 1 000 a day. Beyond the
+            file's last day, the weekly ZPP is spread evenly over the working
+            days (a partly covered week gets the rest of its weekly total on
+            the uncovered days). The backlog is due today.
+          </li>
+          <li>
+            <b>Timing — projected stock.</b> Walking day by day, the engine
+            finds the day the stock — plus every lot planned before — would
+            drop below zero. That is the lot's <b>stock-out day</b>.
           </li>
           <li>
             <b>Safety stock.</b> The lot may start{' '}
@@ -331,7 +338,12 @@ function PlanLogicPage() {
       <Step n={7} id="check" title="Check and report">
         <ul>
           <li>
-            A job that starts after its stock-out day is marked <b>late</b>.
+            A job that starts after its stock-out day is <b>late</b>: the
+            customer would stop. The engine does not leave it — see{' '}
+            <a href="#late" className="underline">
+              Late jobs are re-planned
+            </a>
+            .
           </li>
           <li>
             What does not fit anywhere goes to <b>Unplanned</b>, with the
@@ -348,6 +360,39 @@ function PlanLogicPage() {
           </li>
         </ul>
       </Step>
+
+      <section id="late" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <h2 className="text-sm font-semibold text-amber-950">Late jobs are re-planned</h2>
+        <p className="mt-1 text-sm text-amber-900">
+          A job that starts after its stock runs out means the customer stops —
+          your own safety stock is the only margin. So a late job is never just
+          reported; the engine plans again, up to four rounds:
+        </p>
+        <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-amber-900">
+          <li>
+            <b>Move the late lot forward</b>, ahead of everything except your own
+            "move to front" rules. It then tries every eligible press again, so
+            an alternative press that is free earlier is found.
+          </li>
+          <li>
+            <b>Cut surplus coils in front of it.</b> Parts placed earlier on the
+            same presses that press a whole coil for a small need are cut to
+            the exact need for this plan — the coil is not run out, so the late
+            part gets the press sooner. The job says so in its reason.
+          </li>
+          <li>
+            <b>Keep the best plan</b>: fewest unplanned, then fewest late jobs,
+            then fewest late days, then fewest changes. If a round does not
+            improve the plan, it stops.
+          </li>
+        </ol>
+        <p className="mt-2 text-sm text-amber-900">
+          Whatever is still late is listed at the top of the Production Plan in
+          red, with the presses that were tried and what would fix it —
+          usually capacity: an overtime or weekend shift, or another press in
+          the part's master data.
+        </p>
+      </section>
 
       <section className="mt-8 rounded-lg border border-border p-4">
         <h2 className="text-sm font-semibold text-foreground">When is it recalculated?</h2>
@@ -469,8 +514,16 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
             all the items that follow.
           </Box>
           <Down label="back to 3 with the next item, until the list is empty" />
-          <Box tone="border-destructive/40 bg-destructive/10 text-foreground" title="No press has room → Unplanned">
-            With the reason and the presses that were tried.
+          <Box tone="border-amber-300 bg-amber-50 text-amber-950" title="6 · Anything late? → plan again">
+            A job that starts after its stock runs out stops the customer. Late
+            lots are moved to the front (they try every press again); if that
+            is not enough, surplus coils placed before them on the same presses
+            are cut to the exact need. Up to 4 rounds; the best plan is kept.
+          </Box>
+          <Down label="whatever is still late or does not fit" />
+          <Box tone="border-destructive/40 bg-destructive/10 text-foreground" title="Late jobs / Unplanned">
+            Shown in red on the Production Plan with the presses tried and
+            what would fix it.
           </Box>
         </div>
 
@@ -543,7 +596,8 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
               the engine plans 40 randomly generated plants (progressive and
               transfer halls, single and shared parts, maintenance, stops) and
               the same checks must find zero broken rules. Your 104/105 case and
-              your 1 000 / 2 000 / 6 000 coil case are tests too.
+              your 1 000 / 2 000 / 6 000 coil case, the Wednesday sales day and
+              the late-job repairs are tests too.
             </li>
           </ol>
         </div>
@@ -566,9 +620,13 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
               presses — keep the row order of the ZPP file.
             </li>
             <li>
-              ZPP gives weekly totals, so the engine spreads a week evenly over
-              its working days. An order due on Wednesday is treated as 1/5 per
-              day. ZPP_DAILY could give the exact day for the first weeks.
+              After the last day in ZPP_DAILY, only weekly totals exist, so
+              those weeks are spread evenly over their working days.
+            </li>
+            <li>
+              Re-planning to remove late jobs is a set of trials, not a full
+              search: if 4 rounds cannot remove a late job, the fix is capacity
+              (overtime, another press) — the plan says so.
             </li>
             <li>
               Between an approved plan and the next MB52 upload, the engine

@@ -10,9 +10,15 @@ interface ExcelUploadProps {
    * yanlış dosya tek tıkla bütün veriyi siliyordu.
    */
   replaces?: string
+  /**
+   * Başlık satırındaki tarih hücrelerini YYYY-MM-DD metnine çevir. ZPP_DAILY
+   * gibi her sütunu bir gün olan dosyalar için: Excel tarihi yerel biçimde
+   * (9/16/26 ya da 16.09.2026) gösterir, gün/ay sırası belirsiz kalır.
+   */
+  isoDateHeaders?: boolean
 }
 
-export function ExcelUpload({ expectedColumns, onRows, replaces }: ExcelUploadProps) {
+export function ExcelUpload({ expectedColumns, onRows, replaces, isoDateHeaders }: ExcelUploadProps) {
   const [status, setStatus] = useState<
     { kind: 'idle' } | { kind: 'loading' } | { kind: 'success'; message: string } | { kind: 'error'; message: string }
   >({ kind: 'idle' })
@@ -38,6 +44,7 @@ export function ExcelUpload({ expectedColumns, onRows, replaces }: ExcelUploadPr
       const firstSheetName = workbook.SheetNames[0]
       if (!firstSheetName) throw new Error('No sheet found in the Excel file.')
       const sheet = workbook.Sheets[firstSheetName]
+      if (isoDateHeaders) isoHeaderDates(sheet)
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
         defval: '',
       })
@@ -83,4 +90,27 @@ export function ExcelUpload({ expectedColumns, onRows, replaces }: ExcelUploadPr
       )}
     </div>
   )
+}
+
+/** Başlık satırındaki tarih hücrelerini ISO metnine çevirir. */
+function isoHeaderDates(sheet: XLSX.WorkSheet) {
+  const ref = sheet['!ref']
+  if (!ref) return
+  const range = XLSX.utils.decode_range(ref)
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c })] as XLSX.CellObject | undefined
+    if (!cell) continue
+    const isDate =
+      cell.t === 'd' || (cell.t === 'n' && typeof cell.z === 'string' && XLSX.SSF.is_date(cell.z))
+    if (!isDate) continue
+    const parsed =
+      cell.t === 'd' && cell.v instanceof Date
+        ? { y: cell.v.getFullYear(), m: cell.v.getMonth() + 1, d: cell.v.getDate() }
+        : XLSX.SSF.parse_date_code(Number(cell.v))
+    if (!parsed) continue
+    const iso = `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`
+    cell.w = iso
+    cell.t = 's'
+    cell.v = iso
+  }
 }

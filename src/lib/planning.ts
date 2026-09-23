@@ -1,4 +1,5 @@
 import { addDays, isoDate } from './dates'
+import { splitWeek } from './dailyDemand'
 
 // Planlama motorunun saf hesaplama katmanı.
 // Buradaki fonksiyonlar Convex'ten veya React'ten bağımsızdır; girdi olarak
@@ -61,6 +62,11 @@ export interface DemandInput {
   periods: { label: string; qty: number }[]
   /** Planlamaya dahil depolardaki (Mamul + Üretim Alanı) mevcut stok. */
   stock: number
+  /**
+   * ZPP_DAILY'den satış günleri (ISO tarih, mutlak adet). Varsa kapsadığı
+   * günlerde haftalık rakamın yerine geçer.
+   */
+  daily?: { date: string; qty: number }[]
 }
 
 /**
@@ -86,6 +92,10 @@ export interface DemandEntry {
   phase: 'backlog' | 'urgent' | 'fill'
   urgency: number
   daysOfCover: number
+  /** Geç kalmasın diye öne alındı (geç iş onarımı). */
+  boost?: boolean
+  /** Rulo sonuna kadar basılmıyor: ihtiyaç kadar, geç iş olmasın diye. */
+  exactLot?: boolean
 }
 
 export interface DemandScheduleOptions {
@@ -106,6 +116,46 @@ export interface DemandScheduleOptions {
   today?: string
   /** Talebin tüketildiği günler (varsayılan Pazartesi–Cuma). */
   workingDayKeys?: string[]
+  /** ZPP_DAILY'nin kapsadığı son gün (ISO); yoksa günlük veri kullanılmaz. */
+  dailyUntil?: string | null
+  /**
+   * Bu malzemeler tam ruloya yuvarlanmaz, ihtiyaç kadar üretilir. Geç iş
+   * onarımı kullanır: ihtiyaç fazlası rulo, başka bir parçayı geç
+   * bırakıyorsa kırpılır.
+   */
+  exactLotMaterials?: Set<string>
+}
+
+/** Talep takvimi: bugün ve ufuktaki her haftanın açık (talep alan) günleri. */
+interface DemandCalendar {
+  today: string
+  weeks: { start: string; end: string; openDays: string[] }[]
+  workingDays: Set<string>
+}
+
+function demandCalendar(options: DemandScheduleOptions): DemandCalendar {
+  const horizonWeeks = options.horizonWeeks ?? 4
+  const workingKeys = new Set(options.workingDayKeys ?? ['MO', 'TU', 'WE', 'TH', 'FR'])
+  const baseIso = isoDate(options.baseMonday)
+  const today = options.today && options.today > baseIso ? options.today : baseIso
+  const weeks: DemandCalendar['weeks'] = []
+  const workingDays = new Set<string>()
+  for (let w = 0; w < horizonWeeks; w++) {
+    const openDays: string[] = []
+    for (let d = 0; d < 7; d++) {
+      const date = addDays(options.baseMonday, w * 7 + d)
+      if (!workingKeys.has(DAY_KEYS[(date.getDay() + 6) % 7])) continue
+      const iso = isoDate(date)
+      workingDays.add(iso)
+      if (iso >= today) openDays.push(iso)
+    }
+    weeks.push({
+      start: isoDate(addDays(options.baseMonday, w * 7)),
+      end: isoDate(addDays(options.baseMonday, w * 7 + 6)),
+      openDays,
+    })
+  }
+  return { today, weeks, workingDays }
 }
 
 /**
@@ -132,9 +182,30 @@ export function buildDemandSchedule(
 
   // malzeme → hafta indeksi → kalem
   const entriesByMaterial = new Map<string, DemandEntry[]>()
+  const calendar = demandCalendar(options)
+  // malzeme → gün → talep (stok projeksiyonu için)
+  const dayDemand = new Map<string, Map<string, number>>()
 
   for (const row of rows) {
-    const periods = row.periods.map((p) => ({ label: p.label, qty: Math.abs(p.qty) }))
+    const weeklyPeriods = row.periods.map((p) => ({ label: p.label, qty: Math.abs(p.qty) }))
+    // Haftalık rakam, ZPP_DAILY'nin kapsadığı günlerde günlük dosyayla
+    // değiştirilir: satış günü orada yazan gündür.
+    const perDay = new Map<string, number>()
+    if (Math.abs(row.overdue) > 0) perDay.set(calendar.today, Math.abs(row.overdue))
+    const periods = calendar.weeks.map((week, w) => {
+      const split = splitWeek({
+        weekStart: week.start,
+        weekEnd: week.end,
+        weeklyQty: weeklyPeriods[w]?.qty ?? 0,
+        today: calendar.today,
+        openDays: week.openDays,
+        daily: row.daily,
+        dailyUntil: options.dailyUntil ?? null,
+      })
+      for (const [date, qty] of split.perDay) perDay.set(date, (perDay.get(date) ?? 0) + qty)
+      return { label: weeklyPeriods[w]?.label ?? `+${w}w`, qty: split.total }
+    })
+    dayDemand.set(row.material, perDay)
     const weeklyAvg =
       periods.length > 0 ? periods.reduce((s, p) => s + p.qty, 0) / periods.length : 0
     const dailyRate = weeklyAvg > 0 ? weeklyAvg / workingDaysPerWeek : 0
@@ -234,10 +305,10 @@ export function buildDemandSchedule(
   // Rulo lotu: bağlanan rulo sonuna kadar basılır, bu yüzden ihtiyaç tam
   // ruloya yuvarlanır ve fazlası EN ERKEN kaleme eklenir — rulo tek seferde
   // bitirilir, haftaya bölünmez.
-  roundMaterialsToCoilLot(entriesByMaterial, products, pairedWith)
+  roundMaterialsToCoilLot(entriesByMaterial, products, pairedWith, options.exactLotMaterials)
 
   // Lotların ZAMANI: haftanın başı değil, öngörülen stoğun bittiği gün.
-  timeLotsByProjectedStock(entriesByMaterial, rows, options, pairedWith)
+  timeLotsByProjectedStock(entriesByMaterial, rows, options, pairedWith, calendar, dayDemand)
 
   return Array.from(entriesByMaterial.values())
     .flat()
@@ -270,30 +341,32 @@ function timeLotsByProjectedStock(
   rows: DemandInput[],
   options: DemandScheduleOptions,
   pairedWith: Map<string, string>,
+  calendar: DemandCalendar,
+  dayDemand: Map<string, Map<string, number>>,
 ): void {
-  const horizonWeeks = options.horizonWeeks ?? 4
   const safetyDays = Math.max(0, Math.round(options.safetyStockDays ?? 0))
-  const workingKeys = new Set(options.workingDayKeys ?? ['MO', 'TU', 'WE', 'TH', 'FR'])
-  const baseIso = isoDate(options.baseMonday)
-  const today = options.today && options.today > baseIso ? options.today : baseIso
+  const today = calendar.today
 
-  // Talebin tüketildiği günler: bugün (her zaman) + ufuktaki sonraki iş günleri.
-  const days: string[] = [today]
-  const weekDays: string[][] = []
-  for (let w = 0; w < horizonWeeks; w++) {
-    const list: string[] = []
-    for (let d = 0; d < 7; d++) {
-      const date = addDays(options.baseMonday, w * 7 + d)
-      const iso = isoDate(date)
-      if (!workingKeys.has(DAY_KEYS[(date.getDay() + 6) % 7])) continue
-      if (iso < today) continue
-      list.push(iso)
-      if (iso > today) days.push(iso)
-    }
-    // Haftanın hiç kalan iş günü yoksa talebi bugün tüketilmiş say.
-    weekDays.push(list.length > 0 ? list : [today])
+  // Talebin tüketildiği günler: bugün + ufuktaki iş günleri + ZPP_DAILY'de
+  // satış olan her gün (Cumartesi sevkiyat da olabilir).
+  const daySet = new Set<string>([today])
+  for (const week of calendar.weeks) for (const d of week.openDays) daySet.add(d)
+  for (const perDay of dayDemand.values()) {
+    for (const d of perDay.keys()) if (d >= today) daySet.add(d)
   }
+  const days = Array.from(daySet).sort()
   const dayIndex = new Map(days.map((d, i) => [d, i]))
+  // Emniyet günleri iş günü sayılır; bugün her zaman sayılır.
+  const counts = days.map((d, i) => i === 0 || calendar.workingDays.has(d))
+  const backBy = (from: number, n: number) => {
+    let i = from
+    let left = n
+    while (left > 0 && i > 0) {
+      i -= 1
+      if (counts[i]) left -= 1
+    }
+    return i
+  }
 
   const rowByMaterial = new Map(rows.map((r) => [r.material, r]))
 
@@ -310,14 +383,8 @@ function timeLotsByProjectedStock(
 
     // Günlük brüt talep.
     const demand = new Array<number>(days.length).fill(0)
-    if (row) {
-      demand[0] += Math.abs(row.overdue)
-      row.periods.slice(0, horizonWeeks).forEach((period, w) => {
-        const qty = Math.abs(period.qty)
-        if (qty <= 0) return
-        const spread = weekDays[w]
-        for (const date of spread) demand[dayIndex.get(date) ?? 0] += qty / spread.length
-      })
+    for (const [date, qty] of dayDemand.get(material) ?? []) {
+      demand[dayIndex.get(date < today ? today : date) ?? 0] += qty
     }
 
     let supply = row?.stock ?? 0
@@ -337,7 +404,7 @@ function timeLotsByProjectedStock(
       // haftasına bağlı kalır, ama emniyet günü yine uygulanır.
       const due =
         stockout >= 0 ? stockout : (dayIndex.get(lot.dueDate) ?? nextIndex(days, lot.dueDate))
-      timing.set(key(material, lot.dueDate), { due, start: Math.max(0, due - safetyDays) })
+      timing.set(key(material, lot.dueDate), { due, start: backBy(due, safetyDays) })
     }
   }
 
@@ -422,6 +489,7 @@ function roundMaterialsToCoilLot(
   entriesByMaterial: Map<string, DemandEntry[]>,
   products: Map<string, ProductSpec>,
   pairedWith: Map<string, string>,
+  exact?: Set<string>,
 ): void {
   const done = new Set<string>()
 
@@ -430,6 +498,16 @@ function roundMaterialsToCoilLot(
     const partner = pairedWith.get(material)
     done.add(material)
     if (partner) done.add(partner)
+
+    // İhtiyaç kadar: rulo kuralı bu malzeme için bu hesapta uygulanmaz.
+    if (exact && (exact.has(material) || (partner && exact.has(partner)))) {
+      for (const m of partner ? [material, partner] : [material]) {
+        const spec = products.get(m)
+        if (!spec || piecesPerCoil(spec) <= 0) continue
+        for (const e of entriesByMaterial.get(m) ?? []) if (e.qty > 0) e.exactLot = true
+      }
+      continue
+    }
 
     const own = entriesByMaterial.get(material) ?? []
     const other = partner ? (entriesByMaterial.get(partner) ?? []) : []

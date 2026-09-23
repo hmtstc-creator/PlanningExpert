@@ -12,6 +12,7 @@
 import { addDays, DEFAULT_PLANT_TIME_ZONE, isoDate, mondayOf, plantClock } from './dates'
 import {
   buildDemandSchedule,
+  piecesPerCoil,
   buildRawMaterialPlan,
   buildWeekBuckets,
   materialsMissingRawSpec,
@@ -35,6 +36,7 @@ import {
 } from './maintenance'
 import { alarmedMaterials } from './moldAlarm'
 import { auditPlan, type PlanAudit } from './planAudit'
+import { readDailyDemand } from './dailyDemand'
 import {
   schedule,
   type PlanOverride,
@@ -92,6 +94,8 @@ export interface PlanSettings {
 export interface PlanInputs {
   products: (ProductSpec & { maxShots?: number })[]
   weeklyDemand: { material: string; overdue?: number; periods: DemandInput['periods'] }[]
+  /** ZPP_DAILY satırları — her sütun bir satış günü. Yoksa boş. */
+  dailyDemand?: { material: string; periods: DemandInput['periods'] }[]
   stock: {
     material: string
     storageLocation?: string
@@ -148,6 +152,16 @@ export interface PlanRun {
   capacityFactor: number
   globalFrozenDays: number
   safetyStockDays: number
+  /** Geç iş onarımı: kaç tur, önce/sonra geç iş, öne alınan ve kırpılan parçalar. */
+  lateRepair: {
+    rounds: number
+    lateBefore: number
+    lateAfter: number
+    boosted: string[]
+    trimmed: string[]
+  }
+  /** ZPP_DAILY'nin kapsadığı son gün; bu güne kadar satış günleri esas. */
+  dailyUntil: string | null
   /** Son stok yüklemesinden beri üretilmiş sayılan onaylı iş. */
   producedSinceStock: { quantity: number; jobs: number; stockDay: string }
   presses: { name: string; hall: string; category?: string }[]
@@ -277,23 +291,31 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     }
   }
 
-  const demand = buildDemandSchedule(
-    inputs.weeklyDemand.map((d) => ({
-      material: d.material,
-      overdue: d.overdue ?? 0,
-      periods: d.periods,
-      stock: (stockByMaterial.get(d.material) ?? 0) + (committedByMaterial.get(d.material) ?? 0),
-    })),
-    productByCode,
-    {
+  // ZPP_DAILY: kapsadığı günlerde satış günü oradaki tarihtir.
+  const daily = readDailyDemand(inputs.dailyDemand ?? [])
+  const weeklyByMaterial = new Map(inputs.weeklyDemand.map((d) => [d.material, d]))
+  const materials = new Set<string>([...weeklyByMaterial.keys(), ...daily.byMaterial.keys()])
+
+  const demandRows: DemandInput[] = 
+    Array.from(materials).map((material) => {
+      const d = weeklyByMaterial.get(material)
+      return {
+        material,
+        overdue: d?.overdue ?? 0,
+        periods: d?.periods ?? [],
+        daily: daily.byMaterial.get(material),
+        stock: (stockByMaterial.get(material) ?? 0) + (committedByMaterial.get(material) ?? 0),
+      }
+    })
+  const demandOptions = {
       baseMonday: horizonMonday,
       horizonWeeks,
       workingDaysPerWeek,
       workingDayKeys,
       today: todayIso,
       safetyStockDays,
-    },
-  )
+      dailyUntil: daily.until,
+    }
 
   // ---- Kapasite kovaları ---------------------------------------------------
   const templateByPress = new Map(templates.map((t) => [t.press, t]))
@@ -369,7 +391,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     date: o.date,
   }))
 
-  const result = schedule(demand, productByCode, presses, buckets, { shiftMinutes, overtimeShiftMinutes }, {
+  const scheduleOptions = {
     setupGapMinutes,
     coilSetupGapMinutes,
     concurrentSetupsPerHall,
@@ -395,7 +417,103 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       })),
     ],
     shiftNetMinutes: stopMinutesByShift.map((stopped) => Math.max(1, shiftMinutes - stopped)),
-  })
+  }
+
+  // ---- Planla; geç iş kalırsa yeniden planla -----------------------------
+  //
+  // Geç iş = stok bittikten sonra başlayan iş: müşteri durur. Bırakılmaz;
+  // motor planı yeniden kurar. Her turda:
+  //  1. geç kalan lotlar öne alınır — sıra değişince her lot yine TÜM
+  //     uygun presleri dener, yani alternatif pres senaryoları da denenir;
+  //  2. aynı preslerde geç işten önce yerleşmiş ve rulo yüzünden ihtiyaç
+  //     fazlası basan parçaların lotu ihtiyaç kadara indirilir.
+  // En az plansız, sonra en az geç iş, sonra en az geç gün, sonra en az
+  // değişiklik yapan plan seçilir. Hiçbir deneme daha iyi değilse durulur.
+  const lotKey = (e: { material: string; bucketLabel: string }) => `${e.material}|${e.bucketLabel}`
+  const planOnce = (boost: Set<string>, exact: Set<string>) => {
+    const demand = buildDemandSchedule(demandRows, productByCode, {
+      ...demandOptions,
+      exactLotMaterials: exact,
+    })
+    for (const entry of demand) if (boost.has(lotKey(entry))) entry.boost = true
+    return schedule(
+      demand,
+      productByCode,
+      presses,
+      buckets,
+      { shiftMinutes, overtimeShiftMinutes },
+      scheduleOptions,
+    )
+  }
+  const dayMs = 86_400_000
+  const lateDays = (j: ScheduledJob) =>
+    Math.max(0, Math.round((Date.parse(j.date) - Date.parse(j.dueDate)) / dayMs))
+  const score = (r: ReturnType<typeof schedule>, changes: number) => {
+    const late = r.jobs.filter((j) => j.late)
+    return [r.unplanned.length, late.length, late.reduce((a, j) => a + lateDays(j), 0), changes]
+  }
+  const better = (a: number[], b: number[]) => {
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i]
+    return false
+  }
+
+  let best = {
+    result: planOnce(new Set(), new Set()),
+    boost: new Set<string>(),
+    exact: new Set<string>(),
+  }
+  let bestScore = score(best.result, 0)
+  const lateBefore = best.result.jobs.filter((j) => j.late).length
+  let rounds = 0
+  for (let round = 0; round < 4; round++) {
+    const late = best.result.jobs.filter((j) => j.late)
+    if (late.length === 0) break
+    rounds += 1
+    const boost = new Set(best.boost)
+    const exact = new Set(best.exact)
+    for (const lj of late) {
+      boost.add(lotKey(lj))
+      const product = productByCode.get(lj.material)
+      const eligible = new Set(
+        [
+          product?.mainMachine,
+          product?.altMachine1,
+          product?.altMachine2,
+          product?.altMachine3,
+          product?.altMachine4,
+        ]
+          .map((m) => m?.trim())
+          .filter((m): m is string => !!m),
+      )
+      for (const j of best.result.jobs) {
+        if (j.material === lj.material || !eligible.has(j.press) || j.date > lj.date) continue
+        const spec = productByCode.get(j.material)
+        if (spec && piecesPerCoil(spec) > 0) exact.add(j.material)
+      }
+    }
+    let improved = false
+    for (const trial of [
+      { boost, exact: best.exact },
+      { boost, exact },
+    ]) {
+      const result = planOnce(trial.boost, trial.exact)
+      const trialScore = score(result, trial.boost.size + trial.exact.size)
+      if (better(trialScore, bestScore)) {
+        best = { result, boost: trial.boost, exact: trial.exact }
+        bestScore = trialScore
+        improved = true
+      }
+    }
+    if (!improved) break
+  }
+  const result = best.result
+  const lateRepair = {
+    rounds,
+    lateBefore,
+    lateAfter: result.jobs.filter((j) => j.late).length,
+    boosted: Array.from(new Set(Array.from(best.boost).map((k) => k.split('|')[0]))).sort(),
+    trimmed: Array.from(best.exact).sort(),
+  }
 
   // Dondurulmuş işler motorun çıktısında yok ama sahada yapılacaklar.
   const approvedOn = snapshot ? isoDate(plantClock(snapshot.createdAt, timeZone)) : ''
@@ -498,6 +616,18 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     todayIso,
   })
 
+  if (daily.unreadable.length > 0 && daily.byMaterial.size > 0) {
+    warnings.push(
+      `${daily.unreadable.length} ZPP_DAILY column(s) are not dates and were ignored: ` +
+        `${daily.unreadable.slice(0, 4).join(', ')}${daily.unreadable.length > 4 ? '…' : ''}.`,
+    )
+  }
+  if ((inputs.dailyDemand?.length ?? 0) > 0 && !daily.until) {
+    warnings.push(
+      'ZPP_DAILY is uploaded but none of its column headers could be read as dates — ' +
+        'the plan uses the weekly ZPP only. Check the file on the SAP Data page.',
+    )
+  }
   if (producedSinceStock.jobs > 0) {
     warnings.push(
       `${producedSinceStock.jobs} approved job(s) (${Math.round(producedSinceStock.quantity).toLocaleString('en-GB')} pcs) ` +
@@ -535,6 +665,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     globalFrozenDays,
     safetyStockDays,
     producedSinceStock,
+    dailyUntil: daily.until,
+    lateRepair,
     presses: presses.map((p) => ({ name: p.name, hall: p.hall, category: p.category })),
     plannedStops: plannedStops.map((p) => ({
       shiftIndex: p.shiftIndex,
@@ -596,7 +728,8 @@ function buildWarnings(ctx: {
     )
   if (ctx.lateCount > 0)
     list.push(
-      `${ctx.lateCount} jobs are scheduled after the week they are needed — capacity is short.`,
+      `${ctx.lateCount} job(s) start after their stock runs out — the customer would stop. ` +
+        `The engine re-planned and could not avoid it; see "Late jobs" below for what to change.`,
     )
   if (ctx.missingRawSpec > 0)
     list.push(
