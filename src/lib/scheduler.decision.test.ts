@@ -92,4 +92,32 @@ describe('placement decision', () => {
       note: 'no working time in the horizon',
     })
   })
+
+  it('places the part with fewer eligible presses first when the priority is equal', () => {
+    // X 104 veya 105'te, Y yalnızca 104'te yapılabilir. İkisi de bakiye ve
+    // dosyada X önce geliyor. X önce yerleşseydi 104'ü alır, Y onun arkasına
+    // düşerdi. Tek presli Y önce yerleşir, X 105'e gider.
+    const products = new Map([
+      ['X', product('X', '104', '105')],
+      ['Y', product('Y', '104')],
+    ])
+    const result = schedule(
+      [backlog('X', 1000), backlog('Y', 1000)],
+      products,
+      [
+        { name: '104', hall: 'H1' },
+        { name: '105', hall: 'H2' },
+      ],
+      buckets(['104', '105']),
+      settings,
+      { setupGapMinutes: 60, concurrentSetupsPerHall: 1 },
+    )
+    const x = result.jobs.find((j) => j.material === 'X')!
+    const y = result.jobs.find((j) => j.material === 'Y')!
+    expect(y.decision?.step).toBe(1)
+    expect(y.press).toBe('104')
+    expect(x.press).toBe('105')
+    expect(x.setupStartMinute).toBe(0)
+    expect(y.setupStartMinute).toBe(0)
+  })
 })

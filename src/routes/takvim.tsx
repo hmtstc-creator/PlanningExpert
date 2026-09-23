@@ -2,6 +2,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport'
 import { useEffect, useMemo, useState } from 'react'
 
+import { DEFAULT_SAFETY_STOCK_DAYS } from '../lib/planPipeline'
+
 import { api } from '../../convex/_generated/api'
 import { addDays, isoDate, mondayOf } from '../lib/dates'
 import { useSyncedFields } from '../lib/useSyncedFields'
@@ -158,6 +160,8 @@ function PressCalendarSection() {
   const [breakMinutesPerShift, setBreakMinutesPerShift] = useState(0)
   // Planın ilk kaç günü dondurulsun — presin kendi değeri yoksa bu geçerli.
   const [frozenDays, setFrozenDays] = useState(0)
+  // Emniyet stoğu (iş günü): sonraki lot stok bitmeden bu kadar önce başlar.
+  const [safetyStockDays, setSafetyStockDays] = useState(DEFAULT_SAFETY_STOCK_DAYS)
   // Sunucu değerlerini forma yalnızca sunucuda değiştiklerinde yansıt.
   // Aksi halde sorgu her tazelendiğinde kullanıcının yazdığı değer siliniyor.
   useSyncedFields(
@@ -173,6 +177,7 @@ function PressCalendarSection() {
           planningHorizonWeeks: globalSettings.planningHorizonWeeks ?? 4,
           breakMinutesPerShift: globalSettings.breakMinutesPerShift ?? 0,
           frozenDays: globalSettings.frozenDays ?? 0,
+          safetyStockDays: globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS,
         }
       : undefined,
     {
@@ -186,6 +191,7 @@ function PressCalendarSection() {
       planningHorizonWeeks: setPlanningHorizonWeeks,
       breakMinutesPerShift: setBreakMinutesPerShift,
       frozenDays: setFrozenDays,
+      safetyStockDays: setSafetyStockDays,
     },
   )
 
@@ -201,6 +207,7 @@ function PressCalendarSection() {
       planningHorizonWeeks: number
       breakMinutesPerShift: number
       frozenDays: number
+      safetyStockDays: number
     }>,
   ) {
     await saveGlobalSettingsMutation({
@@ -214,6 +221,7 @@ function PressCalendarSection() {
       planningHorizonWeeks: next?.planningHorizonWeeks ?? planningHorizonWeeks,
       breakMinutesPerShift: next?.breakMinutesPerShift ?? breakMinutesPerShift,
       frozenDays: next?.frozenDays ?? frozenDays,
+      safetyStockDays: next?.safetyStockDays ?? safetyStockDays,
       capacityFactor: globalSettings?.capacityFactor,
     })
     setSavedAt(new Date().toLocaleTimeString('en-GB'))
@@ -303,7 +311,8 @@ function PressCalendarSection() {
       (globalSettings.concurrentSetupsPerHall ?? 1) !== concurrentSetupsPerHall ||
       (globalSettings.shiftStartMinute ?? 420) !== shiftStartMinute ||
       (globalSettings.planningHorizonWeeks ?? 4) !== planningHorizonWeeks ||
-      (globalSettings.frozenDays ?? 0) !== frozenDays)
+      (globalSettings.frozenDays ?? 0) !== frozenDays ||
+      (globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS) !== safetyStockDays)
 
   const calendarDirty =
     !!globalCalendar &&
@@ -338,6 +347,7 @@ function PressCalendarSection() {
       setShiftStartMinute(globalSettings.shiftStartMinute ?? 420)
       setPlanningHorizonWeeks(globalSettings.planningHorizonWeeks ?? 4)
       setFrozenDays(globalSettings.frozenDays ?? 0)
+      setSafetyStockDays(globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS)
     }
     if (globalCalendar) {
       setWorkingDayKeys(globalCalendar.workingDays)
@@ -765,6 +775,22 @@ function PressCalendarSection() {
         </label>
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
+            Safety stock (working days)
+          </span>
+          <input
+            type="number"
+            min={0}
+            max={20}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={safetyStockDays}
+            onChange={(e) => setSafetyStockDays(Number(e.target.value) || 0)}
+            onBlur={() =>
+              setSafetyStockDays(Math.min(20, Math.max(0, Math.round(safetyStockDays) || 0)))
+            }
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
             Concurrent setups per hall
           </span>
           <input
@@ -781,6 +807,9 @@ function PressCalendarSection() {
         the approved plan instead of being recalculated, so the shop floor's
         preparation is not disturbed. A press can override this on the Press
         Definitions page. 0 turns it off.{' '}
+        Safety stock: the next lot of a part may start {safetyStockDays} working
+        day(s) before its projected stock runs out — not earlier, so stock does
+        not pile up.{' '}
         Crane constraint: presses in the same hall can run at most{' '}
         {concurrentSetupsPerHall} setup(s) at a time, with at least{' '}
         {setupGapMinutes} min between consecutive mould setups and{' '}

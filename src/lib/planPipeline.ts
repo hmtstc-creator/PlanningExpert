@@ -45,6 +45,8 @@ import {
 const COUNTED_STOCK = new Set(['finished_goods', 'production_area'])
 const RAW_STOCK = new Set(['raw_material'])
 export const DEFAULT_HORIZON_WEEKS = 4
+/** Emniyet stoğu varsayılanı (iş günü). Work Calendar sayfasından değişir. */
+export const DEFAULT_SAFETY_STOCK_DAYS = 2
 
 export interface PlanPress {
   name: string
@@ -81,6 +83,7 @@ export interface PlanSettings {
   capacityFactor?: number
   planningHorizonWeeks?: number
   frozenDays?: number
+  safetyStockDays?: number
   country?: string
   timeZone?: string
 }
@@ -89,7 +92,13 @@ export interface PlanSettings {
 export interface PlanInputs {
   products: (ProductSpec & { maxShots?: number })[]
   weeklyDemand: { material: string; overdue?: number; periods: DemandInput['periods'] }[]
-  stock: { material: string; storageLocation?: string; unrestricted?: number }[]
+  stock: {
+    material: string
+    storageLocation?: string
+    unrestricted?: number
+    /** MB52 yükleme zamanı (ms). */
+    uploadedAt?: number
+  }[]
   locations: { code: string; category: string }[]
   presses: PlanPress[]
   templates: { press: string; workingDays: number; shiftsPerDay: number; overtimeShifts: number }[]
@@ -138,6 +147,9 @@ export interface PlanRun {
   horizonWeeks: number
   capacityFactor: number
   globalFrozenDays: number
+  safetyStockDays: number
+  /** Son stok yüklemesinden beri üretilmiş sayılan onaylı iş. */
+  producedSinceStock: { quantity: number; jobs: number; stockDay: string }
   presses: { name: string; hall: string; category?: string }[]
   plannedStops: PlannedStop[]
   days: PlanDay[]
@@ -177,6 +189,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const capacityFactor = s.capacityFactor ?? 1
   const horizonWeeks = Math.min(30, Math.max(1, s.planningHorizonWeeks ?? DEFAULT_HORIZON_WEEKS))
   const globalFrozenDays = Math.max(0, s.frozenDays ?? 0)
+  const safetyStockDays = Math.max(0, s.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS)
   const { presses, templates, plannedStops } = inputs
 
   // Vardiya planlı duruşları: devir, çay, yemek her vardiyada farklı.
@@ -239,6 +252,31 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const committedByMaterial = new Map<string, number>()
   for (const job of frozenJobs) sum(committedByMaterial, job.material, job.quantity)
 
+  // Son MB52'den SONRA üretilmiş, ama henüz stok dosyasında görünmeyen iş.
+  // Örnek: Pazartesi 6000 basıldı, stok dosyası Salı sabahı yüklenecek. O
+  // arada 6000 sayılmazsa motor aynı ruloyu bakiye diye yeniden planlar.
+  // Onaylı planda, stok yüklemesinden sonra bitip bugünden önce başlamış
+  // işler yeni MB52 gelene kadar stok gibi sayılır. (Bugün ve sonrası zaten
+  // dondurulmuş ufuk olarak sayılıyor.) Varsayım: onaylı plan uygulandı.
+  const stockUploadedAt = inputs.stock.reduce((max, r) => Math.max(max, r.uploadedAt ?? 0), 0)
+  const producedSinceStock = { quantity: 0, jobs: 0, stockDay: '' }
+  if (snapshot && !snapshot.truncated && stockUploadedAt > 0) {
+    const upload = productionDayOf(plantClock(stockUploadedAt, timeZone), shiftStartMinute)
+    producedSinceStock.stockDay = upload.date
+    for (const job of snapshot.jobs) {
+      if (job.date >= todayIso) continue
+      const endDate = job.endDate ?? job.date
+      // Net dakikayı saate kabaca çevirir (molalar hariç) — gün içi sıra için yeter.
+      const endClock = shiftStartMinute + job.endMinute
+      const afterUpload =
+        endDate > upload.date || (endDate === upload.date && endClock > upload.clockMinute)
+      if (!afterUpload) continue
+      sum(committedByMaterial, job.material, job.quantity)
+      producedSinceStock.quantity += job.quantity
+      producedSinceStock.jobs += 1
+    }
+  }
+
   const demand = buildDemandSchedule(
     inputs.weeklyDemand.map((d) => ({
       material: d.material,
@@ -247,7 +285,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       stock: (stockByMaterial.get(d.material) ?? 0) + (committedByMaterial.get(d.material) ?? 0),
     })),
     productByCode,
-    { baseMonday: horizonMonday, horizonWeeks, workingDaysPerWeek },
+    {
+      baseMonday: horizonMonday,
+      horizonWeeks,
+      workingDaysPerWeek,
+      workingDayKeys,
+      today: todayIso,
+      safetyStockDays,
+    },
   )
 
   // ---- Kapasite kovaları ---------------------------------------------------
@@ -453,6 +498,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     todayIso,
   })
 
+  if (producedSinceStock.jobs > 0) {
+    warnings.push(
+      `${producedSinceStock.jobs} approved job(s) (${Math.round(producedSinceStock.quantity).toLocaleString('en-GB')} pcs) ` +
+        `ran after the last MB52 stock upload (${producedSinceStock.stockDay}). They are counted as stock ` +
+        `until the next upload — upload MB52 to replace this assumption with real stock.`,
+    )
+  }
+
   const audit = auditPlan({
     jobs,
     maintenance,
@@ -480,6 +533,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     horizonWeeks,
     capacityFactor,
     globalFrozenDays,
+    safetyStockDays,
+    producedSinceStock,
     presses: presses.map((p) => ({ name: p.name, hall: p.hall, category: p.category })),
     plannedStops: plannedStops.map((p) => ({
       shiftIndex: p.shiftIndex,

@@ -161,3 +161,43 @@ describe('groupPlanWeeks', () => {
     expect(idle?.reason).toBe('no material lists it')
   })
 })
+
+describe('stock produced since the last MB52 upload', () => {
+  it('counts yesterday\'s approved job until the new stock file arrives', () => {
+    // Salı 15 Eylül 10:00. Stok Cuma 11 Eylül yüklendi; onaylı planda
+    // Pazartesi 14 Eylül 2000 adet basıldı. Yeni MB52 henüz yok.
+    const tuesday = Date.UTC(2026, 8, 15, 7, 0)
+    const approvedMonday = {
+      material: 'MAM-A',
+      press: 'PRS-1',
+      hall: 'H1',
+      date: '2026-09-14',
+      phase: 'backlog',
+      quantity: 2000,
+      shots: 2000,
+      coilsNeeded: 0,
+      setupStartMinute: 0,
+      endMinute: 200,
+      segments: [{ kind: 'run', date: '2026-09-14', start: 0, end: 200 }],
+      reason: 'approved',
+    }
+    const base = inputs({
+      stock: [{ material: 'MAM-A', unrestricted: 0, uploadedAt: Date.UTC(2026, 8, 11, 5, 0) }],
+      latestSnapshot: { createdAt: Date.UTC(2026, 8, 11, 12, 0), jobs: [approvedMonday] },
+    })
+    const run = computePlan(base, tuesday)
+    expect(run.producedSinceStock).toEqual({ quantity: 2000, jobs: 1, stockDay: '2026-09-11' })
+    // 2000 talep o işle karşılandı: yeniden planlanmaz.
+    expect(run.jobs).toHaveLength(0)
+    expect(run.warnings.some((w) => w.includes('after the last MB52 stock upload'))).toBe(true)
+
+    // Salı sabahı yeni MB52 geldi: iş artık stokta, varsayım devre dışı.
+    const fresh = computePlan(
+      { ...base, stock: [{ material: 'MAM-A', unrestricted: 2000, uploadedAt: Date.UTC(2026, 8, 15, 5, 0) }] },
+      tuesday,
+    )
+    expect(fresh.producedSinceStock.jobs).toBe(0)
+    expect(fresh.jobs).toHaveLength(0)
+  })
+})
+

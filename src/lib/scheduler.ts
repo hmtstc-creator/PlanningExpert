@@ -103,8 +103,10 @@ export interface ScheduledJob {
   date: string
   phase: DemandEntry['phase']
   urgency: number
-  /** Bu ihtiyacın ait olduğu hafta (ISO) — gecikme bundan hesaplanır. */
+  /** Stoğun bittiği gün (ISO) — iş bundan sonra başlarsa geç sayılır. */
   dueDate: string
+  /** Üretimin başlayabileceği en erken gün: stok bitişi − emniyet günleri. */
+  earliestDate?: string
   /** ZPP kova etiketi ('Bakiye' veya hafta etiketi). */
   bucketLabel: string
   /** İşin bittiği gün — gün/hafta sınırını aşmışsa `date`'ten farklıdır. */
@@ -492,14 +494,43 @@ export function schedule(
     overrides.filter((o) => o.kind === 'priority').map((o) => o.material),
   )
 
-  // Öne alınan malzemeler faz sırasından bağımsız olarak en başa geçer.
-  const ordered =
-    prioritised.size === 0
-      ? demand
-      : [
-          ...demand.filter((e) => prioritised.has(e.material)),
-          ...demand.filter((e) => !prioritised.has(e.material)),
-        ]
+  // Kaç pres bu malzemeyi yapabilir? Sabitlenmişse tek pres.
+  const pressNames = new Set(presses.map((p) => p.name))
+  const eligibleCount = new Map<string, number>()
+  const countFor = (material: string): number => {
+    const known = eligibleCount.get(material)
+    if (known !== undefined) return known
+    const product = products.get(material)
+    const count = pinned.get(material)?.press
+      ? 1
+      : new Set(
+          [
+            product?.mainMachine,
+            product?.altMachine1,
+            product?.altMachine2,
+            product?.altMachine3,
+            product?.altMachine4,
+          ]
+            .map((m) => m?.trim())
+            .filter((m): m is string => !!m && pressNames.has(m)),
+        ).size
+    eligibleCount.set(material, count)
+    return count
+  }
+
+  // Sıra: öne alınanlar → bakiye → acil → dolgu; aynı grupta stoğu önce
+  // biten önce. Öncelik tamamen eşitse ALTERNATİFİ AZ OLAN önce: tek preste
+  // yapılabilen parça yerini önce alır, esnek parçalar kalan boşluklara
+  // dağılır. Tersi olursa esnek parça, tek presli parçanın ihtiyaç duyduğu
+  // yeri kapabilirdi.
+  const ordered = [...demand].sort(
+    (a, b) =>
+      Number(!prioritised.has(a.material)) - Number(!prioritised.has(b.material)) ||
+      phaseOrder(a.phase) - phaseOrder(b.phase) ||
+      a.dueDate.localeCompare(b.dueDate) ||
+      b.urgency - a.urgency ||
+      countFor(a.material) - countFor(b.material),
+  )
 
   if (presses.length === 0) {
     return {
@@ -659,6 +690,10 @@ export function schedule(
   }
 
   return { jobs, unplanned }
+}
+
+function phaseOrder(phase: DemandEntry['phase']): number {
+  return phase === 'backlog' ? 0 : phase === 'urgent' ? 1 : 2
 }
 
 /**
@@ -1171,8 +1206,8 @@ function placeRun(
     entry.phase === 'backlog'
       ? `Backlog ${Math.round(entry.qty)} pcs`
       : entry.phase === 'urgent'
-        ? `Stock covers ${entry.daysOfCover === Number.POSITIVE_INFINITY ? '∞' : entry.daysOfCover.toFixed(1)} days`
-        : `${entry.bucketLabel} requirement`,
+        ? `Stock runs out ${entry.dueDate} — below safety stock now`
+        : `${entry.bucketLabel}: stock runs out ${entry.dueDate}, may start ${entry.earliestDate}`,
     run.coilsNeeded === 1 ? '1 full coil' : `${run.coilsNeeded} full coils`,
     ...(press.feedsCoil !== false && run.coilChanges > 0
       ? [`${run.coilChanges} coil change${run.coilChanges > 1 ? 's' : ''}`]
@@ -1186,7 +1221,7 @@ function placeRun(
     reasonParts.push('⚠ window too short for setup + approval')
   }
   if (spansDays) reasonParts.push(`continues until ${best.endDate}`)
-  if (late) reasonParts.push(`⚠ later than required week ${entry.dueDate}`)
+  if (late) reasonParts.push(`⚠ starts after the stock runs out (${entry.dueDate})`)
   if (pinned) reasonParts.push('pinned by user')
 
   const setupEnd = locate(timeline, best.startGlobal + (sameMaterial ? 0 : run.setupMinutes))
@@ -1202,6 +1237,7 @@ function placeRun(
     phase: entry.phase,
     urgency: entry.urgency,
     dueDate: entry.dueDate,
+    earliestDate: entry.earliestDate,
     bucketLabel: entry.bucketLabel,
     late,
     quantity: run.quantity,

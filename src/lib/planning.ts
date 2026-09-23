@@ -71,9 +71,15 @@ export interface DemandInput {
 export interface DemandEntry {
   material: string
   qty: number
-  /** Bu ihtiyacın ait olduğu haftanın başlangıcı (ISO). */
+  /**
+   * Stoğun bittiği gün (ISO): bu lot o güne kadar gelmezse müşteri
+   * beklemeye başlar. Bu günden sonra başlayan iş "geç" sayılır.
+   */
   dueDate: string
-  /** Bu işin üretilebileceği en erken gün (ISO). */
+  /**
+   * Bu lotun üretimine başlanabilecek en erken gün (ISO): stoğun emniyet
+   * seviyesine indiği gün — stok bitişinden emniyet stoğu günü kadar önce.
+   */
   earliestDate: string
   /** ZPP'deki kova etiketi (bakiye için 'Bakiye'). */
   bucketLabel: string
@@ -91,6 +97,15 @@ export interface DemandScheduleOptions {
   workingDaysPerWeek?: number
   /** Bu gün sayısından fazla stoğu olan malzeme acil sayılmaz (varsayılan 14). */
   urgentCoverDays?: number
+  /**
+   * Emniyet stoğu, iş günü cinsinden. Bir sonraki lot, stok bitmeden bu
+   * kadar iş günü önce üretilebilir hâle gelir (varsayılan 0).
+   */
+  safetyStockDays?: number
+  /** Bugün (ISO). Bu haftanın talebi bugünden itibaren kalan günlere yayılır. */
+  today?: string
+  /** Talebin tüketildiği günler (varsayılan Pazartesi–Cuma). */
+  workingDayKeys?: string[]
 }
 
 /**
@@ -221,6 +236,9 @@ export function buildDemandSchedule(
   // bitirilir, haftaya bölünmez.
   roundMaterialsToCoilLot(entriesByMaterial, products, pairedWith)
 
+  // Lotların ZAMANI: haftanın başı değil, öngörülen stoğun bittiği gün.
+  timeLotsByProjectedStock(entriesByMaterial, rows, options, pairedWith)
+
   return Array.from(entriesByMaterial.values())
     .flat()
     .filter((entry) => entry.qty > 0)
@@ -230,6 +248,122 @@ export function buildDemandSchedule(
         a.dueDate.localeCompare(b.dueDate) ||
         b.urgency - a.urgency,
     )
+}
+
+/**
+ * Her lotun ne zaman gerektiğini öngörülen stoktan bulur.
+ *
+ * Miktarlar zaten doğru: rulo lotunun artanı sonraki haftaları karşılıyor.
+ * Ama lotun ZAMANI hafta başına ya da (acil malzemede) bugüne bağlıydı —
+ * 1000 bakiye + 2000/hafta talep ve 6000'lik ruloda, iki hafta sonra
+ * gereken ikinci rulo "acil" sayılıp ilkinin hemen ardından basılabiliyordu.
+ *
+ * Şimdi gün gün yürünür: haftalık talep o haftanın iş günlerine eşit
+ * dağıtılır (bu hafta için bugünden sonraki günlere), bakiye bugün
+ * tüketilir. Her lot için, ondan önceki stok + önceki lotlar tükendiği gün
+ * STOK BİTİŞİ'dir (dueDate). Üretim, bundan emniyet stoğu günü kadar iş
+ * günü önce başlayabilir (earliestDate). Daha erken değil — erken üretim
+ * stok şişirir ve presi başka bir parçadan alır.
+ */
+function timeLotsByProjectedStock(
+  entriesByMaterial: Map<string, DemandEntry[]>,
+  rows: DemandInput[],
+  options: DemandScheduleOptions,
+  pairedWith: Map<string, string>,
+): void {
+  const horizonWeeks = options.horizonWeeks ?? 4
+  const safetyDays = Math.max(0, Math.round(options.safetyStockDays ?? 0))
+  const workingKeys = new Set(options.workingDayKeys ?? ['MO', 'TU', 'WE', 'TH', 'FR'])
+  const baseIso = isoDate(options.baseMonday)
+  const today = options.today && options.today > baseIso ? options.today : baseIso
+
+  // Talebin tüketildiği günler: bugün (her zaman) + ufuktaki sonraki iş günleri.
+  const days: string[] = [today]
+  const weekDays: string[][] = []
+  for (let w = 0; w < horizonWeeks; w++) {
+    const list: string[] = []
+    for (let d = 0; d < 7; d++) {
+      const date = addDays(options.baseMonday, w * 7 + d)
+      const iso = isoDate(date)
+      if (!workingKeys.has(DAY_KEYS[(date.getDay() + 6) % 7])) continue
+      if (iso < today) continue
+      list.push(iso)
+      if (iso > today) days.push(iso)
+    }
+    // Haftanın hiç kalan iş günü yoksa talebi bugün tüketilmiş say.
+    weekDays.push(list.length > 0 ? list : [today])
+  }
+  const dayIndex = new Map(days.map((d, i) => [d, i]))
+
+  const rowByMaterial = new Map(rows.map((r) => [r.material, r]))
+
+  // Önce her lotun zamanı hesaplanır (malzeme + lotun haftası anahtarıyla),
+  // sonra uygulanır — eş ürünler aynı vuruştan çıktığı için ikisinin
+  // lotu aynı güne, ikisinden hangisi önce bitecekse ONA göre konmalı.
+  const timing = new Map<string, { due: number; start: number }>()
+  const key = (material: string, week: string) => `${material}|${week}`
+
+  for (const [material, entries] of entriesByMaterial) {
+    const lots = entries.filter((e) => e.qty > 0).sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    if (lots.length === 0) continue
+    const row = rowByMaterial.get(material)
+
+    // Günlük brüt talep.
+    const demand = new Array<number>(days.length).fill(0)
+    if (row) {
+      demand[0] += Math.abs(row.overdue)
+      row.periods.slice(0, horizonWeeks).forEach((period, w) => {
+        const qty = Math.abs(period.qty)
+        if (qty <= 0) return
+        const spread = weekDays[w]
+        for (const date of spread) demand[dayIndex.get(date) ?? 0] += qty / spread.length
+      })
+    }
+
+    let supply = row?.stock ?? 0
+    for (const lot of lots) {
+      // Bu lot gelmeden stok hangi gün eksiye düşer?
+      let consumed = 0
+      let stockout = -1
+      for (let i = 0; i < days.length; i++) {
+        consumed += demand[i]
+        if (supply - consumed < -1e-6) {
+          stockout = i
+          break
+        }
+      }
+      supply += lot.qty
+      // Ufukta hiç bitmiyorsa (ör. eş ürünün kendi talebi yok) lotun
+      // haftasına bağlı kalır, ama emniyet günü yine uygulanır.
+      const due =
+        stockout >= 0 ? stockout : (dayIndex.get(lot.dueDate) ?? nextIndex(days, lot.dueDate))
+      timing.set(key(material, lot.dueDate), { due, start: Math.max(0, due - safetyDays) })
+    }
+  }
+
+  for (const [material, entries] of entriesByMaterial) {
+    const partner = pairedWith.get(material)
+    for (const lot of entries) {
+      if (lot.qty <= 0) continue
+      const own = timing.get(key(material, lot.dueDate))
+      if (!own) continue
+      const other = partner ? timing.get(key(partner, lot.dueDate)) : undefined
+      const due = other ? Math.min(own.due, other.due) : own.due
+      const start = other ? Math.min(own.start, other.start) : own.start
+      lot.dueDate = days[due] ?? lot.dueDate
+      lot.earliestDate = days[start] ?? lot.earliestDate
+      lot.daysOfCover = due
+      if (lot.phase !== 'backlog') {
+        lot.phase = start === 0 ? 'urgent' : 'fill'
+        lot.urgency = lot.phase === 'urgent' ? Math.max(1, 99 - due) : 0
+      }
+    }
+  }
+}
+
+function nextIndex(days: string[], date: string): number {
+  const i = days.findIndex((d) => d >= date)
+  return i >= 0 ? i : days.length - 1
 }
 
 /**

@@ -20,6 +20,7 @@ export interface AuditJob {
   date: string
   phase: string
   dueDate: string
+  earliestDate?: string
   frozen?: boolean
   segments: AuditSegment[]
   endDate?: string
@@ -91,7 +92,7 @@ export function auditPlan(input: AuditInputs): PlanAudit {
   const mouldTwice = rule('mould-twice', 'A mould is never on two presses at the same time')
   const mouldBlackout = rule('mould-blackout', 'Nothing runs on a mould maintenance or not-ready day')
   const crane = rule('crane', 'Crane: setup gaps and simultaneous setups per hall')
-  const fillEarly = rule('fill-early', 'Fill items do not start before their own week')
+  const fillEarly = rule('fill-early', 'No lot starts before its stock reaches the safety level')
   const past = rule('past', 'Nothing is planned in the past')
   const earliest = rule(
     'earliest-press',
@@ -126,8 +127,10 @@ export function auditPlan(input: AuditInputs): PlanAudit {
       }
     }
     fillEarly.check()
-    if (!job.frozen && job.phase === 'fill' && job.date < job.dueDate) {
-      fillEarly.fail(`${job.material} starts ${job.date}, its week starts ${job.dueDate}`)
+    // Dolgu işi, stoğun emniyet seviyesine indiği günden önce başlamaz.
+    const allowedFrom = job.earliestDate ?? job.dueDate
+    if (!job.frozen && job.phase === 'fill' && job.date < allowedFrom) {
+      fillEarly.fail(`${job.material} starts ${job.date}, stock allows it from ${allowedFrom}`)
     }
 
     // Bir işin gün başına tek aralığı: pres ve kalıp meşguliyeti için.

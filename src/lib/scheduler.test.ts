@@ -262,7 +262,7 @@ describe('schedule', () => {
       options,
     )
     expect(result.jobs[0].late).toBe(true)
-    expect(result.jobs[0].reason).toContain('later than required week')
+    expect(result.jobs[0].reason).toContain('starts after the stock runs out')
   })
 
   it('kalıp limitini aşan üretimi partilere bölerek planlar', () => {

@@ -137,6 +137,8 @@ export default defineSchema({
     breakMinutesPerShift: v.optional(v.number()),
     // Planın ilk kaç günü dondurulmuş sayılsın (0 = kapalı).
     frozenDays: v.optional(v.number()),
+    // Emniyet stoğu, iş günü: sonraki lot stok bitmeden bu kadar önce başlar.
+    safetyStockDays: v.optional(v.number()),
     // Tesisin saat dilimi (IANA adı). Plan sunucuda hesaplanıyor ve sunucu
     // UTC'de çalışıyor; gün ve vardiya tesis saatine göre değişmeli.
     timeZone: v.optional(v.string()),

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
 import { DEFAULT_PLANT_TIME_ZONE } from '../lib/dates'
+import { DEFAULT_SAFETY_STOCK_DAYS } from '../lib/planPipeline'
 
 export const Route = createFileRoute('/planlogic')({
   component: PlanLogicPage,
@@ -44,6 +45,7 @@ function PlanLogicPage() {
         capacityFactor?: number
         planningHorizonWeeks?: number
         frozenDays?: number
+        safetyStockDays?: number
         timeZone?: string
       }
     | null
@@ -58,6 +60,7 @@ function PlanLogicPage() {
     concurrent: settings?.concurrentSetupsPerHall ?? 1,
     factor: Math.round((settings?.capacityFactor ?? 1) * 100),
     frozen: settings?.frozenDays ?? 0,
+    safety: settings?.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS,
     timeZone: settings?.timeZone || DEFAULT_PLANT_TIME_ZONE,
   }
 
@@ -71,7 +74,7 @@ function PlanLogicPage() {
         applied to them the same way every time.
       </p>
 
-      <Synoptic />
+      <Synoptic safetyDays={current.safety} />
 
       <h2 className="mt-10 text-lg font-semibold text-foreground">The seven steps in detail</h2>
       <ol className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -105,6 +108,7 @@ function PlanLogicPage() {
             label="Frozen days"
             value={current.frozen > 0 ? `${current.frozen} days` : 'off'}
           />
+          <Setting label="Safety stock" value={`${current.safety} working days`} />
         </dl>
         <p className="mt-3 text-xs text-muted-foreground">
           Change these on the{' '}
@@ -158,11 +162,26 @@ function PlanLogicPage() {
             produced.
           </li>
           <li>
-            <b>Urgency.</b> Days of cover = stock ÷ (average weekly demand ÷
-            working days per week). Less than 14 days of cover makes the
-            material <b>urgent</b>: it may be produced as early as today.
-            Everything else is <b>fill</b>: never produced before its own
-            week, so stock does not pile up.
+            <b>Timing — projected stock.</b> Each week's demand is spread
+            evenly over that week's working days (this week: only the days
+            that are left); the backlog is due today. Walking day by day, the
+            engine finds the day the stock — plus every lot planned before —
+            would drop below zero. That is the lot's <b>stock-out day</b>.
+          </li>
+          <li>
+            <b>Safety stock.</b> The lot may start{' '}
+            <b>{current.safety} working day(s)</b> before its stock-out day, and
+            not earlier, so stock does not pile up and the press stays free
+            for parts that need it. If that day is already today or past, the
+            lot is <b>urgent</b>; otherwise it is <b>fill</b>.
+          </li>
+          <li>
+            <b>Produced but not yet in the stock file.</b> Approved jobs that
+            ran after the last MB52 upload count as stock until the next
+            upload. Example: 6 000 pcs pressed on Monday, stock uploaded again
+            on Tuesday morning — in between, the 6 000 are not planned a
+            second time. The Production Plan says when this assumption is in
+            use.
           </li>
           <li>
             <b>Co-products</b> come out of the same stroke, so they cannot be
@@ -182,6 +201,10 @@ function PlanLogicPage() {
           800 surplus covers next week. Result: one job, one setup — not two.
         </Example>
       </Step>
+
+      <div className="mt-4 max-w-4xl">
+        <StockExample safetyDays={2} />
+      </div>
 
       <Step n={3} id="capacity" title="Build the capacity">
         <p>For every press and every day of the horizon:</p>
@@ -242,9 +265,11 @@ function PlanLogicPage() {
           <li>Fill</li>
         </ol>
         <p>
-          Within each group the earlier week goes first; in the same week, the
-          material with fewer days of cover goes first. Whoever is placed first
-          gets the best slots.
+          Within each group, the lot whose stock runs out first goes first.
+          When that is equal too, the part that can run on the <b>fewest
+          presses</b> goes first: a single-press part takes its slot before a
+          part with alternatives, which then spreads to the presses that are
+          left. Whoever is placed first gets the best slots.
         </p>
       </Step>
 
@@ -291,7 +316,10 @@ function PlanLogicPage() {
             If the quantity needs more strokes than the mould's shot limit, it
             is split into batches, each with its own setup.
           </li>
-          <li>Fill items do not start before their own week.</li>
+          <li>
+            A lot does not start before its safety date ({current.safety} working
+            day(s) before its stock runs out).
+          </li>
         </ul>
         <p>
           <b>The press that finishes the job earliest wins.</b> Its time,
@@ -303,7 +331,7 @@ function PlanLogicPage() {
       <Step n={7} id="check" title="Check and report">
         <ul>
           <li>
-            A job placed after the week it is needed is marked <b>late</b>.
+            A job that starts after its stock-out day is marked <b>late</b>.
           </li>
           <li>
             What does not fit anywhere goes to <b>Unplanned</b>, with the
@@ -407,19 +435,22 @@ function Lane({
   )
 }
 
-function Synoptic() {
+function Synoptic({ safetyDays }: { safetyDays: number }) {
   return (
     <section className="mt-6">
       <h2 className="text-lg font-semibold text-foreground">Planning algorithm — at a glance</h2>
       <div className="mt-3 grid gap-6 lg:grid-cols-2">
         <div>
-          <Box tone="border-border bg-muted/50 text-foreground" title="1 · One list of everything to produce">
-            Demand minus stock, rounded to whole coils, per material and week.
+          <Box tone="border-border bg-muted/50 text-foreground" title="1 · One list of every lot to produce">
+            Demand minus stock, rounded to whole coils. Each lot gets two dates
+            from the projected stock: the day the stock would run out, and{' '}
+            {safetyDays} working day(s) before it — the earliest it may start.
           </Box>
           <Down label="sorted once" />
           <Box tone="border-border bg-muted/50 text-foreground" title="2 · Sort the list">
-            Moved to front → Backlog → Urgent → Fill. Same group: earlier week
-            first, then fewer days of cover.
+            Moved to front → Backlog → Urgent (already below safety stock) →
+            Fill. Same group: the stock that runs out first goes first. Still
+            equal → the part with the fewest eligible presses goes first.
           </Box>
           <Down label="take the next item from the top" />
           <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · Try EVERY press that can make it">
@@ -499,7 +530,7 @@ function Synoptic() {
               every calculation, checking code that is separate from the engine goes
               through every job again and checks each rule — one job per press
               at a time, earliest press chosen, crane gaps, one mould on one
-              press, maintenance, fill not too early, nothing in the past. A
+              press, maintenance, no lot before its safety date, nothing in the past. A
               broken rule shows in red with the job named.
             </li>
             <li>
@@ -511,8 +542,8 @@ function Synoptic() {
               <b className="text-foreground">Automatic tests</b>: before any change goes live,
               the engine plans 40 randomly generated plants (progressive and
               transfer halls, single and shared parts, maintenance, stops) and
-              the same checks must find zero broken rules. Your 104/105 case is
-              one of the tests.
+              the same checks must find zero broken rules. Your 104/105 case and
+              your 1 000 / 2 000 / 6 000 coil case are tests too.
             </li>
           </ol>
         </div>
@@ -525,23 +556,97 @@ function Synoptic() {
           </p>
           <ul className="mt-2 ml-5 list-disc space-y-1 text-xs text-amber-900">
             <li>
-              When items are in the same group and week, and their days of cover
-              are the same (all backlog items, for example), they keep the row
-              order of the ZPP file.
+              A booked job is never moved. Placing parts with fewer eligible
+              presses first when the priority is equal prevents most cases
+              where a flexible part takes a single-press part's slot, but not
+              every one.
             </li>
             <li>
-              A part with alternatives that is placed earlier can take the free
-              slot that a single-press part placed later needed, even if it
-              could have gone somewhere else.
+              Items equal in everything — group, stock-out day and number of
+              presses — keep the row order of the ZPP file.
+            </li>
+            <li>
+              ZPP gives weekly totals, so the engine spreads a week evenly over
+              its working days. An order due on Wednesday is treated as 1/5 per
+              day. ZPP_DAILY could give the exact day for the first weeks.
+            </li>
+            <li>
+              Between an approved plan and the next MB52 upload, the engine
+              assumes the approved jobs were produced as planned.
             </li>
           </ul>
-          <p className="mt-2 text-xs text-amber-900">
-            Both can be improved, for example by placing the parts with the
-            fewest eligible presses first when the priority is equal.
-          </p>
         </div>
       </div>
     </section>
+  )
+}
+
+/** Kullanıcının örneği: öngörülen stok gün gün, ve sonraki rulonun yeri. */
+function StockExample({ safetyDays }: { safetyDays: number }) {
+  // 1000 bakiye, haftada 2000 (günde 400), Pazartesi 6000'lik rulo.
+  const days: { label: string; stock: number }[] = []
+  let stock = 6000 - 1000
+  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  for (let w = 0; w < 3; w++) {
+    for (let d = 0; d < 5; d++) {
+      stock -= 400
+      days.push({ label: `${names[d]} ${14 + w * 7 + d > 30 ? 14 + w * 7 + d - 30 : 14 + w * 7 + d}`, stock })
+    }
+  }
+  const stockout = days.findIndex((d) => d.stock < 0)
+  const start = Math.max(0, stockout - safetyDays)
+  const max = 4600
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <p className="text-sm font-semibold text-foreground">
+        Example — when is the next coil made?
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Backlog 1 000, 2 000 per week, no stock, one coil = 6 000 pcs. The
+        first coil is pressed on Monday 14 September. Bars = projected stock at
+        the end of each day.
+      </p>
+      <div className="mt-3 flex h-28 items-end gap-1">
+        {days.map((d, i) => (
+          <div key={d.label} className="flex h-full flex-1 flex-col justify-end">
+            <div
+              className={`rounded-t ${
+                i === stockout
+                  ? 'bg-destructive'
+                  : i >= start && i < stockout
+                    ? 'bg-amber-400'
+                    : 'bg-slate-400/70'
+              }`}
+              style={{ height: `${Math.max(3, (Math.max(0, d.stock) / max) * 100)}%` }}
+              title={`${d.stock} pcs`}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-1 flex gap-1 text-[10px] text-muted-foreground">
+        {days.map((d) => (
+          <span key={d.label} className="flex-1 text-center">
+            {d.label}
+          </span>
+        ))}
+      </div>
+      <ul className="mt-3 ml-5 list-disc space-y-1 text-xs text-muted-foreground">
+        <li>
+          The first coil covers the backlog, this week, next week and 1 000 of
+          the week after.
+        </li>
+        <li>
+          The stock runs out on <b className="text-destructive">{days[stockout].label}</b>{' '}
+          (red). With {safetyDays} day(s) of safety stock the next coil may start
+          from <b className="text-amber-700">{days[start].label}</b> (amber) — not
+          straight after the first coil, and not after the stock is gone.
+        </li>
+        <li>
+          If the press is busy then, the job moves later; if it starts after{' '}
+          {days[stockout].label} it is marked late.
+        </li>
+      </ul>
+    </div>
   )
 }
 

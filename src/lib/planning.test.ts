@@ -71,8 +71,10 @@ describe('buildDemandSchedule', () => {
     )
     // İlk hafta tamamen stoktan karşılanır, ikinci haftadan 400 düşer.
     expect(entries).toHaveLength(1)
-    expect(entries[0].dueDate).toBe('2026-09-21')
     expect(entries[0].qty).toBe(600)
+    // Kalan 400, ikinci haftanın günde 200'lük tüketimine 2 gün yeter: stok
+    // Çarşamba biter. Lot hafta başına değil, o güne bağlanır.
+    expect(entries[0].dueDate).toBe('2026-09-23')
   })
 
   it('aciliyeti stok kaç gün yeter üzerinden türetir', () => {
@@ -80,9 +82,11 @@ describe('buildDemandSchedule', () => {
     const entries = buildDemandSchedule(
       [{ material: 'A', overdue: 0, periods: [{ label: 'W1', qty: 1000 }], stock: 200 }],
       noProducts,
-      { baseMonday },
+      // Stok Salı biter; 2 günlük emniyet stoğuyla üretim hemen başlamalı.
+      { baseMonday, safetyStockDays: 2 },
     )
     expect(entries[0].daysOfCover).toBe(1)
+    expect(entries[0].dueDate).toBe('2026-09-15')
     expect(entries[0].phase).toBe('urgent')
     expect(entries[0].urgency).toBeGreaterThan(80)
     // Acil kalem plan başında üretilebilir.
