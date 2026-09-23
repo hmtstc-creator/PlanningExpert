@@ -4,7 +4,7 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const groupValidator = v.object({
   _id: v.id('craneGroups'),
@@ -13,14 +13,14 @@ const groupValidator = v.object({
   machines: v.array(v.string()),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(groupValidator),
   handler: async (ctx, args) =>
     ctx.db.query('craneGroups').order('desc').paginate(args.paginationOpts),
 })
 
-export const create = mutation({
+export const create = guardedMutation({
   args: { groupName: v.string(), machines: v.array(v.string()) },
   returns: v.id('craneGroups'),
   handler: async (ctx, args) => {
@@ -32,7 +32,7 @@ export const create = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('craneGroups') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

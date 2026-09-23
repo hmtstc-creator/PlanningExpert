@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const rowValidator = v.object({
   _id: v.id('moldProblems'),
@@ -20,7 +20,7 @@ const rowValidator = v.object({
   photos: v.optional(v.array(v.id('_storage'))),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(
     v.object({
@@ -43,13 +43,13 @@ export const list = query({
 })
 
 /** Fotoğrafın doğrudan tarayıcıdan yükleneceği tek kullanımlık adres. */
-export const generateUploadUrl = mutation({
+export const generateUploadUrl = guardedMutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => ctx.storage.generateUploadUrl(),
 })
 
-export const report = mutation({
+export const report = guardedMutation({
   args: {
     material: v.string(),
     operation: v.string(),
@@ -98,7 +98,7 @@ export const report = mutation({
   },
 })
 
-export const solve = mutation({
+export const solve = guardedMutation({
   args: {
     id: v.id('moldProblems'),
     solution: v.string(),
@@ -128,7 +128,7 @@ export const solve = mutation({
   },
 })
 
-export const reopen = mutation({
+export const reopen = guardedMutation({
   args: { id: v.id('moldProblems') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -141,7 +141,7 @@ export const reopen = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('moldProblems') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

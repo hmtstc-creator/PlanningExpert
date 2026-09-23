@@ -57,7 +57,9 @@ function assertPassword(password: string): void {
  * "parolanı değiştir" işaretiyle doğar.
  */
 export const seedAdmin = action({
-  args: {},
+  // Taşıma katmanı her çağrıya jeton ekliyor; bu işlev denetimden muaf ama
+  // alanı yine de tanımlamalı, yoksa Convex bilinmeyen alan diye reddeder.
+  args: { token: v.optional(v.string()) },
   returns: v.object({ created: v.boolean() }),
   handler: async (ctx): Promise<{ created: boolean }> => {
     const existing: number = await ctx.runQuery(internal.authInternal.countUsers, {})
@@ -76,7 +78,9 @@ export const seedAdmin = action({
 })
 
 export const login = action({
-  args: { name: v.string(), password: v.string() },
+  // `token` taşıma katmanından gelir ve YOK SAYILIR: girerken elde geçerli
+  // bir jeton olmaz, eski bir jetonun girişi etkilemesi de istenmez.
+  args: { name: v.string(), password: v.string(), token: v.optional(v.string()) },
   returns: v.object({ token: v.string() }),
   handler: async (ctx, args): Promise<{ token: string }> => {
     const name = args.name.trim()

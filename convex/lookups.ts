@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { adminMutation, guardedQuery } from './guarded'
 
 /**
  * Kullanıcı tanımlı seçim listeleri.
@@ -19,13 +19,13 @@ const rowValidator = v.object({
   createdAt: v.number(),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(rowValidator),
   handler: async (ctx) => ctx.db.query('lookups').collect(),
 })
 
-export const add = mutation({
+export const add = adminMutation({
   args: { kind: v.string(), value: v.string(), sortOrder: v.optional(v.number()) },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -50,7 +50,7 @@ export const add = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = adminMutation({
   args: { id: v.id('lookups') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -65,7 +65,7 @@ export const remove = mutation({
  * Bu bir "varsayılan", kalıcı bir kural değil: admin silebilir, ekleyebilir.
  * Boş bir seçim listesiyle problem bildirilemeyeceği için bir kere çalışır.
  */
-export const seedDefaults = mutation({
+export const seedDefaults = adminMutation({
   args: {},
   returns: v.number(),
   handler: async (ctx) => {

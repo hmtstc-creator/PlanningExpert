@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const globalSettingsValidator = v.union(
   v.object({
@@ -22,7 +22,7 @@ const globalSettingsValidator = v.union(
   v.null(),
 )
 
-export const getGlobalSettings = query({
+export const getGlobalSettings = guardedQuery({
   args: {},
   returns: globalSettingsValidator,
   handler: async (ctx) =>
@@ -32,7 +32,7 @@ export const getGlobalSettings = query({
       .first(),
 })
 
-export const saveGlobalSettings = mutation({
+export const saveGlobalSettings = guardedMutation({
   args: {
     shiftMinutes: v.number(),
     overtimeShiftMinutes: v.number(),
@@ -73,7 +73,7 @@ const templateValidator = v.union(
   v.null(),
 )
 
-export const getTemplate = query({
+export const getTemplate = guardedQuery({
   args: { press: v.string() },
   returns: templateValidator,
   handler: async (ctx, { press }) =>
@@ -83,7 +83,7 @@ export const getTemplate = query({
       .first(),
 })
 
-export const listTemplates = query({
+export const listTemplates = guardedQuery({
   args: {},
   returns: v.array(
     v.object({
@@ -98,7 +98,7 @@ export const listTemplates = query({
   handler: async (ctx) => ctx.db.query('pressTemplates').collect(),
 })
 
-export const saveTemplate = mutation({
+export const saveTemplate = guardedMutation({
   args: {
     press: v.string(),
     workingDays: v.number(),
@@ -136,7 +136,7 @@ const overrideValidator = v.object({
   overtimeShifts: v.number(),
 })
 
-export const listOverrides = query({
+export const listOverrides = guardedQuery({
   args: { press: v.string() },
   returns: v.array(overrideValidator),
   handler: async (ctx, { press }) =>
@@ -146,7 +146,7 @@ export const listOverrides = query({
       .collect(),
 })
 
-export const saveOverride = mutation({
+export const saveOverride = guardedMutation({
   args: {
     press: v.string(),
     weekStart: v.string(),
@@ -177,7 +177,7 @@ export const saveOverride = mutation({
   },
 })
 
-export const clearOverride = mutation({
+export const clearOverride = guardedMutation({
   args: { press: v.string(), weekStart: v.string() },
   returns: v.null(),
   handler: async (ctx, { press, weekStart }) => {
@@ -196,7 +196,7 @@ export const clearOverride = mutation({
  * Yalnızca kapasite düzeltme katsayısını günceller. Performans sayfası
  * ölçülen gerçekleşme oranını buraya yazar; diğer ayarlar korunur.
  */
-export const setCapacityFactor = mutation({
+export const setCapacityFactor = guardedMutation({
   args: { capacityFactor: v.number() },
   returns: v.null(),
   handler: async (ctx, { capacityFactor }) => {
@@ -235,7 +235,7 @@ export const setCapacityFactor = mutation({
  * presses across all weeks, so fetching per press would mean one query per
  * row.
  */
-export const listAllOverrides = query({
+export const listAllOverrides = guardedQuery({
   args: {},
   returns: v.array(overrideValidator),
   handler: async (ctx) => ctx.db.query('pressWeekOverrides').collect(),

@@ -6,7 +6,7 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const priorityValidator = v.object({
   _id: v.id('machinePriorities'),
@@ -16,7 +16,7 @@ const priorityValidator = v.object({
   priority: v.number(),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(priorityValidator),
   handler: async (ctx, args) =>
@@ -26,13 +26,13 @@ export const list = query({
       .paginate(args.paginationOpts),
 })
 
-export const create = mutation({
+export const create = guardedMutation({
   args: { productCode: v.string(), machineName: v.string(), priority: v.number() },
   returns: v.id('machinePriorities'),
   handler: async (ctx, args) => ctx.db.insert('machinePriorities', args),
 })
 
-export const bulkInsert = mutation({
+export const bulkInsert = guardedMutation({
   args: {
     rows: v.array(
       v.object({
@@ -46,7 +46,7 @@ export const bulkInsert = mutation({
   handler: async () => ({ inserted: 0 }),
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('machinePriorities') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -55,7 +55,7 @@ export const remove = mutation({
   },
 })
 
-export const clearAll = mutation({
+export const clearAll = guardedMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {

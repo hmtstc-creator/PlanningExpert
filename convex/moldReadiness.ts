@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const rowValidator = v.object({
   _id: v.id('moldReadiness'),
@@ -13,7 +13,7 @@ const rowValidator = v.object({
   updatedAt: v.number(),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(rowValidator),
   handler: async (ctx) => ctx.db.query('moldReadiness').collect(),
@@ -26,7 +26,7 @@ export const list = query({
  * olma tarihi olamaz. Kalıp hazır işaretlenirse tarih temizlenir, yoksa
  * eski tarih kayıtta kalır ve ileride yanıltır.
  */
-export const set = mutation({
+export const set = guardedMutation({
   args: {
     material: v.string(),
     ready: v.boolean(),

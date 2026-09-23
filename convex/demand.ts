@@ -4,8 +4,8 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
 import { filterRows, knownMaterialCodes } from './uploadFilter'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const periodValidator = v.object({ label: v.string(), qty: v.number() })
 
@@ -22,7 +22,7 @@ const weeklyValidator = v.object({
 /** Tek sorguda okunacak en fazla satır — bkz. products.listAll. */
 const PLANNING_ROW_LIMIT = 8000
 
-export const listWeekly = query({
+export const listWeekly = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(weeklyValidator),
   handler: async (ctx, args) =>
@@ -30,7 +30,7 @@ export const listWeekly = query({
 })
 
 /** Planlamanın okuduğu eksiksiz haftalık talep. Bkz. products.listAll. */
-export const listAllWeekly = query({
+export const listAllWeekly = guardedQuery({
   args: {},
   returns: v.object({
     rows: v.array(weeklyValidator),
@@ -45,7 +45,7 @@ export const listAllWeekly = query({
   },
 })
 
-export const replaceWeekly = mutation({
+export const replaceWeekly = guardedMutation({
   args: {
     rows: v.array(
       v.object({
@@ -89,14 +89,14 @@ const dailyValidator = v.object({
   uploadedAt: v.number(),
 })
 
-export const listDaily = query({
+export const listDaily = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(dailyValidator),
   handler: async (ctx, args) =>
     ctx.db.query('demandDaily').order('desc').paginate(args.paginationOpts),
 })
 
-export const replaceDaily = mutation({
+export const replaceDaily = guardedMutation({
   args: {
     rows: v.array(
       v.object({

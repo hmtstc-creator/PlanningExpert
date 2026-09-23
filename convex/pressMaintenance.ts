@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const rowValidator = v.object({
   _id: v.id('pressMaintenance'),
@@ -21,7 +21,7 @@ const rowValidator = v.object({
   completedAt: v.optional(v.number()),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(rowValidator),
   handler: async (ctx) => ctx.db.query('pressMaintenance').collect(),
@@ -43,7 +43,7 @@ function requireDate(date: string, field: string): string {
   return date
 }
 
-export const add = mutation({
+export const add = guardedMutation({
   args: {
     press: v.string(),
     date: v.string(),
@@ -86,7 +86,7 @@ export const add = mutation({
   },
 })
 
-export const update = mutation({
+export const update = guardedMutation({
   args: {
     id: v.id('pressMaintenance'),
     date: v.string(),
@@ -125,7 +125,7 @@ export const update = mutation({
  * Planlananla gerçekleşen arasındaki fark bakım performansıdır; kayıt
  * geçmişe dönük saklandığı için silinmez, üzerine yazılır.
  */
-export const complete = mutation({
+export const complete = guardedMutation({
   args: {
     id: v.id('pressMaintenance'),
     actualDate: v.string(),
@@ -168,7 +168,7 @@ export const complete = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('pressMaintenance') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

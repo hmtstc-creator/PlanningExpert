@@ -29,6 +29,7 @@ import {
 } from 'react'
 
 import { reportMutationError } from './mutationErrors'
+import { getSessionToken, subscribeSessionToken } from './sessionToken'
 
 export type TransportMode = 'connecting' | 'websocket' | 'http'
 
@@ -45,6 +46,12 @@ interface TransportValue {
   /** Mutation sonrası HTTP modundaki sorguları tazelemek için sayaç. */
   revision: number
   bumpRevision: () => void
+  /**
+   * Oturum jetonu. Her çağrıya buradan ekleniyor — yüz küsur çağrı
+   * noktasının tek tek taşıması gerekseydi biri mutlaka unutulur ve o işlev
+   * yetkisiz kalırdı.
+   */
+  token: string | null
 }
 
 const TransportContext = createContext<TransportValue>({
@@ -52,6 +59,7 @@ const TransportContext = createContext<TransportValue>({
   http: null,
   revision: 0,
   bumpRevision: () => {},
+  token: null,
 })
 
 export function TransportProvider({ children }: { children: ReactNode }) {
@@ -101,9 +109,14 @@ export function TransportProvider({ children }: { children: ReactNode }) {
 
   const bumpRevision = useCallback(() => setRevision((r) => r + 1), [])
 
+  // Jeton değişince (giriş/çıkış) sorgular yeniden çalışmalı, bu yüzden
+  // React durumuna yansıtılıyor.
+  const [token, setToken] = useState<string | null>(() => getSessionToken())
+  useEffect(() => subscribeSessionToken(setToken), [])
+
   const value = useMemo(
-    () => ({ mode, http, revision, bumpRevision }),
-    [mode, http, revision, bumpRevision],
+    () => ({ mode, http, revision, bumpRevision, token }),
+    [mode, http, revision, bumpRevision, token],
   )
 
   return <TransportContext.Provider value={value}>{children}</TransportContext.Provider>
@@ -170,12 +183,28 @@ function useHttpQuery<T>(
  * abonelik, yoksa HTTPS üzerinden periyodik çekim.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+/**
+ * Çağrı argümanlarına oturum jetonunu ekler.
+ *
+ * Tek yerden eklendiği için hiçbir çağrı noktası jetonu taşımayı
+ * unutamıyor; unutulan bir SUNUCU işlevi ise sessizce açık kalmaz, hata
+ * verir.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withToken(args: any, token: string | null): any {
+  if (args === 'skip') return 'skip'
+  const base = args && typeof args === 'object' ? args : {}
+  return token ? { ...base, token } : { ...base }
+}
+
 export function useQuery(fn: any, args?: any): any {
-  const { mode } = useTransport()
+  const { mode, token } = useTransport()
   const useHttp = mode === 'http'
+  // Jeton değişince nesne kimliği de değişsin ki sorgu yeniden çalışsın.
+  const withAuth = useMemo(() => withToken(args ?? {}, token), [args, token])
   // Hook kuralları: ikisi de her render'da çağrılır, biri devre dışı kalır.
-  const wsResult = useConvexQuery(fn, useHttp ? 'skip' : (args ?? {}))
-  const { data } = useHttpQuery<unknown>(useHttp, fn, args ?? {})
+  const wsResult = useConvexQuery(fn, useHttp ? 'skip' : withAuth)
+  const { data } = useHttpQuery<unknown>(useHttp, fn, withAuth)
   return useHttp ? data : wsResult
 }
 
@@ -191,16 +220,17 @@ export function usePaginatedQuery(
   options: { initialNumItems: number },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): { results: any[]; status: string; loadMore: (n: number) => void } {
-  const { mode } = useTransport()
+  const { mode, token } = useTransport()
   const useHttp = mode === 'http'
 
-  const wsResult = useConvexPaginatedQuery(fn, useHttp ? 'skip' : args, options)
+  const withAuth = useMemo(() => withToken(args, token), [args, token])
+  const wsResult = useConvexPaginatedQuery(fn, useHttp ? 'skip' : withAuth, options)
   const httpArgs = useMemo(
     () => ({
-      ...(args && args !== 'skip' ? args : {}),
+      ...(withAuth && withAuth !== 'skip' ? withAuth : {}),
       paginationOpts: { numItems: options.initialNumItems, cursor: null },
     }),
-    [args, options.initialNumItems],
+    [withAuth, options.initialNumItems],
   )
   const { data } = useHttpQuery<{ page: unknown[] }>(useHttp, fn, httpArgs)
 
@@ -219,17 +249,18 @@ export function usePaginatedQuery(
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useMutation(fn: any): (args?: any) => Promise<any> {
-  const { mode, http, bumpRevision } = useTransport()
+  const { mode, http, bumpRevision, token } = useTransport()
   const wsMutation = useConvexMutation(fn)
 
   return useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (args?: any) => {
-      if (mode !== 'http') return wsMutation(args ?? {})
+      const withAuth = withToken(args ?? {}, token)
+      if (mode !== 'http') return wsMutation(withAuth)
       if (!http) throw new Error('Veritabanı adresi tanımlı değil')
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await (http as any).mutation(fn, args ?? {})
+        const result = await (http as any).mutation(fn, withAuth)
         bumpRevision()
         return result
       } catch (e) {
@@ -237,7 +268,7 @@ export function useMutation(fn: any): (args?: any) => Promise<any> {
         throw e
       }
     },
-    [mode, http, wsMutation, fn, bumpRevision],
+    [mode, http, wsMutation, fn, bumpRevision, token],
   )
 }
 
@@ -252,18 +283,20 @@ export function useMutation(fn: any): (args?: any) => Promise<any> {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useAction(fn: any): (args?: any) => Promise<any> {
-  const { mode, http } = useTransport()
+  const { mode, http, token } = useTransport()
   const wsAction = useConvexAction(fn)
 
   return useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (args?: any) => {
-      if (mode !== 'http') return wsAction(args ?? {})
+      // Giriş action'ı jetonu yok sayar; diğerleri denetler.
+      const withAuth = withToken(args ?? {}, token)
+      if (mode !== 'http') return wsAction(withAuth)
       if (!http) throw new Error('Veritabanı adresi tanımlı değil')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (http as any).action(fn, args ?? {})
+      return (http as any).action(fn, withAuth)
     },
-    [mode, http, wsAction, fn],
+    [mode, http, wsAction, fn, token],
   )
 }
 

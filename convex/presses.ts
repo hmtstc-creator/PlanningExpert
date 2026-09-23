@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const pressValidator = v.object({
   _id: v.id('presses'),
@@ -13,7 +13,7 @@ const pressValidator = v.object({
   frozenDays: v.optional(v.number()),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(pressValidator),
   handler: async (ctx) => ctx.db.query('presses').collect(),
@@ -27,7 +27,7 @@ export const list = query({
  * böyle ifade edilebilir. Çağıran taraf her zaman eksiksiz kayıt
  * göndermelidir; kısmi gönderim diğer alanları sessizce uçurur.
  */
-export const upsert = mutation({
+export const upsert = guardedMutation({
   args: {
     name: v.string(),
     hall: v.string(),
@@ -59,7 +59,7 @@ export const upsert = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('presses') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

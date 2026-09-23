@@ -4,7 +4,7 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const productValidator = v.object({
   _id: v.id('products'),
@@ -76,7 +76,7 @@ function withDefaults<T extends Record<string, unknown>>(doc: T) {
   }
 }
 
-export const list = query({
+export const list = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(productValidator),
   handler: async (ctx, args) => {
@@ -96,7 +96,7 @@ export const list = query({
  * Bu sorgu ya hepsini verir ya da `complete: false` diyerek yalan söylemeyi
  * reddeder — ekran o zaman planın eksik olduğunu söyler.
  */
-export const listAll = query({
+export const listAll = guardedQuery({
   args: {},
   returns: v.object({
     rows: v.array(productValidator),
@@ -111,7 +111,7 @@ export const listAll = query({
   },
 })
 
-export const create = mutation({
+export const create = guardedMutation({
   args: productArgs,
   returns: v.id('products'),
   handler: async (ctx, args) => {
@@ -122,7 +122,7 @@ export const create = mutation({
   },
 })
 
-export const bulkUpsert = mutation({
+export const bulkUpsert = guardedMutation({
   args: { rows: v.array(v.object(productArgs)) },
   returns: v.object({ inserted: v.number(), updated: v.number() }),
   handler: async (ctx, { rows }) => {
@@ -149,7 +149,7 @@ export const bulkUpsert = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('products') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -166,7 +166,7 @@ export const remove = mutation({
  * plan. Passing `null` clears an optional field; `undefined` leaves it
  * untouched.
  */
-export const updateField = mutation({
+export const updateField = guardedMutation({
   args: {
     id: v.id('products'),
     field: v.string(),

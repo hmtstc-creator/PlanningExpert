@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const holidayValidator = v.object({
   _id: v.id('officialHolidays'),
@@ -11,7 +11,7 @@ const holidayValidator = v.object({
   name: v.string(),
 })
 
-export const listByCountry = query({
+export const listByCountry = guardedQuery({
   args: { country: v.string() },
   returns: v.array(holidayValidator),
   handler: async (ctx, { country }) =>
@@ -26,7 +26,7 @@ export const listByCountry = query({
  * Nager.Date'ten çektiği listeyi buraya yazar; böylece tatiller planlama
  * motoruna da ulaşır ve o günün kapasitesi sıfırlanır.
  */
-export const replaceYear = mutation({
+export const replaceYear = guardedMutation({
   args: {
     country: v.string(),
     year: v.number(),

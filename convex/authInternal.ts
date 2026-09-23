@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 
 import { internalMutation, internalQuery, query } from './_generated/server'
+import { guardedQuery } from './guarded'
 
 /**
  * Girişin veritabanı tarafı.
@@ -166,7 +167,7 @@ export const me = query({
 })
 
 /** Yöneticinin kullanıcı listesinde parolanın durumu görünsün. */
-export const listWithPasswordState = query({
+export const listWithPasswordState = guardedQuery({
   args: {},
   returns: v.array(
     v.object({

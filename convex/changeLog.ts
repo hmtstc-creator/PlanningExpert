@@ -4,7 +4,7 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const logValidator = v.object({
   _id: v.id('changeLog'),
@@ -16,7 +16,7 @@ const logValidator = v.object({
   createdAt: v.number(),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(logValidator),
   handler: async (ctx, args) =>
@@ -29,7 +29,7 @@ export const list = query({
  * Denetim izi için: "kim neyi ne zaman değiştirdi" sorusu son olaylarla
  * ilgilidir, sayfalamayla değil.
  */
-export const recent = query({
+export const recent = guardedQuery({
   args: { limit: v.optional(v.number()) },
   returns: v.array(logValidator),
   handler: async (ctx, { limit }) =>
@@ -40,7 +40,7 @@ export const recent = query({
       .take(Math.min(200, Math.max(1, limit ?? 50))),
 })
 
-export const create = mutation({
+export const create = guardedMutation({
   args: {
     title: v.string(),
     detail: v.optional(v.string()),
@@ -55,7 +55,7 @@ export const create = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('changeLog') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

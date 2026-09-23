@@ -4,7 +4,7 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const locValidator = v.object({
   _id: v.id('storageLocations'),
@@ -14,7 +14,7 @@ const locValidator = v.object({
   category: v.string(),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(locValidator),
   handler: async (ctx, args) =>
@@ -26,13 +26,13 @@ export const list = query({
  * yani plana doğrudan girer — sayfa sınırında kalan bir depo stoğun yanlış
  * kategoride sayılmasına yol açardı.
  */
-export const listAll = query({
+export const listAll = guardedQuery({
   args: {},
   returns: v.array(locValidator),
   handler: async (ctx) => ctx.db.query('storageLocations').collect(),
 })
 
-export const upsert = mutation({
+export const upsert = guardedMutation({
   args: {
     code: v.string(),
     description: v.optional(v.string()),
@@ -58,7 +58,7 @@ export const upsert = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('storageLocations') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const jobValidator = v.object({
   material: v.string(),
@@ -52,14 +52,14 @@ const snapshotValidator = v.object({
  */
 const MAX_STORED_JOBS = 1500
 
-export const latest = query({
+export const latest = guardedQuery({
   args: {},
   returns: v.union(snapshotValidator, v.null()),
   handler: async (ctx) =>
     ctx.db.query('planSnapshots').withIndex('by_created').order('desc').first(),
 })
 
-export const approve = mutation({
+export const approve = guardedMutation({
   args: {
     horizonStart: v.string(),
     unplannedCount: v.number(),

@@ -1,7 +1,7 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
 import { runSync } from './moldAlarms'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const recordValidator = v.object({
   _id: v.id('moldMaintenance'),
@@ -15,13 +15,13 @@ const recordValidator = v.object({
   createdAt: v.number(),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(recordValidator),
   handler: async (ctx) => ctx.db.query('moldMaintenance').collect(),
 })
 
-export const add = mutation({
+export const add = guardedMutation({
   args: {
     material: v.string(),
     date: v.string(),
@@ -75,7 +75,7 @@ export const add = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('moldMaintenance') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

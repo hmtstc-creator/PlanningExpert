@@ -4,8 +4,8 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
 import { filterRows, knownLocationCodes, knownMaterialCodes } from './uploadFilter'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const stockValidator = v.object({
   _id: v.id('stock'),
@@ -25,7 +25,7 @@ const stockValidator = v.object({
 /** Tek sorguda okunacak en fazla satır — bkz. products.listAll. */
 const PLANNING_ROW_LIMIT = 8000
 
-export const list = query({
+export const list = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(stockValidator),
   handler: async (ctx, args) =>
@@ -33,7 +33,7 @@ export const list = query({
 })
 
 /** Planlamanın okuduğu eksiksiz stok. Bkz. products.listAll. */
-export const listAll = query({
+export const listAll = guardedQuery({
   args: {},
   returns: v.object({
     rows: v.array(stockValidator),
@@ -48,7 +48,7 @@ export const listAll = query({
   },
 })
 
-export const replaceAll = mutation({
+export const replaceAll = guardedMutation({
   args: {
     rows: v.array(
       v.object({

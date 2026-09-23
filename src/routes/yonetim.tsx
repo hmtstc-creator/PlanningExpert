@@ -144,11 +144,16 @@ function AdminPage() {
           address out of the plan.
         </p>
         <p className="mt-1 text-sm text-amber-900">
-          It guards the <strong>screen</strong>, not yet the data. The database
-          functions can still be called directly by anyone who knows the
-          deployment address; making every one of them check the session is the
-          next step. Roles change what is offered on screen — they do not
-          protect data either.
+          It now guards the data too: every database function checks the
+          session before it runs, so knowing the deployment address is no
+          longer enough. Roles are enforced on the server — a viewer cannot
+          write anything, and only an admin can manage users and the lists
+          below.
+        </p>
+        <p className="mt-1 text-sm text-amber-900">
+          What is left: passwords have no complexity rule beyond a minimum
+          length, there is no lockout after repeated wrong attempts, and the
+          session token lives in this browser's storage.
         </p>
       </div>
 

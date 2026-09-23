@@ -5,8 +5,8 @@
 
 import { v } from 'convex/values'
 
-import { query } from './_generated/server'
 import type { QueryCtx } from './_generated/server'
+import { guardedQuery } from './guarded'
 
 /** Sayım üst sınırı — büyük tablolarda bant genişliğini korur. */
 const COUNT_LIMIT = 5000
@@ -56,7 +56,7 @@ async function tableStats(ctx: QueryCtx, table: TableName) {
  * Tablo bazında kayıt sayısı ve son yazma zamanı. Telefon ile bilgisayarda
  * aynı sayıları görüyorsan aynı veritabanındasın demektir.
  */
-export const summary = query({
+export const summary = guardedQuery({
   args: {},
   returns: v.object({
     serverTime: v.number(),
@@ -80,7 +80,7 @@ export const summary = query({
  * kayıt hatalarına yol açar (eski kod `.unique()` kullandığı için çift
  * kayıt varsa mutation hata fırlatıyordu).
  */
-export const duplicates = query({
+export const duplicates = guardedQuery({
   args: {},
   returns: v.array(
     v.object({ table: v.string(), key: v.string(), count: v.number() }),

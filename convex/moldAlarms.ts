@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 /**
  * Kalıp ömrü alarmları.
@@ -23,7 +23,7 @@ const rowValidator = v.object({
   closeReason: v.optional(v.string()),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(rowValidator),
   handler: async (ctx) => ctx.db.query('moldAlarms').collect(),
@@ -145,7 +145,7 @@ export async function runSync(ctx: Ctx): Promise<{ opened: number; cleared: numb
   return { opened, cleared }
 }
 
-export const sync = mutation({
+export const sync = guardedMutation({
   args: {},
   returns: v.object({ opened: v.number(), cleared: v.number() }),
   handler: async (ctx) => runSync(ctx),
@@ -157,7 +157,7 @@ export const sync = mutation({
  * Kayıt silinmez, kapalı olarak durur — böylece hem geçmişte kalır hem de
  * bir sonraki eşleme onu yeniden açmaz. Ancak sayaç sıfırlanınca düşer.
  */
-export const close = mutation({
+export const close = guardedMutation({
   args: {
     id: v.id('moldAlarms'),
     reason: v.string(),
@@ -188,7 +188,7 @@ export const close = mutation({
 })
 
 /** Kapatılan alarmı yeniden açar — karar geri alınabilir olmalı. */
-export const reopen = mutation({
+export const reopen = guardedMutation({
   args: { id: v.id('moldAlarms'), reopenedBy: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, args) => {

@@ -1,16 +1,16 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { adminMutation, guardedQuery } from './guarded'
 
 /**
  * Kullanıcı kayıtları.
  *
- * DİKKAT — bu bir kimlik DOĞRULAMA değildir. Parola yok, oturum yok;
- * tarayıcıda seçilen kişi kaydın üzerine yazılır. Amacı "kim ne değiştirdi"
- * sorusunu cevaplamaktır, yetkisiz erişimi engellemek değil. Rol alanı da
- * aynı şekilde: ekranı düzenler, veriyi korumaz.
+ * Parolalar `auth.ts` içinde, karma olarak tutuluyor ve oturumlar
+ * `sessions` tablosunda. Buradaki işlevler yalnızca hesabın kendisini
+ * (ad, e-posta, rol, aktiflik) yönetir ve YÖNETİCİYE kısıtlıdır.
  *
- * Gerçek giriş (parola/SSO) ayrı bir iştir ve bu tablonun üstüne kurulur.
+ * Rol artık ekranı düzenlemekten ibaret değil: sunucu tarafında da
+ * denetleniyor (bkz. `authGuard.ts`).
  */
 const ROLES = ['admin', 'planner', 'maintenance', 'viewer']
 
@@ -24,13 +24,13 @@ const rowValidator = v.object({
   createdAt: v.number(),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(rowValidator),
   handler: async (ctx) => ctx.db.query('users').collect(),
 })
 
-export const add = mutation({
+export const add = adminMutation({
   args: { name: v.string(), email: v.optional(v.string()), role: v.string() },
   returns: v.id('users'),
   handler: async (ctx, args) => {
@@ -61,7 +61,7 @@ export const add = mutation({
   },
 })
 
-export const update = mutation({
+export const update = adminMutation({
   args: {
     id: v.id('users'),
     name: v.string(),
@@ -101,7 +101,7 @@ export const update = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = adminMutation({
   args: { id: v.id('users') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

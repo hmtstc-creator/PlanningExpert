@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const overrideValidator = v.object({
   _id: v.id('planOverrides'),
@@ -13,7 +13,7 @@ const overrideValidator = v.object({
   createdAt: v.number(),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(overrideValidator),
   handler: async (ctx) => ctx.db.query('planOverrides').collect(),
@@ -23,7 +23,7 @@ export const list = query({
  * Bir malzeme için müdahale kaydeder. Aynı malzemenin önceki müdahalesi
  * varsa değiştirilir — bir malzemenin aynı anda tek kuralı olur.
  */
-export const set = mutation({
+export const set = guardedMutation({
   args: {
     material: v.string(),
     kind: v.string(),
@@ -72,7 +72,7 @@ export const set = mutation({
   },
 })
 
-export const clear = mutation({
+export const clear = guardedMutation({
   args: { material: v.string() },
   returns: v.null(),
   handler: async (ctx, { material }) => {

@@ -9,7 +9,8 @@ import {
 } from 'react'
 
 import { api } from '../../convex/_generated/api'
-import { useQuery } from './convexTransport'
+import { useAction, useQuery } from './convexTransport'
+import { getSessionToken, setSessionToken, subscribeSessionToken } from './sessionToken'
 
 /**
  * Giriş yapmış kullanıcı.
@@ -19,26 +20,6 @@ import { useQuery } from './convexTransport'
  * Kayıtların üzerine yazılan isim artık bir listeden seçilen değil, giriş
  * yapan kişidir.
  */
-const TOKEN_KEY = 'planningexpert.sessionToken'
-
-function readToken(): string | null {
-  try {
-    return window.localStorage.getItem(TOKEN_KEY)
-  } catch {
-    // Gizli sekme ya da engellenmiş site verisi: oturum hatırlanmaz.
-    return null
-  }
-}
-
-function writeToken(token: string | null): void {
-  try {
-    if (token) window.localStorage.setItem(TOKEN_KEY, token)
-    else window.localStorage.removeItem(TOKEN_KEY)
-  } catch {
-    /* bu tarayıcıda hatırlanmayacak */
-  }
-}
-
 export interface SessionUser {
   name: string
   role: string
@@ -64,20 +45,35 @@ const CurrentUserContext = createContext<CurrentUserValue>({
 })
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
+  // Jeton paylaşılan depoda: taşıma katmanı her çağrıya oradan ekliyor.
   const [token, setTokenState] = useState<string | null>(null)
   // Jeton tarayıcıdan okunana kadar "giriş yok" demek, her açılışta giriş
   // ekranını bir an gösterirdi.
   const [tokenRead, setTokenRead] = useState(false)
 
   useEffect(() => {
-    setTokenState(readToken())
+    setTokenState(getSessionToken())
     setTokenRead(true)
+    return subscribeSessionToken(setTokenState)
   }, [])
 
-  const setToken = useCallback((next: string | null) => {
-    setTokenState(next)
-    writeToken(next)
-  }, [])
+  const logout = useAction(api.auth.logout)
+
+  /**
+   * Çıkış yalnızca jetonu unutmak değil, sunucudaki oturumu da kapatmak
+   * olmalı: kopyalanmış bir jeton aksi halde 12 saat daha çalışırdı.
+   * Sunucuya ulaşılamasa bile yerel jeton her hâlükârda temizlenir.
+   */
+  const setToken = useCallback(
+    (next: string | null) => {
+      const previous = getSessionToken()
+      if (next === null && previous) {
+        void logout({ token: previous }).catch(() => {})
+      }
+      setSessionToken(next)
+    },
+    [logout],
+  )
 
   const result = useQuery(api.authInternal.me, tokenRead ? { token: token ?? undefined } : 'skip')
   const loading = !tokenRead || result === undefined
@@ -86,7 +82,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   // Jeton var ama sunucu tanımıyorsa (süresi dolmuş, kullanıcı silinmiş)
   // saklamanın anlamı yok.
   useEffect(() => {
-    if (!loading && token && user === null) writeToken(null)
+    if (!loading && token && user === null) setSessionToken(null)
   }, [loading, token, user])
 
   const value = useMemo(

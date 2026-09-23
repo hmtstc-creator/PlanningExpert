@@ -4,9 +4,9 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
 import { runSync } from './moldAlarms'
 import { filterRows, knownMaterialCodes } from './uploadFilter'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const rowValidator = v.object({
   _id: v.id('actualProduction'),
@@ -21,7 +21,7 @@ const rowValidator = v.object({
   uploadedAt: v.number(),
 })
 
-export const list = query({
+export const list = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(rowValidator),
   handler: async (ctx, args) =>
@@ -39,7 +39,7 @@ const PLANNING_ROW_LIMIT = 20000
  * güvenli görünür, gerçekleşme oranı olduğundan yüksek çıkar ve o oran tüm
  * planın kapasitesini çarpar. Eksiklik saklanmaz, bildirilir.
  */
-export const listAll = query({
+export const listAll = guardedQuery({
   args: {},
   returns: v.object({
     rows: v.array(rowValidator),
@@ -54,7 +54,7 @@ export const listAll = query({
   },
 })
 
-export const replaceAll = mutation({
+export const replaceAll = guardedMutation({
   args: {
     rows: v.array(
       v.object({

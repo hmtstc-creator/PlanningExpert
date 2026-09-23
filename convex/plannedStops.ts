@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const stopValidator = v.object({
   _id: v.id('plannedStops'),
@@ -14,13 +14,13 @@ const stopValidator = v.object({
 
 const KINDS = ['handover', 'tea', 'meal', 'maintenance', 'other']
 
-export const list = query({
+export const list = guardedQuery({
   args: {},
   returns: v.array(stopValidator),
   handler: async (ctx) => ctx.db.query('plannedStops').collect(),
 })
 
-export const add = mutation({
+export const add = guardedMutation({
   args: {
     shiftIndex: v.number(),
     name: v.string(),
@@ -46,7 +46,7 @@ export const add = mutation({
   },
 })
 
-export const update = mutation({
+export const update = guardedMutation({
   args: {
     id: v.id('plannedStops'),
     name: v.optional(v.string()),
@@ -67,7 +67,7 @@ export const update = mutation({
   },
 })
 
-export const remove = mutation({
+export const remove = guardedMutation({
   args: { id: v.id('plannedStops') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

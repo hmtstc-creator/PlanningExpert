@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
+import { guardedMutation, guardedQuery } from './guarded'
 
 const calendarValidator = v.object({
   _id: v.id('workCalendar'),
@@ -11,7 +11,7 @@ const calendarValidator = v.object({
   holidays: v.array(v.string()),
 })
 
-export const get = query({
+export const get = guardedQuery({
   args: {},
   returns: v.union(calendarValidator, v.null()),
   handler: async (ctx) =>
@@ -21,7 +21,7 @@ export const get = query({
       .first(),
 })
 
-export const save = mutation({
+export const save = guardedMutation({
   args: {
     shiftMinutesPerDay: v.number(),
     workingDays: v.array(v.string()),
