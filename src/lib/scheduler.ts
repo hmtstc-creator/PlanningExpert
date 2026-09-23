@@ -133,6 +133,8 @@ export interface ScheduledJob {
   setupMinutes: number
   qualityApprovalMinutes: number
   reason: string
+  /** Neden bu pres: sıra numarası ve adayların karşılaştırması. */
+  decision?: PlacementDecision
 }
 
 export interface UnplannedItem {
@@ -141,6 +143,32 @@ export interface UnplannedItem {
   phase: DemandEntry['phase']
   dueDate: string
   reason: string
+  /** Hangi presler denendi ve neden olmadı — varsa. */
+  decision?: PlacementDecision
+}
+
+/**
+ * Bir pres adayının karar anındaki sonucu: iş o preste ne zaman biterdi,
+ * ya da neden hiç konamadı.
+ */
+export interface CandidateOutcome {
+  press: string
+  /** İşin o preste biteceği gün ve gün içi net dakika. */
+  endDate?: string
+  endMinute?: number
+  /** Konamadıysa sebebi. */
+  note?: string
+}
+
+/**
+ * Motorun bu iş için verdiği kararın izi. Planı sayılarla tek tek
+ * doğrulamak yerine her işin kararı yerinde okunabilsin diye tutulur:
+ * iş kaçıncı sırada yerleştirildi ve o an her aday pres ne verirdi.
+ */
+export interface PlacementDecision {
+  /** Yerleştirme sırası — 1 ilk yerleştirilen iş. */
+  step: number
+  candidates: CandidateOutcome[]
 }
 
 export interface ScheduleResult {
@@ -528,6 +556,9 @@ export function schedule(
     blackoutsByMaterial.set(b.material, set)
   }
 
+  // Kaçıncı karar olduğu — plan sırayla kurulduğu için doğrulamada önemli.
+  let step = 0
+
   for (const entry of ordered) {
     if (excluded.has(entry.material)) {
       unplanned.push({
@@ -593,6 +624,8 @@ export function schedule(
     // Kalıp limitine göre partilere böl.
     const runs = splitByMoldLimit(product, entry.qty)
     for (const run of runs) {
+      step += 1
+      const decision: PlacementDecision = { step, candidates: [] }
       const placed = placeRun(
         entry,
         product,
@@ -606,6 +639,7 @@ export function schedule(
         options,
         blackoutsByMaterial.get(entry.material),
         !!pin,
+        decision,
       )
       if (placed) {
         jobs.push(placed)
@@ -618,6 +652,7 @@ export function schedule(
           reason: pin
             ? 'Not enough free capacity on the pinned press/day'
             : 'Not enough free capacity in the visible calendar',
+          decision,
         })
       }
     }
@@ -1009,13 +1044,18 @@ function placeRun(
   options: SchedulerOptions,
   blackoutDates: Set<string> | undefined,
   pinned = false,
+  decision?: PlacementDecision,
 ): ScheduledJob | null {
   let best: Placement | null = null
+  const note = (press: string, text: string) => decision?.candidates.push({ press, note: text })
 
   for (const pressName of candidates) {
     const press = pressByName.get(pressName)
     const timeline = timelines.get(pressName)
-    if (!press || !timeline || timeline.days.length === 0) continue
+    if (!press || !timeline || timeline.days.length === 0) {
+      note(pressName, 'no working time in the horizon')
+      continue
+    }
 
     // Dolgu işleri kendi haftasından önce üretilmez; bakiye/acil işler
     // planın ilk gününden itibaren serbesttir.
@@ -1024,13 +1064,19 @@ function placeRun(
     let limit: number | null = null
     if (pinDate) {
       const day = timeline.days.find((d) => d.date === pinDate)
-      if (!day) continue
+      if (!day) {
+        note(pressName, 'pinned day is not a working day')
+        continue
+      }
       earliest = Math.max(earliest, day.offset)
       limit = day.offset + day.capacity
     }
     // Presin ufku doluysa hiç denemeye girme: tıkanmış bir tesiste her
     // kalem için tüm ufku yeniden taramak, aramanın en pahalı hâli.
-    if (firstFreePoint(timeline, earliest) >= timeline.total) continue
+    if (firstFreePoint(timeline, earliest) >= timeline.total) {
+      note(pressName, 'full until the end of the horizon')
+      continue
+    }
 
     const placement = tryPlaceOnPress(
       entry,
@@ -1045,8 +1091,19 @@ function placeRun(
       press.feedsCoil !== false,
       blackoutDates,
     )
-    if (!placement) continue
-    if (limit !== null && placement.endGlobal > limit) continue
+    if (!placement) {
+      note(pressName, 'no slot (mould, crane or maintenance)')
+      continue
+    }
+    if (limit !== null && placement.endGlobal > limit) {
+      note(pressName, 'does not fit in the pinned day')
+      continue
+    }
+    decision?.candidates.push({
+      press: pressName,
+      endDate: placement.endDate,
+      endMinute: placement.endMinute,
+    })
 
     // Takvimde en erken biten pres kazanır. Eksen dakikaları preslere göre
     // farklı ölçekte olduğu için karşılaştırma takvim üzerinden yapılır.
@@ -1163,5 +1220,6 @@ function placeRun(
     coilChanges: press.feedsCoil === false ? 0 : run.coilChanges,
     segments: best.segments,
     reason: reasonParts.join(' · '),
+    decision,
   }
 }

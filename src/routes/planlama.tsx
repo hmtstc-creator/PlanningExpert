@@ -13,6 +13,8 @@ import { productionDayOf } from '../lib/shiftTimeline'
 import { useCurrentUser } from '../lib/currentUser'
 import { diffPlans } from '../lib/planDiff'
 import { groupPlanWeeks, type PlanRun, type SnapshotJob } from '../lib/planPipeline'
+import type { PlanAudit } from '../lib/planAudit'
+import type { PlacementDecision } from '../lib/scheduler'
 import { fixForUnplanned } from '../lib/unplannedFix'
 
 export const Route = createFileRoute('/planlama')({
@@ -551,6 +553,8 @@ function PlanlamaPage() {
         )}
       </div>
 
+      {run?.audit && <PlanCheck audit={run.audit} jobCount={run.jobs.length} />}
+
       {inputsLoading && (
         <p className="mt-8 text-sm text-muted-foreground">Loading data…</p>
       )}
@@ -647,6 +651,9 @@ function PlanlamaPage() {
                     <th className="px-3 py-2 font-medium">Setup start</th>
                     <th className="px-3 py-2 font-medium">End</th>
                     <th className="px-3 py-2 font-medium">Reason</th>
+                    <th className="px-3 py-2 font-medium" title="Order in which the engine placed the job, and when each eligible press would have finished it at that moment">
+                      Why this press
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -695,6 +702,14 @@ function PlanlamaPage() {
                         )}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{job.reason}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        <DecisionCell
+                          decision={job.decision}
+                          chosen={job.frozen ? undefined : job.press}
+                          shiftMinutes={shiftMinutes}
+                          shiftStartMinute={shiftStartMinute}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -770,6 +785,7 @@ function PlanlamaPage() {
                   <th className="px-3 py-2 font-medium">Phase</th>
                   <th className="px-3 py-2 font-medium">Required week</th>
                   <th className="px-3 py-2 font-medium">Reason</th>
+                  <th className="px-3 py-2 font-medium">Presses tried</th>
                   <th className="px-3 py-2 font-medium">Fix</th>
                 </tr>
               </thead>
@@ -787,6 +803,13 @@ function PlanlamaPage() {
                       <td className="px-3 py-2 text-muted-foreground">{u.phase}</td>
                       <td className="px-3 py-2 text-muted-foreground">{u.dueDate}</td>
                       <td className="px-3 py-2 text-muted-foreground">{u.reason}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        <DecisionCell
+                          decision={u.decision}
+                          shiftMinutes={shiftMinutes}
+                          shiftStartMinute={shiftStartMinute}
+                        />
+                      </td>
                       <td className="px-3 py-2 text-xs whitespace-nowrap">
                         {fix.to ? (
                           <Link
@@ -836,6 +859,93 @@ const CHANGE_STYLE: Record<string, string> = {
   moved: 'rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900',
   quantity: 'rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900',
   same: 'text-xs text-muted-foreground',
+}
+
+/**
+ * Karar izi: iş kaçıncı sırada yerleştirildi ve o an her uygun pres işi ne
+ * zaman bitirirdi. Planlamacı "bu parça 105'te daha erken bitmez miydi?"
+ * sorusunun cevabını burada okur.
+ */
+function DecisionCell({
+  decision,
+  chosen,
+  shiftMinutes,
+  shiftStartMinute,
+}: {
+  decision?: PlacementDecision
+  chosen?: string
+  shiftMinutes: number
+  shiftStartMinute: number
+}) {
+  if (!decision) return <span>—</span>
+  return (
+    <span className="whitespace-nowrap">
+      <span className="mr-1 font-medium text-foreground">#{decision.step}</span>
+      {decision.candidates.map((c, i) => (
+        <span key={c.press}>
+          {i > 0 && ' · '}
+          <span className={c.press === chosen ? 'font-semibold text-emerald-700' : undefined}>
+            {c.press}
+            {c.press === chosen && ' ✓'}{' '}
+            {c.endDate !== undefined && c.endMinute !== undefined
+              ? `${new Date(`${c.endDate}T00:00:00`).toLocaleDateString('en-GB', {
+                  weekday: 'short',
+                  day: '2-digit',
+                })} ${formatClock(c.endMinute, shiftMinutes, shiftStartMinute).split(' ')[0]}`
+              : `(${c.note})`}
+          </span>
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/**
+ * Bağımsız plan denetimi: motordan ayrı bir kod, bitmiş planın her işini
+ * her kurala karşı yeniden sayar.
+ */
+function PlanCheck({ audit, jobCount }: { audit: PlanAudit; jobCount: number }) {
+  return (
+    <div
+      className={`mt-6 rounded-lg border p-4 ${
+        audit.ok ? 'border-emerald-200 bg-emerald-50/60' : 'border-destructive bg-destructive/10'
+      }`}
+    >
+      <h2 className="text-sm font-semibold text-foreground">
+        Plan check {audit.ok ? '— all rules hold' : '— rules broken, do not approve'}
+      </h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        After every calculation, separate checking code goes through all{' '}
+        {jobCount.toLocaleString('en-GB')} jobs again and verifies each rule on its own.
+        You do not need to recount the plan by hand. See{' '}
+        <Link to="/planlogic" className="underline hover:no-underline">
+          Planning Logic
+        </Link>
+        .
+      </p>
+      <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
+        {audit.rules.map((r) => (
+          <li key={r.id}>
+            <span className={r.violationCount === 0 ? 'text-emerald-700' : 'text-destructive'}>
+              {r.violationCount === 0 ? '✓' : '✗'}
+            </span>{' '}
+            <span className="text-foreground">{r.label}</span>{' '}
+            <span className="text-xs text-muted-foreground">
+              ({r.checked.toLocaleString('en-GB')} checked
+              {r.violationCount > 0 ? `, ${r.violationCount} broken` : ''})
+            </span>
+            {r.violations.length > 0 && (
+              <ul className="ml-5 list-disc text-xs text-destructive">
+                {r.violations.map((v) => (
+                  <li key={v}>{v}</li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 function Stat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {

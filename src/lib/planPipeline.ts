@@ -34,6 +34,7 @@ import {
   type PressMaintenanceRow,
 } from './maintenance'
 import { alarmedMaterials } from './moldAlarm'
+import { auditPlan, type PlanAudit } from './planAudit'
 import {
   schedule,
   type PlanOverride,
@@ -155,6 +156,8 @@ export interface PlanRun {
   eligiblePresses: string[]
   alarmedMolds: string[]
   unavailableMolds: string[]
+  /** Bitmiş planın kurallara karşı bağımsız denetimi (planAudit.ts). */
+  audit: PlanAudit
 }
 
 function sum<K>(map: Map<K, number>, key: K, add: number) {
@@ -450,6 +453,22 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     todayIso,
   })
 
+  const audit = auditPlan({
+    jobs,
+    maintenance,
+    moldBlackouts,
+    todayIso,
+    setupGapMinutes,
+    coilSetupGapMinutes,
+    concurrentSetupsPerHall,
+  })
+  if (!audit.ok) {
+    const broken = audit.rules.filter((r) => r.violationCount > 0).length
+    warnings.unshift(
+      `The plan check found ${broken} broken rule(s) — see "Plan check" below. Do not approve this plan.`,
+    )
+  }
+
   return {
     computedAt: nowMs,
     todayIso,
@@ -482,6 +501,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     eligiblePresses: Array.from(eligible).sort(),
     alarmedMolds,
     unavailableMolds,
+    audit,
   }
 }
 

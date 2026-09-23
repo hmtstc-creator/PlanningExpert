@@ -71,7 +71,10 @@ function PlanLogicPage() {
         applied to them the same way every time.
       </p>
 
-      <ol className="mt-6 flex flex-wrap gap-2 text-xs">
+      <Synoptic />
+
+      <h2 className="mt-10 text-lg font-semibold text-foreground">The seven steps in detail</h2>
+      <ol className="mt-3 flex flex-wrap gap-2 text-xs">
         {STEPS.map((step, i) => (
           <li key={step.id} className="flex items-center gap-2">
             <a
@@ -338,6 +341,207 @@ function PlanLogicPage() {
         </p>
       </section>
     </div>
+  )
+}
+
+// ---- Sinoptik: algoritmanın tek bakışta resmi ------------------------------
+
+function Box({ tone, title, children }: { tone: string; title: string; children?: ReactNode }) {
+  return (
+    <div className={`rounded-md border px-3 py-2 ${tone}`}>
+      <p className="text-sm font-semibold">{title}</p>
+      {children && <div className="mt-0.5 text-xs opacity-90">{children}</div>}
+    </div>
+  )
+}
+
+function Down({ label }: { label?: string }) {
+  return (
+    <div className="flex items-center gap-2 py-1 pl-6 text-xs text-muted-foreground">
+      <span aria-hidden className="text-base leading-none">↓</span>
+      {label}
+    </div>
+  )
+}
+
+/** Bir pres şeridi: dolu kısım gri, adayın işi renkli. */
+function Lane({
+  press,
+  busy,
+  job,
+  finish,
+  chosen,
+  note,
+}: {
+  press: string
+  busy: number
+  job?: number
+  finish?: string
+  chosen?: boolean
+  note?: string
+}) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="w-10 shrink-0 font-medium text-foreground">{press}</span>
+      <div className="relative h-5 flex-1 rounded bg-muted">
+        <div
+          className="absolute inset-y-0 left-0 rounded-l bg-slate-400/70"
+          style={{ width: `${busy}%` }}
+        />
+        {job !== undefined && (
+          <div
+            className={`absolute inset-y-0 rounded border-2 ${
+              chosen ? 'border-emerald-600 bg-emerald-200' : 'border-dashed border-amber-500 bg-amber-100'
+            }`}
+            style={{ left: `${busy}%`, width: `${job}%` }}
+          />
+        )}
+      </div>
+      <span
+        className={`w-44 shrink-0 ${chosen ? 'font-semibold text-emerald-700' : 'text-muted-foreground'}`}
+      >
+        {note ?? `would finish ${finish}`}
+        {chosen && ' ✓ chosen'}
+      </span>
+    </div>
+  )
+}
+
+function Synoptic() {
+  return (
+    <section className="mt-6">
+      <h2 className="text-lg font-semibold text-foreground">Planning algorithm — at a glance</h2>
+      <div className="mt-3 grid gap-6 lg:grid-cols-2">
+        <div>
+          <Box tone="border-border bg-muted/50 text-foreground" title="1 · One list of everything to produce">
+            Demand minus stock, rounded to whole coils, per material and week.
+          </Box>
+          <Down label="sorted once" />
+          <Box tone="border-border bg-muted/50 text-foreground" title="2 · Sort the list">
+            Moved to front → Backlog → Urgent → Fill. Same group: earlier week
+            first, then fewer days of cover.
+          </Box>
+          <Down label="take the next item from the top" />
+          <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · Try EVERY press that can make it">
+            Main press and all alternatives (e.g. 104, 105, 108, 110). On each
+            one, find the earliest free slot that respects all the rules: shift
+            ends, crane, mould, maintenance.
+          </Box>
+          <Down label="each press gives a finish time" />
+          <Box tone="border-emerald-300 bg-emerald-50 text-emerald-950" title="4 · Choose the press that finishes first">
+            Not "the first press in the list" and not "the main press" — the
+            one where the job is done soonest.
+          </Box>
+          <Down label="book it" />
+          <Box tone="border-border bg-muted/50 text-foreground" title="5 · Book the slot">
+            That press time, the crane slots and the mould are now taken for
+            all the items that follow.
+          </Box>
+          <Down label="back to 3 with the next item, until the list is empty" />
+          <Box tone="border-destructive/40 bg-destructive/10 text-foreground" title="No press has room → Unplanned">
+            With the reason and the presses that were tried.
+          </Box>
+        </div>
+
+        <div className="rounded-lg border border-border p-4">
+          <p className="text-sm font-semibold text-foreground">Example — decision #12</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Part A has a backlog and can run on 104 (main), 105 and 108. Eleven
+            jobs are already booked. Grey = already booked, coloured = where A
+            would go.
+          </p>
+          <div className="mt-3 space-y-2">
+            <Lane press="104" busy={58} job={22} finish="Tue 11:30" />
+            <Lane press="105" busy={30} job={22} finish="Mon 23:30" chosen />
+            <Lane press="108" busy={100} note="full until the end of the horizon" />
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            A goes to <b className="text-foreground">105</b>, even though 104 is
+            its main press, because 105 finishes it a shift and a half
+            earlier. On the Production Plan, the job list shows exactly this
+            line for every job in the <b className="text-foreground">Why this press</b>{' '}
+            column:
+          </p>
+          <p className="mt-2 rounded bg-muted px-2 py-1 font-mono text-[11px] text-foreground">
+            #12 104 Tue 11:30 · <span className="font-semibold text-emerald-700">105 ✓ Mon 23:30</span> · 108 (full until the end of the horizon)
+          </p>
+
+          <p className="mt-4 text-sm font-semibold text-foreground">What this means for your question</p>
+          <ul className="mt-1 ml-5 list-disc space-y-1 text-xs text-muted-foreground">
+            <li>
+              A part is never written onto a press just because it is first in a
+              list. Each job is compared on all of its presses at the moment
+              it is placed.
+            </li>
+            <li>
+              A backlog part can only end up 4th on 104 if at that moment 105,
+              108 and 110 could not finish it earlier. The job's line proves
+              it.
+            </li>
+            <li>
+              The engine decides one job at a time and never moves a job it has
+              already booked. Two consequences are listed below under{' '}
+              <a href="#limits" className="underline">
+                Known limits
+              </a>
+              .
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-border p-4">
+          <h3 className="text-sm font-semibold text-foreground">How to check the plan without recounting it</h3>
+          <ol className="mt-2 ml-5 list-decimal space-y-1 text-xs text-muted-foreground">
+            <li>
+              <b className="text-foreground">Plan check</b> (Production Plan page): after
+              every calculation, checking code that is separate from the engine goes
+              through every job again and checks each rule — one job per press
+              at a time, earliest press chosen, crane gaps, one mould on one
+              press, maintenance, fill not too early, nothing in the past. A
+              broken rule shows in red with the job named.
+            </li>
+            <li>
+              <b className="text-foreground">Why this press</b> (job list): pick any job
+              you doubt and read its decision: its order number and the
+              finish time on every eligible press.
+            </li>
+            <li>
+              <b className="text-foreground">Automatic tests</b>: before any change goes live,
+              the engine plans 40 randomly generated plants (progressive and
+              transfer halls, single and shared parts, maintenance, stops) and
+              the same checks must find zero broken rules. Your 104/105 case is
+              one of the tests.
+            </li>
+          </ol>
+        </div>
+
+        <div id="limits" className="scroll-mt-20 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h3 className="text-sm font-semibold text-amber-950">Known limits</h3>
+          <p className="mt-1 text-xs text-amber-900">
+            The engine places jobs one after the other. That makes every decision
+            explainable, but it is not a search over every possible plan:
+          </p>
+          <ul className="mt-2 ml-5 list-disc space-y-1 text-xs text-amber-900">
+            <li>
+              When items are in the same group and week, and their days of cover
+              are the same (all backlog items, for example), they keep the row
+              order of the ZPP file.
+            </li>
+            <li>
+              A part with alternatives that is placed earlier can take the free
+              slot that a single-press part placed later needed, even if it
+              could have gone somewhere else.
+            </li>
+          </ul>
+          <p className="mt-2 text-xs text-amber-900">
+            Both can be improved, for example by placing the parts with the
+            fewest eligible presses first when the priority is equal.
+          </p>
+        </div>
+      </div>
+    </section>
   )
 }
 
