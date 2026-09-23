@@ -62,14 +62,14 @@ function isoThursdayOf(date: Date): Date {
 }
 
 /** Tesisin saat dilimi. Ayarda başka bir dilim yazılmadıkça bu kullanılır. */
-export const DEFAULT_PLANT_TIME_ZONE = 'Europe/Istanbul'
+export const DEFAULT_PLANT_TIME_ZONE = 'Europe/Bucharest'
 
 /**
  * `ms` anında tesisteki DUVAR SAATİNİ taşıyan bir Date.
  *
  * Plan katmanı tarihleri yerel alanlarla (getDate, getHours…) okur. Tarayıcı
  * tesiste olduğu için bu doğruydu; ama plan artık sunucuda hesaplanıyor ve
- * sunucu UTC'de çalışır — 02:30'da İstanbul'da gün değişmişken sunucu hâlâ
+ * sunucu UTC'de çalışır — 02:30'da Romanya'da gün değişmişken sunucu hâlâ
  * önceki günde olurdu. Bu fonksiyon tesis saatinin parçalarını alıp yerel
  * alanları onlar olan bir Date kurar; böylece aynı kod her iki tarafta da
  * aynı günü, aynı saati görür.

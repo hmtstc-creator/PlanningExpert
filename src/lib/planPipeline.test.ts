@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { plantClock } from './dates'
 import { computePlan, groupPlanWeeks, type PlanInputs } from './planPipeline'
 
-// Salı 16 Eylül 2026, İstanbul 10:00 (UTC 07:00).
+// Çarşamba 16 Eylül 2026, Romanya 10:00 (yaz saati, UTC+3 → UTC 07:00).
 const NOW = Date.UTC(2026, 8, 16, 7, 0)
 
 function inputs(overrides: Partial<PlanInputs> = {}): PlanInputs {
@@ -46,11 +46,17 @@ function inputs(overrides: Partial<PlanInputs> = {}): PlanInputs {
 
 describe('plantClock', () => {
   it('gives the plant wall clock even when the machine runs in another zone', () => {
-    // UTC 23:30 → İstanbul ertesi gün 02:30.
+    // UTC 23:30 → İstanbul ertesi gün 02:30 (başka dilim de verilebilir).
     const d = plantClock(Date.UTC(2026, 8, 15, 23, 30), 'Europe/Istanbul')
     expect(d.getDate()).toBe(16)
     expect(d.getHours()).toBe(2)
     expect(d.getMinutes()).toBe(30)
+  })
+
+  it('uses Romanian time by default, summer and winter', () => {
+    // Yaz saati UTC+3, kış saati UTC+2.
+    expect(plantClock(Date.UTC(2026, 6, 1, 4, 0)).getHours()).toBe(7)
+    expect(plantClock(Date.UTC(2026, 11, 1, 4, 0)).getHours()).toBe(6)
   })
 
   it('falls back to the machine clock for an unknown zone', () => {
@@ -72,7 +78,7 @@ describe('computePlan', () => {
   })
 
   it('treats the night shift as the previous production day', () => {
-    // İstanbul 02:00 → birinci vardiya 07:00'de başlıyor, gün hâlâ dün.
+    // Romanya 02:00 → birinci vardiya 07:00'de başlıyor, gün hâlâ dün.
     const run = computePlan(inputs(), Date.UTC(2026, 8, 16, 23, 0))
     expect(run.todayIso).toBe('2026-09-16')
     expect(run.nowClockMinute).toBe(26 * 60)

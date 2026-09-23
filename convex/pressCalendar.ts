@@ -216,7 +216,7 @@ export const setCapacityFactor = guardedMutation({
         key: 'default',
         shiftMinutes: 480,
         overtimeShiftMinutes: 480,
-        country: 'TR',
+        country: 'RO',
         capacityFactor,
       })
     }

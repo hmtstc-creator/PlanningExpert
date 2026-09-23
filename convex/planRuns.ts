@@ -36,7 +36,7 @@ export const smallInputs = internalQuery({
       .query('globalShiftSettings')
       .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
       .first()
-    const country = settings?.country ?? 'TR'
+    const country = settings?.country ?? 'RO'
     return {
       settings,
       presses: await ctx.db.query('presses').collect(),

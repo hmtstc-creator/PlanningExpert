@@ -9,7 +9,7 @@
 // DİKKAT: bu dosya ve import ettikleri sunucuda da derlenir. `@/` takma adı
 // orada çözülmez; yalnızca göreli import kullanılmalı.
 
-import { addDays, isoDate, mondayOf, plantClock } from './dates'
+import { addDays, DEFAULT_PLANT_TIME_ZONE, isoDate, mondayOf, plantClock } from './dates'
 import {
   buildDemandSchedule,
   buildRawMaterialPlan,
@@ -163,7 +163,7 @@ function sum<K>(map: Map<K, number>, key: K, add: number) {
 
 export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const s = inputs.settings ?? {}
-  const timeZone = s.timeZone || 'Europe/Istanbul'
+  const timeZone = s.timeZone || DEFAULT_PLANT_TIME_ZONE
   const shiftMinutes = s.shiftMinutes ?? 480
   const overtimeShiftMinutes = s.overtimeShiftMinutes ?? 480
   const setupGapMinutes = s.setupGapMinutes ?? 60

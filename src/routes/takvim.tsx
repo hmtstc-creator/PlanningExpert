@@ -149,7 +149,7 @@ function PressCalendarSection() {
   // Vardiya süresi (dk) tüm presler için ortaktır.
   const [shiftMinutes, setShiftMinutes] = useState(480)
   const [overtimeShiftMinutes, setOvertimeShiftMinutes] = useState(480)
-  const [country, setCountry] = useState('TR')
+  const [country, setCountry] = useState('RO')
   const [setupGapMinutes, setSetupGapMinutes] = useState(60)
   const [coilSetupGapMinutes, setCoilSetupGapMinutes] = useState(30)
   const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
