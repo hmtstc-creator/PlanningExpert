@@ -15,11 +15,19 @@ const SESSION_TTL_MS = 12 * 60 * 60 * 1000
 export const findUser = internalQuery({
   args: { name: v.string() },
   returns: v.any(),
-  handler: async (ctx, { name }) =>
-    ctx.db
+  handler: async (ctx, { name }) => {
+    const exact = await ctx.db
       .query('users')
       .withIndex('by_name', (q) => q.eq('name', name))
-      .first(),
+      .first()
+    if (exact) return exact
+    // Kullanıcı adı büyük/küçük harf ayırmaz: telefon klavyesi ilk harfi
+    // büyük yazar ("Admin") ve giriş sebebi görünmeden reddediliyordu.
+    // Kullanıcı tablosu küçük; tek tek bakmak sorun değil.
+    const wanted = name.toLocaleLowerCase('en')
+    const all = await ctx.db.query('users').take(1000)
+    return all.find((u) => u.name.toLocaleLowerCase('en') === wanted) ?? null
+  },
 })
 
 export const countUsers = internalQuery({

@@ -84,6 +84,9 @@ export function LoginGate({ children }: { children: ReactNode }) {
             <input
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />

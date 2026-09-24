@@ -4,7 +4,7 @@ import { v } from 'convex/values'
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto'
 
 import { api, internal } from './_generated/api'
-import { action } from './_generated/server'
+import { action, internalAction } from './_generated/server'
 
 /**
  * Giriş.
@@ -137,6 +137,37 @@ export const changePassword = action({
       // Kendi oturumu açık kalsın; diğer cihazlar kapansın.
       keepToken: args.token,
       actor: me.name,
+    })
+    return null
+  },
+})
+
+/**
+ * Acil durum: parolayı Convex panelinden sıfırlar.
+ *
+ * Yönetici parolası unutulursa uygulamada kimse onu değiştiremez. Bu işlev
+ * dışarıdan çağrılamaz (internal); yalnızca Convex panelinin Functions
+ * sekmesinden, yani deploy'a erişimi olan biri tarafından çalıştırılabilir.
+ * Kullanıcı ilk girişte parolasını değiştirmeye zorlanır ve açık oturumları
+ * kapanır.
+ */
+export const resetPassword = internalAction({
+  args: { name: v.string(), newPassword: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    assertPassword(args.newPassword)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const user: any = await ctx.runQuery(internal.authInternal.findUser, {
+      name: args.name.trim(),
+    })
+    if (!user) throw new Error(`No user named ${args.name}`)
+    const salt = randomBytes(16).toString('hex')
+    await ctx.runMutation(internal.authInternal.storePassword, {
+      id: user._id,
+      passwordHash: hashPassword(args.newPassword, salt),
+      passwordSalt: salt,
+      mustChangePassword: true,
+      actor: 'Convex dashboard (password reset)',
     })
     return null
   },
