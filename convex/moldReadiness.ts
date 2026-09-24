@@ -8,6 +8,7 @@ const rowValidator = v.object({
   material: v.string(),
   ready: v.boolean(),
   readyDate: v.optional(v.string()),
+  readyMinute: v.optional(v.number()),
   reason: v.optional(v.string()),
   updatedBy: v.optional(v.string()),
   updatedAt: v.number(),
@@ -31,6 +32,8 @@ export const set = guardedMutation({
     material: v.string(),
     ready: v.boolean(),
     readyDate: v.optional(v.string()),
+    /** Hazır olacağı saat, gece yarısından dakika (ör. 600 = 10:00). */
+    readyMinute: v.optional(v.number()),
     reason: v.optional(v.string()),
     updatedBy: v.optional(v.string()),
   },
@@ -42,10 +45,21 @@ export const set = guardedMutation({
       throw new Error('Ready date must be in YYYY-MM-DD format')
     }
 
+    if (
+      args.readyMinute !== undefined &&
+      (!Number.isFinite(args.readyMinute) || args.readyMinute < 0 || args.readyMinute >= 24 * 60)
+    ) {
+      throw new Error('Ready time must be between 00:00 and 23:59')
+    }
+
     const patch = {
       material,
       ready: args.ready,
       readyDate: args.ready ? undefined : args.readyDate || undefined,
+      readyMinute:
+        args.ready || !args.readyDate || args.readyMinute === undefined
+          ? undefined
+          : Math.round(args.readyMinute),
       reason: args.ready ? undefined : args.reason?.trim() || undefined,
       updatedBy: args.updatedBy,
       updatedAt: Date.now(),
@@ -65,7 +79,15 @@ export const set = guardedMutation({
       title: `Mold ${args.ready ? 'released for production' : 'held'} — ${material}`,
       detail: args.ready
         ? 'The mold is available to the plan again.'
-        : `Not available${args.readyDate ? ` until ${args.readyDate}` : ' (no date given)'}.` +
+        : `Not available${
+            args.readyDate
+              ? ` until ${args.readyDate}${
+                  args.readyMinute !== undefined
+                    ? ` ${String(Math.floor(args.readyMinute / 60)).padStart(2, '0')}:${String(args.readyMinute % 60).padStart(2, '0')}`
+                    : ''
+                }`
+              : ' (no date given)'
+          }.` +
           (args.reason ? ` ${args.reason}` : ''),
       category: 'maintenance',
       author: args.updatedBy,

@@ -31,22 +31,14 @@ export const PORTAL_MODULES: PortalModule[] = [
   {
     to: '/die-followup',
     title: 'Die Follow-up',
-    description: 'Die condition, shot counters, maintenance and problems.',
-    ready: false,
-    related: [
-      { to: '/kaliplar', label: 'Mold maintenance' },
-      { to: '/kalipproblem', label: 'Mold problems' },
-    ],
+    description: 'Die problems and their history, readiness, maintenance, shot counters and Pareto reports.',
+    ready: true,
   },
   {
     to: '/machine-followup',
     title: 'Machine Follow-up',
-    description: 'Press status, maintenance and downtime.',
-    ready: false,
-    related: [
-      { to: '/presbakim', label: 'Press maintenance' },
-      { to: '/makineler', label: 'Press definitions' },
-    ],
+    description: 'Press breakdowns and their history, planned maintenance and Pareto reports.',
+    ready: true,
   },
   {
     to: '/kpi',

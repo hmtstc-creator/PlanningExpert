@@ -141,7 +141,8 @@ function PlanLogicPage() {
             ],
             ['Presses', 'Hall (for the crane rule) and whether the press is coil-fed', '/makineler'],
             ['Work calendar', 'Shifts per press, working days, planned stops, public holidays', '/takvim'],
-            ['Maintenance', 'Press maintenance hours, mould maintenance days, mould readiness, shot-limit alarms', '/kaliplar'],
+            ['Dies', 'Readiness (date and time), maintenance days, shot-limit alarms — from Die Follow-up', '/die-followup/maintenance'],
+            ['Machines', 'Planned press maintenance hours and open breakdowns that stop a press — from Machine Follow-up', '/machine-followup/breakdowns'],
             ['Your rules', 'Exclude, pin to a press/day, or move to the front', '/planlama'],
             ['Approved plan', 'The last approved plan, for the frozen days', '/planlama'],
           ]}
@@ -245,12 +246,21 @@ function PlanLogicPage() {
             press's day; jobs flow around it.
           </li>
           <li>
+            <b>Machine breakdown</b> (reported in Machine Follow-up with "the
+            press is stopped"): the press is closed from the breakdown until
+            the expected time it is back — or, with no expected time, until
+            the breakdown is solved. A fault that does not stop the press does
+            not change the plan.
+          </li>
+          <li>
             <b>Mould maintenance</b> days: no part of a job with that mould may
             fall on them.
           </li>
           <li>
-            <b>Mould not ready</b>: with a ready date, the mould is blocked
-            until then; without a date, it is held out of the plan entirely.
+            <b>Mould not ready</b>: with a ready date (and time), the mould is
+            blocked until that moment — ready at 10:00 means that day's
+            earlier hours are closed too; without a date, it is held out of
+            the plan entirely.
           </li>
           <li>
             <b>Shot-limit alarm</b>: once a mould passes its periodic
@@ -395,6 +405,33 @@ function PlanLogicPage() {
           usually capacity: an overtime or weekend shift, or another press in
           the part's master data.
         </p>
+      </section>
+
+      <section id="alarms" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold text-foreground">Alarms — dies and machines</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Die and machine follow-up live in their own modules. PlanningExpert
+          keeps only what matters to the plan, on the{' '}
+          <Link to="/alarms" className="underline">
+            Alarms
+          </Link>{' '}
+          page, in two lists:
+        </p>
+        <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
+          <li>
+            <b className="text-foreground">Holding up the plan</b> — a die is not
+            ready, has no ready date, has a shot-limit alarm or is in
+            maintenance, or a press is down or in maintenance, <b className="text-foreground">and</b>{' '}
+            a part's stock runs out before it is available (or its job is late
+            or cannot be planned). Example: die ready the day after tomorrow at
+            10:00, 1 000 parts to ship tomorrow.
+          </li>
+          <li>
+            <b className="text-foreground">For information</b> — not available,
+            but the stock lasts until it is back, or there is no demand in the
+            horizon. The planner should know; nothing is late.
+          </li>
+        </ul>
       </section>
 
       <section className="mt-8 rounded-lg border border-border p-4">

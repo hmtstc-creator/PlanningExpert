@@ -48,3 +48,12 @@ describe('flexible press', () => {
   })
 })
 
+describe('held dies', () => {
+  it('sends a held die to die readiness', () => {
+    expect(fixForUnplanned('Mould held: not ready and no ready date')).toEqual({
+      label: 'Check the die',
+      to: '/die-followup/maintenance',
+    })
+  })
+})
+

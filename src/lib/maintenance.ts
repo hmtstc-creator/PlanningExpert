@@ -26,13 +26,28 @@ export interface MoldMaintenanceRow {
   date: string
   dateTo?: string
   kind?: string
+  note?: string
 }
 
 export interface MoldReadinessRow {
   material: string
   ready: boolean
   readyDate?: string
+  /** Hazır olma saati, gece yarısından dakika. */
+  readyMinute?: number
+  reason?: string
 }
+
+/**
+ * Hazır olma anını (takvim günü + saat) üretim gününe ve o günün net
+ * dakikasına çevirir. Gece vardiyasındaki bir saat bir önceki üretim
+ * gününe aittir. Çağıran taraf vardiya çizelgesini bilir; burada yalnızca
+ * sözleşme tanımlı.
+ */
+export type ReadyMomentToNet = (
+  readyDate: string,
+  readyMinute: number,
+) => { date: string; untilNet: number } | null
 
 /**
  * Pres bakımını, motorun `fixedJobs` olarak yerleştirebileceği bir bloğa
@@ -95,8 +110,13 @@ export function moldBlackouts(
    * bir kapalılıktır, gün listesiyle ifade edilemez.
    */
   alarmed: string[] = [],
-): { blackouts: { material: string; date: string }[]; unavailable: string[] } {
-  const blackouts: { material: string; date: string }[] = []
+  /** Verilirse hazır olma saati de uygulanır: o gün o saate kadar kapalı. */
+  readyMomentToNet?: ReadyMomentToNet,
+): {
+  blackouts: { material: string; date: string; untilNet?: number }[]
+  unavailable: string[]
+} {
+  const blackouts: { material: string; date: string; untilNet?: number }[] = []
   const unavailable: string[] = [...alarmed]
 
   for (const row of maintenance) {
@@ -111,8 +131,18 @@ export function moldBlackouts(
       if (!unavailable.includes(row.material)) unavailable.push(row.material)
       continue
     }
+    // Saat verilmişse hazır olma anı gün içindedir: o güne kadar bütün
+    // günler, o gün de o saate kadar kapalı.
+    const moment =
+      row.readyMinute !== undefined && readyMomentToNet
+        ? readyMomentToNet(row.readyDate, row.readyMinute)
+        : null
+    const fullUntil = moment ? moment.date : row.readyDate
     for (const date of horizonDates) {
-      if (date < row.readyDate) blackouts.push({ material: row.material, date })
+      if (date < fullUntil) blackouts.push({ material: row.material, date })
+    }
+    if (moment && moment.untilNet > 0 && horizonDates.includes(moment.date)) {
+      blackouts.push({ material: row.material, date: moment.date, untilNet: moment.untilNet })
     }
   }
 

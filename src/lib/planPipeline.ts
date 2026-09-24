@@ -24,6 +24,7 @@ import {
 } from './planning'
 import {
   buildDayTimeline,
+  clockToNet,
   productionDayOf,
   remainingCapacityMinutes,
   type PlannedStop,
@@ -38,6 +39,12 @@ import {
 import { alarmedMaterials } from './moldAlarm'
 import { auditPlan, type PlanAudit } from './planAudit'
 import { readDailyDemand } from './dailyDemand'
+import {
+  buildPlanAlarms,
+  type DieUnavailability,
+  type MachineUnavailability,
+  type PlanAlarms,
+} from './planAlarms'
 import {
   schedule,
   type PlanOverride,
@@ -117,6 +124,17 @@ export interface PlanInputs {
   readiness: MoldReadinessRow[]
   pressMaintenance: PressMaintenanceRow[]
   alarms: { material: string; status: string }[]
+  /** Açık makine arızaları. "Pres duruyor" olanlar planda presi kapatır. */
+  machineProblems?: {
+    press: string
+    problemType: string
+    occurredAt: string
+    occurredMinute?: number
+    stopsPress: boolean
+    expectedUpDate?: string
+    expectedUpMinute?: number
+    status: string
+  }[]
   /** Eksik okunan tablolar ('master data', 'demand', 'stock'). */
   truncatedInputs: string[]
 }
@@ -185,6 +203,8 @@ export interface PlanRun {
   unavailableMolds: string[]
   /** Bitmiş planın kurallara karşı bağımsız denetimi (planAudit.ts). */
   audit: PlanAudit
+  /** Kalıp ve makine alarmları: planı aksatanlar ve bilgi için olanlar. */
+  alarms: PlanAlarms
 }
 
 function sum<K>(map: Map<K, number>, key: K, add: number) {
@@ -366,16 +386,59 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const horizonDates = Array.from(horizonDateSet).sort()
 
   const alarmedMolds = alarmedMaterials(inputs.alarms)
+
+  // Takvim günü + saat → üretim günü + o günün saati. Birinci vardiyadan
+  // önceki saat (gece vardiyası) bir önceki üretim gününe aittir.
+  const toProductionClock = (date: string, minute: number) =>
+    minute < shiftStartMinute
+      ? { date: isoDate(addDays(new Date(`${date}T00:00:00`), -1)), clock: minute + 1440 }
+      : { date, clock: minute }
+  // Gün içi net dakika için tam (3 vardiyalık) günün çizelgesi.
+  const fullDay = buildDayTimeline(shiftStartMinute, shiftMinutes, 3, plannedStops)
+
   const { blackouts: moldBlackouts, unavailable: unavailableMolds } = buildMoldBlackouts(
     inputs.moldMaintenance,
     inputs.readiness,
     horizonDates,
     alarmedMolds,
+    (readyDate, readyMinute) => {
+      const at = toProductionClock(readyDate, readyMinute)
+      return { date: at.date, untilNet: clockToNet(at.clock, fullDay) }
+    },
   )
+
+  // Açık, presi durduran arızalar: arızanın anından beklenen devreye girişe
+  // kadar — tarih yoksa ufkun sonuna kadar — pres kapalı. Pres bakımıyla aynı
+  // yoldan plana girer: kapalı aralık olarak.
+  const openBreakdowns = (inputs.machineProblems ?? []).filter(
+    (p) => p.status === 'open' && p.stopsPress,
+  )
+  const breakdownRows: PressMaintenanceRow[] = []
+  for (const b of openBreakdowns) {
+    const from = toProductionClock(b.occurredAt, b.occurredMinute ?? shiftStartMinute)
+    const to = b.expectedUpDate
+      ? toProductionClock(b.expectedUpDate, b.expectedUpMinute ?? shiftStartMinute)
+      : null
+    for (const date of horizonDates) {
+      if (date < from.date || date < todayIso) continue
+      if (to && date > to.date) break
+      const start = date === from.date ? from.clock : shiftStartMinute
+      const end = to && date === to.date ? to.clock : shiftStartMinute + 1440
+      if (end <= start) continue
+      breakdownRows.push({
+        press: b.press,
+        date,
+        startMinute: start,
+        endMinute: end,
+        reason: `Breakdown: ${b.problemType}`,
+        status: 'planned',
+      })
+    }
+  }
 
   // Pres bakımı dolu bir aralıktır: gün kısalmaz, günün bir saati kapanır.
   const maintenance: MaintenanceBlock[] = []
-  for (const row of inputs.pressMaintenance) {
+  for (const row of [...inputs.pressMaintenance, ...breakdownRows]) {
     const shifts = shiftsByPressDate.get(`${row.press}|${row.date}`) ?? 0
     if (shifts <= 0) continue
     const block = pressMaintenanceBlock(
@@ -437,7 +500,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       exactLotMaterials: exact,
     })
     for (const entry of demand) if (boost.has(lotKey(entry))) entry.boost = true
-    return schedule(
+    const scheduled = schedule(
       demand,
       productByCode,
       presses,
@@ -445,6 +508,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       { shiftMinutes, overtimeShiftMinutes },
       scheduleOptions,
     )
+    return { ...scheduled, demand }
   }
   const dayMs = 86_400_000
   const lateDays = (j: ScheduledJob) =>
@@ -498,6 +562,20 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     if (!improved) break
   }
   const result = best.result
+
+  // Kalıbı tutulduğu için plana alınamayan lotun sebebi "kullanıcı dışladı"
+  // değil: kalıp hazır değil ya da ömür alarmı açık. Doğrusu yazılsın.
+  const userExcluded = new Set(
+    inputs.overrides.filter((o) => o.kind === 'exclude').map((o) => o.material),
+  )
+  for (const item of result.unplanned) {
+    if (!item.reason.startsWith('Excluded from planning') || userExcluded.has(item.material)) continue
+    if (!unavailableMolds.includes(item.material)) continue
+    item.reason = alarmedMolds.includes(item.material)
+      ? 'Mould held: shot-limit alarm open until it is closed'
+      : 'Mould held: not ready and no ready date'
+  }
+
   const lateRepair = {
     rounds,
     lateBefore,
@@ -631,6 +709,67 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     })
   }
 
+  // ---- Alarmlar: hangi kalıp / makine müşteriyi bekletiyor? ---------------
+  const dieUnavailable: DieUnavailability[] = []
+  for (const r of inputs.readiness) {
+    if (r.ready) continue
+    if (!r.readyDate) dieUnavailable.push({ material: r.material, kind: 'no-date', reason: r.reason })
+    else if (r.readyDate >= todayIso)
+      dieUnavailable.push({
+        material: r.material,
+        kind: 'until',
+        until: r.readyDate,
+        untilMinute: r.readyMinute,
+        reason: r.reason,
+      })
+  }
+  for (const material of alarmedMolds) dieUnavailable.push({ material, kind: 'shot-limit' })
+  for (const m of inputs.moldMaintenance) {
+    const until = m.dateTo ?? m.date
+    if (until < todayIso) continue
+    dieUnavailable.push({ material: m.material, kind: 'maintenance', from: m.date, until, note: m.note })
+  }
+  const hhmm = (minute: number) =>
+    `${String(Math.floor(minute / 60) % 24).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
+  const horizonEnd = horizonDates[horizonDates.length - 1] ?? todayIso
+  const machineUnavailable: MachineUnavailability[] = []
+  for (const b of inputs.machineProblems ?? []) {
+    if (b.status !== 'open') continue
+    machineUnavailable.push({
+      press: b.press,
+      kind: b.stopsPress ? 'breakdown' : 'fault-running',
+      from: b.occurredAt,
+      until: b.stopsPress ? b.expectedUpDate : undefined,
+      untilMinute: b.stopsPress ? b.expectedUpMinute : undefined,
+      label: b.stopsPress
+        ? `Breakdown: ${b.problemType} — ${
+            b.expectedUpDate
+              ? `expected back ${b.expectedUpDate}${b.expectedUpMinute !== undefined ? ` ${hhmm(b.expectedUpMinute)}` : ''}`
+              : 'down until solved (no expected time)'
+          }`
+        : `Fault: ${b.problemType} — press still running`,
+    })
+  }
+  for (const m of inputs.pressMaintenance) {
+    if (m.status !== 'planned' || m.date < todayIso || m.date > horizonEnd) continue
+    machineUnavailable.push({
+      press: m.press,
+      kind: 'maintenance',
+      from: m.date,
+      until: m.date,
+      label: `Maintenance ${m.date} ${hhmm(m.startMinute)}–${hhmm(m.endMinute)}: ${m.reason}`,
+    })
+  }
+  const alarms = buildPlanAlarms({
+    todayIso,
+    lots: result.demand.map((e) => ({ material: e.material, qty: e.qty, dueDate: e.dueDate })),
+    jobs,
+    unplanned: result.unplanned,
+    dies: dieUnavailable,
+    machines: machineUnavailable,
+    eligiblePresses: (material) => eligiblePressesOf(productByCode.get(material)),
+  })
+
   const audit = auditPlan({
     pressRules,
     jobs,
@@ -663,6 +802,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     producedSinceStock,
     dailyUntil: daily.until,
     lateRepair,
+    alarms,
     presses: presses.map((p) => ({ name: p.name, hall: p.hall, category: p.category })),
     plannedStops: plannedStops.map((p) => ({
       shiftIndex: p.shiftIndex,

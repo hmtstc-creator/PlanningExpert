@@ -2,7 +2,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
 import { useCurrentUser } from '../lib/currentUser'
-import { ALL_GROUPS, NAV_GROUPS, PRIMARY_LINKS } from '../lib/navigation'
+import { ALL_GROUPS, NAV_GROUPS, PRIMARY_LINKS, moduleNavFor } from '../lib/navigation'
 import { isPortalPath } from '../lib/portal'
 
 /**
@@ -59,6 +59,42 @@ export function Header() {
       <span className="font-medium text-foreground">{currentUser}</span>
     </Link>
   )
+
+  // Takip modülleri (kalıp, makine): kendi kısa menüleri, portala dönüş.
+  const moduleNav = moduleNavFor(pathname)
+  if (moduleNav) {
+    return (
+      <header className="border-b border-border bg-background/95 backdrop-blur">
+        <nav className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2.5 sm:px-6 sm:py-3">
+          <Link
+            to="/"
+            className="shrink-0 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+            title="Back to the portal"
+          >
+            ← Portal
+          </Link>
+          <Link to={moduleNav.prefix} className="shrink-0 text-sm font-semibold text-foreground sm:text-base">
+            {moduleNav.title}
+          </Link>
+          <div className="order-last flex w-full gap-1 overflow-x-auto text-sm lg:order-none lg:ml-4 lg:w-auto">
+            {moduleNav.links.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="shrink-0 rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                activeProps={{ className: 'bg-muted text-foreground font-medium' }}
+                activeOptions={{ exact: true }}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+          <span className="ml-auto text-xs text-muted-foreground lg:hidden">{currentUser}</span>
+          {signedIn}
+        </nav>
+      </header>
+    )
+  }
 
   // Portal sayfalarında PlanningExpert menüsü yok: yalnız portal adı ve kullanıcı.
   if (isPortalPath(pathname)) {

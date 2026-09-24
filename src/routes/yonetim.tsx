@@ -36,6 +36,7 @@ const LISTS = [
   { kind: 'operation', label: 'Operations', hint: 'OP10, OP20 … used on mold problem reports' },
   { kind: 'problemType', label: 'Problem types', hint: 'Burr, tear, punch breakage …' },
   { kind: 'maintenanceReason', label: 'Maintenance reasons', hint: 'Suggested on press maintenance' },
+  { kind: 'machineProblemType', label: 'Machine problem types', hint: 'Hydraulic, electrical … used on machine breakdown reports' },
 ]
 
 interface Draft {

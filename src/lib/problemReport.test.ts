@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { byMold, byOperation, byProblemType, inRange, type ProblemRow } from './problemReport'
+import {
+  byMold,
+  byOperation,
+  byProblemType,
+  crossTab,
+  inRange,
+  pareto,
+  type ProblemRow,
+} from './problemReport'
 
 const rows: ProblemRow[] = [
   { material: 'A', operation: 'OP10', problemType: 'Burr', occurredAt: '2026-09-01', status: 'solved', downtimeMinutes: 30 },
@@ -48,3 +56,29 @@ describe('problem raporu', () => {
     expect(byMold([])).toEqual([])
   })
 })
+
+describe('pareto', () => {
+  it('sorts by value and marks the bars that make up the first 80%', () => {
+    const bars = pareto([
+      { key: 'Burr', value: 50 },
+      { key: 'Tear', value: 30 },
+      { key: 'Scratch', value: 15 },
+      { key: 'Misfeed', value: 5 },
+      { key: 'Zero', value: 0 },
+    ])
+    expect(bars.map((b) => b.key)).toEqual(['Burr', 'Tear', 'Scratch', 'Misfeed'])
+    expect(bars.map((b) => Math.round(b.cumulative))).toEqual([50, 80, 95, 100])
+    // Burr + Tear = %80: ikisi önemli azınlık, gerisi değil.
+    expect(bars.map((b) => b.vital)).toEqual([true, true, false, false])
+  })
+
+  it('counts each die against each problem type', () => {
+    const tab = crossTab(rows, (r) => r.material, (r) => r.problemType)
+    expect(tab.rows).toEqual(['A', 'B'])
+    expect(tab.cols).toEqual(['Burr', 'Punch breakage'])
+    expect(tab.count('A', 'Burr')).toBe(2)
+    expect(tab.count('B', 'Burr')).toBe(0)
+    expect(tab.rowTotal('A')).toBe(2)
+  })
+})
+

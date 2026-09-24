@@ -34,7 +34,7 @@ export interface AuditJob {
 export interface AuditInputs {
   jobs: AuditJob[]
   maintenance: { press: string; date: string; start: number; end: number }[]
-  moldBlackouts: { material: string; date: string }[]
+  moldBlackouts: { material: string; date: string; untilNet?: number }[]
   todayIso: string
   setupGapMinutes: number
   coilSetupGapMinutes: number
@@ -117,7 +117,12 @@ export function auditPlan(input: AuditInputs): PlanAudit {
     string,
     { kind: 'setup' | 'coil'; label: string; start: number; end: number }[]
   >()
-  const blackout = new Set(input.moldBlackouts.map((b) => `${b.material}|${b.date}`))
+  // malzeme|gün → o gün hangi net dakikaya kadar kapalı (yoksa bütün gün)
+  const blackout = new Map<string, number>()
+  for (const b of input.moldBlackouts) {
+    const key = `${b.material}|${b.date}`
+    blackout.set(key, Math.max(blackout.get(key) ?? 0, b.untilNet ?? Number.POSITIVE_INFINITY))
+  }
 
   for (const job of input.jobs) {
     const pressRule = input.pressRules?.get(job.material)
@@ -177,7 +182,8 @@ export function auditPlan(input: AuditInputs): PlanAudit {
         past.fail(`${job.material} on ${job.press} runs on ${date}`)
       }
       mouldBlackout.check()
-      if (blackout.has(`${job.material}|${date}`)) {
+      const closedUntil = blackout.get(`${job.material}|${date}`)
+      if (closedUntil !== undefined && s.start < closedUntil - EPS) {
         mouldBlackout.fail(`${job.material} runs on ${date} while its mould is blocked`)
       }
       const pk = `${job.press}|${date}`

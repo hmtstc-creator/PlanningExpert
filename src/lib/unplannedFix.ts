@@ -10,6 +10,9 @@ export interface UnplannedFix {
 }
 
 export function fixForUnplanned(reason: string): UnplannedFix {
+  if (reason.startsWith('Mould held')) {
+    return { label: 'Check the die', to: '/die-followup/maintenance' }
+  }
   if (reason.includes('No main press')) {
     return { label: 'Set main press or tick Flexible', to: '/referanslar' }
   }

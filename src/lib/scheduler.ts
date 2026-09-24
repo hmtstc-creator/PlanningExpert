@@ -63,7 +63,15 @@ export interface SchedulerOptions {
    * (`exclude`) yanlış olurdu — kalıp ertesi gün yine çalışır. Bu yüzden
    * yasak gün bazındadır: işin HİÇBİR parçası o güne düşemez.
    */
-  moldBlackouts?: { material: string; date: string }[]
+  moldBlackouts?: {
+    material: string
+    date: string
+    /**
+     * O gün bu net dakikaya kadar kapalı (kalıp saat 10:00'da hazır olacak).
+     * Verilmezse bütün gün kapalı.
+     */
+    untilNet?: number
+  }[]
   /**
    * Zaten taahhüt edilmiş işler: dondurulmuş ufuktaki onaylı plan.
    *
@@ -571,12 +579,13 @@ export function schedule(
     moldUsage,
   )
 
-  // malzeme → bakım günleri
-  const blackoutsByMaterial = new Map<string, Set<string>>()
+  // malzeme → gün → o gün hangi net dakikaya kadar kapalı (Infinity = bütün gün)
+  const blackoutsByMaterial = new Map<string, Map<string, number>>()
   for (const b of options.moldBlackouts ?? []) {
-    const set = blackoutsByMaterial.get(b.material) ?? new Set<string>()
-    set.add(b.date)
-    blackoutsByMaterial.set(b.material, set)
+    const days = blackoutsByMaterial.get(b.material) ?? new Map<string, number>()
+    const until = b.untilNet ?? Number.POSITIVE_INFINITY
+    days.set(b.date, Math.max(days.get(b.date) ?? 0, until))
+    blackoutsByMaterial.set(b.material, days)
   }
 
   // Kaçıncı karar olduğu — plan sırayla kurulduğu için doğrulamada önemli.
@@ -892,7 +901,7 @@ function tryPlaceOnPress(
   moldUsage: MoldUsage,
   options: SchedulerOptions,
   feedsCoil: boolean,
-  blackoutDates: Set<string> | undefined,
+  blackoutDates: Map<string, number> | undefined,
 ): Placement | null {
   const coilChangeMinutes = feedsCoil ? run.coilChangeMinutes : 0
   const coilGap = options.coilSetupGapMinutes ?? 30
@@ -997,13 +1006,27 @@ function tryPlaceOnPress(
       continue
     }
 
-    // Kalıp bakımda: işin hiçbir parçası o güne düşemez. İş uzun olduğu
-    // için bakım gününü "atlayamaz" — bakımdan sonra yeniden başlar.
-    const blackout = blackoutDates && segments.find((seg) => blackoutDates.has(seg.date))
+    // Kalıp bakımda ya da henüz hazır değil: işin hiçbir parçası kapalı
+    // zamana düşemez. İş uzun olduğu için kapalı günü "atlayamaz" — kalıp
+    // açıldıktan sonra yeniden başlar. Kalıp gün içinde bir saatte hazır
+    // oluyorsa (ör. 10:00) o gün o saatten sonrası kullanılabilir.
+    const blackout =
+      blackoutDates &&
+      segments.find((seg) => {
+        const until = blackoutDates.get(seg.date)
+        return until !== undefined && seg.start < until
+      })
     if (blackout) {
+      const until = blackoutDates!.get(blackout.date)!
+      const day = timeline.days.find((d) => d.date === blackout.date)
+      const openAt =
+        day && Number.isFinite(until) && until - day.startNet < day.capacity
+          ? day.offset + Math.max(0, until - day.startNet)
+          : null
       const resumeDay = timeline.days.find((d) => d.date > blackout.date)
-      if (!resumeDay) return null
-      start = firstFreePoint(timeline, Math.max(start + 1, resumeDay.offset))
+      const resume = openAt ?? resumeDay?.offset
+      if (resume === undefined) return null
+      start = firstFreePoint(timeline, Math.max(start + 1, resume))
       if (start >= timeline.total) return null
       continue
     }
@@ -1071,7 +1094,7 @@ function placeRun(
   pinDate: string | undefined,
   moldUsage: MoldUsage,
   options: SchedulerOptions,
-  blackoutDates: Set<string> | undefined,
+  blackoutDates: Map<string, number> | undefined,
   pinned = false,
   decision?: PlacementDecision,
 ): ScheduledJob | null {

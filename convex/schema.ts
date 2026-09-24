@@ -225,6 +225,8 @@ export default defineSchema({
     ready: v.boolean(),
     // Hazır değilse üretime hazır olacağı tarih (YYYY-MM-DD).
     readyDate: v.optional(v.string()),
+    // O gün hangi saatte hazır (gece yarısından dakika). Yoksa gün başı.
+    readyMinute: v.optional(v.number()),
     reason: v.optional(v.string()),
     updatedBy: v.optional(v.string()),
     updatedAt: v.number(),
@@ -283,8 +285,38 @@ export default defineSchema({
 
   // Kullanıcı tanımlı seçim listeleri: operasyonlar ve problem tipleri.
   // Admin sayfası yönetir; problem ekranı buradan okur.
+  // Makine (pres) arızaları. Kalıp problemleriyle aynı akış: bildir, çöz
+  // (çözüm açıklaması zorunlu), raporla. Farkı: "pres duruyor" işaretliyse
+  // arıza çözülene (ya da beklenen devreye girişe) kadar plan o presi
+  // kullanmaz.
+  machineProblems: defineTable({
+    press: v.string(),
+    problemType: v.string(),
+    description: v.optional(v.string()),
+    occurredAt: v.string(),
+    // Arızanın saati (gece yarısından dakika) — duruş bu andan başlar.
+    occurredMinute: v.optional(v.number()),
+    /** Pres bu arıza yüzünden duruyor mu? Duruyorsa plan onu kullanmaz. */
+    stopsPress: v.boolean(),
+    /** Beklenen devreye giriş; yoksa çözülene kadar süresiz durur. */
+    expectedUpDate: v.optional(v.string()),
+    expectedUpMinute: v.optional(v.number()),
+    reportedBy: v.optional(v.string()),
+    reportedAt: v.number(),
+    // 'open' | 'solved'
+    status: v.string(),
+    solution: v.optional(v.string()),
+    solvedBy: v.optional(v.string()),
+    solvedAt: v.optional(v.number()),
+    /** Kaybedilen üretim süresi (dk). */
+    downtimeMinutes: v.optional(v.number()),
+    photos: v.optional(v.array(v.id('_storage'))),
+  })
+    .index('by_press', ['press'])
+    .index('by_status', ['status']),
+
   lookups: defineTable({
-    // 'operation' | 'problemType' | 'maintenanceReason'
+    // 'operation' | 'problemType' | 'maintenanceReason' | 'machineProblemType'
     kind: v.string(),
     value: v.string(),
     sortOrder: v.optional(v.number()),

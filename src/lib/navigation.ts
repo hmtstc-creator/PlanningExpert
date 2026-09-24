@@ -25,6 +25,7 @@ export const PRIMARY_LINKS: NavItem[] = [
 
 /** Planlama başlığının geri kalanı: veri girişi ve motorun açıklaması. */
 export const PLANNING_LINKS: NavItem[] = [
+  { to: '/alarms', label: 'Alarms', hint: 'Dies and machines that hold up the plan' },
   { to: '/sapdata', label: 'SAP Data', hint: 'Upload ZPP, ZPP_DAILY, MB52 and MB51' },
   { to: '/planlogic', label: 'Planning Logic', hint: 'How the plan is calculated' },
 ]
@@ -52,14 +53,6 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Maintenance',
-    items: [
-      { to: '/presbakim', label: 'Press Maintenance', hint: 'Which press is down, and when' },
-      { to: '/kaliplar', label: 'Mold Maintenance', hint: 'Readiness, bookings, shot limits' },
-      { to: '/kalipproblem', label: 'Mold Problems', hint: 'Report, solve, and report on faults' },
-    ],
-  },
-  {
     label: 'Analysis',
     items: [
       { to: '/performans', label: 'Performance', hint: 'Plan versus actual' },
@@ -80,3 +73,41 @@ export const ALL_GROUPS: NavGroup[] = [
   { label: 'Planning', items: [...PRIMARY_LINKS, ...PLANNING_LINKS] },
   ...NAV_GROUPS.filter((group) => group.label !== 'Planning'),
 ]
+
+/**
+ * Portaldaki takip modüllerinin kendi menüleri. Kalıp ve makine konuları
+ * PlanningExpert'ten çıkıp buraya taşındı; PlanningExpert'te yalnızca planı
+ * etkileyen alarmlar kaldı.
+ */
+export interface ModuleNav {
+  prefix: string
+  title: string
+  links: NavItem[]
+}
+
+export const MODULE_NAVS: ModuleNav[] = [
+  {
+    prefix: '/die-followup',
+    title: 'Die Follow-up',
+    links: [
+      { to: '/die-followup', label: 'Overview' },
+      { to: '/die-followup/problems', label: 'Problems', hint: 'Report, solve, history' },
+      { to: '/die-followup/maintenance', label: 'Maintenance & readiness', hint: 'Ready flag, bookings, shot limits' },
+      { to: '/die-followup/reports', label: 'Reports', hint: 'Pareto by die, problem, operation' },
+    ],
+  },
+  {
+    prefix: '/machine-followup',
+    title: 'Machine Follow-up',
+    links: [
+      { to: '/machine-followup', label: 'Overview' },
+      { to: '/machine-followup/breakdowns', label: 'Breakdowns', hint: 'Report, solve, history' },
+      { to: '/machine-followup/maintenance', label: 'Maintenance', hint: 'Planned press maintenance' },
+      { to: '/machine-followup/reports', label: 'Reports', hint: 'Pareto by press and problem' },
+    ],
+  },
+]
+
+export function moduleNavFor(pathname: string): ModuleNav | undefined {
+  return MODULE_NAVS.find((m) => pathname === m.prefix || pathname.startsWith(`${m.prefix}/`))
+}

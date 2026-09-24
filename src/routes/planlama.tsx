@@ -14,6 +14,7 @@ import { useCurrentUser } from '../lib/currentUser'
 import { diffPlans } from '../lib/planDiff'
 import { groupPlanWeeks, type PlanRun, type SnapshotJob } from '../lib/planPipeline'
 import type { PlanAudit } from '../lib/planAudit'
+import type { PlanAlarms } from '../lib/planAlarms'
 import type { PlacementDecision } from '../lib/scheduler'
 import { fixForUnplanned } from '../lib/unplannedFix'
 
@@ -316,6 +317,8 @@ function PlanlamaPage() {
           the near term will stop moving.
         </p>
       )}
+
+      {run?.alarms && <AlarmBanner alarms={run.alarms} />}
 
       {run && (run.lateRepair?.rounds ?? 0) > 0 && (
         <LateJobs
@@ -877,6 +880,35 @@ const CHANGE_STYLE: Record<string, string> = {
   moved: 'rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900',
   quantity: 'rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900',
   same: 'text-xs text-muted-foreground',
+}
+
+/** Kalıp ve makine alarmlarının plan sayfasındaki özeti. */
+function AlarmBanner({ alarms }: { alarms: PlanAlarms }) {
+  const dies = alarms.dies.filter((d) => d.critical).length
+  const machines = alarms.machines.filter((m) => m.critical).length
+  const info = alarms.dies.length + alarms.machines.length - dies - machines
+  if (dies + machines === 0 && info === 0) return null
+  return (
+    <div
+      className={`mt-6 rounded-lg border p-3 text-sm ${
+        dies + machines > 0 ? 'border-destructive bg-destructive/10' : 'border-border bg-muted/50'
+      }`}
+    >
+      {dies + machines > 0 ? (
+        <strong className="text-destructive">
+          {dies > 0 && `${dies} die(s)`}
+          {dies > 0 && machines > 0 && ' and '}
+          {machines > 0 && `${machines} press(es)`} holding up deliveries.
+        </strong>
+      ) : (
+        <span className="text-muted-foreground">No die or press is holding up a delivery.</span>
+      )}{' '}
+      {info > 0 && <span className="text-muted-foreground">{info} more for information. </span>}
+      <Link to="/alarms" className="font-medium text-foreground underline">
+        See Alarms →
+      </Link>
+    </div>
+  )
 }
 
 /**

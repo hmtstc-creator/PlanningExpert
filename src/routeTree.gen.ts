@@ -10,14 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AlarmsRouteImport } from './routes/alarms'
 import { Route as DepolarRouteImport } from './routes/depolar'
-import { Route as DieFollowupRouteImport } from './routes/die-followup'
 import { Route as GerceklesenRouteImport } from './routes/gerceklesen'
 import { Route as KaliplarRouteImport } from './routes/kaliplar'
 import { Route as KalipproblemRouteImport } from './routes/kalipproblem'
 import { Route as KayitlarRouteImport } from './routes/kayitlar'
 import { Route as KpiRouteImport } from './routes/kpi'
-import { Route as MachineFollowupRouteImport } from './routes/machine-followup'
 import { Route as MakinelerRouteImport } from './routes/makineler'
 import { Route as OeeRouteImport } from './routes/oee'
 import { Route as PerformansRouteImport } from './routes/performans'
@@ -32,20 +31,28 @@ import { Route as StoklarRouteImport } from './routes/stoklar'
 import { Route as TakvimRouteImport } from './routes/takvim'
 import { Route as TaniRouteImport } from './routes/tani'
 import { Route as YonetimRouteImport } from './routes/yonetim'
+import { Route as DieFollowupIndexRouteImport } from './routes/die-followup/index'
+import { Route as DieFollowupMaintenanceRouteImport } from './routes/die-followup/maintenance'
+import { Route as DieFollowupProblemsRouteImport } from './routes/die-followup/problems'
+import { Route as DieFollowupReportsRouteImport } from './routes/die-followup/reports'
+import { Route as MachineFollowupIndexRouteImport } from './routes/machine-followup/index'
+import { Route as MachineFollowupBreakdownsRouteImport } from './routes/machine-followup/breakdowns'
+import { Route as MachineFollowupMaintenanceRouteImport } from './routes/machine-followup/maintenance'
+import { Route as MachineFollowupReportsRouteImport } from './routes/machine-followup/reports'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlarmsRoute = AlarmsRouteImport.update({
+  id: '/alarms',
+  path: '/alarms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DepolarRoute = DepolarRouteImport.update({
   id: '/depolar',
   path: '/depolar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DieFollowupRoute = DieFollowupRouteImport.update({
-  id: '/die-followup',
-  path: '/die-followup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GerceklesenRoute = GerceklesenRouteImport.update({
@@ -71,11 +78,6 @@ const KayitlarRoute = KayitlarRouteImport.update({
 const KpiRoute = KpiRouteImport.update({
   id: '/kpi',
   path: '/kpi',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MachineFollowupRoute = MachineFollowupRouteImport.update({
-  id: '/machine-followup',
-  path: '/machine-followup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MakinelerRoute = MakinelerRouteImport.update({
@@ -148,17 +150,58 @@ const YonetimRoute = YonetimRouteImport.update({
   path: '/yonetim',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DieFollowupIndexRoute = DieFollowupIndexRouteImport.update({
+  id: '/die-followup/',
+  path: '/die-followup/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DieFollowupMaintenanceRoute = DieFollowupMaintenanceRouteImport.update({
+  id: '/die-followup/maintenance',
+  path: '/die-followup/maintenance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DieFollowupProblemsRoute = DieFollowupProblemsRouteImport.update({
+  id: '/die-followup/problems',
+  path: '/die-followup/problems',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DieFollowupReportsRoute = DieFollowupReportsRouteImport.update({
+  id: '/die-followup/reports',
+  path: '/die-followup/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MachineFollowupIndexRoute = MachineFollowupIndexRouteImport.update({
+  id: '/machine-followup/',
+  path: '/machine-followup/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MachineFollowupBreakdownsRoute =
+  MachineFollowupBreakdownsRouteImport.update({
+    id: '/machine-followup/breakdowns',
+    path: '/machine-followup/breakdowns',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const MachineFollowupMaintenanceRoute =
+  MachineFollowupMaintenanceRouteImport.update({
+    id: '/machine-followup/maintenance',
+    path: '/machine-followup/maintenance',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const MachineFollowupReportsRoute = MachineFollowupReportsRouteImport.update({
+  id: '/machine-followup/reports',
+  path: '/machine-followup/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alarms': typeof AlarmsRoute
   '/depolar': typeof DepolarRoute
-  '/die-followup': typeof DieFollowupRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
   '/kpi': typeof KpiRoute
-  '/machine-followup': typeof MachineFollowupRoute
   '/makineler': typeof MakinelerRoute
   '/oee': typeof OeeRoute
   '/performans': typeof PerformansRoute
@@ -173,17 +216,24 @@ export interface FileRoutesByFullPath {
   '/takvim': typeof TakvimRoute
   '/tani': typeof TaniRoute
   '/yonetim': typeof YonetimRoute
+  '/die-followup/maintenance': typeof DieFollowupMaintenanceRoute
+  '/die-followup/problems': typeof DieFollowupProblemsRoute
+  '/die-followup/reports': typeof DieFollowupReportsRoute
+  '/machine-followup/breakdowns': typeof MachineFollowupBreakdownsRoute
+  '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
+  '/machine-followup/reports': typeof MachineFollowupReportsRoute
+  '/die-followup/': typeof DieFollowupIndexRoute
+  '/machine-followup/': typeof MachineFollowupIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alarms': typeof AlarmsRoute
   '/depolar': typeof DepolarRoute
-  '/die-followup': typeof DieFollowupRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
   '/kpi': typeof KpiRoute
-  '/machine-followup': typeof MachineFollowupRoute
   '/makineler': typeof MakinelerRoute
   '/oee': typeof OeeRoute
   '/performans': typeof PerformansRoute
@@ -198,18 +248,25 @@ export interface FileRoutesByTo {
   '/takvim': typeof TakvimRoute
   '/tani': typeof TaniRoute
   '/yonetim': typeof YonetimRoute
+  '/die-followup/maintenance': typeof DieFollowupMaintenanceRoute
+  '/die-followup/problems': typeof DieFollowupProblemsRoute
+  '/die-followup/reports': typeof DieFollowupReportsRoute
+  '/machine-followup/breakdowns': typeof MachineFollowupBreakdownsRoute
+  '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
+  '/machine-followup/reports': typeof MachineFollowupReportsRoute
+  '/die-followup': typeof DieFollowupIndexRoute
+  '/machine-followup': typeof MachineFollowupIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alarms': typeof AlarmsRoute
   '/depolar': typeof DepolarRoute
-  '/die-followup': typeof DieFollowupRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
   '/kpi': typeof KpiRoute
-  '/machine-followup': typeof MachineFollowupRoute
   '/makineler': typeof MakinelerRoute
   '/oee': typeof OeeRoute
   '/performans': typeof PerformansRoute
@@ -224,19 +281,26 @@ export interface FileRoutesById {
   '/takvim': typeof TakvimRoute
   '/tani': typeof TaniRoute
   '/yonetim': typeof YonetimRoute
+  '/die-followup/maintenance': typeof DieFollowupMaintenanceRoute
+  '/die-followup/problems': typeof DieFollowupProblemsRoute
+  '/die-followup/reports': typeof DieFollowupReportsRoute
+  '/machine-followup/breakdowns': typeof MachineFollowupBreakdownsRoute
+  '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
+  '/machine-followup/reports': typeof MachineFollowupReportsRoute
+  '/die-followup/': typeof DieFollowupIndexRoute
+  '/machine-followup/': typeof MachineFollowupIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/alarms'
     | '/depolar'
-    | '/die-followup'
     | '/gerceklesen'
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
     | '/kpi'
-    | '/machine-followup'
     | '/makineler'
     | '/oee'
     | '/performans'
@@ -251,17 +315,24 @@ export interface FileRouteTypes {
     | '/takvim'
     | '/tani'
     | '/yonetim'
+    | '/die-followup/maintenance'
+    | '/die-followup/problems'
+    | '/die-followup/reports'
+    | '/machine-followup/breakdowns'
+    | '/machine-followup/maintenance'
+    | '/machine-followup/reports'
+    | '/die-followup/'
+    | '/machine-followup/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/alarms'
     | '/depolar'
-    | '/die-followup'
     | '/gerceklesen'
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
     | '/kpi'
-    | '/machine-followup'
     | '/makineler'
     | '/oee'
     | '/performans'
@@ -276,17 +347,24 @@ export interface FileRouteTypes {
     | '/takvim'
     | '/tani'
     | '/yonetim'
+    | '/die-followup/maintenance'
+    | '/die-followup/problems'
+    | '/die-followup/reports'
+    | '/machine-followup/breakdowns'
+    | '/machine-followup/maintenance'
+    | '/machine-followup/reports'
+    | '/die-followup'
+    | '/machine-followup'
   id:
     | '__root__'
     | '/'
+    | '/alarms'
     | '/depolar'
-    | '/die-followup'
     | '/gerceklesen'
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
     | '/kpi'
-    | '/machine-followup'
     | '/makineler'
     | '/oee'
     | '/performans'
@@ -301,18 +379,25 @@ export interface FileRouteTypes {
     | '/takvim'
     | '/tani'
     | '/yonetim'
+    | '/die-followup/maintenance'
+    | '/die-followup/problems'
+    | '/die-followup/reports'
+    | '/machine-followup/breakdowns'
+    | '/machine-followup/maintenance'
+    | '/machine-followup/reports'
+    | '/die-followup/'
+    | '/machine-followup/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlarmsRoute: typeof AlarmsRoute
   DepolarRoute: typeof DepolarRoute
-  DieFollowupRoute: typeof DieFollowupRoute
   GerceklesenRoute: typeof GerceklesenRoute
   KaliplarRoute: typeof KaliplarRoute
   KalipproblemRoute: typeof KalipproblemRoute
   KayitlarRoute: typeof KayitlarRoute
   KpiRoute: typeof KpiRoute
-  MachineFollowupRoute: typeof MachineFollowupRoute
   MakinelerRoute: typeof MakinelerRoute
   OeeRoute: typeof OeeRoute
   PerformansRoute: typeof PerformansRoute
@@ -327,6 +412,14 @@ export interface RootRouteChildren {
   TakvimRoute: typeof TakvimRoute
   TaniRoute: typeof TaniRoute
   YonetimRoute: typeof YonetimRoute
+  DieFollowupMaintenanceRoute: typeof DieFollowupMaintenanceRoute
+  DieFollowupProblemsRoute: typeof DieFollowupProblemsRoute
+  DieFollowupReportsRoute: typeof DieFollowupReportsRoute
+  MachineFollowupBreakdownsRoute: typeof MachineFollowupBreakdownsRoute
+  MachineFollowupMaintenanceRoute: typeof MachineFollowupMaintenanceRoute
+  MachineFollowupReportsRoute: typeof MachineFollowupReportsRoute
+  DieFollowupIndexRoute: typeof DieFollowupIndexRoute
+  MachineFollowupIndexRoute: typeof MachineFollowupIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -338,18 +431,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alarms': {
+      id: '/alarms'
+      path: '/alarms'
+      fullPath: '/alarms'
+      preLoaderRoute: typeof AlarmsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/depolar': {
       id: '/depolar'
       path: '/depolar'
       fullPath: '/depolar'
       preLoaderRoute: typeof DepolarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/die-followup': {
-      id: '/die-followup'
-      path: '/die-followup'
-      fullPath: '/die-followup'
-      preLoaderRoute: typeof DieFollowupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gerceklesen': {
@@ -385,13 +478,6 @@ declare module '@tanstack/react-router' {
       path: '/kpi'
       fullPath: '/kpi'
       preLoaderRoute: typeof KpiRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/machine-followup': {
-      id: '/machine-followup'
-      path: '/machine-followup'
-      fullPath: '/machine-followup'
-      preLoaderRoute: typeof MachineFollowupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/makineler': {
@@ -492,19 +578,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof YonetimRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/die-followup/': {
+      id: '/die-followup/'
+      path: '/die-followup'
+      fullPath: '/die-followup/'
+      preLoaderRoute: typeof DieFollowupIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/die-followup/maintenance': {
+      id: '/die-followup/maintenance'
+      path: '/die-followup/maintenance'
+      fullPath: '/die-followup/maintenance'
+      preLoaderRoute: typeof DieFollowupMaintenanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/die-followup/problems': {
+      id: '/die-followup/problems'
+      path: '/die-followup/problems'
+      fullPath: '/die-followup/problems'
+      preLoaderRoute: typeof DieFollowupProblemsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/die-followup/reports': {
+      id: '/die-followup/reports'
+      path: '/die-followup/reports'
+      fullPath: '/die-followup/reports'
+      preLoaderRoute: typeof DieFollowupReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/machine-followup/': {
+      id: '/machine-followup/'
+      path: '/machine-followup'
+      fullPath: '/machine-followup/'
+      preLoaderRoute: typeof MachineFollowupIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/machine-followup/breakdowns': {
+      id: '/machine-followup/breakdowns'
+      path: '/machine-followup/breakdowns'
+      fullPath: '/machine-followup/breakdowns'
+      preLoaderRoute: typeof MachineFollowupBreakdownsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/machine-followup/maintenance': {
+      id: '/machine-followup/maintenance'
+      path: '/machine-followup/maintenance'
+      fullPath: '/machine-followup/maintenance'
+      preLoaderRoute: typeof MachineFollowupMaintenanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/machine-followup/reports': {
+      id: '/machine-followup/reports'
+      path: '/machine-followup/reports'
+      fullPath: '/machine-followup/reports'
+      preLoaderRoute: typeof MachineFollowupReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlarmsRoute: AlarmsRoute,
   DepolarRoute: DepolarRoute,
-  DieFollowupRoute: DieFollowupRoute,
   GerceklesenRoute: GerceklesenRoute,
   KaliplarRoute: KaliplarRoute,
   KalipproblemRoute: KalipproblemRoute,
   KayitlarRoute: KayitlarRoute,
   KpiRoute: KpiRoute,
-  MachineFollowupRoute: MachineFollowupRoute,
   MakinelerRoute: MakinelerRoute,
   OeeRoute: OeeRoute,
   PerformansRoute: PerformansRoute,
@@ -519,6 +660,14 @@ const rootRouteChildren: RootRouteChildren = {
   TakvimRoute: TakvimRoute,
   TaniRoute: TaniRoute,
   YonetimRoute: YonetimRoute,
+  DieFollowupMaintenanceRoute: DieFollowupMaintenanceRoute,
+  DieFollowupProblemsRoute: DieFollowupProblemsRoute,
+  DieFollowupReportsRoute: DieFollowupReportsRoute,
+  MachineFollowupBreakdownsRoute: MachineFollowupBreakdownsRoute,
+  MachineFollowupMaintenanceRoute: MachineFollowupMaintenanceRoute,
+  MachineFollowupReportsRoute: MachineFollowupReportsRoute,
+  DieFollowupIndexRoute: DieFollowupIndexRoute,
+  MachineFollowupIndexRoute: MachineFollowupIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

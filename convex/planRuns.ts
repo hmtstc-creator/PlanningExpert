@@ -60,6 +60,11 @@ export const smallInputs = internalQuery({
       readiness: await ctx.db.query('moldReadiness').collect(),
       pressMaintenance: await ctx.db.query('pressMaintenance').collect(),
       alarms: await ctx.db.query('moldAlarms').collect(),
+      // Açık makine arızaları — "pres duruyor" olanlar presi planda kapatır.
+      machineProblems: await ctx.db
+        .query('machineProblems')
+        .withIndex('by_status', (q: Ctx) => q.eq('status', 'open'))
+        .collect(),
       locations: await ctx.db.query('storageLocations').collect(),
     }
   },
@@ -228,6 +233,29 @@ export const latest = guardedQuery({
       runId: run._id,
       durationMs: run.durationMs,
       trigger: run.trigger,
+    }
+  },
+})
+
+/**
+ * Yalnızca son hesabın alarmları. Kalıp ve makine sayfaları bütün planı
+ * (megabaytlarca iş listesi) çekmeden "planı aksatan var mı" sorusuna cevap
+ * alsın diye. Alarmlar özet dokümanında durur, parçalara bakılmaz.
+ */
+export const latestAlarms = guardedQuery({
+  args: {},
+  returns: v.any(),
+  handler: async (ctx: Ctx) => {
+    const run = await ctx.db
+      .query('planRuns')
+      .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))
+      .order('desc')
+      .first()
+    if (!run) return null
+    return {
+      computedAt: run.computedAt,
+      todayIso: run.summary?.todayIso,
+      alarms: run.summary?.alarms ?? { dies: [], machines: [] },
     }
   },
 })

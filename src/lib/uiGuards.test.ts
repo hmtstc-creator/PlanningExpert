@@ -15,13 +15,16 @@ const ROOTS = ['src/routes', 'src/components']
 
 function sourceFiles(): { path: string; source: string }[] {
   const out: { path: string; source: string }[] = []
-  for (const root of ROOTS) {
-    for (const name of readdirSync(root)) {
-      if (!name.endsWith('.tsx')) continue
-      const path = join(root, name)
-      out.push({ path, source: readFileSync(path, 'utf-8') })
+  // Alt klasörler de taranır: modül sayfaları (die-followup/, machine-followup/)
+  // orada ve korumalar onları da kapsamalı.
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) walk(path)
+      else if (entry.name.endsWith('.tsx')) out.push({ path, source: readFileSync(path, 'utf-8') })
     }
   }
+  for (const root of ROOTS) walk(root)
   return out
 }
 
@@ -88,7 +91,7 @@ describe('girdi sayfaları', () => {
       'src/routes/makineler.tsx',
       'src/routes/referanslar.tsx',
       'src/routes/depolar.tsx',
-      'src/routes/presbakim.tsx',
+      'src/routes/machine-followup/maintenance.tsx',
       'src/routes/yonetim.tsx',
       'src/components/PlannedStopsEditor.tsx',
     ]

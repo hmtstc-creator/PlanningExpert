@@ -8,7 +8,7 @@ import { adminMutation, guardedQuery } from './guarded'
  * Operasyon adları (OP10, OP20 …) ve problem tipleri (çapak, yırtık, zımba
  * kırılması …) atölyeden atölyeye değişir; koda gömülmemeleri gerekir.
  */
-const KINDS = ['operation', 'problemType', 'maintenanceReason']
+const KINDS = ['operation', 'problemType', 'maintenanceReason', 'machineProblemType']
 
 const rowValidator = v.object({
   _id: v.id('lookups'),
@@ -83,6 +83,16 @@ export const seedDefaults = adminMutation({
         'Misfeed',
         'Scratch',
         'Dimensional deviation',
+      ],
+      machineProblemType: [
+        'Hydraulic',
+        'Electrical',
+        'Mechanical',
+        'Feeder / coil line',
+        'Die clamping',
+        'Safety device',
+        'Lubrication',
+        'Control / PLC',
       ],
       maintenanceReason: [
         'Periodic maintenance',

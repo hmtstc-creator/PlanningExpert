@@ -139,7 +139,7 @@ function HomePage() {
       list.push({
         level: 'medium',
         text: `${missingMaxShots} materials have no max shot limit — mold life cannot be tracked.`,
-        link: '/kaliplar',
+        link: '/die-followup/maintenance',
       })
     }
 
