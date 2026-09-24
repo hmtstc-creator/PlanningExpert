@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { useCurrentUser } from '../lib/currentUser'
 import { ALL_GROUPS, NAV_GROUPS, PRIMARY_LINKS } from '../lib/navigation'
+import { isPortalPath } from '../lib/portal'
 
 /**
  * Two navigations from one definition.
@@ -48,6 +49,32 @@ export function Header() {
     return () => document.removeEventListener('keydown', onKey)
   }, [drawerOpen, openGroup])
 
+  const signedIn = (
+    <Link
+      to="/yonetim"
+      className="ml-auto hidden shrink-0 text-xs text-muted-foreground hover:text-foreground lg:block"
+      title="Signed-in user — manage accounts on the Admin page"
+    >
+      <span className="text-muted-foreground/70">Signed in as </span>
+      <span className="font-medium text-foreground">{currentUser}</span>
+    </Link>
+  )
+
+  // Portal sayfalarında PlanningExpert menüsü yok: yalnız portal adı ve kullanıcı.
+  if (isPortalPath(pathname)) {
+    return (
+      <header className="border-b border-border bg-background/95 backdrop-blur">
+        <nav className="flex w-full items-center gap-3 px-4 py-2.5 sm:px-6 sm:py-3">
+          <Link to="/" className="text-sm font-semibold text-foreground sm:text-base">
+            Production Portal
+          </Link>
+          <span className="ml-auto text-xs text-muted-foreground lg:hidden">{currentUser}</span>
+          {signedIn}
+        </nav>
+      </header>
+    )
+  }
+
   const linkClass =
     'rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
   const activeClass = { className: 'bg-muted text-foreground font-medium' }
@@ -68,10 +95,17 @@ export function Header() {
           </button>
 
           <Link
-            to="/planlama"
+            to="/"
+            className="hidden shrink-0 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground sm:block"
+            title="Back to the portal"
+          >
+            ← Portal
+          </Link>
+          <Link
+            to="/planningexpert"
             className="shrink-0 truncate text-sm font-semibold text-foreground sm:text-base"
           >
-            Production Planning
+            PlanningExpert
           </Link>
 
           <div ref={navRef} className="ml-auto hidden items-center gap-1 text-sm lg:flex">
@@ -81,7 +115,7 @@ export function Header() {
                 to={item.to}
                 className={linkClass}
                 activeProps={activeClass}
-                activeOptions={{ exact: item.to === '/' }}
+                activeOptions={{ exact: item.to === '/planningexpert' }}
               >
                 {item.label}
               </Link>
@@ -128,16 +162,8 @@ export function Header() {
           {/*
             Kayıtların üzerine hangi ismin yazıldığı her ekranda görünmeli:
             yanlış kişiyle çalışıldığı fark edilmeden saatler geçebilir.
-            Kimlik doğrulama değil, atıf — bu yüzden mütevazı duruyor.
           */}
-          <Link
-            to="/yonetim"
-            className="ml-auto hidden shrink-0 text-xs text-muted-foreground hover:text-foreground lg:block"
-            title="Signed-in user — manage accounts on the Admin page"
-          >
-            <span className="text-muted-foreground/70">Signed in as </span>
-            <span className="font-medium text-foreground">{currentUser}</span>
-          </Link>
+          {signedIn}
         </nav>
       </header>
 
@@ -150,7 +176,7 @@ export function Header() {
           />
           <div className="absolute inset-y-0 left-0 flex w-[82%] max-w-xs flex-col overflow-y-auto border-r border-border bg-background shadow-xl">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <span className="text-sm font-semibold text-foreground">Production Planning</span>
+              <span className="text-sm font-semibold text-foreground">PlanningExpert</span>
               <button
                 onClick={() => setDrawerOpen(false)}
                 aria-label="Close menu"
@@ -161,6 +187,13 @@ export function Header() {
             </div>
 
             <div className="flex-1 px-2 py-3">
+              <Link
+                to="/"
+                onClick={() => setDrawerOpen(false)}
+                className="mb-3 block rounded-md px-2 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                ← Portal
+              </Link>
               {ALL_GROUPS.map((group) => (
                 <div key={group.label} className="mb-4 last:mb-0">
                   <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -173,7 +206,7 @@ export function Header() {
                       onClick={() => setDrawerOpen(false)}
                       className="block rounded-md px-2 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       activeProps={{ className: 'bg-muted text-foreground font-medium' }}
-                      activeOptions={{ exact: item.to === '/' }}
+                      activeOptions={{ exact: item.to === '/planningexpert' }}
                     >
                       <span className="block">{item.label}</span>
                       {item.hint && (

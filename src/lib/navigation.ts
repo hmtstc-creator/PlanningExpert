@@ -20,7 +20,7 @@ export interface NavGroup {
 /** Always visible, never inside a menu — these are the daily destinations. */
 export const PRIMARY_LINKS: NavItem[] = [
   { to: '/planlama', label: 'Plan', hint: 'The weekly production plan' },
-  { to: '/', label: 'Overview', hint: 'Daily status and warnings' },
+  { to: '/planningexpert', label: 'Overview', hint: 'Daily status and warnings' },
 ]
 
 /** Planlama başlığının geri kalanı: veri girişi ve motorun açıklaması. */

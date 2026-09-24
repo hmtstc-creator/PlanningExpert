@@ -59,7 +59,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
   if (screen === 'login') {
     return (
       <div className="mx-auto w-full max-w-sm px-4 py-16">
-        <h1 className="text-xl font-bold text-foreground">Production Planning</h1>
+        <h1 className="text-xl font-bold text-foreground">Production Portal</h1>
         <p className="mt-1 text-sm text-muted-foreground">Sign in to continue.</p>
 
         <form

@@ -11,14 +11,19 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DepolarRouteImport } from './routes/depolar'
+import { Route as DieFollowupRouteImport } from './routes/die-followup'
 import { Route as GerceklesenRouteImport } from './routes/gerceklesen'
 import { Route as KaliplarRouteImport } from './routes/kaliplar'
 import { Route as KalipproblemRouteImport } from './routes/kalipproblem'
 import { Route as KayitlarRouteImport } from './routes/kayitlar'
+import { Route as KpiRouteImport } from './routes/kpi'
+import { Route as MachineFollowupRouteImport } from './routes/machine-followup'
 import { Route as MakinelerRouteImport } from './routes/makineler'
+import { Route as OeeRouteImport } from './routes/oee'
 import { Route as PerformansRouteImport } from './routes/performans'
 import { Route as PlanlamaRouteImport } from './routes/planlama'
 import { Route as PlanlogicRouteImport } from './routes/planlogic'
+import { Route as PlanningexpertRouteImport } from './routes/planningexpert'
 import { Route as PresbakimRouteImport } from './routes/presbakim'
 import { Route as ReferanslarRouteImport } from './routes/referanslar'
 import { Route as SapdataRouteImport } from './routes/sapdata'
@@ -36,6 +41,11 @@ const IndexRoute = IndexRouteImport.update({
 const DepolarRoute = DepolarRouteImport.update({
   id: '/depolar',
   path: '/depolar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DieFollowupRoute = DieFollowupRouteImport.update({
+  id: '/die-followup',
+  path: '/die-followup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GerceklesenRoute = GerceklesenRouteImport.update({
@@ -58,9 +68,24 @@ const KayitlarRoute = KayitlarRouteImport.update({
   path: '/kayitlar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KpiRoute = KpiRouteImport.update({
+  id: '/kpi',
+  path: '/kpi',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MachineFollowupRoute = MachineFollowupRouteImport.update({
+  id: '/machine-followup',
+  path: '/machine-followup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MakinelerRoute = MakinelerRouteImport.update({
   id: '/makineler',
   path: '/makineler',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OeeRoute = OeeRouteImport.update({
+  id: '/oee',
+  path: '/oee',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PerformansRoute = PerformansRouteImport.update({
@@ -76,6 +101,11 @@ const PlanlamaRoute = PlanlamaRouteImport.update({
 const PlanlogicRoute = PlanlogicRouteImport.update({
   id: '/planlogic',
   path: '/planlogic',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanningexpertRoute = PlanningexpertRouteImport.update({
+  id: '/planningexpert',
+  path: '/planningexpert',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PresbakimRoute = PresbakimRouteImport.update({
@@ -122,14 +152,19 @@ const YonetimRoute = YonetimRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/depolar': typeof DepolarRoute
+  '/die-followup': typeof DieFollowupRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
+  '/kpi': typeof KpiRoute
+  '/machine-followup': typeof MachineFollowupRoute
   '/makineler': typeof MakinelerRoute
+  '/oee': typeof OeeRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
   '/planlogic': typeof PlanlogicRoute
+  '/planningexpert': typeof PlanningexpertRoute
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/sapdata': typeof SapdataRoute
@@ -142,14 +177,19 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/depolar': typeof DepolarRoute
+  '/die-followup': typeof DieFollowupRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
+  '/kpi': typeof KpiRoute
+  '/machine-followup': typeof MachineFollowupRoute
   '/makineler': typeof MakinelerRoute
+  '/oee': typeof OeeRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
   '/planlogic': typeof PlanlogicRoute
+  '/planningexpert': typeof PlanningexpertRoute
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/sapdata': typeof SapdataRoute
@@ -163,14 +203,19 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/depolar': typeof DepolarRoute
+  '/die-followup': typeof DieFollowupRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
+  '/kpi': typeof KpiRoute
+  '/machine-followup': typeof MachineFollowupRoute
   '/makineler': typeof MakinelerRoute
+  '/oee': typeof OeeRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
   '/planlogic': typeof PlanlogicRoute
+  '/planningexpert': typeof PlanningexpertRoute
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/sapdata': typeof SapdataRoute
@@ -185,14 +230,19 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/depolar'
+    | '/die-followup'
     | '/gerceklesen'
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
+    | '/kpi'
+    | '/machine-followup'
     | '/makineler'
+    | '/oee'
     | '/performans'
     | '/planlama'
     | '/planlogic'
+    | '/planningexpert'
     | '/presbakim'
     | '/referanslar'
     | '/sapdata'
@@ -205,14 +255,19 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/depolar'
+    | '/die-followup'
     | '/gerceklesen'
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
+    | '/kpi'
+    | '/machine-followup'
     | '/makineler'
+    | '/oee'
     | '/performans'
     | '/planlama'
     | '/planlogic'
+    | '/planningexpert'
     | '/presbakim'
     | '/referanslar'
     | '/sapdata'
@@ -225,14 +280,19 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/depolar'
+    | '/die-followup'
     | '/gerceklesen'
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
+    | '/kpi'
+    | '/machine-followup'
     | '/makineler'
+    | '/oee'
     | '/performans'
     | '/planlama'
     | '/planlogic'
+    | '/planningexpert'
     | '/presbakim'
     | '/referanslar'
     | '/sapdata'
@@ -246,14 +306,19 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DepolarRoute: typeof DepolarRoute
+  DieFollowupRoute: typeof DieFollowupRoute
   GerceklesenRoute: typeof GerceklesenRoute
   KaliplarRoute: typeof KaliplarRoute
   KalipproblemRoute: typeof KalipproblemRoute
   KayitlarRoute: typeof KayitlarRoute
+  KpiRoute: typeof KpiRoute
+  MachineFollowupRoute: typeof MachineFollowupRoute
   MakinelerRoute: typeof MakinelerRoute
+  OeeRoute: typeof OeeRoute
   PerformansRoute: typeof PerformansRoute
   PlanlamaRoute: typeof PlanlamaRoute
   PlanlogicRoute: typeof PlanlogicRoute
+  PlanningexpertRoute: typeof PlanningexpertRoute
   PresbakimRoute: typeof PresbakimRoute
   ReferanslarRoute: typeof ReferanslarRoute
   SapdataRoute: typeof SapdataRoute
@@ -278,6 +343,13 @@ declare module '@tanstack/react-router' {
       path: '/depolar'
       fullPath: '/depolar'
       preLoaderRoute: typeof DepolarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/die-followup': {
+      id: '/die-followup'
+      path: '/die-followup'
+      fullPath: '/die-followup'
+      preLoaderRoute: typeof DieFollowupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gerceklesen': {
@@ -308,11 +380,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KayitlarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kpi': {
+      id: '/kpi'
+      path: '/kpi'
+      fullPath: '/kpi'
+      preLoaderRoute: typeof KpiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/machine-followup': {
+      id: '/machine-followup'
+      path: '/machine-followup'
+      fullPath: '/machine-followup'
+      preLoaderRoute: typeof MachineFollowupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/makineler': {
       id: '/makineler'
       path: '/makineler'
       fullPath: '/makineler'
       preLoaderRoute: typeof MakinelerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oee': {
+      id: '/oee'
+      path: '/oee'
+      fullPath: '/oee'
+      preLoaderRoute: typeof OeeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/performans': {
@@ -334,6 +427,13 @@ declare module '@tanstack/react-router' {
       path: '/planlogic'
       fullPath: '/planlogic'
       preLoaderRoute: typeof PlanlogicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/planningexpert': {
+      id: '/planningexpert'
+      path: '/planningexpert'
+      fullPath: '/planningexpert'
+      preLoaderRoute: typeof PlanningexpertRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/presbakim': {
@@ -398,14 +498,19 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DepolarRoute: DepolarRoute,
+  DieFollowupRoute: DieFollowupRoute,
   GerceklesenRoute: GerceklesenRoute,
   KaliplarRoute: KaliplarRoute,
   KalipproblemRoute: KalipproblemRoute,
   KayitlarRoute: KayitlarRoute,
+  KpiRoute: KpiRoute,
+  MachineFollowupRoute: MachineFollowupRoute,
   MakinelerRoute: MakinelerRoute,
+  OeeRoute: OeeRoute,
   PerformansRoute: PerformansRoute,
   PlanlamaRoute: PlanlamaRoute,
   PlanlogicRoute: PlanlogicRoute,
+  PlanningexpertRoute: PlanningexpertRoute,
   PresbakimRoute: PresbakimRoute,
   ReferanslarRoute: ReferanslarRoute,
   SapdataRoute: SapdataRoute,
