@@ -132,7 +132,15 @@ export const recompute = internalAction({
     try {
       const inputs = await loadInputs(ctx)
       const run = computePlan(inputs, Date.now())
-      await storeRun(ctx, run, startedAt, trigger)
+      // Hangi yüklemelerle hesaplandı: SAP Data sayfası "bu dosya planda mı"
+      // sorusunu bu kayda bakarak cevaplar.
+      const dataSources = Object.fromEntries(
+        ((inputs as Ctx).sapUploads ?? []).map((u: Ctx) => [
+          u.key,
+          { uploadedAt: u.uploadedAt, fileName: u.fileName },
+        ]),
+      )
+      await storeRun(ctx, Object.assign(run, { dataSources }), startedAt, trigger)
       await ctx.runMutation(internal.planRuns.finishRun, { startedAt })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

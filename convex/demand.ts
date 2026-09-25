@@ -6,6 +6,8 @@ import { v } from 'convex/values'
 
 import { filterRows, knownMaterialCodes } from './uploadFilter'
 import { guardedMutation, guardedQuery } from './guarded'
+import { recordUpload } from './sapUploads'
+import { demandCoverage } from '../src/lib/sapUploads'
 
 const periodValidator = v.object({ label: v.string(), qty: v.number() })
 
@@ -55,6 +57,7 @@ export const replaceWeekly = guardedMutation({
         periods: v.array(periodValidator),
       }),
     ),
+    fileName: v.optional(v.string()),
   },
   returns: v.object({
     count: v.number(),
@@ -63,7 +66,7 @@ export const replaceWeekly = guardedMutation({
     unknownMaterials: v.array(v.string()),
     unknownLocations: v.array(v.string()),
   }),
-  handler: async (ctx, { rows }) => {
+  handler: async (ctx, { rows, fileName }) => {
     // Only materials this press shop actually makes are worth storing.
     const { kept, report } = filterRows<(typeof rows)[number]>({
       rows,
@@ -75,6 +78,15 @@ export const replaceWeekly = guardedMutation({
     await Promise.all(existing.map((doc) => ctx.db.delete(doc._id)))
     const now = Date.now()
     await Promise.all(kept.map((row) => ctx.db.insert('demandWeekly', { ...row, uploadedAt: now })))
+    await recordUpload(ctx, 'weeklyDemand', {
+      fileName,
+      uploadedAt: now,
+      rowsInFile: rows.length,
+      rowsImported: kept.length,
+      skippedUnknownMaterial: report.skippedUnknownMaterial,
+      skippedUnknownLocation: report.skippedUnknownLocation,
+      ...demandCoverage(kept),
+    })
     return { count: kept.length, ...report }
   },
 })
@@ -106,6 +118,7 @@ export const replaceDaily = guardedMutation({
         periods: v.array(periodValidator),
       }),
     ),
+    fileName: v.optional(v.string()),
   },
   returns: v.object({
     count: v.number(),
@@ -114,7 +127,7 @@ export const replaceDaily = guardedMutation({
     unknownMaterials: v.array(v.string()),
     unknownLocations: v.array(v.string()),
   }),
-  handler: async (ctx, { rows }) => {
+  handler: async (ctx, { rows, fileName }) => {
     // Only materials this press shop actually makes are worth storing.
     const { kept, report } = filterRows<(typeof rows)[number]>({
       rows,
@@ -126,6 +139,15 @@ export const replaceDaily = guardedMutation({
     await Promise.all(existing.map((doc) => ctx.db.delete(doc._id)))
     const now = Date.now()
     await Promise.all(kept.map((row) => ctx.db.insert('demandDaily', { ...row, uploadedAt: now })))
+    await recordUpload(ctx, 'dailyDemand', {
+      fileName,
+      uploadedAt: now,
+      rowsInFile: rows.length,
+      rowsImported: kept.length,
+      skippedUnknownMaterial: report.skippedUnknownMaterial,
+      skippedUnknownLocation: report.skippedUnknownLocation,
+      ...demandCoverage(kept),
+    })
     return { count: kept.length, ...report }
   },
 })

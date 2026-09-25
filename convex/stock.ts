@@ -6,6 +6,7 @@ import { v } from 'convex/values'
 
 import { filterRows, knownLocationCodes, knownMaterialCodes } from './uploadFilter'
 import { guardedMutation, guardedQuery } from './guarded'
+import { recordUpload } from './sapUploads'
 
 const stockValidator = v.object({
   _id: v.id('stock'),
@@ -63,6 +64,7 @@ export const replaceAll = guardedMutation({
         transit: v.optional(v.number()),
       }),
     ),
+    fileName: v.optional(v.string()),
   },
   returns: v.object({
     count: v.number(),
@@ -71,7 +73,7 @@ export const replaceAll = guardedMutation({
     unknownMaterials: v.array(v.string()),
     unknownLocations: v.array(v.string()),
   }),
-  handler: async (ctx, { rows }) => {
+  handler: async (ctx, { rows, fileName }) => {
     // MB52 covers the whole plant. Only materials in master data and storage
     // locations the user has defined are relevant here.
     const { kept, report } = filterRows<(typeof rows)[number]>({
@@ -86,6 +88,14 @@ export const replaceAll = guardedMutation({
     await Promise.all(existing.map((doc) => ctx.db.delete(doc._id)))
     const now = Date.now()
     await Promise.all(kept.map((row) => ctx.db.insert('stock', { ...row, uploadedAt: now })))
+    await recordUpload(ctx, 'stock', {
+      fileName,
+      uploadedAt: now,
+      rowsInFile: rows.length,
+      rowsImported: kept.length,
+      skippedUnknownMaterial: report.skippedUnknownMaterial,
+      skippedUnknownLocation: report.skippedUnknownLocation,
+    })
     return { count: kept.length, ...report }
   },
 })

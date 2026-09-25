@@ -7,6 +7,8 @@ import { v } from 'convex/values'
 import { runSync } from './moldAlarms'
 import { filterRows, knownMaterialCodes } from './uploadFilter'
 import { guardedMutation, guardedQuery } from './guarded'
+import { recordUpload } from './sapUploads'
+import { postingCoverage } from '../src/lib/sapUploads'
 
 const rowValidator = v.object({
   _id: v.id('actualProduction'),
@@ -67,6 +69,7 @@ export const replaceAll = guardedMutation({
         orderNumber: v.optional(v.string()),
       }),
     ),
+    fileName: v.optional(v.string()),
   },
   returns: v.object({
     count: v.number(),
@@ -75,7 +78,7 @@ export const replaceAll = guardedMutation({
     unknownMaterials: v.array(v.string()),
     unknownLocations: v.array(v.string()),
   }),
-  handler: async (ctx, { rows }) => {
+  handler: async (ctx, { rows, fileName }) => {
     // MB51 covers every movement in the plant; keep only our own materials.
     const { kept, report } = filterRows<(typeof rows)[number]>({
       rows,
@@ -89,6 +92,15 @@ export const replaceAll = guardedMutation({
     await Promise.all(
       kept.map((row) => ctx.db.insert('actualProduction', { ...row, uploadedAt: now })),
     )
+    await recordUpload(ctx, 'actuals', {
+      fileName,
+      uploadedAt: now,
+      rowsInFile: rows.length,
+      rowsImported: kept.length,
+      skippedUnknownMaterial: report.skippedUnknownMaterial,
+      skippedUnknownLocation: report.skippedUnknownLocation,
+      ...postingCoverage(kept),
+    })
     // Gerçekleşen üretim vuruş sayısını artıran tek şey. Limiti aşan kalıp
     // varsa alarmı yüklemeyle birlikte doğsun; kimsenin bir ekranı açmasını
     // beklemek alarmı günlerce geciktirirdi.

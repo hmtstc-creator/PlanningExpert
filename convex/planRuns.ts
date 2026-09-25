@@ -5,6 +5,7 @@ import { internalMutation, internalQuery } from './_generated/server'
 import { guardedMutation, guardedQuery } from './guarded'
 import { planStatusDoc, requestRecompute } from './planQueue'
 import { withDefaults } from './products'
+import { currentUploads } from './sapUploads'
 
 /**
  * Sunucuda hesaplanan planın veritabanı tarafı.
@@ -66,6 +67,9 @@ export const smallInputs = internalQuery({
         .withIndex('by_status', (q: Ctx) => q.eq('status', 'open'))
         .collect(),
       locations: await ctx.db.query('storageLocations').collect(),
+      // Planın hangi SAP yüklemeleriyle hesaplandığı — SAP Data sayfası
+      // "bu dosya planda mı" sorusunu buna bakarak cevaplar.
+      sapUploads: await currentUploads(ctx),
     }
   },
 })

@@ -60,9 +60,12 @@ export function guardedMutation(spec: Any, roles?: readonly Role[]): Any {
     ...definition,
     args: withSessionArg(definition.args),
     handler: async (ctx: Any, args: Any) => {
-      if (roles) await requireRole(ctx, args.token, roles)
-      else await requireUser(ctx, args.token)
-      const result = await definition.handler(ctx, withoutToken(args))
+      const user = roles
+        ? await requireRole(ctx, args.token, roles)
+        : await requireUser(ctx, args.token)
+      // Yazanın kim olduğu handler'a `ctx.sessionUser` olarak gider (ör.
+      // "bu dosyayı kim yükledi"); jetonun kendisi gitmez.
+      const result = await definition.handler({ ...ctx, sessionUser: user }, withoutToken(args))
       // Plan sunucuda hesaplanıyor: girdisi değişince kısa bir gecikmeyle
       // yeniden hesaplanır. Art arda gelen yazmalar tek hesapta birleşir.
       if (affectsPlan) await requestRecompute(ctx)

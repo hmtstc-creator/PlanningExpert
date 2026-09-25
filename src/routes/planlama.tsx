@@ -17,6 +17,12 @@ import type { PlanAudit } from '../lib/planAudit'
 import type { PlanAlarms } from '../lib/planAlarms'
 import type { PlacementDecision } from '../lib/scheduler'
 import { fixForUnplanned } from '../lib/unplannedFix'
+import {
+  SAP_UPLOAD_KEYS,
+  SAP_UPLOAD_LABELS,
+  formatPlantTime,
+  type PlanDataSources,
+} from '../lib/sapUploads'
 
 export const Route = createFileRoute('/planlama')({
   component: PlanlamaPage,
@@ -253,6 +259,8 @@ function PlanlamaPage() {
           Recalculate now
         </button>
       </div>
+
+      {run && <PlanDataLine sources={(run as { dataSources?: PlanDataSources }).dataSources} />}
 
       <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
         <strong className="text-foreground">Minimum lot is one full coil.</strong> A coil
@@ -1110,5 +1118,31 @@ function Stat({ label, value, warn }: { label: string; value: string; warn?: boo
         {value}
       </p>
     </div>
+  )
+}
+
+/** Planın hesaplandığı SAP dosyaları — hangi veriyle çalıştığı açık olsun. */
+function PlanDataLine({ sources }: { sources: PlanDataSources | undefined }) {
+  return (
+    <p className="mt-2 text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">Calculated with: </span>
+      {sources === undefined
+        ? 'file details are recorded from the next calculation on'
+        : SAP_UPLOAD_KEYS.map((key, i) => {
+            const source = sources[key]
+            return (
+              <span key={key}>
+                {i > 0 && ' · '}
+                {SAP_UPLOAD_LABELS[key].split(' — ')[1]}{' '}
+                {source
+                  ? `${source.fileName ?? 'file'} (${formatPlantTime(source.uploadedAt)})`
+                  : 'not uploaded'}
+              </span>
+            )
+          })}{' '}
+      <Link to="/sapdata" className="underline hover:text-foreground">
+        SAP Data →
+      </Link>
+    </p>
   )
 }

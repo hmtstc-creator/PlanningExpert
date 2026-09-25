@@ -99,6 +99,23 @@ export default defineSchema({
     uploadedAt: v.number(),
   }).index('by_material', ['material']),
 
+  // SAP dosyalarının son yüklemesi — hangi dosya, ne zaman, kim, kaç satır.
+  // Veri tablolarında dosya adı yok; planın hangi dosyayla hesaplandığını
+  // göstermenin tek yolu bu kayıt.
+  sapUploads: defineTable({
+    key: v.string(), // 'weeklyDemand' | 'dailyDemand' | 'stock' | 'actuals'
+    fileName: v.optional(v.string()),
+    uploadedAt: v.number(),
+    uploadedBy: v.optional(v.string()),
+    rowsInFile: v.number(),
+    rowsImported: v.number(),
+    skippedUnknownMaterial: v.number(),
+    skippedUnknownLocation: v.number(),
+    // Dosyanın kapsadığı dönem: ilk ve son hafta/gün ya da kayıt tarihi.
+    coversFrom: v.optional(v.string()),
+    coversTo: v.optional(v.string()),
+  }).index('by_key', ['key']),
+
   storageLocations: defineTable({
     code: v.string(),
     description: v.optional(v.string()),
