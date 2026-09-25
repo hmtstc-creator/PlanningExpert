@@ -28,9 +28,10 @@ import {
   type ReactNode,
 } from 'react'
 
-import { makeFunctionReference } from 'convex/server'
+import { getFunctionName, makeFunctionReference } from 'convex/server'
 
 import { reportMutationError } from './mutationErrors'
+import { CONVEX_URL } from './serverReachability'
 
 /**
  * Deneme sorgusu: girişsiz açık `authInternal:me`. Adıyla referans verilir;
@@ -53,7 +54,6 @@ const WS_VERIFY_MS = 8000
 /** HTTP modunda verinin tazelenme aralığı. */
 const HTTP_POLL_MS = 20_000
 
-const CONVEX_URL: string = (import.meta as any).env?.VITE_CONVEX_URL ?? ''
 
 interface TransportValue {
   mode: TransportMode
@@ -220,13 +220,17 @@ export function useHttpQuery<T>(
   // jetonla gelen cevap sanılıyor ve jeton hemen siliniyordu — HTTP
   // modunda giriş sessizce giriş ekranına geri dönüyordu. Convex'in kendi
   // useQuery'si de yeni argümanlar için cevap gelene kadar undefined döner.
-  const [state, setState] = useState<{ fn: unknown; key: string; data: T | undefined }>({
-    fn: null,
+  //
+  // Sorgu ADIYLA tanınır, nesne kimliğiyle değil: `api.x.y` her erişimde
+  // yeni bir nesne üretir. Kimlikle karşılaştırmak cevabı hiçbir zaman "bu
+  // sorgunun cevabı" saydırmıyor ve sayfa sonsuza kadar yükleniyordu.
+  const [state, setState] = useState<{ key: string; data: T | undefined }>({
     key: '',
     data: undefined,
   })
   const [error, setError] = useState<string | null>(null)
-  const argsKey = JSON.stringify(args ?? null)
+  const fnName = functionNameOf(fn)
+  const argsKey = `${fnName}|${JSON.stringify(args ?? null)}`
   const latest = useRef(0)
 
   useEffect(() => {
@@ -243,11 +247,9 @@ export function useHttpQuery<T>(
           // tüm sayfalarda gereksiz yeniden render ve form sıfırlaması
           // tetikliyordu.
           setState((current) =>
-            current.fn === fn &&
-            current.key === argsKey &&
-            JSON.stringify(current.data) === JSON.stringify(result)
+            current.key === argsKey && JSON.stringify(current.data) === JSON.stringify(result)
               ? current
-              : { fn, key: argsKey, data: result as T },
+              : { key: argsKey, data: result as T },
           )
           setError(null)
         }
@@ -264,11 +266,23 @@ export function useHttpQuery<T>(
       cancelled = true
       clearInterval(interval)
     }
+    // `fn` bilerek bağımlılıkta yok: her render'da yeni nesne olur ve
+    // sorguyu durmadan yeniden başlatırdı. Adı `argsKey`'in içinde.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, http, fn, argsKey, revision])
+  }, [active, http, argsKey, revision])
 
-  const current = state.fn === fn && state.key === argsKey
-  return { data: current ? state.data : undefined, error }
+  return { data: state.key === argsKey ? state.data : undefined, error }
+}
+
+/** Convex işlev referansının adı ("authInternal:me"); referans değilse metni. */
+function functionNameOf(fn: unknown): string {
+  if (typeof fn === 'string') return fn
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return getFunctionName(fn as any)
+  } catch {
+    return String(fn)
+  }
 }
 
 /**

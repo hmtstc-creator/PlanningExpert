@@ -2,6 +2,8 @@
 import { act, render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
+import { makeFunctionReference } from 'convex/server'
+
 import { TransportContext, useHttpQuery } from './convexTransport'
 
 // HTTP yedek modu: giriş sonrası jeton eklendiğinde eski "oturum yok"
@@ -26,7 +28,10 @@ describe('useHttpQuery', () => {
     }
     const seen: unknown[] = []
     function Probe({ token }: { token?: string }) {
-      const { data } = useHttpQuery<unknown>(true, 'authInternal:me', token ? { token } : {})
+      // Uygulamadaki gibi: `api.authInternal.me` her render'da YENİ bir
+      // nesnedir. Kimlikle karşılaştıran bir önbellek burada hiç cevap vermez.
+      const fn = makeFunctionReference<'query'>('authInternal:me')
+      const { data } = useHttpQuery<unknown>(true, fn, token ? { token } : {})
       seen.push(data)
       return null
     }
