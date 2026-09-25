@@ -47,14 +47,33 @@ function CapacityPage() {
     weekStart: string
   } & Pattern)[]
   const [editing, setEditing] = useState<{ press: string; week: CapacityWeek } | null>(null)
+  const [selection, setSelection] = useState<string>(() => {
+    try {
+      return window.localStorage.getItem(SELECTION_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  })
 
   const forecast = data?.capacity ?? null
+  const options = forecast ? viewOptions(forecast) : []
+  // Kayıtlı seçim artık yoksa (pres silindi vb.) ilk hat gösterilir.
+  const selected = options.find((o) => o.key === selection) ?? options[0]
+  function choose(key: string) {
+    setSelection(key)
+    setEditing(null)
+    try {
+      window.localStorage.setItem(SELECTION_KEY, key)
+    } catch {
+      // Tarayıcı saklamaya izin vermiyorsa seçim yalnızca bu oturumda kalır.
+    }
+  }
   const recalculating = !!planStatus?.runningSince || (planStatus?.scheduledFor ?? 0) > Date.now() - 60_000
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
+    <div className="mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 xl:w-2/3 xl:px-0">
       <h1 className="text-2xl font-bold text-foreground">Capacity Dashboard</h1>
-      <p className="mt-2 max-w-5xl text-sm text-muted-foreground">
+      <p className="mt-2 text-sm text-muted-foreground">
         Weekly capacity against demand for every press group and press. Capacity is the net
         working time from the{' '}
         <Link to="/takvim" className="underline">
@@ -94,21 +113,16 @@ function CapacityPage() {
 
       {forecast && (
         <>
-          <GroupCards forecast={forecast} />
-          <div className="mt-6">
-            <CapacityLegend />
-          </div>
-          {forecast.groups.map((group) => (
-            <GroupSection
-              key={group.name}
-              forecast={forecast}
-              group={group}
-              templates={templates}
-              overrides={overrides}
-              editing={editing}
-              onEdit={setEditing}
-            />
-          ))}
+          <GroupCards forecast={forecast} selected={selected} onSelect={choose} />
+          <SelectedView
+            forecast={forecast}
+            selection={selected}
+            onSelect={choose}
+            templates={templates}
+            overrides={overrides}
+            editing={editing}
+            onEdit={setEditing}
+          />
           <Unassigned forecast={forecast} />
         </>
       )}
@@ -123,16 +137,44 @@ function seriesOf(forecast: CapacityForecast, presses: string[]): CapacitySeries
   )
 }
 
-function groupTitle(group: { name: string; presses: string[] }) {
-  return group.presses.length > 1 || group.presses[0] !== group.name
-    ? `${group.name} — ${group.presses.join(' + ')}`
-    : group.name
+const SELECTION_KEY = 'capacity-dashboard-view'
+
+interface ViewOption {
+  key: string
+  label: string
+  kind: 'line' | 'press'
+  presses: string[]
 }
 
-/** Üstteki özet: her grubun toplam fazla/boş saati ve ilk sıkışan hafta. */
-function GroupCards({ forecast }: { forecast: CapacityForecast }) {
+/** Açılır menünün seçenekleri: önce hatlar, sonra tek tek presler. */
+function viewOptions(forecast: CapacityForecast): ViewOption[] {
+  const lines: ViewOption[] = forecast.groups
+    .filter((g) => g.presses.length > 1)
+    .map((g) => ({ key: `line:${g.name}`, label: `${g.name} (${g.presses.join(' + ')})`, kind: 'line', presses: g.presses }))
+  const presses: ViewOption[] = forecast.groups
+    .flatMap((g) => g.presses)
+    .map((p) => ({ key: `press:${p}`, label: p, kind: 'press', presses: [p] }))
+  return [...lines, ...presses]
+}
+
+function groupKey(forecast: CapacityForecast, group: { name: string; presses: string[] }) {
+  return viewOptions(forecast).find(
+    (o) => o.presses.length === group.presses.length && o.presses.every((p) => group.presses.includes(p)),
+  )?.key
+}
+
+/** Üstteki özet: her grubun toplam fazla/boş saati ve ilk sıkışan hafta. Tıklayınca grafiği o hatta çevirir. */
+function GroupCards({
+  forecast,
+  selected,
+  onSelect,
+}: {
+  forecast: CapacityForecast
+  selected: ViewOption | undefined
+  onSelect: (key: string) => void
+}) {
   return (
-    <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {forecast.groups.map((group) => {
         const rows = capacityRows(seriesOf(forecast, group.presses))
         const over = rows.reduce((s, r) => s + r.over, 0)
@@ -140,28 +182,34 @@ function GroupCards({ forecast }: { forecast: CapacityForecast }) {
         const end = rows[rows.length - 1]?.cumulative ?? 0
         const firstShort = rows.findIndex((r) => r.cumulative < 0)
         const firstOver = rows.findIndex((r) => r.over > 0)
+        const key = groupKey(forecast, group)
+        const active = !!key && selected?.key === key
         return (
-          <a
+          <button
             key={group.name}
-            href={`#group-${group.name}`}
-            className="rounded-lg border border-border p-4 hover:bg-muted/40"
+            type="button"
+            onClick={() => key && onSelect(key)}
+            aria-pressed={active}
+            className={`rounded-lg border p-3 text-left hover:bg-muted/40 ${
+              active ? 'border-primary ring-1 ring-primary' : 'border-border'
+            }`}
           >
             <p className="text-sm font-semibold text-foreground">{group.name}</p>
             <p className="text-xs text-muted-foreground">{group.presses.join(' + ')}</p>
-            <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+            <dl className="mt-2 grid grid-cols-3 gap-1 text-xs">
               <div>
-                <dt className="text-muted-foreground">Over capacity</dt>
-                <dd className={`text-lg font-semibold tabular-nums ${over > 0 ? 'text-destructive' : 'text-foreground'}`}>
+                <dt className="text-muted-foreground">Over</dt>
+                <dd className={`text-base font-semibold tabular-nums ${over > 0 ? 'text-destructive' : 'text-foreground'}`}>
                   {fmt(over)} h
                 </dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Idle</dt>
-                <dd className="text-lg font-semibold tabular-nums text-foreground">{fmt(idle)} h</dd>
+                <dd className="text-base font-semibold tabular-nums text-foreground">{fmt(idle)} h</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Cumulative at end</dt>
-                <dd className={`text-lg font-semibold tabular-nums ${end < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                <dt className="text-muted-foreground">Cumul. end</dt>
+                <dd className={`text-base font-semibold tabular-nums ${end < 0 ? 'text-destructive' : 'text-foreground'}`}>
                   {fmt(end)} h
                 </dd>
               </div>
@@ -169,103 +217,108 @@ function GroupCards({ forecast }: { forecast: CapacityForecast }) {
             <p className="mt-2 text-xs">
               {firstShort >= 0 ? (
                 <span className="font-medium text-destructive">
-                  ⚠ Customer waits from {forecast.weeks[firstShort].label} (cumulative below zero)
+                  ⚠ Customer waits from {forecast.weeks[firstShort].label}
                 </span>
               ) : firstOver >= 0 ? (
                 <span className="text-amber-700 dark:text-amber-400">
-                  ⓘ Over capacity in {forecast.weeks[firstOver].label}, covered by idle hours
-                  before it
+                  ⓘ Over in {forecast.weeks[firstOver].label}, covered by earlier idle hours
                 </span>
               ) : (
                 <span className="text-muted-foreground">✓ Demand fits every week</span>
               )}
             </p>
-          </a>
+          </button>
         )
       })}
     </div>
   )
 }
 
-function GroupSection({
+/** Seçilen hat ya da pres: tek tablo, tek grafik. */
+function SelectedView({
   forecast,
-  group,
+  selection,
+  onSelect,
   templates,
   overrides,
   editing,
   onEdit,
 }: {
   forecast: CapacityForecast
-  group: { name: string; presses: string[] }
+  selection: ViewOption | undefined
+  onSelect: (key: string) => void
   templates: ({ press: string } & Pattern)[]
   overrides: ({ press: string; weekStart: string } & Pattern)[]
   editing: { press: string; week: CapacityWeek } | null
   onEdit: (e: { press: string; week: CapacityWeek } | null) => void
 }) {
-  const rows = capacityRows(seriesOf(forecast, group.presses))
-  const single = group.presses.length === 1
+  const options = viewOptions(forecast)
+  if (!selection) return null
+  const rows = capacityRows(seriesOf(forecast, selection.presses))
+  const press = selection.kind === 'press' ? selection.presses[0] : undefined
+  const lines = options.filter((o) => o.kind === 'line')
+  const presses = options.filter((o) => o.kind === 'press')
+
   return (
-    <section id={`group-${group.name}`} className="mt-8 rounded-lg border border-border">
-      <h2 className="border-b border-border bg-muted/40 px-4 py-2 text-base font-semibold text-foreground">
-        {groupTitle(group)}
-      </h2>
+    <section className="mt-6 rounded-lg border border-border">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/40 px-4 py-2">
+        <label htmlFor="capacity-view" className="text-sm font-medium text-muted-foreground">
+          Show
+        </label>
+        <select
+          id="capacity-view"
+          value={selection.key}
+          onChange={(e) => onSelect(e.target.value)}
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-sm font-semibold text-foreground"
+        >
+          {lines.length > 0 && (
+            <optgroup label="Lines">
+              {lines.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          <optgroup label="Presses">
+            {presses.map((o) => (
+              <option key={o.key} value={o.key}>
+                {o.label}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+        {selection.kind === 'line' && (
+          <span className="text-xs text-muted-foreground">
+            Pick a single press to change a week's shifts or overtime.
+          </span>
+        )}
+      </div>
       <div className="p-4">
         <CapacityTable
           weeks={forecast.weeks}
           rows={rows}
-          press={single ? group.presses[0] : undefined}
+          press={press}
           overrides={overrides}
           editing={editing}
           onEdit={onEdit}
         />
-        {single && editing?.press === group.presses[0] && (
+        {press && editing?.press === press && (
           <OvertimeEditor
             key={`${editing.press}|${editing.week.start}`}
-            press={editing.press}
+            press={press}
             week={editing.week}
             templates={templates}
             overrides={overrides}
             onClose={() => onEdit(null)}
           />
         )}
-        <div className="mt-3">
-          <CapacityChart weeks={forecast.weeks} rows={rows} title={group.name} />
+        <div className="mt-4">
+          <CapacityLegend />
         </div>
-
-        {!single && (
-          <div className="mt-6 space-y-6">
-            <h3 className="text-sm font-semibold text-foreground">Each press</h3>
-            {group.presses.map((press) => {
-              const pressRows = capacityRows(seriesOf(forecast, [press]))
-              return (
-                <div key={press} className="rounded-md border border-border p-3">
-                  <p className="mb-2 text-sm font-medium text-foreground">{press}</p>
-                  <CapacityTable
-                    weeks={forecast.weeks}
-                    rows={pressRows}
-                    press={press}
-                    overrides={overrides}
-                    editing={editing}
-                    onEdit={onEdit}
-                  />
-                  {editing?.press === press && (
-                    <OvertimeEditor
-                      key={`${editing.press}|${editing.week.start}`}
-                      press={press}
-                      week={editing.week}
-                      templates={templates}
-                      overrides={overrides}
-                      onClose={() => onEdit(null)}
-                    />
-                  )}
-                  <div className="mt-2">
-                    <CapacityChart weeks={forecast.weeks} rows={pressRows} title={press} compact />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+        <div className="mt-2">
+          <CapacityChart weeks={forecast.weeks} rows={rows} title={selection.label} />
+        </div>
       </div>
     </section>
   )

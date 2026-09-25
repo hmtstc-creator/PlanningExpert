@@ -21,7 +21,7 @@ const PAD_L = 44
 const PAD_R = 12
 const PAD_T = 16
 const PAD_B = 34
-const H = 220
+const H = 360
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-GB')
 
@@ -65,11 +65,13 @@ export function CapacityChart({
   const minV = Math.min(0, ...rows.map((r) => r.cumulative))
   const step = niceStep(maxV - minV)
   const top = Math.ceil(maxV / step) * step
-  const bottom = Math.floor(minV / step) * step
+  // Negatif taraf yalnızca gerektiği kadar: çeyrek adıma yuvarlanır.
+  const bottom = minV < 0 ? -Math.ceil(-minV / (step / 4)) * (step / 4) : 0
   const y = (v: number) => PAD_T + ((top - v) / (top - bottom || 1)) * plotH
   const x = (i: number) => PAD_L + i * COL + COL / 2
   const ticks: number[] = []
-  for (let v = bottom; v <= top + 1e-9; v += step) ticks.push(v)
+  for (let v = 0; v <= top + 1e-9; v += step) ticks.push(v)
+  for (let v = -step; v >= bottom - 1e-9; v -= step) ticks.push(v)
 
   const linePath = (values: number[]) =>
     values.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
