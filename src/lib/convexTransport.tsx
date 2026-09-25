@@ -54,7 +54,8 @@ interface TransportValue {
   token: string | null
 }
 
-const TransportContext = createContext<TransportValue>({
+/** Dışarıya yalnız testler için açık; uygulama `TransportProvider` kullanır. */
+export const TransportContext = createContext<TransportValue>({
   mode: 'connecting',
   http: null,
   revision: 0,
@@ -130,13 +131,23 @@ export function useTransport(): TransportValue {
  * HTTP modunda bir sorguyu periyodik olarak çeker. WebSocket modundayken
  * hiçbir şey yapmaz (hook kuralları gereği yine de çağrılır).
  */
-function useHttpQuery<T>(
+export function useHttpQuery<T>(
   active: boolean,
   fn: unknown,
   args: unknown,
 ): { data: T | undefined; error: string | null } {
   const { http, revision } = useTransport()
-  const [data, setData] = useState<T | undefined>(undefined)
+  // Veri, HANGİ sorgu ve argümanlar için geldiğiyle birlikte tutulur.
+  // Argümanlar değişince (ör. girişten sonra jeton eklenince) eski cevap
+  // yeni sorgunun cevabı gibi dönmemeli: "oturum yok" (null) cevabı, yeni
+  // jetonla gelen cevap sanılıyor ve jeton hemen siliniyordu — HTTP
+  // modunda giriş sessizce giriş ekranına geri dönüyordu. Convex'in kendi
+  // useQuery'si de yeni argümanlar için cevap gelene kadar undefined döner.
+  const [state, setState] = useState<{ fn: unknown; key: string; data: T | undefined }>({
+    fn: null,
+    key: '',
+    data: undefined,
+  })
   const [error, setError] = useState<string | null>(null)
   const argsKey = JSON.stringify(args ?? null)
   const latest = useRef(0)
@@ -154,8 +165,12 @@ function useHttpQuery<T>(
           // Aynı veri tekrar geldiyse state'e dokunma: yeni nesne kimliği
           // tüm sayfalarda gereksiz yeniden render ve form sıfırlaması
           // tetikliyordu.
-          setData((current) =>
-            JSON.stringify(current) === JSON.stringify(result) ? current : (result as T),
+          setState((current) =>
+            current.fn === fn &&
+            current.key === argsKey &&
+            JSON.stringify(current.data) === JSON.stringify(result)
+              ? current
+              : { fn, key: argsKey, data: result as T },
           )
           setError(null)
         }
@@ -175,7 +190,8 @@ function useHttpQuery<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, http, fn, argsKey, revision])
 
-  return { data, error }
+  const current = state.fn === fn && state.key === argsKey
+  return { data: current ? state.data : undefined, error }
 }
 
 /**

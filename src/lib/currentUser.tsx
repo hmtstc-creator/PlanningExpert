@@ -80,10 +80,12 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const user = (result ?? null) as SessionUser | null
 
   // Jeton var ama sunucu tanımıyorsa (süresi dolmuş, kullanıcı silinmiş)
-  // saklamanın anlamı yok.
+  // saklamanın anlamı yok. `result === null` gerçekten BU jeton için gelen
+  // cevaptır: taşıma katmanı yeni argümanlar için cevap gelene kadar
+  // undefined döner, eski "oturum yok" cevabı yeni jetonu sildiremez.
   useEffect(() => {
-    if (!loading && token && user === null) setSessionToken(null)
-  }, [loading, token, user])
+    if (tokenRead && token && result === null) setSessionToken(null)
+  }, [tokenRead, token, result])
 
   const value = useMemo(
     () => ({ name: user?.name ?? null, user, token, loading, setToken }),
