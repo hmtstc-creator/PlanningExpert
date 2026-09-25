@@ -92,10 +92,10 @@ export interface DemandEntry {
   phase: 'backlog' | 'urgent' | 'fill'
   urgency: number
   daysOfCover: number
+  /** Eş ürün bu lotla aynı vuruşta çıkar: eşin karşılanan miktarı. */
+  coProductQty?: number
   /** Geç kalmasın diye öne alındı (geç iş onarımı). */
   boost?: boolean
-  /** Rulo sonuna kadar basılmıyor: ihtiyaç kadar, geç iş olmasın diye. */
-  exactLot?: boolean
 }
 
 export interface DemandScheduleOptions {
@@ -118,12 +118,6 @@ export interface DemandScheduleOptions {
   workingDayKeys?: string[]
   /** ZPP_DAILY'nin kapsadığı son gün (ISO); yoksa günlük veri kullanılmaz. */
   dailyUntil?: string | null
-  /**
-   * Bu malzemeler tam ruloya yuvarlanmaz, ihtiyaç kadar üretilir. Geç iş
-   * onarımı kullanır: ihtiyaç fazlası rulo, başka bir parçayı geç
-   * bırakıyorsa kırpılır.
-   */
-  exactLotMaterials?: Set<string>
 }
 
 /** Talep takvimi: bugün ve ufuktaki her haftanın açık (talep alan) günleri. */
@@ -305,10 +299,15 @@ export function buildDemandSchedule(
   // Rulo lotu: bağlanan rulo sonuna kadar basılır, bu yüzden ihtiyaç tam
   // ruloya yuvarlanır ve fazlası EN ERKEN kaleme eklenir — rulo tek seferde
   // bitirilir, haftaya bölünmez.
-  roundMaterialsToCoilLot(entriesByMaterial, products, pairedWith, options.exactLotMaterials)
+  roundMaterialsToCoilLot(entriesByMaterial, products, pairedWith)
 
   // Lotların ZAMANI: haftanın başı değil, öngörülen stoğun bittiği gün.
   timeLotsByProjectedStock(entriesByMaterial, rows, options, pairedWith, calendar, dayDemand)
+
+  // Eş ürün çifti TEK iştir: aynı vuruş ikisini birden verir. Eşin lotu,
+  // eşi tanımlayan ana ürünün aynı zamanlı lotuna katılır; ayrı planlansaydı
+  // pres süresi ve setup iki kez sayılırdı.
+  mergeCoProductLots(entriesByMaterial, products, pairedWith)
 
   return Array.from(entriesByMaterial.values())
     .flat()
@@ -319,6 +318,45 @@ export function buildDemandSchedule(
         a.dueDate.localeCompare(b.dueDate) ||
         b.urgency - a.urgency,
     )
+}
+
+/**
+ * Eş ürün lotlarını ana ürünün lotuna katar.
+ *
+ * Rulo yuvarlaması ve zamanlama çift için ortak yapıldığından her haftada
+ * iki ürünün lotu aynı güne düşer. Ana ürünün lotu kalır (aciliyeti ikisinin
+ * en acili olur), eşinki kaldırılır ve miktarı `coProductQty` olarak taşınır.
+ */
+function mergeCoProductLots(
+  entriesByMaterial: Map<string, DemandEntry[]>,
+  products: Map<string, ProductSpec>,
+  pairedWith: Map<string, string>,
+): void {
+  const done = new Set<string>()
+  for (const [material, partner] of pairedWith) {
+    if (done.has(material)) continue
+    done.add(material)
+    done.add(partner)
+    const primary = primaryOfPair(material, partner, products)
+    if (!primary) continue
+    const carrier = primary.code === partner ? partner : material
+    const other = carrier === material ? partner : material
+    const carrierLots = (entriesByMaterial.get(carrier) ?? []).filter((e) => e.qty > 0)
+    const otherLots = entriesByMaterial.get(other) ?? []
+    for (const lot of otherLots) {
+      if (lot.qty <= 0) continue
+      const match =
+        carrierLots.find((c) => c.dueDate === lot.dueDate && c.earliestDate === lot.earliestDate) ??
+        carrierLots.find((c) => c.dueDate === lot.dueDate)
+      if (!match) continue
+      match.coProductQty = (match.coProductQty ?? 0) + lot.qty
+      if (phaseRank(lot.phase) < phaseRank(match.phase)) match.phase = lot.phase
+      match.urgency = Math.max(match.urgency, lot.urgency)
+      if (lot.earliestDate < match.earliestDate) match.earliestDate = lot.earliestDate
+      if (lot.dueDate < match.dueDate) match.dueDate = lot.dueDate
+      lot.qty = 0
+    }
+  }
 }
 
 /**
@@ -489,7 +527,6 @@ function roundMaterialsToCoilLot(
   entriesByMaterial: Map<string, DemandEntry[]>,
   products: Map<string, ProductSpec>,
   pairedWith: Map<string, string>,
-  exact?: Set<string>,
 ): void {
   const done = new Set<string>()
 
@@ -499,15 +536,6 @@ function roundMaterialsToCoilLot(
     done.add(material)
     if (partner) done.add(partner)
 
-    // İhtiyaç kadar: rulo kuralı bu malzeme için bu hesapta uygulanmaz.
-    if (exact && (exact.has(material) || (partner && exact.has(partner)))) {
-      for (const m of partner ? [material, partner] : [material]) {
-        const spec = products.get(m)
-        if (!spec || piecesPerCoil(spec) <= 0) continue
-        for (const e of entriesByMaterial.get(m) ?? []) if (e.qty > 0) e.exactLot = true
-      }
-      continue
-    }
 
     const own = entriesByMaterial.get(material) ?? []
     const other = partner ? (entriesByMaterial.get(partner) ?? []) : []
@@ -806,10 +834,16 @@ export function splitByMoldLimit(product: ProductSpec, quantity: number): RunPla
   const maxQtyPerRun = maxShots * cavities
   if (quantity <= maxQtyPerRun) return [computeRunPlan(product, quantity)]
 
+  // Partiler tam rulo sınırında bölünür: bağlanan rulo yarıda bırakılmaz.
+  // Tek rulo limitten büyükse parti bir rulodur (limit aşımı işte uyarılır).
+  const coilUnit = shotsPerCoil(product) * cavities
+  const chunkSize =
+    coilUnit > 0 ? Math.max(coilUnit, Math.floor(maxQtyPerRun / coilUnit) * coilUnit) : maxQtyPerRun
+
   const runs: RunPlan[] = []
   let remaining = quantity
   while (remaining > 0) {
-    const chunk = Math.min(remaining, maxQtyPerRun)
+    const chunk = Math.min(remaining, chunkSize)
     runs.push(computeRunPlan(product, chunk))
     remaining -= chunk
   }

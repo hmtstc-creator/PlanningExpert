@@ -135,8 +135,12 @@ describe('buildDemandSchedule', () => {
     )
     const qty = (m: string) =>
       entries.filter((e) => e.material === m).reduce((sum, e) => sum + e.qty, 0)
+    const co = (m: string) =>
+      entries.filter((e) => e.material === m).reduce((sum, e) => sum + (e.coProductQty ?? 0), 0)
+    // Çift tek iştir: B, A'nın lotunun içinde aynı vuruştan çıkar.
     expect(qty('A')).toBe(1200)
-    expect(qty('B')).toBe(1200)
+    expect(qty('B')).toBe(0)
+    expect(co('A')).toBe(1200)
   })
 
   it('eşi olmayan hafta için eş üründe yeni kalem açar', () => {
@@ -190,11 +194,14 @@ describe('buildDemandSchedule', () => {
     )
     const at = (m: string, d: string) =>
       entries.filter((e) => e.material === m && e.dueDate === d).reduce((s, e) => s + e.qty, 0)
-    // 1. hafta A baskın (1000), 2. hafta B baskın (900).
+    const coAt = (d: string) =>
+      entries.filter((e) => e.material === 'A' && e.dueDate === d).reduce((s, e) => s + (e.coProductQty ?? 0), 0)
+    // 1. hafta A baskın (1000), 2. hafta B baskın (900). B, A'nın işinde çıkar.
     expect(at('A', '2026-09-14')).toBe(1000)
-    expect(at('B', '2026-09-14')).toBe(1000)
+    expect(coAt('2026-09-14')).toBe(1000)
     expect(at('A', '2026-09-21')).toBe(900)
-    expect(at('B', '2026-09-21')).toBe(900)
+    expect(coAt('2026-09-21')).toBe(900)
+    expect(entries.filter((e) => e.material === 'B')).toHaveLength(0)
   })
 })
 
@@ -317,12 +324,27 @@ describe('splitByMoldLimit', () => {
     maxShots: 3000,
   }
 
-  it('limiti aşan üretimi partilere böler', () => {
-    const runs = splitByMoldLimit(product, 10_000) // 5000 vuruş, limit 3000 vuruş
+  it('limiti aşan üretimi partilere böler (rulo verisi yoksa limitte)', () => {
+    const noCoil = { ...product, grossWeight: undefined, coilWeight: undefined }
+    const runs = splitByMoldLimit(noCoil, 10_000) // 5000 vuruş, limit 3000 vuruş
     expect(runs).toHaveLength(2)
     expect(runs[0].shots).toBe(3000)
     expect(runs[1].shots).toBe(2000)
     expect(runs.every((r) => !r.exceedsMoldLimit)).toBe(true)
+  })
+
+  it('rulolu parçada partiyi tam rulo sınırında böler — yarım rulo kalmaz', () => {
+    // Rulo 5333 parça = 2666 vuruş (2 göz) → 5332 parçalık birim. Limit
+    // 3000 vuruş = 6000 parça: partiye tek rulo sığar. 2 rulo = 2 parti.
+    const runs = splitByMoldLimit(product, 2 * 5332)
+    expect(runs.map((r) => r.quantity)).toEqual([5332, 5332])
+    expect(runs.every((r) => r.coilsNeeded === 1)).toBe(true)
+  })
+
+  it('tek rulo kalıp limitinden büyükse rulo bölünmez, limit aşımı işaretlenir', () => {
+    const runs = splitByMoldLimit({ ...product, maxShots: 1000 }, 5332)
+    expect(runs).toHaveLength(1)
+    expect(runs[0].exceedsMoldLimit).toBe(true)
   })
 
   it('limit yoksa tek parti döner', () => {
@@ -677,9 +699,11 @@ describe('rulo lotu (minimum üretim miktarı)', () => {
     )
     const qty = (m: string) =>
       entries.filter((e) => e.material === m).reduce((sum, e) => sum + e.qty, 0)
-    // Max(300, 1200) = 1200 ihtiyaç → tam rulo 3000, ikisi de 3000.
+    const co = entries.filter((e) => e.material === 'A').reduce((s, e) => s + (e.coProductQty ?? 0), 0)
+    // Max(300, 1200) = 1200 ihtiyaç → tam rulo 3000; B aynı vuruştan 3000.
     expect(qty('A')).toBe(3000)
-    expect(qty('B')).toBe(3000)
+    expect(co).toBe(3000)
+    expect(qty('B')).toBe(0)
   })
 
   it('stok ruloyu gereksiz yere bağlatmaz', () => {
@@ -722,10 +746,11 @@ describe('rulo lotu — vuruş bazlı kısıt', () => {
     )
     const qty = (m: string) =>
       entries.filter((e) => e.material === m).reduce((sum, e) => sum + e.qty, 0)
+    const co = entries.filter((e) => e.material === 'A').reduce((s, e) => s + (e.coProductQty ?? 0), 0)
     // Rulo A'nın gramajından 3000 parça verir = 1500 vuruş (A 2 gözlü).
-    // Aynı 1500 vuruştan B'den 1500 parça çıkar — bedavaya.
+    // Aynı 1500 vuruştan B'den 1500 parça çıkar — bedavaya, aynı işte.
     expect(qty('A')).toBe(3000)
-    expect(qty('B')).toBe(1500)
+    expect(co).toBe(1500)
   })
 
   it('çok gözlü kalıpta ihtiyacı vuruşa çevirerek yuvarlar', () => {

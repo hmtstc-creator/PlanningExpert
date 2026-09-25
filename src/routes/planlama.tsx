@@ -267,8 +267,8 @@ function PlanlamaPage() {
         that is mounted is run out, so quantities are rounded up to whole coils and the
         surplus covers the following weeks rather than triggering a second coil. Materials
         with no coil or gross weight in master data are planned to the exact requirement.
-        Exception: when a whole coil would make another part late, that coil is cut to the
-        exact need (see Late jobs).
+        A coil is never cut short, not even to save a late job — late jobs are moved forward
+        instead. A co-product pair is one job: one stroke makes both parts.
       </p>
 
       {thisWeekCapacity.full > 0 && (
@@ -962,14 +962,9 @@ function LateJobs({
         The first plan had {repair.lateBefore} job(s) starting after their stock runs
         out. The engine re-planned {repair.rounds} time(s)
         {repair.boosted.length > 0 && `: moved ${repair.boosted.length} part(s) forward`}
-        {repair.trimmed.length > 0 &&
-          `, cut the surplus coil of ${repair.trimmed.length} part(s) to the exact need`}
-        . Every moved job tried all of its presses again.{' '}
+        . Every moved job tried all of its presses again; coils are never cut short.{' '}
         {fixed > 0 ? `${fixed} fixed` : 'None could be fixed this way'}
         {jobs.length > 0 ? `, ${jobs.length} still late.` : '.'}
-        {repair.trimmed.length > 0 && (
-          <> Cut coils: {repair.trimmed.slice(0, 8).join(', ')}{repair.trimmed.length > 8 ? '…' : ''}.</>
-        )}
       </p>
       {jobs.length > 0 && (
         <div className="mt-3 overflow-x-auto rounded-md border border-destructive/30 bg-background">

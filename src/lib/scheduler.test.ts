@@ -266,7 +266,8 @@ describe('schedule', () => {
   })
 
   it('kalıp limitini aşan üretimi partilere bölerek planlar', () => {
-    const limited = { ...baseProduct, maxShots: 300 }
+    // Rulo verisi yok: parti doğrudan limitte bölünür.
+    const limited = { ...baseProduct, grossWeight: undefined, coilWeight: undefined, maxShots: 300 }
     const result = schedule(
       [backlogEntry],
       new Map([['A', limited]]),
@@ -830,6 +831,8 @@ describe('boşluğa geri dönük yerleştirme', () => {
     // takılıdır.
     const splitProduct: ProductSpec & { mainMachine?: string } = {
       ...baseProduct,
+      grossWeight: undefined,
+      coilWeight: undefined,
       maxShots: 300,
     }
     const result = schedule(

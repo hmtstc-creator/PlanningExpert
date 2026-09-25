@@ -163,9 +163,12 @@ describe('planlama hattı (uçtan uca)', () => {
       const a = demand
         .filter((e) => e.material === 'MAM-A' && e.dueDate === week)
         .reduce((s, e) => s + e.qty, 0)
-      const b = demand
-        .filter((e) => e.material === 'MAM-B' && e.dueDate === week)
-        .reduce((s, e) => s + e.qty, 0)
+      // Çift tek iş: B, A'nın lotunda aynı vuruştan çıkar (coProductQty).
+      const b =
+        demand.filter((e) => e.material === 'MAM-B' && e.dueDate === week).reduce((s, e) => s + e.qty, 0) +
+        demand
+          .filter((e) => e.material === 'MAM-A' && e.dueDate === week)
+          .reduce((s, e) => s + (e.coProductQty ?? 0), 0)
       if (a > 0 || b > 0) {
         // Aynı vuruş sayısı: adet / göz sayısı ikisinde de eşit olmalı.
         expect(a / cavitiesA).toBe(b / cavitiesB)

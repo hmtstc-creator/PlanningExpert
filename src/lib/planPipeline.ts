@@ -13,7 +13,7 @@ import { addDays, DEFAULT_PLANT_TIME_ZONE, isoDate, isoWeek, mondayOf, plantCloc
 import {
   buildDemandSchedule,
   eligiblePressesOf,
-  piecesPerCoil,
+  shotsPerCoil,
   buildRawMaterialPlan,
   buildWeekBuckets,
   materialsMissingRawSpec,
@@ -194,13 +194,12 @@ export interface PlanRun {
   capacityFactor: number
   globalFrozenDays: number
   safetyStockDays: number
-  /** Geç iş onarımı: kaç tur, önce/sonra geç iş, öne alınan ve kırpılan parçalar. */
+  /** Geç iş onarımı: kaç tur, önce/sonra geç iş, öne alınan parçalar. */
   lateRepair: {
     rounds: number
     lateBefore: number
     lateAfter: number
     boosted: string[]
-    trimmed: string[]
   }
   /** ZPP_DAILY'nin kapsadığı son gün; bu güne kadar satış günleri esas. */
   dailyUntil: string | null
@@ -533,11 +532,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // En az plansız, sonra en az geç iş, sonra en az geç gün, sonra en az
   // değişiklik yapan plan seçilir. Hiçbir deneme daha iyi değilse durulur.
   const lotKey = (e: { material: string; bucketLabel: string }) => `${e.material}|${e.bucketLabel}`
-  const planOnce = (boost: Set<string>, exact: Set<string>) => {
-    const demand = buildDemandSchedule(demandRows, productByCode, {
-      ...demandOptions,
-      exactLotMaterials: exact,
-    })
+  const planOnce = (boost: Set<string>) => {
+    const demand = buildDemandSchedule(demandRows, productByCode, demandOptions)
     for (const entry of demand) if (boost.has(lotKey(entry))) entry.boost = true
     const scheduled = schedule(
       demand,
@@ -561,11 +557,12 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     return false
   }
 
-  let best = {
-    result: planOnce(new Set(), new Set()),
-    boost: new Set<string>(),
-    exact: new Set<string>(),
-  }
+  // Bağlanan rulo sonuna kadar basılır: geç işi kurtarmak için bile lot
+  // bobinin altına kırpılmaz (eskiden kırpılıyordu; yük altında neredeyse
+  // bütün parçalar 3000'lik bobinden 450'lik işlere bölünüyordu). Onarım
+  // yalnızca sırayla yapılır: geç lot öne alınır, bütün presleri yeniden
+  // dener ve acil setup kuralından yararlanır.
+  let best = { result: planOnce(new Set()), boost: new Set<string>() }
   let bestScore = score(best.result, 0)
   const lateBefore = best.result.jobs.filter((j) => j.late).length
   let rounds = 0
@@ -574,31 +571,12 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     if (late.length === 0) break
     rounds += 1
     const boost = new Set(best.boost)
-    const exact = new Set(best.exact)
-    for (const lj of late) {
-      boost.add(lotKey(lj))
-      const product = productByCode.get(lj.material)
-      const eligible = new Set(eligiblePressesOf(product))
-      for (const j of best.result.jobs) {
-        if (j.material === lj.material || !eligible.has(j.press) || j.date > lj.date) continue
-        const spec = productByCode.get(j.material)
-        if (spec && piecesPerCoil(spec) > 0) exact.add(j.material)
-      }
-    }
-    let improved = false
-    for (const trial of [
-      { boost, exact: best.exact },
-      { boost, exact },
-    ]) {
-      const result = planOnce(trial.boost, trial.exact)
-      const trialScore = score(result, trial.boost.size + trial.exact.size)
-      if (better(trialScore, bestScore)) {
-        best = { result, boost: trial.boost, exact: trial.exact }
-        bestScore = trialScore
-        improved = true
-      }
-    }
-    if (!improved) break
+    for (const lj of late) boost.add(lotKey(lj))
+    const result = planOnce(boost)
+    const trialScore = score(result, boost.size)
+    if (!better(trialScore, bestScore)) break
+    best = { result, boost }
+    bestScore = trialScore
   }
   const result = best.result
 
@@ -620,7 +598,6 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     lateBefore,
     lateAfter: result.jobs.filter((j) => j.late).length,
     boosted: Array.from(new Set(Array.from(best.boost).map((k) => k.split('|')[0]))).sort(),
-    trimmed: Array.from(best.exact).sort(),
   }
 
   // Dondurulmuş işler motorun çıktısında yok ama sahada yapılacaklar.
@@ -834,6 +811,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     concurrentSetupsPerHall,
     maxSetupsPlantWide,
     maxSetupsPlantWideNormal,
+    coilUnits: new Map(
+      Array.from(productByCode.values())
+        .map((p): [string, number] => [
+          p.code,
+          shotsPerCoil(p) * (p.moldCavities && p.moldCavities > 0 ? p.moldCavities : 1),
+        ])
+        .filter(([, unit]) => unit > 0),
+    ),
   })
   if (!audit.ok) {
     const broken = audit.rules.filter((r) => r.violationCount > 0).length

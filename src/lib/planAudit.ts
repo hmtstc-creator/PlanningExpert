@@ -29,6 +29,7 @@ export interface AuditJob {
   urgentSetup?: boolean
   /** Aynı kalıbın devamı olarak (setup'sız) yerleşti — en erken bitiş kuralı aranmaz. */
   continued?: boolean
+  quantity?: number
   decision?: {
     step: number
     candidates: { press: string; endDate?: string; endMinute?: number; note?: string }[]
@@ -47,6 +48,11 @@ export interface AuditInputs {
   maxSetupsPlantWide?: number
   /** Normal işlerde fabrika genelinde aynı anda en fazla kalıp setup'ı. */
   maxSetupsPlantWideNormal?: number
+  /**
+   * Parça → bir rulonun verdiği adet (vuruş × göz). Rulolu her lot bunun tam
+   * katı olmalı: bağlanan rulo yarıda bırakılmaz.
+   */
+  coilUnits?: Map<string, number>
   /**
    * Parça → ana pres ve esneklik. Esnek olmayan parça yalnız ana preste
    * (ya da kullanıcının sabitlediği preste) çalışabilir.
@@ -110,6 +116,7 @@ export function auditPlan(input: AuditInputs): PlanAudit {
     'No lot starts before its pull-forward window (stock reaching the safety level minus the pull-forward days)',
   )
   const plantSetups = rule('plant-setups', 'Plant-wide: never more mould setups at once than allowed')
+  const wholeCoils = rule('whole-coils', 'Every coil-fed lot is whole coils — a mounted coil is run out')
   const past = rule('past', 'Nothing is planned in the past')
   const mainPress = rule(
     'main-press',
@@ -160,6 +167,15 @@ export function auditPlan(input: AuditInputs): PlanAudit {
               `but ${c.press} would have finished it ${c.endDate} +${Math.round(c.endMinute)} min`,
           )
         }
+      }
+    }
+    const unit = input.coilUnits?.get(job.material)
+    if (unit && unit > 0 && !job.frozen && job.quantity !== undefined) {
+      wholeCoils.check()
+      if (Math.round(job.quantity) % unit !== 0) {
+        wholeCoils.fail(
+          `${job.material} on ${job.press} ${job.date}: ${Math.round(job.quantity)} pcs is not a whole number of coils (${unit} pcs per coil)`,
+        )
       }
     }
     fillEarly.check()
@@ -312,7 +328,7 @@ export function auditPlan(input: AuditInputs): PlanAudit {
     }
   }
 
-  const rules = [mainPress, earliest, pressOverlap, maintenance, mouldTwice, mouldBlackout, crane, plantSetups, fillEarly, past].map(
+  const rules = [mainPress, earliest, pressOverlap, maintenance, mouldTwice, mouldBlackout, crane, plantSetups, wholeCoils, fillEarly, past].map(
     (x) => x.r,
   )
   return { rules, ok: rules.every((r) => r.violationCount === 0) }

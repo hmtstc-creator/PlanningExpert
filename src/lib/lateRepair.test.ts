@@ -48,17 +48,15 @@ describe('late jobs are re-planned, not left late', () => {
     expect(run.jobs.find((j) => j.material === 'Z')?.reason).toContain('moved forward')
   })
 
-  it('cuts a surplus coil when moving forward is not enough', () => {
-    // Y elle öne alınmış: Z onun önüne geçemez. Tek çare Y'nin 6000'lik
-    // rulosunu ihtiyaç kadara (100) indirmek.
+  it('never cuts a mounted coil short, even when another job stays late', () => {
+    // Y elle öne alınmış: Z onun önüne geçemez. Y'nin 6000'lik rulosu yine
+    // sonuna kadar basılır; Z geç kalır ve öyle raporlanır.
     const run = computePlan(plant({ overrides: [{ material: 'Y', kind: 'priority' }] }), MONDAY_0700)
-    expect(run.lateRepair.lateBefore).toBe(1)
-    expect(run.lateRepair.lateAfter).toBe(0)
-    expect(run.lateRepair.trimmed).toContain('Y')
     const y = run.jobs.find((j) => j.material === 'Y')!
-    expect(y.quantity).toBe(100)
-    expect(y.reason).toContain('exact quantity')
-    expect(run.jobs.every((j) => !j.late)).toBe(true)
+    expect(y.quantity).toBe(6000)
+    expect(y.reason).toContain('1 full coil')
+    expect(run.lateRepair.lateAfter).toBe(1)
+    expect(run.jobs.find((j) => j.material === 'Z')!.late).toBe(true)
   })
 
   it('keeps whole coils when nothing is late', () => {

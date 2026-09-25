@@ -205,14 +205,20 @@ function PlanLogicPage() {
           </li>
           <li>
             <b>Co-products</b> come out of the same stroke, so they cannot be
-            made separately. For each week, both parts get the larger of the
-            two requirements.
+            made separately. For each week, the pair is made for the larger of
+            the two requirements, and the pair is <b>one lot and one job</b> —
+            on the part that names the other as its co-product. The job shows
+            both quantities; press time and setup are counted once.
           </li>
           <li>
-            <b>Whole coils.</b> A mounted coil is run to the end, so the
-            quantity is rounded up to whole coils. The surplus covers the
-            following weeks and does not trigger another coil. Materials
-            without a coil or gross weight are planned to the exact quantity.
+            <b>Whole coils — always.</b> A mounted coil is run to the end, so
+            every coil-fed lot is a whole number of coils (strokes per coil ×
+            cavities). The surplus covers the following weeks and does not
+            trigger another coil; backlog and this week's need share the same
+            coil and the same setup. A coil is <b>never cut short</b> — not to
+            fit a gap and not to save a late job. Only parts without coil or
+            gross weight in master data are planned to the exact quantity
+            (the job says so).
           </li>
         </ul>
         <Example>
@@ -232,6 +238,11 @@ function PlanLogicPage() {
           net minutes = shifts × shift length − planned stops (per shift) → × capacity factor
         </Formula>
         <ul>
+          <li>
+            Shifts come from the press's standard week, or from the <b>week exception</b>{' '}
+            on the Work Calendar when there is one — overtime opened for a week (also from
+            the Capacity Dashboard) is planned in that week.
+          </li>
           <li>Holidays and non-working days have no capacity.</li>
           <li>
             Days that have passed are skipped, and today starts at the current
@@ -325,9 +336,12 @@ function PlanLogicPage() {
           <span aria-hidden>→ …</span>
         </div>
         <Formula>
-          strokes = quantity ÷ cavities · production minutes = strokes ÷ SPM (stretched
-          by the mould's performance factor)
+          strokes = quantity ÷ cavities · job time = strokes ÷ SPM ÷ performance factor
         </Formula>
+        <p className="text-xs text-muted-foreground">
+          Example: 10 h of pure stroke time at a 60 % performance factor is a 16.7 h job.
+          Setup, coil changes and quality approval sit inside that time.
+        </p>
         <p>It has to respect every rule at once:</p>
         <ul>
           <li>
@@ -366,7 +380,9 @@ function PlanLogicPage() {
           <li>A mould cannot be on two presses at the same time.</li>
           <li>
             If the quantity needs more strokes than the mould's shot limit, it
-            is split into batches, each with its own setup.
+            is split into batches at <b>whole coils</b> — a coil is never split
+            between batches. If one coil alone is larger than the limit, the
+            batch is that coil and the job is flagged.
           </li>
           <li>
             A lot does not start before its safety date ({current.safety} working
@@ -375,9 +391,13 @@ function PlanLogicPage() {
           </li>
         </ul>
         <p>
-          <b>The press that finishes the job earliest wins.</b> Its time,
-          crane slots and mould are then booked, and the next requirement is
-          placed.
+          <b>The press that finishes the job earliest wins</b> — with one
+          exception: when nothing is urgent, continuing the die already mounted
+          (no setup) is preferred. For backlog, or a job that would otherwise
+          start after its stock runs out, the engine also tries the dynamic
+          setup rule and keeps whichever finishes sooner. The chosen press
+          time, crane slots, setup slot and mould are then booked, and the
+          next requirement is placed.
         </p>
       </Step>
 
@@ -421,10 +441,9 @@ function PlanLogicPage() {
             an alternative press that is free earlier is found.
           </li>
           <li>
-            <b>Cut surplus coils in front of it.</b> Parts placed earlier on the
-            same presses that press a whole coil for a small need are cut to
-            the exact need for this plan — the coil is not run out, so the late
-            part gets the press sooner. The job says so in its reason.
+            <b>Let its setup overlap</b>: a late-risk job may set up while
+            another setup runs (at most {current.plantUrgent} at once in the
+            plant), so production starts sooner.
           </li>
           <li>
             <b>Keep the best plan</b>: fewest unplanned, then fewest late jobs,
@@ -432,6 +451,12 @@ function PlanLogicPage() {
             improve the plan, it stops.
           </li>
         </ol>
+        <p className="mt-2 text-sm text-amber-900">
+          <b>Coils are never cut to save a late job.</b> A mounted coil is run
+          to the end; cutting it would leave a half coil, a second setup and a
+          second coil mount later. If moving forward is not enough, the job stays
+          late and is reported.
+        </p>
         <p className="mt-2 text-sm text-amber-900">
           Whatever is still late is listed at the top of the Production Plan in
           red, with the presses that were tried and what would fix it —
@@ -560,7 +585,8 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
       <div className="mt-3 grid gap-6 lg:grid-cols-2">
         <div>
           <Box tone="border-border bg-muted/50 text-foreground" title="1 · One list of every lot to produce">
-            Demand minus stock, rounded to whole coils. Each lot gets two dates
+            Demand minus stock, rounded to whole coils (never less); a co-product
+            pair is one lot. Each lot gets two dates
             from the projected stock: the day the stock would run out, and{' '}
             {safetyDays} working day(s) before it — the earliest it may start.
           </Box>
@@ -580,7 +606,8 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
           <Down label="each press gives a finish time" />
           <Box tone="border-emerald-300 bg-emerald-50 text-emerald-950" title="4 · Choose the press that finishes first">
             Not "the first press in the list" and not "the main press" — the
-            one where the job is done soonest.
+            one where the job is done soonest. When nothing is urgent, keeping
+            the mounted die running (no setup) wins.
           </Box>
           <Down label="book it" />
           <Box tone="border-border bg-muted/50 text-foreground" title="5 · Book the slot">
@@ -590,9 +617,9 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
           <Down label="back to 3 with the next item, until the list is empty" />
           <Box tone="border-amber-300 bg-amber-50 text-amber-950" title="6 · Anything late? → plan again">
             A job that starts after its stock runs out stops the customer. Late
-            lots are moved to the front (they try every press again); if that
-            is not enough, surplus coils placed before them on the same presses
-            are cut to the exact need. Up to 4 rounds; the best plan is kept.
+            lots are moved to the front (they try every press again) and may
+            overlap their setup with another one. Coils are never cut. Up to 4
+            rounds; the best plan is kept.
           </Box>
           <Down label="whatever is still late or does not fit" />
           <Box tone="border-destructive/40 bg-destructive/10 text-foreground" title="Late jobs / Unplanned">
@@ -658,9 +685,10 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
               every calculation, checking code that is separate from the engine goes
               through every job again and checks each rule — parts that are not
               flexible only on their main press, one job per press
-              at a time, earliest press chosen, crane gaps, one mould on one
-              press, maintenance, no lot before its safety date, nothing in the past. A
-              broken rule shows in red with the job named.
+              at a time, earliest press chosen, crane gaps, setups at once in the
+              plant, whole coils only, one mould on one press, maintenance, no lot
+              before its pull-forward window, nothing in the past. A broken rule
+              shows in red with the job named.
             </li>
             <li>
               <b className="text-foreground">Why this press</b> (job list): pick any job
@@ -694,6 +722,11 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
             <li>
               Items equal in everything — group, stock-out day and number of
               presses — keep the row order of the ZPP file.
+            </li>
+            <li>
+              Because a coil is never cut, an overloaded week can end with a late
+              job that a half coil would have saved. That is deliberate: the fix
+              is capacity (overtime on the Capacity Dashboard) or another press.
             </li>
             <li>
               After the last day in ZPP_DAILY, only weekly totals exist, so

@@ -1418,7 +1418,14 @@ function placeRun(
       : entry.phase === 'urgent'
         ? `Stock runs out ${entry.dueDate} — below safety stock now`
         : `${entry.bucketLabel}: stock runs out ${entry.dueDate}, may start ${entry.earliestDate}`,
-    run.coilsNeeded === 1 ? '1 full coil' : `${run.coilsNeeded} full coils`,
+    run.coilsNeeded === 0
+      ? 'no coil / gross weight in master data — exact quantity'
+      : run.coilsNeeded === 1
+        ? '1 full coil'
+        : `${run.coilsNeeded} full coils`,
+    ...(entry.coProductQty && product.coProduct
+      ? [`co-product ${product.coProduct} ${Math.round(entry.coProductQty).toLocaleString('en-GB')} pcs from the same strokes`]
+      : []),
     ...(press.feedsCoil !== false && run.coilChanges > 0
       ? [`${run.coilChanges} coil change${run.coilChanges > 1 ? 's' : ''}`]
       : []),
@@ -1434,7 +1441,6 @@ function placeRun(
   if (late) reasonParts.push(`⚠ starts after the stock runs out (${entry.dueDate})`)
   if (pinned) reasonParts.push('pinned by user')
   if (entry.boost) reasonParts.push('moved forward so it is not late')
-  if (entry.exactLot) reasonParts.push('exact quantity — coil not run out, so another job is not late')
   if (pulledForward) reasonParts.push(`pulled forward from ${entry.earliestDate} so the press is not idle`)
   if (bestIsContinuation) reasonParts.push('continues the die already mounted — no new setup')
   if (best.urgent && !sameMaterial) reasonParts.push('urgent: setup may overlap another setup (plant-wide limit)')
@@ -1461,7 +1467,7 @@ function placeRun(
     coilsNeeded: run.coilsNeeded,
     pinned,
     coProduct: product.coProduct,
-    coProductQuantity: run.coProductQuantity,
+    coProductQuantity: entry.coProductQty ?? run.coProductQuantity,
     setupStartMinute: best.setupStart,
     setupEndMinute: setupEnd.minute,
     qualityEndMinute: qualityEnd.minute,
