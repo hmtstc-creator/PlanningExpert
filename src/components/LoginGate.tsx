@@ -9,6 +9,15 @@ import {
   validatePassword,
 } from '../lib/authRules'
 import { useCurrentUser } from '../lib/currentUser'
+import {
+  convexHost,
+  friendlyNetworkError,
+  useServerReachability,
+  withTimeout,
+} from '../lib/serverReachability'
+
+/** Giriş isteği bu kadar sürede cevap almazsa ağ sorunu sayılır. */
+const LOGIN_TIMEOUT_MS = 25_000
 
 /**
  * Giriş kapısı.
@@ -34,6 +43,15 @@ export function LoginGate({ children }: { children: ReactNode }) {
 
   const screen = screenFor({ loading, user })
 
+  // Oturum kontrolü uzarsa (sunucuya ulaşılamıyorsa) sebebi gösterilsin;
+  // sonsuza kadar "Checking your session…" yazmak kullanıcıyı çaresiz bırakır.
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    if (screen !== 'loading') return
+    const timer = setTimeout(() => setSlow(true), 12_000)
+    return () => clearTimeout(timer)
+  }, [screen])
+
   // Hiç kullanıcı yoksa ilk yöneticiyi oluştur. Boş bir kurulumda giriş
   // ekranının hiçbir parolayı kabul etmemesi çıkmaz sokak olurdu.
   useEffect(() => {
@@ -50,8 +68,16 @@ export function LoginGate({ children }: { children: ReactNode }) {
 
   if (screen === 'loading') {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center px-4">
         <p className="text-sm text-muted-foreground">Checking your session…</p>
+        {slow && (
+          <div className="mt-4 w-full">
+            <p className="text-center text-xs text-muted-foreground">
+              This is taking longer than usual.
+            </p>
+            <ConnectionCheck />
+          </div>
+        )}
       </div>
     )
   }
@@ -69,11 +95,11 @@ export function LoginGate({ children }: { children: ReactNode }) {
             setError(null)
             setBusy(true)
             try {
-              const result = await login({ name, password })
+              const result = await withTimeout(login({ name, password }), LOGIN_TIMEOUT_MS)
               setToken(result.token)
               setPassword('')
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'Could not sign in')
+              setError(friendlyNetworkError(e))
             } finally {
               setBusy(false)
             }
@@ -118,6 +144,8 @@ export function LoginGate({ children }: { children: ReactNode }) {
           </button>
         </form>
 
+        <ConnectionCheck />
+
         <p className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
           First time here? The account is{' '}
           <strong>{DEFAULT_ADMIN_USERNAME}</strong> with the password{' '}
@@ -156,7 +184,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
               setNewPassword('')
               setConfirmPassword('')
             } catch (e) {
-              setError(e instanceof Error ? e.message : 'Could not change the password')
+              setError(friendlyNetworkError(e))
             } finally {
               setBusy(false)
             }
@@ -218,3 +246,50 @@ export function LoginGate({ children }: { children: ReactNode }) {
 
   return <>{children}</>
 }
+
+/**
+ * Veri sunucusuna bu bilgisayardan ulaşılabiliyor mu? Giriş ekranında
+ * durur: engelliyse kullanıcı sebebini ve IT'ye ne soracağını görür.
+ */
+function ConnectionCheck() {
+  const { state, retry } = useServerReachability()
+  const host = convexHost()
+  if (state === 'ok') {
+    return (
+      <p className="mt-4 text-xs text-emerald-700">● Connected to the data server ({host})</p>
+    )
+  }
+  if (state === 'checking') {
+    return <p className="mt-4 text-xs text-muted-foreground">Checking the connection to {host}…</p>
+  }
+  return (
+    <div className="mt-4 rounded-md border border-destructive bg-destructive/10 p-3 text-xs text-foreground">
+      <p className="font-semibold text-destructive">
+        {state === 'no-url'
+          ? 'The data server address is not configured in this build.'
+          : 'This computer cannot reach the data server.'}
+      </p>
+      {state !== 'no-url' && (
+        <>
+          <p className="mt-1">
+            The page itself loaded, but <strong>{host}</strong> did not answer — usually the
+            company network or security software (firewall, web filter, endpoint protection) is
+            blocking it. Sign-in cannot work until it is allowed.
+          </p>
+          <p className="mt-1">
+            Ask IT to allow <strong>https://{host}</strong> and <strong>wss://{host}</strong>{' '}
+            (WebSocket). Test from another network (e.g. phone on mobile data) to confirm.
+          </p>
+          <button
+            type="button"
+            onClick={retry}
+            className="mt-2 rounded-md border border-border bg-background px-3 py-1 text-xs hover:bg-muted"
+          >
+            Check again
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+

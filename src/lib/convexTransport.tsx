@@ -256,7 +256,10 @@ export function useMutation(fn: any): (args?: any) => Promise<any> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (args?: any) => {
       const withAuth = withToken(args ?? {}, token)
-      if (mode !== 'http') return wsMutation(withAuth)
+      // Yalnızca canlı bağlantı GERÇEKTEN açıkken WebSocket kullanılır.
+      // "Bağlanıyor" durumunda istek WebSocket'e verilirse bağlantı
+      // kurulana kadar — engelli ağda hiçbir zaman — bekler.
+      if (mode === 'websocket') return wsMutation(withAuth)
       if (!http) throw new Error('Veritabanı adresi tanımlı değil')
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -291,7 +294,10 @@ export function useAction(fn: any): (args?: any) => Promise<any> {
     async (args?: any) => {
       // Giriş action'ı jetonu yok sayar; diğerleri denetler.
       const withAuth = withToken(args ?? {}, token)
-      if (mode !== 'http') return wsAction(withAuth)
+      // Action tek istek-tek cevaptır; canlı bağlantıya ihtiyacı yok. Yalnız
+      // WebSocket açıkken onu kullan, aksi halde HTTPS — giriş, WebSocket'i
+      // kesen bir ağda da çalışsın.
+      if (mode === 'websocket') return wsAction(withAuth)
       if (!http) throw new Error('Veritabanı adresi tanımlı değil')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (http as any).action(fn, withAuth)
