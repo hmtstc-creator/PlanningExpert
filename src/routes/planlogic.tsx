@@ -446,7 +446,8 @@ function PlanLogicPage() {
           <li>
             A part is <b>late</b> when the quantity the customer needs is not
             ready by <b>{current.cutoff}</b> on the day it is needed — not when
-            the whole lot ends. Backlog in ZPP and anything needed today are due
+            the whole lot ends. Every day a lot covers is checked, not only the
+            first one. Backlog in ZPP and anything needed today are due
             the <b>next working day at {current.cutoff}</b>. How late is shown in
             hours and days. The engine does not leave it — see{' '}
             <a href="#late" className="underline">
@@ -475,23 +476,26 @@ function PlanLogicPage() {
         <p className="mt-1 text-sm text-amber-900">
           A job that starts after its stock runs out means the customer stops —
           your own safety stock is the only margin. So a late job is never just
-          reported; the engine plans again, up to four rounds:
+          reported; the engine plans again, up to six rounds:
         </p>
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-amber-900">
           <li>
-            <b>Move the late lot forward</b>, ahead of everything except your own
-            "move to front" rules. It then tries every eligible press again, so
-            an alternative press that is free earlier is found.
+            <b>Move the late lot forward</b> within its own group: a late fill lot
+            goes to the head of the fill lots, never ahead of backlog. It then
+            tries every eligible press again, so an alternative press that is
+            free earlier is found.
           </li>
           <li>
             <b>Let its setup overlap</b>: a late-risk job may set up while
             another setup runs (at most {current.plantUrgent} at once in the
-            plant), so production starts sooner.
+            plant), so production starts sooner — but never two in the same hall
+            at once (one crane, one setup team per hall).
           </li>
           <li>
-            <b>Keep the best plan</b>: fewest unplanned, then fewest late jobs,
-            then fewest late days, then fewest changes. If a round does not
-            improve the plan, it stops.
+            <b>Keep the best plan</b>: fewest unplanned, then fewest late
+            <b>parts</b> (three late lots of one part are one customer stop), then
+            fewest late hours. A round that does not improve does not stop the
+            search — the next round may — but the best plan so far is kept.
           </li>
         </ol>
         <p className="mt-2 text-sm text-amber-900">
@@ -529,22 +533,75 @@ function PlanLogicPage() {
           </li>
           <li>
             <b>Best</b> means: fewest unplanned, then fewest late parts, then
-            fewest late hours, then the highest utilisation, then the fewest
-            setups. Utilisation never wins over a late part.
+            fewest late hours, then the highest production time (setups do not
+            count as production), then the fewest setups. Utilisation never wins
+            over a late part.
           </li>
           <li>
             <b>Utilisation</b> = busy press hours ÷ available hours (working
             calendar minus maintenance) in the next 7 days, all presses together.
           </li>
           <li>
-            <b>It stops</b> as soon as {current.target}% is reached, after{' '}
+            <b>It stops</b> as soon as {current.target}% is reached with nothing
+            late, after{' '}
             {current.maxScenarios} scenarios, after 25 scenarios without an
             improvement, or after two minutes. The Production Plan then shows
             the level reached (e.g. "best of {current.maxScenarios} scenarios
             reaches 90%"), the utilisation of each press and the scenarios
             compared.
           </li>
+          <li>
+            <b>Local search</b> then works on each late part directly: move it
+            1, 2 or 4 days forward in its group, switch its "moved forward" mark,
+            or move a non-late part that runs before it on the same press 2 days
+            back. Each move rebuilds the whole plan and is kept only if the plan
+            gets better (at most 150 moves or one minute).
+          </li>
         </ul>
+      </section>
+
+      <section id="check" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-sky-200 bg-sky-50/60 p-4">
+        <h2 className="text-sm font-semibold text-foreground">Independent check — is the plan really right?</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The plan check above re-counts the engine's own numbers. The{' '}
+          <b>independent check</b> is separate code that shares nothing with the
+          planner. After every calculation it:
+        </p>
+        <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
+          <li>
+            <b>Replays stock hour by hour</b> from the SAP files (ZPP, ZPP_DAILY,
+            MB52 2009/1009) and the planned jobs: every need day is due at{' '}
+            {current.cutoff}, production arrives as it is pressed. Every moment
+            stock goes below zero is a real customer stop. The late list must
+            match it exactly — a part the engine missed, or a false alarm, is
+            shown.
+          </li>
+          <li>
+            <b>Asks "could any plan have avoided it?"</b> for each short part: is
+            there enough press time before the deadline on its presses, even
+            alone? Can the setup team and hall cranes do all setups needed by
+            then? The answer is "No" (proven by capacity), "Yes" (a free slot
+            existed) or "not proven". It also gives the proven minimum number of
+            short parts that no plan can go below.
+          </li>
+          <li>
+            <b>Re-checks every rule</b> on the real clock: two jobs on one press,
+            one die on two presses (also overnight), two setups in one hall (also
+            across 07:00), plant-wide setups, eligible press, working time and
+            maintenance, whole coils / Min. lot, pull-forward window, a die change
+            without a setup, backlog before urgent.
+          </li>
+          <li>
+            <b>Measures efficiency</b>: setups against the minimum possible,
+            production time against the maximum possible, and where idle time
+            comes from — no work, not yet allowed, or waiting for the setup team.
+          </li>
+          <li>
+            <b>Flags data to check</b> for short parts: stock in other locations
+            (e.g. 2010), positive values in ZPP, backlog smaller than stock, an old
+            stock file, missing master data.
+          </li>
+        </ol>
       </section>
 
       <section id="alarms" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">

@@ -50,14 +50,118 @@ export function readyMoment(
  * mı başlıyor. Ufukta stoğu hiç bitmeyen lot geç sayılmaz.
  */
 function isLate(entry: DemandEntry, segments: JobSegment[], startDate: string): boolean {
-  if (entry.noStockout) return false
-  if (entry.deadlineDate === undefined || entry.deadlineNet === undefined) return startDate > entry.dueDate
-  const ready = readyMoment(segments, entry.needFraction ?? 1)
-  if (!ready) return false
-  return (
-    ready.date > entry.deadlineDate ||
-    (ready.date === entry.deadlineDate && ready.minute > entry.deadlineNet + 1e-6)
+  return deliveryCheck(entry, segments, startDate).late
+}
+
+/**
+ * Teslim kontrolü: lotun her kontrol noktasında (ihtiyaç günü 08:00) o güne
+ * kadar gereken pay hazır mı? İlk kaçırılan nokta raporlanır; hepsi
+ * tutuyorsa ilk nokta. Kontrol noktası yoksa tek teslim anına bakılır.
+ */
+export function deliveryCheck(
+  entry: DemandEntry,
+  segments: JobSegment[],
+  startDate: string,
+): {
+  late: boolean
+  ready?: { date: string; minute: number }
+  fraction: number
+  deadlineDate?: string
+  deadlineNet?: number
+  deadlineLabel?: string
+} {
+  if (entry.noStockout) return { late: false, fraction: 0 }
+  const after = (r: { date: string; minute: number }, date: string, net: number) =>
+    r.date > date || (r.date === date && r.minute > net + 1e-6)
+  const points = (entry.checkpoints ?? []).filter(
+    (c) => c.deadlineDate !== undefined && c.deadlineNet !== undefined,
   )
+  if (points.length > 0) {
+    // Üretim parçaları bir kez çıkarılır; her nokta aynı dizide aranır.
+    const runs = segments.filter((seg) => seg.kind === 'run')
+    const total = runs.reduce((sum, seg) => sum + (seg.end - seg.start), 0)
+    const readyAt = (fraction: number): { date: string; minute: number } | null => {
+      if (runs.length === 0) return readyMoment(segments, fraction)
+      const target = Math.max(0, Math.min(1, fraction)) * total
+      let done = 0
+      for (const seg of runs) {
+        const len = seg.end - seg.start
+        if (done + len >= target - 1e-9) return { date: seg.date, minute: seg.start + Math.max(0, target - done) }
+        done += len
+      }
+      const last = runs[runs.length - 1]
+      return { date: last.date, minute: last.end }
+    }
+    // Aynı teslim anındaki noktalardan yalnızca en büyük pay önemlidir.
+    const strictest = new Map<string, (typeof points)[number]>()
+    for (const cp of points) {
+      const key = `${cp.deadlineDate}|${cp.deadlineNet}`
+      const prev = strictest.get(key)
+      if (!prev || cp.fraction > prev.fraction) strictest.set(key, cp)
+    }
+    for (const cp of strictest.values()) {
+      const ready = readyAt(cp.fraction)
+      if (ready && after(ready, cp.deadlineDate!, cp.deadlineNet!)) {
+        return {
+          late: true,
+          ready,
+          fraction: cp.fraction,
+          deadlineDate: cp.deadlineDate,
+          deadlineNet: cp.deadlineNet,
+          deadlineLabel: cp.deadlineLabel,
+        }
+      }
+    }
+    const first = points[0]
+    return {
+      late: false,
+      ready: readyAt(first.fraction) ?? undefined,
+      fraction: first.fraction,
+      deadlineDate: first.deadlineDate,
+      deadlineNet: first.deadlineNet,
+      deadlineLabel: first.deadlineLabel,
+    }
+  }
+  const fraction = entry.needFraction ?? 1
+  if (entry.deadlineDate === undefined || entry.deadlineNet === undefined) {
+    return { late: startDate > entry.dueDate, fraction }
+  }
+  const ready = readyMoment(segments, fraction)
+  return {
+    late: !!ready && after(ready, entry.deadlineDate, entry.deadlineNet),
+    ready: ready ?? undefined,
+    fraction,
+    deadlineDate: entry.deadlineDate,
+    deadlineNet: entry.deadlineNet,
+    deadlineLabel: entry.deadlineLabel,
+  }
+}
+
+/**
+ * Kalıp limitiyle bölünen lotun k. partisi: lotun [önceki, önceki+parti)
+ * aralığını karşılar. Kontrol noktaları bu aralığa çevrilir; önceki
+ * partilerin karşıladığı ihtiyaç bu partiyi geç yapmaz.
+ */
+function runShareOf(entry: DemandEntry, before: number, quantity: number): DemandEntry {
+  const total = entry.qty
+  if (total <= 0 || quantity >= total) return entry
+  const a = before / total
+  const b = (before + quantity) / total
+  const map = (f: number) => (Math.min(f, b) - a) / (b - a)
+  const checkpoints = (entry.checkpoints ?? [])
+    .filter((c) => c.fraction > a + 1e-9)
+    .map((c) => ({ ...c, fraction: map(c.fraction) }))
+  const need = entry.needFraction ?? 1
+  const noNeed =
+    entry.checkpoints && entry.checkpoints.length > 0 ? checkpoints.length === 0 : need <= a + 1e-9
+  return {
+    ...entry,
+    qty: quantity,
+    coProductQty: entry.coProductQty !== undefined ? (entry.coProductQty * quantity) / total : undefined,
+    checkpoints,
+    needFraction: need > a ? map(need) : 0,
+    noStockout: entry.noStockout || noNeed,
+  }
 }
 
 export interface PressSpec {
@@ -328,6 +432,15 @@ interface Booking {
   start: number
   end: number
   material: string
+  /** Setup'sız başladı (aynı kalıp önceden takılıydı). */
+  noSetup?: boolean
+  /** Kalıbın setup süresi — araya başka kalıp girerse gerekir. */
+  setupIfNeeded?: number
+  /** İşin başlayabileceği en erken eksen dakikası (öne çekme sınırı). */
+  earliest?: number
+  /** Araya başka kalıp girdiği için sonradan eklenen setup (dk). */
+  addedSetup?: number
+  job?: ScheduledJob
 }
 
 /**
@@ -680,23 +793,26 @@ export function schedule(
     seed = (seed * 16807 + 12345) % 2147483647
     return seed / 2147483647
   }
+  // Sıralama tarihi: stok bitişi, yerel aramanın kaydırmasıyla.
+  const orderDay = (e: DemandEntry) => Date.parse(e.dueDate) / 86_400_000 + (e.orderShift ?? 0)
+  const byDue = (a: DemandEntry, b: DemandEntry) => orderDay(a) - orderDay(b)
   const jitter = new Map<DemandEntry, number>()
   if (strategy === 'shuffle') {
-    for (const e of demand) jitter.set(e, Date.parse(e.dueDate) / 86_400_000 + nextRandom() * 3)
+    for (const e of demand) jitter.set(e, orderDay(e) + nextRandom() * 3)
   }
   const within = (a: DemandEntry, b: DemandEntry): number => {
     switch (strategy) {
       case 'spt':
-        return a.dueDate.localeCompare(b.dueDate) || runMinutes(a) - runMinutes(b)
+        return byDue(a, b) || runMinutes(a) - runMinutes(b)
       case 'lpt':
-        return a.dueDate.localeCompare(b.dueDate) || runMinutes(b) - runMinutes(a)
+        return byDue(a, b) || runMinutes(b) - runMinutes(a)
       case 'fewestPresses':
-        return countFor(a.material) - countFor(b.material) || a.dueDate.localeCompare(b.dueDate)
+        return countFor(a.material) - countFor(b.material) || byDue(a, b)
       case 'shuffle':
         return (jitter.get(a) ?? 0) - (jitter.get(b) ?? 0)
       default:
         return (
-          a.dueDate.localeCompare(b.dueDate) ||
+          byDue(a, b) ||
           b.urgency - a.urgency ||
           countFor(a.material) - countFor(b.material)
         )
@@ -705,8 +821,11 @@ export function schedule(
   const ordered = [...demand].sort(
     (a, b) =>
       Number(!prioritised.has(a.material)) - Number(!prioritised.has(b.material)) ||
-      Number(!a.boost) - Number(!b.boost) ||
+      // Faz önce: öne alınan (onarım) lot yalnızca kendi fazının önüne geçer.
+      // Önce boost gelince dolgu lotları bakiyenin önüne geçip bakiyeyi
+      // geciktiriyordu.
       phaseOrder(a.phase) - phaseOrder(b.phase) ||
+      Number(!a.boost) - Number(!b.boost) ||
       within(a, b),
   )
 
@@ -949,11 +1068,14 @@ export function schedule(
       continue
     }
 
+    let producedBefore = 0
     for (const run of runs) {
       step += 1
       const decision: PlacementDecision = { step, candidates: [] }
+      const runEntry = runs.length > 1 ? runShareOf(entry, producedBefore, run.quantity) : entry
+      producedBefore += run.quantity
       const placed = placeRun(
-        entry,
+        runEntry,
         product,
         run,
         allowedPresses,
@@ -981,6 +1103,23 @@ export function schedule(
           decision,
         })
       }
+    }
+  }
+
+  // Araya başka kalıp girdiği için setup'ı geri gelen işler.
+  for (const timeline of timelines.values()) {
+    for (const b of timeline.bookings) {
+      if (!b.addedSetup || !b.job || b.addedSetup <= 0) continue
+      const job = b.job
+      const setup = toDatedSegments(timeline, 'setup', b.start, b.start + b.addedSetup)
+      if (setup.length === 0) continue
+      job.segments = [...setup, ...job.segments]
+      job.setupMinutes += b.addedSetup
+      job.date = setup[0].date
+      job.setupStartMinute = setup[0].start
+      job.spansDays = job.endDate !== job.date
+      job.continued = false
+      job.reason += ' · setup needed again: another die runs on this press before it'
     }
   }
 
@@ -1044,8 +1183,15 @@ function applyFixedJobs(
     }
 
     if (min === Number.POSITIVE_INFINITY) continue
-    insertBooking(timeline, { start: min, end: max, material: job.material })
-    for (const [date, span] of perDate) {
+    insertBooking(timeline, {
+      start: min,
+      end: max,
+      material: job.material,
+      noSetup: !job.segments.some((seg) => seg.kind === 'setup'),
+    })
+    void perDate
+    const visible = job.segments.filter((seg) => timeline.days.some((d) => d.date === seg.date))
+    for (const [date, span] of dieSpans(visible)) {
       recordMoldInterval(moldUsage, job.material, date, {
         press: job.press,
         start: span.start,
@@ -1080,6 +1226,8 @@ interface Placement {
   waits: string[]
   /** Setup acil kuralla (çakışmaya izin vererek) konuldu. */
   urgent?: boolean
+  /** Arkadaki setup'sız işe geri gelen setup'ın yeri (vinç ayrıldı). */
+  followSetup?: { global: number; date: string; start: number; minutes: number }
 }
 
 /**
@@ -1114,6 +1262,9 @@ export function shiftEndAfter(
  * Bu bloklar gün ve vardiya sınırını aşamaz — bitiremeyeceği setup'ı
  * başlatan ekip yoktur — ve ait oldukları günün hol kaydına uymalıdır.
  */
+/** Komşu günün setup kayıtlarının bakıldığı mesafe (dk): en uzun setup + ara. */
+const BOUNDARY_REACH = 360
+
 function reserveSlot(
   timeline: PressTimeline,
   from: number,
@@ -1161,7 +1312,29 @@ function reserveSlot(
     // Vardiya devri serbestse yalnızca gün sonu sınırdır.
     const shiftEnd = crossShifts ? dayEnd : shiftEndAfter(within, shiftNetMinutes, dayEnd)
 
-    const resources = hallSetups.get(day.date)?.get(hall) ?? { mold: [], coil: [] }
+    // Defter üretim gününe göre tutulur; 3 vardiyalı preste gece sonu
+    // (06:xx) ile ertesi günün 07:00'ı yan yanadır. Komşu günlerin kayıtları
+    // bu günün eksenine kaydırılarak birlikte kontrol edilir.
+    const fullNet = (shiftNetMinutes ?? []).reduce((a, b) => a + b, 0) || 1440
+    const previousDate = shiftIsoDate(day.date, -1)
+    const nextDate = shiftIsoDate(day.date, 1)
+    const neighbours = (pick: (log: HallSetupLog) => SetupInterval[]) => {
+      const list: SetupInterval[] = []
+      // Komşu gün yalnızca gün sınırına yakınken önemlidir.
+      const edges: (readonly [string, number])[] = [[day.date, 0]]
+      if (within < BOUNDARY_REACH) edges.push([previousDate, -fullNet])
+      if (within + duration > dayEnd - BOUNDARY_REACH) edges.push([nextDate, fullNet])
+      for (const [date, shift] of edges) {
+        const log = hallSetups.get(date)
+        if (!log) continue
+        for (const iv of pick(log)) list.push(shift === 0 ? iv : { ...iv, start: iv.start + shift, end: iv.end + shift })
+      }
+      return list
+    }
+    const resources = {
+      mold: neighbours((log) => log.get(hall)?.mold ?? []),
+      coil: neighbours((log) => log.get(hall)?.coil ?? []),
+    }
     const own = pending.filter((r) => r.date === day.date)
     const same = [
       ...(type === 'mold' ? resources.mold : resources.coil),
@@ -1175,7 +1348,7 @@ function reserveSlot(
     const plant =
       type === 'mold' && Number.isFinite(plantCap)
         ? [
-            ...Array.from(hallSetups.get(day.date)?.values() ?? []).flatMap((r) => r.mold),
+            ...neighbours((log) => Array.from(log.values()).flatMap((r) => r.mold)),
             ...own.filter((r) => r.type === 'mold'),
           ]
         : []
@@ -1247,7 +1420,9 @@ function tryPlaceOnPress(
   const normalCap = Math.min(urgentCap, options.maxSetupsPlantWideNormal ?? Number.POSITIVE_INFINITY)
   const plantCap = urgent ? urgentCap : normalCap
   const hallConcurrent = Math.max(1, options.concurrentSetupsPerHall)
-  const concurrent = urgent && Number.isFinite(urgentCap) ? Math.max(hallConcurrent, urgentCap) : hallConcurrent
+  // Hol sınırı (vinç) acil işte de aynıdır; acil kural yalnızca fabrika
+  // geneli sınırı yükseltir. Eskiden acil işte aynı holde iki setup çakışabiliyordu.
+  const concurrent = hallConcurrent
   const crossShifts = !!options.setupsCrossShifts
   const waits: string[] = []
 
@@ -1256,7 +1431,9 @@ function tryPlaceOnPress(
   for (let guard = 0; guard < timeline.days.length * 2 + 24; guard++) {
     // Kalıp o an takılıysa setup tekrarlanmaz. Boşluğa geri dönük yerleşen
     // bir iş için de "önceki iş" doğru olsun diye sıraya bakılır.
-    const sameMaterial = materialBefore(timeline, start) === entry.material
+    const sameMaterial =
+      materialBefore(timeline, start) === entry.material &&
+      !dieMovedSince(timeline, moldUsage, entry.material, pressName, start)
     const setupMinutes = sameMaterial ? 0 : run.setupMinutes
     const segments: JobSegment[] = []
     let moldReservation: Placement['moldReservation'] = null
@@ -1357,6 +1534,70 @@ function tryPlaceOnPress(
       continue
     }
 
+    // Boşluğa giren iş, ardından gelen işin setup'ını geri getirir: sonraki
+    // iş "kalıp hâlâ takılı" diye setup'sız planlandıysa araya başka kalıp
+    // girince setup gerekir. Kalan boşluğa sığıyorsa iş girer ve setup
+    // sonraki işe eklenir (placeRun); sığmıyorsa bu boşluk atlanır.
+    const nextIndex = firstEndAfter(timeline.bookings, end)
+    const next = timeline.bookings[nextIndex]
+    let followSetup: Placement['followSetup']
+    if (next && next.noSetup && next.material !== entry.material && next.start >= end) {
+      const minutes = next.setupIfNeeded ?? 0
+      // Geri gelen setup da vinç ve setup ekibi kuralına uyar: boşlukta,
+      // bu işin kendi setup'ı ve rulo değişimleriyle birlikte aranır.
+      // Önce işin hemen önü denenir (kalıp gerektiği an takılsın), olmazsa
+      // boşluğun başından itibaren.
+      const trySetup = (from: number) =>
+        reserveSlot(
+          timeline,
+          from,
+          minutes,
+          hallSetups,
+          hall,
+          'mold',
+          options.setupGapMinutes,
+          concurrent,
+          options.shiftNetMinutes,
+          [
+            ...(moldReservation ? [{ ...moldReservation, type: 'mold' as const }] : []),
+            ...coilReservations.map((r) => ({ ...r, type: 'coil' as const })),
+          ],
+          plantCap,
+          crossShifts,
+        )
+      // Geri gelen setup da işin öne çekme sınırından önce başlayamaz.
+      const floor = Math.max(end, next.earliest ?? 0)
+      const late = minutes > 0 ? trySetup(Math.max(floor, next.start - minutes)) : null
+      const slot =
+        late && late.global + minutes <= next.start
+          ? late
+          : minutes > 0
+          ? reserveSlot(
+              timeline,
+              floor,
+              minutes,
+              hallSetups,
+              hall,
+              'mold',
+              options.setupGapMinutes,
+              concurrent,
+              options.shiftNetMinutes,
+              [
+                ...(moldReservation ? [{ ...moldReservation, type: 'mold' as const }] : []),
+                ...coilReservations.map((r) => ({ ...r, type: 'coil' as const })),
+              ],
+              plantCap,
+              crossShifts,
+            )
+          : null
+      if (minutes > 0 && (!slot || slot.global + minutes > next.start)) {
+        start = firstFreePoint(timeline, Math.max(start + 1, next.end))
+        if (start >= timeline.total) return null
+        continue
+      }
+      if (slot) followSetup = { ...slot, minutes }
+    }
+
     // Kalıp bakımda ya da henüz hazır değil: işin hiçbir parçası kapalı
     // zamana düşemez. İş uzun olduğu için kapalı günü "atlayamaz" — kalıp
     // açıldıktan sonra yeniden başlar. Kalıp gün içinde bir saatte hazır
@@ -1403,33 +1644,101 @@ function tryPlaceOnPress(
         moldReservation,
         coilReservations,
         waits,
+        followSetup,
       }
     }
 
     // Çakışan işin bitişinden sonra yeniden dene.
     waits.push(`die in use on ${conflict.press}`)
-    const nextDay = timeline.days.find((d) => d.date === conflict.date)
-    start = firstFreePoint(
-      timeline,
-      Math.max(start + 1, (nextDay?.offset ?? 0) + conflict.end),
-    )
+    const conflictDay = timeline.days.find((d) => d.date === conflict.date)
+    // Kalıp o gün sonuna kadar tutuluyorsa (ya da bu pres o gün çalışmıyorsa)
+    // bir sonraki çalışma günü denenir. `conflict.end` gün içi net dakikadır
+    // (bugün için startNet dahil).
+    const after =
+      conflictDay && conflict.end < DAY_CLOSE - 1
+        ? conflictDay.offset + Math.max(0, conflict.end - conflictDay.startNet)
+        : (timeline.days.find((d) => d.date > conflict.date)?.offset ?? timeline.total)
+    start = firstFreePoint(timeline, Math.max(start + 1, after))
     if (start >= timeline.total) return null
   }
   return null
 }
 
 /** Aynı kalıbın başka bir preste çakıştığı ilk aralık. */
+/**
+ * Kalıbın presde takılı kaldığı aralıklar, gün gün. İş geceyi (ya da
+ * çalışılmayan bir günü) aşıyorsa kalıp o arada da o preste takılıdır:
+ * ilk gün işin başından gün sonuna, aradaki günler tamamen, son gün gün
+ * başından işin sonuna.
+ */
+const DAY_OPEN = -1e6
+const DAY_CLOSE = 1e6
+function dieSpans(segments: { date: string; start: number; end: number }[]): Map<string, { start: number; end: number }> {
+  const spans = new Map<string, { start: number; end: number }>()
+  if (segments.length === 0) return spans
+  let first = segments[0].date
+  let last = segments[0].date
+  for (const seg of segments) {
+    if (seg.date < first) first = seg.date
+    if (seg.date > last) last = seg.date
+    const cur = spans.get(seg.date)
+    spans.set(seg.date, {
+      start: cur ? Math.min(cur.start, seg.start) : seg.start,
+      end: cur ? Math.max(cur.end, seg.end) : seg.end,
+    })
+  }
+  if (first === last) return spans
+  for (let d = first; d <= last; d = shiftIsoDate(d, 1)) {
+    const cur = spans.get(d)
+    spans.set(d, {
+      start: d === first && cur ? cur.start : DAY_OPEN,
+      end: d === last && cur ? cur.end : DAY_CLOSE,
+    })
+  }
+  return spans
+}
+
+/**
+ * Önceki işten bu yana kalıp başka bir preste çalıştı mı? Çalıştıysa artık
+ * bu preste takılı değildir; "setup tekrarlanmaz" varsayımı geçersizdir.
+ */
+function dieMovedSince(
+  timeline: PressTimeline,
+  moldUsage: MoldUsage,
+  material: string,
+  pressName: string,
+  at: number,
+): boolean {
+  const index = firstEndAfter(timeline.bookings, at) - 1
+  if (index < 0) return false
+  const from = locate(timeline, timeline.bookings[index].end)
+  const to = locate(timeline, at)
+  const byDate = moldUsage.get(material)
+  if (!byDate) return false
+  for (const [date, list] of byDate) {
+    if (date < from.date || date > to.date) continue
+    for (const iv of list) {
+      if (iv.press === pressName) continue
+      if (date === from.date && iv.end <= from.minute) continue
+      if (date === to.date && iv.start >= to.minute) continue
+      return true
+    }
+  }
+  return false
+}
+
 function findMoldConflict(
   moldUsage: MoldUsage,
   material: string,
   pressName: string,
   segments: JobSegment[],
 ): { date: string; end: number; press: string } | null {
-  for (const segment of segments) {
-    for (const iv of moldIntervalsFor(moldUsage, material, segment.date)) {
+  for (const [date, span] of dieSpans(segments)) {
+    for (const iv of moldIntervalsFor(moldUsage, material, date)) {
       if (iv.press === pressName) continue
-      if (iv.start < segment.end && segment.start < iv.end) {
-        return { date: segment.date, end: iv.end, press: iv.press }
+      if (iv.start < span.end && span.start < iv.end) {
+        // Kalıp o gün sonuna kadar tutuluyorsa ertesi güne bakılır.
+        return { date, end: Math.min(iv.end, DAY_CLOSE - 1), press: iv.press }
       }
     }
   }
@@ -1602,11 +1911,32 @@ function placeRun(
   const timeline = timelines.get(best.press)!
   const sameMaterial = best.sameMaterial
 
-  insertBooking(timeline, {
+  const booking: Booking = {
     start: best.startGlobal,
     end: best.endGlobal,
     material: entry.material,
-  })
+    noSetup: best.sameMaterial,
+    setupIfNeeded: run.setupMinutes,
+    earliest: bestEarliest,
+  }
+  insertBooking(timeline, booking)
+  // Bu iş, arkasından setup'sız gelen başka bir kalıbın önüne girdiyse o
+  // işin setup'ı geri gelir: boşluğun sonuna yazılır. Kayıt kopyalanır
+  // (deneme geri alınırsa eski hâli dönsün); işin kendisi schedule()
+  // sonunda düzeltilir.
+  if (best.followSetup) {
+    const index = firstEndAfter(timeline.bookings, best.endGlobal)
+    const next = timeline.bookings[index]
+    if (next && next !== booking && next.noSetup && next.material !== entry.material) {
+      const { global, minutes } = best.followSetup
+      timeline.bookings[index] = {
+        ...next,
+        start: global,
+        noSetup: false,
+        addedSetup: minutes,
+      }
+    }
+  }
 
   // Vinç kaydı: kalıp ve rulo setupları ait oldukları günün defterine yazılır.
   const reserve = (date: string, type: 'mold' | 'coil', interval: SetupInterval) => {
@@ -1625,17 +1955,16 @@ function placeRun(
   for (const coil of best.coilReservations) {
     reserve(coil.date, 'coil', { start: coil.start, end: coil.end })
   }
+  if (best.followSetup) {
+    reserve(best.followSetup.date, 'mold', {
+      start: best.followSetup.start,
+      end: best.followSetup.start + best.followSetup.minutes,
+    })
+  }
 
   // Kalıp meşguliyeti gün gün işlenir: iş gün sınırını aştıysa kalıp ertesi
   // gün de o preste kilitlidir.
-  const perDate = new Map<string, { start: number; end: number }>()
-  for (const segment of best.segments) {
-    const current = perDate.get(segment.date)
-    perDate.set(segment.date, {
-      start: current ? Math.min(current.start, segment.start) : segment.start,
-      end: current ? Math.max(current.end, segment.end) : segment.end,
-    })
-  }
+  const perDate = dieSpans(best.segments)
   for (const [date, span] of perDate) {
     recordMoldInterval(moldUsage, entry.material, date, {
       press: best.press,
@@ -1644,8 +1973,9 @@ function placeRun(
     })
   }
 
-  const late = isLate(entry, best.segments, best.date)
-  const ready = readyMoment(best.segments, entry.noStockout ? 0 : (entry.needFraction ?? 1))
+  const delivery = deliveryCheck(entry, best.segments, best.date)
+  const late = delivery.late
+  const ready = delivery.ready ?? readyMoment(best.segments, 0)
   const spansDays = best.endDate !== best.date
 
   // Pres bu işten hemen önce boş kaldıysa nedeni.
@@ -1700,7 +2030,7 @@ function placeRun(
   if (late) {
     reasonParts.push(
       entry.deadlineLabel
-        ? `⚠ ${Math.round((entry.needFraction ?? 1) * run.quantity).toLocaleString('en-GB')} pcs needed by ${entry.deadlineLabel} are ready later`
+        ? `⚠ ${Math.round(delivery.fraction * run.quantity).toLocaleString('en-GB')} pcs needed by ${delivery.deadlineLabel ?? entry.deadlineLabel} are ready later`
         : `⚠ starts after the stock runs out (${entry.dueDate})`,
     )
   }
@@ -1713,7 +2043,7 @@ function placeRun(
   const setupEnd = locate(timeline, best.startGlobal + (sameMaterial ? 0 : run.setupMinutes))
   const qualityEnd = locate(timeline, best.qualityEndGlobal)
 
-  return {
+  const job: ScheduledJob = {
     material: entry.material,
     press: best.press,
     hall: press.hall,
@@ -1732,7 +2062,7 @@ function placeRun(
     coilsNeeded: run.coilsNeeded,
     pinned,
     coProduct: product.coProduct,
-    coProductQuantity: entry.coProductQty ?? run.coProductQuantity,
+    coProductQuantity: entry.coProductQty !== undefined ? Math.round(entry.coProductQty) : run.coProductQuantity,
     setupStartMinute: best.setupStart,
     setupEndMinute: setupEnd.minute,
     qualityEndMinute: qualityEnd.minute,
@@ -1746,13 +2076,15 @@ function placeRun(
     waitReason,
     readyDate: ready?.date,
     readyMinute: ready?.minute,
-    deadlineDate: entry.deadlineDate,
-    deadlineMinute: entry.deadlineNet,
-    deadlineLabel: entry.deadlineLabel,
-    neededQuantity: entry.noStockout ? 0 : Math.round((entry.needFraction ?? 1) * run.quantity),
+    deadlineDate: delivery.deadlineDate ?? entry.deadlineDate,
+    deadlineMinute: delivery.deadlineNet ?? entry.deadlineNet,
+    deadlineLabel: delivery.deadlineLabel ?? entry.deadlineLabel,
+    neededQuantity: entry.noStockout ? 0 : Math.round(delivery.fraction * run.quantity),
     urgentSetup: !!best.urgent && !sameMaterial,
     pulledForward,
     continued: bestIsContinuation,
     decision,
   }
+  booking.job = job
+  return job
 }

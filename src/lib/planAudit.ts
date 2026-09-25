@@ -285,9 +285,7 @@ export function auditPlan(input: AuditInputs): PlanAudit {
       for (let j = i + 1; j < list.length; j++) {
         const b = list[j]
         if (a.kind === b.kind) {
-          // Bakiye/geç iş setup'ı başka bir setup'la çakışabilir; onun sınırı
-          // aşağıdaki fabrika geneli kuraldır.
-          if (a.kind === 'setup' && (a.urgent || b.urgent)) continue
+          // Hol sınırı (vinç) acil setup için de geçerlidir.
           const gap = a.kind === 'setup' ? input.setupGapMinutes : input.coilSetupGapMinutes
           // Aynı türden iki iş arasında `gap` dakika olmalı (tek setup
           // izni varken; birden fazlaysa aşağıda eşzamanlılık sayılır).

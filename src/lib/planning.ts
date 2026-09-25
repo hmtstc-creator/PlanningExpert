@@ -102,6 +102,13 @@ export interface DemandEntry {
   needFraction?: number
   /** Ufukta stok hiç bitmiyor: bu lot müşteriyi bekletmez, geç sayılmaz. */
   noStockout?: boolean
+  /**
+   * Teslim kontrol noktaları: lotun karşıladığı HER ihtiyaç günü ve o güne
+   * kadar lottan hazır olması gereken pay (0–1, birikimli). Yalnızca ilk
+   * günü kontrol etmek, lotun kapsadığı sonraki günlerdeki eksikleri
+   * gizliyordu. Teslim anı (08:00) planPipeline'da yazılır.
+   */
+  checkpoints?: DeliveryCheckpoint[]
   /** Teslim anı: üretim günü ve o günün net dakikası (08:00 → net). */
   deadlineDate?: string
   deadlineNet?: number
@@ -109,6 +116,21 @@ export interface DemandEntry {
   deadlineLabel?: string
   /** Geç kalmasın diye öne alındı (geç iş onarımı). */
   boost?: boolean
+  /**
+   * Yerel arama: lot kendi fazı içinde bu kadar gün öne (eksi) ya da
+   * arkaya (artı) sıralanır. Teslim anı değişmez, yalnızca sıra.
+   */
+  orderShift?: number
+}
+
+export interface DeliveryCheckpoint {
+  /** İhtiyaç günü (stoğun o gün eksiye düştüğü gün). */
+  date: string
+  /** O güne kadar lottan hazır olması gereken pay (0–1, birikimli). */
+  fraction: number
+  deadlineDate?: string
+  deadlineNet?: number
+  deadlineLabel?: string
 }
 
 export interface DemandScheduleOptions {
@@ -226,7 +248,12 @@ export function buildDemandSchedule(
       list.push({
         material: row.material,
         qty: overdue,
-        dueDate: baseIso,
+        // Bakiye kendi grubudur: haftanın ilk gününden de önce sıralanır.
+        // Aynı günü paylaşsaydı rulo yuvarlaması bu haftanın talebini de
+        // bakiye lotuna katıyor, stok bakiyeyi karşılasa bile lot "Backlog"
+        // etiketi ve önceliği alıyordu; zamanlama anahtarı da çakışıyordu.
+        // Gerçek tarihini stok projeksiyonu verir.
+        dueDate: isoDate(addDays(baseMonday, -1)),
         earliestDate: baseIso,
         bucketLabel: 'Backlog',
         phase: 'backlog',
@@ -364,6 +391,11 @@ function mergeCoProductLots(
       if (!match) continue
       match.coProductQty = (match.coProductQty ?? 0) + lot.qty
       match.needFraction = Math.max(match.needFraction ?? 0, lot.needFraction ?? 0)
+      if (lot.checkpoints?.length) {
+        match.checkpoints = [...(match.checkpoints ?? []), ...lot.checkpoints].sort(
+          (a, b) => a.date.localeCompare(b.date) || a.fraction - b.fraction,
+        )
+      }
       match.noStockout = !!match.noStockout && !!lot.noStockout
       if (phaseRank(lot.phase) < phaseRank(match.phase)) match.phase = lot.phase
       match.urgency = Math.max(match.urgency, lot.urgency)
@@ -426,7 +458,10 @@ function timeLotsByProjectedStock(
   // Önce her lotun zamanı hesaplanır (malzeme + lotun haftası anahtarıyla),
   // sonra uygulanır — eş ürünler aynı vuruştan çıktığı için ikisinin
   // lotu aynı güne, ikisinden hangisi önce bitecekse ONA göre konmalı.
-  const timing = new Map<string, { due: number; start: number; need: number; none: boolean }>()
+  const timing = new Map<
+    string,
+    { due: number; start: number; need: number; none: boolean; checkpoints: DeliveryCheckpoint[] }
+  >()
   const key = (material: string, week: string) => `${material}|${week}`
 
   for (const [material, entries] of entriesByMaterial) {
@@ -454,6 +489,20 @@ function timeLotsByProjectedStock(
       }
       // O gün eksik kalan adet: lotun teslim anına kadar hazır olması gereken kısmı.
       const need = stockout >= 0 ? Math.max(0, consumed - supply) : 0
+      // Lotun karşıladığı sonraki günler de birer teslim noktasıdır.
+      const checkpoints: DeliveryCheckpoint[] = []
+      if (stockout >= 0 && lot.qty > 0) {
+        let cumulative = consumed
+        for (let i = stockout; i < days.length && checkpoints.length < 40; i++) {
+          if (i > stockout) cumulative += demand[i]
+          const short = Math.min(lot.qty, cumulative - supply)
+          const last = checkpoints[checkpoints.length - 1]
+          if (short > (last ? last.fraction * lot.qty : 0) + 1e-6) {
+            checkpoints.push({ date: days[i], fraction: Math.min(1, short / lot.qty) })
+          }
+          if (short >= lot.qty - 1e-6) break
+        }
+      }
       supply += lot.qty
       // Ufukta hiç bitmiyorsa (ör. eş ürünün kendi talebi yok) lotun
       // haftasına bağlı kalır, ama emniyet günü yine uygulanır.
@@ -464,6 +513,7 @@ function timeLotsByProjectedStock(
         start: backBy(due, safetyDays),
         need: lot.qty > 0 ? Math.min(1, need / lot.qty) : 0,
         none: stockout < 0,
+        checkpoints,
       })
     }
   }
@@ -474,11 +524,19 @@ function timeLotsByProjectedStock(
       if (lot.qty <= 0) continue
       const own = timing.get(key(material, lot.dueDate))
       if (!own) continue
-      const other = partner ? timing.get(key(partner, lot.dueDate)) : undefined
-      const due = other ? Math.min(own.due, other.due) : own.due
-      const start = other ? Math.min(own.start, other.start) : own.start
+      const found = partner ? timing.get(key(partner, lot.dueDate)) : undefined
+      // Stoğu ufukta hiç bitmeyen eş, çiftin zamanını hafta başına çekmesin:
+      // gerçek ihtiyaç diğer tarafınkidir.
+      const other = found && !(found.none && !own.none) ? found : undefined
+      const useOther = !!other && !(own.none && !other.none)
+      const due = other ? (useOther ? Math.min(own.due, other.due) : other.due) : own.due
+      const start = other ? (useOther ? Math.min(own.start, other.start) : other.start) : own.start
       lot.needFraction = other ? Math.max(own.need, other.need) : own.need
       lot.noStockout = other ? own.none && other.none : own.none
+      // Pay vuruş oranıdır; eş ürünün noktaları aynı ölçekte eklenebilir.
+      lot.checkpoints = [...own.checkpoints, ...(other?.checkpoints ?? [])].sort(
+        (a, b) => a.date.localeCompare(b.date) || a.fraction - b.fraction,
+      )
       lot.dueDate = days[due] ?? lot.dueDate
       lot.earliestDate = days[start] ?? lot.earliestDate
       lot.daysOfCover = due

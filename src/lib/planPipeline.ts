@@ -41,6 +41,7 @@ import {
 } from './maintenance'
 import { alarmedMaterials } from './moldAlarm'
 import { auditPlan, type PlanAudit } from './planAudit'
+import { safeValidatePlan, type PlanValidation } from './planValidator'
 import { readDailyDemand } from './dailyDemand'
 import { buildCapacityForecast, PLAN_STOCK_LOCATIONS, type CapacityForecast } from './capacityForecast'
 import {
@@ -208,6 +209,8 @@ export interface PlanOptimisation {
   tried: number
   stoppedBecause: 'target' | 'noImprovement' | 'limit' | 'time'
   windowDays: number
+  /** Geç kalemlere hedefli hamleler: kaç hamle denendi, kaçı tutuldu. */
+  localSearch?: { evaluations: number; improvements: number }
   searchMs: number
   perPress: { press: string; capacityHours: number; busyHours: number; utilisation: number }[]
   scenarios: ScenarioSummary[]
@@ -264,6 +267,8 @@ export interface PlanRun {
   capacity?: CapacityForecast
   /** Senaryo araması: hedef doluluk, denenen senaryolar, seçilen plan. */
   optimisation?: PlanOptimisation
+  /** Bağımsız doğrulama motorunun sonucu (bkz. planValidator.ts). */
+  validation?: PlanValidation | null
   /** Geç kalemler, malzeme bazında, gecikme saati ve kapasite önerisiyle. */
   lateItems?: LateItem[]
   frozenCount: number
@@ -354,7 +359,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const snapshot = inputs.latestSnapshot
   // Kırpılmış bir onaylı plan eksiktir; onunla dondurmak sahada olmayan bir
   // planı dondurmak olur.
-  const frozenJobs =
+  const dayFrozenJobs =
     !snapshot || snapshot.truncated || frozenUntilByPress.size === 0
       ? []
       : snapshot.jobs.filter((job) => {
@@ -362,6 +367,28 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
           if (!until || job.date < todayIso) return false
           return job.date <= until && (job.segments?.length ?? 0) > 0
         })
+  // Şu an çalışan onaylı iş (dün başlamış olsa, dondurma kapalı olsa bile)
+  // presinde kalır: kalıbı takılıdır, rulosu yarım. Eskiden her pres "şimdi
+  // boş" sayılıyor, sekiz pres birden setup sırasına giriyordu.
+  const nowNet = clockToNet(nowClockMinute, buildDayTimeline(shiftStartMinute, shiftMinutes, 3, plannedStops))
+  const endsAfterNow = (job: SnapshotJob) => {
+    const end = job.endDate ?? job.date
+    return end > todayIso || (end === todayIso && job.endMinute > nowNet)
+  }
+  const startedBeforeNow = (job: SnapshotJob) =>
+    job.date < todayIso || (job.date === todayIso && job.setupStartMinute < nowNet)
+  const runningJobs =
+    !snapshot || snapshot.truncated
+      ? []
+      : snapshot.jobs.filter(
+          (job) =>
+            (job.segments?.length ?? 0) > 0 &&
+            startedBeforeNow(job) &&
+            endsAfterNow(job) &&
+            !dayFrozenJobs.includes(job),
+        )
+  const frozenJobs = [...dayFrozenJobs, ...runningJobs]
+  const frozenSet = new Set(frozenJobs)
 
   // Dondurulmuş işlerin ürettiği adet talebi karşılar — sayılmazsa aynı iş
   // iki kere planlanır.
@@ -380,7 +407,10 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     const upload = productionDayOf(plantClock(stockUploadedAt, timeZone), shiftStartMinute)
     producedSinceStock.stockDay = upload.date
     for (const job of snapshot.jobs) {
-      if (job.date >= todayIso) continue
+      // Dondurulmuş ya da şu an çalışan iş yukarıda sayıldı; henüz bitmemiş
+      // iş üretilmiş sayılmaz. Bu sabah biten iş (dondurma kapalıyken
+      // eskiden hiç sayılmıyordu) sayılır.
+      if (frozenSet.has(job) || endsAfterNow(job)) continue
       const endDate = job.endDate ?? job.date
       // Net dakikayı saate kabaca çevirir (molalar hariç) — gün içi sıra için yeter.
       const endClock = shiftStartMinute + job.endMinute
@@ -602,7 +632,16 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     }
     return isoDate(addDays(new Date(`${iso}T00:00:00`), 1))
   }
+  // Tarih etiketi (toLocaleDateString) pahalıdır; gün başına bir kez hesaplanır.
+  const deadlineCache = new Map<string, { date: string; net: number; label: string }>()
   const deadlineOf = (due: string) => {
+    const cached = deadlineCache.get(due)
+    if (cached) return cached
+    const value = computeDeadline(due)
+    deadlineCache.set(due, value)
+    return value
+  }
+  const computeDeadline = (due: string) => {
     const calendarDay = due <= todayIso ? nextWorkingDate(todayIso) : due
     // Takvim saati → üretim günü: birinci vardiyadan önceki saat bir önceki
     // üretim gününün gece vardiyasıdır.
@@ -618,14 +657,27 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     return { date, net: clockToNet(clock, fullDay), label }
   }
 
-  const planOnce = (boost: Set<string>, variant: ScheduleVariant = {}) => {
+  const planOnce = (
+    boost: Set<string>,
+    variant: ScheduleVariant = {},
+    shifts: Map<string, number> = new Map(),
+  ) => {
     const demand = buildDemandSchedule(demandRows, productByCode, demandOptions)
     for (const entry of demand) {
       if (boost.has(lotKey(entry))) entry.boost = true
+      const shift = shifts.get(lotKey(entry))
+      if (shift) entry.orderShift = shift
       const deadline = deadlineOf(entry.dueDate)
       entry.deadlineDate = deadline.date
       entry.deadlineNet = deadline.net
       entry.deadlineLabel = deadline.label
+      // Lotun karşıladığı her ihtiyaç günü 08:00'de kontrol edilir.
+      for (const cp of entry.checkpoints ?? []) {
+        const d = deadlineOf(cp.date)
+        cp.deadlineDate = d.date
+        cp.deadlineNet = d.net
+        cp.deadlineLabel = d.label
+      }
     }
     const scheduled = schedule(
       demand,
@@ -647,10 +699,19 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
             (j.readyMinute - j.deadlineMinute),
         )
       : Math.max(0, ((Date.parse(j.date) - Date.parse(j.dueDate)) / dayMs) * 1440)
-  const score = (r: ReturnType<typeof schedule>, changes: number) => {
-    const late = r.jobs.filter((j) => j.late)
-    return [r.unplanned.length, late.length, Math.round(late.reduce((a, j) => a + lateMinutes(j), 0)), changes]
-  }
+  // Müşteri önce: en az plansız, en az geç MALZEME (bir parçanın üç geç
+  // lotu tek duruştur), en az geç saat, sonra en az geç lot. Saat tam saate
+  // yuvarlanır ki doluluk ve setup gerçekten karar verebilsin.
+  const lateHoursOf = (r: ReturnType<typeof schedule>) =>
+    Math.round(r.jobs.filter((j) => j.late).reduce((a, j) => a + lateMinutes(j), 0) / 60)
+  const lateMaterialsOf = (r: ReturnType<typeof schedule>) =>
+    new Set(r.jobs.filter((j) => j.late).map((j) => j.material)).size
+  const score = (r: ReturnType<typeof schedule>) => [
+    r.unplanned.length,
+    lateMaterialsOf(r),
+    lateHoursOf(r),
+    r.jobs.filter((j) => j.late).length,
+  ]
   const better = (a: number[], b: number[]) => {
     for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i]
     return false
@@ -661,21 +722,28 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // bütün parçalar 3000'lik bobinden 450'lik işlere bölünüyordu). Onarım
   // yalnızca sırayla yapılır: geç lot öne alınır, bütün presleri yeniden
   // dener ve acil setup kuralından yararlanır.
+  // Her tur bir öncekinin geç lotlarını da öne alır; iyileşmeyen bir tur
+  // aramayı bitirmez (bir sonraki tur daha iyi olabilir), ama en iyi plan
+  // saklanır. Öne alınan lot yalnızca kendi fazının (bakiye/acil/dolgu)
+  // başına geçer.
   let best = { result: planOnce(new Set()), boost: new Set<string>() }
-  let bestScore = score(best.result, 0)
+  let bestScore = score(best.result)
   const lateBefore = best.result.jobs.filter((j) => j.late).length
   let rounds = 0
-  for (let round = 0; round < 4; round++) {
-    const late = best.result.jobs.filter((j) => j.late)
+  let current = best
+  for (let round = 0; round < 6; round++) {
+    const late = current.result.jobs.filter((j) => j.late)
     if (late.length === 0) break
     rounds += 1
-    const boost = new Set(best.boost)
+    const boost = new Set(current.boost)
     for (const lj of late) boost.add(lotKey(lj))
-    const result = planOnce(boost)
-    const trialScore = score(result, boost.size)
-    if (!better(trialScore, bestScore)) break
-    best = { result, boost }
-    bestScore = trialScore
+    if (boost.size === current.boost.size) break
+    current = { result: planOnce(boost), boost }
+    const trialScore = score(current.result)
+    if (better(trialScore, bestScore)) {
+      best = current
+      bestScore = trialScore
+    }
   }
 
   // ---- Senaryo araması: doluluk hedefi ---------------------------------------
@@ -695,14 +763,39 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   for (const [press, list] of buckets) {
     for (const b of list) if (inWindow(b.date)) sum(windowCapacity, press, b.minutes)
   }
-  for (const m of maintenance) if (inWindow(m.date)) sum(windowCapacity, m.press, -(m.end - m.start))
+  // Bugünün geçmiş saatleri kapasitede zaten yok; aynı saatlerdeki iş ve
+  // bakım da sayılmaz (yoksa doluluk şişer).
+  const todayStart = new Map<string, number>()
+  for (const [press, list] of buckets) {
+    const today = list.find((b) => b.date === todayIso)
+    if (today) todayStart.set(press, today.startMinute ?? 0)
+  }
+  const clipped = (press: string, seg: { date: string; start: number; end: number }) =>
+    seg.date === todayIso
+      ? Math.max(0, seg.end - Math.max(seg.start, todayStart.get(press) ?? 0))
+      : seg.end - seg.start
+  for (const m of maintenance) if (inWindow(m.date)) sum(windowCapacity, m.press, -clipped(m.press, m))
   const frozenBusy = new Map<string, number>()
+  const frozenProductive = new Map<string, number>()
   for (const job of frozenJobs) {
-    for (const seg of job.segments ?? []) if (inWindow(seg.date)) sum(frozenBusy, job.press, seg.end - seg.start)
+    for (const seg of job.segments ?? []) {
+      if (!inWindow(seg.date)) continue
+      sum(frozenBusy, job.press, clipped(job.press, seg))
+      if (seg.kind === 'run') sum(frozenProductive, job.press, clipped(job.press, seg))
+    }
   }
   const utilisationOf = (r: ReturnType<typeof schedule>) => {
     const busy = new Map(frozenBusy)
-    for (const j of r.jobs) for (const seg of j.segments) if (inWindow(seg.date)) sum(busy, j.press, seg.end - seg.start)
+    const productive = new Map(frozenProductive)
+    for (const j of r.jobs) {
+      for (const seg of j.segments) {
+        if (!inWindow(seg.date)) continue
+        const len = clipped(j.press, seg)
+        sum(busy, j.press, len)
+        if (seg.kind === 'run') sum(productive, j.press, len)
+      }
+    }
+    let productiveUsed = 0
     let cap = 0
     let used = 0
     const perPress = presses.map((p) => {
@@ -710,21 +803,25 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       const u = Math.min(c, busy.get(p.name) ?? 0)
       cap += c
       used += u
+      productiveUsed += Math.min(c, productive.get(p.name) ?? 0)
       return { press: p.name, capacityHours: Math.round(c / 6) / 10, busyHours: Math.round(u / 6) / 10, utilisation: c > 0 ? Math.round((u / c) * 1000) / 10 : 0 }
     })
-    return { overall: cap > 0 ? Math.round((used / cap) * 1000) / 10 : 0, perPress }
+    return {
+      overall: cap > 0 ? Math.round((used / cap) * 1000) / 10 : 0,
+      // Yalnızca üretim (setup, onay, rulo değişimi hariç): skor bunu
+      // kullanır, yoksa fazla setup "daha dolu pres" gibi görünürdü.
+      productive: cap > 0 ? Math.round((productiveUsed / cap) * 1000) / 10 : 0,
+      perPress,
+    }
   }
   const setupsOf = (r: ReturnType<typeof schedule>) => r.jobs.filter((j) => j.setupMinutes > 0).length
-  const optScore = (r: ReturnType<typeof schedule>, util: number) => {
-    const late = r.jobs.filter((j) => j.late)
-    return [
-      r.unplanned.length,
-      late.length,
-      Math.round(late.reduce((a, j) => a + lateMinutes(j), 0)),
-      -Math.round(util * 10),
-      setupsOf(r),
-    ]
-  }
+  // Doluluk tam yüzdeye yuvarlanır: yarım puanlık fark setup sayısını
+  // ezmesin.
+  const optScore = (r: ReturnType<typeof schedule>, productive: number) => [
+    ...score(r),
+    -Math.round(productive),
+    setupsOf(r),
+  ]
   const summaryOf = (label: string, r: ReturnType<typeof schedule>, util: number) => {
     const late = r.jobs.filter((j) => j.late)
     return {
@@ -760,13 +857,23 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   let chosen = {
     label: 'Standard',
     variant: {} as ScheduleVariant,
+    boost: best.boost,
+    shifts: new Map<string, number>(),
     result: best.result,
     util: standardUtil,
-    score: optScore(best.result, standardUtil.overall),
+    score: optScore(best.result, standardUtil.productive),
   }
   const tried = [summaryOf('Standard', best.result, standardUtil.overall)]
-  let stoppedBecause: 'target' | 'noImprovement' | 'limit' | 'time' =
-    standardUtil.overall >= utilisationTarget ? 'target' : 'limit'
+  // Hedefte durmak için geç kalem de olmamalı: dolu ama müşteriyi
+  // durduran plan hedefe ulaşmış sayılmaz.
+  const reached = (r: ReturnType<typeof schedule>, util: number) =>
+    util >= utilisationTarget && r.unplanned.length === 0 && !r.jobs.some((j) => j.late)
+  let stoppedBecause: 'target' | 'noImprovement' | 'limit' | 'time' = reached(
+    best.result,
+    standardUtil.overall,
+  )
+    ? 'target'
+    : 'limit'
   let sinceImprovement = 0
   if (stoppedBecause !== 'target') {
     for (const { label, variant } of variants) {
@@ -779,21 +886,25 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         break
       }
       let r = planOnce(best.boost, variant)
+      let rBoost = best.boost
       // Bu denemede geç kalanlar da bir kez öne alınır.
       const lateHere = r.jobs.filter((j) => j.late)
       if (lateHere.length > 0) {
         const boost = new Set(best.boost)
         for (const lj of lateHere) boost.add(lotKey(lj))
         const again = planOnce(boost, variant)
-        if (better(score(again, 0), score(r, 0))) r = again
+        if (better(score(again), score(r))) {
+          r = again
+          rBoost = boost
+        }
       }
       const util = utilisationOf(r)
-      const sc = optScore(r, util.overall)
+      const sc = optScore(r, util.productive)
       tried.push(summaryOf(label, r, util.overall))
       if (better(sc, chosen.score)) {
-        chosen = { label, variant, result: r, util, score: sc }
+        chosen = { label, variant, boost: rBoost, shifts: new Map(), result: r, util, score: sc }
         sinceImprovement = 0
-        if (util.overall >= utilisationTarget) {
+        if (reached(r, util.overall)) {
           stoppedBecause = 'target'
           break
         }
@@ -803,6 +914,102 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       }
     }
   }
+  // ---- Yerel arama: geç kalemlere hedefli hamleler ---------------------------
+  // Varyantlar bütün sırayı değiştirir; burada tek tek geç lotlar ele alınır:
+  //  - geç lotu kendi fazı içinde 1, 2 ya da 4 gün öne sırala,
+  //  - öne alma (boost) işaretini aç/kapat,
+  //  - aynı preste ondan önce çalışan, geç olmayan bir lotu 2 gün arkaya al.
+  // Her hamle planı baştan kurar ve yalnızca skor iyileşirse kabul edilir.
+  // Süre ve deneme sayısı sınırlıdır.
+  const LOCAL_SEARCH_EVALUATIONS = 150
+  const LOCAL_SEARCH_MS = 60_000
+  const localStarted = Date.now()
+  let localEvaluations = 0
+  let localImprovements = 0
+  const tryMove = (boost: Set<string>, shifts: Map<string, number>): boolean => {
+    localEvaluations += 1
+    const r = planOnce(boost, chosen.variant, shifts)
+    const util = utilisationOf(r)
+    const sc = optScore(r, util.productive)
+    if (!better(sc, chosen.score)) return false
+    chosen = {
+      label: chosen.label.endsWith('+ local search') ? chosen.label : `${chosen.label} + local search`,
+      variant: chosen.variant,
+      boost,
+      shifts,
+      result: r,
+      util,
+      score: sc,
+    }
+    localImprovements += 1
+    return true
+  }
+  const budgetLeft = () =>
+    localEvaluations < LOCAL_SEARCH_EVALUATIONS && Date.now() - localStarted < LOCAL_SEARCH_MS
+  const triedMoves = new Set<string>()
+  for (let pass = 0; pass < 3 && budgetLeft(); pass++) {
+    const lateJobs = chosen.result.jobs
+      .filter((j) => j.late)
+      .sort((a, b) => lateMinutes(b) - lateMinutes(a))
+    if (lateJobs.length === 0) break
+    let improved = false
+    for (const lj of lateJobs) {
+      if (!budgetLeft()) break
+      const key = lotKey(lj)
+      const moves: (() => { boost: Set<string>; shifts: Map<string, number> })[] = []
+      for (const days of [-1, -2, -4]) {
+        moves.push(() => {
+          const shifts = new Map(chosen.shifts)
+          shifts.set(key, (shifts.get(key) ?? 0) + days)
+          return { boost: chosen.boost, shifts }
+        })
+      }
+      moves.push(() => {
+        const boost = new Set(chosen.boost)
+        if (boost.has(key)) boost.delete(key)
+        else boost.add(key)
+        return { boost, shifts: chosen.shifts }
+      })
+      // Aynı preste bu işten önce başlayan, geç olmayan son iki lot.
+      const before = chosen.result.jobs
+        .filter(
+          (j) =>
+            j.press === lj.press &&
+            !j.late &&
+            j.material !== lj.material &&
+            (j.date < lj.date || (j.date === lj.date && j.setupStartMinute < lj.setupStartMinute)),
+        )
+        .sort((a, b) => b.date.localeCompare(a.date) || b.setupStartMinute - a.setupStartMinute)
+        .slice(0, 2)
+      for (const other of before) {
+        const otherKey = lotKey(other)
+        moves.push(() => {
+          const shifts = new Map(chosen.shifts)
+          shifts.set(otherKey, (shifts.get(otherKey) ?? 0) + 2)
+          return { boost: chosen.boost, shifts }
+        })
+      }
+      for (const [index, make] of moves.entries()) {
+        if (!budgetLeft()) break
+        const id = `${pass}|${key}|${index}`
+        if (triedMoves.has(id)) continue
+        triedMoves.add(id)
+        const move = make()
+        if (tryMove(move.boost, move.shifts)) {
+          improved = true
+          break
+        }
+      }
+    }
+    if (!improved) break
+  }
+  if (localEvaluations > 0) {
+    tried.push({
+      ...summaryOf(chosen.label, chosen.result, chosen.util.overall),
+      label: localImprovements > 0 ? chosen.label : `Local search (${localEvaluations} moves, none better)`,
+    })
+  }
+
   const optimisation = {
     target: utilisationTarget,
     achieved: chosen.util.overall,
@@ -812,6 +1019,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     stoppedBecause,
     windowDays: UTILISATION_WINDOW_DAYS,
     searchMs: Date.now() - searchStarted,
+    localSearch: { evaluations: localEvaluations, improvements: localImprovements },
     perPress: chosen.util.perPress,
     // Karşılaştırma tablosu: seçilen + en iyi birkaç deneme.
     scenarios: [...tried]
@@ -1184,7 +1392,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   })
   capacity.unassigned = capacity.unassigned.slice(0, 100)
 
-  return {
+  const run: PlanRun = {
     capacity,
     optimisation,
     lateItems,
@@ -1226,6 +1434,11 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     unavailableMolds,
     audit,
   }
+  // Bağımsız doğrulama: motorun kodunu kullanmadan stoğu yeniden yürütür,
+  // kuralları yeniden sayar, gecikmelerin kaçınılmaz olup olmadığını sınar.
+  // Hata verirse plan yine de çıkar.
+  run.validation = safeValidatePlan(inputs, run, nowMs)
+  return run
 }
 
 function listed(items: string[]): string {
