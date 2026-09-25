@@ -14,6 +14,7 @@ import {
   DAY_KEYS,
   buildDemandSchedule,
   eligiblePressesOf,
+  lotRuleOf,
   shotsPerCoil,
   buildRawMaterialPlan,
   buildWeekBuckets,
@@ -994,6 +995,19 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     warnings.push(
       'ZPP_DAILY is uploaded but none of its column headers could be read as dates — ' +
         'the plan uses the weekly ZPP only. Check the file on the SAP Data page.',
+    )
+  }
+  // Lot kuralı eksik: ne minimum lot ne gerçek bir rulo ağırlığı var. Lot tam
+  // ihtiyaç kadar kuruldu; ana veri düzeltilmeli.
+  const noLotRule = Array.from(new Set(result.jobs.map((j) => j.material)))
+    .filter((m) => lotRuleOf(productByCode.get(m)) === 'missing')
+    .sort()
+  if (noLotRule.length > 0) {
+    warnings.push(
+      `${noLotRule.length} part(s) have neither a Min. lot nor a real coil weight in master data: ` +
+        `${noLotRule.slice(0, 8).join(', ')}${noLotRule.length > 8 ? '…' : ''}. ` +
+        'They are planned at exactly the quantity needed. Enter Min. lot (pcs), or Coil Weight (kg) ' +
+        'and Gross Weight (kg/piece), on the Master Data page.',
     )
   }
   // Tek işte yüzlerce rulo: neredeyse her zaman master data'da rulo ağırlığı

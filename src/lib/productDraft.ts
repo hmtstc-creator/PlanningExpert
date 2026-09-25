@@ -18,6 +18,7 @@ export interface ProductDraft {
   rawMaterialCode: string
   coilWeight: string
   grossWeight: string
+  minLotQty: string
   setupMinutes: string
   coilSetupMinutes: string
   mainMachine: string
@@ -40,6 +41,7 @@ export const PRODUCT_FIELDS: ProductField[] = [
   { name: 'rawMaterialCode', numeric: false },
   { name: 'coilWeight', numeric: true },
   { name: 'grossWeight', numeric: true },
+  { name: 'minLotQty', numeric: true },
   { name: 'setupMinutes', numeric: true },
   { name: 'coilSetupMinutes', numeric: true },
   { name: 'mainMachine', numeric: false },

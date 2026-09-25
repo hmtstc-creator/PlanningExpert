@@ -570,7 +570,10 @@ function roundMaterialsToCoilLot(
     // aynı gramajın içinden bedavaya çıkar.
     const primary = primaryOfPair(material, partner, products)
     const lotShots = primary ? shotsPerCoil(primary) : 0
-    if (lotShots <= 0) continue
+    // Minimum lot, vuruş cinsinden (asıl ürünün göz sayısıyla).
+    const minShots =
+      primary && (primary.minLotQty ?? 0) > 0 ? Math.ceil((primary.minLotQty ?? 0) / cavitiesOf(primary)) : 0
+    if (lotShots <= 0 && minShots <= 0) continue
 
     const ownCavities = cavitiesOf(product)
     const partnerCavities = cavitiesOf(partnerProduct)
@@ -598,8 +601,13 @@ function roundMaterialsToCoilLot(
         Math.ceil(ownNeed / ownCavities),
         Math.ceil(otherNeed / partnerCavities),
       )
+      // Rulo: tam rulo katı. Minimum lot: en az o kadar, üstü ihtiyaç kadar.
       const produceShots =
-        requiredShots > 0 ? Math.ceil(requiredShots / lotShots) * lotShots : 0
+        requiredShots <= 0
+          ? 0
+          : lotShots > 0
+            ? Math.ceil(requiredShots / lotShots) * lotShots
+            : Math.max(requiredShots, minShots)
 
       const producedOwn = produceShots * ownCavities
       const producedPartner = produceShots * partnerCavities
@@ -635,10 +643,27 @@ function phaseRank(phase: DemandEntry['phase']): number {
  * o adedin kaç vuruşta basılacağını belirler.
  */
 export function piecesPerCoil(product: ProductSpec): number {
+  // Minimum lot tanımlıysa rulo hesabı hiç yapılmaz (ör. transfer preste
+  // rulo miktarı esnek; rulo ağırlığı orada yalnızca temsili bir sayıdır).
+  if ((product.minLotQty ?? 0) > 0) return 0
   const grossWeight = product.grossWeight ?? 0
   const coilWeight = product.coilWeight ?? 0
-  if (grossWeight <= 0 || coilWeight <= 0) return 0
+  // 1 kg ve altı gerçek bir rulo değildir, yer tutucudur.
+  if (grossWeight <= 0 || coilWeight <= PLACEHOLDER_COIL_KG) return 0
   return Math.floor(coilWeight / grossWeight)
+}
+
+/** Bu ağırlık ve altındaki rulo ağırlığı "girilmemiş" sayılır. */
+export const PLACEHOLDER_COIL_KG = 1
+
+/**
+ * Lot kuralı: minimum lot tanımlıysa o, değilse tam rulo. İkisi de yoksa
+ * ana veri eksiktir; lot tam ihtiyaç kadar kurulur ve plan uyarır.
+ */
+export function lotRuleOf(product: ProductSpec | undefined): 'minLot' | 'coil' | 'missing' {
+  if (!product) return 'missing'
+  if ((product.minLotQty ?? 0) > 0) return 'minLot'
+  return piecesPerCoil(product) > 0 ? 'coil' : 'missing'
 }
 
 function cavitiesOf(product: ProductSpec | undefined): number {
@@ -687,6 +712,11 @@ export interface ProductSpec {
   grossWeight?: number
   /** Ortalama rulo ağırlığı (kg). */
   coilWeight?: number
+  /**
+   * Minimum lot (adet). Tanımlıysa lot bundan küçük olamaz ve rulo hesabı
+   * yapılmaz; tanımlı değilse lot tam rulodur.
+   */
+  minLotQty?: number
   /** Hammadde (sac rulo) malzeme kodu. */
   rawMaterialCode?: string
   setupMinutes?: number
@@ -781,7 +811,8 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   const coilWeight = product.coilWeight ?? 0
   // Brüt ağırlık parça başına olduğu için tüketim adetten hesaplanır.
   const kgNeeded = quantity * grossWeight
-  const piecesInCoil = grossWeight > 0 && coilWeight > 0 ? Math.floor(coilWeight / grossWeight) : 0
+  void coilWeight
+  const piecesInCoil = piecesPerCoil(product)
   const shotsPerCoil = piecesInCoil > 0 ? Math.floor(piecesInCoil / cavities) : 0
   const coilsNeeded = piecesInCoil > 0 ? Math.ceil(quantity / piecesInCoil) : 0
 

@@ -225,9 +225,20 @@ function PlanLogicPage() {
             cavities). The surplus covers the following weeks and does not
             trigger another coil; backlog and this week's need share the same
             coil and the same setup. A coil is <b>never cut short</b> — not to
-            fit a gap and not to save a late job. Only parts without coil or
-            gross weight in master data are planned to the exact quantity
-            (the job says so).
+            fit a gap and not to save a late job.
+          </li>
+          <li>
+            <b>Min. lot instead of the coil.</b> Where the coil quantity is
+            flexible (transfer presses 106/107), a <b>Min. lot (pcs)</b> is entered
+            in master data. It replaces the coil: the lot is at least that many
+            pieces, and above it exactly the need (need 300, min. lot 2 000 → 2 000;
+            need 2 500 → 2 500). The surplus covers the following weeks. The coil
+            weight is then ignored and may stay empty.
+          </li>
+          <li>
+            <b>Neither?</b> A part with no Min. lot and no real coil weight (empty,
+            or 1 kg as a placeholder) is a master data error: it is planned at
+            exactly the need, and the plan and the Master Data page warn about it.
           </li>
         </ul>
         <Example>
@@ -656,7 +667,8 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
       <div className="mt-3 grid gap-6 lg:grid-cols-2">
         <div>
           <Box tone="border-border bg-muted/50 text-foreground" title="1 · One list of every lot to produce">
-            Demand minus stock, rounded to whole coils (never less); a co-product
+            Demand minus stock, rounded to whole coils (or up to the Min. lot, when
+            one is set; never less); a co-product
             pair is one lot. Each lot gets two dates
             from the projected stock: the day the stock would run out, and{' '}
             {safetyDays} working day(s) before it — the earliest it may start.

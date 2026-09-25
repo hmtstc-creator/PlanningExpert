@@ -16,7 +16,7 @@ import {
 } from '../lib/productDraft'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
-import { piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
+import { lotRuleOf, piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
 import { ExcelUpload } from '../components/ExcelUpload'
 
 export const Route = createFileRoute('/referanslar')({
@@ -31,6 +31,7 @@ const emptyForm = {
   rawMaterialCode: '',
   coilWeight: '',
   grossWeight: '',
+  minLotQty: '',
   setupMinutes: '',
   coilSetupMinutes: '',
   mainMachine: '',
@@ -124,6 +125,7 @@ function ReferanslarPage() {
         rawMaterialCode: str(form.rawMaterialCode),
         coilWeight: num(form.coilWeight),
         grossWeight: num(form.grossWeight),
+        minLotQty: num(form.minLotQty),
         setupMinutes: num(form.setupMinutes),
         coilSetupMinutes: num(form.coilSetupMinutes),
         mainMachine: str(form.mainMachine),
@@ -175,6 +177,14 @@ function ReferanslarPage() {
           row['Gross Ağırlık'] ??
           row['grossWeight'],
       ),
+      minLotQty: n(
+        row['Min Lot (pcs)'] ??
+          row['Min. Lot'] ??
+          row['Min Lot'] ??
+          row['Minimum Lot'] ??
+          row['Min Lot Miktarı'] ??
+          row['minLotQty'],
+      ),
       setupMinutes: n(row['Setup Time'] ?? row['Setup Süresi'] ?? row['setupMinutes']),
       coilSetupMinutes: n(
         row['Coil Setup Time'] ?? row['Rulo Setup Süresi'] ?? row['coilSetupMinutes'],
@@ -220,7 +230,11 @@ function ReferanslarPage() {
         data, setup times, mold shot limit and main/alternative machines.
         Upload an Excel file to load them in bulk, then click any cell in the
         table below to correct a value, then press Save on the row. Gross weight is per piece, so a coil yields coil weight ÷ gross
-        weight pieces — that is the minimum lot, shown in the Pcs/coil column.
+        weight pieces — that is the lot unit, shown in the Pcs/coil column. Where the coil
+        quantity is flexible (transfer presses 106/107), enter <strong>Min. lot</strong>{' '}
+        instead: the lot is then at least that many pieces, otherwise exactly the need, and
+        the coil weight is ignored (it may stay empty). A part with neither is flagged
+        and planned at exactly the need.
         Cavities do not change that number; they decide how many strokes it
         takes. A co-product comes out of the same grams, so it costs no extra
         material. The performance factor
@@ -249,6 +263,7 @@ function ReferanslarPage() {
             'Raw Material Code',
             'Coil Weight (Kg)',
             'Gross Weight (Kg/piece)',
+            'Min Lot (pcs) (optional)',
             'Setup Time',
             'Coil Setup Time',
             'Main Machine',
@@ -277,6 +292,7 @@ function ReferanslarPage() {
           <Field label="Raw Material Code" value={form.rawMaterialCode} onChange={(v) => update('rawMaterialCode', v)} placeholder="SD51-100-0976" />
           <Field label="Coil Weight (Kg)" value={form.coilWeight} onChange={(v) => update('coilWeight', v)} type="number" placeholder="8000" />
           <Field label="Gross Weight (Kg/piece)" value={form.grossWeight} onChange={(v) => update('grossWeight', v)} type="number" placeholder="1.465" />
+          <Field label="Min. lot (pcs) — replaces the coil" value={form.minLotQty} onChange={(v) => update('minLotQty', v)} type="number" placeholder="2000" />
           <Field label="Setup Time (min)" value={form.setupMinutes} onChange={(v) => update('setupMinutes', v)} type="number" placeholder="30" />
           <Field label="Coil Setup Time (min)" value={form.coilSetupMinutes} onChange={(v) => update('coilSetupMinutes', v)} type="number" placeholder="15" />
           <Field label="Main Machine" value={form.mainMachine} onChange={(v) => update('mainMachine', v)} placeholder="PRS-107" />
@@ -337,7 +353,13 @@ function ReferanslarPage() {
               </th>
               <th
                 className="px-3 py-2 font-medium"
-                title="Minimum production lot: coil weight ÷ gross weight"
+                title="Minimum lot in pieces. When set, the coil is not used for lot sizing (e.g. transfer presses)"
+              >
+                Min. lot
+              </th>
+              <th
+                className="px-3 py-2 font-medium"
+                title="Lot rule: Min. lot if set, otherwise whole coils (coil weight ÷ gross weight)"
               >
                 Pcs/coil
               </th>
@@ -362,14 +384,14 @@ function ReferanslarPage() {
           <tbody>
             {status === 'LoadingFirstPage' && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={17}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={18}>
                   Loading…
                 </td>
               </tr>
             )}
             {status !== 'LoadingFirstPage' && visibleProducts.length === 0 && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={17}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={18}>
                   No materials added yet.
                 </td>
               </tr>
@@ -408,9 +430,22 @@ function ReferanslarPage() {
                   <td className="px-1 py-1">{cell(field('rawMaterialCode'), 'w-28')}</td>
                   <td className="px-1 py-1">{cell(field('coilWeight'), 'w-20')}</td>
                   <td className="px-1 py-1">{cell(field('grossWeight'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('minLotQty'), 'w-20')}</td>
                   <td className="px-3 py-2 text-muted-foreground" title="Coil weight ÷ gross weight per piece">
                     {(() => {
                       const spec = { ...p } as unknown as ProductSpec
+                      const rule = lotRuleOf(spec)
+                      if (rule === 'minLot') return <span className="text-xs">min. lot</span>
+                      if (rule === 'missing') {
+                        return (
+                          <span
+                            className="text-xs font-medium text-destructive"
+                            title="Neither a Min. lot nor a real coil weight — the plan uses the exact need and warns"
+                          >
+                            ⚠ no lot rule
+                          </span>
+                        )
+                      }
                       const pieces = piecesPerCoil(spec)
                       const shots = shotsPerCoil(spec)
                       if (!pieces) return '—'

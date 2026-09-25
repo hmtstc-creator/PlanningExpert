@@ -25,6 +25,8 @@ export default defineSchema({
     rawMaterialCode: v.optional(v.string()),
     coilWeight: v.optional(v.number()),
     grossWeight: v.optional(v.number()),
+    // Minimum lot (adet). Tanımlıysa rulo hesabının yerine geçer.
+    minLotQty: v.optional(v.number()),
     setupMinutes: v.optional(v.number()),
     coilSetupMinutes: v.optional(v.number()),
     mainMachine: v.optional(v.string()),

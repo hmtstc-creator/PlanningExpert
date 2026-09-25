@@ -16,6 +16,7 @@ const productValidator = v.object({
   rawMaterialCode: v.string(),
   coilWeight: v.number(),
   grossWeight: v.optional(v.number()),
+  minLotQty: v.optional(v.number()),
   setupMinutes: v.number(),
   coilSetupMinutes: v.optional(v.number()),
   mainMachine: v.string(),
@@ -40,6 +41,7 @@ const productArgs = {
   rawMaterialCode: v.optional(v.string()),
   coilWeight: v.optional(v.number()),
   grossWeight: v.optional(v.number()),
+  minLotQty: v.optional(v.number()),
   setupMinutes: v.optional(v.number()),
   coilSetupMinutes: v.optional(v.number()),
   mainMachine: v.optional(v.string()),
@@ -138,6 +140,8 @@ export const bulkUpsert = guardedMutation({
       // "Flexible press" SAP'den gelmez, burada işaretlenir. Dosyada sütun
       // yoksa mevcut işaret korunur — yeniden yükleme onu silmemeli.
       if (data.flexiblePress === undefined) delete data.flexiblePress
+      // Min. lot da elle girilir; dosyada yoksa mevcut değer korunur.
+      if (data.minLotQty === undefined) delete data.minLotQty
       const existing = await ctx.db
         .query('products')
         .withIndex('by_code', (q) => q.eq('code', code))
@@ -194,6 +198,7 @@ export const updateField = guardedMutation({
       'spm',
       'coilWeight',
       'grossWeight',
+      'minLotQty',
       'setupMinutes',
       'coilSetupMinutes',
       'maxShots',

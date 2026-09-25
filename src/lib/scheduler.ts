@@ -1676,7 +1676,9 @@ function placeRun(
         ? `Stock runs out ${entry.dueDate} — below safety stock now`
         : `${entry.bucketLabel}: stock runs out ${entry.dueDate}, may start ${entry.earliestDate}`,
     run.coilsNeeded === 0
-      ? 'no coil / gross weight in master data — exact quantity'
+      ? (product.minLotQty ?? 0) > 0
+        ? `min. lot ${Math.round(product.minLotQty ?? 0).toLocaleString('en-GB')} pcs`
+        : '⚠ no Min. lot and no coil weight in master data — exact quantity'
       : run.coilsNeeded === 1
         ? '1 full coil'
         : `${run.coilsNeeded} full coils`,
