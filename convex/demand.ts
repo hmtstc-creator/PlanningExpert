@@ -4,10 +4,8 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { filterRows, knownMaterialCodes } from './uploadFilter'
-import { guardedMutation, guardedQuery } from './guarded'
-import { recordUpload } from './sapUploads'
-import { demandCoverage } from '../src/lib/sapUploads'
+import { guardedQuery } from './guarded'
+import { liveRows } from './sapLive'
 
 const periodValidator = v.object({ label: v.string(), qty: v.number() })
 
@@ -28,7 +26,7 @@ export const listWeekly = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(weeklyValidator),
   handler: async (ctx, args) =>
-    ctx.db.query('demandWeekly').order('desc').paginate(args.paginationOpts),
+    (await liveRows(ctx, 'weeklyDemand')).order('desc').paginate(args.paginationOpts),
 })
 
 /** Planlamanın okuduğu eksiksiz haftalık talep. Bkz. products.listAll. */
@@ -39,55 +37,11 @@ export const listAllWeekly = guardedQuery({
     complete: v.boolean(),
   }),
   handler: async (ctx) => {
-    const rows = await ctx.db.query('demandWeekly').take(PLANNING_ROW_LIMIT + 1)
+    const rows = await (await liveRows(ctx, 'weeklyDemand')).take(PLANNING_ROW_LIMIT + 1)
     return {
       rows: rows.slice(0, PLANNING_ROW_LIMIT),
       complete: rows.length <= PLANNING_ROW_LIMIT,
     }
-  },
-})
-
-export const replaceWeekly = guardedMutation({
-  args: {
-    rows: v.array(
-      v.object({
-        material: v.string(),
-        stockInStorage: v.optional(v.number()),
-        overdue: v.optional(v.number()),
-        periods: v.array(periodValidator),
-      }),
-    ),
-    fileName: v.optional(v.string()),
-  },
-  returns: v.object({
-    count: v.number(),
-    skippedUnknownMaterial: v.number(),
-    skippedUnknownLocation: v.number(),
-    unknownMaterials: v.array(v.string()),
-    unknownLocations: v.array(v.string()),
-  }),
-  handler: async (ctx, { rows, fileName }) => {
-    // Only materials this press shop actually makes are worth storing.
-    const { kept, report } = filterRows<(typeof rows)[number]>({
-      rows,
-      materialOf: (r) => r.material,
-      knownMaterials: await knownMaterialCodes(ctx),
-    })
-
-    const existing = await ctx.db.query('demandWeekly').collect()
-    await Promise.all(existing.map((doc) => ctx.db.delete(doc._id)))
-    const now = Date.now()
-    await Promise.all(kept.map((row) => ctx.db.insert('demandWeekly', { ...row, uploadedAt: now })))
-    await recordUpload(ctx, 'weeklyDemand', {
-      fileName,
-      uploadedAt: now,
-      rowsInFile: rows.length,
-      rowsImported: kept.length,
-      skippedUnknownMaterial: report.skippedUnknownMaterial,
-      skippedUnknownLocation: report.skippedUnknownLocation,
-      ...demandCoverage(kept),
-    })
-    return { count: kept.length, ...report }
   },
 })
 
@@ -105,49 +59,5 @@ export const listDaily = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(dailyValidator),
   handler: async (ctx, args) =>
-    ctx.db.query('demandDaily').order('desc').paginate(args.paginationOpts),
-})
-
-export const replaceDaily = guardedMutation({
-  args: {
-    rows: v.array(
-      v.object({
-        material: v.string(),
-        stockInStorage: v.optional(v.number()),
-        overdue: v.optional(v.number()),
-        periods: v.array(periodValidator),
-      }),
-    ),
-    fileName: v.optional(v.string()),
-  },
-  returns: v.object({
-    count: v.number(),
-    skippedUnknownMaterial: v.number(),
-    skippedUnknownLocation: v.number(),
-    unknownMaterials: v.array(v.string()),
-    unknownLocations: v.array(v.string()),
-  }),
-  handler: async (ctx, { rows, fileName }) => {
-    // Only materials this press shop actually makes are worth storing.
-    const { kept, report } = filterRows<(typeof rows)[number]>({
-      rows,
-      materialOf: (r) => r.material,
-      knownMaterials: await knownMaterialCodes(ctx),
-    })
-
-    const existing = await ctx.db.query('demandDaily').collect()
-    await Promise.all(existing.map((doc) => ctx.db.delete(doc._id)))
-    const now = Date.now()
-    await Promise.all(kept.map((row) => ctx.db.insert('demandDaily', { ...row, uploadedAt: now })))
-    await recordUpload(ctx, 'dailyDemand', {
-      fileName,
-      uploadedAt: now,
-      rowsInFile: rows.length,
-      rowsImported: kept.length,
-      skippedUnknownMaterial: report.skippedUnknownMaterial,
-      skippedUnknownLocation: report.skippedUnknownLocation,
-      ...demandCoverage(kept),
-    })
-    return { count: kept.length, ...report }
-  },
+    (await liveRows(ctx, 'dailyDemand')).order('desc').paginate(args.paginationOpts),
 })

@@ -76,7 +76,8 @@ export default defineSchema({
     overdue: v.optional(v.number()),
     periods: v.array(v.object({ label: v.string(), qty: v.number() })),
     uploadedAt: v.number(),
-  }).index('by_material', ['material']),
+  }).index('by_material', ['material'])
+    .index('by_uploadedAt', ['uploadedAt']),
 
   demandDaily: defineTable({
     material: v.string(),
@@ -84,7 +85,8 @@ export default defineSchema({
     overdue: v.optional(v.number()),
     periods: v.array(v.object({ label: v.string(), qty: v.number() })),
     uploadedAt: v.number(),
-  }).index('by_material', ['material']),
+  }).index('by_material', ['material'])
+    .index('by_uploadedAt', ['uploadedAt']),
 
   stock: defineTable({
     material: v.string(),
@@ -97,7 +99,8 @@ export default defineSchema({
     returns: v.optional(v.number()),
     transit: v.optional(v.number()),
     uploadedAt: v.number(),
-  }).index('by_material', ['material']),
+  }).index('by_material', ['material'])
+    .index('by_uploadedAt', ['uploadedAt']),
 
   // SAP dosyalarının son yüklemesi — hangi dosya, ne zaman, kim, kaç satır.
   // Veri tablolarında dosya adı yok; planın hangi dosyayla hesaplandığını
@@ -114,6 +117,9 @@ export default defineSchema({
     // Dosyanın kapsadığı dönem: ilk ve son hafta/gün ya da kayıt tarihi.
     coversFrom: v.optional(v.string()),
     coversTo: v.optional(v.string()),
+    // Kayıt, bu özellikten önce yüklenmiş verinin yerini tutuyor (dosya adı
+    // bilinmiyor). uploadedAt 0 ise ortada hiç veri yok.
+    legacy: v.optional(v.boolean()),
   }).index('by_key', ['key']),
 
   storageLocations: defineTable({
@@ -486,7 +492,8 @@ export default defineSchema({
     uploadedAt: v.number(),
   })
     .index('by_material', ['material'])
-    .index('by_date', ['postingDate']),
+    .index('by_date', ['postingDate'])
+    .index('by_uploadedAt', ['uploadedAt']),
 
   changeLog: defineTable({
     title: v.string(),

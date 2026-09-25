@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
+import { liveRows } from './sapLive'
 
 /**
  * Kalıp ömrü alarmları.
@@ -50,7 +51,7 @@ type Ctx = any
 async function shotStates(ctx: Ctx) {
   const products = await ctx.db.query('products').collect()
   const maintenance = await ctx.db.query('moldMaintenance').collect()
-  const actual = await ctx.db.query('actualProduction').collect()
+  const actual = await (await liveRows(ctx, 'actuals')).collect()
 
   const lastPeriodic = new Map<string, string>()
   for (const row of maintenance) {

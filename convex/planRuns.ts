@@ -5,6 +5,7 @@ import { internalMutation, internalQuery } from './_generated/server'
 import { guardedMutation, guardedQuery } from './guarded'
 import { planStatusDoc, requestRecompute } from './planQueue'
 import { withDefaults } from './products'
+import { liveRows } from './sapLive'
 import { currentUploads } from './sapUploads'
 
 /**
@@ -75,6 +76,7 @@ export const smallInputs = internalQuery({
 })
 
 const BIG_TABLES = ['products', 'demandWeekly', 'demandDaily', 'stock'] as const
+const KEY_OF = { demandWeekly: 'weeklyDemand', demandDaily: 'dailyDemand', stock: 'stock' } as const
 
 /**
  * Büyük tablolar sayfa sayfa. Sayfanın eski `listAll` sorgusu 8000 satırda
@@ -89,7 +91,10 @@ export const inputPage = internalQuery({
   },
   returns: v.any(),
   handler: async (ctx: Ctx, { table, cursor, numItems }: Ctx) => {
-    const result = await ctx.db.query(table).paginate({ cursor, numItems })
+    // SAP tablolarında yalnızca geçerli yüklemenin satırları: yarım kalmış ya
+    // da süren bir yükleme planı bozmasın.
+    const source = table === 'products' ? ctx.db.query(table) : await liveRows(ctx, KEY_OF[table])
+    const result = await source.paginate({ cursor, numItems })
     return {
       page: table === 'products' ? result.page.map(withDefaults) : result.page,
       isDone: result.isDone,

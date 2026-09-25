@@ -5,7 +5,7 @@ interface ExcelUploadProps {
   expectedColumns: string[]
   onRows: (
     rows: Record<string, unknown>[],
-    file: { fileName: string },
+    file: { fileName: string; onProgress: (done: number, total: number) => void },
   ) => Promise<{ message: string }>
   /**
    * Bu yükleme mevcut kayıtların yerine geçiyorsa, neyin silineceğinin adı
@@ -36,7 +36,7 @@ type Status =
       missing: string[]
       summary?: string
     }
-  | { kind: 'saving'; fileName: string }
+  | { kind: 'saving'; fileName: string; done?: number; total?: number }
   | { kind: 'success'; message: string; fileName: string; savedAt: Date }
   | { kind: 'error'; message: string }
 
@@ -95,7 +95,10 @@ export function ExcelUpload({
     const { fileName, rows } = status
     setStatus({ kind: 'saving', fileName })
     try {
-      const result = await onRows(rows, { fileName })
+      const result = await onRows(rows, {
+        fileName,
+        onProgress: (done, total) => setStatus({ kind: 'saving', fileName, done, total }),
+      })
       setStatus({ kind: 'success', message: result.message, fileName, savedAt: new Date() })
     } catch (err) {
       setStatus({
@@ -171,7 +174,10 @@ export function ExcelUpload({
         </div>
       )}
       {status.kind === 'saving' && (
-        <p className="mt-2 text-sm text-muted-foreground">Saving {status.fileName}…</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Saving {status.fileName}…
+          {status.total ? ` ${(status.done ?? 0).toLocaleString('en-GB')} / ${status.total.toLocaleString('en-GB')} rows` : ''}
+        </p>
       )}
       {status.kind === 'success' && (
         <p className="mt-2 text-sm text-emerald-600">

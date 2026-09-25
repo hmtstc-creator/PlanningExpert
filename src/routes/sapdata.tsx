@@ -11,6 +11,8 @@ import {
   formatPlantTime,
   planUsage,
   postingCoverage,
+  uploadInBatches,
+  type BatchUploadApi,
   type PlanDataSources,
   type SapUpload,
   type SapUploadKey,
@@ -29,10 +31,11 @@ export const Route = createFileRoute('/sapdata')({
  * yalnızca veriyi gösteriyor.
  */
 function SapDataPage() {
-  const replaceWeekly = useMutation(api.demand.replaceWeekly)
-  const replaceDaily = useMutation(api.demand.replaceDaily)
-  const replaceStock = useMutation(api.stock.replaceAll)
-  const replaceActuals = useMutation(api.actualProduction.replaceAll)
+  const begin = useMutation(api.sapUploads.beginUpload)
+  const append = useMutation(api.sapUploads.appendRows)
+  const finish = useMutation(api.sapUploads.finishUpload)
+  const prune = useMutation(api.sapUploads.pruneOld)
+  const batchApi = { begin, append, finish, prune } as unknown as BatchUploadApi
   const status = useQuery(api.sapUploads.status) as UploadStatus | undefined
 
   return (
@@ -59,8 +62,9 @@ function SapDataPage() {
             replaces="all weekly demand rows"
             requiredColumns={['Material']}
             describe={describeDemand}
-            onRows={async (raw, { fileName }) => {
-              const result = await replaceWeekly({ rows: parseDemandRows(raw), fileName })
+            onRows={async (raw, { fileName, onProgress }) => {
+              const rows = parseDemandRows(raw)
+              const result = await uploadInBatches(batchApi, { key: 'weeklyDemand', rows, fileName, onProgress, ...demandCoverage(rows) })
               return { message: uploadMessage('weekly demand rows', result) }
             }}
           />
@@ -79,8 +83,9 @@ function SapDataPage() {
             isoDateHeaders
             requiredColumns={['Material']}
             describe={describeDemand}
-            onRows={async (raw, { fileName }) => {
-              const result = await replaceDaily({ rows: parseDemandRows(raw), fileName })
+            onRows={async (raw, { fileName, onProgress }) => {
+              const rows = parseDemandRows(raw)
+              const result = await uploadInBatches(batchApi, { key: 'dailyDemand', rows, fileName, onProgress, ...demandCoverage(rows) })
               return { message: uploadMessage('daily demand rows', result) }
             }}
           />
@@ -107,8 +112,9 @@ function SapDataPage() {
             ]}
             replaces="all stock rows"
             requiredColumns={['Material', 'Storage Location', 'Unrestricted']}
-            onRows={async (raw, { fileName }) => {
-              const result = await replaceStock({ rows: parseStockRows(raw), fileName })
+            onRows={async (raw, { fileName, onProgress }) => {
+              const rows = parseStockRows(raw)
+              const result = await uploadInBatches(batchApi, { key: 'stock', rows, fileName, onProgress })
               return { message: uploadMessage('stock rows', result) }
             }}
           />
@@ -134,8 +140,9 @@ function SapDataPage() {
             replaces="all actual production rows"
             requiredColumns={['Material']}
             describe={describeMovements}
-            onRows={async (raw, { fileName }) => {
-              const result = await replaceActuals({ rows: parseMovementRows(raw), fileName })
+            onRows={async (raw, { fileName, onProgress }) => {
+              const rows = parseMovementRows(raw)
+              const result = await uploadInBatches(batchApi, { key: 'actuals', rows, fileName, onProgress, ...postingCoverage(rows) })
               return { message: uploadMessage('movement rows', result) }
             }}
           />
@@ -242,7 +249,7 @@ function fileLabel(upload: SapUpload | undefined) {
 }
 
 function rowsLabel(upload: SapUpload | undefined) {
-  if (!upload || upload.rowsImported === undefined) return '—'
+  if (!upload || upload.legacy || upload.rowsImported === undefined) return '—'
   const skipped = (upload.skippedUnknownMaterial ?? 0) + (upload.skippedUnknownLocation ?? 0)
   return (
     <>

@@ -104,3 +104,92 @@ export function formatPlantTime(ms: number, timeZone = 'Europe/Bucharest'): stri
     minute: '2-digit',
   })
 }
+
+/** Yükleme raporu — src/lib/uploadMessage.ts'in beklediği biçim. */
+export interface BatchUploadReport {
+  count: number
+  skippedUnknownMaterial: number
+  skippedUnknownLocation: number
+  unknownMaterials: string[]
+  unknownLocations: string[]
+}
+
+export interface BatchUploadApi {
+  begin: (args: { key: SapUploadKey }) => Promise<{ uploadedAt: number; batchSize: number }>
+  append: (args: { key: SapUploadKey; uploadedAt: number; rows: unknown[] }) => Promise<BatchUploadReport>
+  finish: (args: {
+    key: SapUploadKey
+    uploadedAt: number
+    fileName?: string
+    rowsInFile: number
+    rowsImported: number
+    skippedUnknownMaterial: number
+    skippedUnknownLocation: number
+    coversFrom?: string
+    coversTo?: string
+  }) => Promise<unknown>
+  prune: (args: { key: SapUploadKey }) => Promise<{ done: boolean }>
+}
+
+const MAX_REPORTED = 25
+
+/**
+ * Dosyayı parça parça yazar, sonra tek adımda geçerli yapar. Bir parça hata
+ * verirse geçerli dosya değişmez (hata yukarı atılır). Eski satırların
+ * silinmesi sonradan yapılır; onun hatası yüklemeyi bozmaz, çünkü eski
+ * satırları artık kimse okumuyor.
+ */
+export async function uploadInBatches(
+  api: BatchUploadApi,
+  input: {
+    key: SapUploadKey
+    rows: unknown[]
+    fileName?: string
+    coversFrom?: string
+    coversTo?: string
+    onProgress?: (done: number, total: number) => void
+  },
+): Promise<BatchUploadReport> {
+  const { key, rows } = input
+  const { uploadedAt, batchSize } = await api.begin({ key })
+  const total: BatchUploadReport = {
+    count: 0,
+    skippedUnknownMaterial: 0,
+    skippedUnknownLocation: 0,
+    unknownMaterials: [],
+    unknownLocations: [],
+  }
+  const materials = new Set<string>()
+  const locations = new Set<string>()
+  for (let start = 0; start < rows.length; start += batchSize) {
+    input.onProgress?.(start, rows.length)
+    const part = await api.append({ key, uploadedAt, rows: rows.slice(start, start + batchSize) })
+    total.count += part.count
+    total.skippedUnknownMaterial += part.skippedUnknownMaterial
+    total.skippedUnknownLocation += part.skippedUnknownLocation
+    for (const m of part.unknownMaterials) if (materials.size < MAX_REPORTED) materials.add(m)
+    for (const l of part.unknownLocations) if (locations.size < MAX_REPORTED) locations.add(l)
+  }
+  input.onProgress?.(rows.length, rows.length)
+  total.unknownMaterials = [...materials].sort()
+  total.unknownLocations = [...locations].sort()
+
+  await api.finish({
+    key,
+    uploadedAt,
+    fileName: input.fileName,
+    rowsInFile: rows.length,
+    rowsImported: total.count,
+    skippedUnknownMaterial: total.skippedUnknownMaterial,
+    skippedUnknownLocation: total.skippedUnknownLocation,
+    coversFrom: input.coversFrom,
+    coversTo: input.coversTo,
+  })
+
+  try {
+    for (let i = 0; i < 200; i++) if ((await api.prune({ key })).done) break
+  } catch {
+    // Eski satırlar bir sonraki yüklemede silinir; okuyan yok.
+  }
+  return total
+}

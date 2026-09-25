@@ -4,11 +4,8 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { runSync } from './moldAlarms'
-import { filterRows, knownMaterialCodes } from './uploadFilter'
-import { guardedMutation, guardedQuery } from './guarded'
-import { recordUpload } from './sapUploads'
-import { postingCoverage } from '../src/lib/sapUploads'
+import { guardedQuery } from './guarded'
+import { liveRows } from './sapLive'
 
 const rowValidator = v.object({
   _id: v.id('actualProduction'),
@@ -27,7 +24,7 @@ export const list = guardedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(rowValidator),
   handler: async (ctx, args) =>
-    ctx.db.query('actualProduction').order('desc').paginate(args.paginationOpts),
+    (await liveRows(ctx, 'actuals')).order('desc').paginate(args.paginationOpts),
 })
 
 /** Tek sorguda okunacak en fazla satır — bkz. products.listAll. */
@@ -48,64 +45,10 @@ export const listAll = guardedQuery({
     complete: v.boolean(),
   }),
   handler: async (ctx) => {
-    const rows = await ctx.db.query('actualProduction').take(PLANNING_ROW_LIMIT + 1)
+    const rows = await (await liveRows(ctx, 'actuals')).take(PLANNING_ROW_LIMIT + 1)
     return {
       rows: rows.slice(0, PLANNING_ROW_LIMIT),
       complete: rows.length <= PLANNING_ROW_LIMIT,
     }
-  },
-})
-
-export const replaceAll = guardedMutation({
-  args: {
-    rows: v.array(
-      v.object({
-        material: v.string(),
-        postingDate: v.string(),
-        quantity: v.number(),
-        plant: v.optional(v.string()),
-        storageLocation: v.optional(v.string()),
-        movementType: v.optional(v.string()),
-        orderNumber: v.optional(v.string()),
-      }),
-    ),
-    fileName: v.optional(v.string()),
-  },
-  returns: v.object({
-    count: v.number(),
-    skippedUnknownMaterial: v.number(),
-    skippedUnknownLocation: v.number(),
-    unknownMaterials: v.array(v.string()),
-    unknownLocations: v.array(v.string()),
-  }),
-  handler: async (ctx, { rows, fileName }) => {
-    // MB51 covers every movement in the plant; keep only our own materials.
-    const { kept, report } = filterRows<(typeof rows)[number]>({
-      rows,
-      materialOf: (r) => r.material,
-      knownMaterials: await knownMaterialCodes(ctx),
-    })
-
-    const existing = await ctx.db.query('actualProduction').collect()
-    await Promise.all(existing.map((doc) => ctx.db.delete(doc._id)))
-    const now = Date.now()
-    await Promise.all(
-      kept.map((row) => ctx.db.insert('actualProduction', { ...row, uploadedAt: now })),
-    )
-    await recordUpload(ctx, 'actuals', {
-      fileName,
-      uploadedAt: now,
-      rowsInFile: rows.length,
-      rowsImported: kept.length,
-      skippedUnknownMaterial: report.skippedUnknownMaterial,
-      skippedUnknownLocation: report.skippedUnknownLocation,
-      ...postingCoverage(kept),
-    })
-    // Gerçekleşen üretim vuruş sayısını artıran tek şey. Limiti aşan kalıp
-    // varsa alarmı yüklemeyle birlikte doğsun; kimsenin bir ekranı açmasını
-    // beklemek alarmı günlerce geciktirirdi.
-    await runSync(ctx)
-
-    return { count: kept.length, ...report }
   },
 })
