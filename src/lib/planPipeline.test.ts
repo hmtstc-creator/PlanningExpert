@@ -201,3 +201,33 @@ describe('stock produced since the last MB52 upload', () => {
   })
 })
 
+
+describe('capacity forecast and week overrides', () => {
+  it('counts only the hours left this week and adds overtime opened for a week', () => {
+    const base = computePlan(inputs(), NOW)
+    const press = base.capacity!.presses.find((p) => p.press === 'PRS-1')!
+    // 2 × 8 h shifts: Wednesday 10:00 → 5 h left today (first shift 07:00–15:00,
+    // second 15:00–23:00 → 13 h left) + Thu + Fri full (32 h) = 45 h.
+    expect(press.capacity[0]).toBe(45)
+    expect(base.capacity!.weeks[0]).toMatchObject({ start: '2026-09-14', label: 'W38' })
+
+    const withOvertime = computePlan(
+      inputs({
+        weekOverrides: [{ press: 'PRS-1', weekStart: '2026-09-14', workingDays: 5, shiftsPerDay: 2, overtimeShifts: 2 }],
+      }),
+      NOW,
+    )
+    const cap = withOvertime.capacity!.presses.find((p) => p.press === 'PRS-1')!.capacity[0]
+    expect(cap).toBe(45 + 16)
+    // The plan itself sees the same extra capacity.
+    const planMinutes = (r: typeof base) =>
+      r.days.filter((d) => d.press === 'PRS-1' && d.date <= '2026-09-20').reduce((s, d) => s + d.minutes, 0)
+    expect(planMinutes(withOvertime) - planMinutes(base)).toBe(16 * 60)
+  })
+
+  it('turns the week demand into hours on the main press', () => {
+    const run = computePlan(inputs(), NOW)
+    // 2000 pcs / 1 cavity / 20 spm = 100 min, no performance factor.
+    expect(run.capacity!.presses.find((p) => p.press === 'PRS-1')!.demand[0]).toBe(1.67)
+  })
+})

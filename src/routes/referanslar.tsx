@@ -237,6 +237,8 @@ function ReferanslarPage() {
         ticks unless the file has a Flexible column.
       </p>
 
+      <ApplyToAll />
+
       <div className="mt-6">
         <ExcelUpload
           expectedColumns={[
@@ -583,5 +585,87 @@ function CellInput({
           : 'border-transparent hover:border-input focus:border-input'
       }`}
     />
+  )
+}
+
+/**
+ * Bütün parçalara tek seferde onay süresi ve performans çarpanı. Kapasite
+ * öngörüsü bütün kalıplar için aynı varsayımla hesaplansın diye.
+ */
+function ApplyToAll() {
+  const applyToAll = useMutation(api.products.applyToAll)
+  const [approval, setApproval] = useState('3')
+  const [factor, setFactor] = useState('60')
+  const [state, setState] = useState<{ kind: 'idle' | 'saving' } | { kind: 'done' | 'error'; message: string }>({
+    kind: 'idle',
+  })
+
+  async function apply() {
+    const minutes = Number(approval)
+    const percent = Number(factor)
+    if (!Number.isFinite(minutes) || !Number.isFinite(percent) || percent <= 0 || percent > 100) {
+      setState({ kind: 'error', message: 'Enter minutes and a percentage between 1 and 100.' })
+      return
+    }
+    if (
+      !window.confirm(
+        `Set quality approval to ${minutes} min and performance factor to ${percent} % for EVERY part? ` +
+          'This overwrites the current values.',
+      )
+    ) {
+      return
+    }
+    setState({ kind: 'saving' })
+    try {
+      const { updated } = await applyToAll({ qualityApprovalMinutes: minutes, performanceFactor: percent / 100 })
+      setState({ kind: 'done', message: `✓ ${updated.toLocaleString('en-GB')} parts updated. The plan recalculates in a few seconds.` })
+    } catch (err) {
+      setState({ kind: 'error', message: err instanceof Error ? err.message : 'Could not update.' })
+    }
+  }
+
+  return (
+    <details className="mt-3 rounded-lg border border-border">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
+        Set approval time and performance factor for all parts
+      </summary>
+      <div className="flex flex-wrap items-end gap-3 border-t border-border p-4 text-sm">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          Quality approval (min)
+          <input
+            type="number"
+            min={0}
+            value={approval}
+            onChange={(e) => setApproval(e.target.value)}
+            className="w-28 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          Performance factor (%)
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={factor}
+            onChange={(e) => setFactor(e.target.value)}
+            className="w-28 rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => void apply()}
+          disabled={state.kind === 'saving'}
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        >
+          Apply to all parts
+        </button>
+        <p className="basis-full text-xs text-muted-foreground">
+          Admin only. At 60 %, 10 h of pure run time counts as 16.7 h; setup, coil changes and
+          approval sit inside that time.
+        </p>
+        {state.kind === 'done' && <p className="basis-full text-xs text-emerald-600">{state.message}</p>}
+        {state.kind === 'error' && <p className="basis-full text-xs text-destructive">{state.message}</p>}
+      </div>
+    </details>
   )
 }

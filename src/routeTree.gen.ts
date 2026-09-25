@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlarmsRouteImport } from './routes/alarms'
+import { Route as CapacityRouteImport } from './routes/capacity'
 import { Route as DepolarRouteImport } from './routes/depolar'
 import { Route as GerceklesenRouteImport } from './routes/gerceklesen'
 import { Route as KaliplarRouteImport } from './routes/kaliplar'
@@ -48,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
 const AlarmsRoute = AlarmsRouteImport.update({
   id: '/alarms',
   path: '/alarms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CapacityRoute = CapacityRouteImport.update({
+  id: '/capacity',
+  path: '/capacity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DepolarRoute = DepolarRouteImport.update({
@@ -196,6 +202,7 @@ const MachineFollowupReportsRoute = MachineFollowupReportsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alarms': typeof AlarmsRoute
+  '/capacity': typeof CapacityRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
@@ -228,6 +235,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alarms': typeof AlarmsRoute
+  '/capacity': typeof CapacityRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
@@ -261,6 +269,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alarms': typeof AlarmsRoute
+  '/capacity': typeof CapacityRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/kaliplar': typeof KaliplarRoute
@@ -295,6 +304,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/alarms'
+    | '/capacity'
     | '/depolar'
     | '/gerceklesen'
     | '/kaliplar'
@@ -327,6 +337,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/alarms'
+    | '/capacity'
     | '/depolar'
     | '/gerceklesen'
     | '/kaliplar'
@@ -359,6 +370,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/alarms'
+    | '/capacity'
     | '/depolar'
     | '/gerceklesen'
     | '/kaliplar'
@@ -392,6 +404,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlarmsRoute: typeof AlarmsRoute
+  CapacityRoute: typeof CapacityRoute
   DepolarRoute: typeof DepolarRoute
   GerceklesenRoute: typeof GerceklesenRoute
   KaliplarRoute: typeof KaliplarRoute
@@ -436,6 +449,13 @@ declare module '@tanstack/react-router' {
       path: '/alarms'
       fullPath: '/alarms'
       preLoaderRoute: typeof AlarmsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/capacity': {
+      id: '/capacity'
+      path: '/capacity'
+      fullPath: '/capacity'
+      preLoaderRoute: typeof CapacityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/depolar': {
@@ -640,6 +660,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlarmsRoute: AlarmsRoute,
+  CapacityRoute: CapacityRoute,
   DepolarRoute: DepolarRoute,
   GerceklesenRoute: GerceklesenRoute,
   KaliplarRoute: KaliplarRoute,

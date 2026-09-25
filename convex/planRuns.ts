@@ -43,6 +43,8 @@ export const smallInputs = internalQuery({
       settings,
       presses: await ctx.db.query('presses').collect(),
       templates: await ctx.db.query('pressTemplates').collect(),
+      // Work Calendar istisna haftaları: o haftaya açılan fazla mesai dahil.
+      weekOverrides: await ctx.db.query('pressWeekOverrides').collect(),
       workCalendar: await ctx.db
         .query('workCalendar')
         .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
@@ -265,6 +267,28 @@ export const latestAlarms = guardedQuery({
       computedAt: run.computedAt,
       todayIso: run.summary?.todayIso,
       alarms: run.summary?.alarms ?? { dies: [], machines: [] },
+    }
+  },
+})
+
+/**
+ * Yalnızca son hesabın kapasite öngörüsü (Capacity Dashboard). Bütün planı
+ * çekmeden; öngörü özet dokümanında durur.
+ */
+export const latestCapacity = guardedQuery({
+  args: {},
+  returns: v.any(),
+  handler: async (ctx: Ctx) => {
+    const run = await ctx.db
+      .query('planRuns')
+      .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))
+      .order('desc')
+      .first()
+    if (!run) return null
+    return {
+      computedAt: run.computedAt,
+      todayIso: run.summary?.todayIso,
+      capacity: run.summary?.capacity ?? null,
     }
   },
 })

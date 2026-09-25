@@ -4,7 +4,7 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { guardedMutation, guardedQuery } from './guarded'
+import { adminMutation, guardedMutation, guardedQuery } from './guarded'
 
 const productValidator = v.object({
   _id: v.id('products'),
@@ -244,5 +244,45 @@ export const updateField = guardedMutation({
     }
     await ctx.db.patch(id, { [field]: text === '' ? undefined : text })
     return null
+  },
+})
+
+/**
+ * Bir alanı bütün parçalara birden yazar: kalite onay süresi (dk) ve/veya
+ * performans çarpanı (0–1). Kapasite öngörüsü için bütün kalıpların aynı
+ * varsayımla hesaplanması istendiğinde. Yalnızca yönetici.
+ */
+export const applyToAll = adminMutation({
+  args: {
+    qualityApprovalMinutes: v.optional(v.number()),
+    performanceFactor: v.optional(v.number()),
+  },
+  returns: v.object({ updated: v.number() }),
+  handler: async (ctx, { qualityApprovalMinutes, performanceFactor }) => {
+    if (qualityApprovalMinutes !== undefined && (qualityApprovalMinutes < 0 || qualityApprovalMinutes > 600)) {
+      throw new Error('Approval time must be between 0 and 600 minutes')
+    }
+    if (performanceFactor !== undefined && (performanceFactor <= 0 || performanceFactor > 1)) {
+      throw new Error('Performance factor must be above 0 and at most 1 (e.g. 0.6 for 60 %)')
+    }
+    const patch: Record<string, number> = {}
+    if (qualityApprovalMinutes !== undefined) patch.qualityApprovalMinutes = qualityApprovalMinutes
+    if (performanceFactor !== undefined) patch.performanceFactor = performanceFactor
+    if (Object.keys(patch).length === 0) return { updated: 0 }
+    const products = await ctx.db.query('products').collect()
+    for (const product of products) await ctx.db.patch(product._id, patch)
+    await ctx.db.insert('changeLog', {
+      title: `Master data: set for all ${products.length} parts`,
+      detail: [
+        qualityApprovalMinutes !== undefined ? `quality approval ${qualityApprovalMinutes} min` : null,
+        performanceFactor !== undefined ? `performance factor ${Math.round(performanceFactor * 100)} %` : null,
+      ]
+        .filter(Boolean)
+        .join(', '),
+      category: 'decision',
+      author: ctx.sessionUser?.name,
+      createdAt: Date.now(),
+    })
+    return { updated: products.length }
   },
 })

@@ -9,7 +9,7 @@
 // DİKKAT: bu dosya ve import ettikleri sunucuda da derlenir. `@/` takma adı
 // orada çözülmez; yalnızca göreli import kullanılmalı.
 
-import { addDays, DEFAULT_PLANT_TIME_ZONE, isoDate, mondayOf, plantClock } from './dates'
+import { addDays, DEFAULT_PLANT_TIME_ZONE, isoDate, isoWeek, mondayOf, plantClock } from './dates'
 import {
   buildDemandSchedule,
   eligiblePressesOf,
@@ -39,6 +39,7 @@ import {
 import { alarmedMaterials } from './moldAlarm'
 import { auditPlan, type PlanAudit } from './planAudit'
 import { readDailyDemand } from './dailyDemand'
+import { buildCapacityForecast, type CapacityForecast } from './capacityForecast'
 import {
   buildPlanAlarms,
   type DieUnavailability,
@@ -114,6 +115,17 @@ export interface PlanInputs {
   locations: { code: string; category: string }[]
   presses: PlanPress[]
   templates: { press: string; workingDays: number; shiftsPerDay: number; overtimeShifts: number }[]
+  /**
+   * Work Calendar'daki istisna haftalar (o haftaya özel gün, vardiya ve
+   * fazla mesai). Hafta başı Pazartesi, ISO tarih.
+   */
+  weekOverrides?: {
+    press: string
+    weekStart: string
+    workingDays: number
+    shiftsPerDay: number
+    overtimeShifts: number
+  }[]
   settings: PlanSettings | null
   workCalendar: { workingDays?: string[]; holidays?: string[] } | null
   officialHolidays: { date: string; name: string }[]
@@ -196,6 +208,8 @@ export interface PlanRun {
   rawNeeds: RawMaterialNeed[]
   warnings: string[]
   truncatedInputs: string[]
+  /** Kapasite öngörüsü: pres ve grup bazında haftalık kapasite ve talep saati. */
+  capacity?: CapacityForecast
   frozenCount: number
   /** Dondurulmuş işlerin geldiği onaylı planın zamanı. */
   frozenFrom: number | null
@@ -343,8 +357,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
 
   // ---- Kapasite kovaları ---------------------------------------------------
   const templateByPress = new Map(templates.map((t) => [t.press, t]))
-  const patternOf = (press: string) =>
-    templateByPress.get(press) ?? { workingDays: workingDaysPerWeek, shiftsPerDay: 1, overtimeShifts: 0 }
+  // İstisna hafta şablonun önüne geçer: planlamacının o haftaya açtığı
+  // fazla mesai (ya da kapattığı gün) plana girmeli.
+  const overrideByPressWeek = new Map(
+    (inputs.weekOverrides ?? []).map((o) => [`${o.press}|${o.weekStart}`, o]),
+  )
+  const patternOf = (press: string, weekStart?: Date) =>
+    (weekStart && overrideByPressWeek.get(`${press}|${isoDate(weekStart)}`)) ||
+    templateByPress.get(press) || { workingDays: workingDaysPerWeek, shiftsPerDay: 1, overtimeShifts: 0 }
 
   const buckets = new Map<string, DayBucket[]>()
   for (const press of presses) {
@@ -353,7 +373,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       all.push(
         ...buildWeekBuckets(
           addDays(horizonMonday, w * 7),
-          patternOf(press.name),
+          patternOf(press.name, addDays(horizonMonday, w * 7)),
           { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift, stopMinutesByShift },
           holidays,
           workingDayKeys,
@@ -634,7 +654,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   for (const press of presses) {
     for (const bucket of buildWeekBuckets(
       horizonMonday,
-      patternOf(press.name),
+      patternOf(press.name, horizonMonday),
       { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift },
       holidays,
       workingDayKeys,
@@ -804,7 +824,59 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     )
   }
 
+  // ---- Kapasite öngörüsü (Capacity Dashboard) ---------------------------
+  // Plan ufkundan bağımsız: ZPP'de kaç hafta varsa. Kapasite takvimin saf
+  // saatidir; ölçülen gerçekleşme oranı uygulanmaz (talep zaten performans
+  // çarpanıyla büyütülüyor, ikisi birden uygulansa kayıp iki kez sayılırdı).
+  const forecastWeeks = Math.min(
+    52,
+    Math.max(1, ...inputs.weeklyDemand.map((d) => d.periods.length)),
+  )
+  const holidayNames = new Map<string, string>()
+  for (const h of inputs.workCalendar?.holidays ?? []) holidayNames.set(h, 'Holiday')
+  for (const h of inputs.officialHolidays) holidayNames.set(h.date, h.name)
+  const forecastWeekList = Array.from({ length: forecastWeeks }, (_, w) => {
+    const start = addDays(horizonMonday, w * 7)
+    const names: string[] = []
+    for (let d = 0; d < 7; d++) {
+      const name = holidayNames.get(isoDate(addDays(start, d)))
+      if (name && !names.includes(name)) names.push(name)
+    }
+    return { start: isoDate(start), label: `W${isoWeek(start)}`, holidays: names }
+  })
+  const capacityMinutes = new Map<string, number[]>()
+  for (const press of presses) {
+    capacityMinutes.set(
+      press.name,
+      forecastWeekList.map((_, w) => {
+        const start = addDays(horizonMonday, w * 7)
+        let total = 0
+        for (const b of buildWeekBuckets(
+          start,
+          patternOf(press.name, start),
+          { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift, stopMinutesByShift },
+          holidays,
+          workingDayKeys,
+        )) {
+          const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, b.shifts, plannedStops)
+          total += remainingCapacityMinutes(b.date, todayIso, nowClockMinute, b.minutes, timeline)
+        }
+        return total
+      }),
+    )
+  }
+  const capacity = buildCapacityForecast({
+    products: inputs.products,
+    weeklyDemand: inputs.weeklyDemand,
+    stock: inputs.stock,
+    presses: presses.map((p) => p.name),
+    weeks: forecastWeekList,
+    capacityMinutes,
+  })
+  capacity.unassigned = capacity.unassigned.slice(0, 100)
+
   return {
+    capacity,
     computedAt: nowMs,
     todayIso,
     nowClockMinute,
