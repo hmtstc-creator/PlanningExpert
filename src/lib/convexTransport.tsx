@@ -28,13 +28,28 @@ import {
   type ReactNode,
 } from 'react'
 
+import { makeFunctionReference } from 'convex/server'
+
 import { reportMutationError } from './mutationErrors'
+
+/**
+ * Deneme sorgusu: girişsiz açık `authInternal:me`. Adıyla referans verilir;
+ * üretilen `api` dosyasına bağlanmak bu katmanı testte kullanılamaz yapardı.
+ */
+const CANARY_QUERY = makeFunctionReference<'query'>('authInternal:me')
 import { getSessionToken, subscribeSessionToken } from './sessionToken'
 
 export type TransportMode = 'connecting' | 'websocket' | 'http'
 
 /** WebSocket bu süre içinde kurulamazsa HTTP'ye düşülür. */
 const WS_GRACE_MS = 7000
+/**
+ * WebSocket "bağlı" görünse de içinden veri geçmeyebilir: bazı kurumsal
+ * güvenlik duvarları bağlantının açılmasına izin verip mesajları tutar.
+ * Açılınca küçük bir deneme sorgusu gönderilir; bu sürede cevap gelmezse
+ * WebSocket işe yaramıyor sayılır ve sayfa HTTPS'te kalır.
+ */
+const WS_VERIFY_MS = 8000
 /** HTTP modunda verinin tazelenme aralığı. */
 const HTTP_POLL_MS = 20_000
 
@@ -78,15 +93,76 @@ export function TransportProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null
+    // WebSocket bu sayfada bir kere gerçekten veri taşıdı mı?
+    let verified = false
+    // Taşımadığı anlaşıldıysa sayfa kapanana kadar HTTPS'te kalınır; gidip
+    // gelmek (bağlandı-kesildi) her seferinde sorguları askıda bırakırdı.
+    let stickyHttp = false
+    let canary: { stop: () => void } | null = null
+
+    const stopCanary = () => {
+      canary?.stop()
+      canary = null
+    }
+
+    // Açık (girişsiz) bir sorguyu WebSocket üzerinden ister; cevap gelirse
+    // bağlantı gerçekten çalışıyordur.
+    const startCanary = () => {
+      if (canary || verified || stickyHttp) return
+      let done = false
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const watch = (convex as any).watchQuery(CANARY_QUERY, {})
+      const check = () => {
+        if (done) return
+        let answered = false
+        try {
+          answered = watch.localQueryResult() !== undefined
+        } catch {
+          // Sunucu hata döndürdü: yine de WebSocket veri taşıyor demektir.
+          answered = true
+        }
+        if (answered) {
+          done = true
+          verified = true
+          stopCanary()
+          read()
+        }
+      }
+      const unsubscribe = watch.onUpdate(check)
+      const timer = setTimeout(() => {
+        if (done) return
+        done = true
+        stickyHttp = true
+        stopCanary()
+        setMode('http')
+      }, WS_VERIFY_MS)
+      canary = {
+        stop: () => {
+          clearTimeout(timer)
+          unsubscribe()
+        },
+      }
+      check()
+    }
 
     const read = () => {
+      if (stickyHttp) {
+        setMode('http')
+        return
+      }
       const connected = convex.connectionState().isWebSocketConnected
       if (connected) {
         if (fallbackTimer) {
           clearTimeout(fallbackTimer)
           fallbackTimer = null
         }
-        setMode('websocket')
+        if (verified) setMode('websocket')
+        else {
+          // Bağlı ama henüz doğrulanmadı: sorgular WebSocket'i bekler,
+          // yazma ve action'lar HTTPS'ten gider.
+          setMode((current) => (current === 'http' ? 'http' : 'connecting'))
+          startCanary()
+        }
       } else {
         // WebSocket düştüyse hemen HTTP'ye geçme — kısa kopmalar olur.
         setMode((current) => (current === 'http' ? 'http' : 'connecting'))
@@ -104,6 +180,7 @@ export function TransportProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubscribe?.()
       clearInterval(interval)
+      stopCanary()
       if (fallbackTimer) clearTimeout(fallbackTimer)
     }
   }, [convex])
