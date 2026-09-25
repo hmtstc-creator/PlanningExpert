@@ -261,6 +261,8 @@ export interface ScheduledJob {
   pulledForward?: boolean
   /** Aynı kalıbın önceki işinin devamı olarak (setup'sız) yerleşti. */
   continued?: boolean
+  /** Takılı kalıbın dolgu işi, acil işin önünde (acil iş yine zamanında). */
+  mountedFirst?: boolean
   /** Neden bu pres: sıra numarası ve adayların karşılaştırması. */
   decision?: PlacementDecision
 }
@@ -767,7 +769,55 @@ export function schedule(
   // Kaçıncı karar olduğu — plan sırayla kurulduğu için doğrulamada önemli.
   let step = 0
 
+  // Takılı kalıp kuralı: acil iş bir prese setup'la girecekken o preste
+  // takılı kalıbın bekleyen bir dolgu lotu varsa, dolgu setup'sız devam
+  // eder ve acil iş ardından gelir — yeter ki acil iş teslim anına yetişsin.
+  // Aksi hâlde kalıp söküp acil işi basmak, sonra aynı kalıbı yeniden
+  // takmak gerekirdi (iki setup yerine bir).
+  const placedEarly = new Set<DemandEntry>()
+  const pendingFill = new Map<string, DemandEntry[]>()
+  for (const e of ordered) {
+    if (e.phase !== 'fill' || e.boost) continue
+    if (excluded.has(e.material) || pinned.has(e.material) || prioritised.has(e.material)) continue
+    const list = pendingFill.get(e.material) ?? []
+    list.push(e)
+    pendingFill.set(e.material, list)
+  }
+  const fillFor = (material: string, press: string): DemandEntry | undefined => {
+    const product = products.get(material)
+    if (!product || !eligiblePressesOf(product).includes(press)) return undefined
+    return pendingFill.get(material)?.find((e) => !placedEarly.has(e))
+  }
+  /** Presin boşaldığı anda takılı olan kalıp (malzeme). */
+  const mountedAt = (press: string, date: string): string | null => {
+    const timeline = timelines.get(press)
+    if (!timeline) return null
+    return materialBefore(timeline, firstFreePoint(timeline, offsetOfDate(timeline, date)))
+  }
+  // Durumun kopyası: deneme tutmazsa geri dönmek için. Her kopya en fazla
+  // bir kez geri yüklenir, bu yüzden geri yüklerken yeniden kopyalanmaz.
+  const snapshot = () => ({
+    bookings: new Map([...timelines].map(([name, t]) => [name, t.bookings.slice()])),
+    hall: new Map(
+      [...hallSetups].map(([date, log]) => [
+        date,
+        new Map([...log].map(([hall, r]) => [hall, { mold: r.mold.slice(), coil: r.coil.slice() }])),
+      ]),
+    ),
+    mold: new Map(
+      [...moldUsage].map(([m, byDate]) => [m, new Map([...byDate].map(([d, list]) => [d, list.slice()]))]),
+    ),
+  })
+  const restore = (snap: ReturnType<typeof snapshot>) => {
+    for (const [name, bookings] of snap.bookings) timelines.get(name)!.bookings = bookings
+    hallSetups.clear()
+    for (const [date, log] of snap.hall) hallSetups.set(date, log)
+    moldUsage.clear()
+    for (const [m, byDate] of snap.mold) moldUsage.set(m, byDate)
+  }
+
   for (const entry of ordered) {
+    if (placedEarly.has(entry)) continue
     if (excluded.has(entry.material)) {
       unplanned.push({
         material: entry.material,
@@ -833,6 +883,72 @@ export function schedule(
 
     // Kalıp limitine göre partilere böl.
     const runs = splitByMoldLimit(product, entry.qty)
+
+    // Takılı kalıp kuralı (yalnızca acil, tek partili, kullanıcı müdahalesi
+    // olmayan iş). Önce ucuz ön kontrol: adaylardan birinde başka bir
+    // kalıp takılı ve o kalıbın bekleyen dolgu lotu var mı?
+    const mountedBefore = new Map<string, string>()
+    if (entry.phase === 'urgent' && !entry.boost && !pin && !prioritised.has(entry.material) && runs.length === 1) {
+      for (const press of allowedPresses) {
+        const mounted = mountedAt(press, entry.earliestDate)
+        if (mounted && mounted !== entry.material && fillFor(mounted, press)) mountedBefore.set(press, mounted)
+      }
+    }
+    if (mountedBefore.size > 0) {
+      const run = runs[0]
+      const before = snapshot()
+      step += 1
+      const decision: PlacementDecision = { step, candidates: [] }
+      const normal = placeRun(
+        entry, product, run, allowedPresses, pressByName, timelines, hallSetups,
+        undefined, moldUsage, options, blackoutsByMaterial.get(entry.material), false, decision,
+      )
+      const mounted = normal ? mountedBefore.get(normal.press) : undefined
+      const fill = normal && mounted ? fillFor(mounted, normal.press) : undefined
+      const fillProduct = fill ? products.get(fill.material) : undefined
+      const fillRuns = fillProduct && fill ? splitByMoldLimit(fillProduct, fill.qty) : []
+      let accepted: ScheduledJob[] | null = null
+      if (normal && !normal.late && normal.setupMinutes > 0 && fill && fillProduct && fillRuns.length === 1) {
+        const afterNormal = snapshot()
+        restore(before)
+        const fillDecision: PlacementDecision = { step, candidates: [] }
+        const fillJob = placeRun(
+          fill, fillProduct, fillRuns[0], [normal.press], pressByName, timelines, hallSetups,
+          undefined, moldUsage, options, blackoutsByMaterial.get(fill.material), false, fillDecision,
+        )
+        const urgentDecision: PlacementDecision = { step: step + 1, candidates: [] }
+        const urgentJob =
+          fillJob && fillJob.continued && fillJob.press === normal.press
+            ? placeRun(
+                entry, product, run, allowedPresses, pressByName, timelines, hallSetups,
+                undefined, moldUsage, options, blackoutsByMaterial.get(entry.material), false, urgentDecision,
+              )
+            : null
+        if (fillJob && urgentJob && !urgentJob.late) {
+          fillJob.reason += ` · runs before urgent ${entry.material}: die already mounted, ${entry.material} is still ready by ${entry.deadlineLabel ?? entry.dueDate}`
+          fillJob.mountedFirst = true
+          accepted = [fillJob, urgentJob]
+          placedEarly.add(fill)
+          step += 1
+        } else {
+          restore(afterNormal)
+        }
+      }
+      if (accepted) jobs.push(...accepted)
+      else if (normal) jobs.push(normal)
+      else {
+        unplanned.push({
+          material: entry.material,
+          quantity: run.quantity,
+          phase: entry.phase,
+          dueDate: entry.dueDate,
+          reason: 'Not enough free capacity in the visible calendar',
+          decision,
+        })
+      }
+      continue
+    }
+
     for (const run of runs) {
       step += 1
       const decision: PlacementDecision = { step, candidates: [] }

@@ -308,11 +308,31 @@ function PlanLogicPage() {
       <Step n={5} id="order" title="Put the work in order">
         <p>The requirements are planned one by one, in this order:</p>
         <ol className="list-decimal">
-          <li>Materials you moved to the front</li>
-          <li>Backlog</li>
-          <li>Urgent</li>
-          <li>Fill</li>
+          <li>Materials you moved to the front (and lots moved forward so they are not late)</li>
+          <li>
+            <b>Backlog</b> — the ZPP overdue quantity left after stock. Due the next
+            working day at {current.cutoff}.
+          </li>
+          <li>
+            <b>Urgent</b> — a lot whose stock falls to the safety level now: it runs
+            out within {current.safety} working day(s). Due at {current.cutoff} on the
+            day the stock runs out.
+          </li>
+          <li>
+            <b>Fill</b> — every other lot: future days and weeks. It may start{' '}
+            {current.safety} working day(s) before its stock runs out, or up to{' '}
+            {current.pullForward} days earlier when a press would stand idle.
+          </li>
         </ol>
+        <p>
+          Backlog always goes before urgent, even when both are due at the same
+          moment. <b>One exception — the mounted die:</b> when an urgent job would
+          need a setup on a press whose mounted die still has a fill lot waiting,
+          that fill lot runs on first without a setup, as long as the urgent job
+          is still ready by its delivery time. Otherwise the die would be taken
+          off for the urgent job and mounted again later — two setups instead of
+          one. If the urgent job would be late, it goes first.
+        </p>
         <p>
           Within each group, the lot whose stock runs out first goes first.
           When that is equal too, the part that can run on the <b>fewest
