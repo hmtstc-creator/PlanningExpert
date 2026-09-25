@@ -5,6 +5,7 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction } from './_generated/server'
 import { computePlan, type PlanInputs, type PlanRun } from '../src/lib/planPipeline'
+import { compactSegments } from '../src/lib/segmentCompact'
 
 /**
  * Planlama motoru — sunucuda.
@@ -99,6 +100,11 @@ async function storeRun(ctx: Ctx, run: PlanRun, startedAt: number, trigger?: str
   // JSON turu: `undefined` alanları atar — Convex dizilerde undefined kabul
   // etmez.
   const plain = JSON.parse(JSON.stringify(run)) as Record<string, unknown>
+  // Binlerce ruloya bölünmüş bir iş (genelde yanlış rulo ağırlığı) bütün
+  // planın kaydını düşürmesin: Convex bir dizide en fazla 8192 öğe taşır.
+  plain.jobs = ((plain.jobs as Ctx[]) ?? []).map((job) =>
+    job.segments ? { ...job, segments: compactSegments(job.segments) } : job,
+  )
   const summary: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(plain)) {
     if (!(LIST_KINDS as readonly string[]).includes(key)) summary[key] = value

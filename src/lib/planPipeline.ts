@@ -157,6 +157,9 @@ export interface PlanDay {
   minutes: number
 }
 
+/** Bir işte bundan fazla rulo, master data hatasına işaret eder. */
+const MANY_COILS = 200
+
 /** Hesaplanmış plan — ekranın ihtiyacı olan her şey, düz veri olarak. */
 export interface PlanRun {
   computedAt: number
@@ -687,6 +690,20 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     warnings.push(
       'ZPP_DAILY is uploaded but none of its column headers could be read as dates — ' +
         'the plan uses the weekly ZPP only. Check the file on the SAP Data page.',
+    )
+  }
+  // Tek işte yüzlerce rulo: neredeyse her zaman master data'da rulo ağırlığı
+  // ya da parça brüt ağırlığı yanlış birimle girilmiştir.
+  const coilHeavy = result.jobs.filter((j) => j.coilsNeeded > MANY_COILS)
+  if (coilHeavy.length > 0) {
+    warnings.push(
+      `${coilHeavy.length} job(s) need more than ${MANY_COILS} coils in one run: ` +
+        coilHeavy
+          .slice(0, 5)
+          .map((j) => `${j.material} (${j.coilsNeeded.toLocaleString('en-GB')} coils)`)
+          .join(', ') +
+        `${coilHeavy.length > 5 ? '…' : ''}. Check Coil Weight (kg) and Gross Weight (kg/piece) ` +
+        'in master data — a value in tonnes or grams gives this.',
     )
   }
   if (producedSinceStock.jobs > 0) {
