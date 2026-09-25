@@ -129,6 +129,22 @@ interface PlacedBlock extends Segment {
   firstOfJob?: boolean
 }
 
+/** Bir işin o günkü tek çubuğu. */
+interface Bar {
+  job: WeekGanttJob
+  start: number
+  end: number
+  maintenance: boolean
+  /** Setup ve onay — çubuğun renkli başı. */
+  phases: PlacedBlock[]
+  /** Rulo değişimleri — ince dikiş. */
+  coils: PlacedBlock[]
+  /** Çubuğun içine düşen molalar — küçük nokta. */
+  breaks: PlacedBlock[]
+  label: string
+  title: string
+}
+
 const ROW_HEIGHT = 32
 const LABEL_WIDTH = 96
 /** Gün adları ve saat çentiklerinin şeridi. */
@@ -305,7 +321,64 @@ export function WeekGantt({
       }
       blocks.push(...idle)
       blocks.sort((a, b) => a.start - b.start)
-      return { press, blocks }
+
+      // ---- Sunum: her iş tek çubuk -------------------------------------
+      // Molalar çubuğu bölmez: çubuğun içinde küçük bir nokta olur. Rulo
+      // değişimi ince bir dikiş, setup ve onay çubuğun başındaki renkli
+      // kısımdır. Ayrıntılar üzerine gelince okunur.
+      const dayOf = (pos: number) => Math.floor(pos / dayWidthMinutes)
+      const toClock = (pos: number) =>
+        clockLabel(pos - dayOf(pos) * dayWidthMinutes + shiftStartMinute)
+      const groups = new Map<string, { job: WeekGanttJob; parts: PlacedBlock[] }>()
+      const jobIds = new Map<WeekGanttJob, number>()
+      for (const b of blocks) {
+        if (!b.job || b.kind === 'idle') continue
+        if (!jobIds.has(b.job)) jobIds.set(b.job, jobIds.size)
+        const key = `${jobIds.get(b.job)}|${dayOf(b.start)}`
+        const group = groups.get(key) ?? { job: b.job, parts: [] }
+        group.parts.push(b)
+        groups.set(key, group)
+      }
+      const bars: Bar[] = []
+      for (const { job, parts } of groups.values()) {
+        const start = Math.min(...parts.map((p) => p.start))
+        const end = Math.max(...parts.map((p) => p.end))
+        const maintenanceBar = parts.every((p) => p.kind === 'maintenance')
+        const carriedOver = parts.some((p) => p.longLabel?.endsWith('↻'))
+        const setupMin = parts.filter((p) => p.kind === 'setup').reduce((s, p) => s + p.end - p.start, 0)
+        const coilCount = parts.filter((p) => p.kind === 'coil').length
+        bars.push({
+          job,
+          start,
+          end,
+          maintenance: maintenanceBar,
+          phases: parts.filter((p) => p.kind === 'setup' || p.kind === 'quality'),
+          coils: parts.filter((p) => p.kind === 'coil'),
+          breaks: stopsOnRow.filter((st) => st.start >= start && st.end <= end),
+          label: maintenanceBar
+            ? job.material
+            : `${job.material} · ${job.quantity.toLocaleString('en-GB')}${carriedOver ? ' ↻' : ''}`,
+          title: maintenanceBar
+            ? `${job.material} · ${toClock(start)}–${toClock(end)}`
+            : [
+                `${job.material} · ${job.quantity.toLocaleString('en-GB')} pcs`,
+                `${toClock(start)}–${toClock(end)}`,
+                setupMin > 0 ? `setup ${Math.round(setupMin)} min` : 'no setup (die already mounted)',
+                coilCount > 0 ? `${coilCount} coil change${coilCount > 1 ? 's' : ''}` : '',
+                carriedOver ? `continued from ${job.date}` : '',
+                job.urgentSetup ? 'urgent: setup may overlap another' : '',
+                job.frozen ? 'FROZEN (approved plan)' : '',
+                job.late ? 'LATE — starts after the stock runs out' : '',
+              ]
+                .filter(Boolean)
+                .join(' · '),
+        })
+      }
+      // Pres boşken (çubuk dışında) molalar yalnızca soluk bir nokta.
+      const looseBreaks = stopsOnRow.filter(
+        (st) => !bars.some((bar) => st.start >= bar.start && st.end <= bar.end),
+      )
+      return { press, blocks, bars, idle, looseBreaks }
     })
 
 
@@ -375,17 +448,52 @@ export function WeekGantt({
   return (
     <div className="rounded-lg border border-border bg-card">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border px-3 py-2.5">
-        {(Object.keys(COLORS) as BlockKind[])
-          .filter((kind) => usedKinds.has(kind) || kind === 'setup' || kind === 'run')
-          .map((kind) => (
-            <span key={kind} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span
-                className={`inline-block h-3 w-3 rounded-sm ${kind === 'idle' ? 'border border-dashed border-amber-600' : ''}`}
-                style={{ backgroundColor: COLORS[kind].fill }}
-              />
-              {COLORS[kind].label}
+        <LegendItem swatch={<span className="inline-block h-3 w-4 rounded-sm" style={{ backgroundColor: COLORS.setup.fill }} />} label="Mould setup" />
+        <LegendItem swatch={<span className="inline-block h-3 w-1.5 rounded-sm" style={{ backgroundColor: COLORS.quality.fill }} />} label="Quality approval" />
+        <LegendItem swatch={<span className="inline-block h-3 w-4 rounded-sm" style={{ backgroundColor: COLORS.run.fill }} />} label="Production" />
+        <LegendItem
+          swatch={
+            <span className="relative inline-block h-3 w-4 rounded-sm" style={{ backgroundColor: COLORS.run.fill }}>
+              <span className="absolute inset-y-0 left-1/2 w-px bg-white/80" />
             </span>
-          ))}
+          }
+          label="Coil change"
+        />
+        <LegendItem
+          swatch={
+            <span className="relative inline-block h-3 w-4 rounded-sm" style={{ backgroundColor: COLORS.run.fill }}>
+              <span className="absolute inset-x-1 bottom-[2px] h-[2px] rounded-full bg-white/85" />
+            </span>
+          }
+          label="Break / handover"
+        />
+        {rows.some((r) => r.idle.length > 0) && (
+          <LegendItem swatch={<span className="inline-block w-4 border-b-2 border-dashed border-amber-500" />} label="Idle — hover for why" />
+        )}
+        {usedKinds.has('maintenance') && (
+          <LegendItem
+            swatch={
+              <span
+                className="inline-block h-3 w-4 rounded-sm"
+                style={{
+                  backgroundColor: COLORS.maintenance.fill,
+                  backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.45) 0 2px, transparent 2px 4px)',
+                }}
+              />
+            }
+            label="Press maintenance"
+          />
+        )}
+        {jobs.some((j) => j.late) && (
+          <LegendItem
+            swatch={
+              <span className="relative inline-block h-3 w-4 rounded-sm" style={{ backgroundColor: COLORS.run.fill }}>
+                <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-red-600" />
+              </span>
+            }
+            label="Late"
+          />
+        )}
         {jobs.some((j) => j.frozen) && (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
@@ -563,20 +671,17 @@ export function WeekGantt({
               <div key={category} className="mt-2 first:mt-0">
                 {/* Soldaki kategori başlığının karşılığı — hiza için. */}
                 <div className="mb-1" style={{ height: CATEGORY_HEIGHT }} />
-                {catRows.map(({ press, blocks }) => (
+                {catRows.map(({ press, bars, idle, looseBreaks }) => (
                   <div
                     key={press.name}
                     className="flex items-center"
                     style={{ height: ROW_HEIGHT }}
                   >
-                    <div
-                      className="relative rounded border border-border bg-muted/30"
-                      style={{ height: ROW_HEIGHT, width: totalPx }}
-                    >
+                    <div className="relative rounded-md bg-muted/25" style={{ height: ROW_HEIGHT - 4, width: totalPx }}>
                       {visibleDates.map((date, i) => (
                         <span
                           key={date}
-                          className="absolute top-0 h-full w-px bg-border"
+                          className="absolute top-0 h-full w-px bg-border/70"
                           style={{ left: px(i * dayWidthMinutes) }}
                           title={date}
                         />
@@ -584,46 +689,101 @@ export function WeekGantt({
 
                       {nowOffset !== null && (
                         <span
-                          className="pointer-events-none absolute top-0 z-10 h-full w-0.5 bg-red-600/80"
+                          className="pointer-events-none absolute -top-0.5 z-20 h-[calc(100%+4px)] w-0.5 rounded bg-red-600/80"
                           style={{ left: px(nowOffset) }}
                           title="Now"
                         />
                       )}
 
-                      {blocks.map((b, idx) => {
-                        const id = `${press.name}-${idx}`
-                        const width = Math.max(1, px(b.end - b.start))
-                        const clashing =
-                          b.kind === 'setup' && clashKeys.has(`${b.press}|${b.start}`)
+                      {/* Boş pres: ince kesikli alt çizgi; nedeni üzerine gelince. */}
+                      {idle.map((b, idx) => (
+                        <div
+                          key={`idle-${idx}`}
+                          title={b.title}
+                          className="absolute bottom-0 top-0 cursor-help"
+                          style={{ left: px(b.start), width: Math.max(2, px(b.end - b.start)) }}
+                        >
+                          <span className="absolute inset-x-0 bottom-1 border-b-2 border-dashed border-amber-500/80" />
+                        </div>
+                      ))}
+
+                      {/* Pres boşken düşen molalar: soluk nokta. */}
+                      {looseBreaks.map((b, idx) => (
+                        <span
+                          key={`lb-${idx}`}
+                          title={b.title}
+                          className="absolute top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/35"
+                          style={{ left: px((b.start + b.end) / 2) }}
+                        />
+                      ))}
+
+                      {bars.map((bar, idx) => {
+                        const width = Math.max(2, px(bar.end - bar.start))
+                        const local = (x: number) => px(x - bar.start)
                         return (
                           <div
-                            key={id}
-                            title={b.title}
-                            className={`absolute top-1 flex items-center overflow-hidden rounded-sm px-0.5 text-[10px] font-medium text-white ${
-                              clashing ? 'ring-2 ring-dashed ring-red-600' : ''
-                            } ${b.kind === 'idle' ? 'cursor-help border border-dashed border-amber-600 bg-amber-100/40 dark:bg-amber-900/20' : ''}`}
+                            key={`bar-${idx}`}
+                            title={bar.title}
+                            className="absolute top-1 overflow-hidden rounded-md shadow-sm"
                             style={{
-                              left: px(b.start),
+                              left: px(bar.start),
                               width,
-                              height: ROW_HEIGHT - 8,
-                              backgroundColor: COLORS[b.kind].fill,
-                              // Dondurulmuş iş taralı çizilir: rengi korur
-                              // (hangi iş olduğu belli kalsın) ama dokusundan
-                              // yeniden planlanmayacağı anlaşılır.
-                              backgroundImage:
-                                b.kind === 'maintenance'
-                                  ? // Bakım taraması dondurulmuş işinkinden
-                                    // daha sık ve belirgin: makine kapalı,
-                                    // yapılacak bir iş değil.
-                                    'repeating-linear-gradient(45deg, rgba(255,255,255,0.45) 0 4px, transparent 4px 8px)'
-                                  : b.frozen
-                                    ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.35) 0 3px, transparent 3px 7px)'
-                                    : undefined,
+                              height: ROW_HEIGHT - 12,
+                              backgroundColor: bar.maintenance ? COLORS.maintenance.fill : COLORS.run.fill,
+                              backgroundImage: bar.maintenance
+                                ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.45) 0 4px, transparent 4px 8px)'
+                                : bar.job.frozen
+                                  ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.3) 0 3px, transparent 3px 7px)'
+                                  : undefined,
                             }}
                           >
-                            {width > 34 && b.label && (
-                              <span className="truncate">
-                                {width > 96 && b.longLabel ? b.longLabel : b.label}
+                            {bar.phases.map((ph, i) => {
+                              const clashing = ph.kind === 'setup' && clashKeys.has(`${ph.press}|${ph.start}`)
+                              return (
+                                <span
+                                  key={`ph-${i}`}
+                                  title={ph.title}
+                                  className={`absolute inset-y-0 ${clashing ? 'ring-2 ring-inset ring-red-600' : ''}`}
+                                  style={{
+                                    left: local(ph.start),
+                                    width: Math.max(1, px(ph.end - ph.start)),
+                                    backgroundColor: COLORS[ph.kind].fill,
+                                  }}
+                                />
+                              )
+                            })}
+                            {bar.coils.map((c, i) => (
+                              <span
+                                key={`c-${i}`}
+                                title={c.title}
+                                className="absolute inset-y-0 -translate-x-1/2 px-[3px]"
+                                style={{ left: local((c.start + c.end) / 2) }}
+                              >
+                                <span className="block h-full w-px bg-white/75" />
+                              </span>
+                            ))}
+                            {bar.breaks.map((b, i) => (
+                              <span
+                                key={`b-${i}`}
+                                title={b.title}
+                                className="absolute bottom-0 h-2"
+                                style={{ left: local(b.start), width: Math.max(4, px(b.end - b.start)) }}
+                              >
+                                <span className="absolute inset-x-0 bottom-[3px] h-[2px] rounded-full bg-white/80" />
+                              </span>
+                            ))}
+                            {bar.job.late && (
+                              <span
+                                title="Late — starts after the stock runs out"
+                                className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-600 ring-1 ring-white/80"
+                              />
+                            )}
+                            {width > 40 && (
+                              <span
+                                className="pointer-events-none absolute inset-y-0 left-1.5 flex max-w-[calc(100%-12px)] items-center truncate text-[10px] font-medium text-white"
+                                style={{ textShadow: '0 1px 1px rgba(0,0,0,0.35)' }}
+                              >
+                                {width > 110 ? bar.label : bar.job.material}
                               </span>
                             )}
                           </div>
@@ -638,5 +798,14 @@ export function WeekGantt({
         </div>
       </div>
     </div>
+  )
+}
+
+function LegendItem({ swatch, label }: { swatch: React.ReactNode; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {swatch}
+      {label}
+    </span>
   )
 }
