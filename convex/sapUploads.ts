@@ -174,6 +174,20 @@ export const pruneOld = guardedMutation({
 })
 
 /**
+ * Yüklemenin süzgeci: tanımlı malzeme ve depo kodları. Tarayıcı dosyayı bu
+ * listeyle süzer ve sunucuya yalnızca işe yarayan satırları gönderir —
+ * MB51 bütün fabrikanın hareketini taşır, çoğu bizim malzememiz değildir.
+ */
+export const filterCodes = guardedQuery({
+  args: {},
+  returns: v.object({ materials: v.array(v.string()), locations: v.array(v.string()) }),
+  handler: async (ctx: Ctx) => ({
+    materials: [...(await knownMaterialCodes(ctx))],
+    locations: [...(await knownLocationCodes(ctx))],
+  }),
+})
+
+/**
  * Her veri için son yükleme. Kayıt yoksa (bu özellikten önceki yükleme)
  * tarih veri tablosundaki satırdan alınır, dosya adı bilinmez.
  */

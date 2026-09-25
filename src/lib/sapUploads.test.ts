@@ -5,6 +5,7 @@ import {
   formatPlantTime,
   planUsage,
   postingCoverage,
+  prefilterRows,
   uploadInBatches,
   type BatchUploadApi,
   type SapUpload,
@@ -117,5 +118,36 @@ describe('uploadInBatches', () => {
   it('does not fail a saved upload because clean-up failed', async () => {
     const { api } = fakeApi({ pruneFails: true })
     await expect(uploadInBatches(api, { key: 'stock', rows: [1, 2] })).resolves.toMatchObject({ count: 1 })
+  })
+})
+
+describe('prefilterRows', () => {
+  const codes = { materials: ['M1', 'M2'], locations: ['L1'] }
+
+  it('keeps only master data materials, so the rest of the plant never travels', () => {
+    const rows = [{ material: 'M1' }, { material: 'COIL-9' }, { material: 'M2' }, { material: 'COIL-9' }]
+    const { kept, report } = prefilterRows('actuals', rows, codes)
+    expect(kept.map((r) => r.material)).toEqual(['M1', 'M2'])
+    expect(report).toMatchObject({ skippedUnknownMaterial: 2, unknownMaterials: ['COIL-9'] })
+  })
+
+  it('checks storage locations only for MB52', () => {
+    const rows = [{ material: 'M1', storageLocation: 'L9' }]
+    expect(prefilterRows('actuals', rows, codes).kept).toHaveLength(1)
+    expect(prefilterRows('stock', rows, codes).kept).toHaveLength(0)
+  })
+
+  it('counts the rows left out in the saved record', async () => {
+    const { api, log } = fakeApi()
+    await uploadInBatches(api, {
+      key: 'actuals',
+      rows: [1, 2],
+      fileName: 'f',
+      prefiltered: {
+        rowsInFile: 10,
+        report: { skippedUnknownMaterial: 8, skippedUnknownLocation: 0, unknownMaterials: ['C'], unknownLocations: [] },
+      },
+    })
+    expect(log).toContain('finish 10/1 f')
   })
 })

@@ -5,6 +5,8 @@
 // hangi yüklemeyle hesaplandığını açıkça söylemesi gerekiyor. Saf
 // fonksiyonlar burada; sunucu (convex/sapUploads.ts) ve sayfa ortak kullanır.
 
+import { filterRows } from './uploadFilter'
+
 export const SAP_UPLOAD_KEYS = ['weeklyDemand', 'dailyDemand', 'stock', 'actuals'] as const
 export type SapUploadKey = (typeof SAP_UPLOAD_KEYS)[number]
 
@@ -148,19 +150,21 @@ export async function uploadInBatches(
     coversFrom?: string
     coversTo?: string
     onProgress?: (done: number, total: number) => void
+    /** Tarayıcıda süzülüp hiç gönderilmeyen satırlar (bkz. prefilterRows). */
+    prefiltered?: { rowsInFile: number; report: Omit<BatchUploadReport, 'count'> }
   },
 ): Promise<BatchUploadReport> {
-  const { key, rows } = input
+  const { key, rows, prefiltered } = input
   const { uploadedAt, batchSize } = await api.begin({ key })
   const total: BatchUploadReport = {
     count: 0,
-    skippedUnknownMaterial: 0,
-    skippedUnknownLocation: 0,
+    skippedUnknownMaterial: prefiltered?.report.skippedUnknownMaterial ?? 0,
+    skippedUnknownLocation: prefiltered?.report.skippedUnknownLocation ?? 0,
     unknownMaterials: [],
     unknownLocations: [],
   }
-  const materials = new Set<string>()
-  const locations = new Set<string>()
+  const materials = new Set<string>(prefiltered?.report.unknownMaterials.slice(0, MAX_REPORTED))
+  const locations = new Set<string>(prefiltered?.report.unknownLocations.slice(0, MAX_REPORTED))
   for (let start = 0; start < rows.length; start += batchSize) {
     input.onProgress?.(start, rows.length)
     const part = await api.append({ key, uploadedAt, rows: rows.slice(start, start + batchSize) })
@@ -178,7 +182,7 @@ export async function uploadInBatches(
     key,
     uploadedAt,
     fileName: input.fileName,
-    rowsInFile: rows.length,
+    rowsInFile: prefiltered?.rowsInFile ?? rows.length,
     rowsImported: total.count,
     skippedUnknownMaterial: total.skippedUnknownMaterial,
     skippedUnknownLocation: total.skippedUnknownLocation,
@@ -192,4 +196,29 @@ export async function uploadInBatches(
     // Eski satırlar bir sonraki yüklemede silinir; okuyan yok.
   }
   return total
+}
+
+/** Tarayıcıdaki süzgecin kodları — sunucudaki `sapUploads.filterCodes`. */
+export interface FilterCodes {
+  materials: string[]
+  locations: string[]
+}
+
+/**
+ * Dosyayı göndermeden önce süzer: master data'da olmayan malzemeler (MB52'de
+ * tanımsız depolar) hiç gönderilmez. Sunucu aynı süzgeci yine uygular; bu
+ * yalnızca gereksiz satırların yola çıkmaması için.
+ */
+export function prefilterRows<Row extends { material: string; storageLocation?: string }>(
+  key: SapUploadKey,
+  rows: Row[],
+  codes: FilterCodes,
+): { kept: Row[]; report: Omit<BatchUploadReport, 'count'> } {
+  return filterRows<Row>({
+    rows,
+    materialOf: (r) => r.material,
+    locationOf: key === 'stock' ? (r) => r.storageLocation : undefined,
+    knownMaterials: new Set(codes.materials),
+    knownLocations: key === 'stock' ? new Set(codes.locations) : undefined,
+  })
 }

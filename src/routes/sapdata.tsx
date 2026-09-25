@@ -11,8 +11,10 @@ import {
   formatPlantTime,
   planUsage,
   postingCoverage,
+  prefilterRows,
   uploadInBatches,
   type BatchUploadApi,
+  type FilterCodes,
   type PlanDataSources,
   type SapUpload,
   type SapUploadKey,
@@ -37,6 +39,47 @@ function SapDataPage() {
   const prune = useMutation(api.sapUploads.pruneOld)
   const batchApi = { begin, append, finish, prune } as unknown as BatchUploadApi
   const status = useQuery(api.sapUploads.status) as UploadStatus | undefined
+  const codes = useQuery(api.sapUploads.filterCodes) as FilterCodes | undefined
+
+  // MB51 bütün fabrikanın hareketlerini taşır; yalnızca master data'daki
+  // malzemelerin satırları sunucuya gider.
+  const describe = (key: SapUploadKey) => (raw: Record<string, unknown>[]) => {
+    const { parsed, rows } = readAndFilter(key, raw, codes)
+    const { coversFrom, coversTo } = coverageOf(key, rows)
+    return (
+      `${parsed.length.toLocaleString('en-GB')} rows read — ` +
+      (codes
+        ? `${rows.length.toLocaleString('en-GB')} are our materials and will be sent, the rest is left out`
+        : 'all will be sent (master data list still loading)') +
+      (coversFrom ? `. Covers ${coversFrom} → ${coversTo}` : '')
+    )
+  }
+
+  const save =
+    (key: SapUploadKey) =>
+    async (
+      raw: Record<string, unknown>[],
+      { fileName, onProgress }: { fileName: string; onProgress: (done: number, total: number) => void },
+    ) => {
+      const { parsed, rows, report } = readAndFilter(key, raw, codes)
+      // Boş bir kayıt eski veriyi silip yerine hiçbir şey koyardı.
+      if (rows.length === 0) {
+        throw new Error(
+          parsed.length === 0
+            ? 'No rows with a material code were found in this file.'
+            : 'None of the materials in this file are in master data (or, for MB52, in a defined storage location).',
+        )
+      }
+      const result = await uploadInBatches(batchApi, {
+        key,
+        rows,
+        fileName,
+        onProgress,
+        ...coverageOf(key, rows),
+        prefiltered: report && { rowsInFile: parsed.length, report },
+      })
+      return { message: uploadMessage(WHAT[key], result) }
+    }
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
@@ -61,12 +104,8 @@ function SapDataPage() {
             expectedColumns={['Material', 'Stock in storage', 'Overdue Requirements', '...weekly columns']}
             replaces="all weekly demand rows"
             requiredColumns={['Material']}
-            describe={describeDemand}
-            onRows={async (raw, { fileName, onProgress }) => {
-              const rows = parseDemandRows(raw)
-              const result = await uploadInBatches(batchApi, { key: 'weeklyDemand', rows, fileName, onProgress, ...demandCoverage(rows) })
-              return { message: uploadMessage('weekly demand rows', result) }
-            }}
+            describe={describe('weeklyDemand')}
+            onRows={save('weeklyDemand')}
           />
         </UploadCard>
 
@@ -82,12 +121,8 @@ function SapDataPage() {
             replaces="all daily demand rows"
             isoDateHeaders
             requiredColumns={['Material']}
-            describe={describeDemand}
-            onRows={async (raw, { fileName, onProgress }) => {
-              const rows = parseDemandRows(raw)
-              const result = await uploadInBatches(batchApi, { key: 'dailyDemand', rows, fileName, onProgress, ...demandCoverage(rows) })
-              return { message: uploadMessage('daily demand rows', result) }
-            }}
+            describe={describe('dailyDemand')}
+            onRows={save('dailyDemand')}
           />
         </UploadCard>
 
@@ -112,11 +147,8 @@ function SapDataPage() {
             ]}
             replaces="all stock rows"
             requiredColumns={['Material', 'Storage Location', 'Unrestricted']}
-            onRows={async (raw, { fileName, onProgress }) => {
-              const rows = parseStockRows(raw)
-              const result = await uploadInBatches(batchApi, { key: 'stock', rows, fileName, onProgress })
-              return { message: uploadMessage('stock rows', result) }
-            }}
+            describe={describe('stock')}
+            onRows={save('stock')}
           />
         </UploadCard>
 
@@ -139,12 +171,8 @@ function SapDataPage() {
             ]}
             replaces="all actual production rows"
             requiredColumns={['Material']}
-            describe={describeMovements}
-            onRows={async (raw, { fileName, onProgress }) => {
-              const rows = parseMovementRows(raw)
-              const result = await uploadInBatches(batchApi, { key: 'actuals', rows, fileName, onProgress, ...postingCoverage(rows) })
-              return { message: uploadMessage('movement rows', result) }
-            }}
+            describe={describe('actuals')}
+            onRows={save('actuals')}
           />
         </UploadCard>
       </div>
@@ -167,18 +195,36 @@ interface UploadStatus {
   lastError?: string
 }
 
-function describeDemand(raw: Record<string, unknown>[]) {
-  const rows = parseDemandRows(raw)
-  const { coversFrom, coversTo } = demandCoverage(rows)
-  return `${rows.length.toLocaleString('en-GB')} materials` +
-    (coversFrom ? `, periods ${coversFrom} → ${coversTo}` : '')
+const PARSE: Record<SapUploadKey, (raw: Record<string, unknown>[]) => ParsedRow[]> = {
+  weeklyDemand: parseDemandRows,
+  dailyDemand: parseDemandRows,
+  stock: parseStockRows,
+  actuals: parseMovementRows,
 }
 
-function describeMovements(raw: Record<string, unknown>[]) {
-  const rows = parseMovementRows(raw)
-  const { coversFrom, coversTo } = postingCoverage(rows)
-  return `${rows.length.toLocaleString('en-GB')} movements` +
-    (coversFrom ? `, posting dates ${coversFrom} → ${coversTo}` : '')
+type ParsedRow = { material: string; storageLocation?: string; periods?: { label: string }[]; postingDate?: string }
+
+const WHAT: Record<SapUploadKey, string> = {
+  weeklyDemand: 'weekly demand rows',
+  dailyDemand: 'daily demand rows',
+  stock: 'stock rows',
+  actuals: 'movement rows',
+}
+
+function coverageOf(key: SapUploadKey, rows: ParsedRow[]) {
+  if (key === 'actuals') return postingCoverage(rows as { postingDate: string }[])
+  if (key === 'stock') return {}
+  return demandCoverage(rows as { periods: { label: string }[] }[])
+}
+
+/**
+ * Dosyayı oku ve süz. Süzgeç kodları henüz gelmediyse hepsi gönderilir —
+ * sunucu yine süzer, yalnızca daha çok veri yola çıkar.
+ */
+function readAndFilter(key: SapUploadKey, raw: Record<string, unknown>[], codes: FilterCodes | undefined) {
+  const parsed = PARSE[key](raw)
+  const pre = codes ? prefilterRows(key, parsed, codes) : undefined
+  return { parsed, rows: pre ? pre.kept : parsed, report: pre?.report }
 }
 
 /**
