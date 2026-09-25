@@ -19,7 +19,7 @@ export function Header() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const navRef = useRef<HTMLDivElement>(null)
-  const { name: currentUser } = useCurrentUser()
+  const { name: currentUser, setToken } = useCurrentUser()
 
   // Navigating away should always leave the menus closed, however it happened.
   useEffect(() => {
@@ -49,15 +49,37 @@ export function Header() {
     return () => document.removeEventListener('keydown', onKey)
   }, [drawerOpen, openGroup])
 
-  const signedIn = (
-    <Link
-      to="/yonetim"
-      className="ml-auto hidden shrink-0 text-xs text-muted-foreground hover:text-foreground lg:block"
-      title="Signed-in user — manage accounts on the Admin page"
+  // Oturumu kapatır: jeton sunucuda silinir, giriş ekranı geri gelir.
+  const signOut = () => setToken(null)
+  const signOutButton = (
+    <button
+      onClick={signOut}
+      className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+      title="Sign out of the portal"
     >
-      <span className="text-muted-foreground/70">Signed in as </span>
-      <span className="font-medium text-foreground">{currentUser}</span>
-    </Link>
+      Sign out
+    </button>
+  )
+
+  // Masaüstü: kim giriş yaptı + çıkış. Telefonda `signedInMobile`.
+  const signedIn = (
+    <div className="ml-auto hidden shrink-0 items-center gap-3 lg:flex">
+      <Link
+        to="/yonetim"
+        className="text-xs text-muted-foreground hover:text-foreground"
+        title="Signed-in user — manage accounts on the Admin page"
+      >
+        <span className="text-muted-foreground/70">Signed in as </span>
+        <span className="font-medium text-foreground">{currentUser}</span>
+      </Link>
+      {signOutButton}
+    </div>
+  )
+  const signedInMobile = (
+    <div className="ml-auto flex shrink-0 items-center gap-2 lg:hidden">
+      <span className="text-xs text-muted-foreground">{currentUser}</span>
+      {signOutButton}
+    </div>
   )
 
   // Takip modülleri (kalıp, makine): kendi kısa menüleri, portala dönüş.
@@ -89,7 +111,7 @@ export function Header() {
               </Link>
             ))}
           </div>
-          <span className="ml-auto text-xs text-muted-foreground lg:hidden">{currentUser}</span>
+          {signedInMobile}
           {signedIn}
         </nav>
       </header>
@@ -104,7 +126,7 @@ export function Header() {
           <Link to="/" className="text-sm font-semibold text-foreground sm:text-base">
             Production Portal
           </Link>
-          <span className="ml-auto text-xs text-muted-foreground lg:hidden">{currentUser}</span>
+          {signedInMobile}
           {signedIn}
         </nav>
       </header>
@@ -230,6 +252,12 @@ export function Header() {
               >
                 ← Portal
               </Link>
+              <div className="mb-4 flex items-center justify-between rounded-md bg-muted/50 px-2 py-2 text-sm">
+                <span className="text-muted-foreground">
+                  Signed in as <span className="font-medium text-foreground">{currentUser}</span>
+                </span>
+                {signOutButton}
+              </div>
               {ALL_GROUPS.map((group) => (
                 <div key={group.label} className="mb-4 last:mb-0">
                   <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
