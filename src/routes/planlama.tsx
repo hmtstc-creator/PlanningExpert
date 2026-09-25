@@ -131,6 +131,13 @@ function PlanlamaPage() {
   /** Motorun yeni planı — dondurulmuş taahhütler hariç. */
   const engineJobs = useMemo(() => (run?.jobs ?? []).filter((j) => !j.frozen), [run])
   const weeks = useMemo(() => (run ? groupPlanWeeks(run) : []), [run])
+  // Tek, kesintisiz Gantt: bütün haftaların günleri ve işleri bir arada.
+  // Haftaya bölünmüş grafikler arasında gidip gelmek izlemeyi yoruyordu.
+  const allDates = useMemo(
+    () => Array.from(new Set(weeks.flatMap((w) => w.dates))).sort(),
+    [weeks],
+  )
+  const allJobs = useMemo(() => Array.from(new Set(weeks.flatMap((w) => w.jobs))), [weeks])
 
   const { shiftsByPressDate, capacityByPressDate } = useMemo(() => {
     const shifts = new Map<string, number>()
@@ -598,26 +605,19 @@ function PlanlamaPage() {
         </p>
       )}
 
-      {weeks.map((week) => (
-        <div key={week.weekStart} className="mt-8">
+      {weeks.length > 0 && (
+        <div className="mt-8">
           <h2 className="text-sm font-semibold text-foreground">
-            {isoWeekLabel(new Date(`${week.weekStart}T00:00:00`))}{' '}
+            Plan{' '}
             <span className="font-normal text-muted-foreground">
-              · {new Date(`${week.dates[0]}T00:00:00`).toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-              })}
-              –
-              {new Date(
-                `${week.dates[week.dates.length - 1]}T00:00:00`,
-              ).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}{' '}
-              · {week.jobs.length} jobs
+              · {dayMonth(allDates[0])} – {dayMonth(allDates[allDates.length - 1])} ·{' '}
+              {allJobs.length} jobs
             </span>
           </h2>
 
           <div className="mt-2">
             <WeekGantt
-              dates={week.dates}
+              dates={allDates}
               // `nowClockMinute` gece yarısından itibaren sayar (gece
               // vardiyasında 1440'ı aşar), grafiğin ekseni de öyle.
               now={{ date: todayIso, clockMinute: nowClockMinute }}
@@ -629,7 +629,7 @@ function PlanlamaPage() {
                   name: p.name,
                   hall: p.hall,
                   category: p.category,
-                  days: week.dates.map((d) => ({
+                  days: allDates.map((d) => ({
                     date: d,
                     shifts: shiftsByPressDate.get(`${p.name}|${d}`) ?? 0,
                     capacityMinutes: capacityByPressDate.get(`${p.name}|${d}`) ?? 0,
@@ -637,7 +637,7 @@ function PlanlamaPage() {
                 }),
               )}
               jobs={[
-                ...week.jobs.map(
+                ...allJobs.map(
                   (j): WeekGanttJob => ({
                     date: j.date,
                     press: j.press,
@@ -652,23 +652,28 @@ function PlanlamaPage() {
                     urgentSetup: j.urgentSetup,
                   }),
                 ),
-                ...ganttMaintenance.filter((m) => week.dates.includes(m.date)),
+                ...ganttMaintenance,
               ]}
             />
           </div>
 
-          {week.idlePresses.length > 0 && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              <strong className="text-foreground">Idle this week:</strong>{' '}
-              {week.idlePresses.map((p) => `${p.name} (${p.reason})`).join(' · ')}
-            </p>
-          )}
-
-          <details className="mt-2">
-            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-              Show job list ({week.jobs.length})
-            </summary>
-            <div className="mt-2 overflow-x-auto rounded-lg border border-border">
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Job lists by week
+          </h3>
+          {weeks.map((week) => (
+            <details key={week.weekStart} className="mt-2 rounded-lg border border-border">
+              <summary className="cursor-pointer px-3 py-2 text-sm text-foreground hover:bg-muted/40">
+                <span className="font-semibold">
+                  {isoWeekLabel(new Date(`${week.weekStart}T00:00:00`))}
+                </span>{' '}
+                <span className="text-muted-foreground">
+                  · {dayMonth(week.dates[0])} – {dayMonth(week.dates[week.dates.length - 1])} ·{' '}
+                  {week.jobs.length} jobs
+                  {week.idlePresses.length > 0 &&
+                    ` · idle: ${week.idlePresses.map((p) => `${p.name} (${p.reason})`).join(', ')}`}
+                </span>
+              </summary>
+            <div className="overflow-x-auto border-t border-border">
               <table className="w-full text-left text-sm">
                 <thead className="bg-muted text-muted-foreground">
                   <tr>
@@ -746,9 +751,10 @@ function PlanlamaPage() {
                 </tbody>
               </table>
             </div>
-          </details>
+            </details>
+          ))}
         </div>
-      ))}
+      )}
 
       {rawNeeds.length > 0 && (
         <div className="mt-8">
@@ -947,17 +953,81 @@ function LateJobs({
     })
   const daysLate = (start: string, due: string) =>
     Math.max(0, Math.round((Date.parse(start) - Date.parse(due)) / 86_400_000))
+  // Açık/kapalı tercihi bu tarayıcıda hatırlanır; liste uzunsa sayfayı kaplamasın.
+  const [open, setOpen] = useState(() => {
+    try {
+      return window.localStorage.getItem(LATE_OPEN_KEY) !== '0'
+    } catch {
+      return true
+    }
+  })
+  const toggle = () => {
+    setOpen((o) => {
+      try {
+        window.localStorage.setItem(LATE_OPEN_KEY, o ? '0' : '1')
+      } catch {
+        // Saklama kapalıysa tercih yalnızca bu oturumda kalır.
+      }
+      return !o
+    })
+  }
   return (
     <div
       className={`mt-6 rounded-lg border p-4 ${
         jobs.length > 0 ? 'border-destructive bg-destructive/10' : 'border-emerald-200 bg-emerald-50/60'
       }`}
     >
-      <h2 className="text-sm font-semibold text-foreground">
-        {jobs.length > 0
-          ? `Late jobs — ${jobs.length} would stop the customer`
-          : 'Late jobs — none left'}
-      </h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-foreground">
+          {jobs.length > 0
+            ? `Late jobs — ${jobs.length} would stop the customer`
+            : 'Late jobs — none left'}
+        </h2>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          className="shrink-0 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+        >
+          {open ? 'Hide ▴' : 'Show ▾'}
+        </button>
+      </div>
+      {open && (
+        <LateJobsBody
+          jobs={jobs}
+          repair={repair}
+          fixed={fixed}
+          dayName={dayName}
+          daysLate={daysLate}
+          shiftMinutes={shiftMinutes}
+          shiftStartMinute={shiftStartMinute}
+        />
+      )}
+    </div>
+  )
+}
+
+const LATE_OPEN_KEY = 'plan-late-jobs-open'
+
+function LateJobsBody({
+  jobs,
+  repair,
+  fixed,
+  dayName,
+  daysLate,
+  shiftMinutes,
+  shiftStartMinute,
+}: {
+  jobs: PlanRun['jobs']
+  repair: PlanRun['lateRepair']
+  fixed: number
+  dayName: (iso: string) => string
+  daysLate: (start: string, due: string) => number
+  shiftMinutes: number
+  shiftStartMinute: number
+}) {
+  return (
+    <>
       <p className="mt-1 text-xs text-muted-foreground">
         The first plan had {repair.lateBefore} job(s) starting after their stock runs
         out. The engine re-planned {repair.rounds} time(s)
@@ -1016,7 +1086,7 @@ function LateJobs({
           </table>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -1142,4 +1212,9 @@ function PlanDataLine({ sources }: { sources: PlanDataSources | undefined }) {
       </Link>
     </p>
   )
+}
+
+function dayMonth(iso: string | undefined): string {
+  if (!iso) return ''
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
 }

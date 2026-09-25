@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   buildDayTimeline,
@@ -159,6 +159,27 @@ function clockLabel(minute: number): string {
   ).padStart(2, '0')}`
 }
 
+/** ISO haftası ve Pazartesisi — çok haftalı grafikte hafta düğmeleri için. */
+function weekOf(date: string): { key: string; label: string } {
+  const d = new Date(`${date}T00:00:00`)
+  const monday = new Date(d)
+  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  const thursday = new Date(monday)
+  thursday.setDate(monday.getDate() + 3)
+  const firstThursday = new Date(thursday.getFullYear(), 0, 4)
+  firstThursday.setDate(firstThursday.getDate() - ((firstThursday.getDay() + 6) % 7) + 3)
+  const week = 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 86_400_000))
+  const key = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`
+  return { key, label: `W${week}` }
+}
+
+/** Başlıktaki gün etiketi: tarih ve ay; haftanın ilk günü hafta numarasıyla. */
+function headerLabel(date: string, first: boolean): string {
+  const d = new Date(`${date}T00:00:00`)
+  const text = d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })
+  return d.getDay() === 1 || first ? `${weekOf(date).label} · ${text}` : text
+}
+
 function dayLabel(date: string): string {
   return new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', {
     weekday: 'short',
@@ -177,11 +198,28 @@ export function WeekGantt({
 }: Props) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [dayFilter, setDayFilter] = useState<string | null>(null)
+  const [weekFilter, setWeekFilter] = useState<string | null>(null)
 
-  const visibleDates = useMemo(
-    () => (dayFilter && dates.includes(dayFilter) ? [dayFilter] : dates),
-    [dates, dayFilter],
-  )
+  // Birden fazla haftalık grafik: önce hafta seçilir, sonra o haftanın günü.
+  const weekList = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; dates: string[] }>()
+    for (const d of dates) {
+      const w = weekOf(d)
+      const entry = map.get(w.key) ?? { ...w, dates: [] }
+      entry.dates.push(d)
+      map.set(w.key, entry)
+    }
+    return Array.from(map.values())
+  }, [dates])
+  const multiWeek = weekList.length > 1
+  const selectedWeek = weekList.find((w) => w.key === weekFilter) ?? null
+
+  const visibleDates = useMemo(() => {
+    if (dayFilter && dates.includes(dayFilter)) return [dayFilter]
+    if (selectedWeek) return selectedWeek.dates
+    return dates
+  }, [dates, dayFilter, selectedWeek])
+  const dayButtons = multiWeek ? (selectedWeek?.dates ?? []) : dates
 
   const pxPerHour = ZOOM_STEPS[zoom]
   const pxPerMinute = pxPerHour / 60
@@ -413,6 +451,18 @@ export function WeekGantt({
     return index * dayWidthMinutes + (now.clockMinute - shiftStartMinute)
   }, [now, visibleDates, dayWidthMinutes, shiftStartMinute])
 
+  // Açılışta (ve hafta/gün ya da yakınlık değişince) "şimdi" çizgisine kay:
+  // uzun planda sayfa geçmiş günlerle açılmasın. Veri tazelenince kaydırma
+  // bozulmasın diye yalnızca bu değişikliklerde yapılır.
+  const scroller = useRef<HTMLDivElement>(null)
+  const scrollKey = `${visibleDates[0]}|${visibleDates.length}|${zoom}`
+  useEffect(() => {
+    const el = scroller.current
+    if (!el || nowOffset === null) return
+    el.scrollLeft = Math.max(0, nowOffset * (ZOOM_STEPS[zoom] / 60) - 120)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollKey])
+
   const byCategory = useMemo(() => {
     const map = new Map<string, typeof rows>()
     for (const row of rows) {
@@ -542,6 +592,7 @@ export function WeekGantt({
             onClick={() => {
               setZoom(DEFAULT_ZOOM)
               setDayFilter(null)
+              setWeekFilter(null)
             }}
             className="ml-1 h-8 rounded-md border border-border px-2 text-xs text-muted-foreground hover:bg-muted"
           >
@@ -551,16 +602,39 @@ export function WeekGantt({
 
         <div className="flex flex-wrap items-center gap-1">
           <button
-            onClick={() => setDayFilter(null)}
+            onClick={() => {
+              setDayFilter(null)
+              setWeekFilter(null)
+            }}
             className={`h-8 rounded-md px-2 text-xs ${
-              dayFilter === null
+              dayFilter === null && weekFilter === null
                 ? 'bg-foreground text-background'
                 : 'border border-border text-muted-foreground hover:bg-muted'
             }`}
           >
-            Whole week
+            {multiWeek ? 'Whole plan' : 'Whole week'}
           </button>
-          {dates.map((date) => (
+          {multiWeek &&
+            weekList.map((w) => (
+              <button
+                key={w.key}
+                onClick={() => {
+                  setWeekFilter(w.key)
+                  setDayFilter(null)
+                }}
+                className={`h-8 rounded-md px-2 text-xs ${
+                  weekFilter === w.key && dayFilter === null
+                    ? 'bg-foreground text-background'
+                    : weekFilter === w.key
+                      ? 'border border-foreground text-foreground'
+                      : 'border border-border text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {w.label}
+              </button>
+            ))}
+          {multiWeek && dayButtons.length > 0 && <span className="mx-1 h-5 w-px bg-border" aria-hidden />}
+          {dayButtons.map((date) => (
             <button
               key={date}
               onClick={() => {
@@ -632,17 +706,21 @@ export function WeekGantt({
           </div>
         </div>
 
-        <div className="min-w-0 flex-1 overflow-x-auto">
+        <div ref={scroller} className="min-w-0 flex-1 overflow-x-auto">
           <div className="py-3" style={{ width: totalPx + 24 }}>
             <div className="relative" style={{ height: HEADER_HEIGHT, width: totalPx }}>
               {visibleDates.map((date, i) => (
                 <Fragment key={date}>
-                  <span
-                    className="absolute top-0 truncate text-[11px] font-medium text-foreground"
-                    style={{ left: px(i * dayWidthMinutes) + 3, maxWidth: px(dayWidthMinutes) - 6 }}
+                  {/* Gün etiketi günün içinde sola yapışır: kaydırınca yarım kalan
+                      günün tarihi de okunur. */}
+                  <div
+                    className="absolute top-0 h-4"
+                    style={{ left: px(i * dayWidthMinutes), width: px(dayWidthMinutes) }}
                   >
-                    {dayLabel(date)} · starts {clockLabel(shiftStartMinute)}
-                  </span>
+                    <span className="sticky left-0 inline-block max-w-full truncate bg-card px-1 text-[11px] font-medium text-foreground">
+                      {headerLabel(date, i === 0)} · starts {clockLabel(shiftStartMinute)}
+                    </span>
+                  </div>
                   {tickHours > 0 &&
                     Array.from(
                       { length: Math.floor(dayWidthMinutes / 60 / tickHours) + 1 },
