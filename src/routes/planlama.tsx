@@ -648,6 +648,8 @@ function PlanlamaPage() {
                     setupStartMinute: j.setupStartMinute,
                     endMinute: j.endMinute,
                     segments: j.segments,
+                    waitReason: j.waitReason,
+                    urgentSetup: j.urgentSetup,
                   }),
                 ),
                 ...ganttMaintenance.filter((m) => week.dates.includes(m.date)),

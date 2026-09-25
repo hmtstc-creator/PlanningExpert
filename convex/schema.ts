@@ -168,6 +168,15 @@ export default defineSchema({
     // Tesisin saat dilimi (IANA adı). Plan sunucuda hesaplanıyor ve sunucu
     // UTC'de çalışıyor; gün ve vardiya tesis saatine göre değişmeli.
     timeZone: v.optional(v.string()),
+    // Fabrika geneli setup sınırları: normalde ve bakiye/geç iş varken.
+    maxSetupsPlantWideNormal: v.optional(v.number()),
+    maxSetupsPlantWide: v.optional(v.number()),
+    // Setup vardiya değişimini aşabilir mi (varsayılan evet).
+    setupsCrossShifts: v.optional(v.boolean()),
+    // Dolgu işi en fazla kaç gün öne çekilir (pres boş kalmasın).
+    pullForwardDays: v.optional(v.number()),
+    // Tek seferlik geçişler yapıldı mı (ör. setup arası 60 → 10 dk).
+    migratedSetupGap10: v.optional(v.boolean()),
   }).index('by_key', ['key']),
 
   // Planlı duruşlar: vardiya devri, çay, yemek, günlük bakım. Her vardiya

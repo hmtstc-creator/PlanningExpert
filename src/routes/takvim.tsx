@@ -152,7 +152,12 @@ function PressCalendarSection() {
   const [shiftMinutes, setShiftMinutes] = useState(480)
   const [overtimeShiftMinutes, setOvertimeShiftMinutes] = useState(480)
   const [country, setCountry] = useState('RO')
-  const [setupGapMinutes, setSetupGapMinutes] = useState(60)
+  const [setupGapMinutes, setSetupGapMinutes] = useState(10)
+  // Fabrika geneli setup sınırları ve öne çekme (planlamacıyla netleşen kurallar).
+  const [maxSetupsPlantWideNormal, setMaxSetupsPlantWideNormal] = useState(1)
+  const [maxSetupsPlantWide, setMaxSetupsPlantWide] = useState(2)
+  const [setupsCrossShifts, setSetupsCrossShifts] = useState(true)
+  const [pullForwardDays, setPullForwardDays] = useState(10)
   const [coilSetupGapMinutes, setCoilSetupGapMinutes] = useState(30)
   const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
   const [shiftStartMinute, setShiftStartMinute] = useState(420) // 07:00
@@ -170,7 +175,7 @@ function PressCalendarSection() {
           shiftMinutes: globalSettings.shiftMinutes,
           overtimeShiftMinutes: globalSettings.overtimeShiftMinutes,
           country: globalSettings.country,
-          setupGapMinutes: globalSettings.setupGapMinutes ?? 60,
+          setupGapMinutes: globalSettings.setupGapMinutes ?? 10,
           coilSetupGapMinutes: globalSettings.coilSetupGapMinutes ?? 30,
           concurrentSetupsPerHall: globalSettings.concurrentSetupsPerHall ?? 1,
           shiftStartMinute: globalSettings.shiftStartMinute ?? 420,
@@ -178,6 +183,10 @@ function PressCalendarSection() {
           breakMinutesPerShift: globalSettings.breakMinutesPerShift ?? 0,
           frozenDays: globalSettings.frozenDays ?? 0,
           safetyStockDays: globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS,
+          maxSetupsPlantWideNormal: globalSettings.maxSetupsPlantWideNormal ?? 1,
+          maxSetupsPlantWide: globalSettings.maxSetupsPlantWide ?? 2,
+          setupsCrossShifts: globalSettings.setupsCrossShifts ?? true,
+          pullForwardDays: globalSettings.pullForwardDays ?? 10,
         }
       : undefined,
     {
@@ -192,6 +201,10 @@ function PressCalendarSection() {
       breakMinutesPerShift: setBreakMinutesPerShift,
       frozenDays: setFrozenDays,
       safetyStockDays: setSafetyStockDays,
+      maxSetupsPlantWideNormal: setMaxSetupsPlantWideNormal,
+      maxSetupsPlantWide: setMaxSetupsPlantWide,
+      setupsCrossShifts: setSetupsCrossShifts,
+      pullForwardDays: setPullForwardDays,
     },
   )
 
@@ -208,6 +221,10 @@ function PressCalendarSection() {
       breakMinutesPerShift: number
       frozenDays: number
       safetyStockDays: number
+      maxSetupsPlantWideNormal: number
+      maxSetupsPlantWide: number
+      setupsCrossShifts: boolean
+      pullForwardDays: number
     }>,
   ) {
     await saveGlobalSettingsMutation({
@@ -222,6 +239,10 @@ function PressCalendarSection() {
       breakMinutesPerShift: next?.breakMinutesPerShift ?? breakMinutesPerShift,
       frozenDays: next?.frozenDays ?? frozenDays,
       safetyStockDays: next?.safetyStockDays ?? safetyStockDays,
+      maxSetupsPlantWideNormal: next?.maxSetupsPlantWideNormal ?? maxSetupsPlantWideNormal,
+      maxSetupsPlantWide: next?.maxSetupsPlantWide ?? maxSetupsPlantWide,
+      setupsCrossShifts: next?.setupsCrossShifts ?? setupsCrossShifts,
+      pullForwardDays: next?.pullForwardDays ?? pullForwardDays,
       capacityFactor: globalSettings?.capacityFactor,
     })
     setSavedAt(new Date().toLocaleTimeString('en-GB'))
@@ -306,13 +327,17 @@ function PressCalendarSection() {
     (globalSettings.shiftMinutes !== shiftMinutes ||
       globalSettings.overtimeShiftMinutes !== overtimeShiftMinutes ||
       globalSettings.country !== country ||
-      (globalSettings.setupGapMinutes ?? 60) !== setupGapMinutes ||
+      (globalSettings.setupGapMinutes ?? 10) !== setupGapMinutes ||
       (globalSettings.coilSetupGapMinutes ?? 30) !== coilSetupGapMinutes ||
       (globalSettings.concurrentSetupsPerHall ?? 1) !== concurrentSetupsPerHall ||
       (globalSettings.shiftStartMinute ?? 420) !== shiftStartMinute ||
       (globalSettings.planningHorizonWeeks ?? 4) !== planningHorizonWeeks ||
       (globalSettings.frozenDays ?? 0) !== frozenDays ||
-      (globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS) !== safetyStockDays)
+      (globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS) !== safetyStockDays ||
+      (globalSettings.maxSetupsPlantWideNormal ?? 1) !== maxSetupsPlantWideNormal ||
+      (globalSettings.maxSetupsPlantWide ?? 2) !== maxSetupsPlantWide ||
+      (globalSettings.setupsCrossShifts ?? true) !== setupsCrossShifts ||
+      (globalSettings.pullForwardDays ?? 10) !== pullForwardDays)
 
   const calendarDirty =
     !!globalCalendar &&
@@ -341,13 +366,17 @@ function PressCalendarSection() {
       setShiftMinutes(globalSettings.shiftMinutes)
       setOvertimeShiftMinutes(globalSettings.overtimeShiftMinutes)
       setCountry(globalSettings.country)
-      setSetupGapMinutes(globalSettings.setupGapMinutes ?? 60)
+      setSetupGapMinutes(globalSettings.setupGapMinutes ?? 10)
       setCoilSetupGapMinutes(globalSettings.coilSetupGapMinutes ?? 30)
       setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? 1)
       setShiftStartMinute(globalSettings.shiftStartMinute ?? 420)
       setPlanningHorizonWeeks(globalSettings.planningHorizonWeeks ?? 4)
       setFrozenDays(globalSettings.frozenDays ?? 0)
       setSafetyStockDays(globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS)
+      setMaxSetupsPlantWideNormal(globalSettings.maxSetupsPlantWideNormal ?? 1)
+      setMaxSetupsPlantWide(globalSettings.maxSetupsPlantWide ?? 2)
+      setSetupsCrossShifts(globalSettings.setupsCrossShifts ?? true)
+      setPullForwardDays(globalSettings.pullForwardDays ?? 10)
     }
     if (globalCalendar) {
       setWorkingDayKeys(globalCalendar.workingDays)
@@ -801,6 +830,49 @@ function PressCalendarSection() {
             onChange={(e) => setConcurrentSetupsPerHall(Number(e.target.value) || 1)}
           />
         </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
+            Setups at once in the plant (normal)
+          </span>
+          <input
+            type="number"
+            min={1}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={maxSetupsPlantWideNormal}
+            onChange={(e) => setMaxSetupsPlantWideNormal(Math.max(1, Number(e.target.value) || 1))}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">
+            Setups at once with backlog / late risk
+          </span>
+          <input
+            type="number"
+            min={1}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={maxSetupsPlantWide}
+            onChange={(e) => setMaxSetupsPlantWide(Math.max(1, Number(e.target.value) || 1))}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Pull work forward (days)</span>
+          <input
+            type="number"
+            min={0}
+            max={60}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={pullForwardDays}
+            onChange={(e) => setPullForwardDays(Math.max(0, Math.min(60, Number(e.target.value) || 0)))}
+          />
+        </label>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm">
+          <input
+            type="checkbox"
+            checked={setupsCrossShifts}
+            onChange={(e) => setSetupsCrossShifts(e.target.checked)}
+          />
+          <span className="text-xs text-muted-foreground">Setups may run over a shift change</span>
+        </label>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
         Frozen days: the first {frozenDays} day(s) of the plan are taken from
@@ -815,7 +887,16 @@ function PressCalendarSection() {
         {setupGapMinutes} min between consecutive mould setups and{' '}
         {coilSetupGapMinutes} min between coil changes. A mould setup and a coil
         change can follow each other immediately but never overlap. Hall
-        definitions come from the Press Definitions page.
+        definitions come from the Press Definitions page.{' '}
+        Plant-wide: without backlog at most {maxSetupsPlantWideNormal} mould setup(s) run at the
+        same time anywhere in the plant; for backlog or a job that would otherwise be late up to{' '}
+        {maxSetupsPlantWide} may overlap, so production starts sooner.{' '}
+        {setupsCrossShifts
+          ? 'A setup may start near the end of a shift and be finished by the next shift.'
+          : 'A setup must finish within the shift it starts in.'}{' '}
+        Pull forward: when a press would stand idle, work of the coming weeks may start up to{' '}
+        {pullForwardDays} day(s) before it is needed; if nothing is urgent the die already
+        mounted keeps running first, so no extra setup is made.
       </p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">

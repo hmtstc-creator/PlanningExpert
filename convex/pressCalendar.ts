@@ -20,6 +20,11 @@ const globalSettingsValidator = v.union(
     frozenDays: v.optional(v.number()),
     safetyStockDays: v.optional(v.number()),
     timeZone: v.optional(v.string()),
+    maxSetupsPlantWideNormal: v.optional(v.number()),
+    maxSetupsPlantWide: v.optional(v.number()),
+    setupsCrossShifts: v.optional(v.boolean()),
+    pullForwardDays: v.optional(v.number()),
+    migratedSetupGap10: v.optional(v.boolean()),
   }),
   v.null(),
 )
@@ -49,6 +54,10 @@ export const saveGlobalSettings = guardedMutation({
     frozenDays: v.optional(v.number()),
     safetyStockDays: v.optional(v.number()),
     timeZone: v.optional(v.string()),
+    maxSetupsPlantWideNormal: v.optional(v.number()),
+    maxSetupsPlantWide: v.optional(v.number()),
+    setupsCrossShifts: v.optional(v.boolean()),
+    pullForwardDays: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

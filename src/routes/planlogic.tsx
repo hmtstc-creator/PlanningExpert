@@ -47,6 +47,10 @@ function PlanLogicPage() {
         frozenDays?: number
         safetyStockDays?: number
         timeZone?: string
+        maxSetupsPlantWideNormal?: number
+        maxSetupsPlantWide?: number
+        setupsCrossShifts?: boolean
+        pullForwardDays?: number
       }
     | null
     | undefined
@@ -55,7 +59,11 @@ function PlanLogicPage() {
     horizon: settings?.planningHorizonWeeks ?? 4,
     shiftStart: hhmm(settings?.shiftStartMinute ?? 420),
     shiftMinutes: settings?.shiftMinutes ?? 480,
-    setupGap: settings?.setupGapMinutes ?? 60,
+    setupGap: settings?.setupGapMinutes ?? 10,
+    plantNormal: settings?.maxSetupsPlantWideNormal ?? 1,
+    plantUrgent: settings?.maxSetupsPlantWide ?? 2,
+    crossShifts: settings?.setupsCrossShifts ?? true,
+    pullForward: settings?.pullForwardDays ?? 10,
     coilGap: settings?.coilSetupGapMinutes ?? 30,
     concurrent: settings?.concurrentSetupsPerHall ?? 1,
     factor: Math.round((settings?.capacityFactor ?? 1) * 100),
@@ -103,6 +111,10 @@ function PlanLogicPage() {
           <Setting label="Gap between mould setups (same hall)" value={`${current.setupGap} min`} />
           <Setting label="Gap between coil changes (same hall)" value={`${current.coilGap} min`} />
           <Setting label="Setups at the same time per hall" value={String(current.concurrent)} />
+          <Setting label="Setups at once in the plant (normal)" value={String(current.plantNormal)} />
+          <Setting label="Setups at once with backlog / late risk" value={String(current.plantUrgent)} />
+          <Setting label="Pull work forward" value={`${current.pullForward} days`} />
+          <Setting label="Setup over a shift change" value={current.crossShifts ? 'allowed' : 'not allowed'} />
           <Setting label="Capacity factor" value={`${current.factor}%`} />
           <Setting
             label="Frozen days"
@@ -322,8 +334,28 @@ function PlanLogicPage() {
             If the same mould is already on the press, the setup is skipped.
           </li>
           <li>
-            A setup or coil change never crosses the end of a shift — no crew
-            starts a setup it cannot finish. Production can.
+            {current.crossShifts
+              ? 'A setup may start near the end of a shift and be finished by the next shift; it never runs past the last working minute of the day. Production can.'
+              : 'A setup or coil change never crosses the end of a shift — no crew starts a setup it cannot finish. Production can.'}
+          </li>
+          <li>
+            <b>Setup team</b>: normally at most {current.plantNormal} mould setup(s) run at
+            the same time anywhere in the plant. <b>Dynamic rule:</b> for backlog, or for a
+            job that would otherwise start after its stock runs out, up to{' '}
+            {current.plantUrgent} setups may overlap so production starts sooner. Once the
+            urgent work is placed, setups go back to one after the other.
+          </li>
+          <li>
+            <b>No idle press while work is waiting</b>: a lot may start up to{' '}
+            {current.pullForward} day(s) before it is needed when its press would
+            otherwise stand idle, so the plan fills the working days you opened on the
+            Work Calendar — the same hours the Capacity Dashboard counts. If nothing is
+            urgent, the die already on the press keeps running for its next lot first, so
+            no extra setup is made.
+          </li>
+          <li>
+            Every idle gap on the plan chart shows why it is there (setup team busy, die
+            on another press, not allowed yet, …).
           </li>
           <li>
             <b>Crane</b>: in one hall, mould setups are at least{' '}
@@ -338,7 +370,8 @@ function PlanLogicPage() {
           </li>
           <li>
             A lot does not start before its safety date ({current.safety} working
-            day(s) before its stock runs out).
+            day(s) before its stock runs out) minus the pull-forward window of{' '}
+            {current.pullForward} day(s).
           </li>
         </ul>
         <p>

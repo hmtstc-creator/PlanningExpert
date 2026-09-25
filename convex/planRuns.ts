@@ -105,6 +105,28 @@ export const inputPage = internalQuery({
   },
 })
 
+/**
+ * Tek seferlik ayar geçişleri; her hesabın başında denenir, yapıldıysa
+ * işaretlenir ve bir daha dokunulmaz.
+ *
+ * - Setup'lar arası 60 dk → 10 dk (planlamacının kararı). Kayıtta eski
+ *   varsayılan 60 duruyorsa 10 yapılır; başka bir değer elle girildiyse
+ *   korunur. Sonradan tekrar 60 yapılırsa da artık değiştirilmez.
+ */
+async function migrateSettings(ctx: Ctx) {
+  const settings = await ctx.db
+    .query('globalShiftSettings')
+    .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
+    .first()
+  if (!settings || settings.migratedSetupGap10) return
+  await ctx.db.patch(settings._id, {
+    migratedSetupGap10: true,
+    ...(settings.setupGapMinutes === undefined || settings.setupGapMinutes === 60
+      ? { setupGapMinutes: 10 }
+      : {}),
+  })
+}
+
 // ---- Kuyruk ------------------------------------------------------------------
 
 /**
@@ -116,6 +138,7 @@ export const beginRun = internalMutation({
   returns: v.object({ proceed: v.boolean() }),
   handler: async (ctx: Ctx, { trigger }: Ctx) => {
     const now = Date.now()
+    await migrateSettings(ctx)
     const status = await planStatusDoc(ctx)
     if (status?.runningSince && now - status.runningSince < RUN_TIMEOUT_MS) {
       if (!status.scheduledFor || status.scheduledFor < now) {

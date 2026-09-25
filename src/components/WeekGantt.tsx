@@ -34,6 +34,8 @@ const COLORS = {
   // grafikte bir iş gibi okunurdu.
   maintenance: { fill: '#475569', label: 'Press maintenance' },
   other: { fill: '#475569', label: 'Other stop' },
+  // Boş pres: renk değil, kesikli çerçeve — üzerine gelince nedeni yazar.
+  idle: { fill: 'transparent', label: 'Idle (hover for why)' },
 } as const
 
 type BlockKind = keyof typeof COLORS
@@ -78,6 +80,10 @@ export interface WeekGanttJob {
   endMinute: number
   /** Setup → approval → production → coil change → production … */
   segments: WeekGanttSegment[]
+  /** Pres bu işten önce boş kaldıysa nedeni (motordan). */
+  waitReason?: string
+  /** Setup bakiye/geç iş kuralıyla başka bir setup'la çakışabildi. */
+  urgentSetup?: boolean
 }
 
 export interface WeekGanttDay {
@@ -118,6 +124,9 @@ interface PlacedBlock extends Segment {
   title: string
   /** Frozen work is drawn hatched so it reads as "not up for replanning". */
   frozen?: boolean
+  /** The job this block belongs to, and whether it is the job's first block. */
+  job?: WeekGanttJob
+  firstOfJob?: boolean
 }
 
 const ROW_HEIGHT = 32
@@ -206,8 +215,11 @@ export function WeekGantt({
           // A piece that carries on from the previous day is marked so the
           // planner does not read it as a second setup for the same part.
           const carriedOver = (span.date || job.date) !== job.date
-          for (const seg of netIntervalToClockBlocks(span.start, span.end, timeline)) {
+          const firstSpan = span === job.segments[0]
+          for (const [segIndex, seg] of netIntervalToClockBlocks(span.start, span.end, timeline).entries()) {
             blocks.push({
+              job,
+              firstOfJob: firstSpan && segIndex === 0,
               kind,
               press: press.name,
               hall: press.hall,
@@ -241,8 +253,61 @@ export function WeekGantt({
       }
 
       blocks.sort((a, b) => a.start - b.start)
+
+      // Boşluklar: iki iş arasında pres çalışma saatindeyken boş kaldıysa,
+      // sonraki işin bekleme nedeniyle birlikte çizilir. Mola, gece ve
+      // geçmiş saatler boşluk sayılmaz.
+      const windows = press.days
+        .filter((d) => d.shifts > 0 && dayIndex.has(d.date))
+        .map((d) => {
+          const start = dayIndex.get(d.date)! * dayWidthMinutes
+          return { start, end: start + d.shifts * shiftMinutes }
+        })
+      const nowIndex = now ? visibleDates.indexOf(now.date) : -1
+      const nowAt =
+        now && nowIndex >= 0 ? nowIndex * dayWidthMinutes + (now.clockMinute - shiftStartMinute) : null
+      const stopsOnRow = blocks.filter(
+        (b) => b.kind === 'stop' || b.kind === 'meeting' || b.kind === 'other',
+      )
+      const work = blocks.filter((b) => b.job)
+      const idle: PlacedBlock[] = []
+      let prevEnd: number | null = null
+      for (const next of work) {
+        if (next.firstOfJob && next.job && (prevEnd !== null || next.job.waitReason)) {
+          for (const w of windows) {
+            let from = Math.max(w.start, prevEnd ?? w.start, nowAt ?? Number.NEGATIVE_INFINITY)
+            const to = Math.min(w.end, next.start)
+            if (to - from < 10) continue
+            // Molaları çıkar: boşluk molaların arasındaki parçalardır.
+            const pieces: [number, number][] = []
+            for (const st of stopsOnRow) {
+              if (st.end <= from || st.start >= to) continue
+              if (st.start > from) pieces.push([from, st.start])
+              from = Math.max(from, st.end)
+            }
+            if (to > from) pieces.push([from, to])
+            for (const [a, b] of pieces) {
+              if (b - a < 10) continue
+              idle.push({
+                kind: 'idle',
+                press: press.name,
+                hall: press.hall,
+                start: a,
+                end: b,
+                title:
+                  `Idle ${Math.round(b - a)} min before ${next.job.material} — ` +
+                  (next.job.waitReason ?? 'no reason recorded (recalculate the plan)'),
+              })
+            }
+          }
+        }
+        prevEnd = Math.max(prevEnd ?? Number.NEGATIVE_INFINITY, next.end)
+      }
+      blocks.push(...idle)
+      blocks.sort((a, b) => a.start - b.start)
       return { press, blocks }
     })
+
 
     const setups = rows.flatMap((r) => r.blocks.filter((b) => b.kind === 'setup'))
     const clashKeys = new Set<string>()
@@ -251,6 +316,8 @@ export function WeekGantt({
         const a = setups[i]
         const b = setups[j]
         if (a.hall !== b.hall || a.press === b.press) continue
+        // Bakiye/geç iş kuralıyla bilerek çakıştırılan setup hata değildir.
+        if (a.job?.urgentSetup || b.job?.urgentSetup) continue
         if (a.start < b.end && b.start < a.end) {
           clashKeys.add(`${a.press}|${a.start}`)
           clashKeys.add(`${b.press}|${b.start}`)
@@ -259,7 +326,7 @@ export function WeekGantt({
     }
 
     return { rows, dayWidthMinutes, clashKeys }
-  }, [visibleDates, presses, jobs, stops, shiftStartMinute, shiftMinutes])
+  }, [visibleDates, presses, jobs, stops, shiftStartMinute, shiftMinutes, now])
 
   /**
    * "Şimdi" çizgisinin eksendeki yeri. Gün, gösterilen günler arasında
@@ -313,7 +380,7 @@ export function WeekGantt({
           .map((kind) => (
             <span key={kind} className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span
-                className="inline-block h-3 w-3 rounded-sm"
+                className={`inline-block h-3 w-3 rounded-sm ${kind === 'idle' ? 'border border-dashed border-amber-600' : ''}`}
                 style={{ backgroundColor: COLORS[kind].fill }}
               />
               {COLORS[kind].label}
@@ -534,7 +601,7 @@ export function WeekGantt({
                             title={b.title}
                             className={`absolute top-1 flex items-center overflow-hidden rounded-sm px-0.5 text-[10px] font-medium text-white ${
                               clashing ? 'ring-2 ring-dashed ring-red-600' : ''
-                            }`}
+                            } ${b.kind === 'idle' ? 'cursor-help border border-dashed border-amber-600 bg-amber-100/40 dark:bg-amber-900/20' : ''}`}
                             style={{
                               left: px(b.start),
                               width,

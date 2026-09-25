@@ -11,6 +11,12 @@ import {
   eligiblePressesOf,
   splitByMoldLimit,
 } from './planning'
+import { addDays, isoDate } from './dates'
+
+/** ISO tarihe gün ekler/çıkarır. */
+function shiftIsoDate(date: string, days: number): string {
+  return isoDate(addDays(new Date(`${date}T00:00:00`), days))
+}
 
 export interface PressSpec {
   name: string
@@ -51,8 +57,32 @@ export interface SchedulerOptions {
    * tek bir "vardiya uzunluğu" sınırları yanlış yere koyar.
    */
   shiftNetMinutes?: number[]
-  /** Aynı holde aynı anda yapılabilecek setup sayısı. */
+  /** Aynı holde (setup ekibinde) aynı anda yapılabilecek setup sayısı. */
   concurrentSetupsPerHall: number
+  /**
+   * Fabrika genelinde aynı anda yapılabilecek en fazla kalıp setup'ı.
+   * Normal işlerde hol kuralı (1 setup) geçerlidir; bakiye ya da geç kalacak
+   * iş için setup başka bir setup'la çakışabilir, ama fabrikada aynı anda bu
+   * sayıdan fazla setup olmaz. Verilmezse sınır yok.
+   */
+  maxSetupsPlantWide?: number
+  /**
+   * Normal işlerde fabrika genelinde aynı anda en fazla kalıp setup'ı
+   * (varsayılan: sınır yok, yalnız hol kuralı). 1 = fabrikada setuplar hiç
+   * çakışmaz; bakiye/geç iş için `maxSetupsPlantWide` geçerlidir.
+   */
+  maxSetupsPlantWideNormal?: number
+  /**
+   * Setup vardiya değişimini aşabilir: ekip başlar, sonraki vardiya devralır.
+   * Gün sonunu (presin o günkü son çalışma dakikası) yine aşamaz.
+   */
+  setupsCrossShifts?: boolean
+  /**
+   * Dolgu işi ihtiyaç haftasından (emniyet stoğu gününden) en fazla bu kadar
+   * takvim günü önce başlayabilir. Pres takvimde çalışıyor görünüp işsiz
+   * kalmasın: gelecek haftaların işi boşluğa çekilir. 0 = öne çekme yok.
+   */
+  pullForwardDays?: number
   /** Kullanıcının elle müdahaleleri. */
   overrides?: PlanOverride[]
   /**
@@ -144,6 +174,17 @@ export interface ScheduledJob {
   setupMinutes: number
   qualityApprovalMinutes: number
   reason: string
+  /**
+   * Pres bu işten önce boş kaldıysa nedeni: setup ekibi meşgul, kalıp başka
+   * preste, iş henüz öne çekilemiyor… Gantt'taki boşluğun açıklaması.
+   */
+  waitReason?: string
+  /** Setup bakiye/geç iş kuralıyla başka bir setup'la çakışabildi. */
+  urgentSetup?: boolean
+  /** İhtiyaç haftasından önce, pres boş kalmasın diye öne çekildi. */
+  pulledForward?: boolean
+  /** Aynı kalıbın önceki işinin devamı olarak (setup'sız) yerleşti. */
+  continued?: boolean
   /** Neden bu pres: sıra numarası ve adayların karşılaştırması. */
   decision?: PlacementDecision
 }
@@ -395,6 +436,8 @@ function toDatedSegments(
 interface SetupInterval {
   start: number
   end: number
+  /** Setup'ın yapıldığı pres — bekleme nedenini yazmak için. */
+  press?: string
 }
 
 /**
@@ -437,26 +480,44 @@ function earliestFreeStart(
   earliest: number,
   duration: number,
   concurrent: number,
-): number {
-  if (duration <= 0) return earliest
+  /** Fabrikanın bütün hollerindeki aynı türden setuplar (ara süre yok). */
+  plant: SetupInterval[] = [],
+  plantCap = Number.POSITIVE_INFINITY,
+): { start: number; blockedBy: SetupInterval | null } {
+  if (duration <= 0) return { start: earliest, blockedBy: null }
   let candidate = earliest
+  let blockedBy: SetupInterval | null = null
 
-  for (let guard = 0; guard < same.length + others.length + 1; guard++) {
+  for (let guard = 0; guard < (same.length + others.length + plant.length + 1) * 2; guard++) {
     const sameBlocking = same.filter(
       (iv) => candidate < iv.end + gap && iv.start < candidate + duration + gap,
     )
     const otherBlocking = others.filter(
       (iv) => candidate < iv.end && iv.start < candidate + duration,
     )
-    if (sameBlocking.length < concurrent && otherBlocking.length === 0) return candidate
+    const plantBlocking = plant.filter((iv) => candidate < iv.end && iv.start < candidate + duration)
+    if (
+      sameBlocking.length < concurrent &&
+      otherBlocking.length === 0 &&
+      plantBlocking.length < plantCap
+    ) {
+      return { start: candidate, blockedBy }
+    }
 
-    candidate = Math.max(
-      ...sameBlocking.map((iv) => iv.end + gap),
-      ...otherBlocking.map((iv) => iv.end),
-      candidate,
-    )
+    blockedBy ??= sameBlocking[0] ?? otherBlocking[0] ?? plantBlocking[0] ?? null
+    // Bir sonraki aday: sınırı dolduran aralıklardan en erken biteninin sonu
+    // (bir yer açılır); diğer türden setuplar ise tamamen bitmeli.
+    let next = candidate
+    if (sameBlocking.length >= concurrent) {
+      next = Math.max(next, Math.min(...sameBlocking.map((iv) => iv.end + gap)))
+    }
+    if (otherBlocking.length > 0) next = Math.max(next, ...otherBlocking.map((iv) => iv.end))
+    if (plantBlocking.length >= plantCap) {
+      next = Math.max(next, Math.min(...plantBlocking.map((iv) => iv.end)))
+    }
+    candidate = next > candidate ? next : candidate + 1
   }
-  return candidate
+  return { start: candidate, blockedBy }
 }
 
 function moldIntervalsFor(usage: MoldUsage, material: string, date: string): MoldInterval[] {
@@ -744,6 +805,7 @@ function applyFixedJobs(
         resources[segment.kind === 'setup' ? 'mold' : 'coil'].push({
           start: segment.start,
           end: segment.end,
+          press: job.press,
         })
         hallLog.set(press.hall, resources)
         hallSetups.set(segment.date, hallLog)
@@ -783,6 +845,10 @@ interface Placement {
   /** Hol kaydına yazılacak kalıp setupı, gününe göre. */
   moldReservation: { date: string; start: number; end: number } | null
   coilReservations: { date: string; start: number; end: number }[]
+  /** Yerleşirken karşılaşılan beklemeler (boşluğun nedeni). */
+  waits: string[]
+  /** Setup acil kuralla (çakışmaya izin vererek) konuldu. */
+  urgent?: boolean
 }
 
 /**
@@ -833,6 +899,12 @@ function reserveSlot(
    * parçaları arka arkaya rulo bağlamayı 30 dakikanın altına düşürebilir.
    */
   pending: { date: string; start: number; end: number; type: 'mold' | 'coil' }[] = [],
+  /** Fabrika genelinde aynı anda en fazla bu kadar kalıp setup'ı. */
+  plantCap = Number.POSITIVE_INFINITY,
+  /** Setup vardiya değişimini aşabilir mi (gün sonunu aşamaz). */
+  crossShifts = false,
+  /** Bekleme nedenleri buraya yazılır (boşluk açıklaması için). */
+  waits?: string[],
 ): { global: number; date: string; start: number } | null {
   if (duration <= 0) {
     const day = dayAt(timeline, from)
@@ -855,7 +927,8 @@ function reserveSlot(
     const within = day.startNet + (cursor - day.offset)
     const dayEnd = day.startNet + day.capacity
     // Vardiya sınırı: gün içinde vardiya sonuna sığmıyorsa sonrakine geç.
-    const shiftEnd = shiftEndAfter(within, shiftNetMinutes, dayEnd)
+    // Vardiya devri serbestse yalnızca gün sonu sınırdır.
+    const shiftEnd = crossShifts ? dayEnd : shiftEndAfter(within, shiftNetMinutes, dayEnd)
 
     const resources = hallSetups.get(day.date)?.get(hall) ?? { mold: [], coil: [] }
     const own = pending.filter((r) => r.date === day.date)
@@ -867,7 +940,31 @@ function reserveSlot(
       ...(type === 'mold' ? resources.coil : resources.mold),
       ...own.filter((r) => r.type !== type),
     ]
-    const candidate = earliestFreeStart(same, gap, others, within, duration, concurrent)
+    // Fabrika geneli: o gün bütün hollerdeki kalıp setupları.
+    const plant =
+      type === 'mold' && Number.isFinite(plantCap)
+        ? [
+            ...Array.from(hallSetups.get(day.date)?.values() ?? []).flatMap((r) => r.mold),
+            ...own.filter((r) => r.type === 'mold'),
+          ]
+        : []
+    const { start: candidate, blockedBy } = earliestFreeStart(
+      same,
+      gap,
+      others,
+      within,
+      duration,
+      concurrent,
+      plant,
+      plantCap,
+    )
+    if (blockedBy && waits) {
+      waits.push(
+        type === 'mold'
+          ? `setup team busy${blockedBy.press ? ` — ${blockedBy.press} is being set up` : ''}`
+          : `crane busy with a coil change${blockedBy.press ? ` on ${blockedBy.press}` : ''}`,
+      )
+    }
 
     if (candidate + duration <= shiftEnd) {
       return {
@@ -876,6 +973,11 @@ function reserveSlot(
         start: candidate,
       }
     }
+    waits?.push(
+      crossShifts
+        ? `${type === 'mold' ? 'setup' : 'coil change'} would not finish before the press stops for the day`
+        : `${type === 'mold' ? 'setup' : 'coil change'} would not finish before the shift change`,
+    )
     cursor = day.offset + (shiftEnd - day.startNet)
     if (cursor >= day.offset + day.capacity) {
       const next = timeline.days[dayIndexAt(timeline, day.offset + day.capacity)]
@@ -902,10 +1004,21 @@ function tryPlaceOnPress(
   options: SchedulerOptions,
   feedsCoil: boolean,
   blackoutDates: Map<string, number> | undefined,
+  /**
+   * Bakiye ya da geç kalacak iş: setup başka bir setup'la çakışabilir
+   * (fabrika geneli sınıra kadar). Normal işte holde tek setup.
+   */
+  urgent = false,
 ): Placement | null {
   const coilChangeMinutes = feedsCoil ? run.coilChangeMinutes : 0
   const coilGap = options.coilSetupGapMinutes ?? 30
-  const concurrent = Math.max(1, options.concurrentSetupsPerHall)
+  const urgentCap = options.maxSetupsPlantWide ?? Number.POSITIVE_INFINITY
+  const normalCap = Math.min(urgentCap, options.maxSetupsPlantWideNormal ?? Number.POSITIVE_INFINITY)
+  const plantCap = urgent ? urgentCap : normalCap
+  const hallConcurrent = Math.max(1, options.concurrentSetupsPerHall)
+  const concurrent = urgent && Number.isFinite(urgentCap) ? Math.max(hallConcurrent, urgentCap) : hallConcurrent
+  const crossShifts = !!options.setupsCrossShifts
+  const waits: string[] = []
 
   let start = firstFreePoint(timeline, earliestGlobal)
 
@@ -929,6 +1042,10 @@ function tryPlaceOnPress(
       options.setupGapMinutes,
       concurrent,
       options.shiftNetMinutes,
+      [],
+      plantCap,
+      crossShifts,
+      waits,
     )
     if (!setupSlot) return null
 
@@ -973,6 +1090,9 @@ function tryPlaceOnPress(
             ...(moldReservation ? [{ ...moldReservation, type: 'mold' as const }] : []),
             ...coilReservations.map((r) => ({ ...r, type: 'coil' as const })),
           ],
+          Number.POSITIVE_INFINITY,
+          crossShifts,
+          waits,
         )
         if (!slot) {
           failed = true
@@ -1017,6 +1137,7 @@ function tryPlaceOnPress(
         return until !== undefined && seg.start < until
       })
     if (blackout) {
+      waits.push(`die not available (maintenance or not ready) on ${blackout.date}`)
       const until = blackoutDates!.get(blackout.date)!
       const day = timeline.days.find((d) => d.date === blackout.date)
       const openAt =
@@ -1050,10 +1171,12 @@ function tryPlaceOnPress(
         segments,
         moldReservation,
         coilReservations,
+        waits,
       }
     }
 
     // Çakışan işin bitişinden sonra yeniden dene.
+    waits.push(`die in use on ${conflict.press}`)
     const nextDay = timeline.days.find((d) => d.date === conflict.date)
     start = firstFreePoint(
       timeline,
@@ -1070,12 +1193,12 @@ function findMoldConflict(
   material: string,
   pressName: string,
   segments: JobSegment[],
-): { date: string; end: number } | null {
+): { date: string; end: number; press: string } | null {
   for (const segment of segments) {
     for (const iv of moldIntervalsFor(moldUsage, material, segment.date)) {
       if (iv.press === pressName) continue
       if (iv.start < segment.end && segment.start < iv.end) {
-        return { date: segment.date, end: iv.end }
+        return { date: segment.date, end: iv.end, press: iv.press }
       }
     }
   }
@@ -1099,7 +1222,21 @@ function placeRun(
   decision?: PlacementDecision,
 ): ScheduledJob | null {
   let best: Placement | null = null
+  let bestEarliest = 0
+  let bestIsContinuation = false
   const note = (press: string, text: string) => decision?.candidates.push({ press, note: text })
+
+  // Öne çekme: dolgu işi, pres boş kalmasın diye ihtiyacından en fazla
+  // `pullForwardDays` gün önce başlayabilir. Bakiye/acil işler zaten serbest.
+  const pullDays = Math.max(0, options.pullForwardDays ?? 0)
+  const allowedDate =
+    entry.phase === 'fill' && pullDays > 0 ? shiftIsoDate(entry.earliestDate, -pullDays) : entry.earliestDate
+  // Bakiye ve öne alınmış (geç kalmasın diye) iş her zaman acil kuralla.
+  const alwaysUrgent = entry.phase === 'backlog' || !!entry.boost
+  // Aciliyet yoksa önce aynı kalıbın devamı denenir (setup yok).
+  const noUrgency = entry.phase === 'fill' && !entry.boost
+  const endsBefore = (a: Placement, b: Placement) =>
+    a.endDate < b.endDate || (a.endDate === b.endDate && a.endMinute < b.endMinute)
 
   for (const pressName of candidates) {
     const press = pressByName.get(pressName)
@@ -1109,9 +1246,7 @@ function placeRun(
       continue
     }
 
-    // Dolgu işleri kendi haftasından önce üretilmez; bakiye/acil işler
-    // planın ilk gününden itibaren serbesttir.
-    let earliest = offsetOfDate(timeline, entry.earliestDate)
+    let earliest = offsetOfDate(timeline, allowedDate)
     // Kullanıcı günü de sabitlediyse iş o günün penceresinde kalmalıdır.
     let limit: number | null = null
     if (pinDate) {
@@ -1130,19 +1265,52 @@ function placeRun(
       continue
     }
 
-    const placement = tryPlaceOnPress(
-      entry,
-      run,
-      pressName,
-      press.hall,
-      timeline,
-      earliest,
-      hallSetups,
-      moldUsage,
-      options,
-      press.feedsCoil !== false,
-      blackoutDates,
-    )
+    const attempt = (from: number, urgent: boolean) =>
+      tryPlaceOnPress(
+        entry,
+        run,
+        pressName,
+        press.hall,
+        timeline,
+        from,
+        hallSetups,
+        moldUsage,
+        options,
+        press.feedsCoil !== false,
+        blackoutDates,
+        urgent,
+      )
+
+    let placement = attempt(earliest, alwaysUrgent)
+    // Dinamik kural: normal kuralla geç kalacaksa setup çakışmasına izin ver.
+    if (!alwaysUrgent && placement && placement.date > entry.dueDate) {
+      const urgentTry = attempt(earliest, true)
+      if (urgentTry && endsBefore(urgentTry, placement)) {
+        placement = urgentTry
+        placement.urgent = true
+      }
+    } else if (placement && alwaysUrgent) {
+      placement.urgent = true
+    }
+
+    // Aciliyet yoksa: aynı kalıbın bu presteki işinin hemen ardına,
+    // setup'sız devam (kalıp daha uzun çalışır, yeni setup açılmaz).
+    let continuation = false
+    if (noUrgency && !pinDate) {
+      const same = timeline.bookings.filter(
+        (b) => b.material === entry.material && b.end >= earliest && firstFreePoint(timeline, b.end) === b.end,
+      )
+      for (const b of same) {
+        const cont = attempt(b.end, false)
+        if (cont && cont.startGlobal === b.end && cont.sameMaterial && cont.date <= entry.dueDate) {
+          if (!continuation || !placement || endsBefore(cont, placement)) {
+            placement = cont
+            continuation = true
+          }
+        }
+      }
+    }
+
     if (!placement) {
       note(pressName, 'no slot (mould, crane or maintenance)')
       continue
@@ -1157,14 +1325,18 @@ function placeRun(
       endMinute: placement.endMinute,
     })
 
-    // Takvimde en erken biten pres kazanır. Eksen dakikaları preslere göre
-    // farklı ölçekte olduğu için karşılaştırma takvim üzerinden yapılır.
+    // Devam (setup'sız) adayı, aciliyet yokken diğerlerine tercih edilir;
+    // aynı türden adaylar arasında takvimde en erken biten kazanır. Eksen
+    // dakikaları preslere göre farklı ölçekte olduğu için karşılaştırma
+    // takvim üzerinden yapılır.
     if (
       !best ||
-      placement.endDate < best.endDate ||
-      (placement.endDate === best.endDate && placement.endMinute < best.endMinute)
+      (continuation && !bestIsContinuation) ||
+      (continuation === bestIsContinuation && endsBefore(placement, best))
     ) {
       best = placement
+      bestEarliest = earliest
+      bestIsContinuation = continuation
     }
   }
 
@@ -1184,7 +1356,7 @@ function placeRun(
   const reserve = (date: string, type: 'mold' | 'coil', interval: SetupInterval) => {
     const hallLog = hallSetups.get(date) ?? new Map<string, HallResources>()
     const resources = hallLog.get(press.hall) ?? { mold: [], coil: [] }
-    resources[type].push(interval)
+    resources[type].push({ ...interval, press: press.name })
     hallLog.set(press.hall, resources)
     hallSetups.set(date, hallLog)
   }
@@ -1219,6 +1391,27 @@ function placeRun(
   const late = best.date > entry.dueDate
   const spansDays = best.endDate !== best.date
 
+  // Pres bu işten hemen önce boş kaldıysa nedeni.
+  const prevIndex = firstEndAfter(timeline.bookings, best.startGlobal) - 1
+  const prevEnd = prevIndex >= 0 ? timeline.bookings[prevIndex].end : 0
+  const idleBefore = best.startGlobal - prevEnd
+  let waitReason: string | undefined
+  if (idleBefore >= 1) {
+    const reasons: string[] = []
+    if (bestEarliest > prevEnd) {
+      reasons.push(
+        entry.phase === 'fill'
+          ? `not allowed before ${allowedDate} — ${entry.bucketLabel} demand${
+              pullDays > 0 ? `, pulled forward at most ${pullDays} days` : ''
+            }`
+          : `not allowed before ${allowedDate}`,
+      )
+    }
+    for (const w of best.waits) if (!reasons.includes(w)) reasons.push(w)
+    waitReason = reasons.length > 0 ? reasons.join('; ') : 'no earlier slot fits this job'
+  }
+  const pulledForward = entry.phase === 'fill' && best.date < entry.earliestDate
+
   const reasonParts = [
     entry.phase === 'backlog'
       ? `Backlog ${Math.round(entry.qty)} pcs`
@@ -1242,6 +1435,9 @@ function placeRun(
   if (pinned) reasonParts.push('pinned by user')
   if (entry.boost) reasonParts.push('moved forward so it is not late')
   if (entry.exactLot) reasonParts.push('exact quantity — coil not run out, so another job is not late')
+  if (pulledForward) reasonParts.push(`pulled forward from ${entry.earliestDate} so the press is not idle`)
+  if (bestIsContinuation) reasonParts.push('continues the die already mounted — no new setup')
+  if (best.urgent && !sameMaterial) reasonParts.push('urgent: setup may overlap another setup (plant-wide limit)')
 
   const setupEnd = locate(timeline, best.startGlobal + (sameMaterial ? 0 : run.setupMinutes))
   const qualityEnd = locate(timeline, best.qualityEndGlobal)
@@ -1256,7 +1452,8 @@ function placeRun(
     phase: entry.phase,
     urgency: entry.urgency,
     dueDate: entry.dueDate,
-    earliestDate: entry.earliestDate,
+    // Öne çekme penceresiyle birlikte izin verilen en erken gün.
+    earliestDate: allowedDate,
     bucketLabel: entry.bucketLabel,
     late,
     quantity: run.quantity,
@@ -1275,6 +1472,10 @@ function placeRun(
     coilChanges: press.feedsCoil === false ? 0 : run.coilChanges,
     segments: best.segments,
     reason: reasonParts.join(' · '),
+    waitReason,
+    urgentSetup: !!best.urgent && !sameMaterial,
+    pulledForward,
+    continued: bestIsContinuation,
     decision,
   }
 }

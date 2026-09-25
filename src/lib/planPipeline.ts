@@ -95,6 +95,14 @@ export interface PlanSettings {
   planningHorizonWeeks?: number
   frozenDays?: number
   safetyStockDays?: number
+  /** Fabrika genelinde aynı anda en fazla kalıp setup'ı (bakiye kuralı). */
+  maxSetupsPlantWide?: number
+  /** Normal işlerde fabrika genelinde aynı anda en fazla kalıp setup'ı. */
+  maxSetupsPlantWideNormal?: number
+  /** Setup vardiya değişimini aşabilir mi. */
+  setupsCrossShifts?: boolean
+  /** Dolgu işi en fazla kaç gün öne çekilebilir (pres boş kalmasın). */
+  pullForwardDays?: number
   country?: string
   timeZone?: string
 }
@@ -233,8 +241,12 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const timeZone = s.timeZone || DEFAULT_PLANT_TIME_ZONE
   const shiftMinutes = s.shiftMinutes ?? 480
   const overtimeShiftMinutes = s.overtimeShiftMinutes ?? 480
-  const setupGapMinutes = s.setupGapMinutes ?? 60
+  const setupGapMinutes = s.setupGapMinutes ?? 10
   const concurrentSetupsPerHall = s.concurrentSetupsPerHall ?? 1
+  const maxSetupsPlantWide = Math.max(1, s.maxSetupsPlantWide ?? 2)
+  const maxSetupsPlantWideNormal = Math.max(1, Math.min(maxSetupsPlantWide, s.maxSetupsPlantWideNormal ?? 1))
+  const setupsCrossShifts = s.setupsCrossShifts ?? true
+  const pullForwardDays = Math.max(0, s.pullForwardDays ?? 10)
   const coilSetupGapMinutes = s.coilSetupGapMinutes ?? 30
   const shiftStartMinute = s.shiftStartMinute ?? 420 // 07:00
   const breakMinutesPerShift = s.breakMinutesPerShift ?? 0
@@ -482,6 +494,10 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     setupGapMinutes,
     coilSetupGapMinutes,
     concurrentSetupsPerHall,
+    maxSetupsPlantWide,
+    maxSetupsPlantWideNormal,
+    setupsCrossShifts,
+    pullForwardDays,
     // Süresiz kapalı kalıplar (alarm açık, ya da tarihsiz tutuluyor)
     // motora `exclude` olarak geçer.
     overrides: [
@@ -816,6 +832,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     setupGapMinutes,
     coilSetupGapMinutes,
     concurrentSetupsPerHall,
+    maxSetupsPlantWide,
+    maxSetupsPlantWideNormal,
   })
   if (!audit.ok) {
     const broken = audit.rules.filter((r) => r.violationCount > 0).length

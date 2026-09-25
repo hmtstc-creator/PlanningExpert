@@ -25,6 +25,10 @@ export interface AuditJob {
   segments: AuditSegment[]
   endDate?: string
   endMinute?: number
+  /** Setup bakiye/geç iş kuralıyla başka bir setup'la çakışabildi. */
+  urgentSetup?: boolean
+  /** Aynı kalıbın devamı olarak (setup'sız) yerleşti — en erken bitiş kuralı aranmaz. */
+  continued?: boolean
   decision?: {
     step: number
     candidates: { press: string; endDate?: string; endMinute?: number; note?: string }[]
@@ -39,6 +43,10 @@ export interface AuditInputs {
   setupGapMinutes: number
   coilSetupGapMinutes: number
   concurrentSetupsPerHall: number
+  /** Fabrika genelinde aynı anda en fazla bu kadar kalıp setup'ı (bakiye/geç iş). */
+  maxSetupsPlantWide?: number
+  /** Normal işlerde fabrika genelinde aynı anda en fazla kalıp setup'ı. */
+  maxSetupsPlantWideNormal?: number
   /**
    * Parça → ana pres ve esneklik. Esnek olmayan parça yalnız ana preste
    * (ya da kullanıcının sabitlediği preste) çalışabilir.
@@ -97,7 +105,11 @@ export function auditPlan(input: AuditInputs): PlanAudit {
   const mouldTwice = rule('mould-twice', 'A mould is never on two presses at the same time')
   const mouldBlackout = rule('mould-blackout', 'Nothing runs on a mould maintenance or not-ready day')
   const crane = rule('crane', 'Crane: setup gaps and simultaneous setups per hall')
-  const fillEarly = rule('fill-early', 'No lot starts before its stock reaches the safety level')
+  const fillEarly = rule(
+    'fill-early',
+    'No lot starts before its pull-forward window (stock reaching the safety level minus the pull-forward days)',
+  )
+  const plantSetups = rule('plant-setups', 'Plant-wide: never more mould setups at once than allowed')
   const past = rule('past', 'Nothing is planned in the past')
   const mainPress = rule(
     'main-press',
@@ -115,8 +127,10 @@ export function auditPlan(input: AuditInputs): PlanAudit {
   // hol|tarih → setup / rulo değişimi
   const byHallDate = new Map<
     string,
-    { kind: 'setup' | 'coil'; label: string; start: number; end: number }[]
+    { kind: 'setup' | 'coil'; label: string; start: number; end: number; urgent?: boolean }[]
   >()
+  // tarih → bütün hollerdeki kalıp setupları (fabrika geneli sınır)
+  const setupsByDate = new Map<string, { label: string; start: number; end: number; urgent: boolean }[]>()
   // malzeme|gün → o gün hangi net dakikaya kadar kapalı (yoksa bütün gün)
   const blackout = new Map<string, number>()
   for (const b of input.moldBlackouts) {
@@ -133,7 +147,7 @@ export function auditPlan(input: AuditInputs): PlanAudit {
         mainPress.fail(`${job.material} is on ${job.press}, but its main press is ${pressRule.main} and it is not flexible`)
       }
     }
-    if (job.decision && job.endDate !== undefined && job.endMinute !== undefined) {
+    if (!job.continued && job.decision && job.endDate !== undefined && job.endMinute !== undefined) {
       earliest.check()
       const chosen = { date: job.endDate, minute: job.endMinute }
       for (const c of job.decision.candidates) {
@@ -171,8 +185,14 @@ export function auditPlan(input: AuditInputs): PlanAudit {
           label: `${job.material} on ${job.press}`,
           start: seg.start,
           end: seg.end,
+          urgent: seg.kind === 'setup' && !!job.urgentSetup,
         })
         byHallDate.set(key, list)
+        if (seg.kind === 'setup') {
+          const all = setupsByDate.get(seg.date) ?? []
+          all.push({ label: `${job.material} on ${job.press}`, start: seg.start, end: seg.end, urgent: !!job.urgentSetup })
+          setupsByDate.set(seg.date, all)
+        }
       }
     }
 
@@ -240,6 +260,9 @@ export function auditPlan(input: AuditInputs): PlanAudit {
       for (let j = i + 1; j < list.length; j++) {
         const b = list[j]
         if (a.kind === b.kind) {
+          // Bakiye/geç iş setup'ı başka bir setup'la çakışabilir; onun sınırı
+          // aşağıdaki fabrika geneli kuraldır.
+          if (a.kind === 'setup' && (a.urgent || b.urgent)) continue
           const gap = a.kind === 'setup' ? input.setupGapMinutes : input.coilSetupGapMinutes
           // Aynı türden iki iş arasında `gap` dakika olmalı (tek setup
           // izni varken; birden fazlaysa aşağıda eşzamanlılık sayılır).
@@ -258,14 +281,38 @@ export function auditPlan(input: AuditInputs): PlanAudit {
       for (const kind of ['setup', 'coil'] as const) {
         const items = list.filter((x) => x.kind === kind)
         for (const x of items) {
-          const at = items.filter((y) => y.start <= x.start + EPS && x.start < y.end - EPS).length
+          if (x.urgent) continue
+          const at = items.filter((y) => !y.urgent && y.start <= x.start + EPS && x.start < y.end - EPS).length
           if (at > concurrent) crane.fail(`${hall} ${date}: ${at} ${kind === 'setup' ? 'setups' : 'coil changes'} at once`)
         }
       }
     }
   }
 
-  const rules = [mainPress, earliest, pressOverlap, maintenance, mouldTwice, mouldBlackout, crane, fillEarly, past].map(
+  // Fabrika geneli: bir setup başladığı anda süren setup sayısı. Normal
+  // setup yalnız normal setuplarla sayılır (acil setup sonradan onun üstüne
+  // gelebilir); toplam hiçbir anda acil sınırını aşmaz.
+  const urgentCap = input.maxSetupsPlantWide ?? Number.POSITIVE_INFINITY
+  const normalCap = Math.min(urgentCap, input.maxSetupsPlantWideNormal ?? Number.POSITIVE_INFINITY)
+  if (Number.isFinite(urgentCap) || Number.isFinite(normalCap)) {
+    for (const [date, items] of setupsByDate) {
+      for (const x of items) {
+        plantSetups.check()
+        const running = items.filter((y) => y.start <= x.start + EPS && x.start < y.end - EPS)
+        const all = running.length
+        const normal = running.filter((y) => !y.urgent).length
+        if (all > urgentCap) {
+          plantSetups.fail(`${date} ${clock(date, x.start)}: ${all} mould setups at once (limit ${urgentCap})`)
+        } else if (!x.urgent && normal > normalCap) {
+          plantSetups.fail(
+            `${date} ${clock(date, x.start)}: ${normal} normal mould setups at once (limit ${normalCap} without backlog)`,
+          )
+        }
+      }
+    }
+  }
+
+  const rules = [mainPress, earliest, pressOverlap, maintenance, mouldTwice, mouldBlackout, crane, plantSetups, fillEarly, past].map(
     (x) => x.r,
   )
   return { rules, ok: rules.every((r) => r.violationCount === 0) }
