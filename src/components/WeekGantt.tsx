@@ -455,6 +455,7 @@ export function WeekGantt({
   // uzun planda sayfa geçmiş günlerle açılmasın. Veri tazelenince kaydırma
   // bozulmasın diye yalnızca bu değişikliklerde yapılır.
   const scroller = useRef<HTMLDivElement>(null)
+  const [scrollX, setScrollX] = useState(0)
   const scrollKey = `${visibleDates[0]}|${visibleDates.length}|${zoom}`
   useEffect(() => {
     const el = scroller.current
@@ -706,21 +707,29 @@ export function WeekGantt({
           </div>
         </div>
 
-        <div ref={scroller} className="min-w-0 flex-1 overflow-x-auto">
+        <div
+          ref={scroller}
+          className="min-w-0 flex-1 overflow-x-auto"
+          onScroll={(e) => setScrollX(e.currentTarget.scrollLeft)}
+        >
           <div className="py-3" style={{ width: totalPx + 24 }}>
             <div className="relative" style={{ height: HEADER_HEIGHT, width: totalPx }}>
               {visibleDates.map((date, i) => (
                 <Fragment key={date}>
-                  {/* Gün etiketi günün içinde sola yapışır: kaydırınca yarım kalan
-                      günün tarihi de okunur. */}
-                  <div
-                    className="absolute top-0 h-4"
-                    style={{ left: px(i * dayWidthMinutes), width: px(dayWidthMinutes) }}
+                  {/* Gün etiketi, kaydırınca günün görünen kısmının soluna kayar:
+                      yarım kalan günün tarihi de okunur. */}
+                  <span
+                    className="absolute top-0 truncate bg-card px-1 text-[11px] font-medium text-foreground"
+                    style={{
+                      left: Math.min(
+                        Math.max(px(i * dayWidthMinutes), scrollX),
+                        px((i + 1) * dayWidthMinutes) - 180,
+                      ),
+                      maxWidth: px(dayWidthMinutes) - 6,
+                    }}
                   >
-                    <span className="sticky left-0 inline-block max-w-full truncate bg-card px-1 text-[11px] font-medium text-foreground">
-                      {headerLabel(date, i === 0)} · starts {clockLabel(shiftStartMinute)}
-                    </span>
-                  </div>
+                    {headerLabel(date, i === 0)} · starts {clockLabel(shiftStartMinute)}
+                  </span>
                   {tickHours > 0 &&
                     Array.from(
                       { length: Math.floor(dayWidthMinutes / 60 / tickHours) + 1 },
