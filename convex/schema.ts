@@ -175,6 +175,12 @@ export default defineSchema({
     setupsCrossShifts: v.optional(v.boolean()),
     // Dolgu işi en fazla kaç gün öne çekilir (pres boş kalmasın).
     pullForwardDays: v.optional(v.number()),
+    // Teslim saati (gece yarısından dakika, 480 = 08:00): ihtiyaç günü bu
+    // saate kadar hazır olan adet geç sayılmaz.
+    deliveryCutoffMinute: v.optional(v.number()),
+    // Senaryo araması: hedef doluluk (%) ve en çok kaç senaryo denenir.
+    utilisationTarget: v.optional(v.number()),
+    maxScenarios: v.optional(v.number()),
     // Tek seferlik geçişler yapıldı mı (ör. setup arası 60 → 10 dk).
     migratedSetupGap10: v.optional(v.boolean()),
   }).index('by_key', ['key']),

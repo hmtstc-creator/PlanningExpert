@@ -94,6 +94,19 @@ export interface DemandEntry {
   daysOfCover: number
   /** Eş ürün bu lotla aynı vuruşta çıkar: eşin karşılanan miktarı. */
   coProductQty?: number
+  /**
+   * Lotun teslim anına kadar hazır olması gereken payı (0–1): stoğun bittiği
+   * gün eksik kalan adet ÷ lot. Tam rulo lotunun geri kalanı sonraki
+   * haftaların fazlasıdır, onun geç bitmesi gecikme değildir.
+   */
+  needFraction?: number
+  /** Ufukta stok hiç bitmiyor: bu lot müşteriyi bekletmez, geç sayılmaz. */
+  noStockout?: boolean
+  /** Teslim anı: üretim günü ve o günün net dakikası (08:00 → net). */
+  deadlineDate?: string
+  deadlineNet?: number
+  /** Teslim anı, okunur biçimde ("Tue 29 Sep 08:00"). */
+  deadlineLabel?: string
   /** Geç kalmasın diye öne alındı (geç iş onarımı). */
   boost?: boolean
 }
@@ -350,6 +363,8 @@ function mergeCoProductLots(
         carrierLots.find((c) => c.dueDate === lot.dueDate)
       if (!match) continue
       match.coProductQty = (match.coProductQty ?? 0) + lot.qty
+      match.needFraction = Math.max(match.needFraction ?? 0, lot.needFraction ?? 0)
+      match.noStockout = !!match.noStockout && !!lot.noStockout
       if (phaseRank(lot.phase) < phaseRank(match.phase)) match.phase = lot.phase
       match.urgency = Math.max(match.urgency, lot.urgency)
       if (lot.earliestDate < match.earliestDate) match.earliestDate = lot.earliestDate
@@ -411,7 +426,7 @@ function timeLotsByProjectedStock(
   // Önce her lotun zamanı hesaplanır (malzeme + lotun haftası anahtarıyla),
   // sonra uygulanır — eş ürünler aynı vuruştan çıktığı için ikisinin
   // lotu aynı güne, ikisinden hangisi önce bitecekse ONA göre konmalı.
-  const timing = new Map<string, { due: number; start: number }>()
+  const timing = new Map<string, { due: number; start: number; need: number; none: boolean }>()
   const key = (material: string, week: string) => `${material}|${week}`
 
   for (const [material, entries] of entriesByMaterial) {
@@ -437,12 +452,19 @@ function timeLotsByProjectedStock(
           break
         }
       }
+      // O gün eksik kalan adet: lotun teslim anına kadar hazır olması gereken kısmı.
+      const need = stockout >= 0 ? Math.max(0, consumed - supply) : 0
       supply += lot.qty
       // Ufukta hiç bitmiyorsa (ör. eş ürünün kendi talebi yok) lotun
       // haftasına bağlı kalır, ama emniyet günü yine uygulanır.
       const due =
         stockout >= 0 ? stockout : (dayIndex.get(lot.dueDate) ?? nextIndex(days, lot.dueDate))
-      timing.set(key(material, lot.dueDate), { due, start: backBy(due, safetyDays) })
+      timing.set(key(material, lot.dueDate), {
+        due,
+        start: backBy(due, safetyDays),
+        need: lot.qty > 0 ? Math.min(1, need / lot.qty) : 0,
+        none: stockout < 0,
+      })
     }
   }
 
@@ -455,6 +477,8 @@ function timeLotsByProjectedStock(
       const other = partner ? timing.get(key(partner, lot.dueDate)) : undefined
       const due = other ? Math.min(own.due, other.due) : own.due
       const start = other ? Math.min(own.start, other.start) : own.start
+      lot.needFraction = other ? Math.max(own.need, other.need) : own.need
+      lot.noStockout = other ? own.none && other.none : own.none
       lot.dueDate = days[due] ?? lot.dueDate
       lot.earliestDate = days[start] ?? lot.earliestDate
       lot.daysOfCover = due

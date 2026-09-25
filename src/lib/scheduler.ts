@@ -8,6 +8,7 @@ import {
   type ProductSpec,
   type RunPlan,
   type ShiftSettings,
+  computeRunPlan,
   eligiblePressesOf,
   splitByMoldLimit,
 } from './planning'
@@ -16,6 +17,47 @@ import { addDays, isoDate } from './dates'
 /** ISO tarihe gün ekler/çıkarır. */
 function shiftIsoDate(date: string, days: number): string {
   return isoDate(addDays(new Date(`${date}T00:00:00`), days))
+}
+
+/**
+ * Lotun gereken payının hazır olduğu an: üretim parçaları boyunca gereken
+ * pay kadar ilerlenir. Pay 0 ise üretimin başladığı an.
+ */
+export function readyMoment(
+  segments: JobSegment[],
+  fraction: number,
+): { date: string; minute: number } | null {
+  const runs = segments.filter((s) => s.kind === 'run')
+  if (runs.length === 0) {
+    const last = segments[segments.length - 1]
+    return last ? { date: last.date, minute: last.end } : null
+  }
+  const total = runs.reduce((sum, s) => sum + (s.end - s.start), 0)
+  const target = Math.max(0, Math.min(1, fraction)) * total
+  let done = 0
+  for (const seg of runs) {
+    const len = seg.end - seg.start
+    if (done + len >= target - 1e-9) return { date: seg.date, minute: seg.start + Math.max(0, target - done) }
+    done += len
+  }
+  const last = runs[runs.length - 1]
+  return { date: last.date, minute: last.end }
+}
+
+/**
+ * Geç mi: gereken pay teslim anından (ör. ihtiyaç günü 08:00) sonra mı
+ * hazır oluyor. Teslim anı yoksa eski kural: iş stok bittiği günden sonra
+ * mı başlıyor. Ufukta stoğu hiç bitmeyen lot geç sayılmaz.
+ */
+function isLate(entry: DemandEntry, segments: JobSegment[], startDate: string): boolean {
+  if (entry.noStockout) return false
+  if (entry.deadlineDate === undefined || entry.deadlineNet === undefined) return startDate > entry.dueDate
+  const ready = readyMoment(segments, entry.needFraction ?? 1)
+  if (!ready) return false
+  return (
+    ready.date > entry.deadlineDate ||
+    (ready.date === entry.deadlineDate && ready.minute > entry.deadlineNet + 1e-6)
+  )
 }
 
 export interface PressSpec {
@@ -42,7 +84,30 @@ export interface PlanOverride {
   date?: string
 }
 
-export interface SchedulerOptions {
+/**
+ * Bir planlama denemesinin farkı: aynı kurallarla farklı sıralama ve pres
+ * seçimi. Motor birkaç varyasyonu dener, en iyisini seçer.
+ */
+export interface ScheduleVariant {
+  /**
+   * Aynı öncelik grubunda (bakiye / acil / dolgu) sıra:
+   * default — stok bitişi, aciliyet, az presli önce
+   * spt — stok bitişi, kısa iş önce · lpt — uzun iş önce
+   * fewestPresses — az presli önce, sonra stok bitişi
+   * shuffle — stok bitişine birkaç gün tolerans + tohumlu rastgele sıra
+   */
+  orderStrategy?: 'default' | 'spt' | 'lpt' | 'fewestPresses' | 'shuffle'
+  /**
+   * Adaylar arasından pres seçimi (geç kalmayan aday her zaman önce):
+   * earliestFinish — en erken biten · earliestStart — en erken başlayan
+   * (boşlukları doldurur) · leastLoaded — en az yüklü pres
+   */
+  pressRule?: 'earliestFinish' | 'earliestStart' | 'leastLoaded'
+  /** shuffle için tohum — aynı tohum aynı planı verir. */
+  seed?: number
+}
+
+export interface SchedulerOptions extends ScheduleVariant {
   /** Ardışık setuplar arasında bırakılacak minimum dakika (vinç kısıtı). */
   setupGapMinutes: number
   /** Aynı holde iki rulo değişimi arasındaki en az süre. */
@@ -181,6 +246,17 @@ export interface ScheduledJob {
   waitReason?: string
   /** Setup bakiye/geç iş kuralıyla başka bir setup'la çakışabildi. */
   urgentSetup?: boolean
+  /** Gereken payın hazır olduğu an (üretim günü + net dakika). */
+  readyDate?: string
+  readyMinute?: number
+  /** Teslim anı (üretim günü + net dakika) ve okunur hâli. */
+  deadlineDate?: string
+  deadlineMinute?: number
+  deadlineLabel?: string
+  /** Teslim anına kadar gereken adet (lotun geri kalanı sonraki haftalar için). */
+  neededQuantity?: number
+  /** Gecikme, saat (plan hesaplanırken doldurulur). */
+  lateHours?: number
   /** İhtiyaç haftasından önce, pres boş kalmasın diye öne çekildi. */
   pulledForward?: boolean
   /** Aynı kalıbın önceki işinin devamı olarak (setup'sız) yerleşti. */
@@ -210,6 +286,8 @@ export interface CandidateOutcome {
   endMinute?: number
   /** Konamadıysa sebebi. */
   note?: string
+  /** Bu preste gereken pay teslim anından sonra hazır olurdu. */
+  late?: boolean
 }
 
 /**
@@ -583,14 +661,51 @@ export function schedule(
   // yapılabilen parça yerini önce alır, esnek parçalar kalan boşluklara
   // dağılır. Tersi olursa esnek parça, tek presli parçanın ihtiyaç duyduğu
   // yeri kapabilirdi.
+  const strategy = options.orderStrategy ?? 'default'
+  const runMinutesOf = new Map<DemandEntry, number>()
+  const runMinutes = (e: DemandEntry) => {
+    let m = runMinutesOf.get(e)
+    if (m === undefined) {
+      const product = products.get(e.material)
+      m = product ? computeRunPlan(product, e.qty).totalMinutes : 0
+      runMinutesOf.set(e, m)
+    }
+    return m
+  }
+  // Tohumlu rastgele anahtar: stok bitişine 0–3 gün tolerans.
+  let seed = (options.seed ?? 1) * 2654435761
+  const nextRandom = () => {
+    seed = (seed * 16807 + 12345) % 2147483647
+    return seed / 2147483647
+  }
+  const jitter = new Map<DemandEntry, number>()
+  if (strategy === 'shuffle') {
+    for (const e of demand) jitter.set(e, Date.parse(e.dueDate) / 86_400_000 + nextRandom() * 3)
+  }
+  const within = (a: DemandEntry, b: DemandEntry): number => {
+    switch (strategy) {
+      case 'spt':
+        return a.dueDate.localeCompare(b.dueDate) || runMinutes(a) - runMinutes(b)
+      case 'lpt':
+        return a.dueDate.localeCompare(b.dueDate) || runMinutes(b) - runMinutes(a)
+      case 'fewestPresses':
+        return countFor(a.material) - countFor(b.material) || a.dueDate.localeCompare(b.dueDate)
+      case 'shuffle':
+        return (jitter.get(a) ?? 0) - (jitter.get(b) ?? 0)
+      default:
+        return (
+          a.dueDate.localeCompare(b.dueDate) ||
+          b.urgency - a.urgency ||
+          countFor(a.material) - countFor(b.material)
+        )
+    }
+  }
   const ordered = [...demand].sort(
     (a, b) =>
       Number(!prioritised.has(a.material)) - Number(!prioritised.has(b.material)) ||
       Number(!a.boost) - Number(!b.boost) ||
       phaseOrder(a.phase) - phaseOrder(b.phase) ||
-      a.dueDate.localeCompare(b.dueDate) ||
-      b.urgency - a.urgency ||
-      countFor(a.material) - countFor(b.material),
+      within(a, b),
   )
 
   if (presses.length === 0) {
@@ -1224,7 +1339,12 @@ function placeRun(
   let best: Placement | null = null
   let bestEarliest = 0
   let bestIsContinuation = false
+  let bestLate = false
+  let bestLoad = 0
   const note = (press: string, text: string) => decision?.candidates.push({ press, note: text })
+  const pressRule = options.pressRule ?? 'earliestFinish'
+  const startsBefore = (a: Placement, b: Placement) =>
+    a.date < b.date || (a.date === b.date && a.setupStart < b.setupStart)
 
   // Öne çekme: dolgu işi, pres boş kalmasın diye ihtiyacından en fazla
   // `pullForwardDays` gün önce başlayabilir. Bakiye/acil işler zaten serbest.
@@ -1283,7 +1403,7 @@ function placeRun(
 
     let placement = attempt(earliest, alwaysUrgent)
     // Dinamik kural: normal kuralla geç kalacaksa setup çakışmasına izin ver.
-    if (!alwaysUrgent && placement && placement.date > entry.dueDate) {
+    if (!alwaysUrgent && placement && isLate(entry, placement.segments, placement.date)) {
       const urgentTry = attempt(earliest, true)
       if (urgentTry && endsBefore(urgentTry, placement)) {
         placement = urgentTry
@@ -1302,7 +1422,7 @@ function placeRun(
       )
       for (const b of same) {
         const cont = attempt(b.end, false)
-        if (cont && cont.startGlobal === b.end && cont.sameMaterial && cont.date <= entry.dueDate) {
+        if (cont && cont.startGlobal === b.end && cont.sameMaterial && !isLate(entry, cont.segments, cont.date)) {
           if (!continuation || !placement || endsBefore(cont, placement)) {
             placement = cont
             continuation = true
@@ -1323,20 +1443,40 @@ function placeRun(
       press: pressName,
       endDate: placement.endDate,
       endMinute: placement.endMinute,
+      late: isLate(entry, placement.segments, placement.date),
     })
 
-    // Devam (setup'sız) adayı, aciliyet yokken diğerlerine tercih edilir;
-    // aynı türden adaylar arasında takvimde en erken biten kazanır. Eksen
-    // dakikaları preslere göre farklı ölçekte olduğu için karşılaştırma
+    // Seçim sırası: geç kalmayan aday önce; aciliyet yokken setup'sız devam
+    // önce; sonra denemenin pres kuralı (varsayılan: takvimde en erken biten).
+    // Eksen dakikaları preslere göre farklı ölçekte olduğu için karşılaştırma
     // takvim üzerinden yapılır.
+    const late = isLate(entry, placement.segments, placement.date)
+    const load =
+      timeline.total > 0
+        ? timeline.bookings.reduce((sum, b) => sum + (b.end - b.start), 0) / timeline.total
+        : 1
+    const ruleBetter = (): boolean => {
+      if (!best) return true
+      if (pressRule === 'earliestStart') {
+        return startsBefore(placement, best) || (!startsBefore(best, placement) && endsBefore(placement, best))
+      }
+      if (pressRule === 'leastLoaded') {
+        return load < bestLoad - 1e-9 || (Math.abs(load - bestLoad) <= 1e-9 && endsBefore(placement, best))
+      }
+      return endsBefore(placement, best)
+    }
     if (
       !best ||
-      (continuation && !bestIsContinuation) ||
-      (continuation === bestIsContinuation && endsBefore(placement, best))
+      (!late && bestLate) ||
+      (late === bestLate &&
+        ((continuation && !bestIsContinuation) ||
+          (continuation === bestIsContinuation && ruleBetter())))
     ) {
       best = placement
       bestEarliest = earliest
       bestIsContinuation = continuation
+      bestLate = late
+      bestLoad = load
     }
   }
 
@@ -1388,7 +1528,8 @@ function placeRun(
     })
   }
 
-  const late = best.date > entry.dueDate
+  const late = isLate(entry, best.segments, best.date)
+  const ready = readyMoment(best.segments, entry.noStockout ? 0 : (entry.needFraction ?? 1))
   const spansDays = best.endDate !== best.date
 
   // Pres bu işten hemen önce boş kaldıysa nedeni.
@@ -1438,7 +1579,13 @@ function placeRun(
     reasonParts.push('⚠ window too short for setup + approval')
   }
   if (spansDays) reasonParts.push(`continues until ${best.endDate}`)
-  if (late) reasonParts.push(`⚠ starts after the stock runs out (${entry.dueDate})`)
+  if (late) {
+    reasonParts.push(
+      entry.deadlineLabel
+        ? `⚠ ${Math.round((entry.needFraction ?? 1) * run.quantity).toLocaleString('en-GB')} pcs needed by ${entry.deadlineLabel} are ready later`
+        : `⚠ starts after the stock runs out (${entry.dueDate})`,
+    )
+  }
   if (pinned) reasonParts.push('pinned by user')
   if (entry.boost) reasonParts.push('moved forward so it is not late')
   if (pulledForward) reasonParts.push(`pulled forward from ${entry.earliestDate} so the press is not idle`)
@@ -1479,6 +1626,12 @@ function placeRun(
     segments: best.segments,
     reason: reasonParts.join(' · '),
     waitReason,
+    readyDate: ready?.date,
+    readyMinute: ready?.minute,
+    deadlineDate: entry.deadlineDate,
+    deadlineMinute: entry.deadlineNet,
+    deadlineLabel: entry.deadlineLabel,
+    neededQuantity: entry.noStockout ? 0 : Math.round((entry.needFraction ?? 1) * run.quantity),
     urgentSetup: !!best.urgent && !sameMaterial,
     pulledForward,
     continued: bestIsContinuation,

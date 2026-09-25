@@ -82,7 +82,7 @@ function CapacityPage() {
         (holidays removed, week exceptions and overtime included; this week counts only the
         hours still ahead). Demand is the ZPP requirement of the week — this week also carries
         the overdue backlog — after stock in locations{' '}
-        {(forecast?.stockLocations ?? ['2009', '2010', '1009']).join(', ')} is used up, earliest
+        {(forecast?.stockLocations ?? ['2009', '1009']).join(', ')} is used up, earliest
         week first. Hours = pieces ÷ cavities ÷ SPM ÷ performance factor (10 h at 60 % counts as
         16.7 h; setup and approval sit inside that time). Each part counts on its main press; a
         co-product pair counts once. <strong className="text-foreground">Cumulative</strong> adds

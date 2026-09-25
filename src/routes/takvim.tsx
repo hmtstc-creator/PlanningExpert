@@ -158,6 +158,10 @@ function PressCalendarSection() {
   const [maxSetupsPlantWide, setMaxSetupsPlantWide] = useState(2)
   const [setupsCrossShifts, setSetupsCrossShifts] = useState(true)
   const [pullForwardDays, setPullForwardDays] = useState(10)
+  // Teslim saati ve senaryo araması.
+  const [deliveryCutoffMinute, setDeliveryCutoffMinute] = useState(480)
+  const [utilisationTarget, setUtilisationTarget] = useState(95)
+  const [maxScenarios, setMaxScenarios] = useState(100)
   const [coilSetupGapMinutes, setCoilSetupGapMinutes] = useState(30)
   const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
   const [shiftStartMinute, setShiftStartMinute] = useState(420) // 07:00
@@ -187,6 +191,9 @@ function PressCalendarSection() {
           maxSetupsPlantWide: globalSettings.maxSetupsPlantWide ?? 2,
           setupsCrossShifts: globalSettings.setupsCrossShifts ?? true,
           pullForwardDays: globalSettings.pullForwardDays ?? 10,
+          deliveryCutoffMinute: globalSettings.deliveryCutoffMinute ?? 480,
+          utilisationTarget: globalSettings.utilisationTarget ?? 95,
+          maxScenarios: globalSettings.maxScenarios ?? 100,
         }
       : undefined,
     {
@@ -205,6 +212,9 @@ function PressCalendarSection() {
       maxSetupsPlantWide: setMaxSetupsPlantWide,
       setupsCrossShifts: setSetupsCrossShifts,
       pullForwardDays: setPullForwardDays,
+      deliveryCutoffMinute: setDeliveryCutoffMinute,
+      utilisationTarget: setUtilisationTarget,
+      maxScenarios: setMaxScenarios,
     },
   )
 
@@ -225,6 +235,9 @@ function PressCalendarSection() {
       maxSetupsPlantWide: number
       setupsCrossShifts: boolean
       pullForwardDays: number
+      deliveryCutoffMinute: number
+      utilisationTarget: number
+      maxScenarios: number
     }>,
   ) {
     await saveGlobalSettingsMutation({
@@ -243,6 +256,9 @@ function PressCalendarSection() {
       maxSetupsPlantWide: next?.maxSetupsPlantWide ?? maxSetupsPlantWide,
       setupsCrossShifts: next?.setupsCrossShifts ?? setupsCrossShifts,
       pullForwardDays: next?.pullForwardDays ?? pullForwardDays,
+      deliveryCutoffMinute: next?.deliveryCutoffMinute ?? deliveryCutoffMinute,
+      utilisationTarget: next?.utilisationTarget ?? utilisationTarget,
+      maxScenarios: next?.maxScenarios ?? maxScenarios,
       capacityFactor: globalSettings?.capacityFactor,
     })
     setSavedAt(new Date().toLocaleTimeString('en-GB'))
@@ -337,7 +353,10 @@ function PressCalendarSection() {
       (globalSettings.maxSetupsPlantWideNormal ?? 1) !== maxSetupsPlantWideNormal ||
       (globalSettings.maxSetupsPlantWide ?? 2) !== maxSetupsPlantWide ||
       (globalSettings.setupsCrossShifts ?? true) !== setupsCrossShifts ||
-      (globalSettings.pullForwardDays ?? 10) !== pullForwardDays)
+      (globalSettings.pullForwardDays ?? 10) !== pullForwardDays ||
+      (globalSettings.deliveryCutoffMinute ?? 480) !== deliveryCutoffMinute ||
+      (globalSettings.utilisationTarget ?? 95) !== utilisationTarget ||
+      (globalSettings.maxScenarios ?? 100) !== maxScenarios)
 
   const calendarDirty =
     !!globalCalendar &&
@@ -377,6 +396,9 @@ function PressCalendarSection() {
       setMaxSetupsPlantWide(globalSettings.maxSetupsPlantWide ?? 2)
       setSetupsCrossShifts(globalSettings.setupsCrossShifts ?? true)
       setPullForwardDays(globalSettings.pullForwardDays ?? 10)
+      setDeliveryCutoffMinute(globalSettings.deliveryCutoffMinute ?? 480)
+      setUtilisationTarget(globalSettings.utilisationTarget ?? 95)
+      setMaxScenarios(globalSettings.maxScenarios ?? 100)
     }
     if (globalCalendar) {
       setWorkingDayKeys(globalCalendar.workingDays)
@@ -865,6 +887,40 @@ function PressCalendarSection() {
             onChange={(e) => setPullForwardDays(Math.max(0, Math.min(60, Number(e.target.value) || 0)))}
           />
         </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Delivery time on the need day</span>
+          <input
+            type="time"
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={`${String(Math.floor(deliveryCutoffMinute / 60)).padStart(2, '0')}:${String(deliveryCutoffMinute % 60).padStart(2, '0')}`}
+            onChange={(e) => {
+              const [h, m] = e.target.value.split(':').map(Number)
+              if (Number.isFinite(h) && Number.isFinite(m)) setDeliveryCutoffMinute(h * 60 + m)
+            }}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Utilisation target (%)</span>
+          <input
+            type="number"
+            min={50}
+            max={100}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={utilisationTarget}
+            onChange={(e) => setUtilisationTarget(Math.max(50, Math.min(100, Number(e.target.value) || 95)))}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Max scenarios to try</span>
+          <input
+            type="number"
+            min={1}
+            max={300}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={maxScenarios}
+            onChange={(e) => setMaxScenarios(Math.max(1, Math.min(300, Number(e.target.value) || 1)))}
+          />
+        </label>
         <label className="flex items-center gap-2 self-end pb-2 text-sm">
           <input
             type="checkbox"
@@ -896,7 +952,13 @@ function PressCalendarSection() {
           : 'A setup must finish within the shift it starts in.'}{' '}
         Pull forward: when a press would stand idle, work of the coming weeks may start up to{' '}
         {pullForwardDays} day(s) before it is needed; if nothing is urgent the die already
-        mounted keeps running first, so no extra setup is made.
+        mounted keeps running first, so no extra setup is made.{' '}
+        Delivery: a part is on time when the quantity needed is ready by{' '}
+        {`${String(Math.floor(deliveryCutoffMinute / 60)).padStart(2, '0')}:${String(deliveryCutoffMinute % 60).padStart(2, '0')}`}{' '}
+        on the day it is needed; backlog and today's need are due the next working day at that
+        time. Scenarios: the planner tries up to {maxScenarios} plan variants and stops as soon as
+        the presses are {utilisationTarget}% busy in the next 7 days; otherwise it reports the best
+        level it reached.
       </p>
 
       <div className="mt-4 flex flex-wrap items-end gap-3">

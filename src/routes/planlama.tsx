@@ -12,7 +12,13 @@ import {
 import { productionDayOf } from '../lib/shiftTimeline'
 import { useCurrentUser } from '../lib/currentUser'
 import { diffPlans } from '../lib/planDiff'
-import { groupPlanWeeks, type PlanRun, type SnapshotJob } from '../lib/planPipeline'
+import {
+  groupPlanWeeks,
+  type LateItem,
+  type PlanOptimisation,
+  type PlanRun,
+  type SnapshotJob,
+} from '../lib/planPipeline'
 import type { PlanAudit } from '../lib/planAudit'
 import type { PlanAlarms } from '../lib/planAlarms'
 import type { PlacementDecision } from '../lib/scheduler'
@@ -335,7 +341,7 @@ function PlanlamaPage() {
 
       {run?.alarms && <AlarmBanner alarms={run.alarms} />}
 
-      {run && (run.lateRepair?.rounds ?? 0) > 0 && (
+      {run && ((run.lateRepair?.rounds ?? 0) > 0 || (run.lateItems?.length ?? 0) > 0) && (
         <LateJobs
           run={run}
           jobs={engineJobs.filter((j) => j.late)}
@@ -371,11 +377,13 @@ function PlanlamaPage() {
           warn={unplanned.length > 0}
         />
         <Stat
-          label="Late jobs"
-          value={lateCount.toLocaleString('en-GB')}
-          warn={lateCount > 0}
+          label={run?.lateItems ? 'Late materials' : 'Late jobs'}
+          value={(run?.lateItems?.length ?? lateCount).toLocaleString('en-GB')}
+          warn={(run?.lateItems?.length ?? lateCount) > 0}
         />
       </div>
+
+      {run?.optimisation && <OptimisationPanel opt={run.optimisation} />}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
@@ -944,6 +952,7 @@ function LateJobs({
   shiftStartMinute: number
 }) {
   const repair = run.lateRepair
+  const items = run.lateItems
   const fixed = repair.lateBefore - repair.lateAfter
   const dayName = (iso: string) =>
     new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', {
@@ -974,14 +983,18 @@ function LateJobs({
   return (
     <div
       className={`mt-6 rounded-lg border p-4 ${
-        jobs.length > 0 ? 'border-destructive bg-destructive/10' : 'border-emerald-200 bg-emerald-50/60'
+        (items ?? jobs).length > 0 ? 'border-destructive bg-destructive/10' : 'border-emerald-200 bg-emerald-50/60'
       }`}
     >
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">
-          {jobs.length > 0
-            ? `Late jobs — ${jobs.length} would stop the customer`
-            : 'Late jobs — none left'}
+          {items
+            ? items.length > 0
+              ? `Late materials — ${items.length} not ready by 08:00 on the day they are needed`
+              : 'Late materials — none left'
+            : jobs.length > 0
+              ? `Late jobs — ${jobs.length} would stop the customer`
+              : 'Late jobs — none left'}
         </h2>
         <button
           type="button"
@@ -992,7 +1005,8 @@ function LateJobs({
           {open ? 'Hide ▴' : 'Show ▾'}
         </button>
       </div>
-      {open && (
+      {open && items && <LateItemsBody items={items} repair={repair} />}
+      {open && !items && (
         <LateJobsBody
           jobs={jobs}
           repair={repair}
@@ -1008,6 +1022,193 @@ function LateJobs({
 }
 
 const LATE_OPEN_KEY = 'plan-late-jobs-open'
+
+/** Gecikme saatini "61.5 h (2.6 days)" gibi yazar. */
+function lateText(hours: number): string {
+  const h = Math.round(hours * 10) / 10
+  return hours >= 24 ? `${h} h (${(hours / 24).toFixed(1)} days)` : `${h} h`
+}
+
+/**
+ * Malzeme bazında geç liste: ihtiyaç günü sabah 08:00'e kadar gereken adet
+ * hazır olmuyorsa geçtir. Bir malzeme bir kez yazılır (ilk geç lotu).
+ */
+function LateItemsBody({ items, repair }: { items: LateItem[]; repair: PlanRun['lateRepair'] }) {
+  return (
+    <>
+      <p className="mt-1 text-xs text-muted-foreground">
+        A material is late when the quantity the customer needs is not ready by 08:00 on
+        the requirement day (backlog and today's need: next working day 08:00). Stock
+        counts only in storage locations 2009 and 1009.
+        {repair.rounds > 0 &&
+          ` The engine re-planned ${repair.rounds} time(s)${
+            repair.boosted.length > 0 ? ` and moved ${repair.boosted.length} part(s) forward` : ''
+          }; coils are never cut short.`}
+      </p>
+      {items.length > 0 && (
+        <div className="mt-3 overflow-x-auto rounded-md border border-destructive/30 bg-background">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-destructive/10 text-destructive">
+              <tr>
+                <th className="px-3 py-2 font-medium">Material</th>
+                <th className="px-3 py-2 font-medium">Needed by</th>
+                <th className="px-3 py-2 text-right font-medium">Needed qty</th>
+                <th className="px-3 py-2 font-medium">Ready</th>
+                <th className="px-3 py-2 font-medium">Late</th>
+                <th className="px-3 py-2 font-medium">Suggestion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.material} className="border-t border-border align-top">
+                  <td className="px-3 py-2 font-medium text-foreground">
+                    {item.material}
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      {item.presses.join(', ')}
+                      {item.lots > 1 && ` · ${item.lots} late lots`}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.deadline}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                    {item.neededQuantity.toLocaleString('en-GB')}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.ready}</td>
+                  <td className="whitespace-nowrap px-3 py-2 font-medium text-destructive">
+                    {lateText(item.lateHours)}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {item.suggestion}{' '}
+                    <Link to="/takvim" className="underline">
+                      Work Calendar
+                    </Link>{' '}
+                    ·{' '}
+                    <Link to="/referanslar" className="underline">
+                      master data
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
+const STOP_TEXT: Record<PlanOptimisation['stoppedBecause'], string> = {
+  target: 'target reached',
+  noImprovement: 'no better scenario in the last 25 tries',
+  limit: 'scenario limit reached',
+  time: 'time limit reached',
+}
+
+/**
+ * Senaryo araması: aynı veriyle farklı sıralama ve pres seçim kurallarıyla
+ * planlar kurulur; geç işi en az, doluluğu en yüksek olan seçilir.
+ */
+function OptimisationPanel({ opt }: { opt: PlanOptimisation }) {
+  const reached = opt.achieved >= opt.target
+  const pct = (n: number) => `${(Math.round(n * 10) / 10).toLocaleString('en-GB')}%`
+  const [open, setOpen] = useState(false)
+  return (
+    <div
+      className={`mt-6 rounded-lg border p-4 ${
+        reached ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/70'
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-foreground">
+          Press utilisation {pct(opt.achieved)}{' '}
+          <span className="font-normal text-muted-foreground">
+            (target {pct(opt.target)}, next {opt.windowDays} days)
+          </span>
+        </h2>
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="shrink-0 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+        >
+          {open ? 'Hide ▴' : 'Details ▾'}
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {reached
+          ? `Target reached. `
+          : `Target not reached — the best of ${opt.tried} scenario(s) reaches ${pct(opt.achieved)}. `}
+        Tried {opt.tried} scenario(s), stopped: {STOP_TEXT[opt.stoppedBecause]}. Chosen:{' '}
+        <strong className="text-foreground">{opt.chosen}</strong> (standard plan {pct(opt.standard)}).
+        Fewest late items always wins over higher utilisation.
+      </p>
+      {open && (
+        <div className="mt-3 grid gap-4 lg:grid-cols-2">
+          <div className="overflow-x-auto rounded-md border border-border bg-background">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/60 text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Press</th>
+                  <th className="px-3 py-2 text-right font-medium">Available h</th>
+                  <th className="px-3 py-2 text-right font-medium">Busy h</th>
+                  <th className="px-3 py-2 text-right font-medium">Utilisation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {opt.perPress.map((p) => (
+                  <tr key={p.press} className="border-t border-border">
+                    <td className="px-3 py-1.5 font-medium text-foreground">{p.press}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{p.capacityHours.toFixed(1)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{p.busyHours.toFixed(1)}</td>
+                    <td
+                      className={`px-3 py-1.5 text-right tabular-nums ${
+                        p.utilisation < opt.target ? 'text-amber-700' : 'text-emerald-700'
+                      }`}
+                    >
+                      {pct(p.utilisation)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="overflow-x-auto rounded-md border border-border bg-background">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/60 text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Scenario</th>
+                  <th className="px-3 py-2 text-right font-medium">Late</th>
+                  <th className="px-3 py-2 text-right font-medium">Late h</th>
+                  <th className="px-3 py-2 text-right font-medium">Setups</th>
+                  <th className="px-3 py-2 text-right font-medium">Utilisation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {opt.scenarios.map((sc) => (
+                  <tr
+                    key={sc.label}
+                    className={`border-t border-border ${sc.label === opt.chosen ? 'font-semibold text-foreground' : ''}`}
+                  >
+                    <td className="px-3 py-1.5">
+                      {sc.label}
+                      {sc.label === opt.chosen && ' ✓'}
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">
+                      {sc.late}
+                      {sc.unplanned > 0 && ` +${sc.unplanned} unplanned`}
+                    </td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{Math.round(sc.lateHours)}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{sc.setups}</td>
+                    <td className="px-3 py-1.5 text-right tabular-nums">{pct(sc.utilisation)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function LateJobsBody({
   jobs,

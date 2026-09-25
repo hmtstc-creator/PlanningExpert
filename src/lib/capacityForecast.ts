@@ -21,8 +21,13 @@
 
 import type { ProductSpec } from './planning'
 
-/** Talepten düşülen stoğun depoları. */
-export const CAPACITY_STOCK_LOCATIONS = ['2009', '2010', '1009']
+/**
+ * Stok sayılan depolar — plan ve kapasite öngörüsü aynı listeyi kullanır.
+ * 2010 stok sayılmaz (planlamacının kararı).
+ */
+export const PLAN_STOCK_LOCATIONS = ['2009', '1009']
+/** @deprecated PLAN_STOCK_LOCATIONS ile aynı. */
+export const CAPACITY_STOCK_LOCATIONS = PLAN_STOCK_LOCATIONS
 
 /** Raporun grupları. Pres adındaki numarayla eşleşir (PRS-106, 106, P106…). */
 export const CAPACITY_GROUPS: { name: string; numbers: string[] }[] = [

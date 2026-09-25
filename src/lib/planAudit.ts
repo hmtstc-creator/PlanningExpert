@@ -32,7 +32,7 @@ export interface AuditJob {
   quantity?: number
   decision?: {
     step: number
-    candidates: { press: string; endDate?: string; endMinute?: number; note?: string }[]
+    candidates: { press: string; endDate?: string; endMinute?: number; note?: string; late?: boolean }[]
   }
 }
 
@@ -53,6 +53,11 @@ export interface AuditInputs {
    * katı olmalı: bağlanan rulo yarıda bırakılmaz.
    */
   coilUnits?: Map<string, number>
+  /**
+   * Seçilen senaryonun pres kuralı. "En erken biten pres" denetimi yalnızca
+   * bu kural (varsayılan) seçildiyse yapılır.
+   */
+  pressRule?: string
   /**
    * Parça → ana pres ve esneklik. Esnek olmayan parça yalnız ana preste
    * (ya da kullanıcının sabitlediği preste) çalışabilir.
@@ -154,11 +159,15 @@ export function auditPlan(input: AuditInputs): PlanAudit {
         mainPress.fail(`${job.material} is on ${job.press}, but its main press is ${pressRule.main} and it is not flexible`)
       }
     }
-    if (!job.continued && job.decision && job.endDate !== undefined && job.endMinute !== undefined) {
+    const earliestRule = (input.pressRule ?? 'earliestFinish') === 'earliestFinish'
+    if (earliestRule && !job.continued && job.decision && job.endDate !== undefined && job.endMinute !== undefined) {
       earliest.check()
       const chosen = { date: job.endDate, minute: job.endMinute }
+      const chosenLate = job.decision.candidates.find((c) => c.press === job.press)?.late
       for (const c of job.decision.candidates) {
         if (c.endDate === undefined || c.endMinute === undefined || c.press === job.press) continue
+        // Geç kalmayan aday, geç kalacak (ama erken biten) adaya tercih edilir.
+        if (c.late && !chosenLate) continue
         const better =
           c.endDate < chosen.date || (c.endDate === chosen.date && c.endMinute < chosen.minute - EPS)
         if (better) {

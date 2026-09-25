@@ -11,6 +11,7 @@
 
 import { addDays, DEFAULT_PLANT_TIME_ZONE, isoDate, isoWeek, mondayOf, plantClock } from './dates'
 import {
+  DAY_KEYS,
   buildDemandSchedule,
   eligiblePressesOf,
   shotsPerCoil,
@@ -25,6 +26,7 @@ import {
 import {
   buildDayTimeline,
   clockToNet,
+  netToClock,
   productionDayOf,
   remainingCapacityMinutes,
   type PlannedStop,
@@ -39,7 +41,7 @@ import {
 import { alarmedMaterials } from './moldAlarm'
 import { auditPlan, type PlanAudit } from './planAudit'
 import { readDailyDemand } from './dailyDemand'
-import { buildCapacityForecast, type CapacityForecast } from './capacityForecast'
+import { buildCapacityForecast, PLAN_STOCK_LOCATIONS, type CapacityForecast } from './capacityForecast'
 import {
   buildPlanAlarms,
   type DieUnavailability,
@@ -50,10 +52,10 @@ import {
   schedule,
   type PlanOverride,
   type ScheduledJob,
+  type ScheduleVariant,
   type UnplannedItem,
 } from './scheduler'
 
-const COUNTED_STOCK = new Set(['finished_goods', 'production_area'])
 const RAW_STOCK = new Set(['raw_material'])
 export const DEFAULT_HORIZON_WEEKS = 4
 /** Emniyet stoğu varsayılanı (iş günü). Work Calendar sayfasından değişir. */
@@ -103,6 +105,12 @@ export interface PlanSettings {
   setupsCrossShifts?: boolean
   /** Dolgu işi en fazla kaç gün öne çekilebilir (pres boş kalmasın). */
   pullForwardDays?: number
+  /** Teslim saati: ihtiyaç günü bu dakikaya kadar hazır olan adet zamanındadır (480 = 08:00). */
+  deliveryCutoffMinute?: number
+  /** Doluluk hedefi (%): ulaşılmazsa motor başka senaryolar dener. */
+  utilisationTarget?: number
+  /** En fazla kaç senaryo denensin. */
+  maxScenarios?: number
   country?: string
   timeZone?: string
 }
@@ -180,6 +188,42 @@ export interface PlanDay {
 /** Bir işte bundan fazla rulo, master data hatasına işaret eder. */
 const MANY_COILS = 200
 
+export interface ScenarioSummary {
+  label: string
+  late: number
+  lateHours: number
+  unplanned: number
+  utilisation: number
+  setups: number
+}
+
+export interface PlanOptimisation {
+  /** Hedef doluluk (%) ve ulaşılan (ilk `windowDays` gün). */
+  target: number
+  achieved: number
+  /** Standart planın doluluğu (karşılaştırma için). */
+  standard: number
+  chosen: string
+  tried: number
+  stoppedBecause: 'target' | 'noImprovement' | 'limit' | 'time'
+  windowDays: number
+  searchMs: number
+  perPress: { press: string; capacityHours: number; busyHours: number; utilisation: number }[]
+  scenarios: ScenarioSummary[]
+}
+
+export interface LateItem {
+  material: string
+  presses: string[]
+  lots: number
+  /** İlk geç lotun teslim anı ("Tue 29 Sep 08:00"). */
+  deadline: string
+  ready: string
+  neededQuantity: number
+  lateHours: number
+  suggestion: string
+}
+
 /** Hesaplanmış plan — ekranın ihtiyacı olan her şey, düz veri olarak. */
 export interface PlanRun {
   computedAt: number
@@ -217,6 +261,10 @@ export interface PlanRun {
   truncatedInputs: string[]
   /** Kapasite öngörüsü: pres ve grup bazında haftalık kapasite ve talep saati. */
   capacity?: CapacityForecast
+  /** Senaryo araması: hedef doluluk, denenen senaryolar, seçilen plan. */
+  optimisation?: PlanOptimisation
+  /** Geç kalemler, malzeme bazında, gecikme saati ve kapasite önerisiyle. */
+  lateItems?: LateItem[]
   frozenCount: number
   /** Dondurulmuş işlerin geldiği onaylı planın zamanı. */
   frozenFrom: number | null
@@ -265,9 +313,13 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const locCategory = new Map(inputs.locations.map((l) => [l.code, l.category]))
   const stockByMaterial = new Map<string, number>()
   const rawStockByMaterial = new Map<string, number>()
+  // Mamul stoğu yalnızca belirlenen depolardan (2009, 1009) sayılır — Capacity
+  // Dashboard ile aynı liste. Deposu yazılmamış satır (eski/elle veri) sayılır.
+  const stockLocations = new Set(PLAN_STOCK_LOCATIONS)
   for (const row of inputs.stock) {
-    const cat = row.storageLocation ? locCategory.get(row.storageLocation) : undefined
-    if (COUNTED_STOCK.has(cat ?? 'finished_goods')) {
+    const loc = row.storageLocation?.trim()
+    const cat = loc ? locCategory.get(loc) : undefined
+    if (!loc || stockLocations.has(loc)) {
       sum(stockByMaterial, row.material, row.unrestricted ?? 0)
     }
     if (cat && RAW_STOCK.has(cat)) sum(rawStockByMaterial, row.material, row.unrestricted ?? 0)
@@ -532,25 +584,71 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // En az plansız, sonra en az geç iş, sonra en az geç gün, sonra en az
   // değişiklik yapan plan seçilir. Hiçbir deneme daha iyi değilse durulur.
   const lotKey = (e: { material: string; bucketLabel: string }) => `${e.material}|${e.bucketLabel}`
-  const planOnce = (boost: Set<string>) => {
+  // ---- Teslim anı -----------------------------------------------------------
+  // İhtiyaç gününün sabahı (varsayılan 08:00) kadar gereken adet hazırsa lot
+  // zamanındadır. Bakiye ve bugüne düşen ihtiyaç zaten bugün sabah
+  // karşılanamaz: bir sonraki iş gününün sabahı esas alınır.
+  const cutoffMinute = s.deliveryCutoffMinute ?? 480
+  const isWorkingDate = (iso: string) => {
+    const dayKey = DAY_KEYS[(new Date(`${iso}T00:00:00`).getDay() + 6) % 7]
+    return workingDayKeys.includes(dayKey) && !holidays.has(iso)
+  }
+  const nextWorkingDate = (iso: string) => {
+    let d = iso
+    for (let i = 0; i < 14; i++) {
+      d = isoDate(addDays(new Date(`${d}T00:00:00`), 1))
+      if (isWorkingDate(d)) return d
+    }
+    return isoDate(addDays(new Date(`${iso}T00:00:00`), 1))
+  }
+  const deadlineOf = (due: string) => {
+    const calendarDay = due <= todayIso ? nextWorkingDate(todayIso) : due
+    // Takvim saati → üretim günü: birinci vardiyadan önceki saat bir önceki
+    // üretim gününün gece vardiyasıdır.
+    const early = cutoffMinute < shiftStartMinute
+    const date = early ? isoDate(addDays(new Date(`${calendarDay}T00:00:00`), -1)) : calendarDay
+    const clock = early ? cutoffMinute + 1440 : cutoffMinute
+    const label =
+      new Date(`${calendarDay}T00:00:00`).toLocaleDateString('en-GB', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+      }) + ` ${String(Math.floor(cutoffMinute / 60)).padStart(2, '0')}:${String(cutoffMinute % 60).padStart(2, '0')}`
+    return { date, net: clockToNet(clock, fullDay), label }
+  }
+
+  const planOnce = (boost: Set<string>, variant: ScheduleVariant = {}) => {
     const demand = buildDemandSchedule(demandRows, productByCode, demandOptions)
-    for (const entry of demand) if (boost.has(lotKey(entry))) entry.boost = true
+    for (const entry of demand) {
+      if (boost.has(lotKey(entry))) entry.boost = true
+      const deadline = deadlineOf(entry.dueDate)
+      entry.deadlineDate = deadline.date
+      entry.deadlineNet = deadline.net
+      entry.deadlineLabel = deadline.label
+    }
     const scheduled = schedule(
       demand,
       productByCode,
       presses,
       buckets,
       { shiftMinutes, overtimeShiftMinutes },
-      scheduleOptions,
+      { ...scheduleOptions, ...variant },
     )
     return { ...scheduled, demand }
   }
   const dayMs = 86_400_000
-  const lateDays = (j: ScheduledJob) =>
-    Math.max(0, Math.round((Date.parse(j.date) - Date.parse(j.dueDate)) / dayMs))
+  // Gecikme (yaklaşık dakika): gereken payın hazır olduğu an − teslim anı.
+  const lateMinutes = (j: ScheduledJob) =>
+    j.readyDate && j.deadlineDate && j.readyMinute !== undefined && j.deadlineMinute !== undefined
+      ? Math.max(
+          0,
+          ((Date.parse(j.readyDate) - Date.parse(j.deadlineDate)) / dayMs) * 1440 +
+            (j.readyMinute - j.deadlineMinute),
+        )
+      : Math.max(0, ((Date.parse(j.date) - Date.parse(j.dueDate)) / dayMs) * 1440)
   const score = (r: ReturnType<typeof schedule>, changes: number) => {
     const late = r.jobs.filter((j) => j.late)
-    return [r.unplanned.length, late.length, late.reduce((a, j) => a + lateDays(j), 0), changes]
+    return [r.unplanned.length, late.length, Math.round(late.reduce((a, j) => a + lateMinutes(j), 0)), changes]
   }
   const better = (a: number[], b: number[]) => {
     for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i]
@@ -578,7 +676,156 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     best = { result, boost }
     bestScore = trialScore
   }
-  const result = best.result
+
+  // ---- Senaryo araması: doluluk hedefi ---------------------------------------
+  // Aynı kurallarla farklı sıralama ve pres seçimi denenir; en iyi plan
+  // seçilir. Önce müşteri (en az plansız, en az geç kalem, en az geç süre),
+  // sonra doluluk (ilk 7 gün), sonra en az setup. Hedef doluluğa ulaşınca,
+  // arka arkaya 25 denemede iyileşme olmayınca, deneme sınırında ya da süre
+  // dolunca durulur — sonsuza kadar denenmez; ne kadar denendiği raporlanır.
+  const utilisationTarget = Math.min(100, Math.max(1, s.utilisationTarget ?? 95))
+  const maxScenarios = Math.max(1, Math.round(s.maxScenarios ?? 100))
+  const UTILISATION_WINDOW_DAYS = 7
+  const NO_IMPROVEMENT_LIMIT = 25
+  const TIME_BUDGET_MS = 120_000
+  const windowEnd = isoDate(addDays(new Date(`${todayIso}T00:00:00`), UTILISATION_WINDOW_DAYS - 1))
+  const inWindow = (date: string) => date >= todayIso && date <= windowEnd
+  const windowCapacity = new Map<string, number>()
+  for (const [press, list] of buckets) {
+    for (const b of list) if (inWindow(b.date)) sum(windowCapacity, press, b.minutes)
+  }
+  for (const m of maintenance) if (inWindow(m.date)) sum(windowCapacity, m.press, -(m.end - m.start))
+  const frozenBusy = new Map<string, number>()
+  for (const job of frozenJobs) {
+    for (const seg of job.segments ?? []) if (inWindow(seg.date)) sum(frozenBusy, job.press, seg.end - seg.start)
+  }
+  const utilisationOf = (r: ReturnType<typeof schedule>) => {
+    const busy = new Map(frozenBusy)
+    for (const j of r.jobs) for (const seg of j.segments) if (inWindow(seg.date)) sum(busy, j.press, seg.end - seg.start)
+    let cap = 0
+    let used = 0
+    const perPress = presses.map((p) => {
+      const c = Math.max(0, windowCapacity.get(p.name) ?? 0)
+      const u = Math.min(c, busy.get(p.name) ?? 0)
+      cap += c
+      used += u
+      return { press: p.name, capacityHours: Math.round(c / 6) / 10, busyHours: Math.round(u / 6) / 10, utilisation: c > 0 ? Math.round((u / c) * 1000) / 10 : 0 }
+    })
+    return { overall: cap > 0 ? Math.round((used / cap) * 1000) / 10 : 0, perPress }
+  }
+  const setupsOf = (r: ReturnType<typeof schedule>) => r.jobs.filter((j) => j.setupMinutes > 0).length
+  const optScore = (r: ReturnType<typeof schedule>, util: number) => {
+    const late = r.jobs.filter((j) => j.late)
+    return [
+      r.unplanned.length,
+      late.length,
+      Math.round(late.reduce((a, j) => a + lateMinutes(j), 0)),
+      -Math.round(util * 10),
+      setupsOf(r),
+    ]
+  }
+  const summaryOf = (label: string, r: ReturnType<typeof schedule>, util: number) => {
+    const late = r.jobs.filter((j) => j.late)
+    return {
+      label,
+      late: late.length,
+      lateHours: Math.round(late.reduce((a, j) => a + lateMinutes(j), 0) / 6) / 10,
+      unplanned: r.unplanned.length,
+      utilisation: util,
+      setups: setupsOf(r),
+    }
+  }
+
+  const variants: { label: string; variant: ScheduleVariant }[] = [
+    { label: 'Short jobs first', variant: { orderStrategy: 'spt' } },
+    { label: 'Fewest presses first', variant: { orderStrategy: 'fewestPresses' } },
+    { label: 'Fill gaps first', variant: { pressRule: 'earliestStart' } },
+    { label: 'Spread the load', variant: { pressRule: 'leastLoaded' } },
+    { label: 'Long jobs first', variant: { orderStrategy: 'lpt' } },
+    { label: 'Short jobs + fill gaps', variant: { orderStrategy: 'spt', pressRule: 'earliestStart' } },
+    { label: 'Fewest presses + fill gaps', variant: { orderStrategy: 'fewestPresses', pressRule: 'earliestStart' } },
+    { label: 'Short jobs + spread the load', variant: { orderStrategy: 'spt', pressRule: 'leastLoaded' } },
+  ]
+  const variantPressRules: ScheduleVariant['pressRule'][] = ['earliestFinish', 'earliestStart', 'leastLoaded']
+  for (let seed = 1; variants.length < maxScenarios - 1; seed++) {
+    variants.push({
+      label: `Shuffled order #${seed}`,
+      variant: { orderStrategy: 'shuffle', seed, pressRule: variantPressRules[seed % variantPressRules.length] },
+    })
+  }
+
+  const searchStarted = Date.now()
+  const standardUtil = utilisationOf(best.result)
+  let chosen = {
+    label: 'Standard',
+    variant: {} as ScheduleVariant,
+    result: best.result,
+    util: standardUtil,
+    score: optScore(best.result, standardUtil.overall),
+  }
+  const tried = [summaryOf('Standard', best.result, standardUtil.overall)]
+  let stoppedBecause: 'target' | 'noImprovement' | 'limit' | 'time' =
+    standardUtil.overall >= utilisationTarget ? 'target' : 'limit'
+  let sinceImprovement = 0
+  if (stoppedBecause !== 'target') {
+    for (const { label, variant } of variants) {
+      if (tried.length >= maxScenarios) {
+        stoppedBecause = 'limit'
+        break
+      }
+      if (Date.now() - searchStarted > TIME_BUDGET_MS) {
+        stoppedBecause = 'time'
+        break
+      }
+      let r = planOnce(best.boost, variant)
+      // Bu denemede geç kalanlar da bir kez öne alınır.
+      const lateHere = r.jobs.filter((j) => j.late)
+      if (lateHere.length > 0) {
+        const boost = new Set(best.boost)
+        for (const lj of lateHere) boost.add(lotKey(lj))
+        const again = planOnce(boost, variant)
+        if (better(score(again, 0), score(r, 0))) r = again
+      }
+      const util = utilisationOf(r)
+      const sc = optScore(r, util.overall)
+      tried.push(summaryOf(label, r, util.overall))
+      if (better(sc, chosen.score)) {
+        chosen = { label, variant, result: r, util, score: sc }
+        sinceImprovement = 0
+        if (util.overall >= utilisationTarget) {
+          stoppedBecause = 'target'
+          break
+        }
+      } else if (++sinceImprovement >= NO_IMPROVEMENT_LIMIT) {
+        stoppedBecause = 'noImprovement'
+        break
+      }
+    }
+  }
+  const optimisation = {
+    target: utilisationTarget,
+    achieved: chosen.util.overall,
+    standard: standardUtil.overall,
+    chosen: chosen.label,
+    tried: tried.length,
+    stoppedBecause,
+    windowDays: UTILISATION_WINDOW_DAYS,
+    searchMs: Date.now() - searchStarted,
+    perPress: chosen.util.perPress,
+    // Karşılaştırma tablosu: seçilen + en iyi birkaç deneme.
+    scenarios: [...tried]
+      .sort(
+        (a, b) =>
+          a.unplanned - b.unplanned ||
+          a.late - b.late ||
+          a.lateHours - b.lateHours ||
+          b.utilisation - a.utilisation ||
+          a.setups - b.setups,
+      )
+      .slice(0, 8),
+  }
+  const chosenPressRule = chosen.variant.pressRule ?? 'earliestFinish'
+  const result = chosen.result
 
   // Kalıbı tutulduğu için plana alınamayan lotun sebebi "kullanıcı dışladı"
   // değil: kalıp hazır değil ya da ömür alarmı açık. Doğrusu yazılsın.
@@ -636,6 +883,50 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     ),
     ...result.jobs,
   ]
+
+  // ---- Geç kalemler: saat olarak ve malzeme bazında --------------------------
+  // Gecikme = gereken adedin hazır olduğu saat − teslim anı (ör. Sal 08:00).
+  const shiftNetHours = fullDay.netMinutes / 3 / 60
+  const clockTs = (date: string, clock: number) => Date.parse(`${date}T00:00:00Z`) + clock * 60_000
+  for (const job of result.jobs) {
+    if (!job.late || !job.readyDate || job.readyMinute === undefined || !job.deadlineDate || job.deadlineMinute === undefined) continue
+    const shifts = shiftsByPressDate.get(`${job.press}|${job.readyDate}`) ?? 3
+    const pressDay = buildDayTimeline(shiftStartMinute, shiftMinutes, Math.max(1, shifts), plannedStops)
+    const ready = clockTs(job.readyDate, netToClock(job.readyMinute, pressDay))
+    const deadline = clockTs(job.deadlineDate, netToClock(job.deadlineMinute, fullDay))
+    job.lateHours = Math.max(0.1, Math.round(((ready - deadline) / 3_600_000) * 10) / 10)
+  }
+  const lateByMaterial = new Map<string, ScheduledJob[]>()
+  for (const job of result.jobs) {
+    if (!job.late) continue
+    const list = lateByMaterial.get(job.material) ?? []
+    list.push(job)
+    lateByMaterial.set(job.material, list)
+  }
+  const lateItems = Array.from(lateByMaterial.entries())
+    .map(([material, list]) => {
+      const sorted = [...list].sort((a, b) => (a.deadlineDate ?? a.dueDate).localeCompare(b.deadlineDate ?? b.dueDate))
+      const first = sorted[0]
+      const maxLate = Math.max(...list.map((j) => j.lateHours ?? 0))
+      const presses = Array.from(new Set(list.map((j) => j.press)))
+      const shiftsNeeded = Math.max(1, Math.ceil(maxLate / Math.max(1, shiftNetHours)))
+      const product = productByCode.get(material)
+      const canFlex = !product?.flexiblePress && [product?.altMachine1, product?.altMachine2, product?.altMachine3, product?.altMachine4].some((m) => m && m.trim())
+      return {
+        material,
+        presses,
+        lots: list.length,
+        deadline: first.deadlineLabel ?? first.dueDate,
+        ready: first.readyDate ?? first.date,
+        neededQuantity: list.reduce((a, j) => a + (j.neededQuantity ?? j.quantity), 0),
+        lateHours: Math.round(maxLate * 10) / 10,
+        suggestion:
+          `≈${Math.round(maxLate * 10) / 10} h more on ${presses.join('/')} before ${first.deadlineLabel ?? first.dueDate}: ` +
+          `${shiftsNeeded} overtime shift${shiftsNeeded > 1 ? 's' : ''} (${Math.round(shiftNetHours * 10) / 10} h net each)` +
+          (canFlex ? ', or tick Flexible press so it may use its alternative presses' : ''),
+      }
+    })
+    .sort((a, b) => b.lateHours - a.lateHours)
 
   const rawNeeds = buildRawMaterialPlan(result.jobs, productByCode, rawStockByMaterial)
   const missingRawSpec = materialsMissingRawSpec(result.jobs, productByCode)
@@ -811,6 +1102,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     concurrentSetupsPerHall,
     maxSetupsPlantWide,
     maxSetupsPlantWideNormal,
+    pressRule: chosenPressRule,
     coilUnits: new Map(
       Array.from(productByCode.values())
         .map((p): [string, number] => [
@@ -880,6 +1172,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
 
   return {
     capacity,
+    optimisation,
+    lateItems,
     computedAt: nowMs,
     todayIso,
     nowClockMinute,

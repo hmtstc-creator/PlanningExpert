@@ -51,6 +51,9 @@ function PlanLogicPage() {
         maxSetupsPlantWide?: number
         setupsCrossShifts?: boolean
         pullForwardDays?: number
+        deliveryCutoffMinute?: number
+        utilisationTarget?: number
+        maxScenarios?: number
       }
     | null
     | undefined
@@ -64,6 +67,9 @@ function PlanLogicPage() {
     plantUrgent: settings?.maxSetupsPlantWide ?? 2,
     crossShifts: settings?.setupsCrossShifts ?? true,
     pullForward: settings?.pullForwardDays ?? 10,
+    cutoff: hhmm(settings?.deliveryCutoffMinute ?? 480),
+    target: settings?.utilisationTarget ?? 95,
+    maxScenarios: settings?.maxScenarios ?? 100,
     coilGap: settings?.coilSetupGapMinutes ?? 30,
     concurrent: settings?.concurrentSetupsPerHall ?? 1,
     factor: Math.round((settings?.capacityFactor ?? 1) * 100),
@@ -121,6 +127,9 @@ function PlanLogicPage() {
             value={current.frozen > 0 ? `${current.frozen} days` : 'off'}
           />
           <Setting label="Safety stock" value={`${current.safety} working days`} />
+          <Setting label="Delivery time on the need day" value={current.cutoff} />
+          <Setting label="Utilisation target" value={`${current.target}% (next 7 days)`} />
+          <Setting label="Scenarios tried at most" value={String(current.maxScenarios)} />
         </dl>
         <p className="mt-3 text-xs text-muted-foreground">
           Change these on the{' '}
@@ -143,7 +152,7 @@ function PlanLogicPage() {
             ['Sales days', 'ZPP_DAILY: one column per day — the day each quantity is sold', '/sapdata'],
             [
               'Stock',
-              'MB52 unrestricted stock. Only finished goods and production area locations count as stock; raw material locations are used for the coil check',
+              'MB52 unrestricted stock. Only storage locations 2009 and 1009 count as finished stock (2010 is ignored), in the plan and on the Capacity Dashboard; raw material locations are used for the coil check',
               '/sapdata',
             ],
             [
@@ -404,8 +413,11 @@ function PlanLogicPage() {
       <Step n={7} id="check" title="Check and report">
         <ul>
           <li>
-            A job that starts after its stock-out day is <b>late</b>: the
-            customer would stop. The engine does not leave it — see{' '}
+            A part is <b>late</b> when the quantity the customer needs is not
+            ready by <b>{current.cutoff}</b> on the day it is needed — not when
+            the whole lot ends. Backlog in ZPP and anything needed today are due
+            the <b>next working day at {current.cutoff}</b>. How late is shown in
+            hours and days. The engine does not leave it — see{' '}
             <a href="#late" className="underline">
               Late jobs are re-planned
             </a>
@@ -459,10 +471,49 @@ function PlanLogicPage() {
         </p>
         <p className="mt-2 text-sm text-amber-900">
           Whatever is still late is listed at the top of the Production Plan in
-          red, with the presses that were tried and what would fix it —
-          usually capacity: an overtime or weekend shift, or another press in
-          the part's master data.
+          red, <b>once per material</b>: when it is needed, how many pieces, when
+          they are ready, how many hours late, and a suggestion — how many hours
+          are missing on its press before the deadline, i.e. how many overtime
+          shifts would cover it, or ticking Flexible press so it may use its
+          alternative presses.
         </p>
+      </section>
+
+      <section id="scenarios" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold text-foreground">Scenarios — trying other plans</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          One order of placing jobs is not always the best. After the plan above
+          is built, the engine builds it again with other variations and keeps
+          the best one:
+        </p>
+        <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
+          <li>
+            <b>Order</b> within the same urgency: stock-out day (standard),
+            shortest job first, longest job first, parts with the fewest presses
+            first, and shuffled orders.
+          </li>
+          <li>
+            <b>Press choice</b>: the press that finishes first (standard), the
+            one that can start first, or the least loaded one.
+          </li>
+          <li>
+            <b>Best</b> means: fewest unplanned, then fewest late parts, then
+            fewest late hours, then the highest utilisation, then the fewest
+            setups. Utilisation never wins over a late part.
+          </li>
+          <li>
+            <b>Utilisation</b> = busy press hours ÷ available hours (working
+            calendar minus maintenance) in the next 7 days, all presses together.
+          </li>
+          <li>
+            <b>It stops</b> as soon as {current.target}% is reached, after{' '}
+            {current.maxScenarios} scenarios, after 25 scenarios without an
+            improvement, or after two minutes. The Production Plan then shows
+            the level reached (e.g. "best of {current.maxScenarios} scenarios
+            reaches 90%"), the utilisation of each press and the scenarios
+            compared.
+          </li>
+        </ul>
       </section>
 
       <section id="alarms" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">

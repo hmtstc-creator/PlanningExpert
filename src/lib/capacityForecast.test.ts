@@ -44,12 +44,13 @@ describe('buildCapacityForecast', () => {
     expect(f.presses[0].demand[0]).toBe(16.67)
   })
 
-  it('deducts stock only from locations 2009, 2010 and 1009, earliest week first', () => {
+  it('deducts stock only from locations 2009 and 1009, earliest week first', () => {
     const f = buildCapacityForecast(
       input({
         stock: [
           { material: 'A', storageLocation: '2009', unrestricted: 2000 },
           { material: 'A', storageLocation: '1010', unrestricted: 99999 },
+          { material: 'A', storageLocation: '2010', unrestricted: 99999 },
           { material: 'A', storageLocation: '1009', unrestricted: 1000 },
         ],
       }),
