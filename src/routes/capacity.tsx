@@ -218,9 +218,12 @@ interface ViewOption {
 
 /** Açılır menünün seçenekleri: önce hatlar, sonra tek tek presler. */
 function viewOptions(forecast: CapacityForecast): ViewOption[] {
+  // Kategoriler Press Definitions'tan gelir; ad olduğu gibi gösterilir (tek
+  // presli kategori de). Kategorisi boş pres kendi grubudur, yalnızca pres
+  // listesinde görünür.
   const lines: ViewOption[] = forecast.groups
-    .filter((g) => g.presses.length > 1)
-    .map((g) => ({ key: `line:${g.name}`, label: `${g.name} (${g.presses.join(' + ')})`, kind: 'line', presses: g.presses }))
+    .filter((g) => !(g.presses.length === 1 && g.name === g.presses[0]))
+    .map((g) => ({ key: `line:${g.name}`, label: g.name, kind: 'line', presses: g.presses }))
   const presses: ViewOption[] = forecast.groups
     .flatMap((g) => g.presses)
     .map((p) => ({ key: `press:${p}`, label: p, kind: 'press', presses: [p] }))
@@ -325,7 +328,8 @@ function SelectedView({
   const options = viewOptions(forecast)
   if (!selection) return null
   const rows = capacityRows(seriesOf(forecast, selection.presses))
-  const press = selection.kind === 'press' ? selection.presses[0] : undefined
+  // Tek presli kategoride de hafta düzenlenebilir: o kategorinin tek presi.
+  const press = selection.presses.length === 1 ? selection.presses[0] : undefined
   const lines = options.filter((o) => o.kind === 'line')
   const presses = options.filter((o) => o.kind === 'press')
 
@@ -342,7 +346,7 @@ function SelectedView({
           className="rounded-md border border-input bg-background px-2 py-1.5 text-sm font-semibold text-foreground"
         >
           {lines.length > 0 && (
-            <optgroup label="Lines">
+            <optgroup label="Categories (Press Definitions)">
               {lines.map((o) => (
                 <option key={o.key} value={o.key}>
                   {o.label}
@@ -360,7 +364,8 @@ function SelectedView({
         </select>
         {selection.kind === 'line' && (
           <span className="text-xs text-muted-foreground">
-            Pick a single press to change a week's shifts or overtime.
+            {selection.presses.join(' + ')}
+            {selection.presses.length > 1 && ' — pick a single press to change a week or open overtime.'}
           </span>
         )}
       </div>
