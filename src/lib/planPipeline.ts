@@ -9,7 +9,7 @@
 // DİKKAT: bu dosya ve import ettikleri sunucuda da derlenir. `@/` takma adı
 // orada çözülmez; yalnızca göreli import kullanılmalı.
 
-import { addDays, DEFAULT_PLANT_TIME_ZONE, isoDate, isoWeek, mondayOf, plantClock } from './dates'
+import { addDays, DEFAULT_PLANT_TIME_ZONE, isoDate, isoWeek, isoWeekLabel, mondayOf, plantClock } from './dates'
 import {
   DAY_KEYS,
   buildDemandSchedule,
@@ -42,7 +42,7 @@ import {
 import { alarmedMaterials } from './moldAlarm'
 import { auditPlan, type PlanAudit } from './planAudit'
 import { safeValidatePlan, type PlanValidation } from './planValidator'
-import { buildRawConsumption, type RawConsumptionPlan } from './rawCoverage'
+import { buildRawRequirements, type RawRequirementPlan } from './rawMrp'
 import { readDailyDemand } from './dailyDemand'
 import { buildCapacityForecast, PLAN_STOCK_LOCATIONS, type CapacityForecast } from './capacityForecast'
 import {
@@ -305,8 +305,8 @@ export interface PlanRun {
   validation?: PlanValidation | null
   /** Master data'daki malzemelerin SAP dosyalarındaki karşılığı. */
   dataCoverage?: DataCoverage
-  /** Günlük hammadde (rulo) tüketimi ve stoğu — Raw Material Coverage sayfası. */
-  rawConsumption?: RawConsumptionPlan
+  /** Hammadde MRP'si (plandan bağımsız) — Raw Material Coverage sayfası. */
+  rawRequirements?: RawRequirementPlan
   /** Geç kalemler, malzeme bazında, gecikme saati ve kapasite önerisiyle. */
   lateItems?: LateItem[]
   frozenCount: number
@@ -1531,23 +1531,24 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   })
   capacity.unassigned = capacity.unassigned.slice(0, 100)
 
-  // Hammadde yeterliliği: bugünden ufkun sonuna günlük rulo tüketimi
-  // (dondurulmuş işler dahil). Sipariş takvimi sayfada, kullanıcının
-  // ayarıyla hesaplanır (src/lib/rawCoverage.ts).
-  const lastDate = horizonDates[horizonDates.length - 1] ?? todayIso
-  const coverageDates: string[] = []
-  for (let d = todayIso; d <= lastDate && coverageDates.length < 400; d = isoDate(addDays(new Date(`${d}T00:00:00`), 1))) {
-    coverageDates.push(d)
-  }
-  const rawConsumption = buildRawConsumption({
-    jobs,
-    products: productByCode,
-    rawStockKg: rawStockByMaterial,
-    dates: coverageDates,
+  // Hammadde MRP'si — plandan bağımsız: ZPP'nin son haftasına kadar talep,
+  // mamul stoğu (2009 + 1009) FIFO düşülür, kalan brüt ağırlıkla kg'a çevrilir.
+  // Sipariş haftaları sayfada kullanıcının ayarıyla hesaplanır (src/lib/rawMrp.ts).
+  const mrpWeekCount = Math.max(1, ...inputs.weeklyDemand.map((d) => d.periods.length))
+  const mrpWeeks = Array.from({ length: Math.min(60, mrpWeekCount) }, (_, w) => {
+    const monday = addDays(horizonMonday, w * 7)
+    return { start: isoDate(monday), label: isoWeekLabel(monday) }
+  })
+  const rawRequirements = buildRawRequirements({
+    products: inputs.products,
+    weeklyDemand: inputs.weeklyDemand,
+    finishedStock: stockByMaterial,
+    rawStock: rawStockByMaterial,
+    weeks: mrpWeeks,
   })
 
   const run: PlanRun = {
-    rawConsumption,
+    rawRequirements,
     capacity,
     optimisation,
     lateItems,

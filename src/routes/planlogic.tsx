@@ -18,6 +18,21 @@ export const Route = createFileRoute('/planlogic')({
  * değişirse bu sayfa da değişmeli.
  */
 
+/** Hammadde MRP'sinin FMEA'sı: hata türü, etkisi, S, O, D, yöntemdeki önlem. */
+const FMEA_ROWS: [string, string, number, number, number, string][] = [
+  ['Plan and demand both counted', 'Same steel ordered twice', 8, 8, 3, 'Plan-independent: demand only; the safety stock absorbs plan timing and coil surplus'],
+  ['Finished stock not deducted', 'Over-ordering', 7, 5, 4, '2009 + 1009 deducted first-in-first-out, the same locations as the plan'],
+  ['Co-product counted twice', 'Over-ordering on pairs', 6, 6, 5, 'Pair pressed once: strokes = larger need, steel on the primary part only'],
+  ['Part without raw code / gross weight', 'Its steel silently missing → line stops', 10, 5, 8, 'Listed in red on the page with pieces; never silently dropped'],
+  ['Gross weight in wrong unit (g / t)', 'Order 1000× off', 9, 3, 6, 'Weights above 50 kg or below 1 g per piece are flagged'],
+  ['Weekly buckets: safety checked only at week start', 'Below safety at the end of the week', 7, 7, 7, 'Order covers the week’s use + N days after the week ends'],
+  ['Demand unknown after the last ZPP week', 'Safety collapses at the horizon end → too little', 6, 9, 6, 'Safety window extended with the average of the last 4 weeks'],
+  ['Backlog (overdue) ignored', 'Urgent steel missing now', 8, 4, 5, 'Backlog counted in the current week'],
+  ['Blocked / quality stock counted as available', 'Stock overstated', 7, 4, 6, 'Only unrestricted coil stock, Quality and Customer locations excluded'],
+  ['Scrap, coil ends, setup loss', 'Slightly too little', 5, 8, 7, 'Standard extra per order (500 kg, adjustable)'],
+  ['Open purchase orders unknown', 'Steel already ordered is ordered again', 7, 7, 8, 'Next step: open-order file from SAP; until then check the table against open orders'],
+]
+
 const STEPS = [
   { id: 'inputs', title: 'Collect the data' },
   { id: 'demand', title: 'Net the demand' },
@@ -589,6 +604,63 @@ function PlanLogicPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Work that is not approved needs no correction: the plan is rebuilt from the current
           moment every hour and after every change.
+        </p>
+      </section>
+
+      <section id="raw-mrp" className="mt-8 max-w-5xl scroll-mt-20 rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold text-foreground">Raw material requirement (MRP) — independent of the plan</h2>
+        <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
+          <li>Demand: ZPP up to its last week; backlog goes into this week.</li>
+          <li>Finished stock (2009 + 1009) is deducted, earliest weeks first. What is left must be pressed.</li>
+          <li>
+            Steel: pieces × gross weight per piece. A co-product pair is pressed once — strokes are the
+            larger of the two needs — and only the primary part's weight counts.
+          </li>
+          <li>
+            The production plan is <b>not added</b>: its early production and whole-coil surplus are the
+            same demand, timed and rounded differently. Adding them would order the same steel twice.
+            The safety stock absorbs the difference.
+          </li>
+          <li>
+            Week by week: stock at the start of the week + an order must cover that week's use <b>and</b>{' '}
+            the use of the N days after the week ends (safety stock). Otherwise an order is due that
+            week: the shortfall + the standard extra (500 kg by default).
+          </li>
+          <li>After the last ZPP week demand is unknown; the safety window is extended with the average of the last 4 weeks.</li>
+        </ol>
+        <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">FMEA — what can go wrong and how the method guards it</h3>
+        <div className="mt-2 overflow-x-auto rounded-md border border-border">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-muted text-muted-foreground">
+              <tr>
+                <th className="px-2 py-1.5 font-medium">Failure mode</th>
+                <th className="px-2 py-1.5 font-medium">Effect</th>
+                <th className="px-2 py-1.5 font-medium">S</th>
+                <th className="px-2 py-1.5 font-medium">O</th>
+                <th className="px-2 py-1.5 font-medium">D</th>
+                <th className="px-2 py-1.5 font-medium">RPN</th>
+                <th className="px-2 py-1.5 font-medium">Guard in the method</th>
+              </tr>
+            </thead>
+            <tbody>
+              {FMEA_ROWS.map((r) => (
+                <tr key={r[0]} className="border-t border-border align-top">
+                  <td className="px-2 py-1.5 font-medium text-foreground">{r[0]}</td>
+                  <td className="px-2 py-1.5 text-muted-foreground">{r[1]}</td>
+                  <td className="px-2 py-1.5">{r[2]}</td>
+                  <td className="px-2 py-1.5">{r[3]}</td>
+                  <td className="px-2 py-1.5">{r[4]}</td>
+                  <td className="px-2 py-1.5 font-medium">{(r[2] as number) * (r[3] as number) * (r[4] as number)}</td>
+                  <td className="px-2 py-1.5 text-muted-foreground">{r[5]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          S = severity, O = occurrence, D = detection (1–10); the ratings are those before the guard.
+          Open item for the next step: steel already ordered but not yet in MB52 (open purchase orders)
+          is not known yet, so it is ordered again — it needs an SAP open-order file.
         </p>
       </section>
 

@@ -332,7 +332,7 @@ export const latestRawCoverage = guardedQuery({
     return {
       computedAt: run.computedAt,
       todayIso: run.summary?.todayIso,
-      rawConsumption: run.summary?.rawConsumption ?? null,
+      rawRequirements: run.summary?.rawRequirements ?? null,
     }
   },
 })
