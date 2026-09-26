@@ -52,8 +52,10 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   kaldırılır; pres takvimi esastır.
 - Pres düzeninde "haftada N gün" Pazartesiden başlayarak sırayla dolar
   (5 = Pzt–Cuma, 6 = Pzt–Cmt). Günler pres bazında tek tek işaretlenmez.
-- Fazla mesai varsayılan olarak normal günlerden sonraki günlere konur
-  (Cumartesi, sonra Pazar).
+- Pres şablonundaki haftalık "fazla mesai vardiyası sayısı" kalkar. Mesai
+  yalnızca tarihli ve bir mesai tanımıyla açılır (hangi gün, hangi tanım).
+- Düzenli mesai (ör. her Cumartesi tam mesai) şablonda "tekrarlayan mesai"
+  olarak bir kez tanımlanabilir.
 - Olağandışı yönetim: planlamacı mesaiyi hangi güne açtığını girer; plan o
   güne göre çalışır. Örnekler: resmi tatilde mesai, normal çalışma günü
   dışında mesai, haftada 2 vardiya çalışan bir prese hafta içi 3. vardiya.
@@ -77,9 +79,12 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Vardiya tablosu fabrika genelinde bir kez tanımlanır (ör. 1. vardiya
   07:00–15:00, 2. 15:00–23:00, 3. 23:00–07:00); her pres kaç vardiya
   çalıştığını seçer.
-- Mesai tanımları: farklı türler tanımlanır (ör. tam mesai, yarım mesai),
-  her birinde açıklama (ör. hafta içi mesaisi, hafta sonu mesaisi). Mesai
+- Mesai tanımları: farklı türler tanımlanır (ör. tam mesai, yarım mesai).
+  Alanlar: ad, açıklama (ör. hafta içi / hafta sonu mesaisi), başlangıç
+  saati, süre. Örnek: "Tam mesai — hafta sonu, 07:00, 8 saat". Mesai
   açılırken bu tanımlardan biri seçilir.
+- Mesai saatlerine denk gelen planlı duruşlar (çay, yemek) mesaiden de
+  düşülür.
 - Normal düzen dışındaki her çalışma mesaidir; ör. 2 vardiyalı prese hafta
   içi açılan 3. vardiya raporlarda "mesai" görünür. Hangi güne açıldığı
   Work Calendar'da işaretlenir.
@@ -123,16 +128,20 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 4. Work Calendar düzeni olmayan pres: kapasite 0 + plan sayfasında kırmızı
    alarm.
 5. Genel çalışma günü tiklerini kaldır; pres düzenindeki N gün Pazartesiden
-   sırayla, fazla mesai sonraki günlere.
+   sırayla. Şablondaki haftalık fazla mesai sayısını kaldır.
+5a. Geçiş: mevcut bütün fazla mesai kayıtları silinir (şablon ve istisna
+   haftalardaki sayılar); fabrika mesaisiz çalışıyormuş gibi başlar.
+   Planlamacı takvimi kendisi yeniden girer.
 6. Work Calendar'a pres bazlı gün detayı: bir haftanın her günü için vardiya
    ve mesai (tatilde mesai, hafta içi ek vardiya). Capacity Dashboard'dan
    mesai açmak aynı kaydı günceller.
 7. Fabrika geneli vardiya tablosu (saatler ve süreler, ör. 2 × 9 saat);
    pres kaç vardiya çalıştığını seçer. Gün ≤ 24 saat, hafta ≤ 168 saat;
    aşan kayıt reddedilir.
-8. Mesai tanımları (tam, yarım… + açıklama); mesai açarken tanım seçilir.
-   Normal düzen dışındaki her çalışma (hafta içi ek vardiya dahil) mesai
-   olarak görünür.
+8. Mesai tanımları (ad, açıklama, başlangıç saati, süre); mesai tarihli ve
+   tanım seçilerek açılır; tekrarlayan mesai şablonda. Planlı duruşlar
+   mesaiden de düşülür. Normal düzen dışındaki her çalışma (hafta içi ek
+   vardiya dahil) mesai olarak görünür.
 9. Resmi tatilde normal vardiyayı başka güne kaydırmayı kaldır.
 10. Teslim hesabında resmi tatilleri kullanma; bakiye ve bugünün ihtiyacı
     ertesi gün 08:00.
@@ -144,8 +153,7 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 
 ## Açık sorular
 
-- Mesai tanımının alanları (başlangıç saati, süre, molalar).
-- Pres şablonundaki haftalık "fazla mesai vardiyası sayısı" kalacak mı.
-- Mevcut mesai kayıtlarının yeni yapıya taşınması.
+- Tekrarlayan mesainin süresi: tarih aralığı mı, iptal edilene kadar mı.
+- İstisna hafta (o haftaya özel gün ve vardiya sayısı) kalacak mı.
 - Koddaki sabit sayılar: `docs/fixeddefinitions.md` — ileride
   değerlendirilecek.
