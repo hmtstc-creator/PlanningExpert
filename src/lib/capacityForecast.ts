@@ -29,14 +29,6 @@ export const PLAN_STOCK_LOCATIONS = ['2009', '1009']
 /** @deprecated PLAN_STOCK_LOCATIONS ile aynı. */
 export const CAPACITY_STOCK_LOCATIONS = PLAN_STOCK_LOCATIONS
 
-/** Raporun grupları. Pres adındaki numarayla eşleşir (PRS-106, 106, P106…). */
-export const CAPACITY_GROUPS: { name: string; numbers: string[] }[] = [
-  { name: 'Transfer', numbers: ['106', '107'] },
-  { name: '800T Line', numbers: ['104', '105', '108', '110'] },
-  { name: 'PRS-103', numbers: ['103'] },
-  { name: 'PRS-109', numbers: ['109'] },
-]
-
 export interface CapacityWeek {
   /** Pazartesi, ISO. */
   start: string
@@ -66,7 +58,8 @@ export interface ForecastInput {
   products: ProductSpec[]
   weeklyDemand: { material: string; overdue?: number; periods: { label: string; qty: number }[] }[]
   stock: { material: string; storageLocation?: string; unrestricted?: number }[]
-  presses: string[]
+  /** Presler ve Press Definitions'taki kategorileri (800T, Transfer…). */
+  presses: { name: string; category?: string }[]
   weeks: CapacityWeek[]
   /** pres → hafta başına kapasite dakikası (weeks ile aynı sırada). */
   capacityMinutes: Map<string, number[]>
@@ -78,15 +71,28 @@ export function pressNumber(name: string): string {
   return name.match(/(\d+)/)?.[1] ?? name.trim()
 }
 
-/** Pres listesi → raporun grupları; gruba girmeyenler kendi grubunu alır. */
-export function groupPresses(presses: string[]): { name: string; presses: string[] }[] {
-  const used = new Set<string>()
-  const groups = CAPACITY_GROUPS.map((g) => {
-    const members = presses.filter((p) => g.numbers.includes(pressNumber(p)))
-    for (const m of members) used.add(m)
-    return { name: g.name, presses: members }
-  }).filter((g) => g.presses.length > 0)
-  for (const p of presses) if (!used.has(p)) groups.push({ name: p, presses: [p] })
+/**
+ * Raporun grupları Press Definitions'taki kategoriden gelir (Gantt'taki
+ * gruplamayla aynı): aynı kategorideki presler bir hat. Kategorisi boş pres
+ * kendi grubudur. Elle tanımlı grup yoktur.
+ */
+export function groupPresses(presses: { name: string; category?: string }[]): { name: string; presses: string[] }[] {
+  const groups: { name: string; presses: string[] }[] = []
+  const byCategory = new Map<string, { name: string; presses: string[] }>()
+  for (const p of presses) {
+    const category = p.category?.trim()
+    if (!category) {
+      groups.push({ name: p.name, presses: [p.name] })
+      continue
+    }
+    let g = byCategory.get(category)
+    if (!g) {
+      g = { name: category, presses: [] }
+      byCategory.set(category, g)
+      groups.push(g)
+    }
+    g.presses.push(p.name)
+  }
   return groups
 }
 
@@ -96,7 +102,7 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
   const weekCount = input.weeks.length
   const locations = new Set(input.stockLocations ?? CAPACITY_STOCK_LOCATIONS)
   const productByCode = new Map(input.products.map((p) => [p.code.trim(), p]))
-  const pressSet = new Set(input.presses)
+  const pressSet = new Set(input.presses.map((p) => p.name))
 
   // Stok: yalnızca seçili depolar, kısıtsız stok.
   const stock = new Map<string, number>()
@@ -121,7 +127,7 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
   }
 
   const demandMinutes = new Map<string, number[]>(
-    input.presses.map((p) => [p, Array.from({ length: weekCount }, () => 0)]),
+    input.presses.map((p) => [p.name, Array.from({ length: weekCount }, () => 0)]),
   )
   const unassigned: CapacityForecast['unassigned'] = []
   const done = new Set<string>()
@@ -188,7 +194,7 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
 
   return {
     weeks: input.weeks,
-    presses: input.presses.map((press) => ({
+    presses: input.presses.map(({ name: press }) => ({
       press,
       capacity: (input.capacityMinutes.get(press) ?? []).map((m) => round2(m / 60)),
       demand: (demandMinutes.get(press) ?? []).map((m) => round2(m / 60)),

@@ -1511,7 +1511,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     products: inputs.products,
     weeklyDemand: inputs.weeklyDemand,
     stock: inputs.stock,
-    presses: presses.map((p) => p.name),
+    presses: presses.map((p) => ({ name: p.name, category: p.category })),
     weeks: forecastWeekList,
     capacityMinutes,
     stockLocations: [...counted.finished],

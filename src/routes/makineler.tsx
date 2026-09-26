@@ -20,7 +20,6 @@ type Press = {
   hall: string
   category?: string
   feedsCoil?: boolean
-  tonnage?: number
   frozenDays?: number
 }
 
@@ -52,7 +51,6 @@ function MakinelerPage() {
   const [hall, setHall] = useState('')
   const [category, setCategory] = useState('')
   const [feedsCoil, setFeedsCoil] = useState(true)
-  const [tonnage, setTonnage] = useState('')
   const [saving, setSaving] = useState(false)
 
   const byName = useMemo(() => new Map(presses.map((p) => [p.name, p])), [presses])
@@ -100,7 +98,6 @@ function MakinelerPage() {
         hall: hall.trim() || 'Hall 1',
         category: category.trim() || undefined,
         feedsCoil,
-        tonnage: tonnage.trim() === '' ? undefined : Number(tonnage),
       })
     } finally {
       setSaving(false)
@@ -108,7 +105,6 @@ function MakinelerPage() {
     // Girdileri yalnızca kayıt gerçekten başarılıysa temizle.
     if (ok) {
       setName('')
-      setTonnage('')
     }
   }
 
@@ -121,7 +117,9 @@ function MakinelerPage() {
       <p className="mt-2 text-muted-foreground">
         Define which hall each press sits in — presses in the same hall cannot
         set up at the same time, which is the crane constraint the planner
-        relies on. The category is for grouping the plan on screen only;
+        relies on. The category groups presses into lines: the Gantt groups by
+        it and the Capacity Dashboard adds up presses with the same category
+        (e.g. Transfer = 106 + 107). It does not decide where a part runs —
         which press can run a material still comes from the main and
         alternative machines in master data. Coil fed marks a progressive line:
         the first coil goes on during setup and every coil after it costs a coil
@@ -185,16 +183,6 @@ function MakinelerPage() {
             Coil fed
             <span className="block text-[10px]">uncheck for transfer presses</span>
           </span>
-        </label>
-        <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Tonnage (opt.)</span>
-          <input
-            type="number"
-            className="mt-1 w-28 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            placeholder="250"
-            value={tonnage}
-            onChange={(e) => setTonnage(e.target.value)}
-          />
         </label>
         <button
           onClick={() => void addPress()}
@@ -262,7 +250,6 @@ function MakinelerPage() {
                       >
                         Coil fed
                       </th>
-                      <th className="px-3 py-2 font-medium">Tonnage</th>
                       <th className="px-3 py-2 font-medium" title="Days of this press's plan that stay locked">
                         Frozen days
                       </th>
@@ -314,15 +301,6 @@ function MakinelerPage() {
                                 onChange={(e) =>
                                   rows.edit(p._id, { feedsCoil: e.target.checked })
                                 }
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                className={`w-24 ${inputClass}`}
-                                placeholder="—"
-                                value={draft.tonnage}
-                                onChange={(e) => rows.edit(p._id, { tonnage: e.target.value })}
                               />
                             </td>
                             <td className="px-3 py-2">

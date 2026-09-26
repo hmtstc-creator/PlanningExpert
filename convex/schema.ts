@@ -80,6 +80,7 @@ export default defineSchema({
     // Rulodan mı beslenir? Progresif hatlar rulo, transfer presler blank
     // kullanır — transferde rulo değişimi yoktur, setup tektir.
     feedsCoil: v.optional(v.boolean()),
+    // @deprecated Pres tonajı kaldırıldı (hiçbir hesapta yoktu).
     tonnage: v.optional(v.number()),
     // Bu presin planı kaç gün ileriye kadar dondurulmuş sayılsın.
     // Tanımsızsa global ayar geçerlidir.
@@ -146,6 +147,8 @@ export default defineSchema({
     countFinished: v.optional(v.boolean()),
     /** Hammadde (bobin) stoğu MRP'de eldeki stok sayılır mı. Boşsa varsayılan. */
     countRaw: v.optional(v.boolean()),
+    /** MB51: bu depoya 101/102 hareketleri üretim sayılır. Boşsa varsayılan (2009). */
+    countProduction: v.optional(v.boolean()),
   }).index('by_code', ['code']),
 
   workCalendar: defineTable({

@@ -7,7 +7,6 @@ const press: PressRecord = {
   hall: 'Hall 1',
   category: 'Transfer press',
   feedsCoil: false,
-  tonnage: 800,
   frozenDays: 3,
 }
 
@@ -24,9 +23,8 @@ describe('pres taslağı', () => {
   })
 
   it('boş kutu tanımsız demektir, sıfır değil', () => {
-    const cleared = { ...draftOf(press), tonnage: '', frozenDays: '' }
+    const cleared = { ...draftOf(press), frozenDays: '' }
     const payload = pressPayload(press.name, cleared)
-    expect(payload.tonnage).toBeUndefined()
     expect(payload.frozenDays).toBeUndefined()
     expect(pressPayload(press.name, { ...cleared, frozenDays: '0' }).frozenDays).toBe(0)
   })

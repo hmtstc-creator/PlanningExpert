@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { usePaginatedQuery } from '../lib/convexTransport'
+import { useQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -9,11 +9,13 @@ export const Route = createFileRoute('/gerceklesen')({
 })
 
 function GerceklesenPage() {
-  const { results: rows, status } = usePaginatedQuery(
-    api.actualProduction.list,
-    {},
-    { initialNumItems: 500 },
-  )
+  // Yalnızca üretim hareketleri: üretim deposuna (Storage Locations'ta
+  // "Production receipt", varsayılan 2009) 101 girişleri eksi 102 iptalleri.
+  const result = useQuery(api.actualProduction.listAll) as
+    | { rows: { material: string; postingDate: string; quantity: number }[]; complete: boolean }
+    | undefined
+  const rows = useMemo(() => result?.rows ?? [], [result])
+  const status = result === undefined ? 'LoadingFirstPage' : 'Exhausted'
   const [search, setSearch] = useState('')
 
   const byMaterial = useMemo(() => {
@@ -38,9 +40,11 @@ function GerceklesenPage() {
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <h1 className="text-2xl font-bold text-foreground">Actual Production</h1>
       <p className="mt-2 text-muted-foreground">
-        Movements from the SAP MB51 report. This data is used to compare
-        actual production against the plan and to measure real press
-        performance.
+        Production from the SAP MB51 report: 101 receipts minus 102 reversals
+        into the production receipt location (ticked on Storage Locations,
+        2009 by default). Other movements are not production. The same figure
+        feeds plan versus actual, press performance and the mould shot
+        counters.
       </p>
 
       <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">

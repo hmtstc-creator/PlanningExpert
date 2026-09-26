@@ -6,7 +6,7 @@ import { api } from '../../convex/_generated/api'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { SaveStatus } from '../components/SaveStatus'
 import { UnsavedBar } from '../components/UnsavedBar'
-import { countsFinished, countsRaw } from '../lib/stockLocations'
+import { countsFinished, countsProduction, countsRaw } from '../lib/stockLocations'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 
@@ -85,12 +85,14 @@ function DepolarPage() {
       description: l.description ?? '',
       countFinished: countsFinished(l),
       countRaw: countsRaw(l),
+      countProduction: countsProduction(l),
     }),
     (a, b) =>
       a.category === b.category &&
       a.description === b.description &&
       a.countFinished === b.countFinished &&
-      a.countRaw === b.countRaw,
+      a.countRaw === b.countRaw &&
+      a.countProduction === b.countProduction,
   )
 
   const saveLocation = (code: string) => (draft: {
@@ -98,6 +100,7 @@ function DepolarPage() {
     description: string
     countFinished: boolean
     countRaw: boolean
+    countProduction: boolean
   }) =>
     upsert({
       code,
@@ -105,6 +108,7 @@ function DepolarPage() {
       description: draft.description.trim() || undefined,
       countFinished: draft.countFinished,
       countRaw: draft.countRaw,
+      countProduction: draft.countProduction,
     })
 
   const byCode = useMemo(
@@ -255,7 +259,7 @@ function DepolarPage() {
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[860px] text-sm">
+          <table className="w-full min-w-[980px] text-sm">
             <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Location</th>
@@ -268,6 +272,10 @@ function DepolarPage() {
                 <th className="px-3 py-2 text-center font-medium">
                   Raw material
                   <div className="font-normal">coil on hand (MRP)</div>
+                </th>
+                <th className="px-3 py-2 text-center font-medium">
+                  Production receipt
+                  <div className="font-normal">MB51 101 − 102</div>
                 </th>
                 <th className="px-3 py-2 font-medium" />
               </tr>
@@ -346,6 +354,16 @@ function DepolarPage() {
                         onChange={(e) => rows.edit(code, { countRaw: e.target.checked })}
                       />
                     </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={`Count MB51 production receipts in ${code}`}
+                        className="h-5 w-5 accent-violet-600"
+                        disabled={busy}
+                        checked={draft.countProduction}
+                        onChange={(e) => rows.edit(code, { countProduction: e.target.checked })}
+                      />
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right">
                       <button
                         onClick={saveCard}
@@ -374,7 +392,9 @@ function DepolarPage() {
       <p className="mt-6 text-xs text-muted-foreground">
         A tick decides what the stock in that location counts for. Without a
         saved tick, 2009 and 1009 count for both, and a "Raw Material" location
-        counts for raw material. Stock in an unticked location is shown but
+        counts for raw material. Production receipt: MB51 101 movements into
+        this location minus 102 reversals are the actual production (plan
+        versus actual, performance, mould shot counters); 2009 by default. Stock in an unticked location is shown but
         never netted.
       </p>
 

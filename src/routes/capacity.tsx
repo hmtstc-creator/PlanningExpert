@@ -13,6 +13,7 @@ import {
 } from '../lib/capacityForecast'
 import { useMutation, useQuery } from '../lib/convexTransport'
 import { formatPlantTime } from '../lib/sapUploads'
+import { stopMinutesByShift } from '../lib/capacityModel'
 
 export const Route = createFileRoute('/capacity')({
   component: CapacityPage,
@@ -46,6 +47,8 @@ function CapacityPage() {
     press: string
     weekStart: string
   } & Pattern)[]
+  const plannedStops = (useQuery(api.plannedStops.list) ?? []) as { shiftIndex: number; durationMinutes: number }[]
+  const stopsByShift = stopMinutesByShift(plannedStops)
   const [editing, setEditing] = useState<{ press: string; week: CapacityWeek } | null>(null)
   const [selection, setSelection] = useState<string>(() => {
     try {
@@ -89,6 +92,14 @@ function CapacityPage() {
         co-product pair counts once. <strong className="text-foreground">Cumulative</strong> adds
         up idle minus over-capacity hours: above zero you can build stock ahead, below zero the
         customer waits.
+      </p>
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        Planned stops deducted per shift (tea, meal, handover — Work Calendar):{' '}
+        <strong className="text-foreground">
+          {stopsByShift.map((m, i) => `${i + 1}. shift ${m} min`).join(' · ')}
+        </strong>
+        . The Gantt shows the same stops on every press.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">

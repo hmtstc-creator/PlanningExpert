@@ -49,7 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Shop floor',
     items: [
-      { to: '/makineler', label: 'Presses', hint: 'Halls, categories, tonnage' },
+      { to: '/makineler', label: 'Presses', hint: 'Halls, categories, coil feed' },
       { to: '/takvim', label: 'Work Calendar', hint: 'Shifts, stops, capacity' },
       { to: '/depolar', label: 'Storage Locations', hint: 'Which stock counts' },
     ],

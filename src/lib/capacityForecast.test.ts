@@ -20,7 +20,7 @@ function input(over: Partial<ForecastInput> = {}): ForecastInput {
     products: [{ code: 'A', mainMachine: 'PRS-106', spm: 10, moldCavities: 2, performanceFactor: 0.6 }],
     weeklyDemand: [{ material: 'A', overdue: 1200, periods: [{ label: 'W39', qty: 1200 }, { label: 'W40', qty: 2400 }, { label: 'W41', qty: 0 }] }],
     stock: [],
-    presses: ['PRS-106', 'PRS-107'],
+    presses: [{ name: 'PRS-106' }, { name: 'PRS-107' }],
     weeks,
     capacityMinutes: new Map([['PRS-106', [600, 600, 600]]]),
     ...over,
@@ -110,15 +110,20 @@ describe('capacityRows', () => {
 })
 
 describe('groups', () => {
-  it('builds the four report groups from press names, others on their own', () => {
+  it('groups presses by their Press Definitions category, presses without one on their own', () => {
     expect(pressNumber('PRS-106')).toBe('106')
-    const groups = groupPresses(['PRS-104', 'PRS-105', 'PRS-106', 'PRS-107', 'PRS-108', 'PRS-110', 'PRS-103', 'PRS-109', 'PRS-200'])
+    const groups = groupPresses([
+      { name: 'PRS-103' },
+      { name: 'PRS-104', category: '800T' },
+      { name: 'PRS-105', category: '800T' },
+      { name: 'PRS-106', category: 'Transfer' },
+      { name: 'PRS-107', category: 'Transfer' },
+      { name: 'PRS-108', category: ' 800T ' },
+    ])
     expect(groups).toEqual([
-      { name: 'Transfer', presses: ['PRS-106', 'PRS-107'] },
-      { name: '800T Line', presses: ['PRS-104', 'PRS-105', 'PRS-108', 'PRS-110'] },
       { name: 'PRS-103', presses: ['PRS-103'] },
-      { name: 'PRS-109', presses: ['PRS-109'] },
-      { name: 'PRS-200', presses: ['PRS-200'] },
+      { name: '800T', presses: ['PRS-104', 'PRS-105', 'PRS-108'] },
+      { name: 'Transfer', presses: ['PRS-106', 'PRS-107'] },
     ])
   })
 

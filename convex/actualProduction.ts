@@ -6,6 +6,7 @@ import { v } from 'convex/values'
 
 import { guardedQuery } from './guarded'
 import { liveRows } from './sapLive'
+import { countedLocations, productionRows } from '../src/lib/stockLocations'
 
 const rowValidator = v.object({
   _id: v.id('actualProduction'),
@@ -31,7 +32,8 @@ export const list = guardedQuery({
 const PLANNING_ROW_LIMIT = 20000
 
 /**
- * Gerçekleşen üretimin tamamı.
+ * Gerçekleşen üretimin tamamı — yalnızca üretim hareketleri (bkz.
+ * productionQuantity): üretim deposuna 101, iptali 102 (eksi).
  *
  * Kalıp ömrü ve gerçekleşme oranı bu satırların TOPLAMINDAN çıkıyor.
  * Sayfalı okumak toplamı eksik bırakır: kalıp limitine yaklaşmış bir kalıp
@@ -46,8 +48,11 @@ export const listAll = guardedQuery({
   }),
   handler: async (ctx) => {
     const rows = await (await liveRows(ctx, 'actuals')).take(PLANNING_ROW_LIMIT + 1)
+    // Üretim = "Production receipt" tikli depoya (varsayılan 2009) 101 − 102.
+    // Performans, kalıp ömrü ve Actual Production aynı süzgeçten okur.
+    const counted = countedLocations(await ctx.db.query('storageLocations').collect())
     return {
-      rows: rows.slice(0, PLANNING_ROW_LIMIT),
+      rows: productionRows(counted, rows.slice(0, PLANNING_ROW_LIMIT)),
       complete: rows.length <= PLANNING_ROW_LIMIT,
     }
   },

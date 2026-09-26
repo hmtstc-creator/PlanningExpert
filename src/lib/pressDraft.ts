@@ -11,7 +11,6 @@ export interface PressRecord {
   hall: string
   category?: string
   feedsCoil?: boolean
-  tonnage?: number
   frozenDays?: number
 }
 
@@ -23,7 +22,6 @@ export interface PressDraft {
   hall: string
   category: string
   feedsCoil: boolean
-  tonnage: string
   frozenDays: string
 }
 
@@ -33,7 +31,6 @@ export function draftOf(press: PressRecord): PressDraft {
     category: press.category ?? '',
     // Alan hiç yazılmamışsa rulo beslemeli kabul edilir.
     feedsCoil: press.feedsCoil !== false,
-    tonnage: press.tonnage === undefined ? '' : String(press.tonnage),
     frozenDays: press.frozenDays === undefined ? '' : String(press.frozenDays),
   }
 }
@@ -43,7 +40,6 @@ export function sameDraft(a: PressDraft, b: PressDraft): boolean {
     a.hall === b.hall &&
     a.category === b.category &&
     a.feedsCoil === b.feedsCoil &&
-    a.tonnage === b.tonnage &&
     a.frozenDays === b.frozenDays
   )
 }
@@ -62,7 +58,6 @@ export interface PressPayload {
   hall: string
   category: string | undefined
   feedsCoil: boolean
-  tonnage: number | undefined
   frozenDays: number | undefined
 }
 
@@ -73,7 +68,6 @@ export function pressPayload(name: string, draft: PressDraft): PressPayload {
     hall: draft.hall.trim() || 'Hall 1',
     category: draft.category.trim() || undefined,
     feedsCoil: draft.feedsCoil,
-    tonnage: optionalNumber(draft.tonnage),
     frozenDays: optionalNumber(draft.frozenDays, 0),
   }
 }

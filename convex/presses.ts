@@ -9,6 +9,7 @@ const pressValidator = v.object({
   hall: v.string(),
   category: v.optional(v.string()),
   feedsCoil: v.optional(v.boolean()),
+  /** @deprecated Kaldırıldı; eski kayıtlarda kalmış olabilir, okunmaz. */
   tonnage: v.optional(v.number()),
   frozenDays: v.optional(v.number()),
 })
@@ -23,7 +24,7 @@ export const list = guardedQuery({
  * Presi adına göre ekler ya da günceller.
  *
  * DİKKAT: kayıt tümüyle değiştirilir — gönderilmeyen isteğe bağlı alan
- * silinir. Bu kasıtlıdır, çünkü tonaj gibi alanların "boşalt" hâli ancak
+ * silinir. Bu kasıtlıdır, çünkü dondurulmuş gün gibi alanların "boşalt" hâli ancak
  * böyle ifade edilebilir. Çağıran taraf her zaman eksiksiz kayıt
  * göndermelidir; kısmi gönderim diğer alanları sessizce uçurur.
  */
@@ -33,7 +34,6 @@ export const upsert = guardedMutation({
     hall: v.string(),
     category: v.optional(v.string()),
     feedsCoil: v.optional(v.boolean()),
-    tonnage: v.optional(v.number()),
     frozenDays: v.optional(v.number()),
   },
   returns: v.null(),
@@ -49,7 +49,8 @@ export const upsert = guardedMutation({
         hall: args.hall,
         category: args.category,
         feedsCoil: args.feedsCoil,
-        tonnage: args.tonnage,
+        // Tonaj kaldırıldı: eski değer kayıtta kalmasın.
+        tonnage: undefined,
         frozenDays: args.frozenDays,
       })
     } else {
