@@ -43,8 +43,6 @@ export interface CapacitySeries {
   capacity: number[]
   /** Haftalık talep, saat — master data parça performansıyla (B). */
   demand: number[]
-  /** Kapasite × Performance sayfasındaki kabul katsayısı (A). */
-  capacityAccepted?: number[]
   /** Talep, ideal hızda (parça performansı uygulanmamış) (A). */
   demandIdeal?: number[]
 }
@@ -56,10 +54,17 @@ export interface CapacitySeries {
  */
 export type PerformanceBasis = 'accepted' | 'masterData'
 
-export function seriesForBasis(s: CapacitySeries, basis: PerformanceBasis): { capacity: number[]; demand: number[] } {
-  return basis === 'accepted'
-    ? { capacity: s.capacityAccepted ?? s.capacity, demand: s.demandIdeal ?? s.demand }
-    : { capacity: s.capacity, demand: s.demand }
+export function seriesForBasis(
+  s: CapacitySeries,
+  basis: PerformanceBasis,
+  /** A için kabul edilen performans oranı (ör. 0.65). */
+  acceptedRate = 1,
+): { capacity: number[]; demand: number[] } {
+  if (basis !== 'accepted') return { capacity: s.capacity, demand: s.demand }
+  // B ile aynı yöntem: kapasite olduğu gibi, üretim süresi ideal hız ÷ oran.
+  // Tek fark oranın kaynağı: her parça için master data yerine tek bir oran.
+  const rate = acceptedRate > 0 ? acceptedRate : 1
+  return { capacity: s.capacity, demand: (s.demandIdeal ?? s.demand).map((h) => round2(h / rate)) }
 }
 
 export interface CapacityForecast {
@@ -222,7 +227,6 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
       press,
       capacity: (input.capacityMinutes.get(press) ?? []).map((m) => round2(m / 60)),
       demand: (demandMinutes.get(press) ?? []).map((m) => round2(m / 60)),
-      capacityAccepted: (input.capacityMinutes.get(press) ?? []).map((m) => round2((m * (input.capacityFactor ?? 1)) / 60)),
       demandIdeal: (idealMinutes.get(press) ?? []).map((m) => round2(m / 60)),
     })),
     groups: groupPresses(input.presses),

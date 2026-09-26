@@ -76,9 +76,10 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   kırmızı alarm çıkar. Program kendiliğinden vardiya uydurmaz. → uygulanacak
 - Dondurulmuş gün hem genel hem pres bazında kalır (pres değeri geneli ezer).
 - Parça performansı (master data) ve kapasite katsayısı (Performance) ikisi de
-  kalır. Capacity Dashboard'a seçim düğmesi eklenecek: A) kabule göre
-  (Performance'ta yazılan katsayı), B) master data'daki parça performansına
-  göre. → uygulanacak
+  kalır. Capacity Dashboard'da seçim: A) kabul edilen oran — tek bir oran,
+  Capacity Dashboard'da tanımlanır, yalnızca o görünümde kullanılır, planı
+  değiştirmez; B) master data'daki parça performansı. İkisi aynı yöntemle
+  hesaplanır: kapasite olduğu gibi, üretim süresi = ideal süre ÷ oran.
 
 - Vardiya tablosu fabrika genelinde bir kez tanımlanır (ör. 1. vardiya
   07:00–15:00, 2. 15:00–23:00, 3. 23:00–07:00); her pres kaç vardiya

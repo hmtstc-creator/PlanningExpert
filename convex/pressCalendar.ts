@@ -45,6 +45,7 @@ const globalSettingsValidator = v.union(
     rawOrderMailTo: v.optional(v.array(v.string())),
     rawOrderMailCc: v.optional(v.array(v.string())),
     rawUrgentDays: v.optional(v.number()),
+    acceptedPerformanceRate: v.optional(v.number()),
     migratedSetupGap10: v.optional(v.boolean()),
     migratedCalendarV2: v.optional(v.boolean()),
   }),
@@ -266,6 +267,28 @@ export const clearOverride = guardedMutation({
  * Yalnızca kapasite düzeltme katsayısını günceller. Performans sayfası
  * ölçülen gerçekleşme oranını buraya yazar; diğer ayarlar korunur.
  */
+/**
+ * Capacity Dashboard A görünümünün kabul edilen performans oranı. Planı
+ * değiştirmez (plan parça performansını master data'dan okur).
+ */
+export const saveAcceptedPerformanceRate = guardedMutation({
+  args: { rate: v.number() },
+  returns: v.null(),
+  affectsPlan: false,
+  handler: async (ctx, { rate }) => {
+    if (!Number.isFinite(rate) || rate < 0.05 || rate > 2) {
+      throw new ConvexError('The accepted rate must be between 5 % and 200 %.')
+    }
+    const existing = await ctx.db
+      .query('globalShiftSettings')
+      .withIndex('by_key', (q) => q.eq('key', 'default'))
+      .first()
+    if (!existing) throw new ConvexError('Save the Work Calendar settings once first.')
+    await ctx.db.patch(existing._id, { acceptedPerformanceRate: rate })
+    return null
+  },
+})
+
 export const setCapacityFactor = guardedMutation({
   args: { capacityFactor: v.number() },
   returns: v.null(),

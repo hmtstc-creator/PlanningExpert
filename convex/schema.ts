@@ -211,6 +211,9 @@ export default defineSchema({
     rawOrderExtraKg: v.optional(v.number()),
     // Acil hammadde: ilk eksik iş bu kadar iş günü içindeyse Plan sayfasında.
     rawUrgentDays: v.optional(v.number()),
+    // Capacity Dashboard A görünümü: kabul edilen performans oranı (0–2).
+    // Yalnızca o görünümde kullanılır, planı değiştirmez.
+    acceptedPerformanceRate: v.optional(v.number()),
     // Hammadde sipariş maili: alıcılar ve bilgi (CC) grubu, bir kez tanımlanır.
     rawOrderMailTo: v.optional(v.array(v.string())),
     rawOrderMailCc: v.optional(v.array(v.string())),

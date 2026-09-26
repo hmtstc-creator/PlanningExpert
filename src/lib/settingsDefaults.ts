@@ -31,6 +31,7 @@ export const SETTINGS_DEFAULTS = {
   rawCoverageDays: 10,
   rawOrderExtraKg: 500,
   rawUrgentDays: 3,
+  acceptedPerformanceRate: 1,
 } as const
 
 /** Work Calendar'da gün seçilmemişse çalışma günleri. */

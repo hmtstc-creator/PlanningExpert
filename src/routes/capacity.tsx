@@ -64,8 +64,9 @@ function CapacityPage() {
     }
   })
 
-  // Performans kaynağı: A) kabule göre (Performance'taki katsayı kapasiteye),
-  // B) master data parça performansı (talebe). İkisi birlikte uygulanmaz.
+  // Performans kaynağı — iki görünüm aynı yöntemle hesaplanır: kapasite
+  // olduğu gibi, üretim süresi = ideal hız ÷ performans. A) tek bir kabul
+  // edilen oran (bu ekranda tanımlanır), B) her parçanın master data oranı.
   const [basis, setBasis] = useState<PerformanceBasis>(() => {
     try {
       return window.localStorage.getItem(BASIS_KEY) === 'accepted' ? 'accepted' : 'masterData'
@@ -81,13 +82,36 @@ function CapacityPage() {
       // Saklanamıyorsa seçim yalnızca bu oturumda kalır.
     }
   }
+  const settings = useQuery(api.pressCalendar.getGlobalSettings) as { acceptedPerformanceRate?: number } | null | undefined
+  const savedRate = settings?.acceptedPerformanceRate ?? SETTINGS_DEFAULTS.acceptedPerformanceRate
+  const saveRate = useMutation(api.pressCalendar.saveAcceptedPerformanceRate)
+  const [rateText, setRateText] = useState<string | null>(null)
+  const [rateError, setRateError] = useState<string | null>(null)
+  const [rateSaving, setRateSaving] = useState(false)
+  const ratePercent = rateText ?? String(Math.round(savedRate * 1000) / 10)
+  const typedRate = Number(ratePercent.replace(',', '.')) / 100
+  // Yazılan değer tablo için hemen kullanılır; kayıt Save ile.
+  const acceptedRate = Number.isFinite(typedRate) && typedRate >= 0.05 && typedRate <= 2 ? typedRate : savedRate
+  const rateDirty = rateText !== null && Math.abs(acceptedRate - savedRate) > 1e-9
+  async function persistRate() {
+    setRateSaving(true)
+    setRateError(null)
+    try {
+      await saveRate({ rate: acceptedRate })
+      setRateText(null)
+    } catch (e) {
+      setRateError(serverErrorText(e))
+    } finally {
+      setRateSaving(false)
+    }
+  }
   const rawForecast = data?.capacity ?? null
   const forecast = useMemo(
     () =>
       rawForecast
-        ? { ...rawForecast, presses: rawForecast.presses.map((p) => ({ ...p, ...seriesForBasis(p, basis) })) }
+        ? { ...rawForecast, presses: rawForecast.presses.map((p) => ({ ...p, ...seriesForBasis(p, basis, acceptedRate) })) }
         : null,
-    [rawForecast, basis],
+    [rawForecast, basis, acceptedRate],
   )
   const options = forecast ? viewOptions(forecast) : []
   // Kayıtlı seçim artık yoksa (pres silindi vb.) ilk hat gösterilir.
@@ -114,13 +138,12 @@ function CapacityPage() {
         </Link>{' '}
         (days from Monday, holidays removed, week exceptions and dated overtime included, planned
         stops deducted — the same hours the plan uses; this week counts only the hours still
-        ahead). Performance is applied one way, chosen above: A) the accepted rate from the
-        Performance page scales the available hours, or B) each part's performance from Master
-        Data stretches its production time. Demand is the ZPP requirement of the week — this week also carries
+        ahead). Performance is applied to the production time, chosen below: A) one accepted rate
+        for every part, set on this page, or B) each part's performance from Master Data. Demand is the ZPP requirement of the week — this week also carries
         the overdue backlog — after stock in locations{' '}
         {(forecast?.stockLocations ?? ['2009', '1009']).join(', ')} is used up, earliest
-        week first. Hours = pieces ÷ cavities ÷ SPM (with B also ÷ part performance: 10 h at 60 % counts as
-        16.7 h; setup and approval sit inside that time). Each part counts on its main press; a
+        week first. Hours = pieces ÷ cavities ÷ SPM ÷ performance (10 h at 60 % counts as 16.7 h; setup and
+        approval sit inside that time). Each part counts on its main press; a
         co-product pair counts once. <strong className="text-foreground">Cumulative</strong> adds
         up idle minus over-capacity hours: above zero you can build stock ahead, below zero the
         customer waits.
@@ -138,7 +161,7 @@ function CapacityPage() {
         <span className="font-medium text-foreground">Performance based on:</span>
         {(
           [
-            ['accepted', 'A) Accepted rate (Performance page)'],
+            ['accepted', `A) Accepted rate (${Math.round(acceptedRate * 1000) / 10} %)`],
             ['masterData', 'B) Part performance (Master Data)'],
           ] as const
         ).map(([key, label]) => (
@@ -153,10 +176,38 @@ function CapacityPage() {
             {label}
           </button>
         ))}
-        <span className="text-muted-foreground">
+        {basis === 'accepted' && (
+          <span className="flex items-center gap-2">
+            <label className="flex items-center gap-1">
+              <span className="text-muted-foreground">Accepted rate</span>
+              <input
+                type="number"
+                min={5}
+                max={200}
+                step={1}
+                value={ratePercent}
+                onChange={(e) => setRateText(e.target.value)}
+                className="w-20 rounded-md border border-input bg-background px-2 py-1 text-right text-sm"
+              />
+              <span className="text-muted-foreground">%</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => void persistRate()}
+              disabled={!rateDirty || rateSaving}
+              className="rounded-md bg-foreground px-3 py-1 font-medium text-background disabled:opacity-40"
+            >
+              {rateSaving ? 'Saving…' : 'Save'}
+            </button>
+            {rateDirty && <span className="text-amber-700">Unsaved — the table already uses it</span>}
+            {rateError && <span className="text-destructive">{rateError}</span>}
+          </span>
+        )}
+        <span className="basis-full text-muted-foreground">
+          Both views: available hours as they are; production time = ideal time ÷ performance.{' '}
           {basis === 'accepted'
-            ? 'Available hours × the accepted rate; production time at ideal speed.'
-            : 'Available hours as they are; production time ÷ each part’s performance.'}
+            ? `A uses one accepted rate for every part (${Math.round(acceptedRate * 1000) / 10} %). It is only for this view — the plan uses the part performance from Master Data.`
+            : 'B uses each part’s performance from Master Data — the same as the plan.'}
         </span>
       </div>
 

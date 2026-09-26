@@ -134,3 +134,13 @@ describe('groups', () => {
     })
   })
 })
+
+describe('performance basis', () => {
+  it('A and B use the same method: capacity as it is, production time = ideal ÷ rate', async () => {
+    const { seriesForBasis } = await import('./capacityForecast')
+    const s = { capacity: [100, 100], demand: [50, 20], demandIdeal: [30, 12] }
+    expect(seriesForBasis(s, 'masterData')).toEqual({ capacity: [100, 100], demand: [50, 20] })
+    expect(seriesForBasis(s, 'accepted', 0.6)).toEqual({ capacity: [100, 100], demand: [50, 20] })
+    expect(seriesForBasis(s, 'accepted', 0.75)).toEqual({ capacity: [100, 100], demand: [40, 16] })
+  })
+})
