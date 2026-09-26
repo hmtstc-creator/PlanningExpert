@@ -143,3 +143,39 @@ describe('independent check agrees with the engine on random plants', () => {
     }, 30_000)
   }
 })
+
+describe('breaks inside every shift and overtime weeks', () => {
+  // Gerçek fabrikadaki gibi: her vardiyada çay ve yemek, bazı haftalar
+  // cumartesi + fazla mesai. Mola bir setup'ı ikiye böler (yine tek setup);
+  // gece sonundaki setup ertesi sabah 07:00'deki setup'la karşılaştırılır.
+  const NOW = Date.UTC(2026, 8, 16, 7, 0)
+  const stops = [
+    { shiftIndex: 1, name: 'Tea', kind: 'break', startMinute: 540, durationMinutes: 15 },
+    { shiftIndex: 1, name: 'Lunch', kind: 'meal', startMinute: 690, durationMinutes: 30 },
+    { shiftIndex: 2, name: 'Tea', kind: 'break', startMinute: 1020, durationMinutes: 15 },
+    { shiftIndex: 2, name: 'Meal', kind: 'meal', startMinute: 1170, durationMinutes: 30 },
+    { shiftIndex: 3, name: 'Tea', kind: 'break', startMinute: 60, durationMinutes: 15 },
+    { shiftIndex: 3, name: 'Meal', kind: 'meal', startMinute: 180, durationMinutes: 30 },
+  ]
+  for (const seed of [1, 3, 5, 8]) {
+    it(`random plant #${seed}: no rule broken`, () => {
+      const base = randomPlant(seed)
+      const inputs: PlanInputs = {
+        ...base,
+        plannedStops: stops,
+        settings: { ...base.settings, setupGapMinutes: 10, maxScenarios: 20 },
+        weekOverrides: base.presses.map((p) => ({
+          press: p.name,
+          weekStart: '2026-09-14',
+          workingDays: 6,
+          shiftsPerDay: 3,
+          overtimeShifts: 1,
+        })),
+      }
+      const run = computePlan(inputs, NOW)
+      const v = validatePlan(inputs, run, NOW)
+      expect(v.rules.filter((r) => r.broken > 0).map((r) => `${r.id}: ${r.examples[0]}`)).toEqual([])
+      expect(run.audit.rules.flatMap((r) => r.violations)).toEqual([])
+    }, 60_000)
+  }
+})

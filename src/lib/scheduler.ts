@@ -1320,14 +1320,21 @@ function reserveSlot(
     const nextDate = shiftIsoDate(day.date, 1)
     const neighbours = (pick: (log: HallSetupLog) => SetupInterval[]) => {
       const list: SetupInterval[] = []
-      // Komşu gün yalnızca gün sınırına yakınken önemlidir.
-      const edges: (readonly [string, number])[] = [[day.date, 0]]
-      if (within < BOUNDARY_REACH) edges.push([previousDate, -fullNet])
-      if (within + duration > dayEnd - BOUNDARY_REACH) edges.push([nextDate, fullNet])
-      for (const [date, shift] of edges) {
+      // Komşu günden yalnızca gün sınırına yakın kayıtlar önemlidir. Seçim
+      // kaydın yerine göre yapılır, aramanın başladığı yere göre değil:
+      // arama sabah başlayıp gün sonuna kayabilir.
+      for (const [date, shift] of [
+        [day.date, 0],
+        [previousDate, -fullNet],
+        [nextDate, fullNet],
+      ] as const) {
         const log = hallSetups.get(date)
         if (!log) continue
-        for (const iv of pick(log)) list.push(shift === 0 ? iv : { ...iv, start: iv.start + shift, end: iv.end + shift })
+        for (const iv of pick(log)) {
+          if (shift === 0) list.push(iv)
+          else if (shift < 0 ? iv.end + shift > -BOUNDARY_REACH : iv.start + shift < dayEnd + BOUNDARY_REACH)
+            list.push({ ...iv, start: iv.start + shift, end: iv.end + shift })
+        }
       }
       return list
     }

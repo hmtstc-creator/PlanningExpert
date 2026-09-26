@@ -622,6 +622,19 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     }
     segs.sort((a, b) => a.start - b.start)
     const of = (k: string) => mergeBlocks(segs.filter((x) => x.kind === k).map((x) => ({ start: x.start, end: x.end })))
+    // Setup ve rulo değişimi bir moladan geçerse saatte iki parçaya bölünür;
+    // yine TEK setup'tır. Motorun her parçası tek blok (baştan sona) sayılır,
+    // yoksa aynı setup'ın iki yarısı "iki setup" diye vinç kuralına takılır.
+    const spans = (k: string) => {
+      const bySeg = new Map<string, Block>()
+      for (const x of segs) {
+        if (x.kind !== k) continue
+        const key = `${x.date}|${x.netStart}|${x.netEnd}`
+        const cur = bySeg.get(key)
+        bySeg.set(key, cur ? { start: Math.min(cur.start, x.start), end: Math.max(cur.end, x.end) } : { start: x.start, end: x.end })
+      }
+      return mergeBlocks([...bySeg.values()])
+    }
     return {
       id,
       job,
@@ -636,8 +649,8 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
       segs,
       start: segs.length ? segs[0].start : 0,
       end: segs.length ? Math.max(...segs.map((x) => x.end)) : 0,
-      setupSegs: of('setup'),
-      coilSegs: of('coil'),
+      setupSegs: spans('setup'),
+      coilSegs: spans('coil'),
       runSegs: of('run'),
     }
   }
