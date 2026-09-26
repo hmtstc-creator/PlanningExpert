@@ -74,9 +74,25 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   (Performance'ta yazılan katsayı), B) master data'daki parça performansına
   göre. → uygulanacak
 
+- Vardiya tablosu fabrika genelinde bir kez tanımlanır (ör. 1. vardiya
+  07:00–15:00, 2. 15:00–23:00, 3. 23:00–07:00); her pres kaç vardiya
+  çalıştığını seçer.
+- Mesai tanımları: farklı türler tanımlanır (ör. tam mesai, yarım mesai),
+  her birinde açıklama (ör. hafta içi mesaisi, hafta sonu mesaisi). Mesai
+  açılırken bu tanımlardan biri seçilir.
+- Normal düzen dışındaki her çalışma mesaidir; ör. 2 vardiyalı prese hafta
+  içi açılan 3. vardiya raporlarda "mesai" görünür. Hangi güne açıldığı
+  Work Calendar'da işaretlenir.
+- Resmi tatil tatildir: o günün normal vardiyaları başka güne kaymaz.
+  Çalışılacaksa mesai açılır.
+
 ### İş günü (presler dışındaki hesaplar)
 - Teslim hesabında resmi tatiller kullanılmaz: müşteri tatil günü mal
   isteyebilir; o gün hazır değilse gecikme görünür.
+- Bakiye ve bugünün ihtiyacı ertesi gün 08:00'de teslim sayılır (hafta sonu
+  ve tatil fark etmeksizin).
+- Presler dışındaki iş günü = tatil olmayan ve en az bir presin çalıştığı
+  gün.
 - Hammadde (10 iş günü) ve acil hammadde (3 iş günü) iş günüyle sayılır.
 - Haftalık talebin günlere dağıtılması: ZPP_DAILY varsa ZPP haftalığı ezer;
   ZPP_DAILY'nin ulaşmadığı tarihlerde haftalık talep takvime göre dağıtılır.
@@ -111,21 +127,25 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 6. Work Calendar'a pres bazlı gün detayı: bir haftanın her günü için vardiya
    ve mesai (tatilde mesai, hafta içi ek vardiya). Capacity Dashboard'dan
    mesai açmak aynı kaydı günceller.
-7. Vardiya tanımını detaylandır (vardiya sayısı ve süresi, ör. 2 × 9 saat);
-   gün ≤ 24 saat, hafta ≤ 168 saat; aşan kayıt reddedilir.
-8. Teslim hesabında resmi tatilleri kullanma.
-9. Hammadde, acil hammadde ve talep dağıtımı için iş günü tanımını yeni pres
-   takvimine bağla (açık soru 2'ye göre).
-10. Etkisiz "14 gün stok = acil" kodunu kaldır.
-11. BEKLEMEDE: MB51'de hareket türü olmayan eski satırları sayma (yeni format
+7. Fabrika geneli vardiya tablosu (saatler ve süreler, ör. 2 × 9 saat);
+   pres kaç vardiya çalıştığını seçer. Gün ≤ 24 saat, hafta ≤ 168 saat;
+   aşan kayıt reddedilir.
+8. Mesai tanımları (tam, yarım… + açıklama); mesai açarken tanım seçilir.
+   Normal düzen dışındaki her çalışma (hafta içi ek vardiya dahil) mesai
+   olarak görünür.
+9. Resmi tatilde normal vardiyayı başka güne kaydırmayı kaldır.
+10. Teslim hesabında resmi tatilleri kullanma; bakiye ve bugünün ihtiyacı
+    ertesi gün 08:00.
+11. Presler dışındaki iş günü = tatil olmayan ve en az bir presin çalıştığı
+    gün (hammadde, acil hammadde, talep dağıtımı).
+12. Etkisiz "14 gün stok = acil" kodunu kaldır.
+13. BEKLEMEDE: MB51'de hareket türü olmayan eski satırları sayma (yeni format
     yüklenince kontrol).
 
 ## Açık sorular
 
-- Bakiye ve bugünün ihtiyacının teslim anı (tatiller kullanılmayacaksa).
-- Presler dışındaki "iş günü"nün kaynağı.
-- Vardiya tanımı fabrika geneli mi, pres bazında mı; mesai vardiyasının
-  süresi ve molaları.
-- Tatil günü normal vardiyası başka güne kayar mı.
+- Mesai tanımının alanları (başlangıç saati, süre, molalar).
+- Pres şablonundaki haftalık "fazla mesai vardiyası sayısı" kalacak mı.
+- Mevcut mesai kayıtlarının yeni yapıya taşınması.
 - Koddaki sabit sayılar: `docs/fixeddefinitions.md` — ileride
   değerlendirilecek.
