@@ -200,6 +200,9 @@ export default defineSchema({
     // Hammadde: elde tutulacak gün ve her siparişe eklenen standart kg.
     rawCoverageDays: v.optional(v.number()),
     rawOrderExtraKg: v.optional(v.number()),
+    // Hammadde sipariş maili: alıcılar ve bilgi (CC) grubu, bir kez tanımlanır.
+    rawOrderMailTo: v.optional(v.array(v.string())),
+    rawOrderMailCc: v.optional(v.array(v.string())),
     // Tek seferlik geçişler yapıldı mı (ör. setup arası 60 → 10 dk).
     migratedSetupGap10: v.optional(v.boolean()),
   }).index('by_key', ['key']),

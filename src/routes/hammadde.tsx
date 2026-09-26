@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { useMutation, useQuery } from '../lib/convexTransport'
 import { rawMrp, type RawMrpResult, type RawRequirementPlan } from '../lib/rawMrp'
+import { buildDraftEml, buildOrderWorkbook, parseAddresses, workbookBytes, XLSX_TYPE } from '../lib/rawOrderExport'
 import { formatPlantTime } from '../lib/sapUploads'
 
 export const Route = createFileRoute('/hammadde')({
@@ -26,7 +27,7 @@ function RawMaterialCoveragePage() {
     | null
     | undefined
   const settings = useQuery(api.pressCalendar.getGlobalSettings) as
-    | { rawCoverageDays?: number; rawOrderExtraKg?: number }
+    | { rawCoverageDays?: number; rawOrderExtraKg?: number; rawOrderMailTo?: string[]; rawOrderMailCc?: string[] }
     | null
     | undefined
   const saveSettings = useMutation(api.pressCalendar.saveRawCoverageSettings)
@@ -75,22 +76,50 @@ function RawMaterialCoveragePage() {
     }
   }
 
-  const downloadCsv = () => {
-    const header = ['Raw material', 'Used by', 'Stock (kg)', ...weeks.map((w) => `${w.label} (${w.start})`), 'Total (kg)']
-    const lines = [
-      header.join(';'),
-      ...shown.map((r) =>
-        [r.rawMaterial, r.materials.join(' '), r.stockKg, ...r.rows.map((row) => row.orderKg || ''), r.totalOrderKg].join(';'),
-      ),
-      ['Total', '', '', ...weekTotals.map((t) => t || ''), weekTotals.reduce((a, b) => a + b, 0)].join(';'),
-    ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
+  const mailTo = settings?.rawOrderMailTo ?? []
+  const mailCc = settings?.rawOrderMailCc ?? []
+  const fileBase = `raw-material-orders-${data?.todayIso ?? ''}`
+  const excelBytes = () =>
+    workbookBytes(
+      buildOrderWorkbook(results, weeks, {
+        computedAt: data ? formatPlantTime(data.computedAt) : '',
+        coverageDays,
+        extraKg,
+      }),
+    )
+  const download = (bytes: BlobPart, name: string, type: string) => {
+    const url = URL.createObjectURL(new Blob([bytes], { type }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `raw-material-orders-${data?.todayIso ?? ''}.csv`
+    a.download = name
     a.click()
     URL.revokeObjectURL(url)
+  }
+  const downloadExcel = () => download(excelBytes() as Uint8Array<ArrayBuffer>, `${fileBase}.xlsx`, XLSX_TYPE)
+  const prepareMail = () => {
+    const total = weekTotals.reduce((a, b) => a + b, 0)
+    const lines = weeks
+      .map((w, i) => (weekTotals[i] > 0 ? `${w.label} (${w.start}): ${fmt(weekTotals[i])} kg` : null))
+      .filter(Boolean)
+    const body = [
+      'Hello,',
+      '',
+      `Attached are the raw material orders by delivery week, calculated ${data ? formatPlantTime(data.computedAt) : ''}.`,
+      `Safety stock ${coverageDays} days of use, +${fmt(extraKg)} kg per order. Total ${fmt(total)} kg.`,
+      '',
+      'Totals by delivery week:',
+      ...lines,
+      '',
+      'Best regards',
+    ].join('\n')
+    const eml = buildDraftEml({
+      to: mailTo,
+      cc: mailCc,
+      subject: `Raw material orders ${weeks[0]?.label ?? ''} – ${weeks[weeks.length - 1]?.label ?? ''}`,
+      body,
+      attachment: { name: `${fileBase}.xlsx`, bytes: excelBytes(), contentType: XLSX_TYPE },
+    })
+    download(eml, `${fileBase}.eml`, 'message/rfc822')
   }
 
   return (
@@ -145,6 +174,13 @@ function RawMaterialCoveragePage() {
         {error && <span className="text-xs text-destructive">{error}</span>}
         <span className="ml-auto text-xs text-muted-foreground">{data ? `Calculated ${formatPlantTime(data.computedAt)}` : ''}</span>
       </div>
+
+      <RecipientsPanel
+        to={mailTo}
+        cc={mailCc}
+        canSend={!!plan && weekTotals.some((t) => t > 0)}
+        onPrepare={prepareMail}
+      />
 
       {data === undefined ? (
         <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
@@ -202,10 +238,10 @@ function RawMaterialCoveragePage() {
               </label>
               <button
                 type="button"
-                onClick={downloadCsv}
+                onClick={downloadExcel}
                 className="rounded-md border border-border px-2.5 py-1 font-medium hover:bg-muted"
               >
-                Download CSV
+                Download Excel
               </button>
             </div>
           </div>
@@ -277,6 +313,127 @@ function RawMaterialCoveragePage() {
             </table>
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Sipariş mailinin alıcıları (To) ve bilgi grubu (CC): bir kez tanımlanır,
+ * herkes aynı listeyi görür. "Prepare e-mail" Outlook'ta açılan, Excel ekli,
+ * gönderilmemiş bir taslak indirir — şifre ya da hesap bilgisi gerekmez.
+ */
+function RecipientsPanel({
+  to,
+  cc,
+  canSend,
+  onPrepare,
+}: {
+  to: string[]
+  cc: string[]
+  canSend: boolean
+  onPrepare: () => void
+}) {
+  const saveRecipients = useMutation(api.pressCalendar.saveRawOrderRecipients)
+  const [editing, setEditing] = useState(false)
+  const [toText, setToText] = useState('')
+  const [ccText, setCcText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const start = () => {
+    setToText(to.join('\n'))
+    setCcText(cc.join('\n'))
+    setError(null)
+    setEditing(true)
+  }
+  const save = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await saveRecipients({ to: parseAddresses(toText), cc: parseAddresses(ccText) })
+      setEditing(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="mt-4 rounded-lg border border-border p-3 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-foreground">Order e-mail</p>
+          {to.length === 0 && cc.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No recipients yet — define them once with Edit recipients.</p>
+          ) : (
+            <p className="break-words text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">To:</span> {to.join(', ') || '—'}
+              {cc.length > 0 && (
+                <>
+                  {' · '}
+                  <span className="font-medium text-foreground">CC:</span> {cc.join(', ')}
+                </>
+              )}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <button type="button" onClick={start} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+            Edit recipients
+          </button>
+          <button
+            type="button"
+            onClick={onPrepare}
+            disabled={!canSend || to.length === 0}
+            title={to.length === 0 ? 'Define the recipients first' : 'Downloads an Outlook draft with the Excel attached'}
+            className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-40"
+          >
+            Prepare e-mail (Outlook)
+          </button>
+        </div>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Prepare e-mail downloads a draft: open it and Outlook shows the message with the recipients,
+        the subject and the Excel attached — check it and press Send. It goes from your own Outlook;
+        no password is stored here.
+      </p>
+      {editing && (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-xs">
+            <span className="block text-muted-foreground">To (one per line, or separated by ; or ,)</span>
+            <textarea
+              value={toText}
+              onChange={(e) => setToText(e.target.value)}
+              rows={4}
+              className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5"
+              placeholder="buyer@company.com"
+            />
+          </label>
+          <label className="text-xs">
+            <span className="block text-muted-foreground">CC</span>
+            <textarea
+              value={ccText}
+              onChange={(e) => setCcText(e.target.value)}
+              rows={4}
+              className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1.5"
+              placeholder="manager@company.com"
+            />
+          </label>
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={busy}
+              className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-40"
+            >
+              {busy ? 'Saving…' : 'Save recipients'}
+            </button>
+            <button type="button" onClick={() => setEditing(false)} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+              Cancel
+            </button>
+            {error && <span className="text-xs text-destructive">{error}</span>}
+          </div>
+        </div>
       )}
     </div>
   )

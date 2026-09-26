@@ -29,6 +29,8 @@ const globalSettingsValidator = v.union(
     maxScenarios: v.optional(v.number()),
     rawCoverageDays: v.optional(v.number()),
     rawOrderExtraKg: v.optional(v.number()),
+    rawOrderMailTo: v.optional(v.array(v.string())),
+    rawOrderMailCc: v.optional(v.array(v.string())),
     migratedSetupGap10: v.optional(v.boolean()),
   }),
   v.null(),
@@ -68,6 +70,8 @@ export const saveGlobalSettings = guardedMutation({
     maxScenarios: v.optional(v.number()),
     rawCoverageDays: v.optional(v.number()),
     rawOrderExtraKg: v.optional(v.number()),
+    rawOrderMailTo: v.optional(v.array(v.string())),
+    rawOrderMailCc: v.optional(v.array(v.string())),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -283,6 +287,30 @@ export const saveRawCoverageSettings = guardedMutation({
     const patch = { rawCoverageDays: Math.round(args.rawCoverageDays), rawOrderExtraKg: Math.round(args.rawOrderExtraKg) }
     if (existing) await ctx.db.patch(existing._id, patch)
     else throw new Error('Save the Work Calendar settings once first')
+    return null
+  },
+})
+
+const EMAIL = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/
+
+/** Hammadde sipariş mailinin alıcıları (To) ve bilgi grubu (CC) — bir kez tanımlanır. */
+export const saveRawOrderRecipients = guardedMutation({
+  args: { to: v.array(v.string()), cc: v.array(v.string()) },
+  returns: v.null(),
+  affectsPlan: false,
+  handler: async (ctx, args) => {
+    const clean = (list: string[]) => Array.from(new Set(list.map((e) => e.trim().toLowerCase()).filter(Boolean)))
+    const to = clean(args.to)
+    const cc = clean(args.cc).filter((e) => !to.includes(e))
+    const bad = [...to, ...cc].filter((e) => !EMAIL.test(e))
+    if (bad.length > 0) throw new Error(`Not an e-mail address: ${bad.join(', ')}`)
+    if (to.length + cc.length > 50) throw new Error('At most 50 addresses')
+    const existing = await ctx.db
+      .query('globalShiftSettings')
+      .withIndex('by_key', (q) => q.eq('key', 'default'))
+      .first()
+    if (!existing) throw new Error('Save the Work Calendar settings once first')
+    await ctx.db.patch(existing._id, { rawOrderMailTo: to, rawOrderMailCc: cc })
     return null
   },
 })
