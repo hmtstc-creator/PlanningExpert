@@ -567,6 +567,31 @@ function PlanLogicPage() {
         </ul>
       </section>
 
+      <section id="press-start" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold text-foreground">Planner's hand — press start and delays</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Unless you say otherwise every press is planned from now. At the top of the Production
+          Plan (<b>Plan settings</b>) you can set, per press, before recalculating:
+        </p>
+        <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
+          <li>
+            <b>Plan from</b> (date and time) with a reason — no operator, no raw material… The
+            press takes no new work before it; approved jobs that would start earlier are released
+            and planned again after it.
+          </li>
+          <li>
+            <b>Behind / ahead</b> (hours): the line did not keep to the approved plan. +3 h moves
+            the approved (frozen and running) jobs 3 hours later and closes the first 3 hours as
+            "Behind plan"; −2 h brings them forward, never before now. "All presses" sets it for
+            the whole line at once.
+          </li>
+        </ul>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Work that is not approved needs no correction: the plan is rebuilt from the current
+          moment every hour and after every change.
+        </p>
+      </section>
+
       <section id="check" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-sky-200 bg-sky-50/60 p-4">
         <h2 className="text-sm font-semibold text-foreground">Independent check — is the plan really right?</h2>
         <p className="mt-1 text-sm text-muted-foreground">

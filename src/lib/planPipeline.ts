@@ -59,6 +59,8 @@ import {
 } from './scheduler'
 
 const RAW_STOCK = new Set(['raw_material'])
+/** Hammadde eksikliği bu kadar gün içinde bir işi durduruyorsa acildir. */
+export const RAW_URGENT_DAYS = 3
 /** Kullanılamayan stok: kalite bekleyen ve müşteriye geçmiş. */
 const NOT_AVAILABLE = new Set(['quality', 'customer'])
 export const DEFAULT_HORIZON_WEEKS = 4
@@ -169,6 +171,17 @@ export interface PlanInputs {
   }[]
   /** Eksik okunan tablolar ('master data', 'demand', 'stock'). */
   truncatedInputs: string[]
+  /**
+   * Planlamacının pres bazında müdahalesi: plan başlangıcı (pres bu andan
+   * önce yeni iş almaz) ve onaylı işlerin gecikmesi (+ geride, − ileride).
+   */
+  pressStarts?: {
+    press: string
+    fromDate?: string
+    fromMinute?: number
+    reason?: string
+    delayMinutes?: number
+  }[]
 }
 
 export type PlanJob = ScheduledJob & { frozen?: boolean }
@@ -417,7 +430,31 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
             endsAfterNow(job) &&
             !dayFrozenJobs.includes(job),
         )
-  const frozenJobs = [...dayFrozenJobs, ...runningJobs]
+  // Planlamacı bir presi belli bir ana kadar tuttuysa (operatör yok,
+  // hammadde yok…) o presin bu andan önce başlayan onaylı işleri yapılamaz:
+  // serbest bırakılır, motor onları tutulma bittikten sonra yeniden planlar.
+  const nowDay = buildDayTimeline(shiftStartMinute, shiftMinutes, 3, plannedStops)
+  const heldUntil = new Map<string, { date: string; clock: number; net: number; reason: string }>()
+  for (const ps of inputs.pressStarts ?? []) {
+    if (!ps.fromDate) continue
+    const minute = ps.fromMinute ?? shiftStartMinute
+    const at =
+      minute < shiftStartMinute
+        ? { date: isoDate(addDays(new Date(`${ps.fromDate}T00:00:00`), -1)), clock: minute + 1440 }
+        : { date: ps.fromDate, clock: minute }
+    const net = clockToNet(at.clock, nowDay)
+    // Geçmişte kalan bir başlangıç artık bir şey tutmaz.
+    if (at.date < todayIso || (at.date === todayIso && net <= nowNet)) continue
+    heldUntil.set(ps.press, { ...at, net, reason: ps.reason?.trim() || 'planner' })
+  }
+  const released = new Set<SnapshotJob>()
+  for (const job of [...dayFrozenJobs, ...runningJobs]) {
+    const held = heldUntil.get(job.press)
+    if (held && (job.date < held.date || (job.date === held.date && job.setupStartMinute < held.net))) {
+      released.add(job)
+    }
+  }
+  const frozenJobs = [...dayFrozenJobs, ...runningJobs].filter((job) => !released.has(job))
   const frozenSet = new Set(frozenJobs)
 
   // Dondurulmuş işlerin ürettiği adet talebi karşılar — sayılmazsa aynı iş
@@ -587,6 +624,24 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     }
   }
 
+  // Planlamacının tuttuğu pres: şu andan başlangıç anına kadar kapalı.
+  for (const [press, held] of heldUntil) {
+    for (const date of horizonDates) {
+      if (date < todayIso) continue
+      if (date > held.date) break
+      const end = date === held.date ? held.clock : shiftStartMinute + 1440
+      if (end <= shiftStartMinute) continue
+      breakdownRows.push({
+        press,
+        date,
+        startMinute: shiftStartMinute,
+        endMinute: end,
+        reason: `Held until ${held.date} ${clockText(held.clock % 1440)}: ${held.reason}`,
+        status: 'planned',
+      })
+    }
+  }
+
   // Pres bakımı dolu bir aralıktır: gün kısalmaz, günün bir saati kapanır.
   const maintenance: MaintenanceBlock[] = []
   for (const row of [...inputs.pressMaintenance, ...breakdownRows]) {
@@ -597,6 +652,46 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       buildDayTimeline(shiftStartMinute, shiftMinutes, shifts, plannedStops),
     )
     if (block) maintenance.push(block)
+  }
+
+  // Hat plana uyamadı: onaylı işler (donmuş ve çalışan) presin ekseninde
+  // kaydırılır. Geride ise şu andan itibaren o süre "Behind plan" olarak
+  // kapanır (çalışan iş o süre daha sürüyor); ileride ise işler öne gelir.
+  const shiftedJobs = new Map<SnapshotJob, SnapshotJob>()
+  for (const ps of inputs.pressStarts ?? []) {
+    const delay = Math.round(ps.delayMinutes ?? 0)
+    if (!delay) continue
+    const windows = pressWindows(buckets.get(ps.press) ?? [])
+    const onPress = frozenJobs.filter((j) => j.press === ps.press)
+    const placed = onPress.map((job) => ({ job, parts: toGlobalParts(windows, job.segments ?? []) }))
+    const earliest = Math.min(...placed.flatMap((p) => p.parts.map((x) => x.start)), Number.POSITIVE_INFINITY)
+    const shift = delay < 0 && Number.isFinite(earliest) ? Math.max(delay, -earliest) : delay
+    for (const { job, parts } of placed) {
+      if (parts.length === 0) continue
+      const segments = parts.flatMap((x) => fromGlobal(windows, x.start + shift, x.end + shift, x.kind))
+      if (segments.length === 0) continue
+      const copy: SnapshotJob = {
+        ...job,
+        segments,
+        date: segments[0].date,
+        setupStartMinute: segments[0].start,
+        endDate: segments[segments.length - 1].date,
+        endMinute: segments[segments.length - 1].end,
+      }
+      shiftedJobs.set(job, copy)
+      frozenJobs[frozenJobs.indexOf(job)] = copy
+    }
+    if (delay > 0) {
+      for (const seg of fromGlobal(windows, 0, delay, 'maintenance')) {
+        maintenance.push({
+          press: ps.press,
+          date: seg.date,
+          start: seg.start,
+          end: seg.end,
+          label: `Behind plan: +${Math.round((delay / 60) * 10) / 10} h`,
+        })
+      }
+    }
   }
 
   const overrides: PlanOverride[] = inputs.overrides.map((o) => ({
@@ -1214,7 +1309,12 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
 
   const lateCount = result.jobs.filter((j) => j.late).length
   const lateMaterialCount = new Set(result.jobs.filter((j) => j.late).map((j) => j.material)).size
-  const rawShortages = rawNeeds.filter((r) => r.shortageKg > 0).length
+  // Acil hammadde: stoğun yetmediği ilk iş önümüzdeki RAW_URGENT_DAYS gün
+  // içinde başlıyor. Diğer eksikler Raw Material Coverage'da izlenir.
+  const rawUrgentUntil = isoDate(addDays(new Date(`${todayIso}T00:00:00`), RAW_URGENT_DAYS - 1))
+  const rawShortages = rawNeeds.filter(
+    (r) => r.shortageKg > 0 && !!r.shortFrom && r.shortFrom.date <= rawUrgentUntil,
+  ).length
   const warnings = buildWarnings({
     inputs,
     holidayCount: holidays.size,
@@ -1473,7 +1573,15 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // Bağımsız doğrulama: motorun kodunu kullanmadan stoğu yeniden yürütür,
   // kuralları yeniden sayar, gecikmelerin kaçınılmaz olup olmadığını sınar.
   // Hata verirse plan yine de çıkar.
-  run.validation = safeValidatePlan(inputs, run, nowMs)
+  // Doğrulama, planlamacının müdahalesinden sonraki onaylı planı görür:
+  // serbest bırakılan işler yok, kaydırılan işler yeni yerinde.
+  const effectiveSnapshot = snapshot
+    ? {
+        ...snapshot,
+        jobs: snapshot.jobs.filter((j) => !released.has(j)).map((j) => shiftedJobs.get(j) ?? j),
+      }
+    : snapshot
+  run.validation = safeValidatePlan({ ...inputs, latestSnapshot: effectiveSnapshot }, run, nowMs)
   run.dataCoverage = dataCoverageOf(inputs)
   return run
 }
@@ -1515,6 +1623,48 @@ export function dataCoverageOf(inputs: PlanInputs): DataCoverage {
   }
 }
 
+/** Presin günleri, kesintisiz eksende (motorun ekseniyle aynı). */
+function pressWindows(list: DayBucket[]) {
+  const days: { date: string; offset: number; capacity: number; startNet: number }[] = []
+  let offset = 0
+  for (const b of list) {
+    if (b.minutes <= 0) continue
+    days.push({ date: b.date, offset, capacity: b.minutes, startNet: b.startMinute ?? 0 })
+    offset += b.minutes
+  }
+  return days
+}
+
+type PressWindows = ReturnType<typeof pressWindows>
+
+/** Gün içi parçalar → eksen; geçmişte ya da takvim dışında kalan kısım düşer. */
+function toGlobalParts(windows: PressWindows, segments: { kind: string; date: string; start: number; end: number }[]) {
+  const parts: { kind: string; start: number; end: number }[] = []
+  for (const seg of segments) {
+    const day = windows.find((d) => d.date === seg.date)
+    if (!day) continue
+    const start = day.offset + Math.max(0, seg.start - day.startNet)
+    const end = day.offset + Math.min(day.capacity, seg.end - day.startNet)
+    if (end > start) parts.push({ kind: seg.kind, start, end })
+  }
+  return parts
+}
+
+/** Eksen aralığı → gün içi parçalar (gün sınırında bölünür). */
+function fromGlobal(windows: PressWindows, start: number, end: number, kind: string) {
+  const out: { kind: string; date: string; start: number; end: number }[] = []
+  for (const day of windows) {
+    const s = Math.max(start, day.offset)
+    const e = Math.min(end, day.offset + day.capacity)
+    if (e > s) out.push({ kind, date: day.date, start: day.startNet + (s - day.offset), end: day.startNet + (e - day.offset) })
+  }
+  return out
+}
+
+function clockText(minute: number): string {
+  return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
+}
+
 function listed(items: string[]): string {
   return `${items.slice(0, 6).join(', ')}${items.length > 6 ? '…' : ''}`
 }
@@ -1548,7 +1698,7 @@ function buildWarnings(ctx: {
     list.push('No public holidays stored — open the Work Calendar page once so they are saved.')
   if (ctx.rawShortages > 0)
     list.push(
-      `${ctx.rawShortages} raw materials are short — coils must be sourced for the planned jobs.`,
+      `${ctx.rawShortages} raw material(s) run out within ${RAW_URGENT_DAYS} days — coils must be sourced now (see Raw material — urgent).`,
     )
   if (ctx.lateCount > 0)
     list.push(

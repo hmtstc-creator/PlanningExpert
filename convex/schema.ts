@@ -17,6 +17,20 @@ export default defineSchema({
     priority: v.number(),
   }).index('by_product', ['productCode']),
 
+  // Planlamacının pres bazında müdahalesi: pres şu andan önce plana girmez
+  // (operatör yok, hammadde yok…) ve/veya onaylı işleri geride/ileride.
+  pressPlanStarts: defineTable({
+    press: v.string(),
+    // Plan başlangıcı: takvim günü + saat (gece yarısından dakika).
+    fromDate: v.optional(v.string()),
+    fromMinute: v.optional(v.number()),
+    reason: v.optional(v.string()),
+    // Onaylı (dondurulmuş/çalışan) işler bu kadar dakika geride (+) / ileride (−).
+    delayMinutes: v.optional(v.number()),
+    updatedBy: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index('by_press', ['press']),
+
   products: defineTable({
     code: v.string(),
     coProduct: v.optional(v.string()),

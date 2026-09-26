@@ -70,6 +70,8 @@ export const smallInputs = internalQuery({
         .withIndex('by_status', (q: Ctx) => q.eq('status', 'open'))
         .collect(),
       locations: await ctx.db.query('storageLocations').collect(),
+      // Planlamacının pres başlangıcı / gecikme müdahaleleri.
+      pressStarts: await ctx.db.query('pressPlanStarts').collect(),
       // Planın hangi SAP yüklemeleriyle hesaplandığı — SAP Data sayfası
       // "bu dosya planda mı" sorusunu buna bakarak cevaplar.
       sapUploads: await currentUploads(ctx),

@@ -1081,6 +1081,11 @@ export interface RawMaterialNeed {
   availableKg: number
   /** Eksik kilo — 0 ise hammadde yeterli. */
   shortageKg: number
+  /**
+   * Stoğun yetmediği İLK iş: gün, pres ve parça. Planda sırayla yürünür;
+   * bu işten itibaren rulo tedarik edilmelidir.
+   */
+  shortFrom?: { date: string; press: string; material: string }
 }
 
 /**
@@ -1090,11 +1095,14 @@ export interface RawMaterialNeed {
  * atlanır (uyarı olarak ayrıca listelenir).
  */
 export function buildRawMaterialPlan(
-  jobs: { material: string; quantity: number }[],
+  jobs: { material: string; quantity: number; date?: string; press?: string; setupStartMinute?: number }[],
   products: Map<string, ProductSpec>,
   rawStockKg: Map<string, number>,
 ): RawMaterialNeed[] {
-  const byRaw = new Map<string, { kg: number; materials: Set<string> }>()
+  const byRaw = new Map<
+    string,
+    { kg: number; materials: Set<string>; uses: { date: string; minute: number; press: string; material: string; kg: number }[] }
+  >()
 
   // Eş ürün aynı gramajın içinden çıkar: asıl ürünün tükettiği sacın içinde
   // zaten sayılmıştır. İkinci kez saymak hammadde ihtiyacını şişirirdi.
@@ -1111,22 +1119,40 @@ export function buildRawMaterialPlan(
     const grossWeight = product?.grossWeight ?? 0
     if (!raw || grossWeight <= 0) continue
 
-    const entry = byRaw.get(raw) ?? { kg: 0, materials: new Set<string>() }
+    const entry = byRaw.get(raw) ?? { kg: 0, materials: new Set<string>(), uses: [] }
     // Brüt ağırlık parça başına.
     entry.kg += job.quantity * grossWeight
     entry.materials.add(job.material)
+    entry.uses.push({
+      date: job.date ?? '',
+      minute: job.setupStartMinute ?? 0,
+      press: job.press ?? '',
+      material: job.material,
+      kg: job.quantity * grossWeight,
+    })
     byRaw.set(raw, entry)
   }
 
   return Array.from(byRaw.entries())
     .map(([rawMaterial, entry]) => {
       const availableKg = rawStockKg.get(rawMaterial) ?? 0
+      // Zaman sırasıyla: stoğun yetmediği ilk iş.
+      let used = 0
+      let shortFrom: RawMaterialNeed['shortFrom']
+      for (const use of [...entry.uses].sort((a, b) => a.date.localeCompare(b.date) || a.minute - b.minute)) {
+        used += use.kg
+        if (used > availableKg + 1e-6) {
+          shortFrom = { date: use.date, press: use.press, material: use.material }
+          break
+        }
+      }
       return {
         rawMaterial,
         materials: Array.from(entry.materials).sort(),
         requiredKg: entry.kg,
         availableKg,
         shortageKg: Math.max(0, entry.kg - availableKg),
+        shortFrom,
       }
     })
     .sort((a, b) => b.shortageKg - a.shortageKg || a.rawMaterial.localeCompare(b.rawMaterial))
