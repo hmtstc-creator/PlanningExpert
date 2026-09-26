@@ -138,8 +138,8 @@ function CapacityPage() {
         </Link>{' '}
         (days from Monday, holidays removed, week exceptions and dated overtime included, planned
         stops deducted — the same hours the plan uses; this week counts only the hours still
-        ahead). Performance is applied to the production time, chosen below: A) one accepted rate
-        for every part, set on this page, or B) each part's performance from Master Data. Demand is the ZPP requirement of the week — this week also carries
+        ahead). Performance is applied to the production time, chosen below: A) Prediction OEE — one
+        rate for every part, set on this page, or B) each part's Accepted OEE from Master Data. Demand is the ZPP requirement of the week — this week also carries
         the overdue backlog — after stock in locations{' '}
         {(forecast?.stockLocations ?? ['2009', '1009']).join(', ')} is used up, earliest
         week first. Hours = pieces ÷ cavities ÷ SPM ÷ performance (10 h at 60 % counts as 16.7 h; setup and
@@ -161,8 +161,8 @@ function CapacityPage() {
         <span className="font-medium text-foreground">Performance based on:</span>
         {(
           [
-            ['accepted', `A) Accepted rate (${Math.round(acceptedRate * 1000) / 10} %)`],
-            ['masterData', 'B) Part performance (Master Data)'],
+            ['accepted', `A) Prediction OEE (${Math.round(acceptedRate * 1000) / 10} %)`],
+            ['masterData', 'B) Accepted OEE (Master Data)'],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -179,7 +179,7 @@ function CapacityPage() {
         {basis === 'accepted' && (
           <span className="flex items-center gap-2">
             <label className="flex items-center gap-1">
-              <span className="text-muted-foreground">Accepted rate</span>
+              <span className="text-muted-foreground">Prediction OEE</span>
               <input
                 type="number"
                 min={5}
@@ -204,10 +204,10 @@ function CapacityPage() {
           </span>
         )}
         <span className="basis-full text-muted-foreground">
-          Both views: available hours as they are; production time = ideal time ÷ performance.{' '}
+          Both views: available hours as they are; production time = ideal time ÷ OEE.{' '}
           {basis === 'accepted'
-            ? `A uses one accepted rate for every part (${Math.round(acceptedRate * 1000) / 10} %). It is only for this view — the plan uses the part performance from Master Data.`
-            : 'B uses each part’s performance from Master Data — the same as the plan.'}
+            ? `A uses one Prediction OEE for every part (${Math.round(acceptedRate * 1000) / 10} %). It is only for this view — the plan uses the Accepted OEE from Master Data.`
+            : 'B uses each part’s Accepted OEE from Master Data — the same as the plan.'}
         </span>
       </div>
 

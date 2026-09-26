@@ -210,6 +210,7 @@ function ReferanslarPage() {
           row['qualityApprovalMinutes'],
       ),
       performanceFactor: n(
+        row['Accepted OEE'] ??
         row['Performance Factor'] ??
           row['OEE Factor'] ??
           row['Performans Çarpanı'] ??
@@ -238,7 +239,7 @@ function ReferanslarPage() {
         and planned at exactly the need.
         Cavities do not change that number; they decide how many strokes it
         takes. A co-product comes out of the same grams, so it costs no extra
-        material. The performance factor
+        material. The Accepted OEE
         (availability × performance, quality taken as 100%) sets each job's
         total window: setup and quality approval come out of that window and the
         rest is production time.
@@ -271,7 +272,7 @@ function ReferanslarPage() {
             'Alternative 1-4',
             'Max Shot',
             'Quality Approval',
-            'Performance Factor',
+            'Accepted OEE',
             'Flexible (optional: x / yes)',
           ]}
           onRows={handleExcelRows}
@@ -311,7 +312,7 @@ function ReferanslarPage() {
           </label>
           <Field label="Periodic maintenance limit (shots)" value={form.maxShots} onChange={(v) => update('maxShots', v)} type="number" placeholder="500000" />
           <Field label="Quality Approval (min)" value={form.qualityApprovalMinutes} onChange={(v) => update('qualityApprovalMinutes', v)} type="number" placeholder="10" />
-          <Field label="Performance factor (0–1)" value={form.performanceFactor} onChange={(v) => update('performanceFactor', v)} type="number" placeholder="0.8" />
+          <Field label="Accepted OEE (0–1)" value={form.performanceFactor} onChange={(v) => update('performanceFactor', v)} type="number" placeholder="0.8" />
 
           {error && <p className="text-sm text-destructive sm:col-span-3">{error}</p>}
           <button
@@ -378,7 +379,7 @@ function ReferanslarPage() {
                     Periodic limit
                   </th>
               <th className="px-3 py-2 font-medium" title="First-piece approval after setup">Approval</th>
-              <th className="px-3 py-2 font-medium" title="Availability × performance; quality assumed 100%">Perf.</th>
+              <th className="px-3 py-2 font-medium" title="Availability × performance; quality assumed 100%">Accepted OEE</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
@@ -645,7 +646,7 @@ function ApplyToAll() {
     }
     if (
       !window.confirm(
-        `Set quality approval to ${minutes} min and performance factor to ${percent} % for EVERY part? ` +
+        `Set quality approval to ${minutes} min and Accepted OEE to ${percent} % for EVERY part? ` +
           'This overwrites the current values.',
       )
     ) {
@@ -663,7 +664,7 @@ function ApplyToAll() {
   return (
     <details className="mt-3 rounded-lg border border-border">
       <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
-        Set approval time and performance factor for all parts
+        Set approval time and Accepted OEE for all parts
       </summary>
       <div className="flex flex-wrap items-end gap-3 border-t border-border p-4 text-sm">
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -677,7 +678,7 @@ function ApplyToAll() {
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Performance factor (%)
+          Accepted OEE (%)
           <input
             type="number"
             min={1}

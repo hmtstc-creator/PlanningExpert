@@ -75,10 +75,12 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Work Calendar düzeni tanımlanmamış presin kapasitesi 0'dır; plan sayfasında
   kırmızı alarm çıkar. Program kendiliğinden vardiya uydurmaz. → uygulanacak
 - Dondurulmuş gün hem genel hem pres bazında kalır (pres değeri geneli ezer).
+- Adlar: master data'daki parça performansı = **Accepted OEE**; Capacity
+  Dashboard'daki tek oran = **Prediction OEE**.
 - Parça performansı (master data) ve kapasite katsayısı (Performance) ikisi de
-  kalır. Capacity Dashboard'da seçim: A) kabul edilen oran — tek bir oran,
+  kalır. Capacity Dashboard'da seçim: A) Prediction OEE — tek bir oran,
   Capacity Dashboard'da tanımlanır, yalnızca o görünümde kullanılır, planı
-  değiştirmez; B) master data'daki parça performansı. İkisi aynı yöntemle
+  değiştirmez; B) master data'daki Accepted OEE. İkisi aynı yöntemle
   hesaplanır: kapasite olduğu gibi, üretim süresi = ideal süre ÷ oran.
 
 - Vardiya tablosu fabrika genelinde bir kez tanımlanır (ör. 1. vardiya

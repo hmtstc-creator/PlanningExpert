@@ -174,7 +174,7 @@ function PlanLogicPage() {
             ],
             [
               'Master data',
-              'Cavities, strokes per minute (SPM), setup and coil change times, quality approval time, coil and gross weight, mould shot limit, main and alternative presses, Flexible press tick, co-product, performance factor',
+              'Cavities, strokes per minute (SPM), setup and coil change times, quality approval time, coil and gross weight, mould shot limit, main and alternative presses, Flexible press tick, co-product, Accepted OEE',
               '/referanslar',
             ],
             ['Presses', 'Hall (for the crane rule) and whether the press is coil-fed', '/makineler'],
@@ -404,10 +404,10 @@ function PlanLogicPage() {
           <span aria-hidden>→ …</span>
         </div>
         <Formula>
-          strokes = quantity ÷ cavities · job time = strokes ÷ SPM ÷ performance factor
+          strokes = quantity ÷ cavities · job time = strokes ÷ SPM ÷ Accepted OEE
         </Formula>
         <p className="text-xs text-muted-foreground">
-          Example: 10 h of pure stroke time at a 60 % performance factor is a 16.7 h job.
+          Example: 10 h of pure stroke time at a 60 % Accepted OEE is a 16.7 h job.
           Setup, coil changes and quality approval sit inside that time.
         </p>
         <p>It has to respect every rule at once:</p>

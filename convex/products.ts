@@ -229,7 +229,7 @@ export const updateField = guardedMutation({
       if (field === 'performanceFactor' && (parsed <= 0 || parsed > 1)) {
         // A factor above 1 would claim the press runs faster than its own
         // cycle time; zero would make the job infinitely long.
-        throw new ConvexError('Performance factor must be greater than 0 and at most 1')
+        throw new ConvexError('Accepted OEE must be greater than 0 and at most 1')
       }
       await ctx.db.patch(id, { [field]: parsed })
       return null
@@ -268,7 +268,7 @@ export const applyToAll = adminMutation({
       throw new ConvexError('Approval time must be between 0 and 600 minutes')
     }
     if (performanceFactor !== undefined && (performanceFactor <= 0 || performanceFactor > 1)) {
-      throw new ConvexError('Performance factor must be above 0 and at most 1 (e.g. 0.6 for 60 %)')
+      throw new ConvexError('Accepted OEE must be above 0 and at most 1 (e.g. 0.6 for 60 %)')
     }
     const patch: Record<string, number> = {}
     if (qualityApprovalMinutes !== undefined) patch.qualityApprovalMinutes = qualityApprovalMinutes
@@ -280,7 +280,7 @@ export const applyToAll = adminMutation({
       title: `Master data: set for all ${products.length} parts`,
       detail: [
         qualityApprovalMinutes !== undefined ? `quality approval ${qualityApprovalMinutes} min` : null,
-        performanceFactor !== undefined ? `performance factor ${Math.round(performanceFactor * 100)} %` : null,
+        performanceFactor !== undefined ? `Accepted OEE ${Math.round(performanceFactor * 100)} %` : null,
       ]
         .filter(Boolean)
         .join(', '),

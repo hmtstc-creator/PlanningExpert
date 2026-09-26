@@ -277,7 +277,7 @@ export const saveAcceptedPerformanceRate = guardedMutation({
   affectsPlan: false,
   handler: async (ctx, { rate }) => {
     if (!Number.isFinite(rate) || rate < 0.05 || rate > 2) {
-      throw new ConvexError('The accepted rate must be between 5 % and 200 %.')
+      throw new ConvexError('Prediction OEE must be between 5 % and 200 %.')
     }
     const existing = await ctx.db
       .query('globalShiftSettings')

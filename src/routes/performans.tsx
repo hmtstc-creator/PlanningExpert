@@ -212,7 +212,7 @@ function PerformansPage() {
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Applying the measured attainment rate builds the plan around the
-              throughput actually achieved in the past. The per-part performance
+              throughput actually achieved in the past. The per-part Accepted OEE
               from Master Data is already in the plan; this rate is measured
               against that plan, so it corrects on top of it and is not counted
               twice.
