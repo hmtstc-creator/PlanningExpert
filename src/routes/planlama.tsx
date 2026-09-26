@@ -277,12 +277,14 @@ function PlanlamaPage() {
       {run && <PlanDataLine sources={(run as { dataSources?: PlanDataSources }).dataSources} />}
 
       <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-        <strong className="text-foreground">Minimum lot is one full coil.</strong> A coil
-        that is mounted is run out, so quantities are rounded up to whole coils and the
-        surplus covers the following weeks rather than triggering a second coil. Materials
-        with no coil or gross weight in master data are planned to the exact requirement.
-        A coil is never cut short, not even to save a late job — late jobs are moved forward
-        instead. A co-product pair is one job: one stroke makes both parts.
+        <strong className="text-foreground">Lot size: Min. lot if set, otherwise whole coils.</strong>{' '}
+        A mounted coil is run out, so quantities are rounded up to whole coils and the
+        surplus covers the following weeks rather than triggering a second coil. Where a{' '}
+        <strong className="text-foreground">Min. lot</strong> is set in master data (e.g.
+        transfer presses), the lot is at least that many pieces and the coil is ignored.
+        Parts with neither are planned to the exact need and flagged. A coil is never cut
+        short, not even to save a late job — late jobs are moved forward instead. A
+        co-product pair is one job: one stroke makes both parts.
       </p>
 
       {thisWeekCapacity.full > 0 && (

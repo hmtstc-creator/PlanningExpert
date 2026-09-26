@@ -1185,12 +1185,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   }
 
   const lateCount = result.jobs.filter((j) => j.late).length
+  const lateMaterialCount = new Set(result.jobs.filter((j) => j.late).map((j) => j.material)).size
   const rawShortages = rawNeeds.filter((r) => r.shortageKg > 0).length
   const warnings = buildWarnings({
     inputs,
     holidayCount: holidays.size,
     rawShortages,
     lateCount,
+    lateMaterialCount,
     missingRawSpec: missingRawSpec.length,
     alarmedMolds,
     unavailableMolds,
@@ -1456,6 +1458,7 @@ function buildWarnings(ctx: {
   holidayCount: number
   rawShortages: number
   lateCount: number
+  lateMaterialCount: number
   missingRawSpec: number
   alarmedMolds: string[]
   unavailableMolds: string[]
@@ -1483,8 +1486,8 @@ function buildWarnings(ctx: {
     )
   if (ctx.lateCount > 0)
     list.push(
-      `${ctx.lateCount} job(s) start after their stock runs out — the customer would stop. ` +
-        `The engine re-planned and could not avoid it; see "Late jobs" below for what to change.`,
+      `${ctx.lateMaterialCount} part(s) (${ctx.lateCount} lot(s)) are not ready by the delivery time — the customer would stop. ` +
+        `The engine re-planned and could not avoid it; see "Late materials" above for what to change.`,
     )
   if (ctx.missingRawSpec > 0)
     list.push(
