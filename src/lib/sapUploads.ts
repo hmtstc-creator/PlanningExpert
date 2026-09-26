@@ -200,8 +200,11 @@ export async function uploadInBatches(
 
 /** Tarayıcıdaki süzgecin kodları — sunucudaki `sapUploads.filterCodes`. */
 export interface FilterCodes {
+  /** Master data malzemeleri ve eş ürünleri. */
   materials: string[]
   locations: string[]
+  /** Master data'daki hammadde (rulo) kodları — yalnızca MB52 için. */
+  rawMaterials?: string[]
 }
 
 /**
@@ -217,8 +220,10 @@ export function prefilterRows<Row extends { material: string; storageLocation?: 
   return filterRows<Row>({
     rows,
     materialOf: (r) => r.material,
+    rename: (r, material) => ({ ...r, material }),
     locationOf: key === 'stock' ? (r) => r.storageLocation : undefined,
-    knownMaterials: new Set(codes.materials),
+    // MB52'de rulo stoğu da gerekir (hammadde kontrolü).
+    knownMaterials: new Set(key === 'stock' ? [...codes.materials, ...(codes.rawMaterials ?? [])] : codes.materials),
     knownLocations: key === 'stock' ? new Set(codes.locations) : undefined,
   })
 }

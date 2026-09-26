@@ -5,9 +5,29 @@ import type { QueryCtx } from './_generated/server'
 
 export { filterRows, type FilterReport } from '../src/lib/uploadFilter'
 
-export async function knownMaterialCodes(ctx: QueryCtx): Promise<Set<string>> {
+/**
+ * Yüklemede tutulacak malzeme kodları: master data'daki ürünler ve eş
+ * ürünleri (eş ürün kendi satırı olmasa da talebi gerekir). `raw` ile
+ * hammadde (rulo) kodları da eklenir — MB52'deki rulo stoğu için.
+ */
+export async function knownMaterialCodes(
+  ctx: QueryCtx,
+  options: { raw?: boolean } = {},
+): Promise<Set<string>> {
   const products = await ctx.db.query('products').collect()
-  return new Set(products.map((p) => p.code.trim()).filter((c) => c !== ''))
+  const codes = new Set<string>()
+  for (const p of products) {
+    for (const c of [p.code, p.coProduct, options.raw ? p.rawMaterialCode : undefined]) {
+      const t = c?.trim()
+      if (t) codes.add(t)
+    }
+  }
+  return codes
+}
+
+export async function rawMaterialCodes(ctx: QueryCtx): Promise<Set<string>> {
+  const products = await ctx.db.query('products').collect()
+  return new Set(products.map((p) => p.rawMaterialCode?.trim() ?? '').filter((c) => c !== ''))
 }
 
 export async function knownLocationCodes(ctx: QueryCtx): Promise<Set<string>> {

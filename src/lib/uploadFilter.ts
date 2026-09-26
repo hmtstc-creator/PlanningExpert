@@ -29,9 +29,25 @@ export interface FilterReport {
   unknownLocations: string[]
 }
 
+/**
+ * Malzeme kodunun karşılaştırma biçimi: boşluksuz, büyük harf; yalnızca
+ * rakamdan oluşan kodda baştaki sıfırlar ve Excel'in ".0" eki atılır.
+ * SAP "000012345" verir, master data'da "12345" yazar — aynı malzemedir.
+ */
+export function normalizeMaterialCode(code: string): string {
+  let c = String(code ?? '').trim().toUpperCase()
+  if (/^\d+(\.0+)?$/.test(c)) c = c.replace(/\.0+$/, '').replace(/^0+(?=\d)/, '')
+  return c
+}
+
 export interface FilterOptions<Row> {
   rows: Row[]
   materialOf: (row: Row) => string
+  /**
+   * Kod master data'ya yalnızca biçim farkıyla uyuyorsa (baştaki sıfırlar,
+   * büyük/küçük harf) satır master data'daki koda çevrilir.
+   */
+  rename?: (row: Row, material: string) => Row
   /** Omit when the upload has no storage location dimension. */
   locationOf?: (row: Row) => string | undefined
   knownMaterials: Set<string>
@@ -51,8 +67,10 @@ export interface FilterResult<Row> {
  * The same applies to storage locations.
  */
 export function filterRows<Row>(options: FilterOptions<Row>): FilterResult<Row> {
-  const { rows, materialOf, locationOf, knownMaterials, knownLocations } = options
+  const { rows, materialOf, locationOf, knownMaterials, knownLocations, rename } = options
   const checkMaterial = knownMaterials.size > 0
+  const canonical = new Map<string, string>()
+  for (const code of knownMaterials) canonical.set(normalizeMaterialCode(code), code)
   const checkLocation = !!locationOf && !!knownLocations && knownLocations.size > 0
 
   const kept: Row[] = []
@@ -61,14 +79,18 @@ export function filterRows<Row>(options: FilterOptions<Row>): FilterResult<Row> 
   let skippedUnknownMaterial = 0
   let skippedUnknownLocation = 0
 
-  for (const row of rows) {
+  for (let row of rows) {
     const material = materialOf(row).trim()
     if (!material) continue
 
     if (checkMaterial && !knownMaterials.has(material)) {
-      skippedUnknownMaterial++
-      if (unknownMaterials.size < MAX_REPORTED) unknownMaterials.add(material)
-      continue
+      const match = canonical.get(normalizeMaterialCode(material))
+      if (!match) {
+        skippedUnknownMaterial++
+        if (unknownMaterials.size < MAX_REPORTED) unknownMaterials.add(material)
+        continue
+      }
+      if (rename) row = rename(row, match)
     }
 
     if (checkLocation) {

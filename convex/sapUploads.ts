@@ -4,7 +4,7 @@ import { guardedMutation, guardedQuery } from './guarded'
 import { runSync } from './moldAlarms'
 import { planStatusDoc } from './planQueue'
 import { TABLE_OF, liveUploadAt, uploadRecord } from './sapLive'
-import { filterRows, knownLocationCodes, knownMaterialCodes } from './uploadFilter'
+import { filterRows, knownLocationCodes, knownMaterialCodes, rawMaterialCodes } from './uploadFilter'
 import { SAP_UPLOAD_KEYS, type SapUpload, type SapUploadKey } from '../src/lib/sapUploads'
 
 /**
@@ -104,8 +104,9 @@ export const appendRows = guardedMutation({
     const { kept, report } = filterRows<Record<string, unknown>>({
       rows: clean,
       materialOf: (r) => String(r.material ?? ''),
+      rename: (r, material) => ({ ...r, material }),
       locationOf: key === 'stock' ? (r) => r.storageLocation as string | undefined : undefined,
-      knownMaterials: await knownMaterialCodes(ctx),
+      knownMaterials: await knownMaterialCodes(ctx, { raw: key === 'stock' }),
       knownLocations: key === 'stock' ? await knownLocationCodes(ctx) : undefined,
     })
     const table = TABLE_OF[key as SapUploadKey]
@@ -180,10 +181,15 @@ export const pruneOld = guardedMutation({
  */
 export const filterCodes = guardedQuery({
   args: {},
-  returns: v.object({ materials: v.array(v.string()), locations: v.array(v.string()) }),
+  returns: v.object({
+    materials: v.array(v.string()),
+    locations: v.array(v.string()),
+    rawMaterials: v.array(v.string()),
+  }),
   handler: async (ctx: Ctx) => ({
     materials: [...(await knownMaterialCodes(ctx))],
     locations: [...(await knownLocationCodes(ctx))],
+    rawMaterials: [...(await rawMaterialCodes(ctx))],
   }),
 })
 

@@ -218,6 +218,22 @@ export interface PlanOptimisation {
   scenarios: ScenarioSummary[]
 }
 
+/**
+ * Master data kapsaması: master data'daki bir malzeme için yüklenen SAP
+ * dosyalarında hiç satır var mı? Master data ana listedir; bir malzeme hiçbir
+ * dosyada yoksa ya dosya eksik çekilmiştir ya da kod yanlıştır.
+ */
+export interface DataCoverage {
+  materials: number
+  files: Record<
+    'weeklyDemand' | 'dailyDemand' | 'stock',
+    { uploaded: boolean; missingCount: number; missing: string[] }
+  >
+  /** Yüklenen dosyaların hiçbirinde satırı olmayan malzemeler. */
+  missingEverywhereCount: number
+  missingEverywhere: string[]
+}
+
 export interface LateItem {
   material: string
   presses: string[]
@@ -271,6 +287,8 @@ export interface PlanRun {
   optimisation?: PlanOptimisation
   /** Bağımsız doğrulama motorunun sonucu (bkz. planValidator.ts). */
   validation?: PlanValidation | null
+  /** Master data'daki malzemelerin SAP dosyalarındaki karşılığı. */
+  dataCoverage?: DataCoverage
   /** Geç kalemler, malzeme bazında, gecikme saati ve kapasite önerisiyle. */
   lateItems?: LateItem[]
   frozenCount: number
@@ -1446,7 +1464,35 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // kuralları yeniden sayar, gecikmelerin kaçınılmaz olup olmadığını sınar.
   // Hata verirse plan yine de çıkar.
   run.validation = safeValidatePlan(inputs, run, nowMs)
+  run.dataCoverage = dataCoverageOf(inputs)
   return run
+}
+
+const COVERAGE_LIST_CAP = 400
+
+export function dataCoverageOf(inputs: PlanInputs): DataCoverage {
+  const master = Array.from(new Set(inputs.products.map((p) => p.code.trim()).filter(Boolean))).sort()
+  const sets = {
+    weeklyDemand: new Set(inputs.weeklyDemand.map((r) => r.material.trim())),
+    dailyDemand: new Set((inputs.dailyDemand ?? []).map((r) => r.material.trim())),
+    stock: new Set(inputs.stock.map((r) => r.material.trim())),
+  }
+  const keys = ['weeklyDemand', 'dailyDemand', 'stock'] as const
+  const files = {} as DataCoverage['files']
+  for (const key of keys) {
+    const uploaded = sets[key].size > 0
+    const missing = uploaded ? master.filter((m) => !sets[key].has(m)) : []
+    files[key] = { uploaded, missingCount: missing.length, missing: missing.slice(0, COVERAGE_LIST_CAP) }
+  }
+  const uploadedKeys = keys.filter((k) => files[k].uploaded)
+  const everywhere =
+    uploadedKeys.length === 0 ? [] : master.filter((m) => uploadedKeys.every((k) => !sets[k].has(m)))
+  return {
+    materials: master.length,
+    files,
+    missingEverywhereCount: everywhere.length,
+    missingEverywhere: everywhere.slice(0, COVERAGE_LIST_CAP),
+  }
 }
 
 function listed(items: string[]): string {
