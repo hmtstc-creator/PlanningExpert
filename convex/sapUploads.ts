@@ -108,6 +108,7 @@ export const appendRows = guardedMutation({
       locationOf: key === 'stock' ? (r) => r.storageLocation as string | undefined : undefined,
       knownMaterials: await knownMaterialCodes(ctx, { raw: key === 'stock' }),
       knownLocations: key === 'stock' ? await knownLocationCodes(ctx) : undefined,
+      locationExempt: key === 'stock' ? await rawMaterialCodes(ctx) : undefined,
     })
     const table = TABLE_OF[key as SapUploadKey]
     for (const row of kept) await ctx.db.insert(table, { ...row, uploadedAt })

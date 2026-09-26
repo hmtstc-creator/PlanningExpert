@@ -59,6 +59,8 @@ import {
 } from './scheduler'
 
 const RAW_STOCK = new Set(['raw_material'])
+/** Kullanılamayan stok: kalite bekleyen ve müşteriye geçmiş. */
+const NOT_AVAILABLE = new Set(['quality', 'customer'])
 export const DEFAULT_HORIZON_WEEKS = 4
 /** Emniyet stoğu varsayılanı (iş günü). Work Calendar sayfasından değişir. */
 export const DEFAULT_SAFETY_STOCK_DAYS = 2
@@ -226,7 +228,7 @@ export interface PlanOptimisation {
 export interface DataCoverage {
   materials: number
   files: Record<
-    'weeklyDemand' | 'dailyDemand' | 'stock',
+    'weeklyDemand' | 'dailyDemand' | 'stock' | 'rawStock',
     { uploaded: boolean; missingCount: number; missing: string[] }
   >
   /** Yüklenen dosyaların hiçbirinde satırı olmayan malzemeler. */
@@ -339,6 +341,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const locCategory = new Map(inputs.locations.map((l) => [l.code, l.category]))
   const stockByMaterial = new Map<string, number>()
   const rawStockByMaterial = new Map<string, number>()
+  const rawCodes = new Set(inputs.products.map((p) => p.rawMaterialCode?.trim() ?? '').filter(Boolean))
   // Mamul stoğu yalnızca belirlenen depolardan (2009, 1009) sayılır — Capacity
   // Dashboard ile aynı liste. Deposu yazılmamış satır (eski/elle veri) sayılır.
   const stockLocations = new Set(PLAN_STOCK_LOCATIONS)
@@ -348,7 +351,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     if (!loc || stockLocations.has(loc)) {
       sum(stockByMaterial, row.material, row.unrestricted ?? 0)
     }
-    if (cat && RAW_STOCK.has(cat)) sum(rawStockByMaterial, row.material, row.unrestricted ?? 0)
+    // Rulo stoğu: master data'daki hammadde kodu hangi depoda olursa olsun
+    // sayılır; yalnızca kalite bekleyen ve müşteriye geçmiş depolar hariç.
+    if (
+      (cat && RAW_STOCK.has(cat)) ||
+      (rawCodes.has(row.material.trim()) && !(cat && NOT_AVAILABLE.has(cat)))
+    ) {
+      sum(rawStockByMaterial, row.material, row.unrestricted ?? 0)
+    }
   }
 
   const productByCode = new Map<string, ProductSpec>()
@@ -1483,6 +1493,16 @@ export function dataCoverageOf(inputs: PlanInputs): DataCoverage {
     const uploaded = sets[key].size > 0
     const missing = uploaded ? master.filter((m) => !sets[key].has(m)) : []
     files[key] = { uploaded, missingCount: missing.length, missing: missing.slice(0, COVERAGE_LIST_CAP) }
+  }
+  // Master data'daki hammadde (rulo) kodları: MB52'de satırı var mı?
+  const rawCodes = Array.from(
+    new Set(inputs.products.map((p) => p.rawMaterialCode?.trim() ?? '').filter(Boolean)),
+  ).sort()
+  const rawMissing = sets.stock.size > 0 ? rawCodes.filter((c) => !sets.stock.has(c)) : []
+  files.rawStock = {
+    uploaded: sets.stock.size > 0,
+    missingCount: rawMissing.length,
+    missing: rawMissing.slice(0, COVERAGE_LIST_CAP),
   }
   const uploadedKeys = keys.filter((k) => files[k].uploaded)
   const everywhere =

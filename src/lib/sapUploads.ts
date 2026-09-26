@@ -225,5 +225,6 @@ export function prefilterRows<Row extends { material: string; storageLocation?: 
     // MB52'de rulo stoğu da gerekir (hammadde kontrolü).
     knownMaterials: new Set(key === 'stock' ? [...codes.materials, ...(codes.rawMaterials ?? [])] : codes.materials),
     knownLocations: key === 'stock' ? new Set(codes.locations) : undefined,
+    locationExempt: key === 'stock' ? new Set(codes.rawMaterials ?? []) : undefined,
   })
 }

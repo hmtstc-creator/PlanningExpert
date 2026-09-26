@@ -1109,6 +1109,7 @@ const COVERAGE_FILES: { key: keyof DataCoverage['files']; label: string }[] = [
   { key: 'weeklyDemand', label: 'ZPP (weekly demand)' },
   { key: 'dailyDemand', label: 'ZPP_DAILY (daily demand)' },
   { key: 'stock', label: 'MB52 (stock)' },
+  { key: 'rawStock', label: 'MB52 (raw material coils)' },
 ]
 
 /**

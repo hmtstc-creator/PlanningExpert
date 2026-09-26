@@ -50,4 +50,25 @@ describe('master data coverage alarm', () => {
     expect(c.files.dailyDemand).toEqual({ uploaded: false, missingCount: 0, missing: [] })
     expect(c.missingEverywhere).toEqual(['C'])
   })
+
+  it('checks the raw material codes of master data in MB52 too', () => {
+    const c = dataCoverageOf({
+      ...base,
+      products: [{ code: 'A', rawMaterialCode: 'RAW-1' }, { code: 'B', rawMaterialCode: 'RAW-2' }],
+      stock: [...base.stock, { material: 'RAW-1', storageLocation: 'X', unrestricted: 900 }],
+    } as unknown as PlanInputs)
+    expect(c.files.rawStock.missing).toEqual(['RAW-2'])
+  })
+})
+
+describe('raw material stock', () => {
+  it('keeps master data raw codes from any storage location, even an undefined one', () => {
+    const codes = { materials: ['A'], locations: ['2009'], rawMaterials: ['RAW-1'] }
+    const rows = [
+      { material: 'RAW-1', storageLocation: 'R999' },
+      { material: 'A', storageLocation: 'R999' },
+      { material: 'RAW-9', storageLocation: '2009' },
+    ]
+    expect(prefilterRows('stock', rows, codes).kept.map((r) => r.material)).toEqual(['RAW-1'])
+  })
 })

@@ -52,6 +52,11 @@ export interface FilterOptions<Row> {
   locationOf?: (row: Row) => string | undefined
   knownMaterials: Set<string>
   knownLocations?: Set<string>
+  /**
+   * Bu malzemelerin satırları depo süzgecine takılmaz (ör. master data'daki
+   * hammadde kodları: rulo hangi depoda olursa olsun gerekir).
+   */
+  locationExempt?: Set<string>
 }
 
 export interface FilterResult<Row> {
@@ -67,7 +72,8 @@ export interface FilterResult<Row> {
  * The same applies to storage locations.
  */
 export function filterRows<Row>(options: FilterOptions<Row>): FilterResult<Row> {
-  const { rows, materialOf, locationOf, knownMaterials, knownLocations, rename } = options
+  const { rows, materialOf, locationOf, knownMaterials, knownLocations, rename, locationExempt } = options
+  const exempt = new Set(Array.from(locationExempt ?? [], (c) => normalizeMaterialCode(c)))
   const checkMaterial = knownMaterials.size > 0
   const canonical = new Map<string, string>()
   for (const code of knownMaterials) canonical.set(normalizeMaterialCode(code), code)
@@ -91,6 +97,10 @@ export function filterRows<Row>(options: FilterOptions<Row>): FilterResult<Row> 
         continue
       }
       if (rename) row = rename(row, match)
+    }
+    if (exempt.has(normalizeMaterialCode(material))) {
+      kept.push(row)
+      continue
     }
 
     if (checkLocation) {
