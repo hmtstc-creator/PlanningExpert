@@ -150,7 +150,8 @@ export default defineSchema({
 
   workCalendar: defineTable({
     key: v.string(),
-    shiftMinutesPerDay: v.number(),
+    // @deprecated Vardiya süresinin eski kopyası; tek kaynak globalShiftSettings.shiftMinutes.
+    shiftMinutesPerDay: v.optional(v.number()),
     workingDays: v.array(v.string()),
     holidays: v.array(v.string()),
   }).index('by_key', ['key']),

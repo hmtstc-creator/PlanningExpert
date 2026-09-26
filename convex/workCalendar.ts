@@ -6,7 +6,8 @@ const calendarValidator = v.object({
   _id: v.id('workCalendar'),
   _creationTime: v.number(),
   key: v.string(),
-  shiftMinutesPerDay: v.number(),
+  /** @deprecated Vardiya süresi globalShiftSettings.shiftMinutes'tadır; okunmaz. */
+  shiftMinutesPerDay: v.optional(v.number()),
   workingDays: v.array(v.string()),
   holidays: v.array(v.string()),
 })
@@ -23,7 +24,6 @@ export const get = guardedQuery({
 
 export const save = guardedMutation({
   args: {
-    shiftMinutesPerDay: v.number(),
     workingDays: v.array(v.string()),
     holidays: v.array(v.string()),
   },

@@ -32,6 +32,7 @@ import {
   formatPlantTime,
   type PlanDataSources,
 } from '../lib/sapUploads'
+import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 
 export const Route = createFileRoute('/planlama')({
   component: PlanlamaPage,
@@ -116,9 +117,9 @@ function PlanlamaPage() {
   }, [])
 
   const inputsLoading = run === undefined
-  const shiftMinutes = run?.shiftMinutes ?? 480
-  const shiftStartMinute = run?.shiftStartMinute ?? 420
-  const capacityFactor = run?.capacityFactor ?? 1
+  const shiftMinutes = run?.shiftMinutes ?? SETTINGS_DEFAULTS.shiftMinutes
+  const shiftStartMinute = run?.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute
+  const capacityFactor = run?.capacityFactor ?? SETTINGS_DEFAULTS.capacityFactor
   const horizonWeeks = run?.horizonWeeks ?? 4
   const globalFrozenDays = run?.globalFrozenDays ?? 0
   const truncatedInputs = run?.truncatedInputs ?? []
@@ -126,11 +127,11 @@ function PlanlamaPage() {
   const plannedStops = run?.plannedStops ?? []
   const warnings = run?.warnings ?? []
   const rawNeeds = run?.rawNeeds ?? []
-  // Plan sayfasında yalnızca acil hammadde: ilk eksik iş RAW_URGENT_DAYS gün içinde.
-  const rawUrgentUntil = run
-    ? new Date(Date.parse(`${run.todayIso}T00:00:00Z`) + (RAW_URGENT_DAYS - 1) * 86_400_000).toISOString().slice(0, 10)
-    : ''
-  const shortRaw = rawNeeds.filter((r) => r.shortageKg > 0 && r.shortFrom)
+  // Plan sayfasında yalnızca acil hammadde: ilk eksik iş RAW_URGENT_DAYS iş günü
+  // içinde. Sınır motordan gelir (tek hesap); eski planlarda bugünden sayılır.
+  const rawUrgentUntil = run?.rawUrgentUntil ?? run?.todayIso ?? ''
+  // Toplamda yetse de yoldaki rulo geç geliyorsa iş durur: ilk eksik iş esas.
+  const shortRaw = rawNeeds.filter((r) => r.shortFrom)
   const urgentRaw = shortRaw.filter((r) => r.shortFrom!.date <= rawUrgentUntil)
   const laterRaw = shortRaw.length - urgentRaw.length
   const unplanned = run?.unplanned ?? []
@@ -786,12 +787,13 @@ function PlanlamaPage() {
       {urgentRaw.length > 0 && (
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-destructive">
-            Raw material — urgent ({urgentRaw.length}): coil stock runs out within the next {RAW_URGENT_DAYS} days
+            Raw material — urgent ({urgentRaw.length}): coil stock runs out within the next {RAW_URGENT_DAYS} working days
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Planned quantity × gross weight per piece, walked in plan order against the coil
-            stock in MB52 (master data raw material codes, every location except Quality and
-            Customer). Only coils that stop a job in the next {RAW_URGENT_DAYS} days are listed
+            stock in MB52 (locations ticked Raw material on Storage Locations) plus the coils in
+            transit from their arrival day. Only coils that stop a job in the next{' '}
+            {RAW_URGENT_DAYS} working days are listed
             {laterRaw > 0 && ` — ${laterRaw} more run short later in the plan`}. Co-products are
             not counted twice.
           </p>
@@ -802,6 +804,7 @@ function PlanlamaPage() {
                   <th className="px-3 py-2 font-medium">Raw material</th>
                   <th className="px-3 py-2 font-medium">Required (kg)</th>
                   <th className="px-3 py-2 font-medium">Stock (kg)</th>
+                  <th className="px-3 py-2 font-medium">In transit (kg)</th>
                   <th className="px-3 py-2 font-medium">Short (kg)</th>
                   <th className="px-3 py-2 font-medium">First job without coil</th>
                   <th className="px-3 py-2 font-medium">Used by</th>
@@ -817,14 +820,13 @@ function PlanlamaPage() {
                     <td className="px-3 py-2 text-muted-foreground">
                       {Math.round(r.availableKg).toLocaleString('en-GB')}
                     </td>
-                    <td
-                      className={`px-3 py-2 font-medium ${
-                        r.shortageKg > 0 ? 'text-destructive' : 'text-emerald-600'
-                      }`}
-                    >
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {r.inTransitKg ? Math.round(r.inTransitKg).toLocaleString('en-GB') : '—'}
+                    </td>
+                    <td className="px-3 py-2 font-medium text-destructive">
                       {r.shortageKg > 0
                         ? Math.round(r.shortageKg).toLocaleString('en-GB')
-                        : 'sufficient'}
+                        : 'in transit arrives too late'}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs text-foreground">
                       {r.shortFrom ? `${dayMonth(r.shortFrom.date)} · ${r.shortFrom.press} · ${r.shortFrom.material}` : '—'}

@@ -72,6 +72,15 @@ describe('raw material MRP (plan independent)', () => {
     for (const row of r.rows) expect(row.stockEndKg).toBeGreaterThanOrEqual(row.safetyKg)
   })
 
+  it('a holiday week has fewer working days, so 10 working days reach further', () => {
+    // Hafta 2'de 2 gün tatil (3 iş günü): 10 iş günü = hafta 2 (3 gün) + hafta 3 (5) + hafta 4'ün 2 günü.
+    const r = rawMrp(
+      { rawMaterial: 'R1', materials: [], stockKg: 0, needKg: [5000, 3000, 5000, 5000] },
+      { coverageDays: 10, extraKg: 0, workingDaysPerWeek: 5, workingDaysByWeek: [5, 3, 5, 5] },
+    )
+    expect(r.rows[0].safetyKg).toBe(3000 + 5000 + 2000)
+  })
+
   it('no demand, no order — nothing is forecast beyond the last ZPP week', () => {
     const none = rawMrp({ rawMaterial: 'R1', materials: [], stockKg: 0, needKg: [0, 0, 0, 0] }, { coverageDays: 10, extraKg: 500 })
     expect(none.totalOrderKg).toBe(0)

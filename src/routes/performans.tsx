@@ -10,11 +10,9 @@ import {
   performanceFactor,
   theoreticalMinutes,
 } from '../lib/performance'
-import {
-  buildWeekBuckets,
-  type DayBucket,
-  type ProductSpec,
-} from '../lib/planning'
+import { type ProductSpec } from '../lib/planning'
+import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
+import { capacityModel } from '../lib/capacityModel'
 
 export const Route = createFileRoute('/performans')({
   component: PerformansPage,
@@ -52,9 +50,8 @@ function PerformansPage() {
   const setCapacityFactor = useMutation(api.pressCalendar.setCapacityFactor)
   const [applied, setApplied] = useState(false)
 
-  const shiftMinutes = globalSettings?.shiftMinutes ?? 480
-  const overtimeShiftMinutes = globalSettings?.overtimeShiftMinutes ?? 480
-  const breakMinutesPerShift = globalSettings?.breakMinutesPerShift ?? 0
+  const shiftMinutes = globalSettings?.shiftMinutes ?? SETTINGS_DEFAULTS.shiftMinutes
+  const overtimeShiftMinutes = globalSettings?.overtimeShiftMinutes ?? SETTINGS_DEFAULTS.overtimeShiftMinutes
 
   const productByCode = useMemo(() => {
     const map = new Map<string, ProductSpec>()
@@ -97,56 +94,45 @@ function PerformansPage() {
     [actualInRange, productByCode],
   )
 
-  // Aralıktaki açık kapasite: her presin şablon düzeni × takvim günleri.
+  // Aralıktaki açık kapasite — planla aynı formül (capacityModel): şablon,
+  // istisna hafta (fazla mesai), resmi + elle tatiller, planlı duruşlar.
+  const weekOverrides = (useQuery(api.pressCalendar.listAllOverrides) ?? []) as {
+    press: string
+    weekStart: string
+    workingDays: number
+    shiftsPerDay: number
+    overtimeShifts: number
+  }[]
+  const plannedStops = (useQuery(api.plannedStops.list) ?? []) as { shiftIndex: number; durationMinutes: number }[]
+  const country = globalSettings?.country ?? SETTINGS_DEFAULTS.country
+  const officialHolidays = (useQuery(api.holidays.listByCountry, { country }) ?? []) as { date: string }[]
   const availableMinutes = useMemo(() => {
-    const holidays = new Set<string>((workCalendar?.holidays ?? []) as string[])
-    const workingDayKeys = (workCalendar?.workingDays ?? [
-      'MO',
-      'TU',
-      'WE',
-      'TH',
-      'FR',
-    ]) as string[]
-    const templateByPress = new Map(templates.map((t) => [t.press, t]))
-
+    const model = capacityModel({
+      shiftMinutes,
+      overtimeShiftMinutes,
+      plannedStops,
+      templates,
+      weekOverrides,
+      workingDayKeys: (workCalendar?.workingDays ?? undefined) as string[] | undefined,
+      holidays: new Set<string>([
+        ...((workCalendar?.holidays ?? []) as string[]),
+        ...officialHolidays.map((h) => h.date),
+      ]),
+    })
     let total = 0
     for (const press of presses) {
-      const pattern = templateByPress.get(press.name) ?? {
-        workingDays: workingDayKeys.length,
-        shiftsPerDay: 1,
-        overtimeShifts: 0,
-      }
       let week = mondayOf(new Date(from))
       const end = new Date(to)
-      const buckets: DayBucket[] = []
-      // Aralığı kapsayacak kadar hafta üret (en fazla 60 hafta güvenlik sınırı).
+      // Aralığı kapsayacak kadar hafta (en fazla 60 hafta güvenlik sınırı).
       for (let guard = 0; guard < 60 && week <= end; guard++) {
-        buckets.push(
-          ...buildWeekBuckets(
-            week,
-            pattern,
-            { shiftMinutes, overtimeShiftMinutes, breakMinutesPerShift },
-            holidays,
-            workingDayKeys,
-          ),
-        )
+        for (const b of model.weekBuckets(press.name, week)) {
+          if (b.date >= from && b.date <= to) total += b.minutes
+        }
         week = addDays(week, 7)
-      }
-      for (const b of buckets) {
-        if (b.date >= from && b.date <= to) total += b.minutes
       }
     }
     return total
-  }, [
-    presses,
-    templates,
-    workCalendar,
-    from,
-    to,
-    shiftMinutes,
-    overtimeShiftMinutes,
-    breakMinutesPerShift,
-  ])
+  }, [presses, templates, weekOverrides, plannedStops, officialHolidays, workCalendar, from, to, shiftMinutes, overtimeShiftMinutes])
 
   const utilisation = capacityUtilisation(theoretical, availableMinutes)
 
@@ -212,12 +198,15 @@ function PerformansPage() {
           <div className="text-sm">
             <p className="text-foreground">
               Planning capacity currently uses a factor of{' '}
-              <strong>%{Math.round((globalSettings?.capacityFactor ?? 1) * 100)}</strong>{' '}
+              <strong>%{Math.round((globalSettings?.capacityFactor ?? SETTINGS_DEFAULTS.capacityFactor) * 100)}</strong>{' '}
               .
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Applying the measured attainment rate builds the plan around the
-              throughput actually achieved in the past.
+              throughput actually achieved in the past. The per-part performance
+              from Master Data is already in the plan; this rate is measured
+              against that plan, so it corrects on top of it and is not counted
+              twice.
             </p>
           </div>
           <button

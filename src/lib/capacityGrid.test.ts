@@ -73,6 +73,16 @@ describe('buildGrid', () => {
     expect(cell.effectiveShifts).toBe(5)
   })
 
+  it('uses the same net hours as the plan: planned stops are deducted', () => {
+    const [cell] = buildGrid({ ...base, stopMinutesByShift: [30, 30, 30] })
+    expect(cell.effectiveMinutes).toBe(15 * 450)
+  })
+
+  it('never counts more normal days than the Work Calendar working days, like the plan', () => {
+    const [cell] = buildGrid({ ...base, templates: new Map([['PRS-1', { workingDays: 6, shiftsPerDay: 3, overtimeShifts: 0 }]]) })
+    expect(cell.effectiveShifts).toBe(15)
+  })
+
   it('produces one cell per press per week', () => {
     const cells = buildGrid({
       ...base,

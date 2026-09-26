@@ -79,8 +79,9 @@ function CapacityPage() {
         <Link to="/takvim" className="underline">
           Work Calendar
         </Link>{' '}
-        (holidays removed, week exceptions and overtime included; this week counts only the
-        hours still ahead). Demand is the ZPP requirement of the week — this week also carries
+        (holidays removed, week exceptions and overtime included, planned stops deducted and the
+        capacity factor from the Performance page applied — the same hours the plan uses; this
+        week counts only the hours still ahead). Demand is the ZPP requirement of the week — this week also carries
         the overdue backlog — after stock in locations{' '}
         {(forecast?.stockLocations ?? ['2009', '1009']).join(', ')} is used up, earliest
         week first. Hours = pieces ÷ cavities ÷ SPM ÷ performance factor (10 h at 60 % counts as

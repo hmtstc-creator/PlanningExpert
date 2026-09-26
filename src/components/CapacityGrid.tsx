@@ -33,6 +33,8 @@ export interface CapacityGridProps {
   shiftMinutes: number
   overtimeShiftMinutes: number
   defaultPattern: WeekPattern
+  /** Planlı duruşlar (vardiya başına dk) — saatler planla aynı, net. */
+  stopMinutesByShift?: number[]
   onSaveOverride: (press: string, weekStart: string, pattern: WeekPattern) => Promise<unknown>
   onClearOverride: (press: string, weekStart: string) => Promise<unknown>
 }
@@ -232,7 +234,7 @@ export function CapacityGrid(props: CapacityGridProps) {
                               `${press.name} · ${weekLabel(iso)}\n` +
                               `${cell.pattern.workingDays} days × ${cell.pattern.shiftsPerDay} shifts + ` +
                               `${cell.pattern.overtimeShifts} overtime\n` +
-                              `${cell.effectiveShifts} shifts · ${(cell.effectiveMinutes / 60).toFixed(0)} h` +
+                              `${cell.effectiveShifts} shifts · ${(cell.effectiveMinutes / 60).toFixed(0)} net h (planned stops deducted)` +
                               (cell.holidayCount > 0 ? `\n${cell.holidayCount} holiday(s)` : '') +
                               (cell.overridden ? '\nException week' : '')
                             }

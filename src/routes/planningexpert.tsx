@@ -40,13 +40,16 @@ function HomePage() {
   // Plan ile aynı kural: Storage Locations matrisinde "Finished goods" tikli depolar.
   const counted = useMemo(() => countedLocations(locations), [locations])
 
+  // Yalnızca mamul (master data kodu) adedi: MB52'deki rulo satırları kg'dır,
+  // adetle toplanmaz.
   const availableStock = useMemo(() => {
+    const finished = new Set(products.map((p) => p.code))
     let total = 0
     for (const s of stockRows) {
-      if (isFinishedStockRow(counted, s.storageLocation)) total += s.unrestricted ?? 0
+      if (finished.has(s.material) && isFinishedStockRow(counted, s.storageLocation)) total += s.unrestricted ?? 0
     }
     return total
-  }, [stockRows, counted])
+  }, [stockRows, counted, products])
 
   const productCodes = useMemo(() => new Set(products.map((p) => p.code)), [products])
 

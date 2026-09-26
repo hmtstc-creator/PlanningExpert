@@ -28,6 +28,8 @@ export interface MrpWeek {
   /** Pazartesi (ISO). */
   start: string
   label: string
+  /** O haftadaki iş günü (Work Calendar + tatiller). Yoksa haftalık varsayılan. */
+  workingDays?: number
 }
 
 export interface RawRequirement {
@@ -70,6 +72,8 @@ export interface MrpSettings {
   extraKg: number
   /** Haftadaki iş günü (varsayılan 5). */
   workingDaysPerWeek?: number
+  /** Her haftanın kendi iş günü (tatilli hafta daha az); verilirse bu kullanılır. */
+  workingDaysByWeek?: number[]
 }
 
 export interface MrpWeekRow {
@@ -264,12 +268,20 @@ export function rawMrp(item: RawRequirement, settings: MrpSettings): RawMrpResul
    * ihtiyacı iş günlerine eşit dağılır; ZPP'nin ötesinde talep sıfırdır —
    * talep yoksa hammadde de getirilmez.
    */
+  const daysIn = (k: number) => Math.max(0, Math.round(settings.workingDaysByWeek?.[k] ?? perWeek))
   const safetyAfter = (w: number) => {
     let left = coverDays
     let kg = 0
     for (let k = w + 1; left > 0 && k < n; k++) {
-      const days = Math.min(perWeek, left)
-      kg += (need[k] * days) / perWeek
+      const wd = daysIn(k)
+      // İş günü olmayan haftanın (ör. bayram haftası) ihtiyacı yine gelir,
+      // iş günü sayılmaz: pencere bir sonraki haftaya uzar.
+      if (wd === 0) {
+        kg += need[k]
+        continue
+      }
+      const days = Math.min(wd, left)
+      kg += (need[k] * days) / wd
       left -= days
     }
     return kg

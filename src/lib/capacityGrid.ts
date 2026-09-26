@@ -6,7 +6,7 @@
 // week actually has — holidays remove a working day, so a week with the same
 // pattern is not always worth the same number of shifts.
 
-import { DAY_KEYS } from './planning'
+import { buildWeekBuckets, DAY_KEYS } from './planning'
 import { addDays, isoDate } from './dates'
 
 export interface WeekPattern {
@@ -40,6 +40,11 @@ export interface GridInput {
   shiftMinutes: number
   overtimeShiftMinutes: number
   defaultPattern: WeekPattern
+  /**
+   * Vardiya başına planlı duruş dakikası (çay, yemek, devir). Verilirse
+   * saatler planla aynı, net hesaplanır.
+   */
+  stopMinutesByShift?: number[]
 }
 
 /**
@@ -86,8 +91,21 @@ export function buildGrid(input: GridInput): GridCell[] {
         input.holidays,
         input.workingDayKeys,
       )
-      const normalDays = Math.max(0, pattern.workingDays - holidayCount)
-      const effectiveShifts = normalDays * pattern.shiftsPerDay + pattern.overtimeShifts
+      // Planla aynı formül (buildWeekBuckets): normal vardiyalar yalnız
+      // çalışma günlerine, tatil günü kaydırılır, planlı duruşlar düşülür.
+      const buckets = buildWeekBuckets(
+        weekStart,
+        pattern,
+        {
+          shiftMinutes: input.shiftMinutes,
+          overtimeShiftMinutes: input.overtimeShiftMinutes,
+          stopMinutesByShift: input.stopMinutesByShift ?? [0, 0, 0],
+        },
+        input.holidays,
+        input.workingDayKeys,
+      )
+      const effectiveShifts = buckets.reduce((a, b) => a + b.shifts, 0)
+      const effectiveMinutes = buckets.reduce((a, b) => a + b.minutes, 0)
 
       cells.push({
         press: press.name,
@@ -96,9 +114,7 @@ export function buildGrid(input: GridInput): GridCell[] {
         overridden: !!override,
         holidayCount,
         effectiveShifts,
-        effectiveMinutes:
-          normalDays * pattern.shiftsPerDay * input.shiftMinutes +
-          pattern.overtimeShifts * input.overtimeShiftMinutes,
+        effectiveMinutes,
       })
     }
   }

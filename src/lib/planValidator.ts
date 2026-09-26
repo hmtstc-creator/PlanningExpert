@@ -26,6 +26,7 @@ import type { PlanInputs, PlanRun } from './planPipeline'
 import type { ProductSpec } from './planning'
 import type { ScheduledJob } from './scheduler'
 import { countedLocations } from './stockLocations'
+import { DEFAULT_WORKING_DAYS, SETTINGS_DEFAULTS } from './settingsDefaults'
 
 // ---------------------------------------------------------------- çıktı tipleri
 
@@ -378,13 +379,13 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   // ---- ayarlar
   const s = inputs.settings ?? {}
   const timeZone = s.timeZone || run.timeZone || 'Europe/Bucharest'
-  const shiftStart = s.shiftStartMinute ?? 420
-  const shiftLen = s.shiftMinutes ?? 480
-  const overtimeLen = s.overtimeShiftMinutes ?? 480
-  const cutoff = s.deliveryCutoffMinute ?? 480
-  const weeks = Math.min(30, Math.max(1, s.planningHorizonWeeks ?? 4))
-  const capacityFactor = s.capacityFactor ?? 1
-  const setupGap = s.setupGapMinutes ?? 10
+  const shiftStart = s.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute
+  const shiftLen = s.shiftMinutes ?? SETTINGS_DEFAULTS.shiftMinutes
+  const overtimeLen = s.overtimeShiftMinutes ?? SETTINGS_DEFAULTS.overtimeShiftMinutes
+  const cutoff = s.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute
+  const weeks = Math.min(30, Math.max(1, s.planningHorizonWeeks ?? SETTINGS_DEFAULTS.planningHorizonWeeks))
+  const capacityFactor = s.capacityFactor ?? SETTINGS_DEFAULTS.capacityFactor
+  const setupGap = s.setupGapMinutes ?? SETTINGS_DEFAULTS.setupGapMinutes
   // Setup çay/yemek molasında durmaz: presten en fazla en uzun mola kadar
   // az yer tutabilir. Alt sınırlar (kanıt) bu kısalmayı hesaba katar;
   // "boşluğa sığardı" denemesi tam süreyle yapılır (iyimser olmasın).
@@ -393,14 +394,16 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     ...inputs.plannedStops.filter((st) => ['tea', 'meal', 'break'].includes(st.kind)).map((st) => st.durationMinutes),
   )
   const pressSetupOf = (p: ProductSpec | undefined) => Math.max(0, (p?.setupMinutes ?? 0) - setupAbsorb)
-  const coilGap = s.coilSetupGapMinutes ?? 30
-  const hallConcurrent = Math.max(1, s.concurrentSetupsPerHall ?? 1)
-  const plantUrgentCap = Math.max(1, s.maxSetupsPlantWide ?? 2)
-  const plantNormalCap = Math.max(1, Math.min(plantUrgentCap, s.maxSetupsPlantWideNormal ?? 1))
-  const setupsCrossShifts = s.setupsCrossShifts ?? true
-  const pullForwardDays = Math.max(0, s.pullForwardDays ?? 10)
-  const safetyDays = Math.max(0, Math.round(run.safetyStockDays ?? s.safetyStockDays ?? 2))
-  const workingKeys = inputs.workCalendar?.workingDays ?? ['MO', 'TU', 'WE', 'TH', 'FR']
+  const coilGap = s.coilSetupGapMinutes ?? SETTINGS_DEFAULTS.coilSetupGapMinutes
+  const hallConcurrent = Math.max(1, s.concurrentSetupsPerHall ?? SETTINGS_DEFAULTS.concurrentSetupsPerHall)
+  const plantUrgentCap = Math.max(1, s.maxSetupsPlantWide ?? SETTINGS_DEFAULTS.maxSetupsPlantWide)
+  // Bakiye / geç riskli işin setup'ı holde de fabrika acil sınırına kadar çakışabilir.
+  const hallUrgentCap = Math.max(hallConcurrent, plantUrgentCap)
+  const plantNormalCap = Math.max(1, Math.min(plantUrgentCap, s.maxSetupsPlantWideNormal ?? SETTINGS_DEFAULTS.maxSetupsPlantWideNormal))
+  const setupsCrossShifts = s.setupsCrossShifts ?? SETTINGS_DEFAULTS.setupsCrossShifts
+  const pullForwardDays = Math.max(0, s.pullForwardDays ?? SETTINGS_DEFAULTS.pullForwardDays)
+  const safetyDays = Math.max(0, Math.round(run.safetyStockDays ?? s.safetyStockDays ?? SETTINGS_DEFAULTS.safetyStockDays))
+  const workingKeys = inputs.workCalendar?.workingDays ?? [...DEFAULT_WORKING_DAYS]
   const holidays = new Set<string>([
     ...(inputs.workCalendar?.holidays ?? []),
     ...inputs.officialHolidays.map((h) => h.date),
@@ -1144,7 +1147,9 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   for (const hall of new Set(inputs.presses.map((p) => p.hall))) {
     const list = crewNeeds.filter((fn) => fn.presses.every((p) => hallOf(p) === hall))
     if (!list.length) continue
-    hallCrews.set(hall, crewFamily(list, hallUnion.get(hall)!, (fn) => (setupOf(fn.group) + setupGap) / hallConcurrent, hall))
+    // Geç kalma riski olan işler acil sayılır ve holde çakışabilir: gevşetme,
+    // ara süresiz ve acil sınırıyla (alt sınır geçerli kalsın).
+    hallCrews.set(hall, crewFamily(list, hallUnion.get(hall)!, (fn) => setupOf(fn.group) / hallUrgentCap, hall))
   }
   const pressLB = Array.from(pressFamilies.values()).reduce((x, f) => x + f.minLate, 0)
   const hallLB = Array.from(hallCrews.values()).reduce((x, f) => x + f.minLate, 0)
@@ -1236,7 +1241,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
         reason:
           test === 'setup-crew'
             ? `Setup crew (${plantUrgentCap} at once): at least ${fam.minLate} of ${fam.members.size} dies needing a setup cannot be set up in time; the plan has ${fam.planLate} late.`
-            : `Hall ${hall} crane (${hallConcurrent} setup at a time, ${setupGap} min apart): at least ${fam.minLate} of ${fam.members.size} dies must be late; the plan has ${fam.planLate}.`,
+            : `Hall ${hall} crane (${hallUrgentCap} setups at a time for late-risk work): at least ${fam.minLate} of ${fam.members.size} dies must be late; the plan has ${fam.planLate}.`,
       }
     }
     // e) Tanık: geç lot, uygun bir preste teslimden önceki boşluğa sığıyor mu?
@@ -1326,7 +1331,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
           const hallBusy = (hallSetupsAll.get(hall) ?? []).filter((b) => b.start < s1 + setupGap && s0 < b.end + setupGap).length
           const coilBusy = (hallCoilsAll.get(hall) ?? []).some((b) => b.start < s1 && s0 < b.end)
           const plantBusy = plantSetups.filter((b) => b.start < s1 && s0 < b.end).length
-          if (hallBusy >= hallConcurrent || coilBusy || plantBusy >= plantUrgentCap) continue
+          if (hallBusy >= hallUrgentCap || coilBusy || plantBusy >= plantUrgentCap) continue
         }
         // Kalıp başka preste mi, kapalı mı?
         const dieBusy = jobs.some((j) => j !== J && j.group === g && j.press !== press && j.start < endAt && start < j.end)
@@ -1608,15 +1613,18 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     }
   }
 
-  // R3 hol vinci: tek kalıp setup'ı (acil işte de), aralıklar, rulo değişimi
+  // R3 hol vinci: normal işte tek kalıp setup'ı, aralıklar, rulo değişimi.
+  // Acil (bakiye / geç risk) setup holdeki bir setup'la çakışabilir; onun
+  // sınırı R4'teki fabrika geneli acil sınırıdır (kullanıcı kararı).
   const r3 = rule(
     'crane-hall',
-    `Hall crane: ≤ ${hallConcurrent} mould setup at a time (urgent jobs too), ${setupGap} min between setups, ${coilGap} min between coil changes, setup and coil change never together`,
+    `Hall crane: ≤ ${hallConcurrent} mould setup at a time for normal jobs (backlog / late-risk setups may overlap up to the plant-wide limit), ${setupGap} min between setups, ${coilGap} min between coil changes, setup and coil change never together`,
   )
-  const hallItems = new Map<string, { kind: 'mold' | 'coil'; start: number; end: number; id: string; frozen: boolean }[]>()
+  const urgentJobIds = new Set(jobs.filter((j) => j.job?.urgentSetup || j.job?.phase === 'backlog').map((j) => j.id))
+  const hallItems = new Map<string, { kind: 'mold' | 'coil'; start: number; end: number; id: string; frozen: boolean; urgent?: boolean }[]>()
   for (const j of jobs) {
     const list = hallItems.get(j.hall) ?? []
-    for (const b of j.setupSegs) list.push({ kind: 'mold', start: b.start, end: b.end, id: j.id, frozen: j.frozen || j.running })
+    for (const b of j.setupSegs) list.push({ kind: 'mold', start: b.start, end: b.end, id: j.id, frozen: j.frozen || j.running, urgent: urgentJobIds.has(j.id) })
     for (const b of j.coilSegs) list.push({ kind: 'coil', start: b.start, end: b.end, id: j.id, frozen: j.frozen || j.running })
     hallItems.set(j.hall, list)
   }
@@ -1635,6 +1643,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
           continue
         }
         if (a.kind === b.kind) {
+          if (a.kind === 'mold' && (a.urgent || b.urgent)) continue
           const gap = a.kind === 'mold' ? setupGap : coilGap
           if (b.start < a.end + gap - EPS && a.start < b.end + gap - EPS) {
             if (a.kind === 'mold') sameCount++
@@ -1653,7 +1662,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
 
   // R4 fabrika geneli setup sınırı
   const r4 = rule('plant-setups', `Plant-wide ≤ ${plantNormalCap} mould setup at once (≤ ${plantUrgentCap} with backlog/late-risk jobs)`)
-  const urgentIds = new Set(jobs.filter((j) => j.job?.urgentSetup || j.job?.phase === 'backlog').map((j) => j.id))
+  const urgentIds = urgentJobIds
   const plantList = jobs.flatMap((j) => j.setupSegs.map((b) => ({ ...b, id: j.id, fixed: j.frozen || j.running }))).sort((a, b) => a.start - b.start)
   for (let i = 0; i < plantList.length; i++) {
     r4.check()

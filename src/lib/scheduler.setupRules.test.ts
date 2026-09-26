@@ -96,6 +96,34 @@ describe('setup rules', () => {
     expect(result.jobs.filter((j) => j.urgentSetup)).toHaveLength(3)
   })
 
+  it('backlog: two setups may overlap in the same hall too (plant-wide limit), normal jobs never', () => {
+    const oneHall = [
+      { name: 'P1', hall: 'H1' },
+      { name: 'P2', hall: 'H1' },
+      { name: 'P3', hall: 'H1' },
+    ]
+    const backlog = { phase: 'backlog' as const, urgency: 100, bucketLabel: 'Backlog' }
+    const urgent = schedule(
+      [entry('A', backlog), entry('B', backlog), entry('C', backlog)],
+      new Map([product('A', 'P1'), product('B', 'P2'), product('C', 'P3')]),
+      oneHall,
+      buckets(['P1', 'P2', 'P3']),
+      settings,
+      rules,
+    )
+    // Tek holde de iki setup aynı anda başlar; üçüncüsü bekler.
+    expect(maxAtOnce(setups(urgent.jobs))).toBe(2)
+    const normal = schedule(
+      [entry('A'), entry('B'), entry('C')],
+      new Map([product('A', 'P1'), product('B', 'P2'), product('C', 'P3')]),
+      oneHall,
+      buckets(['P1', 'P2', 'P3']),
+      settings,
+      rules,
+    )
+    expect(maxAtOnce(setups(normal.jobs))).toBe(1)
+  })
+
   it('a setup may run over the shift change', () => {
     // P1 busy until 7 h 30 min into the first shift (450 min net); a 60-min
     // setup no longer fits before the shift ends at 480.

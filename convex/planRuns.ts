@@ -6,6 +6,7 @@ import { guardedMutation, guardedQuery } from './guarded'
 import { planStatusDoc, requestRecompute } from './planQueue'
 import { withDefaults } from './products'
 import { liveRows } from './sapLive'
+import { SETTINGS_DEFAULTS } from '../src/lib/settingsDefaults'
 import { currentUploads } from './sapUploads'
 
 /**
@@ -38,7 +39,7 @@ export const smallInputs = internalQuery({
       .query('globalShiftSettings')
       .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
       .first()
-    const country = settings?.country ?? 'RO'
+    const country = settings?.country ?? SETTINGS_DEFAULTS.country
     return {
       settings,
       presses: await ctx.db.query('presses').collect(),

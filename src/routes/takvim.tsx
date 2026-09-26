@@ -2,7 +2,6 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport'
 import { useEffect, useMemo, useState } from 'react'
 
-import { DEFAULT_SAFETY_STOCK_DAYS } from '../lib/planPipeline'
 
 import { api } from '../../convex/_generated/api'
 import { addDays, isoDate, mondayOf } from '../lib/dates'
@@ -11,6 +10,9 @@ import { CapacityGrid } from '../components/CapacityGrid'
 import { UnsavedBar } from '../components/UnsavedBar'
 import { PlannedStopsEditor, type StopRow } from '../components/PlannedStopsEditor'
 import type { WeekPattern as GridPattern } from '../lib/capacityGrid'
+import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
+import { stopMinutesByShift } from '../lib/capacityModel'
+import { weekTotalMinutes } from '../lib/planning'
 
 export const Route = createFileRoute('/takvim')({
   component: TakvimPage,
@@ -75,8 +77,9 @@ function totalShifts(p: WeekPattern) {
   return p.workingDays * p.shiftsPerDay + p.overtimeShifts
 }
 
-function totalMinutes(p: WeekPattern, shiftMinutes: number, overtimeShiftMinutes: number) {
-  return p.workingDays * p.shiftsPerDay * shiftMinutes + p.overtimeShifts * overtimeShiftMinutes
+/** Net haftalık dakika — planla aynı formül: planlı duruşlar düşülür. */
+function totalMinutes(p: WeekPattern, shiftMinutes: number, overtimeShiftMinutes: number, stops: number[]) {
+  return weekTotalMinutes(p, { shiftMinutes, overtimeShiftMinutes, stopMinutesByShift: stops })
 }
 
 function PressCalendarSection() {
@@ -100,6 +103,7 @@ function PressCalendarSection() {
     overtimeShifts: number
   }[]
   const plannedStops = (useQuery(api.plannedStops.list) ?? []) as StopRow[]
+  const stopsByShift = useMemo(() => stopMinutesByShift(plannedStops), [plannedStops])
   const saveOverrideForGrid = useMutation(api.pressCalendar.saveOverride)
   const clearOverrideForGrid = useMutation(api.pressCalendar.clearOverride)
 
@@ -149,28 +153,28 @@ function PressCalendarSection() {
   )
 
   // Vardiya süresi (dk) tüm presler için ortaktır.
-  const [shiftMinutes, setShiftMinutes] = useState(480)
-  const [overtimeShiftMinutes, setOvertimeShiftMinutes] = useState(480)
-  const [country, setCountry] = useState('RO')
-  const [setupGapMinutes, setSetupGapMinutes] = useState(10)
+  const [shiftMinutes, setShiftMinutes] = useState<number>(SETTINGS_DEFAULTS.shiftMinutes)
+  const [overtimeShiftMinutes, setOvertimeShiftMinutes] = useState<number>(SETTINGS_DEFAULTS.overtimeShiftMinutes)
+  const [country, setCountry] = useState<string>(SETTINGS_DEFAULTS.country)
+  const [setupGapMinutes, setSetupGapMinutes] = useState<number>(SETTINGS_DEFAULTS.setupGapMinutes)
   // Fabrika geneli setup sınırları ve öne çekme (planlamacıyla netleşen kurallar).
-  const [maxSetupsPlantWideNormal, setMaxSetupsPlantWideNormal] = useState(1)
-  const [maxSetupsPlantWide, setMaxSetupsPlantWide] = useState(2)
-  const [setupsCrossShifts, setSetupsCrossShifts] = useState(true)
-  const [pullForwardDays, setPullForwardDays] = useState(10)
+  const [maxSetupsPlantWideNormal, setMaxSetupsPlantWideNormal] = useState<number>(SETTINGS_DEFAULTS.maxSetupsPlantWideNormal)
+  const [maxSetupsPlantWide, setMaxSetupsPlantWide] = useState<number>(SETTINGS_DEFAULTS.maxSetupsPlantWide)
+  const [setupsCrossShifts, setSetupsCrossShifts] = useState<boolean>(SETTINGS_DEFAULTS.setupsCrossShifts)
+  const [pullForwardDays, setPullForwardDays] = useState<number>(SETTINGS_DEFAULTS.pullForwardDays)
   // Teslim saati ve senaryo araması.
-  const [deliveryCutoffMinute, setDeliveryCutoffMinute] = useState(480)
-  const [utilisationTarget, setUtilisationTarget] = useState(95)
-  const [maxScenarios, setMaxScenarios] = useState(100)
-  const [coilSetupGapMinutes, setCoilSetupGapMinutes] = useState(30)
-  const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState(1)
-  const [shiftStartMinute, setShiftStartMinute] = useState(420) // 07:00
-  const [planningHorizonWeeks, setPlanningHorizonWeeks] = useState(4)
-  const [breakMinutesPerShift, setBreakMinutesPerShift] = useState(0)
+  const [deliveryCutoffMinute, setDeliveryCutoffMinute] = useState<number>(SETTINGS_DEFAULTS.deliveryCutoffMinute)
+  const [utilisationTarget, setUtilisationTarget] = useState<number>(SETTINGS_DEFAULTS.utilisationTarget)
+  const [maxScenarios, setMaxScenarios] = useState<number>(SETTINGS_DEFAULTS.maxScenarios)
+  const [coilSetupGapMinutes, setCoilSetupGapMinutes] = useState<number>(SETTINGS_DEFAULTS.coilSetupGapMinutes)
+  const [concurrentSetupsPerHall, setConcurrentSetupsPerHall] = useState<number>(SETTINGS_DEFAULTS.concurrentSetupsPerHall)
+  const [shiftStartMinute, setShiftStartMinute] = useState<number>(SETTINGS_DEFAULTS.shiftStartMinute) // 07:00
+  const [planningHorizonWeeks, setPlanningHorizonWeeks] = useState<number>(SETTINGS_DEFAULTS.planningHorizonWeeks)
+  const [breakMinutesPerShift, setBreakMinutesPerShift] = useState<number>(SETTINGS_DEFAULTS.breakMinutesPerShift)
   // Planın ilk kaç günü dondurulsun — presin kendi değeri yoksa bu geçerli.
-  const [frozenDays, setFrozenDays] = useState(0)
+  const [frozenDays, setFrozenDays] = useState<number>(SETTINGS_DEFAULTS.frozenDays)
   // Emniyet stoğu (iş günü): sonraki lot stok bitmeden bu kadar önce başlar.
-  const [safetyStockDays, setSafetyStockDays] = useState(DEFAULT_SAFETY_STOCK_DAYS)
+  const [safetyStockDays, setSafetyStockDays] = useState<number>(SETTINGS_DEFAULTS.safetyStockDays)
   // Sunucu değerlerini forma yalnızca sunucuda değiştiklerinde yansıt.
   // Aksi halde sorgu her tazelendiğinde kullanıcının yazdığı değer siliniyor.
   useSyncedFields(
@@ -179,21 +183,21 @@ function PressCalendarSection() {
           shiftMinutes: globalSettings.shiftMinutes,
           overtimeShiftMinutes: globalSettings.overtimeShiftMinutes,
           country: globalSettings.country,
-          setupGapMinutes: globalSettings.setupGapMinutes ?? 10,
-          coilSetupGapMinutes: globalSettings.coilSetupGapMinutes ?? 30,
-          concurrentSetupsPerHall: globalSettings.concurrentSetupsPerHall ?? 1,
-          shiftStartMinute: globalSettings.shiftStartMinute ?? 420,
-          planningHorizonWeeks: globalSettings.planningHorizonWeeks ?? 4,
-          breakMinutesPerShift: globalSettings.breakMinutesPerShift ?? 0,
-          frozenDays: globalSettings.frozenDays ?? 0,
-          safetyStockDays: globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS,
-          maxSetupsPlantWideNormal: globalSettings.maxSetupsPlantWideNormal ?? 1,
-          maxSetupsPlantWide: globalSettings.maxSetupsPlantWide ?? 2,
-          setupsCrossShifts: globalSettings.setupsCrossShifts ?? true,
-          pullForwardDays: globalSettings.pullForwardDays ?? 10,
-          deliveryCutoffMinute: globalSettings.deliveryCutoffMinute ?? 480,
-          utilisationTarget: globalSettings.utilisationTarget ?? 95,
-          maxScenarios: globalSettings.maxScenarios ?? 100,
+          setupGapMinutes: globalSettings.setupGapMinutes ?? SETTINGS_DEFAULTS.setupGapMinutes,
+          coilSetupGapMinutes: globalSettings.coilSetupGapMinutes ?? SETTINGS_DEFAULTS.coilSetupGapMinutes,
+          concurrentSetupsPerHall: globalSettings.concurrentSetupsPerHall ?? SETTINGS_DEFAULTS.concurrentSetupsPerHall,
+          shiftStartMinute: globalSettings.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute,
+          planningHorizonWeeks: globalSettings.planningHorizonWeeks ?? SETTINGS_DEFAULTS.planningHorizonWeeks,
+          breakMinutesPerShift: globalSettings.breakMinutesPerShift ?? SETTINGS_DEFAULTS.breakMinutesPerShift,
+          frozenDays: globalSettings.frozenDays ?? SETTINGS_DEFAULTS.frozenDays,
+          safetyStockDays: globalSettings.safetyStockDays ?? SETTINGS_DEFAULTS.safetyStockDays,
+          maxSetupsPlantWideNormal: globalSettings.maxSetupsPlantWideNormal ?? SETTINGS_DEFAULTS.maxSetupsPlantWideNormal,
+          maxSetupsPlantWide: globalSettings.maxSetupsPlantWide ?? SETTINGS_DEFAULTS.maxSetupsPlantWide,
+          setupsCrossShifts: globalSettings.setupsCrossShifts ?? SETTINGS_DEFAULTS.setupsCrossShifts,
+          pullForwardDays: globalSettings.pullForwardDays ?? SETTINGS_DEFAULTS.pullForwardDays,
+          deliveryCutoffMinute: globalSettings.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute,
+          utilisationTarget: globalSettings.utilisationTarget ?? SETTINGS_DEFAULTS.utilisationTarget,
+          maxScenarios: globalSettings.maxScenarios ?? SETTINGS_DEFAULTS.maxScenarios,
         }
       : undefined,
     {
@@ -282,9 +286,7 @@ function PressCalendarSection() {
     holidays?: string[]
   }) {
     await saveWorkCalendar({
-      // Günlük süre artık vardiya ayarlarından gelir; kayıt tutarlı kalsın
-      // diye aynı değer yazılır.
-      shiftMinutesPerDay: shiftMinutes,
+      // Vardiya süresi yalnızca vardiya ayarlarında tutulur (tek kaynak).
       workingDays: next?.workingDays ?? workingDayKeys,
       holidays: next?.holidays ?? manualHolidays,
     })
@@ -343,20 +345,20 @@ function PressCalendarSection() {
     (globalSettings.shiftMinutes !== shiftMinutes ||
       globalSettings.overtimeShiftMinutes !== overtimeShiftMinutes ||
       globalSettings.country !== country ||
-      (globalSettings.setupGapMinutes ?? 10) !== setupGapMinutes ||
-      (globalSettings.coilSetupGapMinutes ?? 30) !== coilSetupGapMinutes ||
-      (globalSettings.concurrentSetupsPerHall ?? 1) !== concurrentSetupsPerHall ||
-      (globalSettings.shiftStartMinute ?? 420) !== shiftStartMinute ||
-      (globalSettings.planningHorizonWeeks ?? 4) !== planningHorizonWeeks ||
-      (globalSettings.frozenDays ?? 0) !== frozenDays ||
-      (globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS) !== safetyStockDays ||
-      (globalSettings.maxSetupsPlantWideNormal ?? 1) !== maxSetupsPlantWideNormal ||
-      (globalSettings.maxSetupsPlantWide ?? 2) !== maxSetupsPlantWide ||
-      (globalSettings.setupsCrossShifts ?? true) !== setupsCrossShifts ||
-      (globalSettings.pullForwardDays ?? 10) !== pullForwardDays ||
-      (globalSettings.deliveryCutoffMinute ?? 480) !== deliveryCutoffMinute ||
-      (globalSettings.utilisationTarget ?? 95) !== utilisationTarget ||
-      (globalSettings.maxScenarios ?? 100) !== maxScenarios)
+      (globalSettings.setupGapMinutes ?? SETTINGS_DEFAULTS.setupGapMinutes) !== setupGapMinutes ||
+      (globalSettings.coilSetupGapMinutes ?? SETTINGS_DEFAULTS.coilSetupGapMinutes) !== coilSetupGapMinutes ||
+      (globalSettings.concurrentSetupsPerHall ?? SETTINGS_DEFAULTS.concurrentSetupsPerHall) !== concurrentSetupsPerHall ||
+      (globalSettings.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute) !== shiftStartMinute ||
+      (globalSettings.planningHorizonWeeks ?? SETTINGS_DEFAULTS.planningHorizonWeeks) !== planningHorizonWeeks ||
+      (globalSettings.frozenDays ?? SETTINGS_DEFAULTS.frozenDays) !== frozenDays ||
+      (globalSettings.safetyStockDays ?? SETTINGS_DEFAULTS.safetyStockDays) !== safetyStockDays ||
+      (globalSettings.maxSetupsPlantWideNormal ?? SETTINGS_DEFAULTS.maxSetupsPlantWideNormal) !== maxSetupsPlantWideNormal ||
+      (globalSettings.maxSetupsPlantWide ?? SETTINGS_DEFAULTS.maxSetupsPlantWide) !== maxSetupsPlantWide ||
+      (globalSettings.setupsCrossShifts ?? SETTINGS_DEFAULTS.setupsCrossShifts) !== setupsCrossShifts ||
+      (globalSettings.pullForwardDays ?? SETTINGS_DEFAULTS.pullForwardDays) !== pullForwardDays ||
+      (globalSettings.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute) !== deliveryCutoffMinute ||
+      (globalSettings.utilisationTarget ?? SETTINGS_DEFAULTS.utilisationTarget) !== utilisationTarget ||
+      (globalSettings.maxScenarios ?? SETTINGS_DEFAULTS.maxScenarios) !== maxScenarios)
 
   const calendarDirty =
     !!globalCalendar &&
@@ -385,20 +387,20 @@ function PressCalendarSection() {
       setShiftMinutes(globalSettings.shiftMinutes)
       setOvertimeShiftMinutes(globalSettings.overtimeShiftMinutes)
       setCountry(globalSettings.country)
-      setSetupGapMinutes(globalSettings.setupGapMinutes ?? 10)
-      setCoilSetupGapMinutes(globalSettings.coilSetupGapMinutes ?? 30)
-      setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? 1)
-      setShiftStartMinute(globalSettings.shiftStartMinute ?? 420)
-      setPlanningHorizonWeeks(globalSettings.planningHorizonWeeks ?? 4)
-      setFrozenDays(globalSettings.frozenDays ?? 0)
-      setSafetyStockDays(globalSettings.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS)
-      setMaxSetupsPlantWideNormal(globalSettings.maxSetupsPlantWideNormal ?? 1)
-      setMaxSetupsPlantWide(globalSettings.maxSetupsPlantWide ?? 2)
-      setSetupsCrossShifts(globalSettings.setupsCrossShifts ?? true)
-      setPullForwardDays(globalSettings.pullForwardDays ?? 10)
-      setDeliveryCutoffMinute(globalSettings.deliveryCutoffMinute ?? 480)
-      setUtilisationTarget(globalSettings.utilisationTarget ?? 95)
-      setMaxScenarios(globalSettings.maxScenarios ?? 100)
+      setSetupGapMinutes(globalSettings.setupGapMinutes ?? SETTINGS_DEFAULTS.setupGapMinutes)
+      setCoilSetupGapMinutes(globalSettings.coilSetupGapMinutes ?? SETTINGS_DEFAULTS.coilSetupGapMinutes)
+      setConcurrentSetupsPerHall(globalSettings.concurrentSetupsPerHall ?? SETTINGS_DEFAULTS.concurrentSetupsPerHall)
+      setShiftStartMinute(globalSettings.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute)
+      setPlanningHorizonWeeks(globalSettings.planningHorizonWeeks ?? SETTINGS_DEFAULTS.planningHorizonWeeks)
+      setFrozenDays(globalSettings.frozenDays ?? SETTINGS_DEFAULTS.frozenDays)
+      setSafetyStockDays(globalSettings.safetyStockDays ?? SETTINGS_DEFAULTS.safetyStockDays)
+      setMaxSetupsPlantWideNormal(globalSettings.maxSetupsPlantWideNormal ?? SETTINGS_DEFAULTS.maxSetupsPlantWideNormal)
+      setMaxSetupsPlantWide(globalSettings.maxSetupsPlantWide ?? SETTINGS_DEFAULTS.maxSetupsPlantWide)
+      setSetupsCrossShifts(globalSettings.setupsCrossShifts ?? SETTINGS_DEFAULTS.setupsCrossShifts)
+      setPullForwardDays(globalSettings.pullForwardDays ?? SETTINGS_DEFAULTS.pullForwardDays)
+      setDeliveryCutoffMinute(globalSettings.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute)
+      setUtilisationTarget(globalSettings.utilisationTarget ?? SETTINGS_DEFAULTS.utilisationTarget)
+      setMaxScenarios(globalSettings.maxScenarios ?? SETTINGS_DEFAULTS.maxScenarios)
     }
     if (globalCalendar) {
       setWorkingDayKeys(globalCalendar.workingDays)
@@ -430,7 +432,7 @@ function PressCalendarSection() {
 
   const currentTemplate: WeekPattern = { workingDays, shiftsPerDay, overtimeShifts }
   const templateTotalShifts = totalShifts(currentTemplate)
-  const templateTotalHours = totalMinutes(currentTemplate, shiftMinutes, overtimeShiftMinutes) / 60
+  const templateTotalHours = totalMinutes(currentTemplate, shiftMinutes, overtimeShiftMinutes, stopsByShift) / 60
 
   // 30 haftalık pencere: bulunduğumuz haftadan 1 hafta öncesinden başlar,
   // toplam 30 hafta. Her sayfa yüklendiğinde bugüne göre yeniden
@@ -619,6 +621,7 @@ function PressCalendarSection() {
           workingDayKeys={workingDayKeys}
           shiftMinutes={shiftMinutes}
           overtimeShiftMinutes={overtimeShiftMinutes}
+          stopMinutesByShift={stopsByShift}
           defaultPattern={{
             workingDays: workingDayKeys.length,
             shiftsPerDay: 1,
@@ -946,7 +949,7 @@ function PressCalendarSection() {
         definitions come from the Press Definitions page.{' '}
         Plant-wide: without backlog at most {maxSetupsPlantWideNormal} mould setup(s) run at the
         same time anywhere in the plant; for backlog or a job that would otherwise be late up to{' '}
-        {maxSetupsPlantWide} may overlap, so production starts sooner.{' '}
+        {maxSetupsPlantWide} may overlap — also in the same hall — so production starts sooner.{' '}
         {setupsCrossShifts
           ? 'A setup may start near the end of a shift and be finished by the next shift.'
           : 'A setup must finish within the shift it starts in.'}{' '}
@@ -1058,7 +1061,7 @@ function PressCalendarSection() {
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
               Total: <strong className="text-foreground">{templateTotalShifts} shifts</strong>{' '}
-              · <strong className="text-foreground">{templateTotalHours.toFixed(1)} h</strong>
+              · <strong className="text-foreground">{templateTotalHours.toFixed(1)} net h</strong>
               /week ({workingDays} days × {shiftsPerDay} shifts + {overtimeShifts} overtime
               shifts)
             </p>
@@ -1078,7 +1081,7 @@ function PressCalendarSection() {
                     <th className="px-2 py-2 text-center font-medium">Shifts/day</th>
                     <th className="px-2 py-2 text-center font-medium">Overtime shifts</th>
                     <th className="px-2 py-2 text-center font-medium">Total shifts</th>
-                    <th className="px-2 py-2 text-center font-medium">Total hours</th>
+                    <th className="px-2 py-2 text-center font-medium" title="Planned stops (tea, meal, handover) deducted — the same hours the plan uses">Net hours</th>
                     <th className="px-2 py-2 font-medium" />
                   </tr>
                 </thead>
@@ -1093,6 +1096,7 @@ function PressCalendarSection() {
                       holidaySet={holidaySet}
                       shiftMinutes={shiftMinutes}
                       overtimeShiftMinutes={overtimeShiftMinutes}
+                      stopsByShift={stopsByShift}
                     />
                   ))}
                 </tbody>
@@ -1146,6 +1150,7 @@ function WeekRow({
   holidaySet,
   shiftMinutes,
   overtimeShiftMinutes,
+  stopsByShift,
 }: {
   press: string
   monday: Date
@@ -1154,6 +1159,7 @@ function WeekRow({
   holidaySet: Set<string>
   shiftMinutes: number
   overtimeShiftMinutes: number
+  stopsByShift: number[]
 }) {
   const saveOverrideMutation = useMutation(api.pressCalendar.saveOverride)
   const clearOverrideMutation = useMutation(api.pressCalendar.clearOverride)
@@ -1246,7 +1252,7 @@ function WeekRow({
       </td>
       <td className="px-1 py-1 text-center text-muted-foreground">{totalShifts(shown)}</td>
       <td className="px-1 py-1 text-center text-muted-foreground">
-        {(totalMinutes(shown, shiftMinutes, overtimeShiftMinutes) / 60).toFixed(1)}
+        {(totalMinutes(shown, shiftMinutes, overtimeShiftMinutes, stopsByShift) / 60).toFixed(1)}
       </td>
       <td className="px-2 py-1 text-right">
         {editing ? (

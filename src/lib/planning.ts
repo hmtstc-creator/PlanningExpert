@@ -1,5 +1,6 @@
 import { addDays, isoDate } from './dates'
 import { splitWeek } from './dailyDemand'
+import { DEFAULT_WORKING_DAYS } from './settingsDefaults'
 
 // Planlama motorunun saf hesaplama katmanı.
 // Buradaki fonksiyonlar Convex'ten veya React'ten bağımsızdır; girdi olarak
@@ -164,7 +165,7 @@ interface DemandCalendar {
 
 function demandCalendar(options: DemandScheduleOptions): DemandCalendar {
   const horizonWeeks = options.horizonWeeks ?? 4
-  const workingKeys = new Set(options.workingDayKeys ?? ['MO', 'TU', 'WE', 'TH', 'FR'])
+  const workingKeys = new Set(options.workingDayKeys ?? DEFAULT_WORKING_DAYS)
   const baseIso = isoDate(options.baseMonday)
   const today = options.today && options.today > baseIso ? options.today : baseIso
   const weeks: DemandCalendar['weeks'] = []
@@ -1079,7 +1080,9 @@ export interface RawMaterialNeed {
   materials: string[]
   requiredKg: number
   availableKg: number
-  /** Eksik kilo — 0 ise hammadde yeterli. */
+  /** Yoldan gelecek (Excel listesi) — varış anına kadar kullanılamaz. */
+  inTransitKg?: number
+  /** Eksik kilo — 0 ise hammadde yeterli (stok + yoldakiler). */
   shortageKg: number
   /**
    * Stoğun yetmediği İLK iş: gün, pres ve parça. Planda sırayla yürünür;
@@ -1098,6 +1101,8 @@ export function buildRawMaterialPlan(
   jobs: { material: string; quantity: number; date?: string; press?: string; setupStartMinute?: number }[],
   products: Map<string, ProductSpec>,
   rawStockKg: Map<string, number>,
+  /** Yoldaki rulolar: varış günü (ISO; yoksa bugün gelmiş sayılır) ve kg. */
+  inTransit: Map<string, { eta?: string; kg: number }[]> = new Map(),
 ): RawMaterialNeed[] {
   const byRaw = new Map<
     string,
@@ -1136,12 +1141,18 @@ export function buildRawMaterialPlan(
   return Array.from(byRaw.entries())
     .map(([rawMaterial, entry]) => {
       const availableKg = rawStockKg.get(rawMaterial) ?? 0
-      // Zaman sırasıyla: stoğun yetmediği ilk iş.
+      // Yoldakiler varış gününden itibaren kullanılabilir (Raw Material
+      // Coverage ile aynı kural: tarihsiz = bugün).
+      const arrivals = (inTransit.get(rawMaterial) ?? []).filter((a) => a.kg > 0)
+      const inTransitKg = arrivals.reduce((a, b) => a + b.kg, 0)
+      const arrivedBy = (date: string) =>
+        arrivals.reduce((a, b) => a + (!b.eta || b.eta <= date ? b.kg : 0), 0)
+      // Zaman sırasıyla: stoğun (ve o güne kadar gelenin) yetmediği ilk iş.
       let used = 0
       let shortFrom: RawMaterialNeed['shortFrom']
       for (const use of [...entry.uses].sort((a, b) => a.date.localeCompare(b.date) || a.minute - b.minute)) {
         used += use.kg
-        if (used > availableKg + 1e-6) {
+        if (used > availableKg + arrivedBy(use.date) + 1e-6) {
           shortFrom = { date: use.date, press: use.press, material: use.material }
           break
         }
@@ -1151,7 +1162,8 @@ export function buildRawMaterialPlan(
         materials: Array.from(entry.materials).sort(),
         requiredKg: entry.kg,
         availableKg,
-        shortageKg: Math.max(0, entry.kg - availableKg),
+        ...(inTransitKg > 0 ? { inTransitKg } : {}),
+        shortageKg: Math.max(0, entry.kg - availableKg - inTransitKg),
         shortFrom,
       }
     })

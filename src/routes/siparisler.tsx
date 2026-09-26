@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { usePaginatedQuery } from '../lib/convexTransport'
+import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { countedLocations, isFinishedStockRow, type LocationFlags } from '../lib/stockLocations'
 
 export const Route = createFileRoute('/siparisler')({
   component: SiparislerPage,
@@ -24,6 +25,19 @@ function SiparislerPage() {
   const [highRunnerThreshold, setHighRunnerThreshold] = useState('1500')
 
   const rows = view === 'weekly' ? weekly : daily
+  // Stok sütunu planın kullandığı stok: MB52, Storage Locations'ta "Finished
+  // goods" tikli depolar. ZPP'nin kendi "Stock in storage" değeri farklı bir
+  // kaynaktır ve planda kullanılmaz; iki ayrı sayı göstermemek için burada da yok.
+  const stockResult = useQuery(api.stock.listAll) as { rows: { material: string; storageLocation?: string; unrestricted?: number }[] } | undefined
+  const locations = (useQuery(api.storageLocations.listAll) ?? []) as LocationFlags[]
+  const planStock = useMemo(() => {
+    const counted = countedLocations(locations)
+    const map = new Map<string, number>()
+    for (const r of stockResult?.rows ?? []) {
+      if (isFinishedStockRow(counted, r.storageLocation)) map.set(r.material, (map.get(r.material) ?? 0) + (r.unrestricted ?? 0))
+    }
+    return map
+  }, [stockResult, locations])
   const loading = view === 'weekly' ? weeklyStatus === 'LoadingFirstPage' : dailyStatus === 'LoadingFirstPage'
 
   const periodLabels = useMemo(() => {
@@ -80,8 +94,8 @@ function SiparislerPage() {
         <table className="w-full text-left text-sm">
           <thead className="bg-muted text-muted-foreground">
             <tr>
-              <th className="sticky left-0 bg-muted px-3 py-2 font-medium">Materyal</th>
-              <th className="px-3 py-2 font-medium">Stok</th>
+              <th className="sticky left-0 bg-muted px-3 py-2 font-medium">Material</th>
+              <th className="px-3 py-2 font-medium" title="MB52 stock in the locations ticked Finished goods — the stock the plan uses">Stock (plan)</th>
               <th className="px-3 py-2 font-medium">Overdue</th>
               {view === 'weekly' && <th className="px-3 py-2 font-medium">Class</th>}
               {periodLabels.map((label) => (
@@ -117,7 +131,7 @@ function SiparislerPage() {
                   <td className="sticky left-0 bg-background px-3 py-2 font-medium text-foreground">
                     {r.material}
                   </td>
-                  <td className="px-3 py-2 text-foreground">{r.stockInStorage ?? '—'}</td>
+                  <td className="px-3 py-2 text-foreground">{stockResult ? (planStock.get(r.material) ?? 0).toLocaleString('en-GB') : '…'}</td>
                   <td className={`px-3 py-2 ${((r.overdue ?? 0) < 0) ? 'text-destructive' : 'text-foreground'}`}>
                     {r.overdue ?? 0}
                   </td>

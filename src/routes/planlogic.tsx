@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
 import { DEFAULT_PLANT_TIME_ZONE } from '../lib/dates'
-import { DEFAULT_SAFETY_STOCK_DAYS } from '../lib/planPipeline'
+import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 
 export const Route = createFileRoute('/planlogic')({
   component: PlanLogicPage,
@@ -76,22 +76,22 @@ function PlanLogicPage() {
     | undefined
 
   const current = {
-    horizon: settings?.planningHorizonWeeks ?? 4,
-    shiftStart: hhmm(settings?.shiftStartMinute ?? 420),
-    shiftMinutes: settings?.shiftMinutes ?? 480,
-    setupGap: settings?.setupGapMinutes ?? 10,
-    plantNormal: settings?.maxSetupsPlantWideNormal ?? 1,
-    plantUrgent: settings?.maxSetupsPlantWide ?? 2,
-    crossShifts: settings?.setupsCrossShifts ?? true,
-    pullForward: settings?.pullForwardDays ?? 10,
-    cutoff: hhmm(settings?.deliveryCutoffMinute ?? 480),
-    target: settings?.utilisationTarget ?? 95,
-    maxScenarios: settings?.maxScenarios ?? 100,
-    coilGap: settings?.coilSetupGapMinutes ?? 30,
-    concurrent: settings?.concurrentSetupsPerHall ?? 1,
-    factor: Math.round((settings?.capacityFactor ?? 1) * 100),
-    frozen: settings?.frozenDays ?? 0,
-    safety: settings?.safetyStockDays ?? DEFAULT_SAFETY_STOCK_DAYS,
+    horizon: settings?.planningHorizonWeeks ?? SETTINGS_DEFAULTS.planningHorizonWeeks,
+    shiftStart: hhmm(settings?.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute),
+    shiftMinutes: settings?.shiftMinutes ?? SETTINGS_DEFAULTS.shiftMinutes,
+    setupGap: settings?.setupGapMinutes ?? SETTINGS_DEFAULTS.setupGapMinutes,
+    plantNormal: settings?.maxSetupsPlantWideNormal ?? SETTINGS_DEFAULTS.maxSetupsPlantWideNormal,
+    plantUrgent: settings?.maxSetupsPlantWide ?? SETTINGS_DEFAULTS.maxSetupsPlantWide,
+    crossShifts: settings?.setupsCrossShifts ?? SETTINGS_DEFAULTS.setupsCrossShifts,
+    pullForward: settings?.pullForwardDays ?? SETTINGS_DEFAULTS.pullForwardDays,
+    cutoff: hhmm(settings?.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute),
+    target: settings?.utilisationTarget ?? SETTINGS_DEFAULTS.utilisationTarget,
+    maxScenarios: settings?.maxScenarios ?? SETTINGS_DEFAULTS.maxScenarios,
+    coilGap: settings?.coilSetupGapMinutes ?? SETTINGS_DEFAULTS.coilSetupGapMinutes,
+    concurrent: settings?.concurrentSetupsPerHall ?? SETTINGS_DEFAULTS.concurrentSetupsPerHall,
+    factor: Math.round((settings?.capacityFactor ?? SETTINGS_DEFAULTS.capacityFactor) * 100),
+    frozen: settings?.frozenDays ?? SETTINGS_DEFAULTS.frozenDays,
+    safety: settings?.safetyStockDays ?? SETTINGS_DEFAULTS.safetyStockDays,
     timeZone: settings?.timeZone || DEFAULT_PLANT_TIME_ZONE,
   }
 
@@ -511,9 +511,11 @@ function PlanLogicPage() {
           </li>
           <li>
             <b>Let its setup overlap</b>: a late-risk job may set up while
-            another setup runs (at most {current.plantUrgent} at once in the
-            plant), so production starts sooner — but never two in the same hall
-            at once (one crane, one setup team per hall).
+            another setup runs — also in the same hall — at most{' '}
+            {current.plantUrgent} at once in the whole plant, so production starts
+            sooner. As soon as no backlog or late-risk job is left, setups no
+            longer overlap (one per hall, {current.plantNormal} in the plant). Coil
+            changes never overlap.
           </li>
           <li>
             <b>Keep the best plan</b>: fewest unplanned, then fewest late

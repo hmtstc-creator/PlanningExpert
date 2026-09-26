@@ -231,8 +231,8 @@ export interface SchedulerOptions extends ScheduleVariant {
   /**
    * Fabrika genelinde aynı anda yapılabilecek en fazla kalıp setup'ı.
    * Normal işlerde hol kuralı (1 setup) geçerlidir; bakiye ya da geç kalacak
-   * iş için setup başka bir setup'la çakışabilir, ama fabrikada aynı anda bu
-   * sayıdan fazla setup olmaz. Verilmezse sınır yok.
+   * iş için setup başka bir setup'la — aynı holde de — çakışabilir, ama
+   * fabrikada aynı anda bu sayıdan fazla setup olmaz. Verilmezse sınır yok.
    */
   maxSetupsPlantWide?: number
   /**
@@ -1455,9 +1455,13 @@ function tryPlaceOnPress(
   const normalCap = Math.min(urgentCap, options.maxSetupsPlantWideNormal ?? Number.POSITIVE_INFINITY)
   const plantCap = urgent ? urgentCap : normalCap
   const hallConcurrent = Math.max(1, options.concurrentSetupsPerHall)
-  // Hol sınırı (vinç) acil işte de aynıdır; acil kural yalnızca fabrika
-  // geneli sınırı yükseltir. Eskiden acil işte aynı holde iki setup çakışabiliyordu.
-  const concurrent = hallConcurrent
+  // Acil kural (kullanıcı kararı: bakiye/geç kalacak işte fabrika genelinde en
+  // fazla `maxSetupsPlantWide` setup aynı anda, hol ayrımı yapmadan): acil
+  // işin setup'ı aynı holdeki bir setup'la da çakışabilir, fabrika sınırı
+  // aşılmaz. Normal işte hol kuralı (vinç) geçerlidir. Rulo değişimi her
+  // durumda holde tektir.
+  const concurrent =
+    urgent && Number.isFinite(urgentCap) ? Math.max(hallConcurrent, urgentCap) : hallConcurrent
   const crossShifts = !!options.setupsCrossShifts
   const waits: string[] = []
 

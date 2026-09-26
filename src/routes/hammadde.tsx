@@ -6,6 +6,7 @@ import { useMutation, useQuery } from '../lib/convexTransport'
 import { rawMrp, type RawMrpResult, type RawRequirementPlan } from '../lib/rawMrp'
 import { buildDraftEml, buildOrderWorkbook, parseAddresses, workbookBytes, XLSX_TYPE } from '../lib/rawOrderExport'
 import { formatPlantTime } from '../lib/sapUploads'
+import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 
 export const Route = createFileRoute('/hammadde')({
   component: RawMaterialCoveragePage,
@@ -20,8 +21,8 @@ const productsLabel = (codes: string[]) =>
 // Yapışkan iki sütun: mamul kodu ve hammadde; ikincisi birincinin genişliği kadar sağda.
 const PRODUCT_COL = 'sticky left-0 z-10 w-44 min-w-44 max-w-44'
 const RAW_COL = 'sticky left-44 z-10'
-const DEFAULT_DAYS = 10
-const DEFAULT_EXTRA = 500
+const DEFAULT_DAYS = SETTINGS_DEFAULTS.rawCoverageDays
+const DEFAULT_EXTRA = SETTINGS_DEFAULTS.rawOrderExtraKg
 
 /**
  * Hammadde ihtiyaç planlaması (MRP), plandan bağımsız. ZPP'nin son haftasına
@@ -58,7 +59,11 @@ function RawMaterialCoveragePage() {
   const plan = data?.rawRequirements ?? null
   const workingDaysPerWeek = plan?.workingDaysPerWeek ?? 5
   const results = useMemo<RawMrpResult[]>(
-    () => (plan ? plan.items.map((item) => rawMrp(item, { coverageDays, extraKg, workingDaysPerWeek })) : []),
+    () => {
+      if (!plan) return []
+      const workingDaysByWeek = plan.weeks.map((w) => w.workingDays ?? workingDaysPerWeek)
+      return plan.items.map((item) => rawMrp(item, { coverageDays, extraKg, workingDaysPerWeek, workingDaysByWeek }))
+    },
     [plan, coverageDays, extraKg, workingDaysPerWeek],
   )
   const itemByRaw = useMemo(() => new Map((plan?.items ?? []).map((i) => [i.rawMaterial, i])), [plan])
