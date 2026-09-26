@@ -117,6 +117,7 @@ export const addPressOvertime = guardedMutation({
     const press = args.press.trim()
     if (!press) throw new ConvexError('Press is required')
     if (!ISO.test(args.date)) throw new ConvexError('Date must be YYYY-MM-DD')
+    await requireDefinedPress(ctx, press)
     if (!(await hasCalendar(ctx, press))) {
       throw new ConvexError(`${press} has no Work Calendar pattern yet — define its days and shifts first.`)
     }
@@ -156,6 +157,7 @@ export const setRecurringOvertime = guardedMutation({
   },
   returns: v.null(),
   handler: async (ctx: Ctx, { press, items }: Ctx) => {
+    await requireDefinedPress(ctx, press)
     const template = await ctx.db
       .query('pressTemplates')
       .withIndex('by_press', (q: Ctx) => q.eq('press', press))
@@ -216,6 +218,15 @@ async function sources(ctx: Ctx): Promise<PressDaySources> {
     ),
     holidays: new Set<string>([...(calendar?.holidays ?? []), ...official.map((h: Ctx) => h.date)]),
   }
+}
+
+/** Pres listesinin tek kaynağı Press Definitions (presses tablosu). */
+async function requireDefinedPress(ctx: Ctx, press: string) {
+  const found = await ctx.db
+    .query('presses')
+    .withIndex('by_name', (q: Ctx) => q.eq('name', press))
+    .first()
+  if (!found) throw new ConvexError(`${press} is not defined on Press Definitions — define the press first.`)
 }
 
 async function hasCalendar(ctx: Ctx, press: string) {

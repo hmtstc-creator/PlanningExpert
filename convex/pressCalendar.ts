@@ -166,6 +166,11 @@ export const saveTemplate = guardedMutation({
   handler: async (ctx, args) => {
     const press = args.press.trim()
     if (!press) throw new ConvexError('Press name is required')
+    const defined = await ctx.db
+      .query('presses')
+      .withIndex('by_name', (q) => q.eq('name', press))
+      .first()
+    if (!defined) throw new ConvexError(`${press} is not defined on Press Definitions — define the press first.`)
     const problem = patternProblem(args, await shiftMinutesOf(ctx))
     if (problem) throw new ConvexError(problem)
     const existing = await ctx.db
@@ -216,6 +221,11 @@ export const saveOverride = guardedMutation({
   handler: async (ctx, args) => {
     const press = args.press.trim()
     if (!press) throw new ConvexError('Press name is required')
+    const defined = await ctx.db
+      .query('presses')
+      .withIndex('by_name', (q) => q.eq('name', press))
+      .first()
+    if (!defined) throw new ConvexError(`${press} is not defined on Press Definitions — define the press first.`)
     const problem = patternProblem(args, await shiftMinutesOf(ctx))
     if (problem) throw new ConvexError(problem)
     const existing = await ctx.db

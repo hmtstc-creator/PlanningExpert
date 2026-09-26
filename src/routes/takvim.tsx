@@ -108,16 +108,26 @@ function PressCalendarSection() {
   // takvim tanımlanabilsin.
   const definedPresses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string }[]
 
-  const pressOptions = useMemo(() => {
-    const set = new Set<string>()
-    for (const p of definedPresses) set.add(p.name)
+  // Pres listesinin tek kaynağı Press Definitions. Master data'da ya da eski
+  // takvim kayıtlarında geçen ama tanımlı olmayan presler listeye girmez;
+  // aşağıda uyarı olarak gösterilir.
+  const pressOptions = useMemo(() => definedPresses.map((p) => p.name).sort(), [definedPresses])
+  const undefinedPresses = useMemo(() => {
+    const defined = new Set(definedPresses.map((p) => p.name))
+    const usedBy = new Map<string, Set<string>>()
     for (const p of products) {
       for (const m of [p.mainMachine, p.altMachine1, p.altMachine2, p.altMachine3, p.altMachine4]) {
-        if (m && m.trim()) set.add(m.trim())
+        const name = m?.trim()
+        if (!name || defined.has(name)) continue
+        usedBy.set(name, (usedBy.get(name) ?? new Set()).add(p.code))
       }
     }
-    for (const t of templatesList) set.add(t.press)
-    return Array.from(set).sort()
+    for (const t of templatesList) {
+      if (!defined.has(t.press) && !usedBy.has(t.press)) usedBy.set(t.press, new Set())
+    }
+    return Array.from(usedBy.entries())
+      .map(([name, parts]) => ({ name, parts: Array.from(parts).sort() }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }, [definedPresses, products, templatesList])
 
   // Çalışma günleri ve elle girilen tatiller planlama motorunun doğrudan
@@ -588,6 +598,27 @@ function PressCalendarSection() {
         onSaveAll={() => void saveEverything()}
         onDiscard={discardSharedSettings}
       />
+
+      {undefinedPresses.length > 0 && (
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+          <p className="font-semibold">
+            Presses used in Master Data but not defined on{' '}
+            <Link to="/makineler" className="underline">
+              Press Definitions
+            </Link>
+            : {undefinedPresses.map((u) => u.name).join(', ')}
+          </p>
+          <p className="mt-1">
+            They are not planned and have no calendar. Define them, or correct the main / alternative
+            machine of these parts:{' '}
+            {undefinedPresses
+              .filter((u) => u.parts.length > 0)
+              .map((u) => `${u.name} — ${u.parts.slice(0, 8).join(', ')}${u.parts.length > 8 ? ` +${u.parts.length - 8}` : ''}`)
+              .join(' · ') || 'only an old calendar record remains'}
+            .
+          </p>
+        </div>
+      )}
 
       <CollapsibleSection id="takvim-overtime" title="Overtime" hint="open or delete overtime on a date" defaultOpen>
         <OvertimeEntryPanel presses={pressOptions} />
