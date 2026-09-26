@@ -113,3 +113,43 @@ export const MODULE_NAVS: ModuleNav[] = [
 export function moduleNavFor(pathname: string): ModuleNav | undefined {
   return MODULE_NAVS.find((m) => pathname === m.prefix || pathname.startsWith(`${m.prefix}/`))
 }
+
+/**
+ * Sayfalar arası kısayollar (sayfa başlığındaki küçük düğmeler). Etiketler
+ * menüdeki adlardan gelir; menüde adı değişen sayfa burada da değişir.
+ */
+const RELATED_PAGES: Record<string, string[]> = {
+  '/planlama': ['/capacity', '/takvim', '/alarms', '/hammadde', '/planlogic'],
+  '/planningexpert': ['/planlama', '/capacity', '/alarms', '/sapdata'],
+  '/capacity': ['/takvim', '/planlama', '/makineler', '/referanslar'],
+  '/hammadde': ['/sapdata', '/depolar', '/referanslar', '/takvim'],
+  '/alarms': ['/planlama', '/capacity', '/die-followup/maintenance', '/machine-followup/breakdowns'],
+  '/sapdata': ['/siparisler', '/stoklar', '/gerceklesen', '/depolar'],
+  '/planlogic': ['/planlama', '/capacity', '/takvim', '/hammadde'],
+  '/siparisler': ['/sapdata', '/planlama', '/capacity'],
+  '/stoklar': ['/sapdata', '/depolar', '/hammadde'],
+  '/gerceklesen': ['/sapdata', '/performans', '/depolar'],
+  '/referanslar': ['/makineler', '/planlama', '/capacity'],
+  '/makineler': ['/takvim', '/capacity', '/referanslar'],
+  '/takvim': ['/capacity', '/makineler', '/planlama'],
+  '/depolar': ['/stoklar', '/hammadde', '/sapdata'],
+  '/performans': ['/gerceklesen', '/planlama', '/takvim'],
+}
+
+const EXTRA_LABELS: Record<string, string> = {
+  '/die-followup/maintenance': 'Die Maintenance',
+  '/machine-followup/breakdowns': 'Machine Breakdowns',
+}
+
+export function pageLabel(to: string): string {
+  for (const group of [...NAV_GROUPS, { label: '', items: PRIMARY_LINKS }]) {
+    const hit = group.items.find((i) => i.to === to)
+    if (hit) return hit.label
+  }
+  return EXTRA_LABELS[to] ?? to
+}
+
+/** Bir sayfanın kısayolları: { to, label }. */
+export function relatedPages(path: string): { to: string; label: string }[] {
+  return (RELATED_PAGES[path] ?? []).map((to) => ({ to, label: pageLabel(to) }))
+}

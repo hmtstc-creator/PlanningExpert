@@ -3,6 +3,8 @@ import { useQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/gerceklesen')({
   component: GerceklesenPage,
@@ -38,22 +40,20 @@ function GerceklesenPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Actual Production</h1>
-      <p className="mt-2 text-muted-foreground">
-        Production from the SAP MB51 report: 101 receipts minus 102 reversals
-        into the production receipt location (ticked on Storage Locations,
-        2009 by default). Other movements are not production. The same figure
-        feeds plan versus actual, press performance and the mould shot
-        counters.
-      </p>
+      <PageHeader
+        title="Actual Production"
+        summary="Production from SAP MB51: 101 receipts minus 102 reversals."
+        links={relatedPages('/gerceklesen')}
+        info={
+          <p>
+            Only movements into the production receipt location count (ticked on{' '}
+            <Link to="/depolar">Storage Locations</Link>, 2009 by default). Other movements are not
+            production. The same figure feeds plan versus actual, press performance and the mould
+            shot counters. MB51 is uploaded on <Link to="/sapdata">SAP Data</Link>.
+          </p>
+        }
+      />
 
-      <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-        The MB51 movement report is uploaded on the{' '}
-        <Link to="/sapdata" className="font-medium text-foreground underline hover:no-underline">
-          SAP Data
-        </Link>{' '}
-        page.
-      </p>
 
       <div className="mt-6 flex items-center gap-3">
         <input

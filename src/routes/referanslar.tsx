@@ -19,6 +19,8 @@ import { useSafeMutation } from '../lib/useSafeMutation'
 import { lotRuleOf, piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
 import { ExcelUpload } from '../components/ExcelUpload'
 import { friendlyError } from '../lib/mutationErrors'
+import { InfoTip, PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/referanslar')({
   component: ReferanslarPage,
@@ -226,31 +228,46 @@ function ReferanslarPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Master Data</h1>
-      <p className="mt-2 text-muted-foreground">
-        Material code, co-product if any, cavities, SPM, raw material and coil
-        data, setup times, mold shot limit and main/alternative machines.
-        Upload an Excel file to load them in bulk, then click any cell in the
-        table below to correct a value, then press Save on the row. Gross weight is per piece, so a coil yields coil weight ÷ gross
-        weight pieces — that is the lot unit, shown in the Pcs/coil column. Where the coil
-        quantity is flexible (transfer presses 106/107), enter <strong>Min. lot</strong>{' '}
-        instead: the lot is then at least that many pieces, otherwise exactly the need, and
-        the coil weight is ignored (it may stay empty). A part with neither is flagged
-        and planned at exactly the need.
-        Cavities do not change that number; they decide how many strokes it
-        takes. A co-product comes out of the same grams, so it costs no extra
-        material. The Accepted OEE
-        (availability × performance, quality taken as 100%) sets each job's
-        total window: setup and quality approval come out of that window and the
-        rest is production time.
-      </p>
+      <PageHeader
+        title="Master Data"
+        summary="The main part list: cavities, SPM, coil data, setup times, presses and Accepted OEE."
+        links={relatedPages('/referanslar')}
+        info={
+          <>
+            <p>
+              Material code, co-product if any, cavities, SPM, raw material and coil data, setup
+              times, mould shot limit and main/alternative machines. Upload an Excel file to load
+              them in bulk, then click any cell in the table below to correct a value, then press
+              Save on the row.
+            </p>
+            <p>
+              <b>Lot:</b> gross weight is per piece, so a coil yields coil weight ÷ gross weight
+              pieces — that is the lot unit, shown in the Pcs/coil column. Where the coil quantity
+              is flexible (transfer presses), enter <b>Min. lot</b> instead: the lot is then at
+              least that many pieces, otherwise exactly the need, and the coil weight is ignored (it
+              may stay empty). A part with neither is flagged and planned at exactly the need.
+            </p>
+            <p>
+              Cavities do not change that number; they decide how many strokes it takes. A
+              co-product comes out of the same grams, so it costs no extra material.
+            </p>
+            <p>
+              <b>Accepted OEE</b> (availability × performance, quality taken as 100 %) sets each
+              job's total window: setup and quality approval come out of that window and the rest is
+              production time. The plan and Capacity Dashboard B use it.
+            </p>
+          </>
+        }
+      />
 
       <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
         <strong>Flexible press.</strong> A part runs only on its <strong>main press</strong>{' '}
-        unless it is ticked <strong>Flexible</strong> — quality approval is usually tied to
-        one press, so the alternatives are used only for parts you mark. Ticked parts may
-        go to whichever of their presses finishes them first. The Excel upload keeps the
-        ticks unless the file has a Flexible column.
+        unless it is ticked <strong>Flexible</strong>.{' '}
+        <InfoTip label="About Flexible press">
+          Quality approval is usually tied to one press, so the alternatives are used only for parts
+          you mark. Ticked parts may go to whichever of their presses finishes them first. The Excel
+          upload keeps the ticks unless the file has a Flexible column.
+        </InfoTip>
       </p>
 
       <ApplyToAll />

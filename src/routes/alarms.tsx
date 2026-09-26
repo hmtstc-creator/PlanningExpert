@@ -2,6 +2,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 
 import type { DieAlarm, MachineAlarm } from '../lib/planAlarms'
 import { usePlanAlarms } from '../lib/usePlanAlarms'
+import { PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/alarms')({
   component: AlarmsPage,
@@ -24,15 +26,25 @@ function AlarmsPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Alarms</h1>
-      <p className="mt-2 max-w-4xl text-muted-foreground">
-        Dies and presses that cannot be used, checked against the plan. The top
-        lists are the ones that make a delivery late — for example a die ready
-        the day after tomorrow at 10:00 while 1 000 parts must ship tomorrow.
-        The lists below are for information: the die or press is not available,
-        but the plan is not held up. Updated with every plan calculation
-        {data?.computedAt ? ` (last ${new Date(data.computedAt).toLocaleString('en-GB')})` : ''}.
-      </p>
+      <PageHeader
+        title="Alarms"
+        summary={`Dies and presses that cannot be used, checked against the plan${
+          data?.computedAt ? ` · updated ${new Date(data.computedAt).toLocaleString('en-GB')}` : ''
+        }.`}
+        links={relatedPages('/alarms')}
+        info={
+          <>
+            <p>
+              The top lists are the ones that make a delivery late — for example a die ready the day
+              after tomorrow at 10:00 while 1 000 parts must ship tomorrow.
+            </p>
+            <p>
+              The lists below are for information: the die or press is not available, but the plan
+              is not held up. Updated with every plan calculation.
+            </p>
+          </>
+        }
+      />
 
       {data === undefined && <p className="mt-6 text-sm text-muted-foreground">Loading…</p>}
       {data === null && (

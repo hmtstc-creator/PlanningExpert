@@ -4,6 +4,8 @@ import { useMemo } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { countedLocations, isFinishedStockRow, type LocationFlags } from '../lib/stockLocations'
+import { PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/planningexpert')({
   component: HomePage,
@@ -167,10 +169,11 @@ function HomePage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">PlanningExpert — Overview</h1>
-      <p className="mt-2 text-muted-foreground">
-        Press shop production planning — daily status overview
-      </p>
+      <PageHeader
+        title="PlanningExpert — Overview"
+        summary="Press shop production planning — daily status overview."
+        links={relatedPages('/planningexpert')}
+      />
 
       {truncatedInputs.length > 0 && (
         <p className="mt-4 rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm text-foreground">

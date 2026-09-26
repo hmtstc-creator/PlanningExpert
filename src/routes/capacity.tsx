@@ -16,6 +16,8 @@ import {
 import { useMutation, useQuery } from '../lib/convexTransport'
 import { formatPlantTime } from '../lib/sapUploads'
 import { PressWeekDays } from '../components/OvertimePanels'
+import { InfoTip, PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 import { patternProblem, serverErrorText } from '../lib/pressCalendar'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { stopMinutesByShift } from '../lib/capacityModel'
@@ -129,33 +131,41 @@ function CapacityPage() {
 
   return (
     <div className="mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 xl:w-2/3 xl:px-0">
-      <h1 className="text-2xl font-bold text-foreground">Capacity Dashboard</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Weekly capacity against demand for every press group and press. Capacity is the net
-        working time from the{' '}
-        <Link to="/takvim" className="underline">
-          Work Calendar
-        </Link>{' '}
-        (days from Monday, holidays removed, week exceptions and dated overtime included, planned
-        stops deducted — the same hours the plan uses; this week counts only the hours still
-        ahead). Performance is applied to the production time, chosen below: A) Prediction OEE — one
-        rate for every part, set on this page, or B) each part's Accepted OEE from Master Data. Demand is the ZPP requirement of the week — this week also carries
-        the overdue backlog — after stock in locations{' '}
-        {(forecast?.stockLocations ?? ['2009', '1009']).join(', ')} is used up, earliest
-        week first. Hours = pieces ÷ cavities ÷ SPM ÷ performance (10 h at 60 % counts as 16.7 h; setup and
-        approval sit inside that time). Each part counts on its main press; a
-        co-product pair counts once. <strong className="text-foreground">Cumulative</strong> adds
-        up idle minus over-capacity hours: above zero you can build stock ahead, below zero the
-        customer waits.
-      </p>
-
-      <p className="mt-2 text-xs text-muted-foreground">
-        Planned stops deducted per shift (tea, meal, handover — Work Calendar):{' '}
-        <strong className="text-foreground">
-          {stopsByShift.map((m, i) => `${i + 1}. shift ${m} min`).join(' · ')}
-        </strong>
-        . The Gantt shows the same stops on every press.
-      </p>
+      <PageHeader
+        title="Capacity Dashboard"
+        summary="Weekly capacity against demand for every press group and press."
+        links={relatedPages('/capacity')}
+        info={
+          <>
+            <p>
+              <b>Capacity</b> is the net working time from the{' '}
+              <Link to="/takvim">Work Calendar</Link>: days from Monday, holidays removed, week
+              exceptions and dated overtime included, planned stops deducted — the same hours the
+              plan uses. This week counts only the hours still ahead.
+            </p>
+            <p>
+              Planned stops deducted per shift (tea, meal, handover):{' '}
+              <b>{stopsByShift.map((m, i) => `${i + 1}. shift ${m} min`).join(' · ')}</b>. The Gantt
+              shows the same stops on every press.
+            </p>
+            <p>
+              <b>Demand</b> is the ZPP requirement of the week — this week also carries the overdue
+              backlog — after stock in locations{' '}
+              {(forecast?.stockLocations ?? ['2009', '1009']).join(', ')} is used up, earliest week
+              first. Each part counts on its main press; a co-product pair counts once.
+            </p>
+            <p>
+              <b>Hours</b> = pieces ÷ cavities ÷ SPM ÷ OEE (10 h at 60 % counts as 16.7 h; setup and
+              approval sit inside that time). OEE is chosen below: A) Prediction OEE — one rate for
+              every part, set on this page, or B) each part's Accepted OEE from Master Data.
+            </p>
+            <p>
+              <b>Cumulative</b> adds up idle minus over-capacity hours: above zero you can build
+              stock ahead, below zero the customer waits.
+            </p>
+          </>
+        }
+      />
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <span className="font-medium text-foreground">Performance based on:</span>
@@ -203,12 +213,16 @@ function CapacityPage() {
             {rateError && <span className="text-destructive">{rateError}</span>}
           </span>
         )}
-        <span className="basis-full text-muted-foreground">
-          Both views: available hours as they are; production time = ideal time ÷ OEE.{' '}
-          {basis === 'accepted'
-            ? `A uses one Prediction OEE for every part (${Math.round(acceptedRate * 1000) / 10} %). It is only for this view — the plan uses the Accepted OEE from Master Data.`
-            : 'B uses each part’s Accepted OEE from Master Data — the same as the plan.'}
-        </span>
+        <InfoTip label="About the OEE basis">
+          <p>Both views: available hours as they are; production time = ideal time ÷ OEE.</p>
+          <p>
+            <b>A</b> uses one Prediction OEE for every part ({Math.round(acceptedRate * 1000) / 10} %). It is
+            only for this view — the plan uses the Accepted OEE from Master Data.
+          </p>
+          <p>
+            <b>B</b> uses each part’s Accepted OEE from Master Data — the same as the plan.
+          </p>
+        </InfoTip>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -621,15 +635,22 @@ function OvertimeEditor({
       <p className="text-sm font-medium text-foreground">
         {press} · {week.label} <span className="font-normal text-muted-foreground">(week from {week.start})</span>
       </p>
-      <p className="mt-0.5 text-xs text-muted-foreground">
+      <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
         {override
           ? 'This week has an exception on the Work Calendar.'
           : base
             ? `Standard week: ${base.workingDays} days from Monday × ${base.shiftsPerDay} shifts.`
             : 'This press has no Work Calendar pattern yet — it has no capacity.'}{' '}
-        Days and shifts below change this week only (the same week exception as the Work
-        Calendar). Overtime is opened on a day with an overtime definition — the same record the
-        Work Calendar shows. The plan and this dashboard update a few seconds later.
+        <InfoTip label="About this editor">
+          <p>
+            Days and shifts below change this week only (the same week exception as the Work
+            Calendar). Overtime is opened on a day with an overtime definition — the same record the
+            Work Calendar shows. The plan and this dashboard update a few seconds later.
+          </p>
+        </InfoTip>{' '}
+        <Link to="/takvim" className="ml-1 rounded border border-border px-1.5 py-0.5 font-medium text-foreground hover:bg-muted">
+          Open Work Calendar →
+        </Link>
       </p>
       <div className="mt-2 flex flex-wrap items-end gap-3">
         {field('workingDays', 'Working days', 7)}

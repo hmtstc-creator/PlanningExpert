@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { InfoTip } from './PageHeader'
 
 import { ErrorBanner } from './ErrorBanner'
 import { useDraftRows } from '../lib/useDraftRows'
@@ -112,15 +113,17 @@ export function PlannedStopsEditor({
 
   return (
     <div className="rounded-md border border-border p-3">
-      <h3 className="text-xs font-medium text-muted-foreground">
+      <h3 className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
         Planned stops — production is never scheduled into these
+        <InfoTip label="About planned stops">
+          <p>
+            Enter the real clock time of each handover, tea and meal break for every shift. They are
+            the same for all presses. Capacity is reduced shift by shift, so shifts with different
+            stops are worth different amounts. Stops inside overtime are deducted too.
+          </p>
+          <p>Changing a time or a duration marks that stop until you press Save.</p>
+        </InfoTip>
       </h3>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Enter the real clock time of each handover, tea and meal break for every
-        shift. They are the same for all presses. Capacity is reduced shift by
-        shift, so shifts with different stops are worth different amounts.
-        Changing a time or a duration marks that stop until you press Save.
-      </p>
 
       <ErrorBanner message={addError ?? removeError} onDismiss={clearError} />
 

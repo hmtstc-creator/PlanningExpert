@@ -128,6 +128,12 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Acil hammadde süresi (şu an 3 iş günü) Work Calendar'da ayarlanabilir
   olacak. → uygulanacak
 
+### Arayüz
+- Uzun açıklamalar sayfada durmaz: mavi "i" notunda, üzerine gelince açılır.
+- İlişkili sayfalara küçük kısayol düğmeleri (ör. Work Calendar ↔ Capacity
+  Dashboard).
+- Mimari ve geliştirme kuralları: `docs/architecture.md`.
+
 ## Aksiyon listesi
 
 Uygulandı (2026-09-26, "programı düzelt"):

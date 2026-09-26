@@ -8,6 +8,8 @@ import { buildDraftEml, buildOrderWorkbook, parseAddresses, workbookBytes, XLSX_
 import { formatPlantTime } from '../lib/sapUploads'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { friendlyError } from '../lib/mutationErrors'
+import { InfoTip, PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/hammadde')({
   component: RawMaterialCoveragePage,
@@ -147,25 +149,37 @@ function RawMaterialCoveragePage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Raw Material Coverage</h1>
-      <p className="mt-2 max-w-4xl text-muted-foreground">
-        Steel requirement per week up to the last week in ZPP, independent of the production plan:
-        demand minus finished stock (first weeks first) × gross weight per piece, co-products once.
-        Supply is the coil stock on hand in the locations ticked <em>Raw material</em> on{' '}
-        <Link to="/depolar" className="underline">
-          Storage Locations
-        </Link>{' '}
-        plus the coils in transit (SAP Data → in-transit list, booked in their ETA week). An order is
-        due in the week the stock would not cover that week's use plus the next{' '}
-        <strong className="text-foreground">
-          {coverageDays} working days ({coverWeeks} wk)
-        </strong>
-        ; each order gets <strong className="text-foreground">{fmt(extraKg)} kg</strong> extra. No
-        demand, no order: nothing is brought in beyond the last ZPP week.{' '}
-        <Link to="/planlogic" hash="raw-mrp" className="underline">
-          How it is calculated
-        </Link>
-      </p>
+      <PageHeader
+        title="Raw Material Coverage"
+        summary="Steel requirement and orders per week up to the last ZPP week — independent of the production plan."
+        links={relatedPages('/hammadde')}
+        info={
+          <>
+            <p>
+              <b>Requirement:</b> demand minus finished stock (first weeks first) × gross weight per
+              piece, co-products once.
+            </p>
+            <p>
+              <b>Supply:</b> coil stock on hand in the locations ticked <em>Raw material</em> on{' '}
+              <Link to="/depolar">Storage Locations</Link> plus the coils in transit (SAP Data →
+              in-transit list, booked in their ETA week).
+            </p>
+            <p>
+              <b>Order:</b> due in the week the stock would not cover that week's use plus the next{' '}
+              <b>
+                {coverageDays} working days ({coverWeeks} wk)
+              </b>
+              ; each order gets <b>{fmt(extraKg)} kg</b> extra. No demand, no order: nothing is
+              brought in beyond the last ZPP week.
+            </p>
+            <p>
+              <Link to="/planlogic" hash="raw-mrp">
+                How it is calculated
+              </Link>
+            </p>
+          </>
+        }
+      />
 
       <div className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-border p-3 text-sm">
         <label>
@@ -456,7 +470,14 @@ function RecipientsPanel({
     <div className="mt-4 rounded-lg border border-border p-3 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold text-foreground">Order e-mail</p>
+          <p className="flex items-center gap-2 font-semibold text-foreground">
+            Order e-mail
+            <InfoTip label="About the order e-mail">
+              Prepare e-mail downloads a draft: open it and Outlook shows the message with the
+              recipients, the subject and the Excel attached — check it and press Send. It goes from
+              your own Outlook; no password is stored here.
+            </InfoTip>
+          </p>
           {to.length === 0 && cc.length === 0 ? (
             <p className="text-xs text-muted-foreground">No recipients yet — define them once with Edit recipients.</p>
           ) : (
@@ -486,11 +507,6 @@ function RecipientsPanel({
           </button>
         </div>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Prepare e-mail downloads a draft: open it and Outlook shows the message with the recipients,
-        the subject and the Excel attached — check it and press Send. It goes from your own Outlook;
-        no password is stored here.
-      </p>
       {editing && (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="text-xs">

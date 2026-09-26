@@ -5,6 +5,8 @@ import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
 import { DEFAULT_PLANT_TIME_ZONE } from '../lib/dates'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
+import { PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/planlogic')({
   component: PlanLogicPage,
@@ -71,6 +73,10 @@ function PlanLogicPage() {
         deliveryCutoffMinute?: number
         utilisationTarget?: number
         maxScenarios?: number
+        rawCoverageDays?: number
+        rawOrderExtraKg?: number
+        rawUrgentDays?: number
+        acceptedPerformanceRate?: number
       }
     | null
     | undefined
@@ -93,17 +99,28 @@ function PlanLogicPage() {
     frozen: settings?.frozenDays ?? SETTINGS_DEFAULTS.frozenDays,
     safety: settings?.safetyStockDays ?? SETTINGS_DEFAULTS.safetyStockDays,
     timeZone: settings?.timeZone || DEFAULT_PLANT_TIME_ZONE,
+    rawCoverage: settings?.rawCoverageDays ?? SETTINGS_DEFAULTS.rawCoverageDays,
+    rawExtra: settings?.rawOrderExtraKg ?? SETTINGS_DEFAULTS.rawOrderExtraKg,
+    rawUrgent: settings?.rawUrgentDays ?? SETTINGS_DEFAULTS.rawUrgentDays,
+    predictionOee: Math.round((settings?.acceptedPerformanceRate ?? SETTINGS_DEFAULTS.acceptedPerformanceRate) * 1000) / 10,
   }
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Planning Logic</h1>
-      <p className="mt-2 max-w-4xl text-muted-foreground">
-        Nobody places jobs by hand. The plan is calculated on the server from
-        the data you maintain, in the seven steps below, every time that data
-        changes. To change the plan, change its inputs — the rules here are
-        applied to them the same way every time.
-      </p>
+      <PageHeader
+        title="Planning Logic"
+        summary="How the plan is calculated — the same rules, applied the same way every time."
+        links={relatedPages('/planlogic')}
+        info={
+          <p>
+            Nobody places jobs by hand. The plan is calculated on the server from the data you
+            maintain, in the seven steps below, every time that data changes. To change the plan,
+            change its inputs.
+          </p>
+        }
+      />
+
+      <SingleSource />
 
       <Synoptic safetyDays={current.safety} />
 
@@ -147,6 +164,10 @@ function PlanLogicPage() {
           <Setting label="Delivery time on the need day" value={current.cutoff} />
           <Setting label="Utilisation target" value={`${current.target}% (next 7 days)`} />
           <Setting label="Scenarios tried at most" value={String(current.maxScenarios)} />
+          <Setting label="Raw material safety" value={`${current.rawCoverage} working days`} />
+          <Setting label="Raw order extra" value={`${current.rawExtra.toLocaleString('en-GB')} kg`} />
+          <Setting label="Urgent raw material" value={`${current.rawUrgent} working days`} />
+          <Setting label="Prediction OEE (dashboard only)" value={`${current.predictionOee}%`} />
         </dl>
         <p className="mt-3 text-xs text-muted-foreground">
           Change these on the{' '}
@@ -157,7 +178,11 @@ function PlanLogicPage() {
           <Link to="/performans" className="underline hover:no-underline">
             Performance
           </Link>{' '}
-          page.
+          page; Prediction OEE from the{' '}
+          <Link to="/capacity" className="underline hover:no-underline">
+            Capacity Dashboard
+          </Link>
+          .
         </p>
       </div>
 
@@ -169,16 +194,17 @@ function PlanLogicPage() {
             ['Sales days', 'ZPP_DAILY: one column per day — the day each quantity is sold', '/sapdata'],
             [
               'Stock',
-              'MB52 unrestricted stock. Only storage locations 2009 and 1009 count as finished stock (2010 is ignored), in the plan and on the Capacity Dashboard; raw material locations are used for the coil check',
-              '/sapdata',
+              'MB52 unrestricted stock, counted only in the locations ticked on Storage Locations: Finished goods for the plan and the Capacity Dashboard, Raw material for the coil check (default 2009 + 1009)',
+              '/depolar',
             ],
+            ['Coils in transit', 'In-transit Excel list: each quantity arrives in its ETA week (no ETA = this week)', '/sapdata'],
             [
               'Master data',
               'Cavities, strokes per minute (SPM), setup and coil change times, quality approval time, coil and gross weight, mould shot limit, main and alternative presses, Flexible press tick, co-product, Accepted OEE',
               '/referanslar',
             ],
-            ['Presses', 'Hall (for the crane rule) and whether the press is coil-fed', '/makineler'],
-            ['Work calendar', 'Shifts per press, working days, planned stops, public holidays', '/takvim'],
+            ['Presses', 'The single press list: hall (crane and setup team), category (Gantt and Capacity Dashboard groups), coil fed, frozen days', '/makineler'],
+            ['Work calendar', 'Per press: weekly pattern (days from Monday × shifts), exception weeks, overtime (dated or recurring, from an overtime type); planned stops; public and manual holidays; planning settings', '/takvim'],
             ['Dies', 'Readiness (date and time), maintenance days, shot-limit alarms — from Die Follow-up', '/die-followup/maintenance'],
             ['Machines', 'Planned press maintenance hours and open breakdowns that stop a press — from Machine Follow-up', '/machine-followup/breakdowns'],
             ['Your rules', 'Exclude, pin to a press/day, or move to the front', '/planlama'],
@@ -205,9 +231,11 @@ function PlanLogicPage() {
             <b>Sales days — ZPP_DAILY.</b> For every day the ZPP_DAILY file
             covers, demand falls on the exact date in the file: 5 000 shipped
             on Wednesday is 5 000 on Wednesday, not 1 000 a day. Beyond the
-            file's last day, the weekly ZPP is spread evenly over the working
-            days (a partly covered week gets the rest of its weekly total on
-            the uncovered days). The backlog is due today.
+            file's last day, the weekly ZPP is spread evenly over the plant's
+            working days — not a holiday and at least one press has normal
+            shifts; overtime does not make a working day (a partly covered week
+            gets the rest of its weekly total on the uncovered days). The backlog
+            is due today.
           </li>
           <li>
             <b>Timing — projected stock.</b> Walking day by day, the engine
@@ -272,7 +300,7 @@ function PlanLogicPage() {
       <Step n={3} id="capacity" title="Build the capacity">
         <p>For every press and every day of the horizon:</p>
         <Formula>
-          net minutes = shifts × shift length + overtime − planned stops → × capacity factor
+          net minutes = normal shifts × shift length + overtime windows − planned stops → × capacity factor
         </Formula>
         <ul>
           <li>
@@ -284,7 +312,13 @@ function PlanLogicPage() {
           </li>
           <li>
             A public holiday is a day off: its shifts are lost, never moved to another day.
-            Overtime opened on the holiday is planned.
+            Overtime opened on the holiday is planned. Recurring overtime does not run on a
+            holiday — open it on the date.
+          </li>
+          <li>
+            Shifts have the same length and follow each other from the first shift start (e.g. 2 ×
+            9 h from 07:00: 07:00–16:00, 16:00–01:00). Overtime may not overlap the normal shifts
+            or another overtime.
           </li>
           <li>
             A press without a Work Calendar pattern has no capacity; the Production Plan shows
@@ -497,8 +531,15 @@ function PlanLogicPage() {
             free capacity…).
           </li>
           <li>
-            <b>Raw material</b>: planned quantity × gross weight, compared with
-            raw material stock. Co-products are not counted twice.
+            <b>Urgent raw material</b>: planned quantity × gross weight, walked in
+            plan order against coil stock plus coils in transit from their arrival
+            day. Coils that stop a job within the next {current.rawUrgent} working
+            day(s) are listed at the top of the Production Plan. Co-products are
+            not counted twice. The weekly requirement is separate — see{' '}
+            <a href="#raw-mrp" className="underline">
+              Raw material requirement
+            </a>
+            .
           </li>
           <li>
             Warnings list whatever changed the plan: moulds held out, presses
@@ -623,6 +664,32 @@ function PlanLogicPage() {
         </p>
       </section>
 
+      <section id="capacity-dashboard" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold text-foreground">Capacity Dashboard — Prediction OEE and Accepted OEE</h2>
+        <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
+          <li>
+            <b>Capacity</b> is the same net hours the plan uses (step 3): one formula for the plan,
+            the Work Calendar, the Capacity Dashboard and Performance.
+          </li>
+          <li>
+            <b>Demand hours</b> = pieces ÷ cavities ÷ SPM ÷ OEE, after finished stock, earliest week
+            first; this week carries the backlog. Groups are the press <b>categories</b>.
+          </li>
+          <li>
+            <b>A) Prediction OEE</b> — one rate for every part ({current.predictionOee}%), set on the
+            dashboard. It is a what-if for that view only and never changes the plan.
+          </li>
+          <li>
+            <b>B) Accepted OEE</b> — each part's value from Master Data, the same as the plan.
+          </li>
+          <li>
+            Both use the same method: available hours as they are, production time = ideal time ÷
+            OEE. The <b>capacity factor</b> (Performance page) is a third, separate number: the
+            measured attainment against the approved plan, applied to the plan's capacity.
+          </li>
+        </ul>
+      </section>
+
       <section id="raw-mrp" className="mt-8 max-w-5xl scroll-mt-20 rounded-lg border border-border p-4">
         <h2 className="text-sm font-semibold text-foreground">Raw material requirement (MRP) — independent of the plan</h2>
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
@@ -651,6 +718,10 @@ function PlanLogicPage() {
             standard extra (500 kg by default).
           </li>
           <li>No demand, no order: after the last ZPP week the need is zero; nothing is forecast (kanban comes later).</li>
+          <li>
+            Now: N = {current.rawCoverage} working days, extra = {current.rawExtra.toLocaleString('en-GB')} kg. Working
+            days are the plant's working days (not a holiday, at least one press with normal shifts).
+          </li>
         </ol>
         <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">FMEA — what can go wrong and how the method guards it</h3>
         <div className="mt-2 overflow-x-auto rounded-md border border-border">
@@ -698,7 +769,7 @@ function PlanLogicPage() {
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
           <li>
             <b>Replays stock hour by hour</b> from the SAP files (ZPP, ZPP_DAILY,
-            MB52 2009/1009) and the planned jobs: every need day is due at{' '}
+            MB52 in the Finished goods locations) and the planned jobs: every need day is due at{' '}
             {current.cutoff}, production arrives as it is pressed. Every moment
             stock goes below zero is a real customer stop. The late list must
             match it exactly — a part the engine missed, or a false alarm, is
@@ -726,7 +797,7 @@ function PlanLogicPage() {
           </li>
           <li>
             <b>Flags data to check</b> for short parts: stock in other locations
-            (e.g. 2010), positive values in ZPP, backlog smaller than stock, an old
+            (not ticked Finished goods), positive values in ZPP, backlog smaller than stock, an old
             stock file, missing master data.
           </li>
         </ol>
@@ -779,6 +850,58 @@ function PlanLogicPage() {
         </p>
       </section>
     </div>
+  )
+}
+
+// ---- Tek kaynak: her bilgi nerede tanımlanır -------------------------------
+
+const SOURCES: [string, string, string, string][] = [
+  ['Presses, halls, categories', 'Press Definitions', '/makineler', 'Work Calendar, Capacity Dashboard, overtime, Gantt, setup and crane rules'],
+  ['Press calendar and overtime', 'Work Calendar', '/takvim', 'Plan, Capacity Dashboard (same record), Performance'],
+  ['Planned stops, holidays, settings', 'Work Calendar', '/takvim', 'Plan, capacity, raw material working days'],
+  ['Parts, presses per part, Accepted OEE', 'Master Data', '/referanslar', 'Plan, Capacity Dashboard B, raw material'],
+  ['Which stock counts', 'Storage Locations', '/depolar', 'Plan, raw material, Capacity Dashboard, MB51 production'],
+  ['Demand, stock, movements, in transit', 'SAP Data', '/sapdata', 'Plan, raw material, Actuals, Performance'],
+  ['Prediction OEE', 'Capacity Dashboard', '/capacity', 'That dashboard view only'],
+  ['Capacity factor', 'Performance', '/performans', 'Plan capacity'],
+  ['Die readiness and maintenance', 'Die Follow-up', '/die-followup/maintenance', 'Plan, Alarms'],
+  ['Breakdowns and press maintenance', 'Machine Follow-up', '/machine-followup/breakdowns', 'Plan, Alarms'],
+]
+
+function SingleSource() {
+  return (
+    <section className="mt-6 max-w-5xl rounded-lg border border-border p-4">
+      <h2 className="text-sm font-semibold text-foreground">One source for every input</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Each value is entered in one place only; every page and the plan read that same record, so
+        the same number never differs between pages. Nothing is hard-coded — groups, for example,
+        come from the press category.
+      </p>
+      <div className="mt-2 overflow-x-auto rounded-md border border-border">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-muted text-muted-foreground">
+            <tr>
+              <th className="px-2 py-1.5 font-medium">What</th>
+              <th className="px-2 py-1.5 font-medium">Defined on</th>
+              <th className="px-2 py-1.5 font-medium">Used by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SOURCES.map(([what, page, to, used]) => (
+              <tr key={what} className="border-t border-border align-top">
+                <td className="px-2 py-1.5 font-medium text-foreground">{what}</td>
+                <td className="px-2 py-1.5">
+                  <Link to={to} className="underline hover:no-underline">
+                    {page}
+                  </Link>
+                </td>
+                <td className="px-2 py-1.5 text-muted-foreground">{used}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 
@@ -886,7 +1009,7 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
           <Box tone="border-amber-300 bg-amber-50 text-amber-950" title="6 · Anything late? → plan again">
             A job that starts after its stock runs out stops the customer. Late
             lots are moved to the front (they try every press again) and may
-            overlap their setup with another one. Coils are never cut. Up to 4
+            overlap their setup with another one. Coils are never cut. Up to 6
             rounds; the best plan is kept.
           </Box>
           <Down label="whatever is still late or does not fit" />
@@ -1003,7 +1126,7 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
             </li>
             <li>
               Re-planning to remove late jobs is a set of trials, not a full
-              search: if 4 rounds cannot remove a late job, the fix is capacity
+              search: if 6 rounds cannot remove a late job, the fix is capacity
               (overtime, another press) — the plan says so.
             </li>
             <li>

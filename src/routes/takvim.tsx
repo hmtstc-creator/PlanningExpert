@@ -9,6 +9,8 @@ import { useSyncedFields } from '../lib/useSyncedFields'
 import { CapacityGrid } from '../components/CapacityGrid'
 import { UnsavedBar } from '../components/UnsavedBar'
 import { CollapsibleSection } from '../components/CollapsibleSection'
+import { InfoTip, PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 import { PlannedStopsEditor, type StopRow } from '../components/PlannedStopsEditor'
 import type { WeekPattern as GridPattern } from '../lib/capacityGrid'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
@@ -45,11 +47,25 @@ const FALLBACK_COUNTRIES = [
 function TakvimPage() {
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Work Calendar</h1>
-      <p className="mt-2 text-muted-foreground">
-        When each press runs. Open or delete overtime at the top; every section
-        can be shown or hidden with its button.
-      </p>
+      <PageHeader
+        title="Work Calendar"
+        summary="When each press runs."
+        links={relatedPages('/takvim')}
+        info={
+          <>
+            <p>
+              Each press has one calendar: its weekly pattern (days from Monday, shifts per day),
+              exception weeks and overtime. A public holiday is a day off — open overtime if the
+              press should work.
+            </p>
+            <p>
+              Open or delete overtime at the top; every section can be shown or hidden with its
+              button. Overtime opened on the <Link to="/capacity">Capacity Dashboard</Link> is the
+              same record.
+            </p>
+          </>
+        }
+      />
 
       <PressCalendarSection />
     </div>
@@ -585,11 +601,6 @@ function PressCalendarSection() {
           </button>
         </div>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Each press has one calendar: its weekly pattern (days from Monday, shifts
-        per day), exception weeks and overtime. A public holiday is a day off —
-        open overtime if the press should work.
-      </p>
 
       <UnsavedBar
         count={(sharedDirty ? 1 : 0) + (templateDirty ? 1 : 0)}
@@ -1143,37 +1154,54 @@ function PressCalendarSection() {
       <div className="mt-3 rounded-md border border-border p-3">
         <ShiftTable shiftStartMinute={shiftStartMinute} shiftMinutes={shiftMinutes} />
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Frozen days: the first {frozenDays} day(s) of the plan are taken from
-        the approved plan instead of being recalculated, so the shop floor's
-        preparation is not disturbed. A press can override this on the Press
-        Definitions page. 0 turns it off.{' '}
-        Safety stock: the next lot of a part may start {safetyStockDays} working
-        day(s) before its projected stock runs out — not earlier, so stock does
-        not pile up.{' '}
-        Crane constraint: presses in the same hall can run at most{' '}
-        {concurrentSetupsPerHall} setup(s) at a time, with at least{' '}
-        {setupGapMinutes} min between consecutive mould setups and{' '}
-        {coilSetupGapMinutes} min between coil changes. A mould setup and a coil
-        change can follow each other immediately but never overlap. Hall
-        definitions come from the Press Definitions page.{' '}
-        Plant-wide: without backlog at most {maxSetupsPlantWideNormal} mould setup(s) run at the
-        same time anywhere in the plant; for backlog or a job that would otherwise be late up to{' '}
-        {maxSetupsPlantWide} may overlap — also in the same hall — so production starts sooner.{' '}
-        {setupsCrossShifts
-          ? 'A setup may start near the end of a shift and be finished by the next shift.'
-          : 'A setup must finish within the shift it starts in.'}{' '}
-        Pull forward: when a press would stand idle, work of the coming weeks may start up to{' '}
-        {pullForwardDays} day(s) before it is needed; if nothing is urgent the die already
-        mounted keeps running first, so no extra setup is made.{' '}
-        Delivery: a part is on time when the quantity needed is ready by{' '}
-        {`${String(Math.floor(deliveryCutoffMinute / 60)).padStart(2, '0')}:${String(deliveryCutoffMinute % 60).padStart(2, '0')}`}{' '}
-        on the day it is needed (public holidays included — a customer may want parts on a
-        holiday); backlog and today's need are due the next day at that time. Urgent raw
-        material: coils that stop a job within the next {rawUrgentDays} working day(s) are listed
-        on the Production Plan. Scenarios: the planner tries up to {maxScenarios} plan variants and stops as soon as
-        the presses are {utilisationTarget}% busy in the next 7 days; otherwise it reports the best
-        level it reached.
+      <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+        What these settings do
+        <InfoTip label="About the planning rules">
+          <ul>
+            <li>
+              <b>Frozen days:</b> the first {frozenDays} day(s) of the plan are taken from the
+              approved plan instead of being recalculated, so the shop floor's preparation is not
+              disturbed. A press can override this on Press Definitions. 0 turns it off.
+            </li>
+            <li>
+              <b>Safety stock:</b> the next lot of a part may start {safetyStockDays} working day(s)
+              before its projected stock runs out — not earlier, so stock does not pile up.
+            </li>
+            <li>
+              <b>Crane:</b> presses in the same hall run at most {concurrentSetupsPerHall} setup(s) at
+              a time, at least {setupGapMinutes} min between mould setups and{' '}
+              {coilSetupGapMinutes} min between coil changes. A mould setup and a coil change may
+              follow each other but never overlap. Halls come from Press Definitions.
+            </li>
+            <li>
+              <b>Plant-wide:</b> without backlog at most {maxSetupsPlantWideNormal} mould setup(s) at
+              the same time; for backlog or a job that would otherwise be late up to{' '}
+              {maxSetupsPlantWide} may overlap — also in the same hall.{' '}
+              {setupsCrossShifts
+                ? 'A setup may start near the end of a shift and be finished by the next shift.'
+                : 'A setup must finish within the shift it starts in.'}
+            </li>
+            <li>
+              <b>Pull forward:</b> when a press would stand idle, work may start up to{' '}
+              {pullForwardDays} day(s) before it is needed; if nothing is urgent the mounted die
+              keeps running first, so no extra setup is made.
+            </li>
+            <li>
+              <b>Delivery:</b> on time when the quantity needed is ready by{' '}
+              {`${String(Math.floor(deliveryCutoffMinute / 60)).padStart(2, '0')}:${String(deliveryCutoffMinute % 60).padStart(2, '0')}`}{' '}
+              on the need day (holidays included); backlog and today's need are due the next day at
+              that time.
+            </li>
+            <li>
+              <b>Urgent raw material:</b> coils that stop a job within the next {rawUrgentDays}{' '}
+              working day(s) are listed on the Production Plan.
+            </li>
+            <li>
+              <b>Scenarios:</b> up to {maxScenarios} plan variants; stops as soon as the presses are{' '}
+              {utilisationTarget}% busy in the next 7 days, otherwise reports the best level reached.
+            </li>
+          </ul>
+        </InfoTip>
       </p>
 
       </CollapsibleSection>

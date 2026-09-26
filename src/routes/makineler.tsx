@@ -8,6 +8,8 @@ import { UnsavedBar } from '../components/UnsavedBar'
 import { draftOf, pressPayload, sameDraft } from '../lib/pressDraft'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
+import { PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/makineler')({
@@ -113,24 +115,41 @@ function MakinelerPage() {
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Press Definitions</h1>
-      <p className="mt-2 text-muted-foreground">
-        Define which hall each press sits in — presses in the same hall cannot
-        set up at the same time, which is the crane constraint the planner
-        relies on. The category groups presses into lines: the Gantt groups by
-        it and the Capacity Dashboard adds up presses with the same category
-        (e.g. Transfer = 106 + 107). It does not decide where a part runs —
-        which press can run a material still comes from the main and
-        alternative machines in master data. Coil fed marks a progressive line:
-        the first coil goes on during setup and every coil after it costs a coil
-        change. A transfer press runs blanks, so it has a single setup and no
-        coil changes — untick it there. Frozen days locks that press's plan for
-        the given number of days; leave it empty to use the global setting.
-      </p>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Edits in the table below are <strong className="text-foreground">not</strong>{' '}
-        saved until you press Save on that row, or Save all at the bottom of the
-        page. An edited row is marked until it is saved.
+      <PageHeader
+        title="Press Definitions"
+        summary="Hall, category and coil feed of every press — the single press list of the program."
+        links={relatedPages('/makineler')}
+        info={
+          <>
+            <p>
+              <b>Hall:</b> presses in the same hall cannot set up at the same time — the crane
+              constraint the planner relies on.
+            </p>
+            <p>
+              <b>Category</b> groups presses into lines: the Gantt groups by it and the Capacity
+              Dashboard adds up presses with the same category (e.g. Transfer = 106 + 107). It does
+              not decide where a part runs — that comes from the main and alternative machines in
+              master data.
+            </p>
+            <p>
+              <b>Coil fed</b> marks a progressive line: the first coil goes on during setup and every
+              coil after it costs a coil change. A transfer press runs blanks, so it has a single
+              setup and no coil changes — untick it there.
+            </p>
+            <p>
+              <b>Frozen days</b> locks that press's plan for the given number of days; leave it
+              empty to use the global setting.
+            </p>
+            <p>
+              Only presses defined here appear on the Work Calendar, the Capacity Dashboard and the
+              overtime lists. Each press also needs a Work Calendar pattern, otherwise it has no
+              capacity.
+            </p>
+          </>
+        }
+      />
+      <p className="mt-2 text-xs text-muted-foreground">
+        Edits are saved with Save on the row, or Save all at the bottom.
       </p>
 
       <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />

@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { countedLocations, isFinishedStockRow, type LocationFlags } from '../lib/stockLocations'
+import { PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/siparisler')({
   component: SiparislerPage,
@@ -49,20 +51,19 @@ function SiparislerPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Demand</h1>
-      <p className="mt-2 text-muted-foreground">
-        Net requirements from the SAP ZPP (weekly) and ZPP_DAILY (daily)
-        reports — negative values represent the shortfall that must be
-        produced.
-      </p>
+      <PageHeader
+        title="Demand"
+        summary="Net requirements from ZPP (weekly) and ZPP_DAILY (daily)."
+        links={relatedPages('/siparisler')}
+        info={
+          <p>
+            Negative values are the shortfall that must be produced. Both files are uploaded on{' '}
+            <Link to="/sapdata">SAP Data</Link>. Where ZPP_DAILY covers a day it overrides the
+            weekly ZPP; beyond it the weekly total is spread over the plant's working days.
+          </p>
+        }
+      />
 
-      <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-        ZPP (weekly) and ZPP_DAILY (daily) demand is uploaded on the{' '}
-        <Link to="/sapdata" className="font-medium text-foreground underline hover:no-underline">
-          SAP Data
-        </Link>{' '}
-        page.
-      </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-4">
         <div className="flex gap-2">

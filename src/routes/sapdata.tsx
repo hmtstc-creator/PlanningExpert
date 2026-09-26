@@ -28,6 +28,8 @@ import {
   type SapUploadKey,
 } from '../lib/sapUploads'
 import { uploadMessage } from '../lib/uploadMessage'
+import { PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/sapdata')({
   component: SapDataPage,
@@ -93,12 +95,24 @@ function SapDataPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">SAP Data</h1>
-      <p className="mt-2 max-w-4xl text-muted-foreground">
-        Upload the daily SAP exports here. Choose a file, check the preview and
-        press Save — the saved file replaces the previous one entirely. The plan
-        is recalculated on the server a few seconds after every save.
-      </p>
+      <PageHeader
+        title="SAP Data"
+        summary="Upload the daily SAP exports: choose a file, check the preview, press Save."
+        links={relatedPages('/sapdata')}
+        info={
+          <>
+            <p>
+              The saved file replaces the previous one entirely. The plan is recalculated on the
+              server a few seconds after every save.
+            </p>
+            <p>
+              Master data (cavities, SPM, weights, machines) is maintained on{' '}
+              <Link to="/referanslar">Master Data</Link>. Which stock locations count is set on{' '}
+              <Link to="/depolar">Storage Locations</Link>.
+            </p>
+          </>
+        }
+      />
 
       <DataInUse status={status} />
 

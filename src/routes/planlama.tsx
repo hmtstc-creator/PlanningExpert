@@ -33,6 +33,8 @@ import {
   type PlanDataSources,
 } from '../lib/sapUploads'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
+import { InfoTip, PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/planlama')({
   component: PlanlamaPage,
@@ -247,14 +249,33 @@ function PlanlamaPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Production Plan</h1>
-      <p className="mt-2 text-muted-foreground">
-        The plan is generated automatically: backlog first, then the materials
-        whose stock runs out soonest, and the remaining capacity is filled with
-        the rest of the demand. Crane constraints, mold limits and coil
-        calculations are all applied. You only review and approve. Planning
-        horizon is {horizonWeeks} weeks (change it on the Work Calendar page).
-      </p>
+      <PageHeader
+        title="Production Plan"
+        summary={`Generated automatically — you review and approve. Horizon: ${horizonWeeks} weeks.`}
+        links={relatedPages('/planlama')}
+        info={
+          <>
+            <p>
+              The plan is generated automatically: backlog first, then the materials whose stock
+              runs out soonest, and the remaining capacity is filled with the rest of the demand.
+              Crane constraints, mould limits and coil calculations are all applied. The planning
+              horizon is changed on the <Link to="/takvim">Work Calendar</Link>.
+            </p>
+            <p>
+              <b>Lot size: Min. lot if set, otherwise whole coils.</b> A mounted coil is run out, so
+              quantities are rounded up to whole coils and the surplus covers the following weeks
+              rather than triggering a second coil. Where a <b>Min. lot</b> is set in master data
+              (e.g. transfer presses), the lot is at least that many pieces and the coil is ignored.
+              Parts with neither are planned to the exact need and flagged. A coil is never cut
+              short, not even to save a late job — late jobs are moved forward instead. A co-product
+              pair is one job: one stroke makes both parts.
+            </p>
+            <p>
+              <Link to="/planlogic">Planning Logic</Link> explains every rule.
+            </p>
+          </>
+        }
+      />
 
       <PressStartPanel presses={presses.map((p) => p.name)} />
 
@@ -291,16 +312,6 @@ function PlanlamaPage() {
 
       {run && <PlanDataLine sources={(run as { dataSources?: PlanDataSources }).dataSources} />}
 
-      <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-        <strong className="text-foreground">Lot size: Min. lot if set, otherwise whole coils.</strong>{' '}
-        A mounted coil is run out, so quantities are rounded up to whole coils and the
-        surplus covers the following weeks rather than triggering a second coil. Where a{' '}
-        <strong className="text-foreground">Min. lot</strong> is set in master data (e.g.
-        transfer presses), the lot is at least that many pieces and the coil is ignored.
-        Parts with neither are planned to the exact need and flagged. A coil is never cut
-        short, not even to save a late job — late jobs are moved forward instead. A
-        co-product pair is one job: one stroke makes both parts.
-      </p>
 
       {thisWeekCapacity.full > 0 && (
         <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
@@ -310,8 +321,10 @@ function PlanlamaPage() {
           </strong>{' '}
           still available of {Math.round(thisWeekCapacity.full / 60).toLocaleString('en-GB')} h —{' '}
           {Math.round(thisWeekCapacity.elapsed / 60).toLocaleString('en-GB')} h have already
-          gone by. Days that have passed and the hours already elapsed today are excluded
-          from the plan.
+          gone by.{' '}
+          <InfoTip label="About this week's hours">
+            Days that have passed and the hours already elapsed today are excluded from the plan.
+          </InfoTip>
         </p>
       )}
 
@@ -341,11 +354,14 @@ function PlanlamaPage() {
         <p className="mt-6 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
           <strong className="text-foreground">{frozenCount} jobs are frozen or running now</strong> —
           taken from the plan approved on{' '}
-          {run?.frozenFrom ? new Date(run.frozenFrom).toLocaleString('en-GB') : ''}{' '}
-          instead of being recalculated, so the shop floor's preparation is not
-          disturbed. They are drawn hatched below and the quantity they produce
-          is deducted from the requirement. Change the frozen day count on the
-          Work Calendar page, or per press on Press Definitions.
+          {run?.frozenFrom ? new Date(run.frozenFrom).toLocaleString('en-GB') : ''}.{' '}
+          <InfoTip label="About frozen jobs">
+            They are taken from the approved plan instead of being recalculated, so the shop floor's
+            preparation is not disturbed. They are drawn hatched below and the quantity they produce
+            is deducted from the requirement. Change the frozen day count on the{' '}
+            <Link to="/takvim">Work Calendar</Link>, or per press on{' '}
+            <Link to="/makineler">Press Definitions</Link>.
+          </InfoTip>
         </p>
       )}
 
@@ -525,12 +541,13 @@ function PlanlamaPage() {
       )}
 
       <div id="plan-overrides" className="mt-6 scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Plan overrides</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
-          The plan is always computed by the engine; the rules below are fed in
-          as input, so your override persists but the plan still comes out of
-          the engine.
-        </p>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          Plan overrides
+          <InfoTip label="About plan overrides">
+            The plan is always computed by the engine; the rules below are fed in as input, so your
+            override persists but the plan still comes out of the engine.
+          </InfoTip>
+        </h2>
 
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <label className="text-sm">
@@ -810,13 +827,16 @@ function PlanlamaPage() {
           <h2 className="text-sm font-semibold text-destructive">
             Raw material — urgent ({urgentRaw.length}): coil stock runs out within the next {rawUrgentDays} working days
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Planned quantity × gross weight per piece, walked in plan order against the coil
-            stock in MB52 (locations ticked Raw material on Storage Locations) plus the coils in
-            transit from their arrival day. Only coils that stop a job in the next{' '}
-            {rawUrgentDays} working days are listed (set on the Work Calendar)
-            {laterRaw > 0 && ` — ${laterRaw} more run short later in the plan`}. Co-products are
-            not counted twice.
+          <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            {laterRaw > 0 && `${laterRaw} more run short later in the plan.`}
+            <InfoTip label="About urgent raw material">
+              Planned quantity × gross weight per piece, walked in plan order against the coil stock
+              in MB52 (locations ticked Raw material on <Link to="/depolar">Storage Locations</Link>)
+              plus the coils in transit from their arrival day. Only coils that stop a job in the
+              next {rawUrgentDays} working days are listed (set on the{' '}
+              <Link to="/takvim">Work Calendar</Link>). Co-products are not counted twice. The full
+              requirement is on <Link to="/hammadde">Raw Material Coverage</Link>.
+            </InfoTip>
           </p>
           <div className="mt-2 overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-left text-sm">
@@ -1084,9 +1104,12 @@ function LateItemsBody({ items, repair }: { items: LateItem[]; repair: PlanRun['
   return (
     <>
       <p className="mt-1 text-xs text-muted-foreground">
-        A material is late when the quantity the customer needs is not ready by 08:00 on
-        the requirement day (backlog and today's need: next working day 08:00). Stock
-        counts only in storage locations 2009 and 1009.
+        <InfoTip label="When is a part late?">
+          A material is late when the quantity the customer needs is not ready by the delivery time
+          on the requirement day (Work Calendar, default 08:00; public holidays included). Backlog
+          and today's need are due the next day at that time. Stock counts in the locations ticked
+          Finished goods on <Link to="/depolar">Storage Locations</Link>.
+        </InfoTip>
         {repair.rounds > 0 &&
           ` The engine re-planned ${repair.rounds} time(s)${
             repair.boosted.length > 0 ? ` and moved ${repair.boosted.length} part(s) forward` : ''
@@ -1203,14 +1226,20 @@ function PressStartPanel({ presses }: { presses: string[] }) {
       </div>
       {open && (
         <div className="mt-3">
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Plan from</strong>: the press takes no new work
-            before this date and time (no operator, no raw material…). Approved jobs on it that
-            would start earlier are released and planned again after it.{' '}
-            <strong className="text-foreground">Behind / ahead</strong>: the line did not keep to
-            the approved plan. +3 h moves the approved (frozen and running) jobs 3 hours later and
-            closes the first 3 hours; −2 h brings them forward. Leave empty to plan normally. Each
-            save recalculates the plan.
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            How these work
+            <InfoTip label="About press start and delays">
+              <p>
+                <b>Plan from</b>: the press takes no new work before this date and time (no operator,
+                no raw material…). Approved jobs on it that would start earlier are released and
+                planned again after it.
+              </p>
+              <p>
+                <b>Behind / ahead</b>: the line did not keep to the approved plan. +3 h moves the
+                approved (frozen and running) jobs 3 hours later and closes the first 3 hours; −2 h
+                brings them forward. Leave empty to plan normally. Each save recalculates the plan.
+              </p>
+            </InfoTip>
           </p>
           <div className="mt-2 flex flex-wrap items-end gap-2 text-xs">
             <label>
@@ -1414,9 +1443,11 @@ function DataCoveragePanel({ coverage }: { coverage: DataCoverage }) {
         </button>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Master data is the main list: only its parts are kept from the uploaded files. A part in
-        master data with no row at all means the file was pulled without it, or its code is
-        written differently in master data. It is planned with no demand and no stock.{' '}
+        <InfoTip label="About the master data check">
+          Master data is the main list: only its parts are kept from the uploaded files. A part in
+          master data with no row at all means the file was pulled without it, or its code is
+          written differently in master data. It is planned with no demand and no stock.
+        </InfoTip>{' '}
         <Link to="/sapdata" className="underline">
           SAP Data
         </Link>{' '}
@@ -1496,7 +1527,12 @@ function IndependentCheck({ v }: { v: PlanValidation }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">
           Independent check —{' '}
-          {rulesOk && engineOk ? 'the plan and its late list are confirmed' : 'differences found'}
+          {rulesOk && engineOk ? 'the plan and its late list are confirmed' : 'differences found'}{' '}
+          <InfoTip label="About the independent check">
+            Separate code, not the planner's, replays stock hour by hour from the SAP files and the
+            planned jobs, re-checks every rule, and tests whether any plan could have avoided each
+            shortage. <Link to="/planlogic" hash="check">Planning Logic</Link>
+          </InfoTip>
         </h2>
         <button
           type="button"
@@ -1507,11 +1543,7 @@ function IndependentCheck({ v }: { v: PlanValidation }) {
           {open ? 'Hide ▴' : 'Details ▾'}
         </button>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Separate code, not the planner's, replays stock hour by hour from the SAP files and the
-        planned jobs, re-checks every rule, and tests whether any plan could have avoided each
-        shortage.
-      </p>
+
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <CheckStat label="Parts really short (stock replay)" value={sm.realStockouts} warn={sm.realStockouts > 0} />
         <CheckStat
@@ -1892,17 +1924,13 @@ function PlanCheck({ audit, jobCount }: { audit: PlanAudit; jobCount: number }) 
       }`}
     >
       <h2 className="text-sm font-semibold text-foreground">
-        Plan check {audit.ok ? '— all rules hold' : '— rules broken, do not approve'}
+        Plan check {audit.ok ? '— all rules hold' : '— rules broken, do not approve'}{' '}
+        <InfoTip label="About the plan check">
+          After every calculation, separate checking code goes through all{' '}
+          {jobCount.toLocaleString('en-GB')} jobs again and verifies each rule on its own. You do not
+          need to recount the plan by hand. See <Link to="/planlogic">Planning Logic</Link>.
+        </InfoTip>
       </h2>
-      <p className="mt-1 text-xs text-muted-foreground">
-        After every calculation, separate checking code goes through all{' '}
-        {jobCount.toLocaleString('en-GB')} jobs again and verifies each rule on its own.
-        You do not need to recount the plan by hand. See{' '}
-        <Link to="/planlogic" className="underline hover:no-underline">
-          Planning Logic
-        </Link>
-        .
-      </p>
       <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
         {audit.rules.map((r) => (
           <li key={r.id}>

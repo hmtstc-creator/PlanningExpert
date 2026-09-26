@@ -9,6 +9,8 @@ import { UnsavedBar } from '../components/UnsavedBar'
 import { countsFinished, countsProduction, countsRaw } from '../lib/stockLocations'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
+import { PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/depolar')({
   component: DepolarPage,
@@ -146,15 +148,37 @@ function DepolarPage() {
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Storage Locations</h1>
-      <p className="mt-2 text-muted-foreground">
-        Define the storage locations you care about and choose how each one is
-        treated in planning. MB52 rows in any location that is not defined here
-        are ignored on upload — stock you have not declared is not your stock.
-        The matrix below answers "which stock do I really have?": tick what the
-        stock in each location counts for — finished goods (plan and raw
-        material netting) and raw material on hand (coil orders).
-      </p>
+      <PageHeader
+        title="Storage Locations"
+        summary="Which stock do I really have? Tick what each location counts for."
+        links={relatedPages('/depolar')}
+        info={
+          <>
+            <p>
+              Define the storage locations you care about and choose how each one is treated in
+              planning. MB52 rows in any location that is not defined here are ignored on upload —
+              stock you have not declared is not your stock.
+            </p>
+            <ul>
+              <li>
+                <b>Finished goods:</b> plan and raw material netting.
+              </li>
+              <li>
+                <b>Raw material:</b> coils on hand for coil orders.
+              </li>
+              <li>
+                <b>Production receipt:</b> MB51 101 movements into this location minus 102 reversals
+                are the actual production (plan versus actual, performance, mould shot counters).
+              </li>
+            </ul>
+            <p>
+              Without a saved tick, 2009 and 1009 count for finished goods and raw material, and
+              2009 for production receipt. Stock in an unticked location is shown but never
+              netted.
+            </p>
+          </>
+        }
+      />
 
 
       <div className="mt-6 flex gap-2">
@@ -177,10 +201,8 @@ function DepolarPage() {
       </div>
 
       <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
-      <p className="mt-3 text-sm text-muted-foreground">
-        Changing a tick or the note marks the location{' '}
-        <strong className="text-foreground">Unsaved</strong> — press Save on that
-        row, or Save all at the bottom of the page.
+      <p className="mt-3 text-xs text-muted-foreground">
+        Changes are saved with Save on the row, or Save all at the bottom.
       </p>
 
       {undefinedInStock.length > 0 && (
@@ -324,13 +346,6 @@ function DepolarPage() {
         </div>
       )}
 
-      <p className="mt-6 text-xs text-muted-foreground">
-        A tick decides what the stock in that location counts for. Without a
-        saved tick, 2009 and 1009 count for finished goods and raw material. Production receipt: MB51 101 movements into
-        this location minus 102 reversals are the actual production (plan
-        versus actual, performance, mould shot counters); 2009 by default. Stock in an unticked location is shown but
-        never netted.
-      </p>
 
       <UnsavedBar
         count={rows.dirtyKeys.length}

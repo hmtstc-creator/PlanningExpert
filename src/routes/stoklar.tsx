@@ -3,6 +3,8 @@ import { usePaginatedQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/stoklar')({
   component: StoklarPage,
@@ -50,19 +52,19 @@ function StoklarPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Stock</h1>
-      <p className="mt-2 text-muted-foreground">
-        Stock from the SAP MB52 report. Total available stock is calculated
-        per material; the detail view breaks it down by storage location.
-      </p>
+      <PageHeader
+        title="Stock"
+        summary="Stock from the SAP MB52 report, per material and location."
+        links={relatedPages('/stoklar')}
+        info={
+          <p>
+            Total available stock is calculated per material; the detail view breaks it down by
+            storage location. MB52 is uploaded on <Link to="/sapdata">SAP Data</Link>; which
+            locations count is set on <Link to="/depolar">Storage Locations</Link>.
+          </p>
+        }
+      />
 
-      <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-        The MB52 stock report is uploaded on the{' '}
-        <Link to="/sapdata" className="font-medium text-foreground underline hover:no-underline">
-          SAP Data
-        </Link>{' '}
-        page.
-      </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <div className="flex gap-2">

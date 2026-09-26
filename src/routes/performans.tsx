@@ -14,6 +14,8 @@ import { type ProductSpec } from '../lib/planning'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { capacityModel } from '../lib/capacityModel'
 import { useOvertimeData } from '../components/OvertimePanels'
+import { InfoTip, PageHeader } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/performans')({
   component: PerformansPage,
@@ -159,12 +161,25 @@ function PerformansPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Performance</h1>
-      <p className="mt-2 text-muted-foreground">
-        Compares the approved plan with the actual production uploaded from
-        MB51. The resulting performance factor can be fed back to make planning
-        capacity realistic.
-      </p>
+      <PageHeader
+        title="Performance"
+        summary="Approved plan versus actual production (MB51)."
+        links={relatedPages('/performans')}
+        info={
+          <>
+            <p>
+              Compares the approved plan with the actual production uploaded from MB51 (101 − 102
+              into the production receipt location). The resulting performance factor (measured
+              attainment) can be fed back as the capacity factor to make planning capacity
+              realistic.
+            </p>
+            <p>
+              This is not the Accepted OEE of Master Data and not the Prediction OEE of the Capacity
+              Dashboard.
+            </p>
+          </>
+        }
+      />
 
       <div className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border border-border p-4">
         <label className="text-sm">
@@ -208,14 +223,13 @@ function PerformansPage() {
             <p className="text-foreground">
               Planning capacity currently uses a factor of{' '}
               <strong>%{Math.round((globalSettings?.capacityFactor ?? SETTINGS_DEFAULTS.capacityFactor) * 100)}</strong>{' '}
-              .
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Applying the measured attainment rate builds the plan around the
-              throughput actually achieved in the past. The per-part Accepted OEE
-              from Master Data is already in the plan; this rate is measured
-              against that plan, so it corrects on top of it and is not counted
-              twice.
+              .{' '}
+              <InfoTip label="About the capacity factor">
+                Applying the measured attainment rate builds the plan around the throughput actually
+                achieved in the past. The per-part Accepted OEE from Master Data is already in the
+                plan; this rate is measured against that plan, so it corrects on top of it and is not
+                counted twice.
+              </InfoTip>
             </p>
           </div>
           <button
