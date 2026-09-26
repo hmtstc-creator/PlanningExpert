@@ -49,11 +49,23 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Capacity Dashboard grupları kategoriden gelir.
 - Bir presin tek takvimi vardır: Work Calendar'daki pres düzeni (gün, vardiya,
   fazla mesai, istisna haftalar). Sayfadaki "genel çalışma günleri" tikleri
-  kafa karıştırır; pres takvimi esastır. → uygulanacak (bkz. açık sorular)
+  kaldırılır; pres takvimi esastır.
+- Pres düzeninde "haftada N gün" Pazartesiden başlayarak sırayla dolar
+  (5 = Pzt–Cuma, 6 = Pzt–Cmt). Günler pres bazında tek tek işaretlenmez.
+- Fazla mesai varsayılan olarak normal günlerden sonraki günlere konur
+  (Cumartesi, sonra Pazar).
+- Olağandışı yönetim: planlamacı mesaiyi hangi güne açtığını girer; plan o
+  güne göre çalışır. Örnekler: resmi tatilde mesai, normal çalışma günü
+  dışında mesai, haftada 2 vardiya çalışan bir prese hafta içi 3. vardiya.
+  Bunun için Work Calendar'da pres bazlı gün detayı bölümü olur.
+- Vardiya düzeni vardiya tanımının yapıldığı yerde detaylanır: ör. 2 × 8
+  saat ya da 2 × 9 saat. Bir gün 24 saati doldurmak zorunda değildir, ama
+  geçemez.
 - Capacity Dashboard'dan açılan fazla mesai o presin Work Calendar kaydını
   günceller (aynı kayıt; zaten böyle).
-- Tek sınır: bir presin haftası 7 gün × 24 saat = 168 saati geçemez (planlı
-  duruşlar dahil). → uygulanacak
+- Sınırlar: bir gün 24 saati, bir presin haftası 168 saati (7 × 24) geçemez;
+  planlı duruşlar dahil. Aşan kayıt Work Calendar'da da Capacity
+  Dashboard'da da reddedilir ve mesaj gösterilir.
 - Work Calendar düzeni tanımlanmamış presin kapasitesi 0'dır; plan sayfasında
   kırmızı alarm çıkar. Program kendiliğinden vardiya uydurmaz. → uygulanacak
 - Dondurulmuş gün hem genel hem pres bazında kalır (pres değeri geneli ezer).
@@ -61,6 +73,13 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   kalır. Capacity Dashboard'a seçim düğmesi eklenecek: A) kabule göre
   (Performance'ta yazılan katsayı), B) master data'daki parça performansına
   göre. → uygulanacak
+
+### İş günü (presler dışındaki hesaplar)
+- Teslim hesabında resmi tatiller kullanılmaz: müşteri tatil günü mal
+  isteyebilir; o gün hazır değilse gecikme görünür.
+- Hammadde (10 iş günü) ve acil hammadde (3 iş günü) iş günüyle sayılır.
+- Haftalık talebin günlere dağıtılması: ZPP_DAILY varsa ZPP haftalığı ezer;
+  ZPP_DAILY'nin ulaşmadığı tarihlerde haftalık talep takvime göre dağıtılır.
 
 ### Setup
 - Normal: holde tek setup, fabrikada aynı anda 1; iki setup arası 10 dk.
@@ -79,11 +98,34 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Acil hammadde süresi (şu an 3 iş günü) Work Calendar'da ayarlanabilir
   olacak. → uygulanacak
 
+## Aksiyon listesi ("programı düzelt" dendiğinde uygulanır)
+
+1. Depo matrisinden Category sütununu kaldır.
+2. Capacity Dashboard'a performans seçimi: A) kabule göre (Performance
+   katsayısı), B) master data parça performansına göre.
+3. Acil hammadde süresini (3 iş günü) Work Calendar'da ayarlanabilir yap.
+4. Work Calendar düzeni olmayan pres: kapasite 0 + plan sayfasında kırmızı
+   alarm.
+5. Genel çalışma günü tiklerini kaldır; pres düzenindeki N gün Pazartesiden
+   sırayla, fazla mesai sonraki günlere.
+6. Work Calendar'a pres bazlı gün detayı: bir haftanın her günü için vardiya
+   ve mesai (tatilde mesai, hafta içi ek vardiya). Capacity Dashboard'dan
+   mesai açmak aynı kaydı günceller.
+7. Vardiya tanımını detaylandır (vardiya sayısı ve süresi, ör. 2 × 9 saat);
+   gün ≤ 24 saat, hafta ≤ 168 saat; aşan kayıt reddedilir.
+8. Teslim hesabında resmi tatilleri kullanma.
+9. Hammadde, acil hammadde ve talep dağıtımı için iş günü tanımını yeni pres
+   takvimine bağla (açık soru 2'ye göre).
+10. Etkisiz "14 gün stok = acil" kodunu kaldır.
+11. BEKLEMEDE: MB51'de hareket türü olmayan eski satırları sayma (yeni format
+    yüklenince kontrol).
+
 ## Açık sorular
 
-- Genel çalışma günü tikleri kalkınca: pres düzenindeki "haftada N gün" hangi
-  günlere konur; presler dışında kullanılan "iş günü" (teslimde ertesi iş
-  günü, hammadde 10 iş günü, günlük talep dağılımı, acil hammadde) nereden
-  gelir; 168 saat aşılırsa ne olur.
+- Bakiye ve bugünün ihtiyacının teslim anı (tatiller kullanılmayacaksa).
+- Presler dışındaki "iş günü"nün kaynağı.
+- Vardiya tanımı fabrika geneli mi, pres bazında mı; mesai vardiyasının
+  süresi ve molaları.
+- Tatil günü normal vardiyası başka güne kayar mı.
 - Koddaki sabit sayılar: `docs/fixeddefinitions.md` — ileride
   değerlendirilecek.
