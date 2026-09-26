@@ -47,6 +47,15 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   kategori = hat (Gantt gruplaması ve Capacity Dashboard toplamı, ör.
   Transfer = 106 + 107, 800T).
 - Capacity Dashboard grupları kategoriden gelir.
+- Bir presin tek takvimi vardır: Work Calendar'daki pres düzeni (gün, vardiya,
+  fazla mesai, istisna haftalar). Sayfadaki "genel çalışma günleri" tikleri
+  kafa karıştırır; pres takvimi esastır. → uygulanacak (bkz. açık sorular)
+- Capacity Dashboard'dan açılan fazla mesai o presin Work Calendar kaydını
+  günceller (aynı kayıt; zaten böyle).
+- Tek sınır: bir presin haftası 7 gün × 24 saat = 168 saati geçemez (planlı
+  duruşlar dahil). → uygulanacak
+- Work Calendar düzeni tanımlanmamış presin kapasitesi 0'dır; plan sayfasında
+  kırmızı alarm çıkar. Program kendiliğinden vardiya uydurmaz. → uygulanacak
 - Dondurulmuş gün hem genel hem pres bazında kalır (pres değeri geneli ezer).
 - Parça performansı (master data) ve kapasite katsayısı (Performance) ikisi de
   kalır. Capacity Dashboard'a seçim düğmesi eklenecek: A) kabule göre
@@ -72,5 +81,9 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 
 ## Açık sorular
 
-- Şablonu olmayan pres ve çalışma günü tutarsızlığı (bkz. sohbet, madde 5–6).
-- Koddaki sabit sayılar: programda mı kalsın, kullanıcı mı tanımlasın.
+- Genel çalışma günü tikleri kalkınca: pres düzenindeki "haftada N gün" hangi
+  günlere konur; presler dışında kullanılan "iş günü" (teslimde ertesi iş
+  günü, hammadde 10 iş günü, günlük talep dağılımı, acil hammadde) nereden
+  gelir; 168 saat aşılırsa ne olur.
+- Koddaki sabit sayılar: `docs/fixeddefinitions.md` — ileride
+  değerlendirilecek.
