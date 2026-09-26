@@ -17,9 +17,10 @@ const DEFAULT_EXTRA = 500
 
 /**
  * Hammadde ihtiyaç planlaması (MRP), plandan bağımsız. ZPP'nin son haftasına
- * kadar: talep − mamul stoğu (2009 + 1009) → brüt ağırlıkla kg → haftalık
- * stok yürütme; her hafta sonunda N günlük emniyet kalacak şekilde teslim
- * haftasına sipariş (+ standart ek). Hesap: src/lib/rawMrp.ts.
+ * kadar: talep − mamul stoğu → brüt ağırlıkla kg → haftalık stok yürütme
+ * (eldeki rulo + yoldakiler); her hafta sonunda sonraki N iş gününün
+ * tüketimi kalacak şekilde teslim haftasına sipariş (+ standart ek).
+ * Talep yoksa sipariş yok. Hesap: src/lib/rawMrp.ts.
  */
 function RawMaterialCoveragePage() {
   const data = useQuery(api.planRuns.latestRawCoverage) as
@@ -47,10 +48,13 @@ function RawMaterialCoveragePage() {
   const dirty = coverageDays !== savedDays || extraKg !== savedExtra
 
   const plan = data?.rawRequirements ?? null
+  const workingDaysPerWeek = plan?.workingDaysPerWeek ?? 5
   const results = useMemo<RawMrpResult[]>(
-    () => (plan ? plan.items.map((item) => rawMrp(item, { coverageDays, extraKg })) : []),
-    [plan, coverageDays, extraKg],
+    () => (plan ? plan.items.map((item) => rawMrp(item, { coverageDays, extraKg, workingDaysPerWeek })) : []),
+    [plan, coverageDays, extraKg, workingDaysPerWeek],
   )
+  const itemByRaw = useMemo(() => new Map((plan?.items ?? []).map((i) => [i.rawMaterial, i])), [plan])
+  const coverWeeks = Math.round((coverageDays / workingDaysPerWeek) * 10) / 10
   const weeks = plan?.weeks ?? []
   const shown = results
     .filter((r) => !onlyOrders || r.totalOrderKg > 0)
@@ -62,7 +66,8 @@ function RawMaterialCoveragePage() {
     })
   const weekTotals = weeks.map((_, w) => results.reduce((a, r) => a + r.rows[w].orderKg, 0))
   const thisWeek = results.filter((r) => (r.rows[0]?.orderKg ?? 0) > 0)
-  const lowCover = results.filter((r) => r.coversWeeks !== null && r.coversWeeks * 7 < coverageDays)
+  const lowCover = results.filter((r) => r.coversWeeks !== null && r.coversWeeks * workingDaysPerWeek < coverageDays)
+  const transitTotal = results.reduce((a, r) => a + r.totalInTransitKg, 0)
 
   const save = async () => {
     setSaving(true)
@@ -105,7 +110,7 @@ function RawMaterialCoveragePage() {
       'Hello,',
       '',
       `Attached are the raw material orders by delivery week, calculated ${data ? formatPlantTime(data.computedAt) : ''}.`,
-      `Safety stock ${coverageDays} days of use, +${fmt(extraKg)} kg per order. Total ${fmt(total)} kg.`,
+      `Safety stock ${coverageDays} working days of use after each week, +${fmt(extraKg)} kg per order. Stock on hand and material in transit are already deducted. Total ${fmt(total)} kg.`,
       '',
       'Totals by delivery week:',
       ...lines,
@@ -127,13 +132,18 @@ function RawMaterialCoveragePage() {
       <h1 className="text-2xl font-bold text-foreground">Raw Material Coverage</h1>
       <p className="mt-2 max-w-4xl text-muted-foreground">
         Steel requirement per week up to the last week in ZPP, independent of the production plan:
-        demand minus finished stock (2009 + 1009, first weeks first) × gross weight per piece,
-        co-products once. Coil stock is MB52 for the raw material codes in master data. An order is
+        demand minus finished stock (first weeks first) × gross weight per piece, co-products once.
+        Supply is the coil stock on hand in the locations ticked <em>Raw material</em> on{' '}
+        <Link to="/depolar" className="underline">
+          Storage Locations
+        </Link>{' '}
+        plus the coils in transit (SAP Data → in-transit list, booked in their ETA week). An order is
         due in the week the stock would not cover that week's use plus the next{' '}
-        <strong className="text-foreground">{coverageDays} days</strong>; each order gets{' '}
-        <strong className="text-foreground">{fmt(extraKg)} kg</strong> extra. The plan's early
-        production and whole-coil surplus are not added again — the {coverageDays}-day safety stock
-        absorbs them.{' '}
+        <strong className="text-foreground">
+          {coverageDays} working days ({coverWeeks} wk)
+        </strong>
+        ; each order gets <strong className="text-foreground">{fmt(extraKg)} kg</strong> extra. No
+        demand, no order: nothing is brought in beyond the last ZPP week.{' '}
         <Link to="/planlogic" hash="raw-mrp" className="underline">
           How it is calculated
         </Link>
@@ -141,7 +151,7 @@ function RawMaterialCoveragePage() {
 
       <div className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-border p-3 text-sm">
         <label>
-          <span className="block text-xs text-muted-foreground">Safety stock (days of use)</span>
+          <span className="block text-xs text-muted-foreground">Safety stock (working days after week end)</span>
           <input
             type="number"
             min={1}
@@ -213,9 +223,10 @@ function RawMaterialCoveragePage() {
             </p>
           )}
 
-          <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
             <Card label="Raw materials" value={fmt(results.length)} />
-            <Card label={`Stock covers less than ${coverageDays} days`} value={fmt(lowCover.length)} warn={lowCover.length > 0} />
+            <Card label="In transit" value={transitTotal > 0 ? `${fmt(transitTotal)} kg` : '—'} />
+            <Card label={`Stock + transit covers < ${coverageDays} working days`} value={fmt(lowCover.length)} warn={lowCover.length > 0} />
             <Card
               label={`Due this week (${weeks[0]?.label ?? ''})`}
               value={thisWeek.length > 0 ? `${thisWeek.length} · ${fmt(weekTotals[0] ?? 0)} kg` : '—'}
@@ -245,13 +256,16 @@ function RawMaterialCoveragePage() {
               </button>
             </div>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">Click a raw material to see need, stock and safety per week.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Click a raw material to see need, stock, arrivals and safety per week.
+          </p>
           <div className="mt-2 overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-right text-xs tabular-nums">
               <thead className="bg-muted text-muted-foreground">
                 <tr>
                   <th className="sticky left-0 z-10 bg-muted px-3 py-2 text-left font-medium">Raw material</th>
                   <th className="px-2 py-2 font-medium">Stock</th>
+                  <th className="px-2 py-2 font-medium">In transit</th>
                   <th className="px-2 py-2 font-medium">Covers</th>
                   {weeks.map((w) => (
                     <th key={w.start} className="whitespace-nowrap px-2 py-2 font-medium" title={`Week from ${w.start}`}>
@@ -273,7 +287,8 @@ function RawMaterialCoveragePage() {
                         {r.rawMaterial}
                       </td>
                       <td className="px-2 py-1.5">{fmt(r.stockKg)}</td>
-                      <td className={`whitespace-nowrap px-2 py-1.5 ${r.coversWeeks !== null && r.coversWeeks * 7 < coverageDays ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
+                      <td className="px-2 py-1.5 text-sky-700">{r.totalInTransitKg > 0 ? fmt(r.totalInTransitKg) : '·'}</td>
+                      <td className={`whitespace-nowrap px-2 py-1.5 ${r.coversWeeks !== null && r.coversWeeks * workingDaysPerWeek < coverageDays ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
                         {r.coversWeeks === null ? (r.totalNeedKg > 0 ? 'horizon' : '—') : `${r.coversWeeks} wk`}
                       </td>
                       {r.rows.map((row, w) => (
@@ -287,11 +302,26 @@ function RawMaterialCoveragePage() {
                       <>
                         <DetailRow label="Need" values={r.rows.map((x) => x.needKg)} />
                         <DetailRow label="Stock at week start" values={r.rows.map((x) => x.stockStartKg)} />
-                        <DetailRow label={`Safety (${coverageDays} days)`} values={r.rows.map((x) => x.safetyKg)} />
+                        <DetailRow label="In transit arriving" values={r.rows.map((x) => x.inTransitKg)} />
+                        <DetailRow label={`Safety (${coverageDays} working days)`} values={r.rows.map((x) => x.safetyKg)} />
                         <DetailRow label="Stock at week end" values={r.rows.map((x) => x.stockEndKg)} />
                         <tr className="bg-muted/20">
-                          <td colSpan={weeks.length + 4} className="px-3 py-1.5 text-left text-muted-foreground">
+                          <td colSpan={weeks.length + 5} className="px-3 py-1.5 text-left text-muted-foreground">
                             Used by {r.materials.join(', ') || '—'} · need up to the last ZPP week {fmt(r.totalNeedKg)} kg
+                            {(itemByRaw.get(r.rawMaterial)?.inTransit ?? []).length > 0 && (
+                              <>
+                                {' · In transit: '}
+                                {(itemByRaw.get(r.rawMaterial)?.inTransit ?? [])
+                                  .map(
+                                    (l) =>
+                                      `${fmt(l.quantityKg)} kg ${l.eta ? `ETA ${l.eta}` : 'no ETA (counted this week)'}` +
+                                      (l.week < 0 ? ' (after the last ZPP week)' : '') +
+                                      (l.poNumber ? ` PO ${l.poNumber}` : '') +
+                                      (l.supplier ? ` ${l.supplier}` : ''),
+                                  )
+                                  .join('; ')}
+                              </>
+                            )}
                           </td>
                         </tr>
                       </>
@@ -300,6 +330,7 @@ function RawMaterialCoveragePage() {
                 ))}
                 <tr className="border-t-2 border-border bg-muted/40 font-semibold text-foreground">
                   <td className="sticky left-0 z-10 bg-muted px-3 py-1.5 text-left">Total</td>
+                  <td />
                   <td />
                   <td />
                   {weekTotals.map((t, w) => (
@@ -443,6 +474,7 @@ function DetailRow({ label, values }: { label: string; values: number[] }) {
   return (
     <tr className="bg-muted/20 text-muted-foreground">
       <td className="sticky left-0 z-10 bg-muted/60 px-3 py-1 pl-7 text-left">{label}</td>
+      <td />
       <td />
       <td />
       {values.map((v, i) => (

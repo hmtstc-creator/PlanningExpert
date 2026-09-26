@@ -72,6 +72,8 @@ export const smallInputs = internalQuery({
       locations: await ctx.db.query('storageLocations').collect(),
       // Planlamacının pres başlangıcı / gecikme müdahaleleri.
       pressStarts: await ctx.db.query('pressPlanStarts').collect(),
+      // Yoldaki hammadde — MRP'de varış haftasında giriş.
+      inTransit: await (await liveRows(ctx, 'inTransit')).collect(),
       // Planın hangi SAP yüklemeleriyle hesaplandığı — SAP Data sayfası
       // "bu dosya planda mı" sorusunu buna bakarak cevaplar.
       sapUploads: await currentUploads(ctx),

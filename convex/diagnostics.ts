@@ -23,6 +23,7 @@ const TABLES = [
   'demandDaily',
   'stock',
   'actualProduction',
+  'rawInTransit',
   'planSnapshots',
   'changeLog',
   'moldMaintenance',

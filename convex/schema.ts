@@ -142,6 +142,10 @@ export default defineSchema({
     code: v.string(),
     description: v.optional(v.string()),
     category: v.string(),
+    /** Bitmiş ürün stoğu plana ve MRP netleştirmesine sayılır mı. Boşsa varsayılan. */
+    countFinished: v.optional(v.boolean()),
+    /** Hammadde (bobin) stoğu MRP'de eldeki stok sayılır mı. Boşsa varsayılan. */
+    countRaw: v.optional(v.boolean()),
   }).index('by_code', ['code']),
 
   workCalendar: defineTable({
@@ -518,6 +522,19 @@ export default defineSchema({
 
   // MB51'den yüklenen gerçekleşen üretim hareketleri. Plan/gerçek
   // karşılaştırması ve performans faktörü buradan beslenir.
+  // Yoldaki hammadde (rulo) — kullanıcının Excel listesi; MRP'de planlı giriş.
+  rawInTransit: defineTable({
+    material: v.string(),
+    quantityKg: v.number(),
+    /** Tahmini varış (ISO). Yoksa ilk haftada gelmiş sayılır. */
+    eta: v.optional(v.string()),
+    poNumber: v.optional(v.string()),
+    supplier: v.optional(v.string()),
+    uploadedAt: v.number(),
+  })
+    .index('by_material', ['material'])
+    .index('by_uploadedAt', ['uploadedAt']),
+
   actualProduction: defineTable({
     material: v.string(),
     postingDate: v.string(),

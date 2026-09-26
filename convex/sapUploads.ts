@@ -48,6 +48,7 @@ const FIELDS_OF: Record<SapUploadKey, readonly string[]> = {
     'transit',
   ],
   actuals: ['material', 'postingDate', 'quantity', 'plant', 'storageLocation', 'movementType', 'orderNumber'],
+  inTransit: ['material', 'quantityKg', 'eta', 'poNumber', 'supplier'],
 }
 
 /** Bir parçada en fazla bu kadar satır — işlem sınırının çok altında. */
@@ -106,7 +107,10 @@ export const appendRows = guardedMutation({
       materialOf: (r) => String(r.material ?? ''),
       rename: (r, material) => ({ ...r, material }),
       locationOf: key === 'stock' ? (r) => r.storageLocation as string | undefined : undefined,
-      knownMaterials: await knownMaterialCodes(ctx, { raw: key === 'stock' }),
+      knownMaterials:
+        key === 'inTransit'
+          ? await rawMaterialCodes(ctx)
+          : await knownMaterialCodes(ctx, { raw: key === 'stock' }),
       knownLocations: key === 'stock' ? await knownLocationCodes(ctx) : undefined,
       locationExempt: key === 'stock' ? await rawMaterialCodes(ctx) : undefined,
     })

@@ -3,7 +3,15 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { api } from '../../convex/_generated/api'
 import { ExcelUpload } from '../components/ExcelUpload'
 import { useMutation, useQuery } from '../lib/convexTransport'
-import { parseDemandRows, parseMovementRows, parseStockRows } from '../lib/sapParsers'
+import * as XLSX from 'xlsx'
+
+import {
+  IN_TRANSIT_COLUMNS,
+  parseDemandRows,
+  parseInTransitRows,
+  parseMovementRows,
+  parseStockRows,
+} from '../lib/sapParsers'
 import {
   SAP_UPLOAD_KEYS,
   SAP_UPLOAD_LABELS,
@@ -67,7 +75,9 @@ function SapDataPage() {
         throw new Error(
           parsed.length === 0
             ? 'No rows with a material code were found in this file.'
-            : 'None of the materials in this file are in master data (or, for MB52, in a defined storage location).',
+            : key === 'inTransit'
+              ? 'None of the materials in this file is a raw material code in master data.'
+              : 'None of the materials in this file are in master data (or, for MB52, in a defined storage location).',
         )
       }
       const result = await uploadInBatches(batchApi, {
@@ -175,6 +185,29 @@ function SapDataPage() {
             onRows={save('actuals')}
           />
         </UploadCard>
+
+        <UploadCard
+          title={SAP_UPLOAD_LABELS.inTransit}
+          dataKey="inTransit"
+          status={status}
+          feeds="Coils on the way. Raw Material Coverage books each quantity as a receipt in its ETA week (no ETA = this week), so no order is raised for it."
+          view={{ to: '/hammadde', label: 'View raw material coverage' }}
+        >
+          <button
+            type="button"
+            onClick={downloadInTransitTemplate}
+            className="mb-3 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+          >
+            Download template (.xlsx)
+          </button>
+          <ExcelUpload
+            expectedColumns={[...IN_TRANSIT_COLUMNS, 'Unit (optional: KG / TO)']}
+            replaces="all in-transit rows"
+            requiredColumns={['Material']}
+            describe={describe('inTransit')}
+            onRows={save('inTransit')}
+          />
+        </UploadCard>
       </div>
 
       <p className="mt-6 text-sm text-muted-foreground">
@@ -200,21 +233,45 @@ const PARSE: Record<SapUploadKey, (raw: Record<string, unknown>[]) => ParsedRow[
   dailyDemand: parseDemandRows,
   stock: parseStockRows,
   actuals: parseMovementRows,
+  inTransit: parseInTransitRows,
 }
 
-type ParsedRow = { material: string; storageLocation?: string; periods?: { label: string }[]; postingDate?: string }
+type ParsedRow = {
+  material: string
+  storageLocation?: string
+  periods?: { label: string }[]
+  postingDate?: string
+  eta?: string
+}
 
 const WHAT: Record<SapUploadKey, string> = {
   weeklyDemand: 'weekly demand rows',
   dailyDemand: 'daily demand rows',
   stock: 'stock rows',
   actuals: 'movement rows',
+  inTransit: 'in-transit rows',
 }
 
 function coverageOf(key: SapUploadKey, rows: ParsedRow[]) {
   if (key === 'actuals') return postingCoverage(rows as { postingDate: string }[])
   if (key === 'stock') return {}
+  if (key === 'inTransit') {
+    const dates = rows.map((r) => r.eta).filter((d): d is string => !!d)
+    return postingCoverage(dates.map((postingDate) => ({ postingDate })))
+  }
   return demandCoverage(rows as { periods: { label: string }[] }[])
+}
+
+/** Yoldaki hammadde şablonu: başlık ve bir örnek satır. */
+function downloadInTransitTemplate() {
+  const sheet = XLSX.utils.aoa_to_sheet([
+    [...IN_TRANSIT_COLUMNS, 'Unit'],
+    ['RAW-CODE-001', 24000, '2026-10-12', '4500012345', 'Supplier name', 'KG'],
+  ])
+  sheet['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 6 }]
+  const book = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(book, sheet, 'In transit')
+  XLSX.writeFile(book, 'raw-material-in-transit-template.xlsx')
 }
 
 /**

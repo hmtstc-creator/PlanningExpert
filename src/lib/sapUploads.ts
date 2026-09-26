@@ -7,7 +7,7 @@
 
 import { filterRows } from './uploadFilter'
 
-export const SAP_UPLOAD_KEYS = ['weeklyDemand', 'dailyDemand', 'stock', 'actuals'] as const
+export const SAP_UPLOAD_KEYS = ['weeklyDemand', 'dailyDemand', 'stock', 'actuals', 'inTransit'] as const
 export type SapUploadKey = (typeof SAP_UPLOAD_KEYS)[number]
 
 export const SAP_UPLOAD_LABELS: Record<SapUploadKey, string> = {
@@ -15,6 +15,7 @@ export const SAP_UPLOAD_LABELS: Record<SapUploadKey, string> = {
   dailyDemand: 'Daily demand — ZPP_DAILY',
   stock: 'Stock — MB52',
   actuals: 'Actual production — MB51',
+  inTransit: 'Raw material in transit — in-transit list',
 }
 
 /** Bir yüklemenin kaydı. Özellikten önceki yüklemelerde dosya adı yok. */
@@ -203,7 +204,7 @@ export interface FilterCodes {
   /** Master data malzemeleri ve eş ürünleri. */
   materials: string[]
   locations: string[]
-  /** Master data'daki hammadde (rulo) kodları — yalnızca MB52 için. */
+  /** Master data'daki hammadde (rulo) kodları — MB52 ve yoldakiler için. */
   rawMaterials?: string[]
 }
 
@@ -223,7 +224,14 @@ export function prefilterRows<Row extends { material: string; storageLocation?: 
     rename: (r, material) => ({ ...r, material }),
     locationOf: key === 'stock' ? (r) => r.storageLocation : undefined,
     // MB52'de rulo stoğu da gerekir (hammadde kontrolü).
-    knownMaterials: new Set(key === 'stock' ? [...codes.materials, ...(codes.rawMaterials ?? [])] : codes.materials),
+    // Yoldakiler yalnızca hammadde kodlarıdır.
+    knownMaterials: new Set(
+      key === 'stock'
+        ? [...codes.materials, ...(codes.rawMaterials ?? [])]
+        : key === 'inTransit'
+          ? codes.rawMaterials ?? []
+          : codes.materials,
+    ),
     knownLocations: key === 'stock' ? new Set(codes.locations) : undefined,
     locationExempt: key === 'stock' ? new Set(codes.rawMaterials ?? []) : undefined,
   })

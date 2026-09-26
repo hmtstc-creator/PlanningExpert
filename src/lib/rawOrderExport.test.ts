@@ -22,7 +22,8 @@ describe('raw material order export', () => {
     const rows = XLSX.utils.sheet_to_json<(string | number)[]>(back.Sheets.Orders, { header: 1 })
     // Yalnızca siparişi olan hammadde (R2 yok) + toplam satırı.
     expect(rows[4][0]).toBe('R1')
-    expect(rows[4][3]).toBe(17500)
+    // Sütun 3 yoldaki; hafta 1: 7 000 + sonraki haftanın 7 000 emniyeti + 500.
+    expect(rows[4][4]).toBe(14500)
     expect(rows[5][0]).toBe('Total')
   })
 

@@ -11,14 +11,16 @@
 //  4. Plan EKLENMEZ: planın öne çekmesi ve rulo/Min. lot fazlası aynı talebin
 //     zamanlaması ve yuvarlamasıdır; ikisini toplamak mükerrer sipariş olur.
 //     Bu sapmaları 10 günlük emniyet stoğu karşılar.
-//  5. Haftalık stok yürütme: hafta başı stok + gelen sipariş, o haftanın
-//     tüketimini VE haftanın sonundan itibaren N günlük tüketimi (emniyet)
-//     karşılamalı. Yalnızca hafta başında N gün bakmak, hafta sonuna doğru
-//     emniyetin altına düşmek demek olurdu (kova hatası).
-//  6. Yetmiyorsa o hafta teslim edilecek sipariş: eksik + standart ek (500 kg).
-//  7. ZPP'nin bittiği yerde talep bilinmez; son haftalarda emniyet penceresi
-//     son 4 haftanın ortalamasıyla uzatılır (yoksa ufkun sonunda emniyet
-//     çöker ve sipariş eksik çıkar).
+//  5. Eldeki rulo stoğu (Storage Locations'ta "Raw material" tikli depolar)
+//     başlangıç stoğudur; yoldakiler (Excel listesi) varış haftasında girer.
+//     Varış tarihi yoksa ya da geçmişse ilk haftada gelmiş sayılır.
+//  6. Haftalık stok yürütme: hafta başı stok + yoldan gelen + sipariş, o
+//     haftanın tüketimini VE hafta sonundan itibaren N İŞ GÜNÜNÜN tüketimini
+//     (emniyet; 10 iş günü = sonraki 2 hafta) karşılamalı. Yalnızca hafta
+//     başında bakmak hafta sonuna doğru emniyetin altına düşmek olurdu.
+//  7. Yetmiyorsa o hafta teslim edilecek sipariş: eksik + standart ek (500 kg).
+//  8. Talep yoksa sipariş yok: ZPP'nin bittiği yerden sonrası sıfırdır, tahmin
+//     eklenmez (kanban ileride ayrı bir kural olarak gelir).
 
 import type { ProductSpec } from './planning'
 
@@ -36,6 +38,19 @@ export interface RawRequirement {
   stockKg: number
   /** Haftalık brüt hammadde ihtiyacı (kg), `weeks` ile aynı sırada. */
   needKg: number[]
+  /** Yoldan varış haftasına gelen miktar (kg), `weeks` ile aynı sırada. */
+  inTransitKg?: number[]
+  /** Yoldaki kalemler (listeden) — ufuk dışında varanlar dahil. */
+  inTransit?: InTransitLine[]
+}
+
+export interface InTransitLine {
+  quantityKg: number
+  eta?: string
+  poNumber?: string
+  supplier?: string
+  /** Hangi haftaya yazıldı; ufkun ötesindeyse -1. */
+  week: number
 }
 
 export interface RawRequirementPlan {
@@ -45,18 +60,25 @@ export interface RawRequirementPlan {
   missingSpec: { material: string; pieces: number; reason: string }[]
   /** Brüt ağırlığı olağan dışı (birim hatası şüphesi) mamuller. */
   suspectWeights: { material: string; grossWeight: number }[]
+  /** Haftadaki iş günü sayısı (Work Calendar) — emniyet günleri buna göre haftaya çevrilir. */
+  workingDaysPerWeek?: number
 }
 
 export interface MrpSettings {
+  /** Emniyet: hafta sonundan sonraki kaç İŞ GÜNÜNÜN tüketimi elde olmalı. */
   coverageDays: number
   extraKg: number
+  /** Haftadaki iş günü (varsayılan 5). */
+  workingDaysPerWeek?: number
 }
 
 export interface MrpWeekRow {
   needKg: number
-  /** Hafta başı stok (sipariş gelmeden). */
+  /** Hafta başı stok (sipariş ve yoldan gelen hariç). */
   stockStartKg: number
-  /** Hafta sonu için tutulması gereken emniyet: sonraki N günün tüketimi. */
+  /** Bu hafta yoldan gelen (kg). */
+  inTransitKg: number
+  /** Hafta sonu için tutulması gereken emniyet: sonraki N iş gününün tüketimi. */
   safetyKg: number
   /** Bu hafta teslim edilmesi gereken sipariş. */
   orderKg: number
@@ -68,6 +90,7 @@ export interface RawMrpResult {
   rawMaterial: string
   materials: string[]
   stockKg: number
+  totalInTransitKg: number
   totalNeedKg: number
   totalOrderKg: number
   /** Siparişsiz, bugünkü stok kaç hafta yetiyor (ufukta bitmezse null). */
@@ -89,7 +112,10 @@ export function buildRawRequirements(input: {
   finishedStock: Map<string, number>
   /** Hammadde stoğu (kg). */
   rawStock: Map<string, number>
+  /** Yoldaki hammadde (Excel listesi). */
+  inTransit?: { material: string; quantityKg: number; eta?: string; poNumber?: string; supplier?: string }[]
   weeks: MrpWeek[]
+  workingDaysPerWeek?: number
 }): RawRequirementPlan {
   const { weeks } = input
   const n = weeks.length
@@ -183,15 +209,38 @@ export function buildRawRequirements(input: {
     .filter((p) => (p.grossWeight ?? 0) > 50 || ((p.grossWeight ?? 0) > 0 && (p.grossWeight ?? 0) < 0.001))
     .map((p) => ({ material: p.code, grossWeight: p.grossWeight ?? 0 }))
 
+  // 5. Yoldakiler: varış haftasına. Tarihsiz ya da geçmiş tarihli → ilk hafta.
+  const lines = new Map<string, InTransitLine[]>()
+  const weekOf = (eta: string | undefined) => {
+    if (!eta || n === 0 || eta < weeks[0].start) return 0
+    for (let w = n - 1; w >= 0; w--) if (eta >= weeks[w].start) return eta < addDaysIso(weeks[w].start, 7) ? w : -1
+    return 0
+  }
+  for (const t of input.inTransit ?? []) {
+    const raw = t.material.trim()
+    if (!raw || !(t.quantityKg > 0)) continue
+    rawEntry(raw)
+    const list = lines.get(raw) ?? []
+    list.push({ quantityKg: round(t.quantityKg), eta: t.eta, poNumber: t.poNumber, supplier: t.supplier, week: weekOf(t.eta) })
+    lines.set(raw, list)
+  }
+
   return {
     weeks,
+    workingDaysPerWeek: input.workingDaysPerWeek,
     items: Array.from(byRaw.entries())
-      .map(([rawMaterial, e]) => ({
-        rawMaterial,
-        materials: Array.from(e.materials).sort(),
-        stockKg: round(input.rawStock.get(rawMaterial) ?? 0),
-        needKg: e.kg.map(round),
-      }))
+      .map(([rawMaterial, e]) => {
+        const own = (lines.get(rawMaterial) ?? []).sort((a, b) => (a.eta ?? '').localeCompare(b.eta ?? ''))
+        const inTransitKg = Array.from({ length: n }, () => 0)
+        for (const l of own) if (l.week >= 0) inTransitKg[l.week] += l.quantityKg
+        return {
+          rawMaterial,
+          materials: Array.from(e.materials).sort(),
+          stockKg: round(input.rawStock.get(rawMaterial) ?? 0),
+          needKg: e.kg.map(round),
+          ...(own.length > 0 ? { inTransitKg, inTransit: own } : {}),
+        }
+      })
       .sort((a, b) => a.rawMaterial.localeCompare(b.rawMaterial)),
     missingSpec: Array.from(missing.entries())
       .map(([material, m]) => ({ material, pieces: m.pieces, reason: m.reason }))
@@ -206,28 +255,31 @@ export function buildRawRequirements(input: {
 export function rawMrp(item: RawRequirement, settings: MrpSettings): RawMrpResult {
   const need = item.needKg
   const n = need.length
-  const coverDays = Math.max(1, settings.coverageDays)
+  const receipts = item.inTransitKg ?? []
+  const coverDays = Math.max(0, settings.coverageDays)
   const extra = Math.max(0, settings.extraKg)
-  // Ufuk sonrası: son 4 haftanın ortalaması (talep orada bitmiyor, bilinmiyor).
-  const tail = need.slice(Math.max(0, n - 4))
-  const tailAvg = tail.length > 0 ? tail.reduce((a, b) => a + b, 0) / tail.length : 0
-  const weekNeed = (w: number) => (w < n ? need[w] : tailAvg)
-  /** `w` haftasının sonundan itibaren `coverDays` günlük tüketim (günlük eşit dağılım). */
+  const perWeek = Math.min(7, Math.max(1, Math.round(settings.workingDaysPerWeek ?? 5)))
+  /**
+   * `w` haftasının sonundan itibaren `coverDays` iş gününün tüketimi. Haftanın
+   * ihtiyacı iş günlerine eşit dağılır; ZPP'nin ötesinde talep sıfırdır —
+   * talep yoksa hammadde de getirilmez.
+   */
   const safetyAfter = (w: number) => {
     let left = coverDays
     let kg = 0
-    for (let k = w + 1; left > 0; k++) {
-      const days = Math.min(7, left)
-      kg += (weekNeed(k) * days) / 7
+    for (let k = w + 1; left > 0 && k < n; k++) {
+      const days = Math.min(perWeek, left)
+      kg += (need[k] * days) / perWeek
       left -= days
     }
     return kg
   }
 
-  // Siparişsiz kapsama.
+  // Siparişsiz kapsama (stok + yoldakiler).
   let left = item.stockKg
   let coversWeeks: number | null = null
   for (let w = 0; w < n; w++) {
+    left += receipts[w] ?? 0
     if (need[w] > left + 1e-9) {
       coversWeeks = Math.round((w + (need[w] > 0 ? left / need[w] : 0)) * 10) / 10
       break
@@ -238,21 +290,37 @@ export function rawMrp(item: RawRequirement, settings: MrpSettings): RawMrpResul
   let stock = item.stockKg
   const rows: MrpWeekRow[] = []
   for (let w = 0; w < n; w++) {
+    const incoming = receipts[w] ?? 0
+    const available = stock + incoming
     const safety = safetyAfter(w)
     const required = need[w] + safety
     let order = 0
-    if (required > 0 && stock < required - 1e-9) order = round(required - stock + extra)
-    const end = stock + order - need[w]
-    rows.push({ needKg: need[w], stockStartKg: round(stock), safetyKg: round(safety), orderKg: order, stockEndKg: round(end) })
+    if (required > 0 && available < required - 1e-9) order = round(required - available + extra)
+    const end = available + order - need[w]
+    rows.push({
+      needKg: need[w],
+      stockStartKg: round(stock),
+      inTransitKg: round(incoming),
+      safetyKg: round(safety),
+      orderKg: order,
+      stockEndKg: round(end),
+    })
     stock = end
   }
   return {
     rawMaterial: item.rawMaterial,
     materials: item.materials,
     stockKg: item.stockKg,
+    totalInTransitKg: round(receipts.reduce((a, b) => a + b, 0)),
     totalNeedKg: round(need.reduce((a, b) => a + b, 0)),
     totalOrderKg: rows.reduce((a, r) => a + r.orderKg, 0),
     coversWeeks,
     rows,
   }
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }

@@ -12,6 +12,8 @@ const locValidator = v.object({
   code: v.string(),
   description: v.optional(v.string()),
   category: v.string(),
+  countFinished: v.optional(v.boolean()),
+  countRaw: v.optional(v.boolean()),
 })
 
 export const list = guardedQuery({
@@ -37,6 +39,8 @@ export const upsert = guardedMutation({
     code: v.string(),
     description: v.optional(v.string()),
     category: v.string(),
+    countFinished: v.optional(v.boolean()),
+    countRaw: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -50,6 +54,8 @@ export const upsert = guardedMutation({
       await ctx.db.patch(existing._id, {
         description: args.description,
         category: args.category,
+        countFinished: args.countFinished,
+        countRaw: args.countRaw,
       })
     } else {
       await ctx.db.insert('storageLocations', { ...args, code })

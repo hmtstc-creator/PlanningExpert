@@ -3,6 +3,7 @@ import { useQuery } from '../lib/convexTransport'
 import { useMemo } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { countedLocations, isFinishedStockRow, type LocationFlags } from '../lib/stockLocations'
 
 export const Route = createFileRoute('/planningexpert')({
   component: HomePage,
@@ -18,10 +19,7 @@ function HomePage() {
   const products = useMemo(() => productsResult?.rows ?? [], [productsResult])
   const weekly = useMemo(() => demandResult?.rows ?? [], [demandResult])
   const stockRows = useMemo(() => stockResult?.rows ?? [], [stockResult])
-  const locations = (useQuery(api.storageLocations.listAll) ?? []) as {
-    code: string
-    category: string
-  }[]
+  const locations = (useQuery(api.storageLocations.listAll) ?? []) as LocationFlags[]
 
   const truncatedInputs = [
     productsResult && !productsResult.complete ? 'master data' : null,
@@ -39,21 +37,16 @@ function HomePage() {
   // holidays. Either one missing silently changes how capacity is computed.
   const calendarReady = !!calendar && !!shiftSettings
 
-  const locCategory = useMemo(
-    () => new Map(locations.map((l) => [l.code, l.category])),
-    [locations],
-  )
+  // Plan ile aynı kural: Storage Locations matrisinde "Finished goods" tikli depolar.
+  const counted = useMemo(() => countedLocations(locations), [locations])
 
   const availableStock = useMemo(() => {
     let total = 0
     for (const s of stockRows) {
-      const cat = s.storageLocation
-        ? locCategory.get(s.storageLocation) ?? 'finished_goods'
-        : 'finished_goods'
-      if (cat === 'finished_goods' || cat === 'production_area') total += s.unrestricted ?? 0
+      if (isFinishedStockRow(counted, s.storageLocation)) total += s.unrestricted ?? 0
     }
     return total
-  }, [stockRows, locCategory])
+  }, [stockRows, counted])
 
   const productCodes = useMemo(() => new Set(products.map((p) => p.code)), [products])
 
@@ -94,14 +87,15 @@ function HomePage() {
       })
     }
 
+    const definedLocs = new Set(locations.map((l) => l.code))
     const undefinedLocs = new Set<string>()
     for (const s of stockRows) {
-      if (s.storageLocation && !locCategory.has(s.storageLocation)) undefinedLocs.add(s.storageLocation)
+      if (s.storageLocation && !definedLocs.has(s.storageLocation)) undefinedLocs.add(s.storageLocation)
     }
     if (undefinedLocs.size > 0) {
       list.push({
         level: 'medium',
-        text: `${undefinedLocs.size} storage locations are not defined yet — they count as stock by default.`,
+        text: `${undefinedLocs.size} storage locations in MB52 are not defined yet — only 2009 and 1009 count by default.`,
         link: '/depolar',
       })
     }
@@ -157,7 +151,7 @@ function HomePage() {
     products,
     weekly,
     stockRows,
-    locCategory,
+    locations,
     calendar,
     calendarReady,
     shiftSettings,

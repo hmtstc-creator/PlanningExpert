@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseDemandRows, parseMovementRows, parseSapDate, parseStockRows } from './sapParsers'
+import { parseDemandRows, parseInTransitRows, parseMovementRows, parseSapDate, parseStockRows } from './sapParsers'
 
 describe('SAP parsers', () => {
   it('reads ZPP rows with one column per period', () => {
@@ -44,5 +44,19 @@ describe('SAP parsers', () => {
 
   it('understands Excel serial dates', () => {
     expect(parseSapDate(46268)).toBe('2026-09-03')
+  })
+})
+
+describe('parseInTransitRows', () => {
+  it('reads English and Turkish headers, tonnes and Excel dates', () => {
+    const rows = parseInTransitRows([
+      { Malzeme: 'R1', Miktar: 2, Birim: 'TO', 'Varış Tarihi': '12.10.2026', Tedarikçi: 'X' },
+      { Material: 'R2', 'Quantity (kg)': 24000, ETA: 46307, 'PO Number': 45001 },
+      { Material: 'R3', Quantity: '' },
+    ])
+    expect(rows).toEqual([
+      { material: 'R1', quantityKg: 2000, eta: '2026-10-12', poNumber: undefined, supplier: 'X' },
+      { material: 'R2', quantityKg: 24000, eta: '2026-10-12', poNumber: '45001', supplier: undefined },
+    ])
   })
 })

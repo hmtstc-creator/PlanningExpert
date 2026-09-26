@@ -6,6 +6,7 @@ import { api } from '../../convex/_generated/api'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { SaveStatus } from '../components/SaveStatus'
 import { UnsavedBar } from '../components/UnsavedBar'
+import { countsFinished, countsRaw } from '../lib/stockLocations'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 
@@ -13,36 +14,37 @@ export const Route = createFileRoute('/depolar')({
   component: DepolarPage,
 })
 
-// These values must match COUNTED_STOCK / RAW_STOCK in planlama.tsx exactly.
+// Kategori yalnızca açıklayıcıdır ve hammadde tikinin varsayılanını belirler;
+// neyin sayılacağına matristeki tikler karar verir (src/lib/stockLocations.ts).
 const CATEGORIES = [
   {
     value: 'finished_goods',
     label: 'Finished Goods',
-    hint: 'Finished product — deducted from the production requirement.',
+    hint: 'Finished product store.',
     color: 'bg-emerald-100 text-emerald-800',
   },
   {
     value: 'production_area',
     label: 'Production Area',
-    hint: 'Work in progress — deducted from the production requirement.',
+    hint: 'Work in progress at the line.',
     color: 'bg-teal-100 text-teal-800',
   },
   {
     value: 'raw_material',
     label: 'Raw Material',
-    hint: 'Raw coil stock — not finished goods, not deducted from the requirement.',
+    hint: 'Raw coil store — "Raw material" is ticked by default.',
     color: 'bg-slate-200 text-slate-700',
   },
   {
     value: 'quality',
     label: 'Quality',
-    hint: 'Awaiting quality inspection — not counted as available yet.',
+    hint: 'Awaiting quality inspection.',
     color: 'bg-amber-100 text-amber-800',
   },
   {
     value: 'customer',
     label: 'Customer',
-    hint: 'Transferred or sold to the customer — not counted as stock.',
+    hint: 'Transferred or sold to the customer.',
     color: 'bg-slate-200 text-slate-700',
   },
 ]
@@ -74,21 +76,35 @@ function DepolarPage() {
 
   // Kategori ve not birlikte kaydedilir: `upsert` kaydı tümüyle değiştirir,
   // bu yüzden yalnızca birini göndermek diğerini siler.
+  // Tikler kayıtta boşsa varsayılan gösterilir; kaydedince açıkça yazılır.
   const rows = useDraftRows(
     locations,
     (l) => l.code,
-    (l) => ({ category: l.category ?? DEFAULT_CATEGORY, description: l.description ?? '' }),
-    (a, b) => a.category === b.category && a.description === b.description,
+    (l) => ({
+      category: l.category ?? DEFAULT_CATEGORY,
+      description: l.description ?? '',
+      countFinished: countsFinished(l),
+      countRaw: countsRaw(l),
+    }),
+    (a, b) =>
+      a.category === b.category &&
+      a.description === b.description &&
+      a.countFinished === b.countFinished &&
+      a.countRaw === b.countRaw,
   )
 
   const saveLocation = (code: string) => (draft: {
     category: string
     description: string
+    countFinished: boolean
+    countRaw: boolean
   }) =>
     upsert({
       code,
       category: draft.category,
       description: draft.description.trim() || undefined,
+      countFinished: draft.countFinished,
+      countRaw: draft.countRaw,
     })
 
   const byCode = useMemo(
@@ -117,6 +133,18 @@ function DepolarPage() {
     // Kutu yalnızca kayıt gerçekten başarılıysa temizlenir.
     if (ok) setNewCode('')
   }
+
+  // MB52'de görünen ama burada tanımlı olmayan depolar (hammadde kodları
+  // depo süzgecinden muaf yüklendiği için burada çıkabilir).
+  const undefinedInStock = useMemo(() => {
+    const defined = new Set(locations.map((l) => l.code))
+    const found = new Set<string>()
+    for (const s of stockRows) {
+      const loc = s.storageLocation?.trim()
+      if (loc && !defined.has(loc)) found.add(loc)
+    }
+    return [...found].sort()
+  }, [locations, stockRows])
 
   const stockByLocation = useMemo(() => {
     const map = new Map<string, number>()
@@ -159,8 +187,9 @@ function DepolarPage() {
         Define the storage locations you care about and choose how each one is
         treated in planning. MB52 rows in any location that is not defined here
         are ignored on upload — stock you have not declared is not your stock.
-        This setting answers "which stock do I really have?" and directly
-        affects the quantity to be produced.
+        The matrix below answers "which stock do I really have?": tick what the
+        stock in each location counts for — finished goods (plan and raw
+        material netting) and raw material on hand (coil orders).
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -195,10 +224,29 @@ function DepolarPage() {
 
       <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
       <p className="mt-3 text-sm text-muted-foreground">
-        Changing the category or the note marks the location{' '}
+        Changing a tick, the category or the note marks the location{' '}
         <strong className="text-foreground">Unsaved</strong> — press Save on that
-        card, or Save all at the bottom of the page.
+        row, or Save all at the bottom of the page.
       </p>
+
+      {undefinedInStock.length > 0 && (
+        <p className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          MB52 has stock in locations not defined here:{' '}
+          {undefinedInStock.map((code, i) => (
+            <span key={code}>
+              {i > 0 && ', '}
+              <button
+                className="font-semibold underline hover:no-underline"
+                onClick={() => setNewCode(code)}
+                title="Put this code in the box above"
+              >
+                {code}
+              </button>
+            </span>
+          ))}
+          . Define them to decide whether they count.
+        </p>
+      )}
 
       {allCodes.length === 0 ? (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -206,93 +254,128 @@ function DepolarPage() {
           MB52 rows in any other location are ignored on upload.
         </p>
       ) : (
-        <div className="mt-4 space-y-2">
-          {allCodes.map((code) => {
-            const current = byCode.get(code)
-            const qty = stockByLocation.get(code) ?? 0
-            const draft = current
-              ? rows.draftFor(current)
-              : { category: DEFAULT_CATEGORY, description: '' }
-            const dirty = current ? rows.isDirty(current) : false
-            const busy = rows.savingKey === code || saving === code
-            const saveCard = () => {
-              if (dirty && !busy) void rows.commit(code, saveLocation(code))
-            }
-            return (
-              <div
-                key={code}
-                className={`flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${
-                  dirty ? 'border-amber-300 bg-amber-50' : 'border-border'
-                }`}
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-semibold text-foreground">{code}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {qty.toLocaleString('en-GB')} pcs in stock
-                    </span>
-                    <SaveStatus
-                      dirty={dirty}
-                      saving={busy}
-                      justSaved={!!rows.justSaved[code]}
-                    />
-                  </div>
-                  <input
-                    className="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm sm:w-72"
-                    placeholder="What is this location for? (optional note)"
-                    value={draft.description}
-                    onChange={(e) =>
-                      rows.edit(code, { description: e.target.value })
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveCard()
-                    }}
-                  />
-                </div>
-                <div className="flex flex-wrap items-center gap-1">
-                  {CATEGORIES.map((c) => {
-                    const active = draft.category === c.value
-                    return (
-                      <button
-                        key={c.value}
-                        disabled={busy}
-                        onClick={() => rows.edit(code, { category: c.value })}
-                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                          active
-                            ? c.color
-                            : 'bg-muted text-muted-foreground hover:bg-muted/70'
-                        }`}
-                      >
-                        {c.label}
-                      </button>
-                    )
-                  })}
-                  <button
-                    onClick={saveCard}
-                    disabled={!dirty || busy}
-                    className="ml-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Location</th>
+                <th className="px-3 py-2 font-medium">Note</th>
+                <th className="px-3 py-2 font-medium">Category</th>
+                <th className="px-3 py-2 text-center font-medium">
+                  Finished goods
+                  <div className="font-normal">plan &amp; MRP netting</div>
+                </th>
+                <th className="px-3 py-2 text-center font-medium">
+                  Raw material
+                  <div className="font-normal">coil on hand (MRP)</div>
+                </th>
+                <th className="px-3 py-2 font-medium" />
+              </tr>
+            </thead>
+            <tbody>
+              {allCodes.map((code) => {
+                const current = byCode.get(code)
+                if (!current) return null
+                const qty = stockByLocation.get(code) ?? 0
+                const draft = rows.draftFor(current)
+                const dirty = rows.isDirty(current)
+                const busy = rows.savingKey === code || saving === code
+                const saveCard = () => {
+                  if (dirty && !busy) void rows.commit(code, saveLocation(code))
+                }
+                return (
+                  <tr
+                    key={code}
+                    className={`border-t border-border ${dirty ? 'bg-amber-50' : ''}`}
                   >
-                    Save
-                  </button>
-                  {current && (
-                    <button
-                      disabled={busy}
-                      onClick={() => void deleteLocation(code)}
-                      title="Delete this storage location definition"
-                      className="rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+                    <td className="px-3 py-2 align-middle">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base font-semibold text-foreground">{code}</span>
+                        <SaveStatus
+                          dirty={dirty}
+                          saving={busy}
+                          justSaved={!!rows.justSaved[code]}
+                        />
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {qty.toLocaleString('en-GB')} in stock
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        className="w-full min-w-40 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                        placeholder="Optional note"
+                        value={draft.description}
+                        onChange={(e) => rows.edit(code, { description: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveCard()
+                        }}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+                        disabled={busy}
+                        value={draft.category}
+                        onChange={(e) => rows.edit(code, { category: e.target.value })}
+                      >
+                        {CATEGORIES.map((c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={`Count finished goods in ${code}`}
+                        className="h-5 w-5 accent-emerald-600"
+                        disabled={busy}
+                        checked={draft.countFinished}
+                        onChange={(e) => rows.edit(code, { countFinished: e.target.checked })}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={`Count raw material in ${code}`}
+                        className="h-5 w-5 accent-sky-600"
+                        disabled={busy}
+                        checked={draft.countRaw}
+                        onChange={(e) => rows.edit(code, { countRaw: e.target.checked })}
+                      />
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                      <button
+                        onClick={saveCard}
+                        disabled={!dirty || busy}
+                        className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+                      >
+                        Save
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() => void deleteLocation(code)}
+                        title="Delete this storage location definition"
+                        className="ml-1 rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Undefined storage locations are treated as "Finished Goods" by default.
+        A tick decides what the stock in that location counts for. Without a
+        saved tick, 2009 and 1009 count for both, and a "Raw Material" location
+        counts for raw material. Stock in an unticked location is shown but
+        never netted.
       </p>
 
       <UnsavedBar

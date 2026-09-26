@@ -20,31 +20,32 @@ export function buildOrderWorkbook(results: RawMrpResult[], weeks: MrpWeek[], me
   const totals = weeks.map((_, w) => withOrders.reduce((a, r) => a + r.rows[w].orderKg, 0))
   const orders: (string | number | null)[][] = [
     ['Raw material orders by delivery week (kg)'],
-    [`Calculated ${meta.computedAt} · safety stock ${meta.coverageDays} days · +${meta.extraKg} kg per order`],
+    [`Calculated ${meta.computedAt} · safety stock ${meta.coverageDays} working days · +${meta.extraKg} kg per order`],
     [],
-    ['Raw material', 'Used by', 'Stock (kg)', ...weeks.map((w) => `${w.label} (${w.start})`), 'Total (kg)'],
+    ['Raw material', 'Used by', 'Stock (kg)', 'In transit (kg)', ...weeks.map((w) => `${w.label} (${w.start})`), 'Total (kg)'],
     ...withOrders.map((r) => [
       r.rawMaterial,
       r.materials.join(', '),
       r.stockKg,
+      r.totalInTransitKg > 0 ? r.totalInTransitKg : null,
       ...r.rows.map((row) => (row.orderKg > 0 ? row.orderKg : null)),
       r.totalOrderKg,
     ]),
-    ['Total', '', null, ...totals.map((t) => (t > 0 ? t : null)), totals.reduce((a, b) => a + b, 0)],
+    ['Total', '', null, null, ...totals.map((t) => (t > 0 ? t : null)), totals.reduce((a, b) => a + b, 0)],
   ]
   const sheet = XLSX.utils.aoa_to_sheet(orders)
-  sheet['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 11 }, ...weeks.map(() => ({ wch: 20 })), { wch: 12 }]
+  sheet['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 11 }, { wch: 14 }, ...weeks.map(() => ({ wch: 20 })), { wch: 12 }]
 
   const detail: (string | number)[][] = [
-    ['Raw material', 'Week', 'Week start', 'Need (kg)', 'Stock at start (kg)', 'Safety (kg)', 'Order (kg)', 'Stock at end (kg)'],
+    ['Raw material', 'Week', 'Week start', 'Need (kg)', 'Stock at start (kg)', 'In transit arriving (kg)', 'Safety (kg)', 'Order (kg)', 'Stock at end (kg)'],
   ]
   for (const r of withOrders) {
     r.rows.forEach((row, w) =>
-      detail.push([r.rawMaterial, weeks[w].label, weeks[w].start, row.needKg, row.stockStartKg, row.safetyKg, row.orderKg, row.stockEndKg]),
+      detail.push([r.rawMaterial, weeks[w].label, weeks[w].start, row.needKg, row.stockStartKg, row.inTransitKg, row.safetyKg, row.orderKg, row.stockEndKg]),
     )
   }
   const detailSheet = XLSX.utils.aoa_to_sheet(detail)
-  detailSheet['!cols'] = [{ wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 11 }, { wch: 18 }, { wch: 12 }, { wch: 11 }, { wch: 16 }]
+  detailSheet['!cols'] = [{ wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 11 }, { wch: 18 }, { wch: 22 }, { wch: 12 }, { wch: 11 }, { wch: 16 }]
 
   const book = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(book, sheet, 'Orders')

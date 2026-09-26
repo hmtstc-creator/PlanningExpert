@@ -15,6 +15,7 @@ export const TABLE_OF: Record<SapUploadKey, string> = {
   dailyDemand: 'demandDaily',
   stock: 'stock',
   actuals: 'actualProduction',
+  inTransit: 'rawInTransit',
 }
 
 export async function uploadRecord(ctx: Ctx, key: SapUploadKey) {

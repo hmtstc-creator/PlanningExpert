@@ -25,6 +25,7 @@
 import type { PlanInputs, PlanRun } from './planPipeline'
 import type { ProductSpec } from './planning'
 import type { ScheduledJob } from './scheduler'
+import { countedLocations } from './stockLocations'
 
 // ---------------------------------------------------------------- çıktı tipleri
 
@@ -157,7 +158,6 @@ const QTY_TOL = 0.5
 const MIN_TOL = 1
 const EPS = 0.01
 const UTIL_WINDOW_DAYS = 7
-const COUNTED_LOCATIONS = new Set(['2009', '1009'])
 const PLACEHOLDER_COIL_KG = 1
 
 const DAY_KEYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU']
@@ -849,9 +849,10 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const stock0 = new Map<string, number>()
   const otherStock = new Map<string, Map<string, number>>()
   const stockAge = new Map<string, number>()
+  const counted = countedLocations(inputs.locations ?? [])
   for (const r of inputs.stock) {
     const loc = r.storageLocation?.trim()
-    if (!loc || COUNTED_LOCATIONS.has(loc)) stock0.set(r.material, (stock0.get(r.material) ?? 0) + (r.unrestricted ?? 0))
+    if (!loc || counted.finished.has(loc)) stock0.set(r.material, (stock0.get(r.material) ?? 0) + (r.unrestricted ?? 0))
     else {
       const m = otherStock.get(r.material) ?? new Map<string, number>()
       m.set(loc, (m.get(loc) ?? 0) + (r.unrestricted ?? 0))
@@ -1350,7 +1351,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
       if (other) {
         const total = Array.from(other.values()).reduce((a, b) => a + b, 0)
         const where = Array.from(other.entries()).map(([l, q]) => `${l} ${Math.round(q)}`).join(', ')
-        if (total >= firstShort - QTY_TOL && total > 0) flags.push(`${m}: stock in non-counted locations (${where}) would cover the ${Math.round(firstShort)} pcs short — only 2009/1009 count.`)
+        if (total >= firstShort - QTY_TOL && total > 0) flags.push(`${m}: stock in non-counted locations (${where}) would cover the ${Math.round(firstShort)} pcs short — only locations ticked "Finished goods" on Storage Locations count.`)
         else if (total > 0) flags.push(`${m}: ${Math.round(total)} pcs in non-counted locations (${where}).`)
       }
       const w = weeklyBy.get(m)

@@ -44,7 +44,8 @@ import { auditPlan, type PlanAudit } from './planAudit'
 import { safeValidatePlan, type PlanValidation } from './planValidator'
 import { buildRawRequirements, type RawRequirementPlan } from './rawMrp'
 import { readDailyDemand } from './dailyDemand'
-import { buildCapacityForecast, PLAN_STOCK_LOCATIONS, type CapacityForecast } from './capacityForecast'
+import { buildCapacityForecast, type CapacityForecast } from './capacityForecast'
+import { countedLocations, isFinishedStockRow, isRawStockRow } from './stockLocations'
 import {
   buildPlanAlarms,
   type DieUnavailability,
@@ -59,11 +60,8 @@ import {
   type UnplannedItem,
 } from './scheduler'
 
-const RAW_STOCK = new Set(['raw_material'])
 /** Hammadde eksikliği bu kadar gün içinde bir işi durduruyorsa acildir. */
 export const RAW_URGENT_DAYS = 3
-/** Kullanılamayan stok: kalite bekleyen ve müşteriye geçmiş. */
-const NOT_AVAILABLE = new Set(['quality', 'customer'])
 export const DEFAULT_HORIZON_WEEKS = 4
 /** Emniyet stoğu varsayılanı (iş günü). Work Calendar sayfasından değişir. */
 export const DEFAULT_SAFETY_STOCK_DAYS = 2
@@ -135,7 +133,9 @@ export interface PlanInputs {
     /** MB52 yükleme zamanı (ms). */
     uploadedAt?: number
   }[]
-  locations: { code: string; category: string }[]
+  locations: { code: string; category: string; countFinished?: boolean; countRaw?: boolean }[]
+  /** Yoldaki hammadde (Excel listesi) — MRP'de varış haftasında giriş. */
+  inTransit?: { material: string; quantityKg: number; eta?: string; poNumber?: string; supplier?: string }[]
   presses: PlanPress[]
   templates: { press: string; workingDays: number; shiftsPerDay: number; overtimeShifts: number }[]
   /**
@@ -354,26 +354,18 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     if (i >= 0 && i < 3) stopMinutesByShift[i] += stop.durationMinutes
   }
 
-  const locCategory = new Map(inputs.locations.map((l) => [l.code, l.category]))
   const stockByMaterial = new Map<string, number>()
   const rawStockByMaterial = new Map<string, number>()
   const rawCodes = new Set(inputs.products.map((p) => p.rawMaterialCode?.trim() ?? '').filter(Boolean))
-  // Mamul stoğu yalnızca belirlenen depolardan (2009, 1009) sayılır — Capacity
-  // Dashboard ile aynı liste. Deposu yazılmamış satır (eski/elle veri) sayılır.
-  const stockLocations = new Set(PLAN_STOCK_LOCATIONS)
+  // Hangi depo neye sayılır Storage Locations matrisinden gelir; tik yoksa
+  // 2009/1009 varsayılandır. Deposu yazılmamış satır (eski/elle veri) sayılır.
+  const counted = countedLocations(inputs.locations)
   for (const row of inputs.stock) {
-    const loc = row.storageLocation?.trim()
-    const cat = loc ? locCategory.get(loc) : undefined
-    if (!loc || stockLocations.has(loc)) {
-      sum(stockByMaterial, row.material, row.unrestricted ?? 0)
-    }
-    // Rulo stoğu: master data'daki hammadde kodu hangi depoda olursa olsun
-    // sayılır; yalnızca kalite bekleyen ve müşteriye geçmiş depolar hariç.
-    if (
-      (cat && RAW_STOCK.has(cat)) ||
-      (rawCodes.has(row.material.trim()) && !(cat && NOT_AVAILABLE.has(cat)))
-    ) {
-      sum(rawStockByMaterial, row.material, row.unrestricted ?? 0)
+    if (isFinishedStockRow(counted, row.storageLocation)) sum(stockByMaterial, row.material, row.unrestricted ?? 0)
+    // Rulo stoğu: yalnızca "hammadde" tiki olan depolardan.
+    const material = row.material.trim()
+    if (rawCodes.has(material) && isRawStockRow(counted, row.storageLocation)) {
+      sum(rawStockByMaterial, material, row.unrestricted ?? 0)
     }
   }
 
@@ -1528,11 +1520,13 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     presses: presses.map((p) => p.name),
     weeks: forecastWeekList,
     capacityMinutes,
+    stockLocations: [...counted.finished],
   })
   capacity.unassigned = capacity.unassigned.slice(0, 100)
 
   // Hammadde MRP'si — plandan bağımsız: ZPP'nin son haftasına kadar talep,
-  // mamul stoğu (2009 + 1009) FIFO düşülür, kalan brüt ağırlıkla kg'a çevrilir.
+  // mamul stoğu (Finished goods tikli depolar) FIFO düşülür, kalan brüt
+  // ağırlıkla kg'a çevrilir; eldeki rulo ve yoldakiler arzdır.
   // Sipariş haftaları sayfada kullanıcının ayarıyla hesaplanır (src/lib/rawMrp.ts).
   const mrpWeekCount = Math.max(1, ...inputs.weeklyDemand.map((d) => d.periods.length))
   const mrpWeeks = Array.from({ length: Math.min(60, mrpWeekCount) }, (_, w) => {
@@ -1544,7 +1538,9 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     weeklyDemand: inputs.weeklyDemand,
     finishedStock: stockByMaterial,
     rawStock: rawStockByMaterial,
+    inTransit: inputs.inTransit,
     weeks: mrpWeeks,
+    workingDaysPerWeek,
   })
 
   const run: PlanRun = {

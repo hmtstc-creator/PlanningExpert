@@ -105,3 +105,42 @@ export function parseMovementRows(rows: Record<string, unknown>[]) {
     }))
     .filter((r) => r.material)
 }
+
+/** Başlığı karşılaştırmak için: küçük harf, boşluk/nokta/parantez yok. */
+const headerKey = (h: string) =>
+  h
+    .toLocaleLowerCase('tr')
+    .replace(/[ıi̇]/g, 'i')
+    .replace(/[^a-z0-9ğüşöç]/g, '')
+
+function pick(row: Record<string, unknown>, names: string[]): unknown {
+  const wanted = new Set(names.map(headerKey))
+  for (const [key, value] of Object.entries(row)) if (wanted.has(headerKey(key))) return value
+  return undefined
+}
+
+/** Yoldaki hammadde şablonunun sütunları (şablon indirme ve beklenen sütunlar). */
+export const IN_TRANSIT_COLUMNS = ['Material', 'Quantity (kg)', 'ETA', 'PO Number', 'Supplier'] as const
+
+/**
+ * Yoldaki hammadde listesi — hangi rulo ne kadar, ne zaman gelecek.
+ * İngilizce ve Türkçe sütun adlarını tanır. Birim sütunu "TO"/"T" ise
+ * miktar tondur ve kg'a çevrilir. Varış tarihi yoksa satır "bu hafta
+ * gelecek" sayılır (MRP'de ilk hafta).
+ */
+export function parseInTransitRows(rows: Record<string, unknown>[]) {
+  return rows
+    .map((row) => {
+      const material = movementStr(pick(row, ['Material', 'Malzeme', 'Raw material', 'Hammadde'])) ?? ''
+      const raw = pick(row, ['Quantity (kg)', 'Quantity kg', 'Quantity', 'Qty', 'Miktar (kg)', 'Miktar', 'Kg'])
+      let quantityKg = typeof raw === 'number' ? raw : movementNum(raw) ?? 0
+      const unit = String(pick(row, ['Unit', 'UoM', 'Birim']) ?? '').trim().toUpperCase()
+      if (unit === 'TO' || unit === 'T' || unit === 'TON') quantityKg *= 1000
+      const etaRaw = pick(row, ['ETA', 'Arrival', 'Arrival date', 'Delivery date', 'Varış', 'Varış tarihi', 'Tahmini varış', 'Teslim tarihi'])
+      const eta = parseSapDate(etaRaw) || undefined
+      const poNumber = movementStr(pick(row, ['PO Number', 'PO', 'Purchase order', 'Sipariş', 'Sipariş no', 'Satınalma siparişi']))
+      const supplier = movementStr(pick(row, ['Supplier', 'Vendor', 'Tedarikçi']))
+      return { material, quantityKg: Math.max(0, quantityKg), eta, poNumber, supplier }
+    })
+    .filter((r) => r.material && r.quantityKg > 0)
+}

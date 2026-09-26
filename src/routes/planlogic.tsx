@@ -21,16 +21,18 @@ export const Route = createFileRoute('/planlogic')({
 /** Hammadde MRP'sinin FMEA'sı: hata türü, etkisi, S, O, D, yöntemdeki önlem. */
 const FMEA_ROWS: [string, string, number, number, number, string][] = [
   ['Plan and demand both counted', 'Same steel ordered twice', 8, 8, 3, 'Plan-independent: demand only; the safety stock absorbs plan timing and coil surplus'],
-  ['Finished stock not deducted', 'Over-ordering', 7, 5, 4, '2009 + 1009 deducted first-in-first-out, the same locations as the plan'],
+  ['Finished stock not deducted', 'Over-ordering', 7, 5, 4, 'Locations ticked “Finished goods” on Storage Locations deducted first-in-first-out, the same as the plan'],
+  ['Coil stock on hand not deducted', 'Steel already in the plant is ordered again', 8, 6, 5, 'Coil stock in the locations ticked “Raw material” (default 2009 + 1009) is the opening stock'],
   ['Co-product counted twice', 'Over-ordering on pairs', 6, 6, 5, 'Pair pressed once: strokes = larger need, steel on the primary part only'],
   ['Part without raw code / gross weight', 'Its steel silently missing → line stops', 10, 5, 8, 'Listed in red on the page with pieces; never silently dropped'],
   ['Gross weight in wrong unit (g / t)', 'Order 1000× off', 9, 3, 6, 'Weights above 50 kg or below 1 g per piece are flagged'],
-  ['Weekly buckets: safety checked only at week start', 'Below safety at the end of the week', 7, 7, 7, 'Order covers the week’s use + N days after the week ends'],
-  ['Demand unknown after the last ZPP week', 'Safety collapses at the horizon end → too little', 6, 9, 6, 'Safety window extended with the average of the last 4 weeks'],
+  ['Weekly buckets: safety checked only at week start', 'Below safety at the end of the week', 7, 7, 7, 'Every week end must hold the next N working days (10 = the next 2 weeks)'],
+  ['Steel ordered with no demand behind it', 'Dead stock, cash tied up', 6, 6, 5, 'No demand, no order: nothing is forecast beyond the last ZPP week (kanban comes later)'],
   ['Backlog (overdue) ignored', 'Urgent steel missing now', 8, 4, 5, 'Backlog counted in the current week'],
-  ['Blocked / quality stock counted as available', 'Stock overstated', 7, 4, 6, 'Only unrestricted coil stock, Quality and Customer locations excluded'],
+  ['Blocked / quality stock counted as available', 'Stock overstated', 7, 4, 6, 'Only unrestricted stock, and only in locations ticked on Storage Locations'],
   ['Scrap, coil ends, setup loss', 'Slightly too little', 5, 8, 7, 'Standard extra per order (500 kg, adjustable)'],
-  ['Open purchase orders unknown', 'Steel already ordered is ordered again', 7, 7, 8, 'Next step: open-order file from SAP; until then check the table against open orders'],
+  ['Steel in transit unknown', 'Steel already on the way is ordered again', 7, 7, 8, 'In-transit Excel list: each quantity is a receipt in its ETA week (no ETA = this week)'],
+  ['In-transit ETA wrong or missing', 'Order a week too late or too early', 6, 5, 6, 'No ETA counts as this week; each arrival shows its ETA and PO on the page to check'],
 ]
 
 const STEPS = [
@@ -611,7 +613,10 @@ function PlanLogicPage() {
         <h2 className="text-sm font-semibold text-foreground">Raw material requirement (MRP) — independent of the plan</h2>
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
           <li>Demand: ZPP up to its last week; backlog goes into this week.</li>
-          <li>Finished stock (2009 + 1009) is deducted, earliest weeks first. What is left must be pressed.</li>
+          <li>
+            Finished stock (locations ticked <i>Finished goods</i> on Storage Locations) is deducted,
+            earliest weeks first. What is left must be pressed.
+          </li>
           <li>
             Steel: pieces × gross weight per piece. A co-product pair is pressed once — strokes are the
             larger of the two needs — and only the primary part's weight counts.
@@ -622,11 +627,16 @@ function PlanLogicPage() {
             The safety stock absorbs the difference.
           </li>
           <li>
-            Week by week: stock at the start of the week + an order must cover that week's use <b>and</b>{' '}
-            the use of the N days after the week ends (safety stock). Otherwise an order is due that
-            week: the shortfall + the standard extra (500 kg by default).
+            Supply: coil stock on hand in the locations ticked <i>Raw material</i> (default 2009 + 1009)
+            plus the in-transit list, each quantity in its ETA week (no ETA or a past ETA = this week).
           </li>
-          <li>After the last ZPP week demand is unknown; the safety window is extended with the average of the last 4 weeks.</li>
+          <li>
+            Week by week: stock at the start of the week + arrivals + an order must cover that week's
+            use <b>and</b> the use of the N <b>working days</b> after the week ends — with 10 days every
+            week end holds the next 2 weeks. Otherwise an order is due that week: the shortfall + the
+            standard extra (500 kg by default).
+          </li>
+          <li>No demand, no order: after the last ZPP week the need is zero; nothing is forecast (kanban comes later).</li>
         </ol>
         <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">FMEA — what can go wrong and how the method guards it</h3>
         <div className="mt-2 overflow-x-auto rounded-md border border-border">
@@ -659,8 +669,8 @@ function PlanLogicPage() {
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           S = severity, O = occurrence, D = detection (1–10); the ratings are those before the guard.
-          Open item for the next step: steel already ordered but not yet in MB52 (open purchase orders)
-          is not known yet, so it is ordered again — it needs an SAP open-order file.
+          Steel already ordered but not yet shipped is only known when it is on the in-transit list;
+          keep that list up to date.
         </p>
       </section>
 
