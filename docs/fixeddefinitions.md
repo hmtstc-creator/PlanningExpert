@@ -30,8 +30,8 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 | 22 | Acil hammadde süresi | 3 iş günü (varsayılan) | Work Calendar ayarı | K — uygulandı | K |
 | 23 | Kalıp setup'ının çay/yemek molasından geçebilmesi | çay, yemek, mola türleri | `planPipeline.ts` (SETUP_THROUGH_KINDS) | P | |
 | 24 | Vinç kontrolünde komşu güne bakış | 360 dk | `scheduler.ts` (BOUNDARY_REACH) | P (teknik) | |
-| 26 | Tekrarlayan mesai resmi tatilde | çalışmaz (tatilde mesai tarihli açılır) | `pressCalendar.ts` | P | |
-| 27 | "İş günü" sayarken mesai | sayılmaz: yalnızca normal vardiyası olan gün | `capacityModel.ts` (isPlantWorkingDate) | P | |
+| 26 | Tekrarlayan mesai resmi tatilde | çalışmaz (tatilde mesai tarihli açılır) | `pressCalendar.ts` | P | P — onaylandı |
+| 27 | "İş günü" sayarken mesai | sayılmaz: yalnızca normal vardiyası olan gün | `capacityModel.ts` (isPlantWorkingDate) | P | P — onaylandı |
 | 28 | Normal vardiyayla ya da başka mesaiyle çakışan mesai | kaydedilmez | `pressCalendar.ts` | P | |
 | 25 | Varsayılan depolar (matriste tik yoksa) | bitmiş ürün ve hammadde: 2009, 1009; üretim girişi: 2009 | `stockLocations.ts` | P | |
 

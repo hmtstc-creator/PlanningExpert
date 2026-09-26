@@ -100,8 +100,10 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   isteyebilir; o gün hazır değilse gecikme görünür.
 - Bakiye ve bugünün ihtiyacı ertesi gün 08:00'de teslim sayılır (hafta sonu
   ve tatil fark etmeksizin).
-- Presler dışındaki iş günü = tatil olmayan ve en az bir presin çalıştığı
-  gün.
+- Presler dışındaki iş günü = tatil olmayan ve en az bir presin normal
+  vardiyası olan gün; mesai iş günü saymaz (onaylandı).
+- Tekrarlayan mesai resmi tatilde çalışmaz; tatilde mesai tarihli açılır
+  (onaylandı).
 - Hammadde (10 iş günü) ve acil hammadde (3 iş günü) iş günüyle sayılır.
 - Haftalık talebin günlere dağıtılması: ZPP_DAILY varsa ZPP haftalığı ezer;
   ZPP_DAILY'nin ulaşmadığı tarihlerde haftalık talep takvime göre dağıtılır.
