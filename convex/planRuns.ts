@@ -318,6 +318,25 @@ export const latestCapacity = guardedQuery({
   },
 })
 
+/** Raw Material Coverage sayfası: günlük rulo tüketimi ve stoğu. */
+export const latestRawCoverage = guardedQuery({
+  args: {},
+  returns: v.any(),
+  handler: async (ctx: Ctx) => {
+    const run = await ctx.db
+      .query('planRuns')
+      .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))
+      .order('desc')
+      .first()
+    if (!run) return null
+    return {
+      computedAt: run.computedAt,
+      todayIso: run.summary?.todayIso,
+      rawConsumption: run.summary?.rawConsumption ?? null,
+    }
+  },
+})
+
 /** Kuyruğun durumu: hesap sürüyor mu, bekliyor mu, son hata ne. */
 export const status = guardedQuery({
   args: {},

@@ -14,6 +14,7 @@ import { Route as AlarmsRouteImport } from './routes/alarms'
 import { Route as CapacityRouteImport } from './routes/capacity'
 import { Route as DepolarRouteImport } from './routes/depolar'
 import { Route as GerceklesenRouteImport } from './routes/gerceklesen'
+import { Route as HammaddeRouteImport } from './routes/hammadde'
 import { Route as KaliplarRouteImport } from './routes/kaliplar'
 import { Route as KalipproblemRouteImport } from './routes/kalipproblem'
 import { Route as KayitlarRouteImport } from './routes/kayitlar'
@@ -64,6 +65,11 @@ const DepolarRoute = DepolarRouteImport.update({
 const GerceklesenRoute = GerceklesenRouteImport.update({
   id: '/gerceklesen',
   path: '/gerceklesen',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HammaddeRoute = HammaddeRouteImport.update({
+  id: '/hammadde',
+  path: '/hammadde',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KaliplarRoute = KaliplarRouteImport.update({
@@ -205,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/capacity': typeof CapacityRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
+  '/hammadde': typeof HammaddeRoute
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/capacity': typeof CapacityRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
+  '/hammadde': typeof HammaddeRoute
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
@@ -272,6 +280,7 @@ export interface FileRoutesById {
   '/capacity': typeof CapacityRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
+  '/hammadde': typeof HammaddeRoute
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
@@ -307,6 +316,7 @@ export interface FileRouteTypes {
     | '/capacity'
     | '/depolar'
     | '/gerceklesen'
+    | '/hammadde'
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
@@ -340,6 +350,7 @@ export interface FileRouteTypes {
     | '/capacity'
     | '/depolar'
     | '/gerceklesen'
+    | '/hammadde'
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
@@ -373,6 +384,7 @@ export interface FileRouteTypes {
     | '/capacity'
     | '/depolar'
     | '/gerceklesen'
+    | '/hammadde'
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
@@ -407,6 +419,7 @@ export interface RootRouteChildren {
   CapacityRoute: typeof CapacityRoute
   DepolarRoute: typeof DepolarRoute
   GerceklesenRoute: typeof GerceklesenRoute
+  HammaddeRoute: typeof HammaddeRoute
   KaliplarRoute: typeof KaliplarRoute
   KalipproblemRoute: typeof KalipproblemRoute
   KayitlarRoute: typeof KayitlarRoute
@@ -470,6 +483,13 @@ declare module '@tanstack/react-router' {
       path: '/gerceklesen'
       fullPath: '/gerceklesen'
       preLoaderRoute: typeof GerceklesenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hammadde': {
+      id: '/hammadde'
+      path: '/hammadde'
+      fullPath: '/hammadde'
+      preLoaderRoute: typeof HammaddeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/kaliplar': {
@@ -663,6 +683,7 @@ const rootRouteChildren: RootRouteChildren = {
   CapacityRoute: CapacityRoute,
   DepolarRoute: DepolarRoute,
   GerceklesenRoute: GerceklesenRoute,
+  HammaddeRoute: HammaddeRoute,
   KaliplarRoute: KaliplarRoute,
   KalipproblemRoute: KalipproblemRoute,
   KayitlarRoute: KayitlarRoute,

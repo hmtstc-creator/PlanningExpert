@@ -27,6 +27,8 @@ const globalSettingsValidator = v.union(
     deliveryCutoffMinute: v.optional(v.number()),
     utilisationTarget: v.optional(v.number()),
     maxScenarios: v.optional(v.number()),
+    rawCoverageDays: v.optional(v.number()),
+    rawOrderExtraKg: v.optional(v.number()),
     migratedSetupGap10: v.optional(v.boolean()),
   }),
   v.null(),
@@ -64,6 +66,8 @@ export const saveGlobalSettings = guardedMutation({
     deliveryCutoffMinute: v.optional(v.number()),
     utilisationTarget: v.optional(v.number()),
     maxScenarios: v.optional(v.number()),
+    rawCoverageDays: v.optional(v.number()),
+    rawOrderExtraKg: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -258,4 +262,27 @@ export const listAllOverrides = guardedQuery({
   args: {},
   returns: v.array(overrideValidator),
   handler: async (ctx) => ctx.db.query('pressWeekOverrides').collect(),
+})
+
+/** Raw Material Coverage sayfasının ayarları: yalnızca bu iki alan yazılır. */
+export const saveRawCoverageSettings = guardedMutation({
+  args: { rawCoverageDays: v.number(), rawOrderExtraKg: v.number() },
+  returns: v.null(),
+  affectsPlan: false,
+  handler: async (ctx, args) => {
+    if (!Number.isFinite(args.rawCoverageDays) || args.rawCoverageDays < 1 || args.rawCoverageDays > 90) {
+      throw new Error('Coverage days must be between 1 and 90')
+    }
+    if (!Number.isFinite(args.rawOrderExtraKg) || args.rawOrderExtraKg < 0 || args.rawOrderExtraKg > 100_000) {
+      throw new Error('Extra kg must be between 0 and 100 000')
+    }
+    const existing = await ctx.db
+      .query('globalShiftSettings')
+      .withIndex('by_key', (q) => q.eq('key', 'default'))
+      .first()
+    const patch = { rawCoverageDays: Math.round(args.rawCoverageDays), rawOrderExtraKg: Math.round(args.rawOrderExtraKg) }
+    if (existing) await ctx.db.patch(existing._id, patch)
+    else throw new Error('Save the Work Calendar settings once first')
+    return null
+  },
 })

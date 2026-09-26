@@ -42,6 +42,7 @@ import {
 import { alarmedMaterials } from './moldAlarm'
 import { auditPlan, type PlanAudit } from './planAudit'
 import { safeValidatePlan, type PlanValidation } from './planValidator'
+import { buildRawConsumption, type RawConsumptionPlan } from './rawCoverage'
 import { readDailyDemand } from './dailyDemand'
 import { buildCapacityForecast, PLAN_STOCK_LOCATIONS, type CapacityForecast } from './capacityForecast'
 import {
@@ -304,6 +305,8 @@ export interface PlanRun {
   validation?: PlanValidation | null
   /** Master data'daki malzemelerin SAP dosyalarındaki karşılığı. */
   dataCoverage?: DataCoverage
+  /** Günlük hammadde (rulo) tüketimi ve stoğu — Raw Material Coverage sayfası. */
+  rawConsumption?: RawConsumptionPlan
   /** Geç kalemler, malzeme bazında, gecikme saati ve kapasite önerisiyle. */
   lateItems?: LateItem[]
   frozenCount: number
@@ -1528,7 +1531,23 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   })
   capacity.unassigned = capacity.unassigned.slice(0, 100)
 
+  // Hammadde yeterliliği: bugünden ufkun sonuna günlük rulo tüketimi
+  // (dondurulmuş işler dahil). Sipariş takvimi sayfada, kullanıcının
+  // ayarıyla hesaplanır (src/lib/rawCoverage.ts).
+  const lastDate = horizonDates[horizonDates.length - 1] ?? todayIso
+  const coverageDates: string[] = []
+  for (let d = todayIso; d <= lastDate && coverageDates.length < 400; d = isoDate(addDays(new Date(`${d}T00:00:00`), 1))) {
+    coverageDates.push(d)
+  }
+  const rawConsumption = buildRawConsumption({
+    jobs,
+    products: productByCode,
+    rawStockKg: rawStockByMaterial,
+    dates: coverageDates,
+  })
+
   const run: PlanRun = {
+    rawConsumption,
     capacity,
     optimisation,
     lateItems,

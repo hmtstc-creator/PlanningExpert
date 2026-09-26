@@ -26,6 +26,7 @@ export const PRIMARY_LINKS: NavItem[] = [
 /** Planlama başlığının geri kalanı: veri girişi ve motorun açıklaması. */
 export const PLANNING_LINKS: NavItem[] = [
   { to: '/capacity', label: 'Capacity Dashboard', hint: 'Weekly capacity vs demand by press group' },
+  { to: '/hammadde', label: 'Raw Material Coverage', hint: 'Coil stock, days of cover and the order calendar' },
   { to: '/alarms', label: 'Alarms', hint: 'Dies and machines that hold up the plan' },
   { to: '/sapdata', label: 'SAP Data', hint: 'Upload ZPP, ZPP_DAILY, MB52 and MB51' },
   { to: '/planlogic', label: 'Planning Logic', hint: 'How the plan is calculated' },

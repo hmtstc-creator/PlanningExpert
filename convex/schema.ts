@@ -197,6 +197,9 @@ export default defineSchema({
     // Senaryo araması: hedef doluluk (%) ve en çok kaç senaryo denenir.
     utilisationTarget: v.optional(v.number()),
     maxScenarios: v.optional(v.number()),
+    // Hammadde: elde tutulacak gün ve her siparişe eklenen standart kg.
+    rawCoverageDays: v.optional(v.number()),
+    rawOrderExtraKg: v.optional(v.number()),
     // Tek seferlik geçişler yapıldı mı (ör. setup arası 60 → 10 dk).
     migratedSetupGap10: v.optional(v.boolean()),
   }).index('by_key', ['key']),
