@@ -657,6 +657,7 @@ function PlanlamaPage() {
                     late: j.late,
                     frozen: j.frozen,
                     setupStartMinute: j.setupStartMinute,
+                    setupMinutes: j.setupMinutes,
                     endMinute: j.endMinute,
                     segments: j.segments,
                     waitReason: j.waitReason,

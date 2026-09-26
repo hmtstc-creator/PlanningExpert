@@ -983,6 +983,13 @@ export interface DayBucket {
    * Pencerenin nerede başladığı da taşınmalı.
    */
   startMinute?: number
+  /**
+   * Setup'ın durmadan geçtiği planlı duruşlar (çay, yemek): günün net
+   * ekseninde yeri ve saat olarak süresi. Setup operatörleri endirekttir,
+   * molaya setup bitince çıkar; pres zaten durduğu için setup'ın bu kısmı
+   * kapasiteden yemez.
+   */
+  setupBreaks?: { at: number; minutes: number }[]
 }
 
 export const DAY_KEYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const

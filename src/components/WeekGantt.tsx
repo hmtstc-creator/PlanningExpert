@@ -41,6 +41,33 @@ const COLORS = {
 type BlockKind = keyof typeof COLORS
 
 /** Handover is the start-of-shift meeting; tea and meals are the breaks. */
+/**
+ * Setup çay ve yemek molasında durmaz (setup ekibi endirekt): moladan önce
+ * ve sonraki parçaları tek çubuk olur, molada biten setup molanın içine
+ * uzar. Böylece grafikte setup'ın gerçek süresi görünür.
+ */
+function setupThroughBreaks(
+  blocks: { start: number; end: number }[],
+  stops: { start: number; end: number; kind: string }[],
+  nominal: number | undefined,
+): { start: number; end: number }[] {
+  const through = stops.filter((st) => st.kind === 'tea' || st.kind === 'meal' || st.kind === 'break')
+  const near = (a: number, b: number) => Math.abs(a - b) < 0.5
+  const merged: { start: number; end: number }[] = []
+  for (const b of blocks) {
+    const prev = merged[merged.length - 1]
+    if (prev && through.some((st) => near(st.start, prev.end) && near(st.end, b.start))) prev.end = b.end
+    else merged.push({ ...b })
+  }
+  const last = merged[merged.length - 1]
+  if (last && nominal !== undefined) {
+    const drawn = merged.reduce((sum, b) => sum + b.end - b.start, 0)
+    const stop = through.find((st) => near(st.start, last.end))
+    if (stop && drawn < nominal - 0.5) last.end = Math.min(stop.end, last.end + (nominal - drawn))
+  }
+  return merged
+}
+
 function kindOfStop(stopKind: string): BlockKind {
   if (stopKind === 'handover') return 'meeting'
   if (stopKind === 'tea' || stopKind === 'meal') return 'stop'
@@ -77,6 +104,8 @@ export interface WeekGanttJob {
    */
   frozen?: boolean
   setupStartMinute: number
+  /** Setup'ın saat olarak süresi (çay/yemek molasında durmaz). */
+  setupMinutes?: number
   endMinute: number
   /** Setup → approval → production → coil change → production … */
   segments: WeekGanttSegment[]
@@ -270,7 +299,10 @@ export function WeekGantt({
           // planner does not read it as a second setup for the same part.
           const carriedOver = (span.date || job.date) !== job.date
           const firstSpan = span === job.segments[0]
-          for (const [segIndex, seg] of netIntervalToClockBlocks(span.start, span.end, timeline).entries()) {
+          const clockBlocks = netIntervalToClockBlocks(span.start, span.end, timeline)
+          const drawnBlocks =
+            kind === 'setup' ? setupThroughBreaks(clockBlocks, timeline.stops, job.setupMinutes) : clockBlocks
+          for (const [segIndex, seg] of drawnBlocks.entries()) {
             blocks.push({
               job,
               firstOfJob: firstSpan && segIndex === 0,

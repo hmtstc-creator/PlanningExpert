@@ -385,6 +385,14 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const weeks = Math.min(30, Math.max(1, s.planningHorizonWeeks ?? 4))
   const capacityFactor = s.capacityFactor ?? 1
   const setupGap = s.setupGapMinutes ?? 10
+  // Setup çay/yemek molasında durmaz: presten en fazla en uzun mola kadar
+  // az yer tutabilir. Alt sınırlar (kanıt) bu kısalmayı hesaba katar;
+  // "boşluğa sığardı" denemesi tam süreyle yapılır (iyimser olmasın).
+  const setupAbsorb = Math.max(
+    0,
+    ...inputs.plannedStops.filter((st) => ['tea', 'meal', 'break'].includes(st.kind)).map((st) => st.durationMinutes),
+  )
+  const pressSetupOf = (p: ProductSpec | undefined) => Math.max(0, (p?.setupMinutes ?? 0) - setupAbsorb)
   const coilGap = s.coilSetupGapMinutes ?? 30
   const hallConcurrent = Math.max(1, s.concurrentSetupsPerHall ?? 1)
   const plantUrgentCap = Math.max(1, s.maxSetupsPlantWide ?? 2)
@@ -1025,7 +1033,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const pc = piecesPerCoil(p)
     const feeds = pressByName.get(press)?.feedsCoil !== false
     const coilChanges = feeds && pc > 0 ? Math.max(0, Math.ceil(qPrimary / pc) - 1) : 0
-    const setup = mountedAt0.get(press) === g ? 0 : p.setupMinutes ?? 0
+    const setup = mountedAt0.get(press) === g ? 0 : pressSetupOf(p)
     const fullNonProd = (p.setupMinutes ?? 0) + (p.qualityApprovalMinutes ?? 0) + coilChanges * (p.coilSetupMinutes ?? 0)
     const usedNonProd = setup + (p.qualityApprovalMinutes ?? 0) + coilChanges * (p.coilSetupMinutes ?? 0)
     const runMin = f < 1 ? Math.max(theor / f - fullNonProd, theor) : theor
@@ -1302,7 +1310,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
         const setup = mounted ? 0 : product?.setupMinutes ?? 0
         const start = ft.reach(gap.from, 0.0001)
         if (start === null || start >= gap.to) continue
-        const needW = minWork(g, strokes, press, qPrimary) - (mountedAt0.get(press) === g ? 0 : product?.setupMinutes ?? 0) + setup
+        const needW = minWork(g, strokes, press, qPrimary) - (mountedAt0.get(press) === g ? 0 : pressSetupOf(product)) + setup
         const readyAt = ft.reach(gap.from, needW)
         if (readyAt === null || readyAt > T + MIN_TOL) continue
         const whole = lotWork - (J.setupSegs.length && mounted ? product?.setupMinutes ?? 0 : 0)

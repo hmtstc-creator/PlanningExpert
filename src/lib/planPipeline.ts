@@ -189,6 +189,8 @@ export interface PlanDay {
 
 /** Bir işte bundan fazla rulo, master data hatasına işaret eder. */
 const MANY_COILS = 200
+/** Setup'ın durmadan geçtiği planlı duruş türleri. Devir ve bakım setup'ı da durdurur. */
+const SETUP_THROUGH_KINDS = new Set(['tea', 'meal', 'break'])
 
 export interface ScenarioSummary {
   label: string
@@ -487,6 +489,10 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
           // Bugünün penceresi geçmiş dakikadan başlar; yoksa iş sabaha,
           // yani geçmişe konurdu.
           startMinute: b.date === todayIso && remaining > 0 ? adjusted - remaining : 0,
+          // Çay ve yemek molası setup'ı durdurmaz (setup ekibi endirekt).
+          setupBreaks: timeline.stops
+            .filter((st) => SETUP_THROUGH_KINDS.has(st.kind))
+            .map((st) => ({ at: clockToNet(st.start, timeline), minutes: st.end - st.start })),
         }
       }),
     )

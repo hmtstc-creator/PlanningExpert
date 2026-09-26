@@ -425,6 +425,33 @@ interface DayWindow {
    * yoksa bugünün işi sabaha, yani geçmişe düşer.
    */
   startNet: number
+  /** Setup'ın durmadan geçtiği molalar (net yer, saat süresi). */
+  setupBreaks?: { at: number; minutes: number }[]
+}
+
+/**
+ * `minutes` dakikalık setup `global` anda başlarsa eksende kaç NET dakika
+ * tutar: çay ve yemek molası setup'ı durdurmaz, o dakikalar setup'tan düşer.
+ * Örnek: 30 dk setup, 15 dk sonra 15 dk'lık çay → setup molayla birlikte
+ * biter, eksende 15 dk tutar; üretim moladan hemen sonra başlar.
+ */
+function setupNetLength(timeline: PressTimeline, global: number, minutes: number): number {
+  const day = dayAt(timeline, global)
+  if (!day || !day.setupBreaks || day.setupBreaks.length === 0 || minutes <= 0) return minutes
+  let pos = day.startNet + (global - day.offset)
+  let left = minutes
+  let net = 0
+  for (const b of day.setupBreaks) {
+    if (b.at < pos - 1e-9) continue
+    const run = b.at - pos
+    if (left <= run + 1e-9) return net + left
+    net += run
+    left -= run
+    pos = b.at
+    left -= b.minutes
+    if (left <= 1e-9) return net
+  }
+  return net + left
 }
 
 /** Presin ekseninde dolu bir aralık ve o sırada takılı olan kalıp. */
@@ -472,6 +499,7 @@ function buildTimeline(buckets: DayBucket[]): PressTimeline {
       offset,
       capacity: bucket.minutes,
       startNet: bucket.startMinute ?? 0,
+      setupBreaks: bucket.setupBreaks ? [...bucket.setupBreaks].sort((a, b) => a.at - b.at) : undefined,
     })
     offset += bucket.minutes
   }
@@ -1467,13 +1495,15 @@ function tryPlaceOnPress(
     let cursor = setupSlot.global
     const setupGlobalStart = cursor
     if (setupMinutes > 0) {
-      segments.push(...toDatedSegments(timeline, 'setup', cursor, cursor + setupMinutes))
+      // Çay/yemek molası setup'ı durdurmaz: eksende daha az yer tutar.
+      const setupNet = setupNetLength(timeline, cursor, setupMinutes)
+      segments.push(...toDatedSegments(timeline, 'setup', cursor, cursor + setupNet))
       moldReservation = {
         date: setupSlot.date,
         start: setupSlot.start,
-        end: setupSlot.start + setupMinutes,
+        end: setupSlot.start + setupNet,
       }
-      cursor += setupMinutes
+      cursor += setupNet
     }
 
     // 2) Kalite onayı.
@@ -1597,12 +1627,13 @@ function tryPlaceOnPress(
               crossShifts,
             )
           : null
-      if (minutes > 0 && (!slot || slot.global + minutes > next.start)) {
+      const netMinutes = slot ? setupNetLength(timeline, slot.global, minutes) : minutes
+      if (minutes > 0 && (!slot || slot.global + netMinutes > next.start)) {
         start = firstFreePoint(timeline, Math.max(start + 1, next.end))
         if (start >= timeline.total) return null
         continue
       }
-      if (slot) followSetup = { ...slot, minutes }
+      if (slot) followSetup = { ...slot, minutes: netMinutes }
     }
 
     // Kalıp bakımda ya da henüz hazır değil: işin hiçbir parçası kapalı
@@ -2047,7 +2078,11 @@ function placeRun(
   if (bestIsContinuation) reasonParts.push('continues the die already mounted — no new setup')
   if (best.urgent && !sameMaterial) reasonParts.push('urgent: setup may overlap another setup (plant-wide limit)')
 
-  const setupEnd = locate(timeline, best.startGlobal + (sameMaterial ? 0 : run.setupMinutes))
+  const setupNet = best.segments.filter((seg) => seg.kind === 'setup').reduce((a, seg) => a + seg.end - seg.start, 0)
+  if (!sameMaterial && setupNet < run.setupMinutes - 0.5) {
+    reasonParts.push('setup runs on through the tea/meal break')
+  }
+  const setupEnd = locate(timeline, best.startGlobal + setupNet)
   const qualityEnd = locate(timeline, best.qualityEndGlobal)
 
   const job: ScheduledJob = {

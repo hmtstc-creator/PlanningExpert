@@ -393,6 +393,13 @@ function PlanLogicPage() {
               : 'A setup or coil change never crosses the end of a shift — no crew starts a setup it cannot finish. Production can.'}
           </li>
           <li>
+            <b>Setups run on through tea and meal breaks.</b> The setup team is
+            indirect and takes its break after the setup. A 30-minute setup that
+            meets a 15-minute tea break after 15 minutes still takes 30 minutes;
+            production starts right after the break, and the break costs the press
+            nothing. Shift handover and maintenance stops do pause a setup.
+          </li>
+          <li>
             <b>Setup team</b>: normally at most {current.plantNormal} mould setup(s) run at
             the same time anywhere in the plant. <b>Dynamic rule:</b> for backlog, or for a
             job that would otherwise start after its stock runs out, up to{' '}
