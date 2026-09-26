@@ -59,7 +59,8 @@ describe('buildGrid', () => {
       ]),
     })
     expect(cell.overridden).toBe(true)
-    expect(cell.effectiveShifts).toBe(17)
+    // Şablon/istisna haftadaki eski mesai sayısı okunmaz: mesai tarihli açılır.
+    expect(cell.effectiveShifts).toBe(15)
   })
 
   it('removes the capacity a holiday takes away', () => {
@@ -78,9 +79,9 @@ describe('buildGrid', () => {
     expect(cell.effectiveMinutes).toBe(15 * 450)
   })
 
-  it('never counts more normal days than the Work Calendar working days, like the plan', () => {
+  it('fills the days from Monday, like the plan: 6 days = Mon–Sat', () => {
     const [cell] = buildGrid({ ...base, templates: new Map([['PRS-1', { workingDays: 6, shiftsPerDay: 3, overtimeShifts: 0 }]]) })
-    expect(cell.effectiveShifts).toBe(15)
+    expect(cell.effectiveShifts).toBe(18)
   })
 
   it('produces one cell per press per week', () => {

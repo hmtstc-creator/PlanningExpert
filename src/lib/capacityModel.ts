@@ -2,34 +2,41 @@
 //
 // Aynı soru ("bu pres bu hafta kaç dakika çalışır?") eskiden dört yerde ayrı
 // hesaplanıyordu: plan, Work Calendar tablosu, Capacity Dashboard ve
-// Performance sayfası. Kimi planlı duruşları düşmüyor, kimi istisna haftayı
-// (fazla mesai) ya da resmi tatili görmüyordu; aynı girdiyle farklı sayılar
-// çıkıyordu. Artık hepsi buradan okur.
+// Performance sayfası. Artık hepsi buradan okur. Takvim kuralları
+// pressCalendar.ts'tedir (Pazartesiden sırayla gün, tatilde kayma yok,
+// tarihli mesai, günde en fazla 24 saat).
 
 import { buildWeekBuckets, type DayBucket, type ShiftSettings } from './planning'
-import { isoDate } from './dates'
-import { DEFAULT_WORKING_DAYS } from './settingsDefaults'
+import { addDays, isoDate } from './dates'
+import {
+  pressDay,
+  type DatedOvertime,
+  type OvertimeDefinition,
+  type PressDaySources,
+  type RecurringOvertime,
+  type WeekPattern,
+} from './pressCalendar'
+import type { PlannedStop } from './shiftTimeline'
 
-export interface WeekPatternLike {
-  workingDays: number
-  shiftsPerDay: number
-  overtimeShifts: number
-}
+export type { WeekPattern }
+/** @deprecated Adı eski; WeekPattern ile aynı. */
+export type WeekPatternLike = WeekPattern
 
 export interface CapacitySources {
   shiftMinutes: number
-  overtimeShiftMinutes: number
-  plannedStops: { shiftIndex: number; durationMinutes: number }[]
-  templates: ({ press: string } & WeekPatternLike)[]
-  weekOverrides?: ({ press: string; weekStart: string } & WeekPatternLike)[]
-  /** Work Calendar'daki çalışma günleri (MO..SU). */
-  workingDayKeys?: readonly string[]
+  /** Birinci vardiyanın başlangıcı (gece yarısından dakika). */
+  shiftStartMinute: number
+  plannedStops: PlannedStop[]
+  templates: ({ press: string; recurringOvertime?: RecurringOvertime[] } & WeekPattern)[]
+  weekOverrides?: ({ press: string; weekStart: string } & WeekPattern)[]
+  overtimeDefinitions?: OvertimeDefinition[]
+  pressOvertime?: DatedOvertime[]
   /** Elle girilen + resmi tatiller. */
   holidays: Set<string>
 }
 
 /** Vardiya başına planlı duruş (çay, yemek, devir…), index 0 = 1. vardiya. */
-export function stopMinutesByShift(stops: CapacitySources['plannedStops']): number[] {
+export function stopMinutesByShift(stops: { shiftIndex: number; durationMinutes: number }[]): number[] {
   const out = [0, 0, 0]
   for (const stop of stops) {
     const i = stop.shiftIndex - 1
@@ -39,33 +46,90 @@ export function stopMinutesByShift(stops: CapacitySources['plannedStops']): numb
 }
 
 export interface CapacityModel {
-  workingDayKeys: string[]
   shiftSettings: ShiftSettings
-  /** O haftanın düzeni: istisna hafta > pres şablonu > takvim varsayılanı. */
-  patternOf: (press: string, weekStart: Date) => WeekPatternLike
+  /** Presin Work Calendar düzeni var mı (yoksa kapasitesi 0). */
+  hasCalendar: (press: string) => boolean
+  /** O haftanın düzeni: istisna hafta > pres şablonu; tanımsızsa null. */
+  patternOf: (press: string, weekStart: Date) => WeekPattern | null
   /** Presin o haftadaki gün kovaları, planlı duruşlar düşülmüş (net dakika). */
   weekBuckets: (press: string, weekStart: Date) => DayBucket[]
+  /** Plana alınamayan mesai kayıtları (çakışma, 24 saat). */
+  overtimeProblems: (press: string, weekStart: Date) => string[]
+  /**
+   * Fabrikanın iş günü: tatil değil ve en az bir presin normal vardiyası var.
+   * Presler dışındaki hesaplar (hammadde, talep dağıtımı) bunu kullanır.
+   */
+  isPlantWorkingDate: (iso: string) => boolean
+}
+
+const mondayIso = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
+  return d.toISOString().slice(0, 10)
 }
 
 export function capacityModel(src: CapacitySources): CapacityModel {
-  const workingDayKeys = [...(src.workingDayKeys && src.workingDayKeys.length > 0 ? src.workingDayKeys : DEFAULT_WORKING_DAYS)]
   const shiftSettings: ShiftSettings = {
     shiftMinutes: src.shiftMinutes,
-    overtimeShiftMinutes: src.overtimeShiftMinutes,
-    // Duruşlar her zaman planlı duruş tablosundan; eski "vardiya başı mola"
-    // alanı artık okunmaz (arayüzde yok, iki kez düşülmesin).
+    overtimeShiftMinutes: src.shiftMinutes,
+    // Duruşlar her zaman planlı duruş tablosundan.
     stopMinutesByShift: stopMinutesByShift(src.plannedStops),
+    shiftStartMinute: src.shiftStartMinute,
+    plannedStops: src.plannedStops,
   }
-  const templateByPress = new Map(src.templates.map((t) => [t.press, t]))
-  const overrideByPressWeek = new Map((src.weekOverrides ?? []).map((o) => [`${o.press}|${o.weekStart}`, o]))
-  const fallback = { workingDays: workingDayKeys.length, shiftsPerDay: 1, overtimeShifts: 0 }
+  const datedOvertime = new Map<string, DatedOvertime[]>()
+  for (const o of src.pressOvertime ?? []) {
+    const key = `${o.press}|${o.date}`
+    datedOvertime.set(key, [...(datedOvertime.get(key) ?? []), o])
+  }
+  const day: PressDaySources = {
+    shiftStartMinute: src.shiftStartMinute,
+    shiftMinutes: src.shiftMinutes,
+    templates: new Map(src.templates.map((t) => [t.press, t])),
+    weekOverrides: new Map((src.weekOverrides ?? []).map((o) => [`${o.press}|${o.weekStart}`, o])),
+    datedOvertime,
+    definitions: new Map((src.overtimeDefinitions ?? []).map((d) => [d.id, d])),
+    holidays: src.holidays,
+  }
   const patternOf = (press: string, weekStart: Date) =>
-    overrideByPressWeek.get(`${press}|${isoDate(weekStart)}`) ?? templateByPress.get(press) ?? fallback
+    day.weekOverrides.get(`${press}|${isoDate(weekStart)}`) ?? day.templates.get(press) ?? null
+  const weekBuckets = (press: string, weekStart: Date) => {
+    const ws = isoDate(weekStart)
+    return buildWeekBuckets(
+      weekStart,
+      patternOf(press, weekStart) ?? { workingDays: 0, shiftsPerDay: 0 },
+      shiftSettings,
+      src.holidays,
+      undefined,
+      (date) => {
+        const d = pressDay(day, press, ws, date)
+        return { shifts: d.shifts, overtime: d.overtime }
+      },
+    )
+  }
+  const presses = Array.from(day.templates.keys())
+  const workingCache = new Map<string, boolean>()
   return {
-    workingDayKeys,
     shiftSettings,
+    hasCalendar: (press) => day.templates.has(press),
     patternOf,
-    weekBuckets: (press, weekStart) =>
-      buildWeekBuckets(weekStart, patternOf(press, weekStart), shiftSettings, src.holidays, workingDayKeys),
+    weekBuckets,
+    overtimeProblems: (press, weekStart) => {
+      const ws = isoDate(weekStart)
+      const out: string[] = []
+      for (let i = 0; i < 7; i++) {
+        const date = isoDate(addDays(weekStart, i))
+        for (const p of pressDay(day, press, ws, date).problems) out.push(`${press} ${date}: ${p}`)
+      }
+      return out
+    },
+    isPlantWorkingDate: (iso) => {
+      const hit = workingCache.get(iso)
+      if (hit !== undefined) return hit
+      const ws = mondayIso(iso)
+      const value = !src.holidays.has(iso) && presses.some((press) => pressDay(day, press, ws, iso).shifts > 0)
+      workingCache.set(iso, value)
+      return value
+    },
   }
 }

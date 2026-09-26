@@ -7,6 +7,7 @@ import { planStatusDoc, requestRecompute } from './planQueue'
 import { withDefaults } from './products'
 import { liveRows } from './sapLive'
 import { SETTINGS_DEFAULTS } from '../src/lib/settingsDefaults'
+import { countsFinished, countsProduction, countsRaw } from '../src/lib/stockLocations'
 import { currentUploads } from './sapUploads'
 
 /**
@@ -71,6 +72,19 @@ export const smallInputs = internalQuery({
         .withIndex('by_status', (q: Ctx) => q.eq('status', 'open'))
         .collect(),
       locations: await ctx.db.query('storageLocations').collect(),
+      // Mesai tanımları ve tarihli mesailer (pres takvimi).
+      overtimeDefinitions: (await ctx.db.query('overtimeDefinitions').collect()).map((d: Ctx) => ({
+        id: d._id,
+        name: d.name,
+        description: d.description,
+        startMinute: d.startMinute,
+        durationMinutes: d.durationMinutes,
+      })),
+      pressOvertime: (await ctx.db.query('pressOvertime').collect()).map((o: Ctx) => ({
+        press: o.press,
+        date: o.date,
+        definitionId: o.definitionId,
+      })),
       // Planlamacının pres başlangıcı / gecikme müdahaleleri.
       pressStarts: await ctx.db.query('pressPlanStarts').collect(),
       // Yoldaki hammadde — MRP'de varış haftasında giriş.
@@ -123,13 +137,36 @@ async function migrateSettings(ctx: Ctx) {
     .query('globalShiftSettings')
     .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
     .first()
-  if (!settings || settings.migratedSetupGap10) return
-  await ctx.db.patch(settings._id, {
-    migratedSetupGap10: true,
-    ...(settings.setupGapMinutes === undefined || settings.setupGapMinutes === 60
-      ? { setupGapMinutes: 10 }
-      : {}),
-  })
+  if (!settings) return
+  if (!settings.migratedSetupGap10) {
+    await ctx.db.patch(settings._id, {
+      migratedSetupGap10: true,
+      ...(settings.setupGapMinutes === undefined || settings.setupGapMinutes === 60
+        ? { setupGapMinutes: 10 }
+        : {}),
+    })
+  }
+  if (!settings.migratedCalendarV2) {
+    // Pres takvimi v2 (planlamacının kararı): şablon ve istisna haftalardaki
+    // eski "haftalık mesai sayısı" silinir — fabrika mesaisiz başlar, mesai
+    // tarihli ve tanımla yeniden açılır.
+    for (const t of await ctx.db.query('pressTemplates').collect()) {
+      if (t.overtimeShifts !== undefined) await ctx.db.patch(t._id, { overtimeShifts: undefined })
+    }
+    for (const o of await ctx.db.query('pressWeekOverrides').collect()) {
+      if (o.overtimeShifts !== undefined) await ctx.db.patch(o._id, { overtimeShifts: undefined })
+    }
+    // Depo "Category" sütunu kalkıyor: bugünkü etkisi tiklere açıkça yazılır.
+    for (const l of await ctx.db.query('storageLocations').collect()) {
+      await ctx.db.patch(l._id, {
+        countFinished: countsFinished(l),
+        countRaw: countsRaw(l),
+        countProduction: countsProduction(l),
+        category: undefined,
+      })
+    }
+    await ctx.db.patch(settings._id, { migratedCalendarV2: true })
+  }
 }
 
 // ---- Kuyruk ------------------------------------------------------------------

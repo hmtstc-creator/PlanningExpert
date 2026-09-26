@@ -353,73 +353,39 @@ describe('splitByMoldLimit', () => {
   })
 })
 
-describe('buildWeekBuckets', () => {
+describe('buildWeekBuckets (pres takvimi kuralları)', () => {
   const settings = { shiftMinutes: 480, overtimeShiftMinutes: 480 }
   const monday = new Date('2026-09-14T00:00:00Z')
 
-  it('normal vardiyaları çalışma günlerine, mesaiyi sonrasına dağıtır', () => {
+  it('N gün Pazartesiden sırayla dolar; mesai yalnızca tarihli pencereyle gelir', () => {
     const buckets = buildWeekBuckets(monday, { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 }, settings)
     expect(buckets).toHaveLength(7)
     expect(buckets.slice(0, 5).every((b) => b.shifts === 3 && !b.isOvertime)).toBe(true)
-    expect(buckets[5].isOvertime).toBe(true)
-    expect(buckets[5].shifts).toBe(2)
-    expect(buckets[6].shifts).toBe(0)
+    // Şablondaki eski "haftalık mesai sayısı" okunmaz.
+    expect(buckets[5].shifts).toBe(0)
+    expect(buckets[5].isOvertime).toBe(false)
   })
 
-  it('tatil gününü sıfır kapasiteye çeker', () => {
-    const buckets = buildWeekBuckets(
-      monday,
-      { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 0 },
-      settings,
-      new Set(['2026-09-16']),
-    )
+  it('resmi tatil o günün vardiyasını götürür, başka güne kaymaz', () => {
+    const buckets = buildWeekBuckets(monday, { workingDays: 5, shiftsPerDay: 3 }, settings, new Set(['2026-09-16']))
     const holiday = buckets.find((b) => b.date === '2026-09-16')!
     expect(holiday.isHoliday).toBe(true)
     expect(holiday.minutes).toBe(0)
-    // tatil bir çalışma gününü tüketmez, gün Cumaya kayar
-    expect(buckets.filter((b) => b.shifts === 3)).toHaveLength(5)
-  })
-})
-
-describe('çalışma günleri (workingDays) kısıtı', () => {
-  const settings = { shiftMinutes: 480, overtimeShiftMinutes: 480 }
-  const monday = new Date('2026-09-14T00:00:00Z')
-
-  it('normal vardiyaları yalnızca tanımlı çalışma günlerine koyar', () => {
-    // Şirket Salı–Cumartesi çalışıyor: Pazartesi normal vardiya almamalı.
-    const buckets = buildWeekBuckets(
-      monday,
-      { workingDays: 5, shiftsPerDay: 2, overtimeShifts: 0 },
-      settings,
-      new Set(),
-      ['TU', 'WE', 'TH', 'FR', 'SA'],
-    )
-    const normal = buckets.filter((b) => b.shifts > 0 && !b.isOvertime)
-    expect(normal.map((b) => b.dayKey)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA'])
-    expect(buckets.find((b) => b.dayKey === 'MO')!.minutes).toBe(0)
+    expect(buckets.filter((b) => b.shifts === 3)).toHaveLength(4)
+    expect(buckets[5].shifts).toBe(0)
   })
 
-  it('çalışma günü verilmezse tüm günler uygundur (eski davranış)', () => {
-    const buckets = buildWeekBuckets(
-      monday,
-      { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 },
-      settings,
+  it('6 gün = Pazartesi–Cumartesi', () => {
+    const buckets = buildWeekBuckets(monday, { workingDays: 6, shiftsPerDay: 2 }, settings)
+    expect(buckets.filter((b) => b.shifts === 2).map((b) => b.dayKey)).toEqual(['MO', 'TU', 'WE', 'TH', 'FR', 'SA'])
+  })
+
+  it('tarihli mesai penceresi günün kapasitesine eklenir', () => {
+    const buckets = buildWeekBuckets(monday, { workingDays: 5, shiftsPerDay: 2 }, settings, new Set(), undefined, (date, i) =>
+      i === 5 ? { shifts: 0, overtime: [{ start: 420, end: 900, name: 'Full' }] } : { shifts: i < 5 ? 2 : 0, overtime: [] },
     )
-    expect(buckets.slice(0, 5).every((b) => b.shifts === 3 && !b.isOvertime)).toBe(true)
     expect(buckets[5].isOvertime).toBe(true)
-  })
-
-  it('mesai vardiyaları çalışma günü olmayan güne de konabilir', () => {
-    const buckets = buildWeekBuckets(
-      monday,
-      { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 },
-      settings,
-      new Set(),
-      ['MO', 'TU', 'WE', 'TH', 'FR'],
-    )
-    const saturday = buckets.find((b) => b.dayKey === 'SA')!
-    expect(saturday.isOvertime).toBe(true)
-    expect(saturday.shifts).toBe(2)
+    expect(buckets[5].minutes).toBe(480)
   })
 })
 
@@ -522,15 +488,6 @@ describe('vardiya molası', () => {
     expect(buckets[0].minutes).toBe(1350)
   })
 
-  it('mesai vardiyalarından da düşer', () => {
-    const buckets = buildWeekBuckets(
-      monday,
-      { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 },
-      { shiftMinutes: 480, overtimeShiftMinutes: 480, breakMinutesPerShift: 30 },
-    )
-    expect(buckets[5].minutes).toBe(900) // 2 × 450
-  })
-
   it('mola vardiyadan uzunsa kapasite negatife düşmez', () => {
     const buckets = buildWeekBuckets(
       monday,
@@ -540,25 +497,17 @@ describe('vardiya molası', () => {
     expect(buckets[0].minutes).toBe(0)
   })
 
-  it('haftalık toplam da moladan arındırılmış olur', () => {
-    const pattern = { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 }
-    expect(
-      weekTotalMinutes(pattern, {
-        shiftMinutes: 480,
-        overtimeShiftMinutes: 480,
-        breakMinutesPerShift: 30,
-      }),
-    ).toBe(17 * 450)
+  it('haftalık toplam da moladan arındırılmış olur (mesai hariç)', () => {
+    const pattern = { workingDays: 5, shiftsPerDay: 3 }
+    expect(weekTotalMinutes(pattern, { shiftMinutes: 480, overtimeShiftMinutes: 480, breakMinutesPerShift: 30 })).toBe(15 * 450)
   })
 })
 
 describe('haftalık toplamlar', () => {
-  it('5 gün × 3 vardiya + 2 mesai = 17 vardiya', () => {
+  it('5 gün × 3 vardiya = 15 vardiya; mesai tarihli açılır, şablonda sayılmaz', () => {
     const pattern = { workingDays: 5, shiftsPerDay: 3, overtimeShifts: 2 }
-    expect(weekTotalShifts(pattern)).toBe(17)
-    expect(weekTotalMinutes(pattern, { shiftMinutes: 480, overtimeShiftMinutes: 480 })).toBe(
-      17 * 480,
-    )
+    expect(weekTotalShifts(pattern)).toBe(15)
+    expect(weekTotalMinutes(pattern, { shiftMinutes: 480, overtimeShiftMinutes: 480 })).toBe(15 * 480)
   })
 })
 

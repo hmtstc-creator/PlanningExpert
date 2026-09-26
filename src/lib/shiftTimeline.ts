@@ -28,6 +28,21 @@ export interface StopBlock extends Segment {
   shiftIndex: number
 }
 
+/**
+ * Mesai penceresi: üretim gününün saat ekseninde (gece yarısından dakika;
+ * birinci vardiyadan önceki saatler +1440). Normal vardiyaların dışında,
+ * planlamacının açtığı mesaidir (tam mesai, yarım mesai, 3. vardiya…).
+ */
+export interface OvertimeWindow extends Segment {
+  name?: string
+}
+
+/** Bir günün şekli: normal vardiya sayısı ve açılan mesai pencereleri. */
+export interface DayShape {
+  shifts: number
+  overtime?: OvertimeWindow[]
+}
+
 export interface DayTimeline {
   /** Productive stretches in clock minutes, in order. */
   segments: Segment[]
@@ -94,9 +109,11 @@ function cutStops(window: Segment, stops: StopBlock[]): Segment[] {
 export function buildDayTimeline(
   shiftStartMinute: number,
   shiftMinutes: number,
-  shiftsToday: number,
+  day: number | DayShape,
   stops: PlannedStop[],
 ): DayTimeline {
+  const shiftsToday = typeof day === 'number' ? day : day.shifts
+  const overtime = typeof day === 'number' ? [] : day.overtime ?? []
   const segments: Segment[] = []
   const resolved: StopBlock[] = []
   const shiftStarts: number[] = []
@@ -113,6 +130,19 @@ export function buildDayTimeline(
     resolved.push(...inShift)
     segments.push(...cutStops(window, inShift))
   }
+
+  // Mesai: saatine denk gelen planlı duruşlar (hangi vardiyanın tanımı olursa
+  // olsun) mesaiden de düşülür.
+  for (const window of [...overtime].sort((a, b) => a.start - b.start)) {
+    if (window.end <= window.start) continue
+    shiftStarts.push(window.start)
+    const inWindow = stops
+      .map((s) => resolveStop(s, window))
+      .filter((s): s is StopBlock => s !== null)
+    resolved.push(...inWindow)
+    segments.push(...cutStops(window, inWindow))
+  }
+  segments.sort((a, b) => a.start - b.start)
 
   return {
     segments,

@@ -13,6 +13,7 @@ import {
 import { type ProductSpec } from '../lib/planning'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { capacityModel } from '../lib/capacityModel'
+import { useOvertimeData } from '../components/OvertimePanels'
 
 export const Route = createFileRoute('/performans')({
   component: PerformansPage,
@@ -103,17 +104,25 @@ function PerformansPage() {
     shiftsPerDay: number
     overtimeShifts: number
   }[]
-  const plannedStops = (useQuery(api.plannedStops.list) ?? []) as { shiftIndex: number; durationMinutes: number }[]
+  const plannedStops = (useQuery(api.plannedStops.list) ?? []) as {
+    shiftIndex: number
+    name: string
+    kind: string
+    startMinute: number
+    durationMinutes: number
+  }[]
+  const { definitions: overtimeDefinitions, pressOvertime } = useOvertimeData()
   const country = globalSettings?.country ?? SETTINGS_DEFAULTS.country
   const officialHolidays = (useQuery(api.holidays.listByCountry, { country }) ?? []) as { date: string }[]
   const availableMinutes = useMemo(() => {
     const model = capacityModel({
       shiftMinutes,
-      overtimeShiftMinutes,
+      shiftStartMinute: globalSettings?.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute,
       plannedStops,
       templates,
       weekOverrides,
-      workingDayKeys: (workCalendar?.workingDays ?? undefined) as string[] | undefined,
+      overtimeDefinitions: overtimeDefinitions.map((d) => ({ ...d, id: d._id })),
+      pressOvertime,
       holidays: new Set<string>([
         ...((workCalendar?.holidays ?? []) as string[]),
         ...officialHolidays.map((h) => h.date),
@@ -132,7 +141,7 @@ function PerformansPage() {
       }
     }
     return total
-  }, [presses, templates, weekOverrides, plannedStops, officialHolidays, workCalendar, from, to, shiftMinutes, overtimeShiftMinutes])
+  }, [presses, templates, weekOverrides, plannedStops, overtimeDefinitions, pressOvertime, officialHolidays, workCalendar, from, to, shiftMinutes, globalSettings?.shiftStartMinute])
 
   const utilisation = capacityUtilisation(theoretical, availableMinutes)
 

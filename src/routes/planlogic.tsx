@@ -272,15 +272,26 @@ function PlanLogicPage() {
       <Step n={3} id="capacity" title="Build the capacity">
         <p>For every press and every day of the horizon:</p>
         <Formula>
-          net minutes = shifts × shift length − planned stops (per shift) → × capacity factor
+          net minutes = shifts × shift length + overtime − planned stops → × capacity factor
         </Formula>
         <ul>
           <li>
-            Shifts come from the press's standard week, or from the <b>week exception</b>{' '}
-            on the Work Calendar when there is one — overtime opened for a week (also from
-            the Capacity Dashboard) is planned in that week.
+            Each press has <b>one calendar</b>: its standard week ("N days" are filled from
+            Monday: 5 = Mon–Fri, 6 = Mon–Sat; shifts per day), a <b>week exception</b> when
+            there is one, and the <b>overtime</b> opened on dates (or every week on the pattern)
+            with an overtime definition — start time and length. Overtime opened on the
+            Capacity Dashboard is the same record.
           </li>
-          <li>Holidays and non-working days have no capacity.</li>
+          <li>
+            A public holiday is a day off: its shifts are lost, never moved to another day.
+            Overtime opened on the holiday is planned.
+          </li>
+          <li>
+            A press without a Work Calendar pattern has no capacity; the Production Plan shows
+            a red alarm. A day never exceeds 24 hours (planned stops included), so a press week
+            never exceeds 168 hours — longer entries are refused when saved.
+          </li>
+          <li>Planned stops falling inside overtime are deducted too.</li>
           <li>
             Days that have passed are skipped, and today starts at the current
             time — nothing is planned in the past. The plan day begins with the
@@ -339,7 +350,7 @@ function PlanLogicPage() {
           <li>Materials you moved to the front (and lots moved forward so they are not late)</li>
           <li>
             <b>Backlog</b> — the ZPP overdue quantity left after stock. Due the next
-            working day at {current.cutoff}.
+            day at {current.cutoff}.
           </li>
           <li>
             <b>Urgent</b> — a lot whose stock falls to the safety level now: it runs
@@ -472,7 +483,8 @@ function PlanLogicPage() {
             ready by <b>{current.cutoff}</b> on the day it is needed — not when
             the whole lot ends. Every day a lot covers is checked, not only the
             first one. Backlog in ZPP and anything needed today are due
-            the <b>next working day at {current.cutoff}</b>. How late is shown in
+            the <b>next day at {current.cutoff}</b>. Public holidays are not skipped: a customer
+            may want parts on a holiday. How late is shown in
             hours and days. The engine does not leave it — see{' '}
             <a href="#late" className="underline">
               Late jobs are re-planned
@@ -986,7 +998,8 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
             </li>
             <li>
               After the last day in ZPP_DAILY, only weekly totals exist, so
-              those weeks are spread evenly over their working days.
+              those weeks are spread evenly over the plant's working days (not a holiday and at
+              least one press has normal shifts).
             </li>
             <li>
               Re-planning to remove late jobs is a set of trials, not a full

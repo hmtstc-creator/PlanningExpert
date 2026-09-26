@@ -1370,7 +1370,17 @@ function reserveSlot(
       mold: neighbours((log) => log.get(hall)?.mold ?? []),
       coil: neighbours((log) => log.get(hall)?.coil ?? []),
     }
-    const own = pending.filter((r) => r.date === day.date)
+    // Aynı işin kendi rezervasyonları da komşu günden bu günün eksenine
+    // kaydırılır: gece sonundaki rulo değişimi 07:00'dakiyle yan yanadır.
+    const own = pending.flatMap((r) =>
+      r.date === day.date
+        ? [r]
+        : r.date === previousDate
+          ? [{ ...r, start: r.start - fullNet, end: r.end - fullNet }]
+          : r.date === nextDate
+            ? [{ ...r, start: r.start + fullNet, end: r.end + fullNet }]
+            : [],
+    )
     const same = [
       ...(type === 'mold' ? resources.mold : resources.coil),
       ...own.filter((r) => r.type === type),

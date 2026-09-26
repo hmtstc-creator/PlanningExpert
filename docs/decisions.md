@@ -55,7 +55,11 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Pres şablonundaki haftalık "fazla mesai vardiyası sayısı" kalkar. Mesai
   yalnızca tarihli ve bir mesai tanımıyla açılır (hangi gün, hangi tanım).
 - Düzenli mesai (ör. her Cumartesi tam mesai) şablonda "tekrarlayan mesai"
-  olarak bir kez tanımlanabilir.
+  olarak bir kez tanımlanabilir; iptal edilene kadar her hafta geçerlidir.
+- İstisna hafta kalır: o haftaya özel gün ve vardiya sayısı (ör. 5 yerine 3
+  gün, 3 yerine 2 vardiya).
+- Vardiyalar aynı uzunluktadır ve ilk vardiyanın başlangıcından itibaren art
+  arda dizilir (ör. 07:00'dan 2 × 9 saat: 07:00–16:00, 16:00–01:00).
 - Olağandışı yönetim: planlamacı mesaiyi hangi güne açtığını girer; plan o
   güne göre çalışır. Örnekler: resmi tatilde mesai, normal çalışma günü
   dışında mesai, haftada 2 vardiya çalışan bir prese hafta içi 3. vardiya.
@@ -119,41 +123,35 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Acil hammadde süresi (şu an 3 iş günü) Work Calendar'da ayarlanabilir
   olacak. → uygulanacak
 
-## Aksiyon listesi ("programı düzelt" dendiğinde uygulanır)
+## Aksiyon listesi
 
-1. Depo matrisinden Category sütununu kaldır.
-2. Capacity Dashboard'a performans seçimi: A) kabule göre (Performance
-   katsayısı), B) master data parça performansına göre.
-3. Acil hammadde süresini (3 iş günü) Work Calendar'da ayarlanabilir yap.
-4. Work Calendar düzeni olmayan pres: kapasite 0 + plan sayfasında kırmızı
-   alarm.
-5. Genel çalışma günü tiklerini kaldır; pres düzenindeki N gün Pazartesiden
-   sırayla. Şablondaki haftalık fazla mesai sayısını kaldır.
-5a. Geçiş: mevcut bütün fazla mesai kayıtları silinir (şablon ve istisna
-   haftalardaki sayılar); fabrika mesaisiz çalışıyormuş gibi başlar.
-   Planlamacı takvimi kendisi yeniden girer.
-6. Work Calendar'a pres bazlı gün detayı: bir haftanın her günü için vardiya
-   ve mesai (tatilde mesai, hafta içi ek vardiya). Capacity Dashboard'dan
-   mesai açmak aynı kaydı günceller.
-7. Fabrika geneli vardiya tablosu (saatler ve süreler, ör. 2 × 9 saat);
-   pres kaç vardiya çalıştığını seçer. Gün ≤ 24 saat, hafta ≤ 168 saat;
-   aşan kayıt reddedilir.
-8. Mesai tanımları (ad, açıklama, başlangıç saati, süre); mesai tarihli ve
-   tanım seçilerek açılır; tekrarlayan mesai şablonda. Planlı duruşlar
-   mesaiden de düşülür. Normal düzen dışındaki her çalışma (hafta içi ek
-   vardiya dahil) mesai olarak görünür.
-9. Resmi tatilde normal vardiyayı başka güne kaydırmayı kaldır.
-10. Teslim hesabında resmi tatilleri kullanma; bakiye ve bugünün ihtiyacı
-    ertesi gün 08:00.
-11. Presler dışındaki iş günü = tatil olmayan ve en az bir presin çalıştığı
-    gün (hammadde, acil hammadde, talep dağıtımı).
-12. Etkisiz "14 gün stok = acil" kodunu kaldır.
-13. BEKLEMEDE: MB51'de hareket türü olmayan eski satırları sayma (yeni format
-    yüklenince kontrol).
+Uygulandı (2026-09-26, "programı düzelt"):
+
+1. ✅ Depo matrisinden Category sütunu kaldırıldı (geçişte mevcut etkisi tiklere yazıldı).
+2. ✅ Capacity Dashboard'a performans seçimi: A) kabule göre, B) master data parça performansı.
+3. ✅ Acil hammadde süresi Work Calendar'da ayarlanabilir (varsayılan 3 iş günü).
+4. ✅ Work Calendar düzeni olmayan pres: kapasite 0 + Plan sayfasında kırmızı alarm.
+5. ✅ Genel çalışma günü tikleri kaldırıldı; pres günleri Pazartesiden sırayla. Şablondaki
+   haftalık mesai sayısı kaldırıldı.
+5a. ✅ Geçiş: mevcut fazla mesai sayıları silinir (bir sonraki plan hesabında, bir kez).
+6. ✅ Work Calendar'da her haftaya gün detayı ("Days / overtime"): tarihli mesai açma ve
+   kaldırma. Capacity Dashboard'daki hafta düzenleyicisi aynı bileşeni ve kaydı kullanır.
+7. ✅ Vardiya tablosu (ilk vardiya saati + vardiya süresi, art arda). Gün ≤ 24 saat;
+   aşan düzen, istisna hafta ve mesai kaydedilmez, mesaj gösterilir.
+8. ✅ Mesai tanımları (ad, açıklama, başlangıç, süre); tarihli ve tekrarlayan mesai;
+   planlı duruşlar mesaiden de düşülür.
+9. ✅ Resmi tatilde normal vardiya başka güne kaymaz.
+10. ✅ Teslimde tatil gözetilmez; bakiye ve bugünün ihtiyacı ertesi gün 08:00.
+11. ✅ Presler dışındaki iş günü = tatil değil ve en az bir presin normal vardiyası var
+    (hammadde, acil hammadde, talep dağıtımı).
+12. ✅ Etkisiz "14 gün stok = acil" kodu kaldırıldı.
+13. BEKLEMEDE: MB51'de hareket türü olmayan eski satırları sayma (yeni format yüklenince
+    kontrol).
+
+Ek düzeltme: aynı işin iki rulo değişimi gün sınırında (07:00) 30 dakikadan yakın
+düşebiliyordu; vinç kontrolü artık önceki günün kendi rezervasyonlarını da görür.
 
 ## Açık sorular
 
-- Tekrarlayan mesainin süresi: tarih aralığı mı, iptal edilene kadar mı.
-- İstisna hafta (o haftaya özel gün ve vardiya sayısı) kalacak mı.
 - Koddaki sabit sayılar: `docs/fixeddefinitions.md` — ileride
   değerlendirilecek.

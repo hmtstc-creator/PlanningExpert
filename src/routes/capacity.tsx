@@ -1,18 +1,23 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { CapacityChart, CapacityLegend } from '../components/CapacityChart'
 import {
   capacityRows,
+  seriesForBasis,
   sumSeries,
   type CapacityForecast,
+  type PerformanceBasis,
   type CapacityRow,
   type CapacitySeries,
   type CapacityWeek,
 } from '../lib/capacityForecast'
 import { useMutation, useQuery } from '../lib/convexTransport'
 import { formatPlantTime } from '../lib/sapUploads'
+import { PressWeekDays } from '../components/OvertimePanels'
+import { patternProblem, serverErrorText } from '../lib/pressCalendar'
+import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { stopMinutesByShift } from '../lib/capacityModel'
 
 export const Route = createFileRoute('/capacity')({
@@ -22,8 +27,9 @@ export const Route = createFileRoute('/capacity')({
 interface Pattern {
   workingDays: number
   shiftsPerDay: number
-  overtimeShifts: number
 }
+
+const BASIS_KEY = 'capacity-dashboard-basis'
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-GB')
 
@@ -58,7 +64,31 @@ function CapacityPage() {
     }
   })
 
-  const forecast = data?.capacity ?? null
+  // Performans kaynağı: A) kabule göre (Performance'taki katsayı kapasiteye),
+  // B) master data parça performansı (talebe). İkisi birlikte uygulanmaz.
+  const [basis, setBasis] = useState<PerformanceBasis>(() => {
+    try {
+      return window.localStorage.getItem(BASIS_KEY) === 'accepted' ? 'accepted' : 'masterData'
+    } catch {
+      return 'masterData'
+    }
+  })
+  const chooseBasis = (b: PerformanceBasis) => {
+    setBasis(b)
+    try {
+      window.localStorage.setItem(BASIS_KEY, b)
+    } catch {
+      // Saklanamıyorsa seçim yalnızca bu oturumda kalır.
+    }
+  }
+  const rawForecast = data?.capacity ?? null
+  const forecast = useMemo(
+    () =>
+      rawForecast
+        ? { ...rawForecast, presses: rawForecast.presses.map((p) => ({ ...p, ...seriesForBasis(p, basis) })) }
+        : null,
+    [rawForecast, basis],
+  )
   const options = forecast ? viewOptions(forecast) : []
   // Kayıtlı seçim artık yoksa (pres silindi vb.) ilk hat gösterilir.
   const selected = options.find((o) => o.key === selection) ?? options[0]
@@ -82,12 +112,14 @@ function CapacityPage() {
         <Link to="/takvim" className="underline">
           Work Calendar
         </Link>{' '}
-        (holidays removed, week exceptions and overtime included, planned stops deducted and the
-        capacity factor from the Performance page applied — the same hours the plan uses; this
-        week counts only the hours still ahead). Demand is the ZPP requirement of the week — this week also carries
+        (days from Monday, holidays removed, week exceptions and dated overtime included, planned
+        stops deducted — the same hours the plan uses; this week counts only the hours still
+        ahead). Performance is applied one way, chosen above: A) the accepted rate from the
+        Performance page scales the available hours, or B) each part's performance from Master
+        Data stretches its production time. Demand is the ZPP requirement of the week — this week also carries
         the overdue backlog — after stock in locations{' '}
         {(forecast?.stockLocations ?? ['2009', '1009']).join(', ')} is used up, earliest
-        week first. Hours = pieces ÷ cavities ÷ SPM ÷ performance factor (10 h at 60 % counts as
+        week first. Hours = pieces ÷ cavities ÷ SPM (with B also ÷ part performance: 10 h at 60 % counts as
         16.7 h; setup and approval sit inside that time). Each part counts on its main press; a
         co-product pair counts once. <strong className="text-foreground">Cumulative</strong> adds
         up idle minus over-capacity hours: above zero you can build stock ahead, below zero the
@@ -101,6 +133,32 @@ function CapacityPage() {
         </strong>
         . The Gantt shows the same stops on every press.
       </p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-medium text-foreground">Performance based on:</span>
+        {(
+          [
+            ['accepted', 'A) Accepted rate (Performance page)'],
+            ['masterData', 'B) Part performance (Master Data)'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => chooseBasis(key)}
+            className={`rounded-md px-3 py-1.5 font-medium ${
+              basis === key ? 'bg-foreground text-background' : 'border border-border text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="text-muted-foreground">
+          {basis === 'accepted'
+            ? 'Available hours × the accepted rate; production time at ideal speed.'
+            : 'Available hours as they are; production time ÷ each part’s performance.'}
+        </span>
+      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         {data ? (
@@ -423,8 +481,8 @@ function CapacityTable({
       </table>
       {press && (
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Click an available-hours cell to change that week's shifts or add overtime. * = week
-          exception from the Work Calendar.
+          Click an available-hours cell to change that week's days and shifts or open overtime on a
+          day. * = week exception from the Work Calendar.
         </p>
       )}
     </div>
@@ -452,14 +510,18 @@ function OvertimeEditor({
   const saveOverride = useMutation(api.pressCalendar.saveOverride)
   const clearOverride = useMutation(api.pressCalendar.clearOverride)
   const override = overrides.find((o) => o.press === press && o.weekStart === week.start)
-  const template = templates.find((t) => t.press === press)
-  const base: Pattern = override ??
-    template ?? { workingDays: 5, shiftsPerDay: 1, overtimeShifts: 0 }
+  const template = templates.find((t) => t.press === press) as ({ press: string; recurringOvertime?: { dayKey: string; definitionId: string }[] } & Pattern) | undefined
+  const base: Pattern | null = override ?? template ?? null
   const [draft, setDraft] = useState<Pattern>({
-    workingDays: base.workingDays,
-    shiftsPerDay: base.shiftsPerDay,
-    overtimeShifts: base.overtimeShifts,
+    workingDays: base?.workingDays ?? 0,
+    shiftsPerDay: base?.shiftsPerDay ?? 0,
   })
+  const settings = useQuery(api.pressCalendar.getGlobalSettings) as { shiftMinutes?: number; shiftStartMinute?: number; country?: string } | null | undefined
+  const calendar = useQuery(api.workCalendar.get) as { holidays?: string[] } | null | undefined
+  const official = (useQuery(api.holidays.listByCountry, { country: settings?.country ?? SETTINGS_DEFAULTS.country }) ?? []) as { date: string }[]
+  const holidays = new Set<string>([...(calendar?.holidays ?? []), ...official.map((h) => h.date)])
+  const shiftMinutes = settings?.shiftMinutes ?? SETTINGS_DEFAULTS.shiftMinutes
+  const problem = patternProblem(draft, shiftMinutes)
   const [state, setState] = useState<{ kind: 'idle' | 'saving' | 'saved' } | { kind: 'error'; message: string }>({
     kind: 'idle',
   })
@@ -481,10 +543,10 @@ function OvertimeEditor({
   async function save() {
     setState({ kind: 'saving' })
     try {
-      await saveOverride({ press, weekStart: week.start, ...draft })
+      await saveOverride({ press, weekStart: week.start, workingDays: draft.workingDays, shiftsPerDay: draft.shiftsPerDay })
       setState({ kind: 'saved' })
     } catch (err) {
-      setState({ kind: 'error', message: err instanceof Error ? err.message : 'Could not save.' })
+      setState({ kind: 'error', message: serverErrorText(err, 'Could not save.') })
     }
   }
 
@@ -494,7 +556,7 @@ function OvertimeEditor({
       await clearOverride({ press, weekStart: week.start })
       setState({ kind: 'saved' })
     } catch (err) {
-      setState({ kind: 'error', message: err instanceof Error ? err.message : 'Could not save.' })
+      setState({ kind: 'error', message: serverErrorText(err, 'Could not save.') })
     }
   }
 
@@ -505,19 +567,21 @@ function OvertimeEditor({
       </p>
       <p className="mt-0.5 text-xs text-muted-foreground">
         {override
-          ? 'This week already has an exception on the Work Calendar.'
-          : `Standard week: ${base.workingDays} days × ${base.shiftsPerDay} shifts + ${base.overtimeShifts} overtime.`}{' '}
-        Saving writes the same week exception as the Work Calendar; the plan and this dashboard
-        update a few seconds later.
+          ? 'This week has an exception on the Work Calendar.'
+          : base
+            ? `Standard week: ${base.workingDays} days from Monday × ${base.shiftsPerDay} shifts.`
+            : 'This press has no Work Calendar pattern yet — it has no capacity.'}{' '}
+        Days and shifts below change this week only (the same week exception as the Work
+        Calendar). Overtime is opened on a day with an overtime definition — the same record the
+        Work Calendar shows. The plan and this dashboard update a few seconds later.
       </p>
       <div className="mt-2 flex flex-wrap items-end gap-3">
         {field('workingDays', 'Working days', 7)}
         {field('shiftsPerDay', 'Shifts per day', 3)}
-        {field('overtimeShifts', 'Overtime shifts', 21)}
         <button
           type="button"
           onClick={() => void save()}
-          disabled={state.kind === 'saving'}
+          disabled={state.kind === 'saving' || !!problem}
           className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           Save
@@ -539,7 +603,19 @@ function OvertimeEditor({
       {state.kind === 'saved' && (
         <p className="mt-2 text-xs text-emerald-600">✓ Saved. Recalculating the plan and the dashboard…</p>
       )}
+      {problem && <p className="mt-2 text-xs text-destructive">{problem}</p>}
       {state.kind === 'error' && <p className="mt-2 text-xs text-destructive">{state.message}</p>}
+      <div className="mt-3 border-t border-primary/20 pt-3">
+        <PressWeekDays
+          press={press}
+          weekStart={new Date(`${week.start}T00:00:00Z`)}
+          pattern={base}
+          recurring={template?.recurringOvertime ?? []}
+          holidays={holidays}
+          shiftStartMinute={settings?.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute}
+          shiftMinutes={shiftMinutes}
+        />
+      </div>
     </div>
   )
 }

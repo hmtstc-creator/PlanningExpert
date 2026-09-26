@@ -142,7 +142,8 @@ export default defineSchema({
   storageLocations: defineTable({
     code: v.string(),
     description: v.optional(v.string()),
-    category: v.string(),
+    // @deprecated Yalnızca açıklamaydı; neyin sayılacağına tikler karar verir.
+    category: v.optional(v.string()),
     /** Bitmiş ürün stoğu plana ve MRP netleştirmesine sayılır mı. Boşsa varsayılan. */
     countFinished: v.optional(v.boolean()),
     /** Hammadde (bobin) stoğu MRP'de eldeki stok sayılır mı. Boşsa varsayılan. */
@@ -208,11 +209,15 @@ export default defineSchema({
     // Hammadde: elde tutulacak gün ve her siparişe eklenen standart kg.
     rawCoverageDays: v.optional(v.number()),
     rawOrderExtraKg: v.optional(v.number()),
+    // Acil hammadde: ilk eksik iş bu kadar iş günü içindeyse Plan sayfasında.
+    rawUrgentDays: v.optional(v.number()),
     // Hammadde sipariş maili: alıcılar ve bilgi (CC) grubu, bir kez tanımlanır.
     rawOrderMailTo: v.optional(v.array(v.string())),
     rawOrderMailCc: v.optional(v.array(v.string())),
     // Tek seferlik geçişler yapıldı mı (ör. setup arası 60 → 10 dk).
     migratedSetupGap10: v.optional(v.boolean()),
+    // Pres takvimi v2: şablondaki mesai sayıları silindi, depo tikleri açık yazıldı.
+    migratedCalendarV2: v.optional(v.boolean()),
   }).index('by_key', ['key']),
 
   // Planlı duruşlar: vardiya devri, çay, yemek, günlük bakım. Her vardiya
@@ -229,16 +234,41 @@ export default defineSchema({
     durationMinutes: v.number(),
   }).index('by_shift', ['shiftIndex']),
 
-  // Her presin "standart" haftalık düzeni: kaç gün çalışılır, gün başına
-  // kaç vardiya, haftalık kaç fazla mesai vardiyası. 30 haftalık takvimde
-  // özel olarak düzenlenmemiş her hafta bu şablonu kullanır — yani hafta
-  // ilerledikçe otomatik "kayar", elle yeniden girmeye gerek kalmaz.
+  // Her presin "standart" haftalık düzeni: haftada kaç gün (Pazartesiden
+  // sırayla), günde kaç vardiya ve her hafta tekrarlayan mesai. Özel olarak
+  // düzenlenmemiş her hafta bu şablonu kullanır.
   pressTemplates: defineTable({
     press: v.string(),
     workingDays: v.number(),
     shiftsPerDay: v.number(),
-    overtimeShifts: v.number(),
+    // @deprecated Mesai artık tarihli açılır; okunmaz.
+    overtimeShifts: v.optional(v.number()),
+    // Her hafta tekrarlayan mesai (ör. her Cumartesi tam mesai); iptal
+    // edilene kadar geçerli, resmi tatilde çalışmaz.
+    recurringOvertime: v.optional(
+      v.array(v.object({ dayKey: v.string(), definitionId: v.id('overtimeDefinitions') })),
+    ),
   }).index('by_press', ['press']),
+
+  // Mesai tanımları: tam mesai, yarım mesai… Mesai açılırken biri seçilir.
+  overtimeDefinitions: defineTable({
+    name: v.string(),
+    // ör. "hafta sonu mesaisi", "hafta içi mesaisi"
+    description: v.optional(v.string()),
+    // Saat (gece yarısından dakika) ve süre (dk).
+    startMinute: v.number(),
+    durationMinutes: v.number(),
+  }),
+
+  // Tarihli mesai: bir presin bir üretim gününe açılan mesai.
+  pressOvertime: defineTable({
+    press: v.string(),
+    date: v.string(),
+    definitionId: v.id('overtimeDefinitions'),
+  })
+    .index('by_press_date', ['press', 'date'])
+    .index('by_date', ['date'])
+    .index('by_definition', ['definitionId']),
 
   // İstisna haftalar: plan değişikliği olan belirli bir hafta için
   // şablonu geçersiz kılan kayıt.
@@ -247,7 +277,8 @@ export default defineSchema({
     weekStart: v.string(),
     workingDays: v.number(),
     shiftsPerDay: v.number(),
-    overtimeShifts: v.number(),
+    // @deprecated Mesai artık tarihli açılır; okunmaz.
+    overtimeShifts: v.optional(v.number()),
   }).index('by_press_week', ['press', 'weekStart']),
 
   // Kalıp bakım kayıtları. Kalıp ömrü sayacı son bakımdan sonraki

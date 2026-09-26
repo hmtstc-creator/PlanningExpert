@@ -6,13 +6,14 @@
 // week actually has — holidays remove a working day, so a week with the same
 // pattern is not always worth the same number of shifts.
 
-import { buildWeekBuckets, DAY_KEYS } from './planning'
+import { buildWeekBuckets, DAY_KEYS, type DayBucket } from './planning'
 import { addDays, isoDate } from './dates'
 
 export interface WeekPattern {
   workingDays: number
   shiftsPerDay: number
-  overtimeShifts: number
+  /** @deprecated Mesai tarihli açılır; okunmaz. */
+  overtimeShifts?: number
 }
 
 export interface GridCell {
@@ -26,6 +27,8 @@ export interface GridCell {
   /** Shifts after holidays are removed. */
   effectiveShifts: number
   effectiveMinutes: number
+  /** O hafta mesai açılmış mı (tarihli ya da tekrarlayan). */
+  hasOvertime?: boolean
 }
 
 export interface GridInput {
@@ -45,6 +48,11 @@ export interface GridInput {
    * saatler planla aynı, net hesaplanır.
    */
   stopMinutesByShift?: number[]
+  /**
+   * Verilirse hücre bu kovalardan hesaplanır (capacityModel: plan ile aynı
+   * formül, tarihli ve tekrarlayan mesai dahil).
+   */
+  bucketsOf?: (press: string, weekStart: Date) => DayBucket[]
 }
 
 /**
@@ -85,15 +93,11 @@ export function buildGrid(input: GridInput): GridCell[] {
       const override = input.overrides.get(key)
       const pattern = override ?? template
 
-      const holidayCount = holidaysCostingCapacity(
-        weekStart,
-        pattern,
-        input.holidays,
-        input.workingDayKeys,
-      )
-      // Planla aynı formül (buildWeekBuckets): normal vardiyalar yalnız
-      // çalışma günlerine, tatil günü kaydırılır, planlı duruşlar düşülür.
-      const buckets = buildWeekBuckets(
+      // Günler Pazartesiden sırayla dolar (genel çalışma günü tikleri yok).
+      const holidayCount = holidaysCostingCapacity(weekStart, pattern, input.holidays, [])
+      // Planla aynı formül: tatil günü kaybolur (kaymaz), planlı duruşlar
+      // düşülür, tarihli ve tekrarlayan mesai eklenir (bucketsOf verilirse).
+      const buckets = input.bucketsOf ? input.bucketsOf(press.name, weekStart) : buildWeekBuckets(
         weekStart,
         pattern,
         {
@@ -115,6 +119,7 @@ export function buildGrid(input: GridInput): GridCell[] {
         holidayCount,
         effectiveShifts,
         effectiveMinutes,
+        hasOvertime: buckets.some((b) => b.isOvertime),
       })
     }
   }

@@ -1,5 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 
+import { patternProblem, serverErrorText } from '../lib/pressCalendar'
+
 import {
   buildGrid,
   intensityStep,
@@ -35,6 +37,10 @@ export interface CapacityGridProps {
   defaultPattern: WeekPattern
   /** Planlı duruşlar (vardiya başına dk) — saatler planla aynı, net. */
   stopMinutesByShift?: number[]
+  /** Hücreler plan ile aynı formülden (mesai dahil) hesaplanır. */
+  bucketsOf?: (press: string, weekStart: Date) => import('../lib/planning').DayBucket[]
+  /** Seçili pres-haftanın gün detayı (tarihli mesai açma). */
+  renderDays?: (press: string, weekStart: Date) => React.ReactNode
   onSaveOverride: (press: string, weekStart: string, pattern: WeekPattern) => Promise<unknown>
   onClearOverride: (press: string, weekStart: string) => Promise<unknown>
 }
@@ -50,12 +56,10 @@ function weekLabel(weekStart: string): string {
 
 export function CapacityGrid(props: CapacityGridProps) {
   const [editing, setEditing] = useState<{ press: string; weekStart: string } | null>(null)
-  const [draft, setDraft] = useState<WeekPattern>({
-    workingDays: 5,
-    shiftsPerDay: 1,
-    overtimeShifts: 0,
-  })
+  const [draft, setDraft] = useState<WeekPattern>({ workingDays: 5, shiftsPerDay: 1 })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const problem = patternProblem(draft, props.shiftMinutes)
 
   const cells = useMemo(() => buildGrid(props), [props])
   const byKey = useMemo(() => {
@@ -97,20 +101,23 @@ export function CapacityGrid(props: CapacityGridProps) {
   const draftDirty =
     !!editingCell &&
     (editingCell.pattern.workingDays !== draft.workingDays ||
-      editingCell.pattern.shiftsPerDay !== draft.shiftsPerDay ||
-      editingCell.pattern.overtimeShifts !== draft.overtimeShifts)
+      editingCell.pattern.shiftsPerDay !== draft.shiftsPerDay)
 
   function openCell(cell: GridCell) {
     setEditing({ press: cell.press, weekStart: cell.weekStart })
-    setDraft(cell.pattern)
+    setDraft({ workingDays: cell.pattern.workingDays, shiftsPerDay: cell.pattern.shiftsPerDay })
+    setError(null)
   }
 
   async function save() {
     if (!editing) return
     setSaving(true)
+    setError(null)
     try {
       await props.onSaveOverride(editing.press, editing.weekStart, draft)
       setEditing(null)
+    } catch (e) {
+      setError(serverErrorText(e))
     } finally {
       setSaving(false)
     }
@@ -232,8 +239,9 @@ export function CapacityGrid(props: CapacityGridProps) {
                             onClick={() => openCell(cell)}
                             title={
                               `${press.name} · ${weekLabel(iso)}\n` +
-                              `${cell.pattern.workingDays} days × ${cell.pattern.shiftsPerDay} shifts + ` +
-                              `${cell.pattern.overtimeShifts} overtime\n` +
+                              `${cell.pattern.workingDays} days from Monday × ${cell.pattern.shiftsPerDay} shifts` +
+                              (cell.hasOvertime ? ' + overtime' : '') +
+                              '\n' +
                               `${cell.effectiveShifts} shifts · ${(cell.effectiveMinutes / 60).toFixed(0)} net h (planned stops deducted)` +
                               (cell.holidayCount > 0 ? `\n${cell.holidayCount} holiday(s)` : '') +
                               (cell.overridden ? '\nException week' : '')
@@ -244,6 +252,7 @@ export function CapacityGrid(props: CapacityGridProps) {
                             style={{ backgroundColor: RAMP[step], color: INK[step] }}
                           >
                             {cell.effectiveShifts}
+                            {cell.hasOvertime && <span className="ml-0.5 text-[10px] font-semibold">+OT</span>}
                             {cell.holidayCount > 0 && (
                               <span className="absolute right-0.5 top-0 leading-none text-destructive">
                                 •
@@ -312,26 +321,11 @@ export function CapacityGrid(props: CapacityGridProps) {
               }
             />
           </label>
-          <label className="text-sm">
-            <span className="block text-xs text-muted-foreground">Overtime shifts</span>
-            <input
-              type="number"
-              min={0}
-              className="mt-1 w-24 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-              value={draft.overtimeShifts}
-              onChange={(e) => setDraft({ ...draft, overtimeShifts: Number(e.target.value) })}
-              onBlur={() =>
-                setDraft((d) => ({
-                  ...d,
-                  overtimeShifts: Math.max(0, Math.round(d.overtimeShifts) || 0),
-                }))
-              }
-            />
-          </label>
 
+          {(problem || error) && <span className="pb-2 text-xs text-destructive">{problem ?? error}</span>}
           <button
             onClick={() => void save()}
-            disabled={saving}
+            disabled={saving || !!problem}
             className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save this week'}
@@ -370,6 +364,11 @@ export function CapacityGrid(props: CapacityGridProps) {
           >
             Close
           </button>
+          {props.renderDays && (
+            <div className="basis-full">
+              {props.renderDays(editingCell.press, new Date(`${editingCell.weekStart}T00:00:00Z`))}
+            </div>
+          )}
         </div>
       )}
     </div>

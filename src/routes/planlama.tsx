@@ -130,6 +130,7 @@ function PlanlamaPage() {
   // Plan sayfasında yalnızca acil hammadde: ilk eksik iş RAW_URGENT_DAYS iş günü
   // içinde. Sınır motordan gelir (tek hesap); eski planlarda bugünden sayılır.
   const rawUrgentUntil = run?.rawUrgentUntil ?? run?.todayIso ?? ''
+  const rawUrgentDays = run?.rawUrgentDays ?? RAW_URGENT_DAYS
   // Toplamda yetse de yoldaki rulo geç geliyorsa iş durur: ilk eksik iş esas.
   const shortRaw = rawNeeds.filter((r) => r.shortFrom)
   const urgentRaw = shortRaw.filter((r) => r.shortFrom!.date <= rawUrgentUntil)
@@ -156,14 +157,16 @@ function PlanlamaPage() {
   )
   const allJobs = useMemo(() => Array.from(new Set(weeks.flatMap((w) => w.jobs))), [weeks])
 
-  const { shiftsByPressDate, capacityByPressDate } = useMemo(() => {
+  const { shiftsByPressDate, capacityByPressDate, overtimeByPressDate } = useMemo(() => {
     const shifts = new Map<string, number>()
     const capacity = new Map<string, number>()
+    const overtime = new Map<string, { start: number; end: number; name?: string }[]>()
     for (const day of run?.days ?? []) {
       shifts.set(`${day.press}|${day.date}`, day.shifts)
       capacity.set(`${day.press}|${day.date}`, day.minutes)
+      if (day.overtime?.length) overtime.set(`${day.press}|${day.date}`, day.overtime)
     }
-    return { shiftsByPressDate: shifts, capacityByPressDate: capacity }
+    return { shiftsByPressDate: shifts, capacityByPressDate: capacity, overtimeByPressDate: overtime }
   }, [run])
 
   /** Pres bakımları grafikte ayrı çizilir — iş listesine karışmaz. */
@@ -355,6 +358,23 @@ function PlanlamaPage() {
       )}
 
       {run?.alarms && <AlarmBanner alarms={run.alarms} />}
+
+      {(run?.pressesWithoutCalendar?.length ?? 0) > 0 && (
+        <div className="mt-4 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm">
+          <p className="font-semibold text-destructive">
+            {run!.pressesWithoutCalendar!.length} press(es) have no Work Calendar pattern:{' '}
+            {run!.pressesWithoutCalendar!.join(', ')}
+          </p>
+          <p className="mt-1 text-xs text-foreground">
+            These presses get no capacity and nothing is planned on them until their days and shifts
+            are defined on the{' '}
+            <Link to="/takvim" className="underline">
+              Work Calendar
+            </Link>{' '}
+            page.
+          </p>
+        </div>
+      )}
 
       {run?.dataCoverage && <DataCoveragePanel coverage={run.dataCoverage} />}
 
@@ -659,6 +679,7 @@ function PlanlamaPage() {
                   days: allDates.map((d) => ({
                     date: d,
                     shifts: shiftsByPressDate.get(`${p.name}|${d}`) ?? 0,
+                    overtime: overtimeByPressDate.get(`${p.name}|${d}`),
                     capacityMinutes: capacityByPressDate.get(`${p.name}|${d}`) ?? 0,
                   })),
                 }),
@@ -787,13 +808,13 @@ function PlanlamaPage() {
       {urgentRaw.length > 0 && (
         <div className="mt-8">
           <h2 className="text-sm font-semibold text-destructive">
-            Raw material — urgent ({urgentRaw.length}): coil stock runs out within the next {RAW_URGENT_DAYS} working days
+            Raw material — urgent ({urgentRaw.length}): coil stock runs out within the next {rawUrgentDays} working days
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Planned quantity × gross weight per piece, walked in plan order against the coil
             stock in MB52 (locations ticked Raw material on Storage Locations) plus the coils in
             transit from their arrival day. Only coils that stop a job in the next{' '}
-            {RAW_URGENT_DAYS} working days are listed
+            {rawUrgentDays} working days are listed (set on the Work Calendar)
             {laterRaw > 0 && ` — ${laterRaw} more run short later in the plan`}. Co-products are
             not counted twice.
           </p>

@@ -39,10 +39,27 @@ export interface CapacityWeek {
 }
 
 export interface CapacitySeries {
-  /** Haftalık kapasite, saat. */
+  /** Haftalık net kapasite, saat (planlı duruşlar düşülmüş, katsayısız). */
   capacity: number[]
-  /** Haftalık talep, saat. */
+  /** Haftalık talep, saat — master data parça performansıyla (B). */
   demand: number[]
+  /** Kapasite × Performance sayfasındaki kabul katsayısı (A). */
+  capacityAccepted?: number[]
+  /** Talep, ideal hızda (parça performansı uygulanmamış) (A). */
+  demandIdeal?: number[]
+}
+
+/**
+ * Performansın hangi kaynaktan uygulanacağı: A) kabule göre — Performance
+ * sayfasındaki katsayı kapasiteye; B) master data'daki parça performansı
+ * talebe. İkisi birlikte uygulanmaz.
+ */
+export type PerformanceBasis = 'accepted' | 'masterData'
+
+export function seriesForBasis(s: CapacitySeries, basis: PerformanceBasis): { capacity: number[]; demand: number[] } {
+  return basis === 'accepted'
+    ? { capacity: s.capacityAccepted ?? s.capacity, demand: s.demandIdeal ?? s.demand }
+    : { capacity: s.capacity, demand: s.demand }
 }
 
 export interface CapacityForecast {
@@ -61,8 +78,10 @@ export interface ForecastInput {
   /** Presler ve Press Definitions'taki kategorileri (800T, Transfer…). */
   presses: { name: string; category?: string }[]
   weeks: CapacityWeek[]
-  /** pres → hafta başına kapasite dakikası (weeks ile aynı sırada). */
+  /** pres → hafta başına net kapasite dakikası (weeks ile aynı sırada), katsayısız. */
   capacityMinutes: Map<string, number[]>
+  /** Performance sayfasındaki kabul katsayısı (varsayılan 1). */
+  capacityFactor?: number
   stockLocations?: string[]
 }
 
@@ -129,6 +148,9 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
   const demandMinutes = new Map<string, number[]>(
     input.presses.map((p) => [p.name, Array.from({ length: weekCount }, () => 0)]),
   )
+  const idealMinutes = new Map<string, number[]>(
+    input.presses.map((p) => [p.name, Array.from({ length: weekCount }, () => 0)]),
+  )
   const unassigned: CapacityForecast['unassigned'] = []
   const done = new Set<string>()
   const ownerOf = new Map<string, ProductSpec>()
@@ -185,10 +207,12 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
         ? Math.min(1, carrier.performanceFactor)
         : 1
     const row = demandMinutes.get(press)!
+    const ideal = idealMinutes.get(press)!
     for (let w = 0; w < weekCount; w++) {
       const qty = Math.max(net[w], partnerNet?.[w] ?? 0)
       if (qty <= 0) continue
       row[w] += qty / cavities / spm / factor
+      ideal[w] += qty / cavities / spm
     }
   }
 
@@ -198,6 +222,8 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
       press,
       capacity: (input.capacityMinutes.get(press) ?? []).map((m) => round2(m / 60)),
       demand: (demandMinutes.get(press) ?? []).map((m) => round2(m / 60)),
+      capacityAccepted: (input.capacityMinutes.get(press) ?? []).map((m) => round2((m * (input.capacityFactor ?? 1)) / 60)),
+      demandIdeal: (idealMinutes.get(press) ?? []).map((m) => round2(m / 60)),
     })),
     groups: groupPresses(input.presses),
     unassigned: unassigned.sort((a, b) => b.quantity - a.quantity),

@@ -11,22 +11,21 @@ import { UnsavedBar } from '../components/UnsavedBar'
 import { PlannedStopsEditor, type StopRow } from '../components/PlannedStopsEditor'
 import type { WeekPattern as GridPattern } from '../lib/capacityGrid'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
-import { stopMinutesByShift } from '../lib/capacityModel'
+import { capacityModel, stopMinutesByShift } from '../lib/capacityModel'
 import { weekTotalMinutes } from '../lib/planning'
+import { patternProblem, serverErrorText } from '../lib/pressCalendar'
+import {
+  OvertimeDefinitionsPanel,
+  PressWeekDays,
+  RecurringOvertimePanel,
+  ShiftTable,
+  useOvertimeData,
+} from '../components/OvertimePanels'
 
 export const Route = createFileRoute('/takvim')({
   component: TakvimPage,
 })
 
-const DAYS = [
-  { key: 'MO', label: 'Monday', short: 'Mon' },
-  { key: 'TU', label: 'Tuesday', short: 'Tue' },
-  { key: 'WE', label: 'Wednesday', short: 'Wed' },
-  { key: 'TH', label: 'Thursday', short: 'Thu' },
-  { key: 'FR', label: 'Friday', short: 'Fri' },
-  { key: 'SA', label: 'Saturday', short: 'Sat' },
-  { key: 'SU', label: 'Sunday', short: 'Sun' },
-]
 
 
 const FALLBACK_COUNTRIES = [
@@ -64,7 +63,6 @@ function TakvimPage() {
 interface WeekPattern {
   workingDays: number
   shiftsPerDay: number
-  overtimeShifts: number
 }
 
 function formatWeekLabel(monday: Date): string {
@@ -73,8 +71,9 @@ function formatWeekLabel(monday: Date): string {
   return `${fmt(monday)} – ${fmt(sunday)} ${sunday.getFullYear()}`
 }
 
+/** Normal (mesaisiz) haftalık vardiya: mesai tarihli açılır, burada sayılmaz. */
 function totalShifts(p: WeekPattern) {
-  return p.workingDays * p.shiftsPerDay + p.overtimeShifts
+  return Math.min(7, p.workingDays) * p.shiftsPerDay
 }
 
 /** Net haftalık dakika — planla aynı formül: planlı duruşlar düşülür. */
@@ -100,7 +99,6 @@ function PressCalendarSection() {
     weekStart: string
     workingDays: number
     shiftsPerDay: number
-    overtimeShifts: number
   }[]
   const plannedStops = (useQuery(api.plannedStops.list) ?? []) as StopRow[]
   const stopsByShift = useMemo(() => stopMinutesByShift(plannedStops), [plannedStops])
@@ -175,6 +173,8 @@ function PressCalendarSection() {
   const [frozenDays, setFrozenDays] = useState<number>(SETTINGS_DEFAULTS.frozenDays)
   // Emniyet stoğu (iş günü): sonraki lot stok bitmeden bu kadar önce başlar.
   const [safetyStockDays, setSafetyStockDays] = useState<number>(SETTINGS_DEFAULTS.safetyStockDays)
+  // Acil hammadde: ilk eksik iş bu kadar iş günü içindeyse Plan sayfasında.
+  const [rawUrgentDays, setRawUrgentDays] = useState<number>(SETTINGS_DEFAULTS.rawUrgentDays)
   // Sunucu değerlerini forma yalnızca sunucuda değiştiklerinde yansıt.
   // Aksi halde sorgu her tazelendiğinde kullanıcının yazdığı değer siliniyor.
   useSyncedFields(
@@ -198,6 +198,7 @@ function PressCalendarSection() {
           deliveryCutoffMinute: globalSettings.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute,
           utilisationTarget: globalSettings.utilisationTarget ?? SETTINGS_DEFAULTS.utilisationTarget,
           maxScenarios: globalSettings.maxScenarios ?? SETTINGS_DEFAULTS.maxScenarios,
+          rawUrgentDays: globalSettings.rawUrgentDays ?? SETTINGS_DEFAULTS.rawUrgentDays,
         }
       : undefined,
     {
@@ -219,6 +220,7 @@ function PressCalendarSection() {
       deliveryCutoffMinute: setDeliveryCutoffMinute,
       utilisationTarget: setUtilisationTarget,
       maxScenarios: setMaxScenarios,
+      rawUrgentDays: setRawUrgentDays,
     },
   )
 
@@ -242,6 +244,7 @@ function PressCalendarSection() {
       deliveryCutoffMinute: number
       utilisationTarget: number
       maxScenarios: number
+      rawUrgentDays: number
     }>,
   ) {
     await saveGlobalSettingsMutation({
@@ -263,6 +266,7 @@ function PressCalendarSection() {
       deliveryCutoffMinute: next?.deliveryCutoffMinute ?? deliveryCutoffMinute,
       utilisationTarget: next?.utilisationTarget ?? utilisationTarget,
       maxScenarios: next?.maxScenarios ?? maxScenarios,
+      rawUrgentDays: next?.rawUrgentDays ?? rawUrgentDays,
       capacityFactor: globalSettings?.capacityFactor,
     })
     setSavedAt(new Date().toLocaleTimeString('en-GB'))
@@ -293,45 +297,42 @@ function PressCalendarSection() {
     setSavedAt(new Date().toLocaleTimeString('en-GB'))
   }
 
-  function toggleWorkingDay(key: string) {
-    const next = workingDayKeys.includes(key)
-      ? workingDayKeys.filter((d) => d !== key)
-      : [...workingDayKeys, key]
-    // Hafta sırası korunsun ki planlama günleri doğru sırada değerlendirsin.
-    const ordered = DAYS.map((d) => d.key).filter((k) => next.includes(k))
-    setWorkingDayKeys(ordered)
-  }
 
   const template = templatesList.find((t) => t.press === press)
   const defaultWorkingDays = globalCalendar?.workingDays.length ?? 5
 
   const [workingDays, setWorkingDays] = useState(defaultWorkingDays)
   const [shiftsPerDay, setShiftsPerDay] = useState(1)
-  const [overtimeShifts, setOvertimeShifts] = useState(0)
+  const [templateError, setTemplateError] = useState<string | null>(null)
 
   useSyncedFields(
     template
       ? {
           workingDays: template.workingDays,
           shiftsPerDay: template.shiftsPerDay,
-          overtimeShifts: template.overtimeShifts,
         }
       : undefined,
     {
       workingDays: setWorkingDays,
       shiftsPerDay: setShiftsPerDay,
-      overtimeShifts: setOvertimeShifts,
     },
   )
 
+  // Kayıttan önce: günde vardiya × süre 24 saati geçemez (sunucu da reddeder).
+  const templateProblem = patternProblem({ workingDays, shiftsPerDay }, shiftMinutes)
+
   async function saveTemplate(next?: Partial<WeekPattern>) {
     if (!press) return
-    await saveTemplateMutation({
-      press,
-      workingDays: next?.workingDays ?? workingDays,
-      shiftsPerDay: next?.shiftsPerDay ?? shiftsPerDay,
-      overtimeShifts: next?.overtimeShifts ?? overtimeShifts,
-    })
+    setTemplateError(null)
+    try {
+      await saveTemplateMutation({
+        press,
+        workingDays: next?.workingDays ?? workingDays,
+        shiftsPerDay: next?.shiftsPerDay ?? shiftsPerDay,
+      })
+    } catch (e) {
+      setTemplateError(serverErrorText(e))
+    }
   }
 
   function pickShiftsPerDay(n: number) {
@@ -358,7 +359,8 @@ function PressCalendarSection() {
       (globalSettings.pullForwardDays ?? SETTINGS_DEFAULTS.pullForwardDays) !== pullForwardDays ||
       (globalSettings.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute) !== deliveryCutoffMinute ||
       (globalSettings.utilisationTarget ?? SETTINGS_DEFAULTS.utilisationTarget) !== utilisationTarget ||
-      (globalSettings.maxScenarios ?? SETTINGS_DEFAULTS.maxScenarios) !== maxScenarios)
+      (globalSettings.maxScenarios ?? SETTINGS_DEFAULTS.maxScenarios) !== maxScenarios ||
+      (globalSettings.rawUrgentDays ?? SETTINGS_DEFAULTS.rawUrgentDays) !== rawUrgentDays)
 
   const calendarDirty =
     !!globalCalendar &&
@@ -378,8 +380,7 @@ function PressCalendarSection() {
     templatesQuery !== undefined &&
     (!template ||
       template.workingDays !== workingDays ||
-      template.shiftsPerDay !== shiftsPerDay ||
-      template.overtimeShifts !== overtimeShifts)
+      template.shiftsPerDay !== shiftsPerDay)
 
   /** Kaydedilmemiş düzenlemeleri atıp sunucudaki hâle döner. */
   function discardSharedSettings() {
@@ -401,6 +402,7 @@ function PressCalendarSection() {
       setDeliveryCutoffMinute(globalSettings.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute)
       setUtilisationTarget(globalSettings.utilisationTarget ?? SETTINGS_DEFAULTS.utilisationTarget)
       setMaxScenarios(globalSettings.maxScenarios ?? SETTINGS_DEFAULTS.maxScenarios)
+      setRawUrgentDays(globalSettings.rawUrgentDays ?? SETTINGS_DEFAULTS.rawUrgentDays)
     }
     if (globalCalendar) {
       setWorkingDayKeys(globalCalendar.workingDays)
@@ -409,7 +411,6 @@ function PressCalendarSection() {
     if (template) {
       setWorkingDays(template.workingDays)
       setShiftsPerDay(template.shiftsPerDay)
-      setOvertimeShifts(template.overtimeShifts)
     }
   }
 
@@ -430,7 +431,7 @@ function PressCalendarSection() {
     }
   }
 
-  const currentTemplate: WeekPattern = { workingDays, shiftsPerDay, overtimeShifts }
+  const currentTemplate: WeekPattern = { workingDays, shiftsPerDay }
   const templateTotalShifts = totalShifts(currentTemplate)
   const templateTotalHours = totalMinutes(currentTemplate, shiftMinutes, overtimeShiftMinutes, stopsByShift) / 60
 
@@ -527,6 +528,24 @@ function PressCalendarSection() {
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [holidays, weekStarts])
 
+  // Takvimin tek formülü (plan, Capacity Dashboard ve Performance ile aynı):
+  // Pazartesiden sırayla gün, tatil kaybolur, tarihli ve tekrarlayan mesai.
+  const { definitions: overtimeDefinitions, pressOvertime } = useOvertimeData()
+  const calendarModel = useMemo(
+    () =>
+      capacityModel({
+        shiftMinutes,
+        shiftStartMinute,
+        plannedStops,
+        templates: templatesList,
+        weekOverrides: allOverrides,
+        overtimeDefinitions: overtimeDefinitions.map((d) => ({ ...d, id: d._id })),
+        pressOvertime,
+        holidays: new Set([...holidaySet, ...manualHolidays]),
+      }),
+    [shiftMinutes, shiftStartMinute, plannedStops, templatesList, allOverrides, overtimeDefinitions, pressOvertime, holidaySet, manualHolidays],
+  )
+
   type Override = WeekPattern & { weekStart: string }
   const overridesList = (useQuery(
     api.pressCalendar.listOverrides,
@@ -559,10 +578,11 @@ function PressCalendarSection() {
         </div>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Define each press's standard weekly pattern (how many days, how many
-        shifts per day, how many overtime shifts). The 30-week calendar applies
-        that standard automatically and rolls forward on its own. If a specific
-        week differs, edit and save just that week. Nothing in this block is
+        Each press has one calendar: its standard weekly pattern (how many days,
+        filled from Monday, and how many shifts per day), exception weeks and the
+        overtime opened on dates. A public holiday is a day off — its shifts are
+        not moved to another day; open overtime if the press should work. A press
+        without a pattern has no capacity. Nothing in the settings block is
         written until you press Save — an edited field is marked Unsaved.
       </p>
 
@@ -596,11 +616,7 @@ function PressCalendarSection() {
             new Map(
               templatesList.map((t) => [
                 t.press,
-                {
-                  workingDays: t.workingDays,
-                  shiftsPerDay: t.shiftsPerDay,
-                  overtimeShifts: t.overtimeShifts,
-                } as GridPattern,
+                { workingDays: t.workingDays, shiftsPerDay: t.shiftsPerDay } as GridPattern,
               ]),
             )
           }
@@ -608,11 +624,7 @@ function PressCalendarSection() {
             new Map(
               allOverrides.map((o) => [
                 `${o.press}|${o.weekStart}`,
-                {
-                  workingDays: o.workingDays,
-                  shiftsPerDay: o.shiftsPerDay,
-                  overtimeShifts: o.overtimeShifts,
-                } as GridPattern,
+                { workingDays: o.workingDays, shiftsPerDay: o.shiftsPerDay } as GridPattern,
               ]),
             )
           }
@@ -622,11 +634,19 @@ function PressCalendarSection() {
           shiftMinutes={shiftMinutes}
           overtimeShiftMinutes={overtimeShiftMinutes}
           stopMinutesByShift={stopsByShift}
-          defaultPattern={{
-            workingDays: workingDayKeys.length,
-            shiftsPerDay: 1,
-            overtimeShifts: 0,
-          }}
+          bucketsOf={(p, ws) => calendarModel.weekBuckets(p, ws)}
+          renderDays={(p, ws) => (
+            <PressWeekDays
+              press={p}
+              weekStart={ws}
+              pattern={calendarModel.patternOf(p, ws)}
+              recurring={templatesList.find((t) => t.press === p)?.recurringOvertime ?? []}
+              holidays={new Set([...holidaySet, ...manualHolidays])}
+              shiftStartMinute={shiftStartMinute}
+              shiftMinutes={shiftMinutes}
+            />
+          )}
+          defaultPattern={{ workingDays: 0, shiftsPerDay: 0 }}
           onSaveOverride={(press, weekStart, pattern) =>
             saveOverrideForGrid({ press, weekStart, ...pattern })
           }
@@ -636,31 +656,6 @@ function PressCalendarSection() {
 
       <div className="mt-4 rounded-md border border-border p-3">
         <h3 className="text-xs font-medium text-muted-foreground">
-          Working days — normal shifts are only placed on these days
-        </h3>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {DAYS.map((d) => {
-            const active = workingDayKeys.includes(d.key)
-            return (
-              <button
-                key={d.key}
-                onClick={() => toggleWorkingDay(d.key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  active
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/70'
-                }`}
-              >
-                {d.label}
-              </button>
-            )
-          })}
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Overtime shifts may also fall outside these days (e.g. Saturday).
-        </p>
-
-        <h3 className="mt-4 text-xs font-medium text-muted-foreground">
           Manual holiday / shutdown day
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -719,17 +714,6 @@ function PressCalendarSection() {
             className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={shiftMinutes}
             onChange={(e) => setShiftMinutes(Number(e.target.value) || 0)}
-          />
-        </label>
-        <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">
-            Overtime shift length (min) — shared by all presses
-          </span>
-          <input
-            type="number"
-            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-            value={overtimeShiftMinutes}
-            onChange={(e) => setOvertimeShiftMinutes(Number(e.target.value) || 0)}
           />
         </label>
         <label className="text-sm">
@@ -880,6 +864,17 @@ function PressCalendarSection() {
           />
         </label>
         <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Urgent raw material (working days)</span>
+          <input
+            type="number"
+            min={1}
+            max={30}
+            className="mt-1 w-32 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={rawUrgentDays}
+            onChange={(e) => setRawUrgentDays(Math.max(1, Math.min(30, Math.round(Number(e.target.value)) || 1)))}
+          />
+        </label>
+        <label className="text-sm">
           <span className="block text-xs text-muted-foreground">Pull work forward (days)</span>
           <input
             type="number"
@@ -933,6 +928,12 @@ function PressCalendarSection() {
           <span className="text-xs text-muted-foreground">Setups may run over a shift change</span>
         </label>
       </div>
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-md border border-border p-3">
+          <ShiftTable shiftStartMinute={shiftStartMinute} shiftMinutes={shiftMinutes} />
+        </div>
+        <OvertimeDefinitionsPanel />
+      </div>
       <p className="mt-2 text-xs text-muted-foreground">
         Frozen days: the first {frozenDays} day(s) of the plan are taken from
         the approved plan instead of being recalculated, so the shop floor's
@@ -958,8 +959,10 @@ function PressCalendarSection() {
         mounted keeps running first, so no extra setup is made.{' '}
         Delivery: a part is on time when the quantity needed is ready by{' '}
         {`${String(Math.floor(deliveryCutoffMinute / 60)).padStart(2, '0')}:${String(deliveryCutoffMinute % 60).padStart(2, '0')}`}{' '}
-        on the day it is needed; backlog and today's need are due the next working day at that
-        time. Scenarios: the planner tries up to {maxScenarios} plan variants and stops as soon as
+        on the day it is needed (public holidays included — a customer may want parts on a
+        holiday); backlog and today's need are due the next day at that time. Urgent raw
+        material: coils that stop a job within the next {rawUrgentDays} working day(s) are listed
+        on the Production Plan. Scenarios: the planner tries up to {maxScenarios} plan variants and stops as soon as
         the presses are {utilisationTarget}% busy in the next 7 days; otherwise it reports the best
         level it reached.
       </p>
@@ -1035,22 +1038,10 @@ function PressCalendarSection() {
                 </div>
               </div>
 
-              <label className="text-sm">
-                <span className="block text-xs text-muted-foreground">
-                  Overtime shifts per week
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  className="mt-1 w-24 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                  value={overtimeShifts}
-                  onChange={(e) => setOvertimeShifts(Number(e.target.value) || 0)}
-                />
-              </label>
 
               <button
                 onClick={() => void saveTemplate()}
-                disabled={!templateDirty}
+                disabled={!templateDirty || !!templateProblem}
                 className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-40"
               >
                 Save press pattern
@@ -1059,12 +1050,19 @@ function PressCalendarSection() {
                 <span className="pb-2 text-xs font-medium text-amber-700">● Unsaved</span>
               )}
             </div>
+            {(templateProblem || templateError) && (
+              <p className="mt-2 text-xs font-medium text-destructive">{templateProblem ?? templateError}</p>
+            )}
             <p className="mt-3 text-sm text-muted-foreground">
               Total: <strong className="text-foreground">{templateTotalShifts} shifts</strong>{' '}
               · <strong className="text-foreground">{templateTotalHours.toFixed(1)} net h</strong>
-              /week ({workingDays} days × {shiftsPerDay} shifts + {overtimeShifts} overtime
-              shifts)
+              /week without overtime ({workingDays} days from Monday × {shiftsPerDay} shifts)
             </p>
+            <RecurringOvertimePanel
+              press={press}
+              recurring={template?.recurringOvertime ?? []}
+              disabled={!template}
+            />
           </div>
 
           <details className="mt-4">
@@ -1079,7 +1077,6 @@ function PressCalendarSection() {
                     <th className="px-2 py-2 font-medium">Week</th>
                     <th className="px-2 py-2 text-center font-medium">Normal days</th>
                     <th className="px-2 py-2 text-center font-medium">Shifts/day</th>
-                    <th className="px-2 py-2 text-center font-medium">Overtime shifts</th>
                     <th className="px-2 py-2 text-center font-medium">Total shifts</th>
                     <th className="px-2 py-2 text-center font-medium" title="Planned stops (tea, meal, handover) deducted — the same hours the plan uses">Net hours</th>
                     <th className="px-2 py-2 font-medium" />
@@ -1093,10 +1090,14 @@ function PressCalendarSection() {
                       monday={monday}
                       template={currentTemplate}
                       override={overridesByWeek.get(isoDate(monday))}
-                      holidaySet={holidaySet}
+                      holidaySet={new Set([...holidaySet, ...manualHolidays])}
                       shiftMinutes={shiftMinutes}
-                      overtimeShiftMinutes={overtimeShiftMinutes}
-                      stopsByShift={stopsByShift}
+                      shiftStartMinute={shiftStartMinute}
+                      recurring={template?.recurringOvertime ?? []}
+                      hasTemplate={!!template}
+                      netMinutes={calendarModel
+                        .weekBuckets(press, monday)
+                        .reduce((a, b) => a + b.minutes, 0)}
                     />
                   ))}
                 </tbody>
@@ -1149,8 +1150,10 @@ function WeekRow({
   override,
   holidaySet,
   shiftMinutes,
-  overtimeShiftMinutes,
-  stopsByShift,
+  shiftStartMinute,
+  recurring,
+  hasTemplate,
+  netMinutes,
 }: {
   press: string
   monday: Date
@@ -1158,8 +1161,11 @@ function WeekRow({
   override: (WeekPattern & { weekStart: string }) | undefined
   holidaySet: Set<string>
   shiftMinutes: number
-  overtimeShiftMinutes: number
-  stopsByShift: number[]
+  shiftStartMinute: number
+  recurring: { dayKey: string; definitionId: string }[]
+  hasTemplate: boolean
+  /** Planla aynı formülden: normal vardiyalar + mesai, duruşlar düşülmüş. */
+  netMinutes: number
 }) {
   const saveOverrideMutation = useMutation(api.pressCalendar.saveOverride)
   const clearOverrideMutation = useMutation(api.pressCalendar.clearOverride)
@@ -1169,19 +1175,27 @@ function WeekRow({
 
   const effective: WeekPattern = override ?? template
   const [editing, setEditing] = useState(false)
+  const [showDays, setShowDays] = useState(false)
   const [draft, setDraft] = useState<WeekPattern>(effective)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!editing) setDraft(effective)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effective.workingDays, effective.shiftsPerDay, effective.overtimeShifts, editing])
+  }, [effective.workingDays, effective.shiftsPerDay, editing])
 
   const isCurrentWeek = weekStart === isoDate(mondayOf(new Date()))
   const isOverridden = !!override
+  const problem = editing ? patternProblem(draft, shiftMinutes) : null
 
   async function handleSave() {
-    await saveOverrideMutation({ press, weekStart, ...draft })
-    setEditing(false)
+    setError(null)
+    try {
+      await saveOverrideMutation({ press, weekStart, workingDays: draft.workingDays, shiftsPerDay: draft.shiftsPerDay })
+      setEditing(false)
+    } catch (e) {
+      setError(serverErrorText(e))
+    }
   }
 
   async function handleRevert() {
@@ -1192,106 +1206,121 @@ function WeekRow({
   const shown = editing ? draft : effective
 
   return (
-    <tr
-      className={`border-t border-border ${isCurrentWeek ? 'bg-primary/5' : ''} ${
-        weekHolidays.length > 0 ? 'bg-red-50/50' : ''
-      }`}
-    >
-      <td className="whitespace-nowrap px-2 py-1.5 font-medium text-foreground">
-        {formatWeekLabel(monday)}
-        {isOverridden && (
-          <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
-            custom
-          </span>
-        )}
-        {weekHolidays.length > 0 && (
-          <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
-            tatil ({weekHolidays.length})
-          </span>
-        )}
-      </td>
-      <td className="px-1 py-1 text-center">
-        {editing ? (
-          <input
-            type="number"
-            min={0}
-            max={7}
-            className="w-14 rounded border border-input bg-background px-1 py-0.5 text-center text-xs"
-            value={draft.workingDays}
-            onChange={(e) => setDraft((d) => ({ ...d, workingDays: Number(e.target.value) || 0 }))}
-          />
-        ) : (
-          shown.workingDays
-        )}
-      </td>
-      <td className="px-1 py-1 text-center">
-        {editing ? (
-          <input
-            type="number"
-            min={0}
-            className="w-14 rounded border border-input bg-background px-1 py-0.5 text-center text-xs"
-            value={draft.shiftsPerDay}
-            onChange={(e) => setDraft((d) => ({ ...d, shiftsPerDay: Number(e.target.value) || 0 }))}
-          />
-        ) : (
-          shown.shiftsPerDay
-        )}
-      </td>
-      <td className="px-1 py-1 text-center">
-        {editing ? (
-          <input
-            type="number"
-            min={0}
-            className="w-14 rounded border border-input bg-background px-1 py-0.5 text-center text-xs"
-            value={draft.overtimeShifts}
-            onChange={(e) => setDraft((d) => ({ ...d, overtimeShifts: Number(e.target.value) || 0 }))}
-          />
-        ) : (
-          shown.overtimeShifts
-        )}
-      </td>
-      <td className="px-1 py-1 text-center text-muted-foreground">{totalShifts(shown)}</td>
-      <td className="px-1 py-1 text-center text-muted-foreground">
-        {(totalMinutes(shown, shiftMinutes, overtimeShiftMinutes, stopsByShift) / 60).toFixed(1)}
-      </td>
-      <td className="px-2 py-1 text-right">
-        {editing ? (
-          <div className="flex justify-end gap-1">
-            <button
-              onClick={() => void handleSave()}
-              className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:opacity-90"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => {
-                setDraft(effective)
-                setEditing(false)
-              }}
-              className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <div className="flex justify-end gap-1">
-            <button
-              onClick={() => setEditing(true)}
-              className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
-            >
-              Edit
-            </button>
-            {isOverridden && (
+    <>
+      <tr
+        className={`border-t border-border ${isCurrentWeek ? 'bg-primary/5' : ''} ${
+          weekHolidays.length > 0 ? 'bg-red-50/50' : ''
+        }`}
+      >
+        <td className="whitespace-nowrap px-2 py-1.5 font-medium text-foreground">
+          {formatWeekLabel(monday)}
+          {isOverridden && (
+            <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+              exception week
+            </span>
+          )}
+          {weekHolidays.length > 0 && (
+            <span className="ml-2 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800">
+              holiday ({weekHolidays.length})
+            </span>
+          )}
+        </td>
+        <td className="px-1 py-1 text-center">
+          {editing ? (
+            <input
+              type="number"
+              min={0}
+              max={7}
+              className="w-14 rounded border border-input bg-background px-1 py-0.5 text-center text-xs"
+              value={draft.workingDays}
+              onChange={(e) => setDraft((d) => ({ ...d, workingDays: Number(e.target.value) || 0 }))}
+            />
+          ) : (
+            shown.workingDays
+          )}
+        </td>
+        <td className="px-1 py-1 text-center">
+          {editing ? (
+            <input
+              type="number"
+              min={0}
+              className="w-14 rounded border border-input bg-background px-1 py-0.5 text-center text-xs"
+              value={draft.shiftsPerDay}
+              onChange={(e) => setDraft((d) => ({ ...d, shiftsPerDay: Number(e.target.value) || 0 }))}
+            />
+          ) : (
+            shown.shiftsPerDay
+          )}
+        </td>
+        <td className="px-1 py-1 text-center text-muted-foreground">{totalShifts(shown)}</td>
+        <td className="px-1 py-1 text-center text-muted-foreground" title="Normal shifts and overtime, planned stops deducted — the hours the plan uses">
+          {(netMinutes / 60).toFixed(1)}
+        </td>
+        <td className="px-2 py-1 text-right">
+          {editing ? (
+            <div className="flex items-center justify-end gap-1">
+              {(problem || error) && <span className="text-[11px] text-destructive">{problem ?? error}</span>}
               <button
-                onClick={() => void handleRevert()}
+                onClick={() => void handleSave()}
+                disabled={!!problem}
+                className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setDraft(effective)
+                  setEditing(false)
+                  setError(null)
+                }}
                 className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
               >
-                Reset to template
+                Cancel
               </button>
-            )}
-          </div>
-        )}
-      </td>
-    </tr>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-1">
+              <button
+                onClick={() => setShowDays((v) => !v)}
+                className="rounded bg-violet-100 px-2 py-1 text-xs text-violet-900 hover:bg-violet-200"
+                title="Day detail: shifts, holidays and overtime of each day; open overtime on a date"
+              >
+                {showDays ? 'Hide days' : 'Days / overtime'}
+              </button>
+              <button
+                onClick={() => setEditing(true)}
+                className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
+                title="Exception week: different days or shifts for this week only"
+              >
+                Edit week
+              </button>
+              {isOverridden && (
+                <button
+                  onClick={() => void handleRevert()}
+                  className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
+                >
+                  Reset to template
+                </button>
+              )}
+            </div>
+          )}
+        </td>
+      </tr>
+      {showDays && (
+        <tr className="border-t border-border bg-muted/20">
+          <td colSpan={6} className="px-2 py-2">
+            <PressWeekDays
+              press={press}
+              weekStart={monday}
+              pattern={hasTemplate || override ? effective : null}
+              recurring={recurring}
+              holidays={holidaySet}
+              shiftStartMinute={shiftStartMinute}
+              shiftMinutes={shiftMinutes}
+            />
+          </td>
+        </tr>
+      )}
+    </>
   )
 }

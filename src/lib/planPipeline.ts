@@ -30,6 +30,8 @@ import {
   netToClock,
   productionDayOf,
   remainingCapacityMinutes,
+  type DayShape,
+  type OvertimeWindow,
   type PlannedStop,
 } from './shiftTimeline'
 import {
@@ -60,10 +62,11 @@ import {
   type ScheduleVariant,
   type UnplannedItem,
 } from './scheduler'
-import { DEFAULT_WORKING_DAYS, SETTINGS_DEFAULTS } from './settingsDefaults'
+import { SETTINGS_DEFAULTS } from './settingsDefaults'
 
 /** Hammadde eksikliği bu kadar İŞ GÜNÜ içinde bir işi durduruyorsa acildir. */
-export const RAW_URGENT_DAYS = 3
+/** @deprecated Ayardır: settings.rawUrgentDays (Work Calendar). Varsayılan. */
+export const RAW_URGENT_DAYS = SETTINGS_DEFAULTS.rawUrgentDays
 /** @deprecated SETTINGS_DEFAULTS.planningHorizonWeeks */
 export const DEFAULT_HORIZON_WEEKS = SETTINGS_DEFAULTS.planningHorizonWeeks
 /** Emniyet stoğu varsayılanı (iş günü). Work Calendar sayfasından değişir. */
@@ -96,6 +99,8 @@ export interface SnapshotJob {
 export interface PlanSettings {
   shiftMinutes?: number
   overtimeShiftMinutes?: number
+  /** Acil hammadde: ilk eksik iş bu kadar iş günü içindeyse (Work Calendar). */
+  rawUrgentDays?: number
   setupGapMinutes?: number
   concurrentSetupsPerHall?: number
   coilSetupGapMinutes?: number
@@ -136,22 +141,34 @@ export interface PlanInputs {
     /** MB52 yükleme zamanı (ms). */
     uploadedAt?: number
   }[]
-  locations: { code: string; category: string; countFinished?: boolean; countRaw?: boolean }[]
+  locations: { code: string; category?: string; countFinished?: boolean; countRaw?: boolean }[]
   /** Yoldaki hammadde (Excel listesi) — MRP'de varış haftasında giriş. */
   inTransit?: { material: string; quantityKg: number; eta?: string; poNumber?: string; supplier?: string }[]
   presses: PlanPress[]
-  templates: { press: string; workingDays: number; shiftsPerDay: number; overtimeShifts: number }[]
+  templates: {
+    press: string
+    workingDays: number
+    shiftsPerDay: number
+    /** @deprecated Mesai tarihli açılır; okunmaz. */
+    overtimeShifts?: number
+    /** Her hafta tekrarlayan mesai (ör. her Cumartesi tam mesai). */
+    recurringOvertime?: { dayKey: string; definitionId: string }[]
+  }[]
   /**
-   * Work Calendar'daki istisna haftalar (o haftaya özel gün, vardiya ve
-   * fazla mesai). Hafta başı Pazartesi, ISO tarih.
+   * Work Calendar'daki istisna haftalar (o haftaya özel gün ve vardiya
+   * sayısı). Hafta başı Pazartesi, ISO tarih.
    */
   weekOverrides?: {
     press: string
     weekStart: string
     workingDays: number
     shiftsPerDay: number
-    overtimeShifts: number
+    overtimeShifts?: number
   }[]
+  /** Mesai tanımları (tam mesai, yarım mesai…): başlangıç saati ve süre. */
+  overtimeDefinitions?: { id: string; name: string; description?: string; startMinute: number; durationMinutes: number }[]
+  /** Tarihli mesailer: hangi pres, hangi üretim günü, hangi tanım. */
+  pressOvertime?: { press: string; date: string; definitionId: string }[]
   settings: PlanSettings | null
   workCalendar: { workingDays?: string[]; holidays?: string[] } | null
   officialHolidays: { date: string; name: string }[]
@@ -202,8 +219,11 @@ export interface MaintenanceBlock {
 export interface PlanDay {
   press: string
   date: string
+  /** Normal vardiya sayısı. */
   shifts: number
   minutes: number
+  /** O güne açılan mesai pencereleri (saat ekseni). */
+  overtime?: OvertimeWindow[]
 }
 
 /** Bir işte bundan fazla rulo, master data hatasına işaret eder. */
@@ -298,8 +318,11 @@ export interface PlanRun {
   unplanned: UnplannedItem[]
   maintenance: MaintenanceBlock[]
   rawNeeds: RawMaterialNeed[]
-  /** Acil hammadde sınırı: bugünden RAW_URGENT_DAYS iş günü (ISO). */
+  /** Acil hammadde sınırı: bugünden `rawUrgentDays` iş günü (ISO). */
   rawUrgentUntil?: string
+  rawUrgentDays?: number
+  /** Work Calendar düzeni olmayan presler (kapasite 0, kırmızı alarm). */
+  pressesWithoutCalendar?: string[]
   warnings: string[]
   truncatedInputs: string[]
   /** Kapasite öngörüsü: pres ve grup bazında haftalık kapasite ve talep saati. */
@@ -376,12 +399,26 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const productByCode = new Map<string, ProductSpec>()
   for (const p of inputs.products) productByCode.set(p.code, p)
 
-  const workingDayKeys = inputs.workCalendar?.workingDays ?? [...DEFAULT_WORKING_DAYS]
-  const workingDaysPerWeek = workingDayKeys.length || 5
-
   // Resmi tatiller + elle girilen tatiller birlikte kapasiteyi sıfırlar.
   const holidays = new Set<string>(inputs.workCalendar?.holidays ?? [])
   for (const h of inputs.officialHolidays) holidays.add(h.date)
+
+  // ---- Pres takvimi (tek formül: capacityModel + pressCalendar) -----------
+  // Her presin tek takvimi: haftalık düzeni (Pazartesiden sırayla gün),
+  // istisna haftaları ve tarihli / tekrarlayan mesaileri. Tatil günü kaybolur.
+  const capModel = capacityModel({
+    shiftMinutes,
+    shiftStartMinute,
+    plannedStops,
+    templates,
+    weekOverrides: inputs.weekOverrides,
+    overtimeDefinitions: inputs.overtimeDefinitions,
+    pressOvertime: inputs.pressOvertime,
+    holidays,
+  })
+  const patternOf = capModel.patternOf
+  // Fabrikanın iş günü: tatil değil ve en az bir presin normal vardiyası var.
+  const isWorkingDate = capModel.isPlantWorkingDate
 
   // Tesis saatiyle "şimdi". Sunucu UTC'de çalışır; yerel alanlar tesisin
   // duvar saatini göstermezse gün yanlış yerde değişir.
@@ -505,30 +542,20 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         stock: (stockByMaterial.get(material) ?? 0) + (committedByMaterial.get(material) ?? 0),
       }
     })
+  const workingDaysPerWeek =
+    Array.from({ length: 7 }, (_, d) => isoDate(addDays(horizonMonday, d))).filter(isWorkingDate).length || 5
   const demandOptions = {
       baseMonday: horizonMonday,
       horizonWeeks,
       workingDaysPerWeek,
-      workingDayKeys,
+      // ZPP_DAILY'nin ulaşmadığı günlerde haftalık talep iş günlerine dağılır.
+      isWorkingDate,
       today: todayIso,
       safetyStockDays,
       dailyUntil: daily.until,
     }
 
   // ---- Kapasite kovaları ---------------------------------------------------
-  // Tek formül (capacityModel): istisna hafta > pres şablonu, planlı duruşlar
-  // düşülmüş. Work Calendar, Capacity Dashboard ve Performance da bunu okur.
-  const capModel = capacityModel({
-    shiftMinutes,
-    overtimeShiftMinutes,
-    plannedStops,
-    templates,
-    weekOverrides: inputs.weekOverrides,
-    workingDayKeys,
-    holidays,
-  })
-  const patternOf = capModel.patternOf
-
   const buckets = new Map<string, DayBucket[]>()
   for (const press of presses) {
     const all: DayBucket[] = []
@@ -540,7 +567,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       press.name,
       all.map((b) => {
         const adjusted = capacityFactor === 1 ? b.minutes : Math.floor(b.minutes * capacityFactor)
-        const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, b.shifts, plannedStops)
+        const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, b, plannedStops)
         const remaining = remainingCapacityMinutes(b.date, todayIso, nowClockMinute, adjusted, timeline)
         return {
           ...b,
@@ -557,11 +584,12 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     )
   }
 
-  const shiftsByPressDate = new Map<string, number>()
+  // Pres × gün: normal vardiya sayısı ve mesai pencereleri (saat ekseni).
+  const dayShapeByPressDate = new Map<string, DayShape>()
   const horizonDateSet = new Set<string>()
   for (const [pressName, list] of buckets) {
     for (const b of list) {
-      shiftsByPressDate.set(`${pressName}|${b.date}`, b.shifts)
+      dayShapeByPressDate.set(`${pressName}|${b.date}`, { shifts: b.shifts, overtime: b.overtime })
       horizonDateSet.add(b.date)
     }
   }
@@ -639,12 +667,9 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // Pres bakımı dolu bir aralıktır: gün kısalmaz, günün bir saati kapanır.
   const maintenance: MaintenanceBlock[] = []
   for (const row of [...inputs.pressMaintenance, ...breakdownRows]) {
-    const shifts = shiftsByPressDate.get(`${row.press}|${row.date}`) ?? 0
-    if (shifts <= 0) continue
-    const block = pressMaintenanceBlock(
-      row,
-      buildDayTimeline(shiftStartMinute, shiftMinutes, shifts, plannedStops),
-    )
+    const shape = dayShapeByPressDate.get(`${row.press}|${row.date}`)
+    if (!shape || (shape.shifts <= 0 && !shape.overtime?.length)) continue
+    const block = pressMaintenanceBlock(row, buildDayTimeline(shiftStartMinute, shiftMinutes, shape, plannedStops))
     if (block) maintenance.push(block)
   }
 
@@ -743,10 +768,6 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // zamanındadır. Bakiye ve bugüne düşen ihtiyaç zaten bugün sabah
   // karşılanamaz: bir sonraki iş gününün sabahı esas alınır.
   const cutoffMinute = s.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute
-  const isWorkingDate = (iso: string) => {
-    const dayKey = DAY_KEYS[(new Date(`${iso}T00:00:00`).getDay() + 6) % 7]
-    return workingDayKeys.includes(dayKey) && !holidays.has(iso)
-  }
   const nextWorkingDate = (iso: string) => {
     let d = iso
     for (let i = 0; i < 14; i++) {
@@ -765,7 +786,9 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     return value
   }
   const computeDeadline = (due: string) => {
-    const calendarDay = due <= todayIso ? nextWorkingDate(todayIso) : due
+    // Teslimde tatil gözetilmez (müşteri tatil günü de isteyebilir): bakiye ve
+    // bugünün ihtiyacı ertesi gün, teslim saatinde.
+    const calendarDay = due <= todayIso ? isoDate(addDays(new Date(`${todayIso}T00:00:00`), 1)) : due
     // Takvim saati → üretim günü: birinci vardiyadan önceki saat bir önceki
     // üretim gününün gece vardiyasıdır.
     const early = cutoffMinute < shiftStartMinute
@@ -1222,8 +1245,13 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const clockTs = (date: string, clock: number) => Date.parse(`${date}T00:00:00Z`) + clock * 60_000
   for (const job of result.jobs) {
     if (!job.late || !job.readyDate || job.readyMinute === undefined || !job.deadlineDate || job.deadlineMinute === undefined) continue
-    const shifts = shiftsByPressDate.get(`${job.press}|${job.readyDate}`) ?? 3
-    const pressDay = buildDayTimeline(shiftStartMinute, shiftMinutes, Math.max(1, shifts), plannedStops)
+    const shape = dayShapeByPressDate.get(`${job.press}|${job.readyDate}`) ?? { shifts: 3 }
+    const pressDay = buildDayTimeline(
+      shiftStartMinute,
+      shiftMinutes,
+      shape.shifts > 0 || shape.overtime?.length ? shape : { shifts: 1 },
+      plannedStops,
+    )
     const ready = clockTs(job.readyDate, netToClock(job.readyMinute, pressDay))
     const deadline = clockTs(job.deadlineDate, netToClock(job.deadlineMinute, fullDay))
     job.lateHours = Math.max(0.1, Math.round(((ready - deadline) / 3_600_000) * 10) / 10)
@@ -1283,7 +1311,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         todayIso,
         nowClockMinute,
         adjusted,
-        buildDayTimeline(shiftStartMinute, shiftMinutes, bucket.shifts, plannedStops),
+        buildDayTimeline(shiftStartMinute, shiftMinutes, bucket, plannedStops),
       )
     }
   }
@@ -1296,7 +1324,9 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const days: PlanDay[] = []
   for (const [press, list] of buckets) {
     for (const b of list) {
-      if (b.shifts > 0 || b.minutes > 0) days.push({ press, date: b.date, shifts: b.shifts, minutes: b.minutes })
+      if (b.shifts > 0 || b.minutes > 0 || b.overtime?.length) {
+        days.push({ press, date: b.date, shifts: b.shifts, minutes: b.minutes, ...(b.overtime?.length ? { overtime: b.overtime } : {}) })
+      }
     }
   }
 
@@ -1306,7 +1336,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // RAW_URGENT_DAYS İŞ GÜNÜ içinde başlıyor (bugün dahil). Diğer eksikler Raw
   // Material Coverage'da izlenir.
   let rawUrgentUntil = todayIso
-  for (let n = isWorkingDate(todayIso) ? 1 : 0; n < RAW_URGENT_DAYS; n++) rawUrgentUntil = nextWorkingDate(rawUrgentUntil)
+  const rawUrgentDays = Math.max(1, Math.round(s.rawUrgentDays ?? SETTINGS_DEFAULTS.rawUrgentDays))
+  for (let n = isWorkingDate(todayIso) ? 1 : 0; n < rawUrgentDays; n++) rawUrgentUntil = nextWorkingDate(rawUrgentUntil)
   const rawShortages = rawNeeds.filter((r) => !!r.shortFrom && r.shortFrom.date <= rawUrgentUntil).length
   const warnings = buildWarnings({
     inputs,
@@ -1320,7 +1351,23 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     maintenance,
     moldBlackouts,
     todayIso,
+    rawUrgentDays,
   })
+  // Pres takvimi: düzeni olmayan pres hiç çalışmaz (program vardiya uydurmaz);
+  // plana alınamayan mesai kaydı da bildirilir.
+  const pressesWithoutCalendar = presses.filter((p) => !capModel.hasCalendar(p.name)).map((p) => p.name)
+  if (pressesWithoutCalendar.length > 0) {
+    warnings.unshift(
+      `No Work Calendar pattern for ${pressesWithoutCalendar.join(', ')} — these presses have no capacity until their days and shifts are defined.`,
+    )
+  }
+  for (const press of presses) {
+    for (let w = 0; w < horizonWeeks; w++) {
+      for (const problem of capModel.overtimeProblems(press.name, addDays(horizonMonday, w * 7))) {
+        warnings.push(`Overtime not planned — ${problem}`)
+      }
+    }
+  }
 
   if (daily.unreadable.length > 0 && daily.byMaterial.size > 0) {
     warnings.push(
@@ -1498,10 +1545,10 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         const start = addDays(horizonMonday, w * 7)
         let total = 0
         for (const b of capModel.weekBuckets(press.name, start)) {
-          // Plandaki gibi: ölçülen gerçekleşme oranı, sonra bugünün geçmiş saatleri.
-          const adjusted = capacityFactor === 1 ? b.minutes : Math.floor(b.minutes * capacityFactor)
-          const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, b.shifts, plannedStops)
-          total += remainingCapacityMinutes(b.date, todayIso, nowClockMinute, adjusted, timeline)
+          // Net saat, bugünün geçmiş saatleri düşülmüş. Kabul katsayısı (A) ya
+          // da parça performansı (B) Capacity Dashboard'da seçilir.
+          const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, b, plannedStops)
+          total += remainingCapacityMinutes(b.date, todayIso, nowClockMinute, b.minutes, timeline)
         }
         return total
       }),
@@ -1514,6 +1561,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     presses: presses.map((p) => ({ name: p.name, category: p.category })),
     weeks: forecastWeekList,
     capacityMinutes,
+    capacityFactor,
     stockLocations: [...counted.finished],
   })
   capacity.unassigned = capacity.unassigned.slice(0, 100)
@@ -1573,6 +1621,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     maintenance,
     rawNeeds,
     rawUrgentUntil,
+    rawUrgentDays,
+    pressesWithoutCalendar,
     warnings,
     truncatedInputs: inputs.truncatedInputs,
     frozenCount: frozenJobs.length,
@@ -1694,13 +1744,12 @@ function buildWarnings(ctx: {
   maintenance: MaintenanceBlock[]
   moldBlackouts: { material: string; date: string }[]
   todayIso: string
+  rawUrgentDays: number
 }): string[] {
   const { inputs, todayIso } = ctx
   const list: string[] = []
   if (inputs.presses.length === 0)
     list.push('No presses defined — add them on the Press Definitions page.')
-  if (inputs.templates.length === 0)
-    list.push('No work calendar defined for any press — defaulting to 1 shift.')
   if (inputs.weeklyDemand.length === 0) list.push('No ZPP weekly demand data uploaded.')
   if (inputs.stock.length === 0)
     list.push('No MB52 stock data uploaded — planning without deducting stock.')
@@ -1711,7 +1760,7 @@ function buildWarnings(ctx: {
     list.push('No public holidays stored — open the Work Calendar page once so they are saved.')
   if (ctx.rawShortages > 0)
     list.push(
-      `${ctx.rawShortages} raw material(s) run out within ${RAW_URGENT_DAYS} working days — coils must be sourced now (see Raw material — urgent).`,
+      `${ctx.rawShortages} raw material(s) run out within ${ctx.rawUrgentDays} working days — coils must be sourced now (see Raw material — urgent).`,
     )
   if (ctx.lateCount > 0)
     list.push(

@@ -1,6 +1,19 @@
 import { v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
+import { patternProblem } from '../src/lib/pressCalendar'
+import { SETTINGS_DEFAULTS } from '../src/lib/settingsDefaults'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function shiftMinutesOf(ctx: any): Promise<number> {
+  const settings = await ctx.db
+    .query('globalShiftSettings')
+    .withIndex('by_key', (q: any) => q.eq('key', 'default')) // eslint-disable-line @typescript-eslint/no-explicit-any
+    .first()
+  return settings?.shiftMinutes ?? SETTINGS_DEFAULTS.shiftMinutes
+}
+
+const recurringValidator = v.array(v.object({ dayKey: v.string(), definitionId: v.id('overtimeDefinitions') }))
 
 const globalSettingsValidator = v.union(
   v.object({
@@ -31,7 +44,9 @@ const globalSettingsValidator = v.union(
     rawOrderExtraKg: v.optional(v.number()),
     rawOrderMailTo: v.optional(v.array(v.string())),
     rawOrderMailCc: v.optional(v.array(v.string())),
+    rawUrgentDays: v.optional(v.number()),
     migratedSetupGap10: v.optional(v.boolean()),
+    migratedCalendarV2: v.optional(v.boolean()),
   }),
   v.null(),
 )
@@ -72,6 +87,7 @@ export const saveGlobalSettings = guardedMutation({
     rawOrderExtraKg: v.optional(v.number()),
     rawOrderMailTo: v.optional(v.array(v.string())),
     rawOrderMailCc: v.optional(v.array(v.string())),
+    rawUrgentDays: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -79,6 +95,19 @@ export const saveGlobalSettings = guardedMutation({
       .query('globalShiftSettings')
       .withIndex('by_key', (q) => q.eq('key', 'default'))
       .first()
+    // Günde vardiya × süre 24 saati geçemez: kayıtlı her pres düzeni yeni
+    // vardiya süresiyle kontrol edilir.
+    const patterns = [
+      ...(await ctx.db.query('pressTemplates').collect()).map((t) => ({ ...t, where: t.press })),
+      ...(await ctx.db.query('pressWeekOverrides').collect()).map((o) => ({ ...o, where: `${o.press} week ${o.weekStart}` })),
+    ]
+    for (const p of patterns) {
+      const problem = patternProblem(p, args.shiftMinutes)
+      if (problem) throw new Error(`${p.where}: ${problem}`)
+    }
+    if (args.rawUrgentDays !== undefined && (!Number.isInteger(args.rawUrgentDays) || args.rawUrgentDays < 1 || args.rawUrgentDays > 30)) {
+      throw new Error('Urgent raw material days must be a whole number between 1 and 30')
+    }
     if (existing) {
       await ctx.db.patch(existing._id, args)
     } else {
@@ -95,7 +124,8 @@ const templateValidator = v.union(
     press: v.string(),
     workingDays: v.number(),
     shiftsPerDay: v.number(),
-    overtimeShifts: v.number(),
+    overtimeShifts: v.optional(v.number()),
+    recurringOvertime: v.optional(recurringValidator),
   }),
   v.null(),
 )
@@ -119,7 +149,8 @@ export const listTemplates = guardedQuery({
       press: v.string(),
       workingDays: v.number(),
       shiftsPerDay: v.number(),
-      overtimeShifts: v.number(),
+      overtimeShifts: v.optional(v.number()),
+      recurringOvertime: v.optional(recurringValidator),
     }),
   ),
   handler: async (ctx) => ctx.db.query('pressTemplates').collect(),
@@ -130,12 +161,13 @@ export const saveTemplate = guardedMutation({
     press: v.string(),
     workingDays: v.number(),
     shiftsPerDay: v.number(),
-    overtimeShifts: v.number(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
     if (!press) throw new Error('Press name is required')
+    const problem = patternProblem(args, await shiftMinutesOf(ctx))
+    if (problem) throw new Error(problem)
     const existing = await ctx.db
       .query('pressTemplates')
       .withIndex('by_press', (q) => q.eq('press', press))
@@ -144,7 +176,7 @@ export const saveTemplate = guardedMutation({
       await ctx.db.patch(existing._id, {
         workingDays: args.workingDays,
         shiftsPerDay: args.shiftsPerDay,
-        overtimeShifts: args.overtimeShifts,
+        overtimeShifts: undefined,
       })
     } else {
       await ctx.db.insert('pressTemplates', { ...args, press })
@@ -160,7 +192,7 @@ const overrideValidator = v.object({
   weekStart: v.string(),
   workingDays: v.number(),
   shiftsPerDay: v.number(),
-  overtimeShifts: v.number(),
+  overtimeShifts: v.optional(v.number()),
 })
 
 export const listOverrides = guardedQuery({
@@ -179,12 +211,13 @@ export const saveOverride = guardedMutation({
     weekStart: v.string(),
     workingDays: v.number(),
     shiftsPerDay: v.number(),
-    overtimeShifts: v.number(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
     if (!press) throw new Error('Press name is required')
+    const problem = patternProblem(args, await shiftMinutesOf(ctx))
+    if (problem) throw new Error(problem)
     const existing = await ctx.db
       .query('pressWeekOverrides')
       .withIndex('by_press_week', (q) =>
@@ -195,7 +228,7 @@ export const saveOverride = guardedMutation({
       await ctx.db.patch(existing._id, {
         workingDays: args.workingDays,
         shiftsPerDay: args.shiftsPerDay,
-        overtimeShifts: args.overtimeShifts,
+        overtimeShifts: undefined,
       })
     } else {
       await ctx.db.insert('pressWeekOverrides', { ...args, press })

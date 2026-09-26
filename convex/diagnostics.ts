@@ -24,6 +24,8 @@ const TABLES = [
   'stock',
   'actualProduction',
   'rawInTransit',
+  'overtimeDefinitions',
+  'pressOvertime',
   'planSnapshots',
   'changeLog',
   'moldMaintenance',

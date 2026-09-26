@@ -117,8 +117,17 @@ export interface WeekGanttJob {
 
 export interface WeekGanttDay {
   date: string
+  /** Normal vardiya sayısı. */
   shifts: number
+  /** Açılan mesai pencereleri (üretim gününün saat ekseni). */
+  overtime?: { start: number; end: number; name?: string }[]
   capacityMinutes: number
+}
+
+/** Günün çalışılan son dakikası (birinci vardiyanın başından). */
+function daySpan(day: WeekGanttDay, shiftStartMinute: number, shiftMinutes: number): number {
+  const ot = Math.max(0, ...(day.overtime ?? []).map((o) => o.end - shiftStartMinute))
+  return Math.max(day.shifts * shiftMinutes, ot)
 }
 
 export interface WeekGanttPress {
@@ -254,8 +263,11 @@ export function WeekGantt({
   const pxPerMinute = pxPerHour / 60
 
   const { rows, dayWidthMinutes, clashKeys } = useMemo(() => {
-    const maxShifts = Math.max(1, ...presses.flatMap((p) => p.days.map((d) => d.shifts)))
-    const dayWidthMinutes = maxShifts * shiftMinutes
+    // Gün genişliği: en uzun çalışılan gün (normal vardiyalar ya da mesai).
+    const dayWidthMinutes = Math.max(
+      shiftMinutes,
+      ...presses.flatMap((p) => p.days.map((d) => daySpan(d, shiftStartMinute, shiftMinutes))),
+    )
     const dayIndex = new Map(visibleDates.map((d, i) => [d, i]))
 
     // Parçalar kendi günlerine göre dağıtılır — işin başladığı güne değil.
@@ -277,9 +289,9 @@ export function WeekGantt({
 
       for (const day of press.days) {
         const index = dayIndex.get(day.date)
-        if (index === undefined || day.shifts <= 0) continue
+        if (index === undefined || (day.shifts <= 0 && !day.overtime?.length)) continue
         const base = index * dayWidthMinutes - shiftStartMinute
-        const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, day.shifts, stops)
+        const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, day, stops)
 
         for (const stop of timeline.stops) {
           blocks.push({
@@ -344,11 +356,14 @@ export function WeekGantt({
       // sonraki işin bekleme nedeniyle birlikte çizilir. Mola, gece ve
       // geçmiş saatler boşluk sayılmaz.
       const windows = press.days
-        .filter((d) => d.shifts > 0 && dayIndex.has(d.date))
-        .map((d) => {
-          const start = dayIndex.get(d.date)! * dayWidthMinutes
-          return { start, end: start + d.shifts * shiftMinutes }
+        .filter((d) => dayIndex.has(d.date))
+        .flatMap((d) => {
+          const base = dayIndex.get(d.date)! * dayWidthMinutes
+          const list = d.shifts > 0 ? [{ start: base, end: base + d.shifts * shiftMinutes }] : []
+          for (const o of d.overtime ?? []) list.push({ start: base + o.start - shiftStartMinute, end: base + o.end - shiftStartMinute })
+          return list
         })
+        .sort((a, b) => a.start - b.start)
       const nowIndex = now ? visibleDates.indexOf(now.date) : -1
       const nowAt =
         now && nowIndex >= 0 ? nowIndex * dayWidthMinutes + (now.clockMinute - shiftStartMinute) : null

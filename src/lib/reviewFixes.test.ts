@@ -169,8 +169,10 @@ describe('breaks inside every shift and overtime weeks', () => {
           weekStart: '2026-09-14',
           workingDays: 6,
           shiftsPerDay: 3,
-          overtimeShifts: 1,
         })),
+        // Pazar mesaisi (tarihli, tanımla): 07:00'dan 8 saat, molalar düşülür.
+        overtimeDefinitions: [{ id: 'full', name: 'Full overtime', startMinute: 420, durationMinutes: 480 }],
+        pressOvertime: base.presses.map((p) => ({ press: p.name, date: '2026-09-20', definitionId: 'full' })),
       }
       const run = computePlan(inputs, NOW)
       const v = validatePlan(inputs, run, NOW)

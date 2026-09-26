@@ -203,7 +203,7 @@ describe('stock produced since the last MB52 upload', () => {
 
 
 describe('capacity forecast and week overrides', () => {
-  it('counts only the hours left this week and adds overtime opened for a week', () => {
+  it('counts only the hours left this week and adds overtime opened on a date', () => {
     const base = computePlan(inputs(), NOW)
     const press = base.capacity!.presses.find((p) => p.press === 'PRS-1')!
     // 2 × 8 h shifts: Wednesday 10:00 → 5 h left today (first shift 07:00–15:00,
@@ -211,9 +211,11 @@ describe('capacity forecast and week overrides', () => {
     expect(press.capacity[0]).toBe(45)
     expect(base.capacity!.weeks[0]).toMatchObject({ start: '2026-09-14', label: 'W38' })
 
+    // Mesai tarihli ve tanımla açılır: Cumartesi 07:00'dan 2 × 8 saat.
     const withOvertime = computePlan(
       inputs({
-        weekOverrides: [{ press: 'PRS-1', weekStart: '2026-09-14', workingDays: 5, shiftsPerDay: 2, overtimeShifts: 2 }],
+        overtimeDefinitions: [{ id: 'double', name: 'Double overtime', startMinute: 420, durationMinutes: 960 }],
+        pressOvertime: [{ press: 'PRS-1', date: '2026-09-19', definitionId: 'double' }],
       }),
       NOW,
     )

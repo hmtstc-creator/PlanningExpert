@@ -11,7 +11,7 @@ const locValidator = v.object({
   _creationTime: v.number(),
   code: v.string(),
   description: v.optional(v.string()),
-  category: v.string(),
+  category: v.optional(v.string()),
   countFinished: v.optional(v.boolean()),
   countRaw: v.optional(v.boolean()),
   countProduction: v.optional(v.boolean()),
@@ -39,7 +39,6 @@ export const upsert = guardedMutation({
   args: {
     code: v.string(),
     description: v.optional(v.string()),
-    category: v.string(),
     countFinished: v.optional(v.boolean()),
     countRaw: v.optional(v.boolean()),
     countProduction: v.optional(v.boolean()),
@@ -55,7 +54,7 @@ export const upsert = guardedMutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         description: args.description,
-        category: args.category,
+        category: undefined,
         countFinished: args.countFinished,
         countRaw: args.countRaw,
         countProduction: args.countProduction,

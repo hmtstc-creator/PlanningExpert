@@ -14,42 +14,6 @@ export const Route = createFileRoute('/depolar')({
   component: DepolarPage,
 })
 
-// Kategori yalnızca açıklayıcıdır ve hammadde tikinin varsayılanını belirler;
-// neyin sayılacağına matristeki tikler karar verir (src/lib/stockLocations.ts).
-const CATEGORIES = [
-  {
-    value: 'finished_goods',
-    label: 'Finished Goods',
-    hint: 'Finished product store.',
-    color: 'bg-emerald-100 text-emerald-800',
-  },
-  {
-    value: 'production_area',
-    label: 'Production Area',
-    hint: 'Work in progress at the line.',
-    color: 'bg-teal-100 text-teal-800',
-  },
-  {
-    value: 'raw_material',
-    label: 'Raw Material',
-    hint: 'Raw coil store — "Raw material" is ticked by default.',
-    color: 'bg-slate-200 text-slate-700',
-  },
-  {
-    value: 'quality',
-    label: 'Quality',
-    hint: 'Awaiting quality inspection.',
-    color: 'bg-amber-100 text-amber-800',
-  },
-  {
-    value: 'customer',
-    label: 'Customer',
-    hint: 'Transferred or sold to the customer.',
-    color: 'bg-slate-200 text-slate-700',
-  },
-]
-
-const DEFAULT_CATEGORY = 'finished_goods'
 
 function DepolarPage() {
   const { results: locations } = usePaginatedQuery(
@@ -81,14 +45,12 @@ function DepolarPage() {
     locations,
     (l) => l.code,
     (l) => ({
-      category: l.category ?? DEFAULT_CATEGORY,
       description: l.description ?? '',
       countFinished: countsFinished(l),
       countRaw: countsRaw(l),
       countProduction: countsProduction(l),
     }),
     (a, b) =>
-      a.category === b.category &&
       a.description === b.description &&
       a.countFinished === b.countFinished &&
       a.countRaw === b.countRaw &&
@@ -96,7 +58,6 @@ function DepolarPage() {
   )
 
   const saveLocation = (code: string) => (draft: {
-    category: string
     description: string
     countFinished: boolean
     countRaw: boolean
@@ -104,7 +65,6 @@ function DepolarPage() {
   }) =>
     upsert({
       code,
-      category: draft.category,
       description: draft.description.trim() || undefined,
       countFinished: draft.countFinished,
       countRaw: draft.countRaw,
@@ -130,7 +90,7 @@ function DepolarPage() {
     setSaving(code)
     let ok = false
     try {
-      ok = await upsert({ code, category: DEFAULT_CATEGORY })
+      ok = await upsert({ code })
     } finally {
       setSaving(null)
     }
@@ -165,7 +125,7 @@ function DepolarPage() {
   /**
    * Deletes a storage location definition. A location that still appears in
    * MB52 stock does not disappear from the list — only its definition
-   * (category/note) is removed and it falls back to the default, because the
+   * (ticks/note) is removed and it falls back to the defaults, because the
    * stock data keeps producing that code.
    */
   async function deleteLocation(code: string) {
@@ -173,7 +133,7 @@ function DepolarPage() {
     if (!record) return
     const stillInStock = stockRows.some((s) => s.storageLocation === code)
     const message = stillInStock
-      ? `Delete the definition for storage location ${code}? It still appears in MB52 stock, so it will stay in the list but fall back to the default category.`
+      ? `Delete the definition for storage location ${code}? It still appears in MB52 stock, so it will stay in the list but fall back to the default ticks.`
       : `Remove storage location ${code} from the list entirely?`
     if (!window.confirm(message)) return
     setSaving(code)
@@ -196,16 +156,6 @@ function DepolarPage() {
         material netting) and raw material on hand (coil orders).
       </p>
 
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {CATEGORIES.map((c) => (
-          <div key={c.value} className="rounded-lg border border-border p-3">
-            <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${c.color}`}>
-              {c.label}
-            </span>
-            <p className="mt-2 text-xs text-muted-foreground">{c.hint}</p>
-          </div>
-        ))}
-      </div>
 
       <div className="mt-6 flex gap-2">
         <input
@@ -228,7 +178,7 @@ function DepolarPage() {
 
       <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
       <p className="mt-3 text-sm text-muted-foreground">
-        Changing a tick, the category or the note marks the location{' '}
+        Changing a tick or the note marks the location{' '}
         <strong className="text-foreground">Unsaved</strong> — press Save on that
         row, or Save all at the bottom of the page.
       </p>
@@ -259,12 +209,11 @@ function DepolarPage() {
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Location</th>
                 <th className="px-3 py-2 font-medium">Note</th>
-                <th className="px-3 py-2 font-medium">Category</th>
                 <th className="px-3 py-2 text-center font-medium">
                   Finished goods
                   <div className="font-normal">plan &amp; MRP netting</div>
@@ -319,20 +268,6 @@ function DepolarPage() {
                           if (e.key === 'Enter') saveCard()
                         }}
                       />
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        className="rounded-md border border-input bg-background px-2 py-1 text-sm"
-                        disabled={busy}
-                        value={draft.category}
-                        onChange={(e) => rows.edit(code, { category: e.target.value })}
-                      >
-                        {CATEGORIES.map((c) => (
-                          <option key={c.value} value={c.value}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
                     </td>
                     <td className="px-3 py-2 text-center">
                       <input
@@ -391,8 +326,7 @@ function DepolarPage() {
 
       <p className="mt-6 text-xs text-muted-foreground">
         A tick decides what the stock in that location counts for. Without a
-        saved tick, 2009 and 1009 count for both, and a "Raw Material" location
-        counts for raw material. Production receipt: MB51 101 movements into
+        saved tick, 2009 and 1009 count for finished goods and raw material. Production receipt: MB51 101 movements into
         this location minus 102 reversals are the actual production (plan
         versus actual, performance, mould shot counters); 2009 by default. Stock in an unticked location is shown but
         never netted.

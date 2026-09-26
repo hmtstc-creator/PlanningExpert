@@ -1,6 +1,7 @@
 import { addDays, isoDate } from './dates'
 import { splitWeek } from './dailyDemand'
 import { DEFAULT_WORKING_DAYS } from './settingsDefaults'
+import { buildDayTimeline, type OvertimeWindow, type PlannedStop } from './shiftTimeline'
 
 // Planlama motorunun saf hesaplama katmanı.
 // Buradaki fonksiyonlar Convex'ten veya React'ten bağımsızdır; girdi olarak
@@ -10,7 +11,8 @@ import { DEFAULT_WORKING_DAYS } from './settingsDefaults'
 export interface WeekPattern {
   workingDays: number
   shiftsPerDay: number
-  overtimeShifts: number
+  /** @deprecated Mesai artık tarihli açılır (pressCalendar.ts); okunmaz. */
+  overtimeShifts?: number
 }
 
 export interface ShiftSettings {
@@ -26,6 +28,12 @@ export interface ShiftSettings {
    * Vardiya devri, çay ve yemek her vardiyada farklı olabilir.
    */
   stopMinutesByShift?: number[]
+  /**
+   * Verilirse günün net dakikası saat ekseninden (buildDayTimeline) çıkar:
+   * mesai pencereleri ve onlara denk gelen duruşlar dahil.
+   */
+  shiftStartMinute?: number
+  plannedStops?: PlannedStop[]
 }
 
 /** Bir vardiyanın planlı duruşlardan arındırılmış net süresi. */
@@ -141,8 +149,6 @@ export interface DemandScheduleOptions {
   horizonWeeks?: number
   /** Aciliyet hesabında haftada kaç gün çalışıldığı (varsayılan 5). */
   workingDaysPerWeek?: number
-  /** Bu gün sayısından fazla stoğu olan malzeme acil sayılmaz (varsayılan 14). */
-  urgentCoverDays?: number
   /**
    * Emniyet stoğu, iş günü cinsinden. Bir sonraki lot, stok bitmeden bu
    * kadar iş günü önce üretilebilir hâle gelir (varsayılan 0).
@@ -152,6 +158,12 @@ export interface DemandScheduleOptions {
   today?: string
   /** Talebin tüketildiği günler (varsayılan Pazartesi–Cuma). */
   workingDayKeys?: string[]
+  /**
+   * Fabrikanın iş günü (pres takviminden). Verilirse `workingDayKeys` yerine
+   * bu kullanılır: ZPP_DAILY'nin ulaşmadığı günlerde haftalık talep yalnızca
+   * iş günlerine dağılır.
+   */
+  isWorkingDate?: (iso: string) => boolean
   /** ZPP_DAILY'nin kapsadığı son gün (ISO); yoksa günlük veri kullanılmaz. */
   dailyUntil?: string | null
 }
@@ -174,8 +186,8 @@ function demandCalendar(options: DemandScheduleOptions): DemandCalendar {
     const openDays: string[] = []
     for (let d = 0; d < 7; d++) {
       const date = addDays(options.baseMonday, w * 7 + d)
-      if (!workingKeys.has(DAY_KEYS[(date.getDay() + 6) % 7])) continue
       const iso = isoDate(date)
+      if (options.isWorkingDate ? !options.isWorkingDate(iso) : !workingKeys.has(DAY_KEYS[(date.getDay() + 6) % 7])) continue
       workingDays.add(iso)
       if (iso >= today) openDays.push(iso)
     }
@@ -206,7 +218,6 @@ export function buildDemandSchedule(
 ): DemandEntry[] {
   const horizonWeeks = options.horizonWeeks ?? 4
   const workingDaysPerWeek = options.workingDaysPerWeek ?? 5
-  const urgentCoverDays = options.urgentCoverDays ?? 14
   const baseMonday = options.baseMonday
   const baseIso = isoDate(baseMonday)
 
@@ -241,7 +252,6 @@ export function buildDemandSchedule(
     const dailyRate = weeklyAvg > 0 ? weeklyAvg / workingDaysPerWeek : 0
     const daysOfCover =
       dailyRate > 0 ? row.stock / dailyRate : row.stock > 0 ? Number.POSITIVE_INFINITY : 0
-    const isUrgent = daysOfCover < urgentCoverDays
 
     const list: DemandEntry[] = []
     const overdue = Math.abs(row.overdue)
@@ -266,21 +276,16 @@ export function buildDemandSchedule(
     periods.slice(0, horizonWeeks).forEach((period, index) => {
       if (period.qty <= 0) return
       const due = isoDate(addDays(baseMonday, index * 7))
-      const phase: DemandEntry['phase'] = isUrgent ? 'urgent' : 'fill'
+      // Acil mi dolgu mu, stok projeksiyonu belirler (stoğun bittiği gün ve
+      // emniyet stoğu); burada her kalem dolgu olarak başlar.
       list.push({
         material: row.material,
         qty: period.qty,
         dueDate: due,
-        // Acil kalemler öne çekilebilir, dolgu kalemleri kendi haftasından
-        // önce üretilmez.
-        earliestDate: phase === 'urgent' ? baseIso : due,
+        earliestDate: due,
         bucketLabel: period.label,
-        phase,
-        urgency: isUrgent
-          ? Math.round(
-              Math.max(0, Math.min(99, ((urgentCoverDays - daysOfCover) / urgentCoverDays) * 99)),
-            )
-          : 0,
+        phase: 'fill',
+        urgency: 0,
         daysOfCover,
       })
     })
@@ -991,85 +996,66 @@ export interface DayBucket {
    * kapasiteden yemez.
    */
   setupBreaks?: { at: number; minutes: number }[]
+  /** O güne açılan mesai pencereleri (saat ekseni). */
+  overtime?: OvertimeWindow[]
 }
 
 export const DAY_KEYS = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const
 
 
 /**
- * Bir haftanın gün bazlı kapasitesini çıkarır.
- * Normal vardiyalar haftanın ilk `workingDays` gününe dağıtılır (tatiller
- * atlanır), fazla mesai vardiyaları bunların ardındaki günlere eklenir.
+ * Bir haftanın gün bazlı kapasitesini çıkarır (docs/decisions.md):
+ * normal vardiyalar Pazartesiden başlayarak haftanın ilk `workingDays`
+ * gününe konur; resmi tatil o günün vardiyasını götürür, başka güne
+ * kaydırılmaz. Mesai yalnızca `overtimeOf` ile gelen tarihli pencerelerdir.
  */
 export function buildWeekBuckets(
   weekStart: Date,
   pattern: WeekPattern,
   settings: ShiftSettings,
   holidays: Set<string> = new Set(),
-  /**
-   * Normal vardiyaların yerleşebileceği hafta günleri (MO..SU). Şirket
-   * Salı–Cumartesi çalışıyorsa normal vardiyalar Pazartesi'ye konmamalı.
-   * Verilmezse tüm günler uygundur (eski davranış).
-   */
-  workingDayKeys?: readonly string[],
+  /** @deprecated Genel çalışma günleri kaldırıldı; okunmaz. */
+  _workingDayKeys?: readonly string[],
+  /** O günün normal vardiyası ve açılan mesaileri (pressCalendar.pressDay). */
+  dayOf?: (date: string, index: number, isHoliday: boolean) => { shifts: number; overtime: OvertimeWindow[] },
 ): DayBucket[] {
   const buckets: DayBucket[] = []
-  let normalDaysLeft = pattern.workingDays
-  let overtimeShiftsLeft = pattern.overtimeShifts
-  const allowed =
-    workingDayKeys && workingDayKeys.length > 0
-      ? new Set(workingDayKeys)
-      : new Set<string>(DAY_KEYS)
-
   for (let i = 0; i < 7; i++) {
-    const date = addDays(weekStart, i)
-    const dateStr = isoDate(date)
+    const dateStr = isoDate(addDays(weekStart, i))
     const isHoliday = holidays.has(dateStr)
     const dayKey = DAY_KEYS[i]
-
-    if (isHoliday) {
-      buckets.push({ date: dateStr, dayKey, shifts: 0, isOvertime: false, isHoliday, minutes: 0 })
-      continue
-    }
-
-    if (allowed.has(dayKey) && normalDaysLeft > 0) {
-      normalDaysLeft--
-      buckets.push({
-        date: dateStr,
-        dayKey,
-        shifts: pattern.shiftsPerDay,
-        isOvertime: false,
-        isHoliday: false,
-        minutes: dayMinutes(pattern.shiftsPerDay, settings.shiftMinutes, settings),
-      })
-    } else if (overtimeShiftsLeft > 0) {
-      const shifts = Math.min(overtimeShiftsLeft, 3)
-      overtimeShiftsLeft -= shifts
-      buckets.push({
-        date: dateStr,
-        dayKey,
-        shifts,
-        isOvertime: true,
-        isHoliday: false,
-        minutes: dayMinutes(shifts, settings.overtimeShiftMinutes, settings),
-      })
-    } else {
-      buckets.push({ date: dateStr, dayKey, shifts: 0, isOvertime: false, isHoliday: false, minutes: 0 })
-    }
+    const day = dayOf
+      ? dayOf(dateStr, i, isHoliday)
+      : { shifts: !isHoliday && i < pattern.workingDays ? pattern.shiftsPerDay : 0, overtime: [] as OvertimeWindow[] }
+    buckets.push({
+      date: dateStr,
+      dayKey,
+      shifts: day.shifts,
+      isOvertime: day.overtime.length > 0,
+      isHoliday,
+      minutes: dayNetMinutes(day.shifts, day.overtime, settings),
+      ...(day.overtime.length > 0 ? { overtime: day.overtime } : {}),
+    })
   }
-
   return buckets
 }
 
+/** Günün net dakikası: normal vardiyalar + mesai, planlı duruşlar düşülmüş. */
+function dayNetMinutes(shifts: number, overtime: OvertimeWindow[], settings: ShiftSettings): number {
+  if (settings.plannedStops && settings.shiftStartMinute !== undefined) {
+    return buildDayTimeline(settings.shiftStartMinute, settings.shiftMinutes, { shifts, overtime }, settings.plannedStops)
+      .netMinutes
+  }
+  return dayMinutes(shifts, settings.shiftMinutes, settings) + overtime.reduce((a, w) => a + (w.end - w.start), 0)
+}
+
+/** Haftanın normal (mesaisiz) net dakikası. */
 export function weekTotalMinutes(pattern: WeekPattern, settings: ShiftSettings): number {
-  return (
-    pattern.workingDays * dayMinutes(pattern.shiftsPerDay, settings.shiftMinutes, settings) +
-    dayMinutes(pattern.overtimeShifts, settings.overtimeShiftMinutes, settings)
-  )
+  return Math.min(7, pattern.workingDays) * dayMinutes(pattern.shiftsPerDay, settings.shiftMinutes, settings)
 }
 
 export function weekTotalShifts(pattern: WeekPattern): number {
-  return pattern.workingDays * pattern.shiftsPerDay + pattern.overtimeShifts
+  return Math.min(7, pattern.workingDays) * pattern.shiftsPerDay
 }
 
 // ---- 4) Hammadde (rulo) ihtiyacı ------------------------------------------

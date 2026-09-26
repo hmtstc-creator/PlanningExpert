@@ -30,6 +30,7 @@ export const SETTINGS_DEFAULTS = {
   maxScenarios: 100,
   rawCoverageDays: 10,
   rawOrderExtraKg: 500,
+  rawUrgentDays: 3,
 } as const
 
 /** Work Calendar'da gün seçilmemişse çalışma günleri. */

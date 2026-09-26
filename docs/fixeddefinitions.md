@@ -16,7 +16,7 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 | 8 | Brüt ağırlık "birim hatası" uyarısı | parça başı 50 kg'dan fazla ya da 1 g'dan az | `rawMrp.ts` | P | |
 | 9 | "Çok rulo" uyarısı | bir işte 200'den fazla rulo | `planPipeline.ts` (MANY_COILS) | P | |
 | 10 | "Yer tutucu" rulo ağırlığı | 1 kg ve altı: rulo kuralı uygulanmaz | `planning.ts`, `planValidator.ts` | P | |
-| 11 | Genel çalışma günü seçilmemişse | Pzt–Cuma | `settingsDefaults.ts` | — (genel tikler kalkıyor) | |
+| 11 | Genel çalışma günü seçilmemişse | — | — | Kaldırıldı: pres takvimi esas | — |
 | 12 | Hol adı boş bırakılırsa | "Hall 1" | `pressDraft.ts` | K (hol zorunlu) | |
 | 13 | Bakiye ve bugünün ihtiyacı | ertesi iş günü, teslim saatinde | `planPipeline.ts` | P | |
 | 14 | Varış tarihi olmayan yoldaki rulo | bu hafta gelmiş sayılır | `rawMrp.ts`, `planning.ts` | P | |
@@ -27,11 +27,13 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 | 19 | Plan yeniden hesaplama gecikmesi | kayıttan 4 sn sonra | `convex/planQueue.ts` | P | |
 | 20 | Saklanan eski plan sayısı | 3 | `convex/planRuns.ts` | P | |
 | 21 | Tek seferde okunan en fazla satır | MB51 20.000; ZPP ve MB52 8.000 (aşılırsa uyarı) | `convex/*.ts` | P | |
-| 22 | Acil hammadde süresi | 3 iş günü | `planPipeline.ts` (RAW_URGENT_DAYS) | K — **karar verildi**, Work Calendar'a taşınacak | K |
+| 22 | Acil hammadde süresi | 3 iş günü (varsayılan) | Work Calendar ayarı | K — uygulandı | K |
 | 23 | Kalıp setup'ının çay/yemek molasından geçebilmesi | çay, yemek, mola türleri | `planPipeline.ts` (SETUP_THROUGH_KINDS) | P | |
 | 24 | Vinç kontrolünde komşu güne bakış | 360 dk | `scheduler.ts` (BOUNDARY_REACH) | P (teknik) | |
+| 26 | Tekrarlayan mesai resmi tatilde | çalışmaz (tatilde mesai tarihli açılır) | `pressCalendar.ts` | P | |
+| 27 | "İş günü" sayarken mesai | sayılmaz: yalnızca normal vardiyası olan gün | `capacityModel.ts` (isPlantWorkingDate) | P | |
+| 28 | Normal vardiyayla ya da başka mesaiyle çakışan mesai | kaydedilmez | `pressCalendar.ts` | P | |
 | 25 | Varsayılan depolar (matriste tik yoksa) | bitmiş ürün ve hammadde: 2009, 1009; üretim girişi: 2009 | `stockLocations.ts` | P | |
 
-Not: Eski "14 gün stok = acil" kuralının kodu (`planning.ts`, urgentCoverDays)
-artık etkisizdir; acil tanımı stok projeksiyonundan gelir. Bir sonraki
-düzeltmede kaldırılacak.
+Not: Eski "14 gün stok = acil" kuralının kodu kaldırıldı; acil tanımı stok
+projeksiyonundan gelir.
