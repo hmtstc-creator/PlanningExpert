@@ -12,6 +12,14 @@ export const Route = createFileRoute('/hammadde')({
 })
 
 const fmt = (n: number) => Math.round(n).toLocaleString('en-GB')
+/** kg → ton, bir ondalık. */
+const tons = (kg: number) => (kg / 1000).toLocaleString('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+/** Mamul kodları: ilk ikisi, fazlası "+n". */
+const productsLabel = (codes: string[]) =>
+  codes.length === 0 ? '—' : codes.length <= 2 ? codes.join(', ') : `${codes.slice(0, 2).join(', ')} +${codes.length - 2}`
+// Yapışkan iki sütun: mamul kodu ve hammadde; ikincisi birincinin genişliği kadar sağda.
+const PRODUCT_COL = 'sticky left-0 z-10 w-44 min-w-44 max-w-44'
+const RAW_COL = 'sticky left-44 z-10'
 const DEFAULT_DAYS = 10
 const DEFAULT_EXTRA = 500
 
@@ -65,6 +73,10 @@ function RawMaterialCoveragePage() {
       return (fa < 0 ? 999 : fa) - (fb < 0 ? 999 : fb) || a.rawMaterial.localeCompare(b.rawMaterial)
     })
   const weekTotals = weeks.map((_, w) => results.reduce((a, r) => a + r.rows[w].orderKg, 0))
+  // Bütün hammaddelerin haftalık ihtiyacı (kg) — tablonun üstünde ton olarak.
+  const weekNeed = weeks.map((_, w) => results.reduce((a, r) => a + r.rows[w].needKg, 0))
+  const totalNeed = weekNeed.reduce((a, b) => a + b, 0)
+  const totalStock = results.reduce((a, r) => a + r.stockKg, 0)
   const thisWeek = results.filter((r) => (r.rows[0]?.orderKg ?? 0) > 0)
   const lowCover = results.filter((r) => r.coversWeeks !== null && r.coversWeeks * workingDaysPerWeek < coverageDays)
   const transitTotal = results.reduce((a, r) => a + r.totalInTransitKg, 0)
@@ -256,14 +268,25 @@ function RawMaterialCoveragePage() {
               </button>
             </div>
           </div>
+          <p className="mt-2 text-sm text-foreground">
+            Total raw material need to {weeks[weeks.length - 1]?.label ?? ''}:{' '}
+            <strong>{tons(totalNeed)} t</strong>
+            <span className="text-muted-foreground">
+              {' '}
+              · stock {tons(totalStock)} t · in transit {tons(transitTotal)} t · to order{' '}
+              {tons(weekTotals.reduce((a, b) => a + b, 0))} t
+            </span>
+          </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Click a raw material to see need, stock, arrivals and safety per week.
+            The first two rows are all raw materials together, in tonnes per week. Click a raw material
+            to see need, stock, arrivals and safety per week (kg).
           </p>
           <div className="mt-2 overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-right text-xs tabular-nums">
               <thead className="bg-muted text-muted-foreground">
                 <tr>
-                  <th className="sticky left-0 z-10 bg-muted px-3 py-2 text-left font-medium">Raw material</th>
+                  <th className={`${PRODUCT_COL} bg-muted px-3 py-2 text-left font-medium`}>Finished product</th>
+                  <th className={`${RAW_COL} bg-muted px-3 py-2 text-left font-medium`}>Raw material</th>
                   <th className="px-2 py-2 font-medium">Stock</th>
                   <th className="px-2 py-2 font-medium">In transit</th>
                   <th className="px-2 py-2 font-medium">Covers</th>
@@ -276,13 +299,47 @@ function RawMaterialCoveragePage() {
                 </tr>
               </thead>
               <tbody>
+                <tr className="bg-sky-50 font-semibold text-foreground">
+                  <td colSpan={2} className="sticky left-0 z-10 bg-sky-50 px-3 py-1.5 text-left">
+                    Need, all raw materials (t)
+                  </td>
+                  <td className="px-2 py-1.5 font-normal text-muted-foreground">{tons(totalStock)}</td>
+                  <td className="px-2 py-1.5 font-normal text-muted-foreground">{transitTotal > 0 ? tons(transitTotal) : '·'}</td>
+                  <td />
+                  {weekNeed.map((kg, w) => (
+                    <td key={weeks[w].start} className="px-2 py-1.5">
+                      {kg > 0 ? tons(kg) : '·'}
+                    </td>
+                  ))}
+                  <td className="px-3 py-1.5">{tons(totalNeed)}</td>
+                </tr>
+                <tr className="border-b-2 border-border bg-sky-50/60 text-foreground">
+                  <td colSpan={2} className="sticky left-0 z-10 bg-sky-50 px-3 py-1.5 text-left font-medium">
+                    Orders, all raw materials (t)
+                  </td>
+                  <td />
+                  <td />
+                  <td />
+                  {weekTotals.map((kg, w) => (
+                    <td key={weeks[w].start} className="px-2 py-1.5">
+                      {kg > 0 ? tons(kg) : '·'}
+                    </td>
+                  ))}
+                  <td className="px-3 py-1.5 font-semibold">{tons(weekTotals.reduce((a, b) => a + b, 0))}</td>
+                </tr>
                 {shown.map((r) => (
                   <Fragment key={r.rawMaterial}>
                     <tr
                       onClick={() => setOpen(open === r.rawMaterial ? null : r.rawMaterial)}
                       className={`cursor-pointer border-t border-border hover:bg-muted/50 ${open === r.rawMaterial ? 'bg-muted/40' : ''}`}
                     >
-                      <td className="sticky left-0 z-10 whitespace-nowrap bg-background px-3 py-1.5 text-left font-medium text-foreground">
+                      <td
+                        className={`${PRODUCT_COL} truncate bg-background px-3 py-1.5 text-left text-foreground`}
+                        title={r.materials.join(', ')}
+                      >
+                        {productsLabel(r.materials)}
+                      </td>
+                      <td className={`${RAW_COL} whitespace-nowrap bg-background px-3 py-1.5 text-left font-medium text-foreground`}>
                         {open === r.rawMaterial ? '▾ ' : '▸ '}
                         {r.rawMaterial}
                       </td>
@@ -306,7 +363,7 @@ function RawMaterialCoveragePage() {
                         <DetailRow label={`Safety (${coverageDays} working days)`} values={r.rows.map((x) => x.safetyKg)} />
                         <DetailRow label="Stock at week end" values={r.rows.map((x) => x.stockEndKg)} />
                         <tr className="bg-muted/20">
-                          <td colSpan={weeks.length + 5} className="px-3 py-1.5 text-left text-muted-foreground">
+                          <td colSpan={weeks.length + 6} className="px-3 py-1.5 text-left text-muted-foreground">
                             Used by {r.materials.join(', ') || '—'} · need up to the last ZPP week {fmt(r.totalNeedKg)} kg
                             {(itemByRaw.get(r.rawMaterial)?.inTransit ?? []).length > 0 && (
                               <>
@@ -329,7 +386,7 @@ function RawMaterialCoveragePage() {
                   </Fragment>
                 ))}
                 <tr className="border-t-2 border-border bg-muted/40 font-semibold text-foreground">
-                  <td className="sticky left-0 z-10 bg-muted px-3 py-1.5 text-left">Total</td>
+                  <td colSpan={2} className="sticky left-0 z-10 bg-muted px-3 py-1.5 text-left">Total (kg)</td>
                   <td />
                   <td />
                   <td />
@@ -473,7 +530,7 @@ function RecipientsPanel({
 function DetailRow({ label, values }: { label: string; values: number[] }) {
   return (
     <tr className="bg-muted/20 text-muted-foreground">
-      <td className="sticky left-0 z-10 bg-muted/60 px-3 py-1 pl-7 text-left">{label}</td>
+      <td colSpan={2} className="sticky left-0 z-10 bg-muted/60 px-3 py-1 pl-7 text-left">{label}</td>
       <td />
       <td />
       <td />

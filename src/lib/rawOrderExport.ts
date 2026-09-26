@@ -22,7 +22,7 @@ export function buildOrderWorkbook(results: RawMrpResult[], weeks: MrpWeek[], me
     ['Raw material orders by delivery week (kg)'],
     [`Calculated ${meta.computedAt} · safety stock ${meta.coverageDays} working days · +${meta.extraKg} kg per order`],
     [],
-    ['Raw material', 'Used by', 'Stock (kg)', 'In transit (kg)', ...weeks.map((w) => `${w.label} (${w.start})`), 'Total (kg)'],
+    ['Raw material', 'Finished product', 'Stock (kg)', 'In transit (kg)', ...weeks.map((w) => `${w.label} (${w.start})`), 'Total (kg)'],
     ...withOrders.map((r) => [
       r.rawMaterial,
       r.materials.join(', '),
