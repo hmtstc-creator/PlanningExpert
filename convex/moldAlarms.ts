@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 import { liveRows } from './sapLive'
@@ -173,9 +173,9 @@ export const close = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id)
-    if (!row) throw new Error('Alarm not found')
+    if (!row) throw new ConvexError('Alarm not found')
     const reason = args.reason.trim()
-    if (!reason) throw new Error('Say why the mold may keep running')
+    if (!reason) throw new ConvexError('Say why the mold may keep running')
 
     await ctx.db.patch(args.id, {
       status: 'closed',
@@ -200,7 +200,7 @@ export const reopen = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id)
-    if (!row) throw new Error('Alarm not found')
+    if (!row) throw new ConvexError('Alarm not found')
     await ctx.db.patch(args.id, {
       status: 'open',
       closedAt: undefined,

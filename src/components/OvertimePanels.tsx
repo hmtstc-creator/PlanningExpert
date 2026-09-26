@@ -96,10 +96,9 @@ export function OvertimeDefinitionsPanel() {
 
   return (
     <div className="rounded-md border border-border p-3">
-      <p className="text-sm font-semibold text-foreground">Overtime definitions</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Overtime is always opened with one of these, on a date (or every week on a press pattern).
-        Planned stops falling inside it are deducted too.
+      <p className="text-xs text-muted-foreground">
+        A type is a start time and a length (e.g. Full overtime, 07:00, 8 h). Planned stops falling
+        inside it are deducted.
       </p>
       {definitions.length > 0 && (
         <table className="mt-2 w-full text-left text-xs">
@@ -293,7 +292,7 @@ function DefinitionSelect({
 }) {
   return (
     <select className="rounded-md border border-input bg-background px-2 py-1" value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{definitions.length ? 'Choose overtime…' : 'Define an overtime first'}</option>
+      <option value="">{definitions.length ? 'Choose type…' : 'Add an overtime type first'}</option>
       {definitions.map((d) => (
         <option key={d._id} value={d._id}>
           {d.name} · {clockText(d.startMinute)} {hours(d.durationMinutes)}
@@ -304,10 +303,32 @@ function DefinitionSelect({
   )
 }
 
+/** Silme düğmesi: onay sorar, hatayı gösterir. */
+function DeleteOvertime({ id, label }: { id: string; label: string }) {
+  const remove = useMutation(api.overtime.removePressOvertime)
+  const [error, setError] = useState<string | null>(null)
+  return (
+    <>
+      <button
+        type="button"
+        className="rounded-md border border-destructive/40 px-2 py-0.5 text-destructive hover:bg-destructive/10"
+        onClick={() => {
+          if (!window.confirm(`Delete ${label}?`)) return
+          setError(null)
+          remove({ id }).catch((e: unknown) => setError(errorText(e)))
+        }}
+      >
+        Delete
+      </button>
+      {error && <span className="ml-2 text-destructive">{error}</span>}
+    </>
+  )
+}
+
 /**
- * Bir presin bir haftası, gün gün: normal vardiyalar (Pazartesiden sırayla,
- * tatilde yok) ve o güne açılan mesailer. Buradan tarihli mesai açılır ve
- * kaldırılır; kayıt Work Calendar ile ortaktır.
+ * Bir presin bir haftasındaki mesailer: liste (her birinde Sil) ve yeni mesai
+ * açma satırı. Work Calendar tablosu ve Capacity Dashboard aynı bileşeni ve
+ * aynı kaydı kullanır.
  */
 export function PressWeekDays({
   press,
@@ -315,8 +336,6 @@ export function PressWeekDays({
   pattern,
   recurring,
   holidays,
-  shiftStartMinute,
-  shiftMinutes,
 }: {
   press: string
   weekStart: Date
@@ -324,12 +343,11 @@ export function PressWeekDays({
   pattern: WeekPattern | null
   recurring: { dayKey: string; definitionId: string }[]
   holidays: Set<string>
-  shiftStartMinute: number
-  shiftMinutes: number
+  shiftStartMinute?: number
+  shiftMinutes?: number
 }) {
   const { definitions, pressOvertime } = useOvertimeData()
   const add = useMutation(api.overtime.addPressOvertime)
-  const remove = useMutation(api.overtime.removePressOvertime)
   const [date, setDate] = useState(isoDate(addDays(weekStart, 5)))
   const [definitionId, setDefinitionId] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -346,16 +364,14 @@ export function PressWeekDays({
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const iso = isoDate(addDays(weekStart, i))
-    const holiday = holidays.has(iso)
-    const shifts = !holiday && i < pattern.workingDays ? pattern.shiftsPerDay : 0
-    const dated = pressOvertime.filter((o) => o.press === press && o.date === iso)
-    const rec = holiday ? [] : recurring.filter((r) => r.dayKey === WEEKDAY_KEYS[i])
-    const defs = [...dated.map((o) => defBy.get(o.definitionId)), ...rec.map((r) => defBy.get(r.definitionId))].filter(
-      (d): d is OvertimeDefinitionRow => !!d,
-    )
-    const { windows } = dayOvertime(shifts, shiftStartMinute, shiftMinutes, defs)
-    return { iso, i, holiday, shifts, dated, rec, windows }
+    return { iso, i, holiday: holidays.has(iso) }
   })
+  const dated = pressOvertime
+    .filter((o) => o.press === press && days.some((d) => d.iso === o.date))
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const recurringHere = days.flatMap((d) =>
+    d.holiday ? [] : recurring.filter((r) => r.dayKey === WEEKDAY_KEYS[d.i]).map((r) => ({ ...r, iso: d.iso })),
+  )
 
   const submit = async () => {
     setBusy(true)
@@ -372,51 +388,36 @@ export function PressWeekDays({
 
   return (
     <div className="text-xs">
-      <div className="grid grid-cols-7 gap-1">
-        {days.map((d) => (
-          <div
-            key={d.iso}
-            className={`rounded border p-1.5 ${d.holiday ? 'border-red-200 bg-red-50' : d.windows.length ? 'border-violet-200 bg-violet-50' : 'border-border'}`}
-          >
-            <p className="font-medium text-foreground">
-              {WEEKDAY_LABELS[WEEKDAY_KEYS[d.i]]} {d.iso.slice(8)}.{d.iso.slice(5, 7)}
-            </p>
-            <p className="text-muted-foreground">
-              {d.holiday ? 'Holiday' : d.shifts > 0 ? `${d.shifts} shift(s)` : 'No shifts'}
-            </p>
-            {d.dated.map((o) => {
-              const def = defBy.get(o.definitionId)
-              return (
-                <p key={o._id} className="mt-0.5 flex items-center justify-between gap-1 text-violet-900">
-                  <span>
-                    OT {def?.name ?? '?'} {def ? `${clockText(def.startMinute)} ${hours(def.durationMinutes)}` : ''}
-                  </span>
-                  <button
-                    className="text-destructive"
-                    title="Remove this overtime"
-                    onClick={() => {
-                      if (window.confirm(`Remove ${def?.name ?? 'this overtime'} on ${o.date} for ${press}?`)) void remove({ id: o._id })
-                    }}
-                  >
-                    ×
-                  </button>
-                </p>
-              )
-            })}
-            {d.rec.map((r, j) => (
-              <p key={`r${j}`} className="mt-0.5 text-violet-700" title="Recurring overtime from the press pattern">
-                OT {defBy.get(r.definitionId)?.name ?? '?'} (every week)
-              </p>
-            ))}
-          </div>
-        ))}
-      </div>
+      <p className="font-medium text-foreground">Overtime this week — {press}</p>
+      {dated.length === 0 && recurringHere.length === 0 ? (
+        <p className="mt-1 text-muted-foreground">No overtime this week.</p>
+      ) : (
+        <ul className="mt-1 space-y-1">
+          {dated.map((o) => {
+            const def = defBy.get(o.definitionId)
+            const label = `${def?.name ?? 'Overtime'} on ${dayText(o.date)} for ${press}`
+            return (
+              <li key={o._id} className="flex flex-wrap items-center gap-2">
+                <span className="text-foreground">
+                  {dayText(o.date)} · {def?.name ?? '?'}{' '}
+                  {def ? `${clockText(def.startMinute)}–${clockText(def.startMinute + def.durationMinutes)}` : ''}
+                </span>
+                <DeleteOvertime id={o._id} label={label} />
+              </li>
+            )
+          })}
+          {recurringHere.map((r, j) => (
+            <li key={`r${j}`} className="text-muted-foreground">
+              {dayText(r.iso)} · {defBy.get(r.definitionId)?.name ?? '?'} — every week (change it on the press pattern)
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span className="text-muted-foreground">Open overtime on</span>
         <select className="rounded-md border border-input bg-background px-2 py-1" value={date} onChange={(e) => setDate(e.target.value)}>
           {days.map((d) => (
             <option key={d.iso} value={d.iso}>
-              {WEEKDAY_LABELS[WEEKDAY_KEYS[d.i]]} {d.iso}
+              {dayText(d.iso)}
               {d.holiday ? ' (holiday)' : ''}
             </option>
           ))}
@@ -427,10 +428,153 @@ export function PressWeekDays({
           onClick={() => void submit()}
           className="rounded-md bg-foreground px-3 py-1 font-medium text-background disabled:opacity-40"
         >
-          Open overtime
+          Add overtime
         </button>
         {error && <span className="text-destructive">{error}</span>}
       </div>
+    </div>
+  )
+}
+
+/** "Sat 19 Sep" */
+function dayText(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'UTC',
+  })
+}
+
+/**
+ * Mesai girişi — tek yer: pres, tarih, mesai türü, Ekle. Altında açık
+ * mesailerin listesi, her birinde Sil. Geçmiş haftalar gizli.
+ */
+export function OvertimeEntryPanel({ presses }: { presses: string[] }) {
+  const { definitions, pressOvertime } = useOvertimeData()
+  const add = useMutation(api.overtime.addPressOvertime)
+  const today = new Date().toISOString().slice(0, 10)
+  const [press, setPress] = useState('')
+  const [date, setDate] = useState('')
+  const [definitionId, setDefinitionId] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [showTypes, setShowTypes] = useState(false)
+  const defBy = new Map(definitions.map((d) => [d._id, d]))
+  const chosenPress = press || presses[0] || ''
+  const upcoming = pressOvertime
+    .filter((o) => o.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.press.localeCompare(b.press))
+
+  const submit = async () => {
+    setBusy(true)
+    setError(null)
+    setDone(null)
+    try {
+      await add({ press: chosenPress, date, definitionId })
+      setDone(`${defBy.get(definitionId)?.name ?? 'Overtime'} added on ${dayText(date)} for ${chosenPress}.`)
+    } catch (e) {
+      setError(errorText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="text-sm">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-xs">
+          <span className="block text-muted-foreground">Press</span>
+          <select
+            className="mt-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={chosenPress}
+            onChange={(e) => setPress(e.target.value)}
+          >
+            {presses.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs">
+          <span className="block text-muted-foreground">Date</span>
+          <input
+            type="date"
+            className="mt-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
+        </label>
+        <label className="text-xs">
+          <span className="block text-muted-foreground">Overtime type</span>
+          <div className="mt-1">
+            <DefinitionSelect definitions={definitions} value={definitionId} onChange={setDefinitionId} />
+          </div>
+        </label>
+        <button
+          disabled={busy || !chosenPress || !date || !definitionId}
+          onClick={() => void submit()}
+          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-40"
+        >
+          Add overtime
+        </button>
+      </div>
+      {error && <p className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+      {done && !error && <p className="mt-2 text-xs text-emerald-700">✓ {done}</p>}
+
+      <div className="mt-3 overflow-x-auto rounded-md border border-border">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-muted text-muted-foreground">
+            <tr>
+              <th className="px-2 py-1.5 font-medium">Date</th>
+              <th className="px-2 py-1.5 font-medium">Press</th>
+              <th className="px-2 py-1.5 font-medium">Overtime</th>
+              <th className="px-2 py-1.5 font-medium">Time</th>
+              <th className="px-2 py-1.5" />
+            </tr>
+          </thead>
+          <tbody>
+            {upcoming.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-2 py-2 text-muted-foreground">
+                  No overtime from today on.
+                </td>
+              </tr>
+            )}
+            {upcoming.map((o) => {
+              const def = defBy.get(o.definitionId)
+              return (
+                <tr key={o._id} className="border-t border-border">
+                  <td className="px-2 py-1.5 font-medium text-foreground">{dayText(o.date)}</td>
+                  <td className="px-2 py-1.5">{o.press}</td>
+                  <td className="px-2 py-1.5">{def?.name ?? '?'}</td>
+                  <td className="px-2 py-1.5 tabular-nums">
+                    {def ? `${clockText(def.startMinute)}–${clockText(def.startMinute + def.durationMinutes)}` : ''}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">
+                    <DeleteOvertime id={o._id} label={`${def?.name ?? 'overtime'} on ${dayText(o.date)} for ${o.press}`} />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowTypes((v) => !v)}
+        className="mt-3 text-xs text-muted-foreground underline hover:text-foreground"
+      >
+        {showTypes ? 'Hide overtime types' : `Overtime types (${definitions.length}) — add or change`}
+      </button>
+      {showTypes && (
+        <div className="mt-2">
+          <OvertimeDefinitionsPanel />
+        </div>
+      )}
     </div>
   )
 }

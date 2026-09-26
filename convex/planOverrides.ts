@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -34,12 +34,12 @@ export const set = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const material = args.material.trim()
-    if (!material) throw new Error('Material code is required')
+    if (!material) throw new ConvexError('Material code is required')
     if (!['exclude', 'pin', 'priority'].includes(args.kind)) {
-      throw new Error(`Unknown override type: ${args.kind}`)
+      throw new ConvexError(`Unknown override type: ${args.kind}`)
     }
     if (args.kind === 'pin' && !args.press?.trim()) {
-      throw new Error('A press must be selected to pin a material')
+      throw new ConvexError('A press must be selected to pin a material')
     }
 
     const existing = await ctx.db

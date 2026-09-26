@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 import { runSync } from './moldAlarms'
@@ -91,9 +91,9 @@ export const appendRows = guardedMutation({
   }),
   affectsPlan: false,
   handler: async (ctx: Ctx, { key, uploadedAt, rows }: Ctx) => {
-    if (rows.length > APPEND_BATCH) throw new Error(`At most ${APPEND_BATCH} rows per batch`)
+    if (rows.length > APPEND_BATCH) throw new ConvexError(`At most ${APPEND_BATCH} rows per batch`)
     if (uploadedAt <= (await liveUploadAt(ctx, key))) {
-      throw new Error('This upload is older than the current file — start again')
+      throw new ConvexError('This upload is older than the current file — start again')
     }
     const fields = FIELDS_OF[key as SapUploadKey]
     const clean = (rows as Record<string, unknown>[]).map((row) => {
@@ -138,7 +138,7 @@ export const finishUpload = guardedMutation({
     const { key, uploadedAt } = args
     const current = await uploadRecord(ctx, key)
     if (current && current.uploadedAt >= uploadedAt) {
-      throw new Error('A newer file was saved in the meantime — this one was not applied')
+      throw new ConvexError('A newer file was saved in the meantime — this one was not applied')
     }
     const doc = {
       ...args,

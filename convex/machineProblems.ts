@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -38,7 +38,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/
 function checkMinute(value: number | undefined, field: string) {
   if (value === undefined) return
   if (!Number.isFinite(value) || value < 0 || value >= 24 * 60) {
-    throw new Error(`${field} must be between 00:00 and 23:59`)
+    throw new ConvexError(`${field} must be between 00:00 and 23:59`)
   }
 }
 
@@ -85,20 +85,20 @@ export const report = guardedMutation({
   returns: v.id('machineProblems'),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new Error('A press is required')
+    if (!press) throw new ConvexError('A press is required')
     const problemType = args.problemType.trim()
-    if (!problemType) throw new Error('A problem type is required')
-    if (!DATE.test(args.occurredAt)) throw new Error('The date must be in YYYY-MM-DD format')
+    if (!problemType) throw new ConvexError('A problem type is required')
+    if (!DATE.test(args.occurredAt)) throw new ConvexError('The date must be in YYYY-MM-DD format')
     if (args.expectedUpDate && !DATE.test(args.expectedUpDate)) {
-      throw new Error('The expected date must be in YYYY-MM-DD format')
+      throw new ConvexError('The expected date must be in YYYY-MM-DD format')
     }
     if (args.expectedUpDate && args.expectedUpDate < args.occurredAt) {
-      throw new Error('The press cannot be back before the breakdown happened')
+      throw new ConvexError('The press cannot be back before the breakdown happened')
     }
     checkMinute(args.occurredMinute, 'The time')
     checkMinute(args.expectedUpMinute, 'The expected time')
     if (args.downtimeMinutes !== undefined && args.downtimeMinutes < 0) {
-      throw new Error('Downtime cannot be negative')
+      throw new ConvexError('Downtime cannot be negative')
     }
 
     const id = await ctx.db.insert('machineProblems', {
@@ -143,9 +143,9 @@ export const setExpectedUp = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id)
-    if (!row) throw new Error('Breakdown record not found')
+    if (!row) throw new ConvexError('Breakdown record not found')
     if (args.expectedUpDate && !DATE.test(args.expectedUpDate)) {
-      throw new Error('The expected date must be in YYYY-MM-DD format')
+      throw new ConvexError('The expected date must be in YYYY-MM-DD format')
     }
     checkMinute(args.expectedUpMinute, 'The expected time')
     await ctx.db.patch(args.id, {
@@ -166,11 +166,11 @@ export const solve = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id)
-    if (!row) throw new Error('Breakdown record not found')
+    if (!row) throw new ConvexError('Breakdown record not found')
     const solution = args.solution.trim()
-    if (!solution) throw new Error('Describe what was done')
+    if (!solution) throw new ConvexError('Describe what was done')
     if (args.downtimeMinutes !== undefined && args.downtimeMinutes < 0) {
-      throw new Error('Downtime cannot be negative')
+      throw new ConvexError('Downtime cannot be negative')
     }
     await ctx.db.patch(args.id, {
       status: 'solved',

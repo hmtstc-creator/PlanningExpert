@@ -2,7 +2,7 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from 'convex/server'
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { adminMutation, guardedMutation, guardedQuery } from './guarded'
 
@@ -120,7 +120,7 @@ export const create = guardedMutation({
   returns: v.id('products'),
   handler: async (ctx, args) => {
     const code = args.code.trim()
-    if (!code) throw new Error('Material code is required')
+    if (!code) throw new ConvexError('Material code is required')
     const { name: _n, material: _m, cycleTimeSeconds: _c, ...rest } = args
     return ctx.db.insert('products', { ...rest, code })
   },
@@ -213,23 +213,23 @@ export const updateField = guardedMutation({
     }
 
     if (!textFields.includes(field) && !numberFields.includes(field)) {
-      throw new Error(`Unknown field: ${field}`)
+      throw new ConvexError(`Unknown field: ${field}`)
     }
 
     if (value === null) {
-      if (field === 'code') throw new Error('Material code cannot be empty')
+      if (field === 'code') throw new ConvexError('Material code cannot be empty')
       await ctx.db.patch(id, { [field]: undefined })
       return null
     }
 
     if (numberFields.includes(field)) {
       const parsed = typeof value === 'number' ? value : Number(value)
-      if (!Number.isFinite(parsed)) throw new Error(`${field} must be a number`)
-      if (parsed < 0) throw new Error(`${field} cannot be negative`)
+      if (!Number.isFinite(parsed)) throw new ConvexError(`${field} must be a number`)
+      if (parsed < 0) throw new ConvexError(`${field} cannot be negative`)
       if (field === 'performanceFactor' && (parsed <= 0 || parsed > 1)) {
         // A factor above 1 would claim the press runs faster than its own
         // cycle time; zero would make the job infinitely long.
-        throw new Error('Performance factor must be greater than 0 and at most 1')
+        throw new ConvexError('Performance factor must be greater than 0 and at most 1')
       }
       await ctx.db.patch(id, { [field]: parsed })
       return null
@@ -237,14 +237,14 @@ export const updateField = guardedMutation({
 
     const text = String(value).trim()
     if (field === 'code') {
-      if (!text) throw new Error('Material code cannot be empty')
+      if (!text) throw new ConvexError('Material code cannot be empty')
       // A duplicate code would make bulk upload and planning ambiguous.
       const clash = await ctx.db
         .query('products')
         .withIndex('by_code', (q) => q.eq('code', text))
         .first()
       if (clash && clash._id !== id) {
-        throw new Error(`Material code ${text} is already used by another record`)
+        throw new ConvexError(`Material code ${text} is already used by another record`)
       }
     }
     await ctx.db.patch(id, { [field]: text === '' ? undefined : text })
@@ -265,10 +265,10 @@ export const applyToAll = adminMutation({
   returns: v.object({ updated: v.number() }),
   handler: async (ctx, { qualityApprovalMinutes, performanceFactor }) => {
     if (qualityApprovalMinutes !== undefined && (qualityApprovalMinutes < 0 || qualityApprovalMinutes > 600)) {
-      throw new Error('Approval time must be between 0 and 600 minutes')
+      throw new ConvexError('Approval time must be between 0 and 600 minutes')
     }
     if (performanceFactor !== undefined && (performanceFactor <= 0 || performanceFactor > 1)) {
-      throw new Error('Performance factor must be above 0 and at most 1 (e.g. 0.6 for 60 %)')
+      throw new ConvexError('Performance factor must be above 0 and at most 1 (e.g. 0.6 for 60 %)')
     }
     const patch: Record<string, number> = {}
     if (qualityApprovalMinutes !== undefined) patch.qualityApprovalMinutes = qualityApprovalMinutes

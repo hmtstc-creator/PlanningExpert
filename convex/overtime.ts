@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 import {
@@ -57,12 +57,12 @@ export const saveDefinition = guardedMutation({
   returns: v.null(),
   handler: async (ctx: Ctx, args: Ctx) => {
     const name = args.name.trim()
-    if (!name) throw new Error('Give the overtime a name (e.g. Full overtime)')
+    if (!name) throw new ConvexError('Give the overtime a name (e.g. Full overtime)')
     if (!Number.isInteger(args.startMinute) || args.startMinute < 0 || args.startMinute >= DAY_MINUTES) {
-      throw new Error('Start time must be between 00:00 and 23:59')
+      throw new ConvexError('Start time must be between 00:00 and 23:59')
     }
     if (!Number.isInteger(args.durationMinutes) || args.durationMinutes <= 0 || args.durationMinutes > DAY_MINUTES) {
-      throw new Error('Duration must be more than 0 and at most 24 hours')
+      throw new ConvexError('Duration must be more than 0 and at most 24 hours')
     }
     const doc = {
       name,
@@ -74,7 +74,7 @@ export const saveDefinition = guardedMutation({
       // Değişen tanım, onu kullanan her mesaiye yansır: kullananlar yeniden denetlenir.
       await ctx.db.patch(args.id, doc)
       const problems = await problemsForDefinition(ctx, args.id)
-      if (problems.length) throw new Error(`This change cannot be planned: ${problems.slice(0, 3).join(' ')}`)
+      if (problems.length) throw new ConvexError(`This change cannot be planned: ${problems.slice(0, 3).join(' ')}`)
     } else {
       await ctx.db.insert('overtimeDefinitions', doc)
     }
@@ -94,7 +94,7 @@ export const removeDefinition = guardedMutation({
       (t.recurringOvertime ?? []).some((r: Ctx) => r.definitionId === id),
     )
     if (dated || recurring) {
-      throw new Error(
+      throw new ConvexError(
         `Still in use (${dated ? `${dated.press} ${dated.date}` : `every ${recurring.press} template`}) — remove that overtime first.`,
       )
     }
@@ -115,15 +115,26 @@ export const addPressOvertime = guardedMutation({
   returns: v.null(),
   handler: async (ctx: Ctx, args: Ctx) => {
     const press = args.press.trim()
-    if (!press) throw new Error('Press is required')
-    if (!ISO.test(args.date)) throw new Error('Date must be YYYY-MM-DD')
+    if (!press) throw new ConvexError('Press is required')
+    if (!ISO.test(args.date)) throw new ConvexError('Date must be YYYY-MM-DD')
     if (!(await hasCalendar(ctx, press))) {
-      throw new Error(`${press} has no Work Calendar pattern yet — define its days and shifts first.`)
+      throw new ConvexError(`${press} has no Work Calendar pattern yet — define its days and shifts first.`)
+    }
+    const def = await ctx.db.get(args.definitionId)
+    if (!def) throw new ConvexError('This overtime type no longer exists — choose another one.')
+    const sameDay = await ctx.db
+      .query('pressOvertime')
+      .withIndex('by_press_date', (q: Ctx) => q.eq('press', press).eq('date', args.date))
+      .collect()
+    if (sameDay.some((o: Ctx) => o.definitionId === args.definitionId)) {
+      throw new ConvexError(`${def.name} is already open on ${args.date} for ${press}.`)
     }
     // Yaz, sonra denetle: sorun varsa hata işlemi geri alır, kayıt kalmaz.
     await ctx.db.insert('pressOvertime', { press, date: args.date, definitionId: args.definitionId })
     const day = await dayOf(ctx, press, args.date)
-    if (day.problems.length) throw new Error(day.problems.join(' '))
+    if (day.problems.length) {
+      throw new ConvexError(`Cannot open ${def.name} on ${args.date} for ${press}: ${day.problems.join(' ')}`)
+    }
     return null
   },
 })
@@ -149,9 +160,9 @@ export const setRecurringOvertime = guardedMutation({
       .query('pressTemplates')
       .withIndex('by_press', (q: Ctx) => q.eq('press', press))
       .first()
-    if (!template) throw new Error(`${press} has no Work Calendar pattern yet — define its days and shifts first.`)
+    if (!template) throw new ConvexError(`${press} has no Work Calendar pattern yet — define its days and shifts first.`)
     for (const it of items) {
-      if (!(WEEKDAY_KEYS as readonly string[]).includes(it.dayKey)) throw new Error(`Unknown day ${it.dayKey}`)
+      if (!(WEEKDAY_KEYS as readonly string[]).includes(it.dayKey)) throw new ConvexError(`Unknown day ${it.dayKey}`)
     }
     await ctx.db.patch(template._id, { recurringOvertime: items })
     // Normal bir hafta üzerinde denetle: her tekrarlayan gün plana alınabilmeli.
@@ -160,7 +171,7 @@ export const setRecurringOvertime = guardedMutation({
     for (let i = 0; i < 7; i++) {
       const date = `2001-01-0${i + 1}` // 1 Ocak 2001 Pazartesi
       const problems = pressDay(src, press, '2001-01-01', date).problems
-      if (problems.length) throw new Error(`${WEEKDAY_KEYS[i]}: ${problems.join(' ')}`)
+      if (problems.length) throw new ConvexError(`${WEEKDAY_KEYS[i]}: ${problems.join(' ')}`)
     }
     return null
   },

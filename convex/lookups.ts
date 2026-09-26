@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { adminMutation, guardedQuery } from './guarded'
 
@@ -30,9 +30,9 @@ export const add = adminMutation({
   args: { kind: v.string(), value: v.string(), sortOrder: v.optional(v.number()) },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (!KINDS.includes(args.kind)) throw new Error(`Unknown list: ${args.kind}`)
+    if (!KINDS.includes(args.kind)) throw new ConvexError(`Unknown list: ${args.kind}`)
     const value = args.value.trim()
-    if (!value) throw new Error('A value is required')
+    if (!value) throw new ConvexError('A value is required')
 
     const existing = await ctx.db
       .query('lookups')

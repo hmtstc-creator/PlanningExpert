@@ -2,7 +2,7 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from 'convex/server'
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -46,7 +46,7 @@ export const upsert = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const code = args.code.trim()
-    if (!code) throw new Error('Storage location code is required')
+    if (!code) throw new ConvexError('Storage location code is required')
     const existing = await ctx.db
       .query('storageLocations')
       .withIndex('by_code', (q) => q.eq('code', code))

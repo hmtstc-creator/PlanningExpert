@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { runSync } from './moldAlarms'
 import { guardedMutation, guardedQuery } from './guarded'
@@ -35,15 +35,15 @@ export const add = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const material = args.material.trim()
-    if (!material) throw new Error('Material code is required')
+    if (!material) throw new ConvexError('Material code is required')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) {
-      throw new Error('Maintenance date must be in YYYY-MM-DD format')
+      throw new ConvexError('Maintenance date must be in YYYY-MM-DD format')
     }
     if (args.dateTo && !/^\d{4}-\d{2}-\d{2}$/.test(args.dateTo)) {
-      throw new Error('The end date must be in YYYY-MM-DD format')
+      throw new ConvexError('The end date must be in YYYY-MM-DD format')
     }
     if (args.dateTo && args.dateTo < args.date) {
-      throw new Error('The end date cannot be before the start date')
+      throw new ConvexError('The end date cannot be before the start date')
     }
     const kind = args.kind === 'repair' ? 'repair' : 'periodic'
     await ctx.db.insert('moldMaintenance', {

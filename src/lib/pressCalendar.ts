@@ -13,6 +13,7 @@
 //  - Bir üretim günü 24 saati geçemez (planlı duruşlar dahil); bu yüzden bir
 //    presin haftası da 168 saati geçemez.
 
+import { friendlyError } from './mutationErrors'
 import type { OvertimeWindow } from './shiftTimeline'
 
 export const DAY_MINUTES = 1440
@@ -178,18 +179,7 @@ export function pressDay(src: PressDaySources, press: string, weekStart: string,
   return { date, dayKey, isHoliday, shifts, overtime: windows, problems }
 }
 
-/**
- * Sunucu hatasının kullanıcıya gösterilecek kısmı. Convex hatayı birkaç
- * satırda verir ("[CONVEX M(...)] ... Uncaught Error: <mesaj>\n    at ...");
- * yalnızca mesaj kalır.
- */
+/** Sunucu hatasının kullanıcıya gösterilecek kısmı (bkz. mutationErrors.friendlyError). */
 export function serverErrorText(e: unknown, fallback = 'Could not save'): string {
-  if (!(e instanceof Error)) return fallback
-  return (
-    e.message
-      .replace(/^[\s\S]*Uncaught Error:\s*/, '')
-      .replace(/\s+at [\s\S]*$/, '')
-      .replace(/\s*Called by client\s*$/, '')
-      .trim() || fallback
-  )
+  return friendlyError(e).message || fallback
 }

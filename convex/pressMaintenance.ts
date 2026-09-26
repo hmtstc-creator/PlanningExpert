@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -28,17 +28,17 @@ export const list = guardedQuery({
 })
 
 function clockMinute(value: number, field: string): number {
-  if (!Number.isFinite(value)) throw new Error(`${field} must be a number`)
+  if (!Number.isFinite(value)) throw new ConvexError(`${field} must be a number`)
   const rounded = Math.round(value)
   if (rounded < 0 || rounded > 24 * 60) {
-    throw new Error(`${field} must be between 00:00 and 24:00`)
+    throw new ConvexError(`${field} must be between 00:00 and 24:00`)
   }
   return rounded
 }
 
 function requireDate(date: string, field: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    throw new Error(`${field} must be in YYYY-MM-DD format`)
+    throw new ConvexError(`${field} must be in YYYY-MM-DD format`)
   }
   return date
 }
@@ -56,13 +56,13 @@ export const add = guardedMutation({
   returns: v.id('pressMaintenance'),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new Error('Press is required')
+    if (!press) throw new ConvexError('Press is required')
     const reason = args.reason.trim()
-    if (!reason) throw new Error('A reason is required')
+    if (!reason) throw new ConvexError('A reason is required')
     const date = requireDate(args.date, 'Date')
     const start = clockMinute(args.startMinute, 'Start time')
     const end = clockMinute(args.endMinute, 'End time')
-    if (end <= start) throw new Error('The end time must be after the start time')
+    if (end <= start) throw new ConvexError('The end time must be after the start time')
 
     const id = await ctx.db.insert('pressMaintenance', {
       press,
@@ -99,13 +99,13 @@ export const update = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     if (!['planned', 'done', 'cancelled'].includes(args.status)) {
-      throw new Error(`Unknown status: ${args.status}`)
+      throw new ConvexError(`Unknown status: ${args.status}`)
     }
     const start = clockMinute(args.startMinute, 'Start time')
     const end = clockMinute(args.endMinute, 'End time')
-    if (end <= start) throw new Error('The end time must be after the start time')
+    if (end <= start) throw new ConvexError('The end time must be after the start time')
     const reason = args.reason.trim()
-    if (!reason) throw new Error('A reason is required')
+    if (!reason) throw new ConvexError('A reason is required')
 
     await ctx.db.patch(args.id, {
       date: requireDate(args.date, 'Date'),
@@ -137,10 +137,10 @@ export const complete = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id)
-    if (!row) throw new Error('Maintenance record not found')
+    if (!row) throw new ConvexError('Maintenance record not found')
     const start = clockMinute(args.actualStartMinute, 'Actual start')
     const end = clockMinute(args.actualEndMinute, 'Actual end')
-    if (end <= start) throw new Error('The actual end must be after the actual start')
+    if (end <= start) throw new ConvexError('The actual end must be after the actual start')
 
     await ctx.db.patch(args.id, {
       status: 'done',

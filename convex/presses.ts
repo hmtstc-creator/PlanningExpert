@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -39,7 +39,7 @@ export const upsert = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const name = args.name.trim()
-    if (!name) throw new Error('Press name is required')
+    if (!name) throw new ConvexError('Press name is required')
     const existing = await ctx.db
       .query('presses')
       .withIndex('by_name', (q) => q.eq('name', name))

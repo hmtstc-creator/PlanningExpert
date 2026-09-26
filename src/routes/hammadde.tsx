@@ -7,6 +7,7 @@ import { rawMrp, type RawMrpResult, type RawRequirementPlan } from '../lib/rawMr
 import { buildDraftEml, buildOrderWorkbook, parseAddresses, workbookBytes, XLSX_TYPE } from '../lib/rawOrderExport'
 import { formatPlantTime } from '../lib/sapUploads'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
+import { friendlyError } from '../lib/mutationErrors'
 
 export const Route = createFileRoute('/hammadde')({
   component: RawMaterialCoveragePage,
@@ -92,7 +93,7 @@ function RawMaterialCoveragePage() {
     try {
       await saveSettings({ rawCoverageDays: coverageDays, rawOrderExtraKg: extraKg })
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save')
+      setError(friendlyError(e).message)
     } finally {
       setSaving(false)
     }
@@ -446,7 +447,7 @@ function RecipientsPanel({
       await saveRecipients({ to: parseAddresses(toText), cc: parseAddresses(ccText) })
       setEditing(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save')
+      setError(friendlyError(e).message)
     } finally {
       setBusy(false)
     }

@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -40,16 +40,16 @@ export const set = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const material = args.material.trim()
-    if (!material) throw new Error('Material code is required')
+    if (!material) throw new ConvexError('Material code is required')
     if (!args.ready && args.readyDate && !/^\d{4}-\d{2}-\d{2}$/.test(args.readyDate)) {
-      throw new Error('Ready date must be in YYYY-MM-DD format')
+      throw new ConvexError('Ready date must be in YYYY-MM-DD format')
     }
 
     if (
       args.readyMinute !== undefined &&
       (!Number.isFinite(args.readyMinute) || args.readyMinute < 0 || args.readyMinute >= 24 * 60)
     ) {
-      throw new Error('Ready time must be between 00:00 and 23:59')
+      throw new ConvexError('Ready time must be between 00:00 and 23:59')
     }
 
     const patch = {

@@ -8,6 +8,7 @@ import { addDays, isoDate, mondayOf } from '../lib/dates'
 import { useSyncedFields } from '../lib/useSyncedFields'
 import { CapacityGrid } from '../components/CapacityGrid'
 import { UnsavedBar } from '../components/UnsavedBar'
+import { CollapsibleSection } from '../components/CollapsibleSection'
 import { PlannedStopsEditor, type StopRow } from '../components/PlannedStopsEditor'
 import type { WeekPattern as GridPattern } from '../lib/capacityGrid'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
@@ -15,7 +16,7 @@ import { capacityModel, stopMinutesByShift } from '../lib/capacityModel'
 import { weekTotalMinutes } from '../lib/planning'
 import { patternProblem, serverErrorText } from '../lib/pressCalendar'
 import {
-  OvertimeDefinitionsPanel,
+  OvertimeEntryPanel,
   PressWeekDays,
   RecurringOvertimePanel,
   ShiftTable,
@@ -46,11 +47,8 @@ function TakvimPage() {
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <h1 className="text-2xl font-bold text-foreground">Work Calendar</h1>
       <p className="mt-2 text-muted-foreground">
-        Define when and how much the plant runs so planning stays realistic.
-        Shifts run back to back from the start time — 07:00 with 8-hour shifts
-        gives 07:00–15:00, 15:00–23:00 and 23:00–07:00. Shift length, working
-        days and holidays are shared by all presses; each press then gets its
-        own weekly pattern.
+        When each press runs. Open or delete overtime at the top; every section
+        can be shown or hidden with its button.
       </p>
 
       <PressCalendarSection />
@@ -557,7 +555,7 @@ function PressCalendarSection() {
   )
 
   return (
-    <section className="mt-6 rounded-lg border border-border p-5">
+    <div className="mt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold text-foreground">Per-press Calendar</h2>
         <div className="flex items-center gap-3">
@@ -578,12 +576,9 @@ function PressCalendarSection() {
         </div>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        Each press has one calendar: its standard weekly pattern (how many days,
-        filled from Monday, and how many shifts per day), exception weeks and the
-        overtime opened on dates. A public holiday is a day off — its shifts are
-        not moved to another day; open overtime if the press should work. A press
-        without a pattern has no capacity. Nothing in the settings block is
-        written until you press Save — an edited field is marked Unsaved.
+        Each press has one calendar: its weekly pattern (days from Monday, shifts
+        per day), exception weeks and overtime. A public holiday is a day off —
+        open overtime if the press should work.
       </p>
 
       <UnsavedBar
@@ -594,22 +589,12 @@ function PressCalendarSection() {
         onDiscard={discardSharedSettings}
       />
 
-      <div className="mt-4">
-        <PlannedStopsEditor
-          stops={plannedStops}
-          shiftCount={3}
-          shiftStartMinute={shiftStartMinute}
-          shiftMinutes={shiftMinutes}
-          addStop={api.plannedStops.add}
-          updateStop={api.plannedStops.update}
-          removeStop={api.plannedStops.remove}
-        />
-      </div>
+      <CollapsibleSection id="takvim-overtime" title="Overtime" hint="open or delete overtime on a date" defaultOpen>
+        <OvertimeEntryPanel presses={pressOptions} />
+      </CollapsibleSection>
 
+      <CollapsibleSection id="takvim-grid" title="Capacity overview" hint="all presses, all weeks — click a week to change it" defaultOpen>
       <div className="mt-4">
-        <h3 className="mb-2 text-sm font-semibold text-foreground">
-          Capacity overview — all presses, all weeks
-        </h3>
         <CapacityGrid
           presses={definedPresses}
           templates={
@@ -654,6 +639,184 @@ function PressCalendarSection() {
         />
       </div>
 
+      </CollapsibleSection>
+
+      <CollapsibleSection id="takvim-press" title="Press pattern and weeks" hint="days, shifts, recurring overtime, exception weeks" defaultOpen>
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <label className="text-sm">
+          <span className="block text-xs text-muted-foreground">Press</span>
+          <select
+            className="mt-1 w-48 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={press}
+            onChange={(e) => setPress(e.target.value)}
+          >
+            {pressOptions.length === 0 && <option value="">— pres yok —</option>}
+            {pressOptions.map((p) => (
+              <option key={p} value={p}>
+                {p}
+                {hallOfPress.get(p) ? ` · ${hallOfPress.get(p)}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="text-xs text-muted-foreground">
+          To add presses or define halls, use{' '}
+          <Link to="/makineler" className="font-medium underline">
+            Press Definitions
+          </Link>{' '}
+          .
+        </p>
+      </div>
+
+      {press && (
+        <>
+          <div className="mt-4 rounded-md border border-border p-3">
+            <p className="text-sm font-medium text-foreground">Standard weekly pattern</p>
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label className="text-sm">
+                <span className="block text-xs text-muted-foreground">Normal working days</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={7}
+                  className="mt-1 w-24 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                  value={workingDays}
+                  onChange={(e) => setWorkingDays(Number(e.target.value) || 0)}
+                />
+              </label>
+
+              <div className="text-sm">
+                <span className="block text-xs text-muted-foreground">
+                  Shifts per normal working day
+                </span>
+                <div className="mt-1 flex items-center gap-1">
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => pickShiftsPerDay(n)}
+                      className={`rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                        shiftsPerDay === n
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-16 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                    value={shiftsPerDay}
+                    onChange={(e) => setShiftsPerDay(Number(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+
+
+              <button
+                onClick={() => void saveTemplate()}
+                disabled={!templateDirty || !!templateProblem}
+                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-40"
+              >
+                Save press pattern
+              </button>
+              {templateDirty && (
+                <span className="pb-2 text-xs font-medium text-amber-700">● Unsaved</span>
+              )}
+            </div>
+            {(templateProblem || templateError) && (
+              <p className="mt-2 text-xs font-medium text-destructive">{templateProblem ?? templateError}</p>
+            )}
+            <p className="mt-3 text-sm text-muted-foreground">
+              Total: <strong className="text-foreground">{templateTotalShifts} shifts</strong>{' '}
+              · <strong className="text-foreground">{templateTotalHours.toFixed(1)} net h</strong>
+              /week without overtime ({workingDays} days from Monday × {shiftsPerDay} shifts)
+            </p>
+            <RecurringOvertimePanel
+              press={press}
+              recurring={template?.recurringOvertime ?? []}
+              disabled={!template}
+            />
+          </div>
+
+          <details className="mt-4">
+            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+              Week-by-week detail for {press} (the grid above covers all presses)
+            </summary>
+          <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
+            <div className="overflow-x-auto rounded-md border border-border">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead className="bg-muted text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-2 font-medium">Week</th>
+                    <th className="px-2 py-2 text-center font-medium">Normal days</th>
+                    <th className="px-2 py-2 text-center font-medium">Shifts/day</th>
+                    <th className="px-2 py-2 text-center font-medium">Total shifts</th>
+                    <th className="px-2 py-2 text-center font-medium" title="Planned stops (tea, meal, handover) deducted — the same hours the plan uses">Net hours</th>
+                    <th className="px-2 py-2 font-medium" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {weekStarts.map((monday) => (
+                    <WeekRow
+                      key={isoDate(monday)}
+                      press={press}
+                      monday={monday}
+                      template={currentTemplate}
+                      override={overridesByWeek.get(isoDate(monday))}
+                      holidaySet={new Set([...holidaySet, ...manualHolidays])}
+                      shiftMinutes={shiftMinutes}
+                      shiftStartMinute={shiftStartMinute}
+                      recurring={template?.recurringOvertime ?? []}
+                      hasTemplate={!!template}
+                      netMinutes={calendarModel
+                        .weekBuckets(press, monday)
+                        .reduce((a, b) => a + b.minutes, 0)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <aside className="rounded-md border border-border p-3">
+              <h3 className="text-sm font-semibold text-foreground">
+                {countries.find((c) => c.countryCode === country)?.name ?? country} — Resmi
+                Holidays
+              </h3>
+              {holidaysError && (
+                <p className="mt-2 text-xs text-destructive">Could not load the holiday list.</p>
+              )}
+              {!holidaysError && visibleHolidays.length === 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No holidays found in the visible 30-week range.
+                </p>
+              )}
+              <ul className="mt-2 space-y-1.5">
+                {visibleHolidays.map((h) => (
+                  <li
+                    key={h.date}
+                    className="rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-900"
+                  >
+                    <span className="font-medium">
+                      {new Date(h.date).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        weekday: 'short',
+                      })}
+                    </span>
+                    <span className="block text-red-700">{h.name}</span>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          </div>
+          </details>
+        </>
+      )}
+      </CollapsibleSection>
+
+      <CollapsibleSection id="takvim-holidays" title="Manual holidays" hint={manualHolidays.length ? `${manualHolidays.length} day(s)` : 'plant shutdowns'}>
       <div className="mt-4 rounded-md border border-border p-3">
         <h3 className="text-xs font-medium text-muted-foreground">
           Manual holiday / shutdown day
@@ -704,6 +867,24 @@ function PressCalendarSection() {
         )}
       </div>
 
+      </CollapsibleSection>
+
+      <CollapsibleSection id="takvim-stops" title="Planned stops" hint="tea, meal, handover per shift">
+      <div className="mt-4">
+        <PlannedStopsEditor
+          stops={plannedStops}
+          shiftCount={3}
+          shiftStartMinute={shiftStartMinute}
+          shiftMinutes={shiftMinutes}
+          addStop={api.plannedStops.add}
+          updateStop={api.plannedStops.update}
+          removeStop={api.plannedStops.remove}
+        />
+      </div>
+
+      </CollapsibleSection>
+
+      <CollapsibleSection id="takvim-rules" title="Shifts and planning rules" hint={`${shiftMinutes / 60} h shifts from ${String(Math.floor(shiftStartMinute / 60)).padStart(2, '0')}:${String(shiftStartMinute % 60).padStart(2, '0')}`}>
       <div className="mt-4 flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
@@ -928,11 +1109,8 @@ function PressCalendarSection() {
           <span className="text-xs text-muted-foreground">Setups may run over a shift change</span>
         </label>
       </div>
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <div className="rounded-md border border-border p-3">
-          <ShiftTable shiftStartMinute={shiftStartMinute} shiftMinutes={shiftMinutes} />
-        </div>
-        <OvertimeDefinitionsPanel />
+      <div className="mt-3 rounded-md border border-border p-3">
+        <ShiftTable shiftStartMinute={shiftStartMinute} shiftMinutes={shiftMinutes} />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
         Frozen days: the first {frozenDays} day(s) of the plan are taken from
@@ -967,179 +1145,8 @@ function PressCalendarSection() {
         level it reached.
       </p>
 
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Press</span>
-          <select
-            className="mt-1 w-48 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-            value={press}
-            onChange={(e) => setPress(e.target.value)}
-          >
-            {pressOptions.length === 0 && <option value="">— pres yok —</option>}
-            {pressOptions.map((p) => (
-              <option key={p} value={p}>
-                {p}
-                {hallOfPress.get(p) ? ` · ${hallOfPress.get(p)}` : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="text-xs text-muted-foreground">
-          To add presses or define halls, use{' '}
-          <Link to="/makineler" className="font-medium underline">
-            Press Definitions
-          </Link>{' '}
-          .
-        </p>
-      </div>
-
-      {press && (
-        <>
-          <div className="mt-4 rounded-md border border-border p-3">
-            <p className="text-sm font-medium text-foreground">Standard weekly pattern</p>
-            <div className="mt-3 flex flex-wrap items-end gap-3">
-              <label className="text-sm">
-                <span className="block text-xs text-muted-foreground">Normal working days</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={7}
-                  className="mt-1 w-24 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                  value={workingDays}
-                  onChange={(e) => setWorkingDays(Number(e.target.value) || 0)}
-                />
-              </label>
-
-              <div className="text-sm">
-                <span className="block text-xs text-muted-foreground">
-                  Shifts per normal working day
-                </span>
-                <div className="mt-1 flex items-center gap-1">
-                  {[1, 2, 3].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => pickShiftsPerDay(n)}
-                      className={`rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors ${
-                        shiftsPerDay === n
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/70'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                  <input
-                    type="number"
-                    min={0}
-                    className="w-16 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                    value={shiftsPerDay}
-                    onChange={(e) => setShiftsPerDay(Number(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-
-
-              <button
-                onClick={() => void saveTemplate()}
-                disabled={!templateDirty || !!templateProblem}
-                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-40"
-              >
-                Save press pattern
-              </button>
-              {templateDirty && (
-                <span className="pb-2 text-xs font-medium text-amber-700">● Unsaved</span>
-              )}
-            </div>
-            {(templateProblem || templateError) && (
-              <p className="mt-2 text-xs font-medium text-destructive">{templateProblem ?? templateError}</p>
-            )}
-            <p className="mt-3 text-sm text-muted-foreground">
-              Total: <strong className="text-foreground">{templateTotalShifts} shifts</strong>{' '}
-              · <strong className="text-foreground">{templateTotalHours.toFixed(1)} net h</strong>
-              /week without overtime ({workingDays} days from Monday × {shiftsPerDay} shifts)
-            </p>
-            <RecurringOvertimePanel
-              press={press}
-              recurring={template?.recurringOvertime ?? []}
-              disabled={!template}
-            />
-          </div>
-
-          <details className="mt-4">
-            <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-              Week-by-week detail for {press} (the grid above covers all presses)
-            </summary>
-          <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full border-collapse text-left text-sm">
-                <thead className="bg-muted text-muted-foreground">
-                  <tr>
-                    <th className="px-2 py-2 font-medium">Week</th>
-                    <th className="px-2 py-2 text-center font-medium">Normal days</th>
-                    <th className="px-2 py-2 text-center font-medium">Shifts/day</th>
-                    <th className="px-2 py-2 text-center font-medium">Total shifts</th>
-                    <th className="px-2 py-2 text-center font-medium" title="Planned stops (tea, meal, handover) deducted — the same hours the plan uses">Net hours</th>
-                    <th className="px-2 py-2 font-medium" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {weekStarts.map((monday) => (
-                    <WeekRow
-                      key={isoDate(monday)}
-                      press={press}
-                      monday={monday}
-                      template={currentTemplate}
-                      override={overridesByWeek.get(isoDate(monday))}
-                      holidaySet={new Set([...holidaySet, ...manualHolidays])}
-                      shiftMinutes={shiftMinutes}
-                      shiftStartMinute={shiftStartMinute}
-                      recurring={template?.recurringOvertime ?? []}
-                      hasTemplate={!!template}
-                      netMinutes={calendarModel
-                        .weekBuckets(press, monday)
-                        .reduce((a, b) => a + b.minutes, 0)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <aside className="rounded-md border border-border p-3">
-              <h3 className="text-sm font-semibold text-foreground">
-                {countries.find((c) => c.countryCode === country)?.name ?? country} — Resmi
-                Holidays
-              </h3>
-              {holidaysError && (
-                <p className="mt-2 text-xs text-destructive">Could not load the holiday list.</p>
-              )}
-              {!holidaysError && visibleHolidays.length === 0 && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  No holidays found in the visible 30-week range.
-                </p>
-              )}
-              <ul className="mt-2 space-y-1.5">
-                {visibleHolidays.map((h) => (
-                  <li
-                    key={h.date}
-                    className="rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-900"
-                  >
-                    <span className="font-medium">
-                      {new Date(h.date).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        weekday: 'short',
-                      })}
-                    </span>
-                    <span className="block text-red-700">{h.name}</span>
-                  </li>
-                ))}
-              </ul>
-            </aside>
-          </div>
-          </details>
-        </>
-      )}
-    </section>
+      </CollapsibleSection>
+    </div>
   )
 }
 
@@ -1175,7 +1182,6 @@ function WeekRow({
 
   const effective: WeekPattern = override ?? template
   const [editing, setEditing] = useState(false)
-  const [showDays, setShowDays] = useState(false)
   const [draft, setDraft] = useState<WeekPattern>(effective)
   const [error, setError] = useState<string | null>(null)
 
@@ -1281,13 +1287,6 @@ function WeekRow({
           ) : (
             <div className="flex justify-end gap-1">
               <button
-                onClick={() => setShowDays((v) => !v)}
-                className="rounded bg-violet-100 px-2 py-1 text-xs text-violet-900 hover:bg-violet-200"
-                title="Day detail: shifts, holidays and overtime of each day; open overtime on a date"
-              >
-                {showDays ? 'Hide days' : 'Days / overtime'}
-              </button>
-              <button
                 onClick={() => setEditing(true)}
                 className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-muted/70"
                 title="Exception week: different days or shifts for this week only"
@@ -1306,21 +1305,6 @@ function WeekRow({
           )}
         </td>
       </tr>
-      {showDays && (
-        <tr className="border-t border-border bg-muted/20">
-          <td colSpan={6} className="px-2 py-2">
-            <PressWeekDays
-              press={press}
-              weekStart={monday}
-              pattern={hasTemplate || override ? effective : null}
-              recurring={recurring}
-              holidays={holidaySet}
-              shiftStartMinute={shiftStartMinute}
-              shiftMinutes={shiftMinutes}
-            />
-          </td>
-        </tr>
-      )}
     </>
   )
 }

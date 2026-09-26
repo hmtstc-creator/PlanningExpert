@@ -1,4 +1,5 @@
 import { useMutation } from './convexTransport'
+import { friendlyError } from './mutationErrors'
 import { useCallback, useState } from 'react'
 
 /**
@@ -25,7 +26,7 @@ export function useSafeMutation<Mutation extends Parameters<typeof useMutation>[
         await (mutate as any)(args)
         return true
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e))
+        setError(friendlyError(e).message)
         return false
       } finally {
         setPending(false)

@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { internalMutation, internalQuery, query } from './_generated/server'
 import { guardedQuery } from './guarded'
@@ -84,7 +84,7 @@ export const storePassword = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.id)
-    if (!user) throw new Error('User not found')
+    if (!user) throw new ConvexError('User not found')
 
     await ctx.db.patch(args.id, {
       passwordHash: args.passwordHash,

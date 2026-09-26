@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -65,16 +65,16 @@ export const report = guardedMutation({
   returns: v.id('moldProblems'),
   handler: async (ctx, args) => {
     const material = args.material.trim()
-    if (!material) throw new Error('Material code is required')
+    if (!material) throw new ConvexError('Material code is required')
     const operation = args.operation.trim()
-    if (!operation) throw new Error('An operation is required')
+    if (!operation) throw new ConvexError('An operation is required')
     const problemType = args.problemType.trim()
-    if (!problemType) throw new Error('A problem type is required')
+    if (!problemType) throw new ConvexError('A problem type is required')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(args.occurredAt)) {
-      throw new Error('The date must be in YYYY-MM-DD format')
+      throw new ConvexError('The date must be in YYYY-MM-DD format')
     }
     if (args.downtimeMinutes !== undefined && args.downtimeMinutes < 0) {
-      throw new Error('Downtime cannot be negative')
+      throw new ConvexError('Downtime cannot be negative')
     }
 
     const id = await ctx.db.insert('moldProblems', {
@@ -110,9 +110,9 @@ export const solve = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id)
-    if (!row) throw new Error('Problem record not found')
+    if (!row) throw new ConvexError('Problem record not found')
     const solution = args.solution.trim()
-    if (!solution) throw new Error('Describe what was done')
+    if (!solution) throw new ConvexError('Describe what was done')
 
     await ctx.db.patch(args.id, {
       status: 'solved',

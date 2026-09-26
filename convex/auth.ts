@@ -1,6 +1,6 @@
 'use node'
 
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto'
 
 import { api, internal } from './_generated/api'
@@ -40,9 +40,9 @@ const DEFAULT_ADMIN_PASSWORD = 'admin'
 const MIN_PASSWORD_LENGTH = 4
 
 function assertPassword(password: string): void {
-  if (password.trim().length === 0) throw new Error('A password cannot be empty')
+  if (password.trim().length === 0) throw new ConvexError('A password cannot be empty')
   if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(`The password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+    throw new ConvexError(`The password must be at least ${MIN_PASSWORD_LENGTH} characters`)
   }
 }
 
@@ -116,16 +116,16 @@ export const changePassword = action({
     assertPassword(args.newPassword)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const me: any = await ctx.runQuery(api.authInternal.me, { token: args.token })
-    if (!me) throw new Error('Your session has expired — sign in again')
+    if (!me) throw new ConvexError('Your session has expired — sign in again')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const user: any = await ctx.runQuery(internal.authInternal.findUser, { name: me.name })
-    if (!user?.passwordHash || !user.passwordSalt) throw new Error('User not found')
+    if (!user?.passwordHash || !user.passwordSalt) throw new ConvexError('User not found')
 
     if (!hashesMatch(hashPassword(args.currentPassword, user.passwordSalt), user.passwordHash)) {
-      throw new Error('The current password is wrong')
+      throw new ConvexError('The current password is wrong')
     }
     if (args.newPassword === args.currentPassword) {
-      throw new Error('The new password must be different from the current one')
+      throw new ConvexError('The new password must be different from the current one')
     }
 
     const salt = randomBytes(16).toString('hex')
@@ -160,7 +160,7 @@ export const resetPassword = internalAction({
     const user: any = await ctx.runQuery(internal.authInternal.findUser, {
       name: args.name.trim(),
     })
-    if (!user) throw new Error(`No user named ${args.name}`)
+    if (!user) throw new ConvexError(`No user named ${args.name}`)
     const salt = randomBytes(16).toString('hex')
     await ctx.runMutation(internal.authInternal.storePassword, {
       id: user._id,
@@ -186,8 +186,8 @@ export const setPasswordAsAdmin = action({
     assertPassword(args.newPassword)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const me: any = await ctx.runQuery(api.authInternal.me, { token: args.token })
-    if (!me) throw new Error('Your session has expired — sign in again')
-    if (me.role !== 'admin') throw new Error('Only an admin can set another password')
+    if (!me) throw new ConvexError('Your session has expired — sign in again')
+    if (me.role !== 'admin') throw new ConvexError('Only an admin can set another password')
 
     const salt = randomBytes(16).toString('hex')
     await ctx.runMutation(internal.authInternal.storePassword, {

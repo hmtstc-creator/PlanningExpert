@@ -4,7 +4,7 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from 'convex/server'
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -35,7 +35,7 @@ export const create = guardedMutation({
   handler: async (ctx, args) => {
     const name = args.name.trim()
     const hall = args.hall.trim()
-    if (!name || !hall) throw new Error('This feature is no longer in use')
+    if (!name || !hall) throw new ConvexError('This feature is no longer in use')
     return ctx.db.insert('machines', { name, hall, hasCrane: args.hasCrane, tonnage: 0 })
   },
 })

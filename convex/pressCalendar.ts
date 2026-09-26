@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 import { patternProblem } from '../src/lib/pressCalendar'
@@ -103,10 +103,10 @@ export const saveGlobalSettings = guardedMutation({
     ]
     for (const p of patterns) {
       const problem = patternProblem(p, args.shiftMinutes)
-      if (problem) throw new Error(`${p.where}: ${problem}`)
+      if (problem) throw new ConvexError(`${p.where}: ${problem}`)
     }
     if (args.rawUrgentDays !== undefined && (!Number.isInteger(args.rawUrgentDays) || args.rawUrgentDays < 1 || args.rawUrgentDays > 30)) {
-      throw new Error('Urgent raw material days must be a whole number between 1 and 30')
+      throw new ConvexError('Urgent raw material days must be a whole number between 1 and 30')
     }
     if (existing) {
       await ctx.db.patch(existing._id, args)
@@ -165,9 +165,9 @@ export const saveTemplate = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new Error('Press name is required')
+    if (!press) throw new ConvexError('Press name is required')
     const problem = patternProblem(args, await shiftMinutesOf(ctx))
-    if (problem) throw new Error(problem)
+    if (problem) throw new ConvexError(problem)
     const existing = await ctx.db
       .query('pressTemplates')
       .withIndex('by_press', (q) => q.eq('press', press))
@@ -215,9 +215,9 @@ export const saveOverride = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new Error('Press name is required')
+    if (!press) throw new ConvexError('Press name is required')
     const problem = patternProblem(args, await shiftMinutesOf(ctx))
-    if (problem) throw new Error(problem)
+    if (problem) throw new ConvexError(problem)
     const existing = await ctx.db
       .query('pressWeekOverrides')
       .withIndex('by_press_week', (q) =>
@@ -261,7 +261,7 @@ export const setCapacityFactor = guardedMutation({
   returns: v.null(),
   handler: async (ctx, { capacityFactor }) => {
     if (capacityFactor <= 0 || capacityFactor > 2) {
-      throw new Error('Capacity factor must be between 0 and 2')
+      throw new ConvexError('Capacity factor must be between 0 and 2')
     }
     const existing = await ctx.db
       .query('globalShiftSettings')
@@ -308,10 +308,10 @@ export const saveRawCoverageSettings = guardedMutation({
   affectsPlan: false,
   handler: async (ctx, args) => {
     if (!Number.isFinite(args.rawCoverageDays) || args.rawCoverageDays < 1 || args.rawCoverageDays > 90) {
-      throw new Error('Coverage days must be between 1 and 90')
+      throw new ConvexError('Coverage days must be between 1 and 90')
     }
     if (!Number.isFinite(args.rawOrderExtraKg) || args.rawOrderExtraKg < 0 || args.rawOrderExtraKg > 100_000) {
-      throw new Error('Extra kg must be between 0 and 100 000')
+      throw new ConvexError('Extra kg must be between 0 and 100 000')
     }
     const existing = await ctx.db
       .query('globalShiftSettings')
@@ -319,7 +319,7 @@ export const saveRawCoverageSettings = guardedMutation({
       .first()
     const patch = { rawCoverageDays: Math.round(args.rawCoverageDays), rawOrderExtraKg: Math.round(args.rawOrderExtraKg) }
     if (existing) await ctx.db.patch(existing._id, patch)
-    else throw new Error('Save the Work Calendar settings once first')
+    else throw new ConvexError('Save the Work Calendar settings once first')
     return null
   },
 })
@@ -336,13 +336,13 @@ export const saveRawOrderRecipients = guardedMutation({
     const to = clean(args.to)
     const cc = clean(args.cc).filter((e) => !to.includes(e))
     const bad = [...to, ...cc].filter((e) => !EMAIL.test(e))
-    if (bad.length > 0) throw new Error(`Not an e-mail address: ${bad.join(', ')}`)
-    if (to.length + cc.length > 50) throw new Error('At most 50 addresses')
+    if (bad.length > 0) throw new ConvexError(`Not an e-mail address: ${bad.join(', ')}`)
+    if (to.length + cc.length > 50) throw new ConvexError('At most 50 addresses')
     const existing = await ctx.db
       .query('globalShiftSettings')
       .withIndex('by_key', (q) => q.eq('key', 'default'))
       .first()
-    if (!existing) throw new Error('Save the Work Calendar settings once first')
+    if (!existing) throw new ConvexError('Save the Work Calendar settings once first')
     await ctx.db.patch(existing._id, { rawOrderMailTo: to, rawOrderMailCc: cc })
     return null
   },

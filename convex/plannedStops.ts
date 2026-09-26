@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -31,15 +31,15 @@ export const add = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const name = args.name.trim()
-    if (!name) throw new Error('Stop name is required')
-    if (!KINDS.includes(args.kind)) throw new Error(`Unknown stop type: ${args.kind}`)
+    if (!name) throw new ConvexError('Stop name is required')
+    if (!KINDS.includes(args.kind)) throw new ConvexError(`Unknown stop type: ${args.kind}`)
     if (args.shiftIndex < 1 || args.shiftIndex > 3) {
-      throw new Error('Shift must be 1, 2 or 3')
+      throw new ConvexError('Shift must be 1, 2 or 3')
     }
     if (args.startMinute < 0 || args.startMinute >= 24 * 60) {
-      throw new Error('Start time must be within the day')
+      throw new ConvexError('Start time must be within the day')
     }
-    if (args.durationMinutes <= 0) throw new Error('Duration must be greater than zero')
+    if (args.durationMinutes <= 0) throw new ConvexError('Duration must be greater than zero')
 
     await ctx.db.insert('plannedStops', { ...args, name })
     return null
@@ -57,10 +57,10 @@ export const update = guardedMutation({
   returns: v.null(),
   handler: async (ctx, { id, ...patch }) => {
     if (patch.kind && !KINDS.includes(patch.kind)) {
-      throw new Error(`Unknown stop type: ${patch.kind}`)
+      throw new ConvexError(`Unknown stop type: ${patch.kind}`)
     }
     if (patch.durationMinutes !== undefined && patch.durationMinutes <= 0) {
-      throw new Error('Duration must be greater than zero')
+      throw new ConvexError('Duration must be greater than zero')
     }
     await ctx.db.patch(id, patch)
     return null

@@ -2,7 +2,7 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from 'convex/server'
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -51,7 +51,7 @@ export const create = guardedMutation({
   returns: v.id('changeLog'),
   handler: async (ctx, args) => {
     const title = args.title.trim()
-    if (!title) throw new Error('Title is required')
+    if (!title) throw new ConvexError('Title is required')
     return ctx.db.insert('changeLog', { ...args, title, createdAt: Date.now() })
   },
 })

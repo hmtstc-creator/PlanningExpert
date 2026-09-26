@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -46,13 +46,13 @@ export const set = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new Error('Press is required')
-    if (args.fromDate !== undefined && !DATE.test(args.fromDate)) throw new Error('Date must be YYYY-MM-DD')
+    if (!press) throw new ConvexError('Press is required')
+    if (args.fromDate !== undefined && !DATE.test(args.fromDate)) throw new ConvexError('Date must be YYYY-MM-DD')
     if (args.fromMinute !== undefined && (!Number.isFinite(args.fromMinute) || args.fromMinute < 0 || args.fromMinute >= 1440)) {
-      throw new Error('Time must be between 00:00 and 23:59')
+      throw new ConvexError('Time must be between 00:00 and 23:59')
     }
     if (args.delayMinutes !== undefined && (!Number.isFinite(args.delayMinutes) || Math.abs(args.delayMinutes) > 7 * 1440)) {
-      throw new Error('Delay must be at most 7 days either way')
+      throw new ConvexError('Delay must be at most 7 days either way')
     }
     const doc = {
       press,

@@ -10,6 +10,7 @@ import { validatePassword } from '../lib/authRules'
 import { useCurrentUser } from '../lib/currentUser'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
+import { friendlyError } from '../lib/mutationErrors'
 
 export const Route = createFileRoute('/yonetim')({
   component: AdminPage,
@@ -330,7 +331,7 @@ function AdminPage() {
                                 setNewPassword('')
                               } catch (e) {
                                 setPasswordError(
-                                  e instanceof Error ? e.message : 'Could not set the password',
+                                  friendlyError(e).message || 'Could not set the password',
                                 )
                               }
                             }}

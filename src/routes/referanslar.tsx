@@ -18,6 +18,7 @@ import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { lotRuleOf, piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
 import { ExcelUpload } from '../components/ExcelUpload'
+import { friendlyError } from '../lib/mutationErrors'
 
 export const Route = createFileRoute('/referanslar')({
   component: ReferanslarPage,
@@ -140,7 +141,7 @@ function ReferanslarPage() {
       })
       setForm(emptyForm)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      setError(friendlyError(err).message)
     } finally {
       setSubmitting(false)
     }
@@ -655,7 +656,7 @@ function ApplyToAll() {
       const { updated } = await applyToAll({ qualityApprovalMinutes: minutes, performanceFactor: percent / 100 })
       setState({ kind: 'done', message: `✓ ${updated.toLocaleString('en-GB')} parts updated. The plan recalculates in a few seconds.` })
     } catch (err) {
-      setState({ kind: 'error', message: err instanceof Error ? err.message : 'Could not update.' })
+      setState({ kind: 'error', message: friendlyError(err).message })
     }
   }
 

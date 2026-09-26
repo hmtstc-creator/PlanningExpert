@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { adminMutation, guardedQuery } from './guarded'
 
@@ -36,14 +36,14 @@ export const add = adminMutation({
   returns: v.id('users'),
   handler: async (ctx, args) => {
     const name = args.name.trim()
-    if (!name) throw new Error('A name is required')
-    if (!ROLES.includes(args.role)) throw new Error(`Unknown role: ${args.role}`)
+    if (!name) throw new ConvexError('A name is required')
+    if (!ROLES.includes(args.role)) throw new ConvexError(`Unknown role: ${args.role}`)
 
     const existing = await ctx.db
       .query('users')
       .withIndex('by_name', (q) => q.eq('name', name))
       .first()
-    if (existing) throw new Error(`A user named ${name} already exists`)
+    if (existing) throw new ConvexError(`A user named ${name} already exists`)
 
     const id = await ctx.db.insert('users', {
       name,
@@ -74,14 +74,14 @@ export const update = adminMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const name = args.name.trim()
-    if (!name) throw new Error('A name is required')
-    if (!ROLES.includes(args.role)) throw new Error(`Unknown role: ${args.role}`)
+    if (!name) throw new ConvexError('A name is required')
+    if (!ROLES.includes(args.role)) throw new ConvexError(`Unknown role: ${args.role}`)
 
     const clash = await ctx.db
       .query('users')
       .withIndex('by_name', (q) => q.eq('name', name))
       .first()
-    if (clash && clash._id !== args.id) throw new Error(`A user named ${name} already exists`)
+    if (clash && clash._id !== args.id) throw new ConvexError(`A user named ${name} already exists`)
 
     await ctx.db.patch(args.id, {
       name,

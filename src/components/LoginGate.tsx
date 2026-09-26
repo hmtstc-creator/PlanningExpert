@@ -15,6 +15,7 @@ import {
   useServerReachability,
   withTimeout,
 } from '../lib/serverReachability'
+import { friendlyError } from '../lib/mutationErrors'
 
 /** Giriş isteği bu kadar sürede cevap almazsa ağ sorunu sayılır. */
 const LOGIN_TIMEOUT_MS = 25_000
@@ -61,7 +62,7 @@ export function LoginGate({ children }: { children: ReactNode }) {
       void seedAdmin({})
         .then(() => setSeedError(null))
         .catch((e: unknown) =>
-          setSeedError(e instanceof Error ? e.message : 'Could not create the first account'),
+          setSeedError(friendlyError(e).message || 'Could not create the first account'),
         )
     }
   }, [screen, seedAdmin])

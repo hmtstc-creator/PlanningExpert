@@ -2,7 +2,7 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from 'convex/server'
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 
@@ -26,8 +26,8 @@ export const create = guardedMutation({
   handler: async (ctx, args) => {
     const groupName = args.groupName.trim()
     const machines = args.machines.map((m) => m.trim()).filter(Boolean)
-    if (!groupName) throw new Error('Group name is required')
-    if (machines.length < 2) throw new Error('At least 2 machines are required')
+    if (!groupName) throw new ConvexError('Group name is required')
+    if (machines.length < 2) throw new ConvexError('At least 2 machines are required')
     return ctx.db.insert('craneGroups', { groupName, machines })
   },
 })

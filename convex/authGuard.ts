@@ -1,4 +1,4 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
 /**
  * Sunucu tarafı yetki denetimi.
@@ -32,22 +32,22 @@ export type Role = (typeof ROLES)[number]
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function requireUser(ctx: any, token: string | undefined) {
-  if (!token) throw new Error('Not signed in')
+  if (!token) throw new ConvexError('Not signed in')
 
   const session = await ctx.db
     .query('sessions')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .withIndex('by_token', (q: any) => q.eq('token', token))
     .first()
-  if (!session) throw new Error('Not signed in')
+  if (!session) throw new ConvexError('Not signed in')
   if (session.expiresAt <= Date.now()) {
-    throw new Error('Your session has expired — sign in again')
+    throw new ConvexError('Your session has expired — sign in again')
   }
 
   const user = await ctx.db.get(session.userId)
-  if (!user) throw new Error('Not signed in')
+  if (!user) throw new ConvexError('Not signed in')
   // Pasife alınan kullanıcının açık jetonu işe yaramamalı.
-  if (!user.active) throw new Error('This account is no longer active')
+  if (!user.active) throw new ConvexError('This account is no longer active')
 
   return user
 }
@@ -63,7 +63,7 @@ export async function requireUser(ctx: any, token: string | undefined) {
 export async function requireRole(ctx: any, token: string | undefined, roles: readonly Role[]) {
   const user = await requireUser(ctx, token)
   if (!roles.includes(user.role)) {
-    throw new Error(`This needs one of: ${roles.join(', ')} — you are ${user.role}`)
+    throw new ConvexError(`This needs one of: ${roles.join(', ')} — you are ${user.role}`)
   }
   return user
 }

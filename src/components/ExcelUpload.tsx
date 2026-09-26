@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import { useState } from 'react'
+import { friendlyError } from '../lib/mutationErrors'
 
 interface ExcelUploadProps {
   expectedColumns: string[]
@@ -104,7 +105,7 @@ export function ExcelUpload({
       setStatus({
         kind: 'error',
         message:
-          (err instanceof Error ? err.message : 'The file could not be saved.') +
+          (friendlyError(err).message || 'The file could not be saved.') +
           ' Nothing was changed.',
       })
     }
