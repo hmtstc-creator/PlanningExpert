@@ -42,7 +42,9 @@ import { Route as MachineFollowupMaintenanceRouteImport } from './routes/machine
 import { Route as MachineFollowupReportsRouteImport } from './routes/machine-followup/reports'
 import { Route as OeeIndexRouteImport } from './routes/oee/index'
 import { Route as OeeDataRouteImport } from './routes/oee/data'
+import { Route as OeeGuideRouteImport } from './routes/oee/guide'
 import { Route as OeeLossesRouteImport } from './routes/oee/losses'
+import { Route as OeeSettingsRouteImport } from './routes/oee/settings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -211,9 +213,19 @@ const OeeDataRoute = OeeDataRouteImport.update({
   path: '/oee/data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OeeGuideRoute = OeeGuideRouteImport.update({
+  id: '/oee/guide',
+  path: '/oee/guide',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OeeLossesRoute = OeeLossesRouteImport.update({
   id: '/oee/losses',
   path: '/oee/losses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OeeSettingsRoute = OeeSettingsRouteImport.update({
+  id: '/oee/settings',
+  path: '/oee/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -248,7 +260,9 @@ export interface FileRoutesByFullPath {
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
   '/oee/data': typeof OeeDataRoute
+  '/oee/guide': typeof OeeGuideRoute
   '/oee/losses': typeof OeeLossesRoute
+  '/oee/settings': typeof OeeSettingsRoute
   '/die-followup/': typeof DieFollowupIndexRoute
   '/machine-followup/': typeof MachineFollowupIndexRoute
   '/oee/': typeof OeeIndexRoute
@@ -284,7 +298,9 @@ export interface FileRoutesByTo {
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
   '/oee/data': typeof OeeDataRoute
+  '/oee/guide': typeof OeeGuideRoute
   '/oee/losses': typeof OeeLossesRoute
+  '/oee/settings': typeof OeeSettingsRoute
   '/die-followup': typeof DieFollowupIndexRoute
   '/machine-followup': typeof MachineFollowupIndexRoute
   '/oee': typeof OeeIndexRoute
@@ -321,7 +337,9 @@ export interface FileRoutesById {
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
   '/oee/data': typeof OeeDataRoute
+  '/oee/guide': typeof OeeGuideRoute
   '/oee/losses': typeof OeeLossesRoute
+  '/oee/settings': typeof OeeSettingsRoute
   '/die-followup/': typeof DieFollowupIndexRoute
   '/machine-followup/': typeof MachineFollowupIndexRoute
   '/oee/': typeof OeeIndexRoute
@@ -359,7 +377,9 @@ export interface FileRouteTypes {
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
     | '/oee/data'
+    | '/oee/guide'
     | '/oee/losses'
+    | '/oee/settings'
     | '/die-followup/'
     | '/machine-followup/'
     | '/oee/'
@@ -395,7 +415,9 @@ export interface FileRouteTypes {
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
     | '/oee/data'
+    | '/oee/guide'
     | '/oee/losses'
+    | '/oee/settings'
     | '/die-followup'
     | '/machine-followup'
     | '/oee'
@@ -431,7 +453,9 @@ export interface FileRouteTypes {
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
     | '/oee/data'
+    | '/oee/guide'
     | '/oee/losses'
+    | '/oee/settings'
     | '/die-followup/'
     | '/machine-followup/'
     | '/oee/'
@@ -468,7 +492,9 @@ export interface RootRouteChildren {
   MachineFollowupMaintenanceRoute: typeof MachineFollowupMaintenanceRoute
   MachineFollowupReportsRoute: typeof MachineFollowupReportsRoute
   OeeDataRoute: typeof OeeDataRoute
+  OeeGuideRoute: typeof OeeGuideRoute
   OeeLossesRoute: typeof OeeLossesRoute
+  OeeSettingsRoute: typeof OeeSettingsRoute
   DieFollowupIndexRoute: typeof DieFollowupIndexRoute
   MachineFollowupIndexRoute: typeof MachineFollowupIndexRoute
   OeeIndexRoute: typeof OeeIndexRoute
@@ -707,11 +733,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OeeDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oee/guide': {
+      id: '/oee/guide'
+      path: '/oee/guide'
+      fullPath: '/oee/guide'
+      preLoaderRoute: typeof OeeGuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/oee/losses': {
       id: '/oee/losses'
       path: '/oee/losses'
       fullPath: '/oee/losses'
       preLoaderRoute: typeof OeeLossesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oee/settings': {
+      id: '/oee/settings'
+      path: '/oee/settings'
+      fullPath: '/oee/settings'
+      preLoaderRoute: typeof OeeSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -748,7 +788,9 @@ const rootRouteChildren: RootRouteChildren = {
   MachineFollowupMaintenanceRoute: MachineFollowupMaintenanceRoute,
   MachineFollowupReportsRoute: MachineFollowupReportsRoute,
   OeeDataRoute: OeeDataRoute,
+  OeeGuideRoute: OeeGuideRoute,
   OeeLossesRoute: OeeLossesRoute,
+  OeeSettingsRoute: OeeSettingsRoute,
   DieFollowupIndexRoute: DieFollowupIndexRoute,
   MachineFollowupIndexRoute: MachineFollowupIndexRoute,
   OeeIndexRoute: OeeIndexRoute,

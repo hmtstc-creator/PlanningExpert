@@ -38,15 +38,23 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 Not: Eski "14 gün stok = acil" kuralının kodu kaldırıldı; acil tanımı stok
 projeksiyonundan gelir.
 
-## OEE (docs/oeedashboard.md) — karar: programda sabit (şimdilik)
+## OEE (docs/oeedashboard.md) — karar: tesise özel hiçbir değer kodda yok (2026-09-27)
 
-| # | Konu | Değer | Kodda |
-|---|---|---|---|
-| 29 | Masraf yeri adları | 51010171 Transfer, 51010173 Progressive, 51010172 APR | `src/lib/oee.ts` (COST_CENTERS) |
-| 30 | Vardiya kodu → vardiya | UB61/UB64 = 1, UB62/UB65 = 2, UB63/UB66 = 3 | `src/lib/oee.ts` (SHIFT_NUMBER) |
-| 31 | Kayıp grupları | KLP, STP, ARZ, KSD, KON, OFC, YNT, # ; Others = YNT + OFC + KON | `src/lib/oee.ts` (LOSS_GROUPS) |
-| 32 | Trend uzunluğu | 10 hafta | `src/routes/oee/*.tsx` (WEEKS) |
-| 33 | Listelerde ilk gösterilen | en kötü 10 kalıp, 15 neden | `src/routes/oee/losses.tsx` |
-| 34 | Duruş satırı okuma sınırı | bir sorguda en çok 8 gün | `convex/oee.ts` |
-| 35 | Setup sayılan duruşlar | DIE SETUP - PLANNED/UNPLANNED, REGLAJ MATRITA - PLANIFICATA/NEPLANIFICATA | `src/lib/oee.ts` (DIE_SETUP_TEXTS) |
-| 36 | Setup sonrası OK için üretim | 60 dk (planlamacının kararı) | `src/lib/oee.ts` (STARTUP_RUN_MIN) |
+Planlamacı: "manuel programın kodunda yazılı bir değer olmamalı". Aşağıdakiler
+kullanıcının **OEE → Settings** sayfasında tanımlanır (`oeeSettings` tablosu):
+
+| # | Konu | Nerede |
+|---|---|---|
+| 29 | Alanlar (üstteki düğmeler) ve seçim türü (masraf yeri / makine) | Settings → Areas |
+| 30 | Masraf yeri adları ve alanı | Settings → Cost centers |
+| 31 | Vardiya grubu kodu → vardiya numarası | Settings → Shifts |
+| 32 | Kayıp sayılan / mola sayılan Reason Code 1 | Settings → Reason Code 1 |
+| 33 | Kayıp grupları (Reason Code 2): ad, grafik sütunu, arıza (MTTR/MTBF) | Settings → Loss groups |
+| 34 | Setup sayılan duruş metinleri (planlı / plansız) | Settings → Setups |
+| 35 | Setup sonrası OK için üretim süresi, trend hafta sayısı, liste uzunluğu | Settings → Numbers |
+
+Programda kalanlar yalnızca dosya biçimidir (sayfa adları, sütun başlıkları,
+formüller) ve "Suggest from data" düğmesinin öneri değerleri
+(`src/lib/settingsDefaults.ts` → `OEE_SUGGESTED`: 60 dk, 10 hafta, 10 satır) —
+öneri kaydedilmeden hiçbir hesap onu kullanmaz. Duruş satırlarını okuma sınırı
+(bir sorguda 8 gün) teknik sınırdır.

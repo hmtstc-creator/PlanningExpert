@@ -331,22 +331,41 @@ Gerçek veri (1–25 Eylül):
 - APR: 656 setup → 258 OK, 398 NOK; 343'ünde neden "sonraki setup geldi"
   (APR'de siparişler kısa, 1 saat dolmadan sıradaki setup başlıyor).
 
-### Haftalık arşiv (2026-09-27, planlamacı: "geçmiş haftaları Weekly KPI_fix'ten arşive al")
+### ~~Haftalık arşiv programın içinde~~ → sürdürülebilir kullanım (2026-09-27, planlamacı)
 
-- Weekly KPI_fix'in 629 satırı (2026, 2–37. haftalar; 33. hafta dosyada yok)
-  programın içinde kalıcı arşiv: `src/lib/oeeWeeklyArchive.ts`. Yükleme
-  gerekmez, yeni yüklemeler silmez.
-- Öncelik: yüklenen Weekly KPI_fix (arşiv düzeltmesi) > programdaki arşiv >
-  yüklenen Weekly KPI > vardiyalardan hesap. Arşivde olan hafta Weekly KPI
-  ile ezilmez: Weekly KPI'ın ilk haftası yarım gelebiliyor (36. hafta, 31
-  Ağustos yok; PRS-106 Loading 5 128 dk, arşivde 6 482 dk).
-- Losses Trend'in 10 haftalık grafiğinde arşiv haftaları için yalnızca Speed
-  gösterilir (Production − Operation); duruş grupları Downtimes yüklenen
-  haftalardan başlar.
+Planlamacı: "Program sürdürülebilir olmalı. İlk defaya mahsus sene başından
+beri Weekly, Monthly, Daily vereceğim; sonra hep son 2 hafta Shiftly KPI,
+Downtimes ve Shiftly Order Based KPI yükleyeceğim. Geçmişi silmemeli,
+devamına eklemeli, aynı satırı mükerrer kaydetmemeli. Satın alan herkese
+basit bir kullanım yöntemi verilmeli. Kodda elle yazılmış değer olmamalı."
+
+Uygulama:
+- Programa gömülü Weekly KPI_fix arşivi **kaldırıldı**; geçmiş yalnızca
+  yüklenen veriden gelir ve veritabanında birikir.
+- Yükleme **silmez**; her satır anahtarıyla eklenir ya da güncellenir:
+  vardiya (tarih + iş merkezi + vardiya grubu), gün (tarih + iş merkezi),
+  sipariş (tarih + iş merkezi + vardiya + sipariş + ekipman), duruş (iş
+  merkezi + başlangıç tarihi/saati + sipariş; gün kaydında birleşir), hafta
+  (yıl + hafta + iş merkezi), ay (yıl + ay + iş merkezi).
+- Gün tabanı (`oeeDays`): vardiyaların toplamı; vardiyası olmayan günde Daily
+  KPI. Hafta / ay = günlerin toplamı; yüklenen Weekly / Monthly satırı daha
+  çok Loading kapsıyorsa o (geçmişin başı yalnızca haftalık/aylık olabilir).
+- Aylık sayfada yıl yok: dosyadaki en son günlük/vardiya tarihinden çıkarılır.
+- Tesise özel bütün değerler **OEE → Settings**'te (docs/fixeddefinitions.md
+  29–35). "Suggest from data" verideki kodlardan öneri doldurur.
+- Kayıp özeti ham kodlarla saklanır (Reason Code 1 | 2); ayar değişince
+  sayfalar yeniden hesaplar, veri değişmez.
+- Kullanım yöntemi: **OEE → How to use** sayfası (ilk kurulum, rutin
+  yükleme, kontrol, hesap kuralları) ve neyin yüklü olduğu tablosu.
+
+Eski biçimdeki kayıtlar: ilk sürümün kayıp özetleri okunmaz; yılı olmayan
+aylık satırlar okunmaz. İlk kurulum yüklemesi aynı günleri/ayları yeniden
+yazınca düzelir.
 
 ## Bekleyen konular
 
-- APR için 1 saat kuralı uygun mu (kısa siparişler)? Planlamacıya sorulacak.
+- APR için setup sonrası üretim süresi (şu an tek değer, Settings'te):
+  APR'ye ayrı süre gerekir mi? Planlamacıya sorulacak.
 
 - Downtimes plansız duruş toplamı ile Shiftly Unscheduled Downtime farkı
   (medyan 7,9 dk/vardiya, en çok 163 dk) — ayrıca incelenecek.

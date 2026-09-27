@@ -1,8 +1,8 @@
-// OEE Trend and Losses — ASAKAI raporunun hesapları. Saf fonksiyonlar.
+// OEE Trend and Losses — hesaplar. Saf fonksiyonlar.
 //
 // Kaynak: sistemden indirilen Excel (Shiftly KPI, Daily KPI, Weekly KPI,
 // Monthly KPI, Shiftly Order Based KPI, Downtimes). Notlar ve kararlar:
-// docs/oeedashboard.md.
+// docs/oeedashboard.md; kullanım: OEE modülündeki "How to use" sayfası.
 //
 // Temel kural: hiçbir dönem için yüzde ORTALAMASI alınmaz. Süreler (Loading,
 // Production, Operation) ve adetler toplanır, oran toplamdan hesaplanır:
@@ -12,49 +12,11 @@
 //   OEE          = Availability × Performance × Quality
 // Tek istisna planlamacının kararıyla kalıp OEE'sidir: dosyadaki gibi iyi
 // adetle ağırlıklı (Σ OEE × Good ÷ Σ Good).
-
-// ---- sabitler (docs/fixeddefinitions.md) -----------------------------------
-
-/** Masraf yeri → ad. Excel'deki BoardReport ile aynı. */
-export const COST_CENTERS: Record<string, string> = {
-  '51010171': 'Transfer',
-  '51010173': 'Progressive',
-  '51010172': 'APR',
-}
-
-/** Vardiya kodu → 1/2/3 (Excel "Data" sayfası AC:AD). */
-export const SHIFT_NUMBER: Record<string, number> = {
-  UB61: 1,
-  UB62: 2,
-  UB63: 3,
-  UB64: 1,
-  UB65: 2,
-  UB66: 3,
-}
-
-/** Downtimes "Reason Code 2" → kayıp grubu (Excel Losses_Follow). */
-export const LOSS_GROUPS: { code: string; label: string }[] = [
-  { code: 'KLP', label: 'Die breakdown' },
-  { code: 'STP', label: 'Setup' },
-  { code: 'ARZ', label: 'Machine breakdown' },
-  { code: 'KSD', label: 'Short stoppages' },
-  { code: 'KON', label: 'Quality' },
-  { code: 'OFC', label: 'Logistic' },
-  { code: 'YNT', label: 'Management' },
-  { code: '#', label: 'Undefined' },
-]
-
-/** BoardReport "% of Loading" grafiğinin sütunları; OTHERS = YNT + OFC + KON. */
-export const LOSS_CHART_GROUPS: { key: string; label: string; codes: string[] }[] = [
-  { key: 'die', label: 'Die', codes: ['KLP'] },
-  { key: 'setup', label: 'Setup', codes: ['STP'] },
-  { key: 'machine', label: 'Machine', codes: ['ARZ'] },
-  { key: 'short', label: 'Short', codes: ['KSD'] },
-  { key: 'others', label: 'Others', codes: ['YNT', 'OFC', 'KON'] },
-  { key: 'speed', label: 'Speed', codes: [] },
-]
-
-export type Area = 'PRS' | 'APR'
+//
+// Tesise özel hiçbir değer kodda yazılı değildir: alanlar, masraf yeri
+// adları, vardiya numaraları, kayıp grupları, setup metinleri ve süreler
+// kullanıcının OEE ayarlarındadır (OeeConfig). Program yalnızca verideki
+// kodlardan bir ÖNERİ çıkarır (suggestConfig); kaydeden kullanıcıdır.
 
 // ---- tipler ------------------------------------------------------------------
 
@@ -69,7 +31,15 @@ export interface OeeTimes {
   loadingMin: number
 }
 
-export interface ShiftRow extends OeeTimes {
+/** Dosyadaki oranlar (%), gösterim için; hesap toplamdan yapılır. */
+interface FileRatios {
+  availability: number
+  quality: number
+  performance: number
+  oee: number
+}
+
+export interface ShiftRow extends OeeTimes, FileRatios {
   date: string
   plantKey: string
   responsible: string
@@ -77,14 +47,32 @@ export interface ShiftRow extends OeeTimes {
   workCenter: string
   shiftGroup: string
   shiftDefinition: string
-  /** Dosyadaki oranlar (%), gösterim için; hesap toplamdan yapılır. */
-  availability: number
-  quality: number
-  performance: number
-  oee: number
 }
 
-export interface OrderRow extends OeeTimes {
+/** Daily KPI satırı (ilk kurulumda geçmiş için yüklenir). */
+export interface DailyRow extends OeeTimes, FileRatios {
+  date: string
+  plantKey: string
+  responsible: string
+  costCenter: string
+  workCenter: string
+  scheduledSec: number
+}
+
+/**
+ * Gün × iş merkezi — bütün hafta/ay hesaplarının tabanı. O günün vardiya
+ * satırları varsa onların toplamı (source 'shiftly'), yoksa Daily KPI.
+ */
+export interface DayRow extends OeeTimes {
+  date: string
+  plantKey: string
+  responsible: string
+  costCenter: string
+  workCenter: string
+  source: 'shiftly' | 'daily'
+}
+
+export interface OrderRow extends OeeTimes, FileRatios {
   date: string
   plant: string
   plantName: string
@@ -93,13 +81,9 @@ export interface OrderRow extends OeeTimes {
   order: string
   equipment: string
   material: string
-  availability: number
-  quality: number
-  performance: number
-  oee: number
 }
 
-export interface WeeklyRow extends OeeTimes {
+export interface WeeklyRow extends OeeTimes, FileRatios {
   year: number
   week: number
   plantKey: string
@@ -107,15 +91,13 @@ export interface WeeklyRow extends OeeTimes {
   costCenter: string
   workCenter: string
   scheduledSec: number
-  availability: number
-  quality: number
-  performance: number
-  oee: number
-  /** 'archive' = Weekly KPI_fix (geçmiş haftalar arşivi); yoksa Weekly KPI. */
-  source?: 'archive' | 'weekly'
+  /** Hangi sayfadan geldiği (Weekly KPI / Weekly KPI_fix); yalnızca bilgi. */
+  sheet?: string
 }
 
-export interface MonthlyRow extends OeeTimes {
+export interface MonthlyRow extends OeeTimes, FileRatios {
+  /** Dosyada yıl yok; yüklemede tarihlerden çıkarılır. */
+  year: number
   month: string
   monthKey: string
   plantKey: string
@@ -123,17 +105,9 @@ export interface MonthlyRow extends OeeTimes {
   costCenter: string
   workCenter: string
   scheduledSec: number
-  availability: number
-  quality: number
-  performance: number
-  oee: number
 }
 
-/**
- * Bir duruş satırı. Sunucuda gün × iş merkezi başına tek kayıtta dizi olarak
- * durur (satır sayısı çok), bu yüzden alan adları kısa tutulmadı ama gün,
- * iş merkezi ve masraf yeri üst kayıttadır.
- */
+/** Bir duruş satırı. Sunucuda gün × iş merkezi kaydında dizi olarak durur. */
 export interface DowntimeEvent {
   order: string
   material: string
@@ -164,16 +138,18 @@ export interface DowntimeDay {
   events: DowntimeEvent[]
 }
 
-/** Gün × iş merkezi kayıp özeti (trend ve karşılaştırma bunu okur). */
+/**
+ * Gün × iş merkezi duruş özeti — ham kodlarla (Reason Code 1 ve 2), ayardan
+ * bağımsız. Ayar değişince özet yeniden hesaplanmaz; gruplama okurken yapılır.
+ */
 export interface LossDay {
   date: string
   costCenter: string
   workCenter: string
-  /** Kayıp grubu → dakika (plansız; "#" grubu bütün satırlar). */
-  minutes: Record<string, number>
-  counts: Record<string, number>
-  /** Plansız duruş nedeni (EN) → [dakika, adet, grup]. */
-  reasons: Record<string, [number, number, string]>
+  /** `${rc1}|${rc2}` → [dakika, adet] */
+  codes: Record<string, [number, number]>
+  /** `${rc1}|${rc2}|${metin}` → [dakika, adet] */
+  reasons: Record<string, [number, number]>
 }
 
 export const EMPTY_TIMES: OeeTimes = {
@@ -186,6 +162,61 @@ export const EMPTY_TIMES: OeeTimes = {
   productionMin: 0,
   loadingMin: 0,
 }
+
+// ---- ayarlar -------------------------------------------------------------------
+
+export type Pick = 'costCenter' | 'machine'
+
+/** Kullanıcının OEE ayarları (OEE → Settings). */
+export interface OeeConfig {
+  /** Üstteki seçim düğmeleri; `pick`: masraf yeri mi makine mi seçilir. */
+  areas: { name: string; pick: Pick }[]
+  costCenters: { code: string; name: string; area: string }[]
+  /** Vardiya grubu kodu (Shift Group) → vardiya numarası (1, 2, 3 …). */
+  shifts: { code: string; number: number }[]
+  /** Reason Code 1 değerleri: kayıp sayılan ve mola (planlı duruş) sayılan. */
+  lossReasonCodes: string[]
+  breakReasonCodes: string[]
+  /** Reason Code 2 → kayıp grubu; `chart`: grafikteki sütun adı; `breakdown`: MTTR/MTBF tablosunda. */
+  lossGroups: { code: string; label: string; chart: string; breakdown: boolean }[]
+  /** Setup sayılan duruş metinleri (Reason Code Definition EN). */
+  setupTexts: { text: string; kind: 'planned' | 'unplanned' }[]
+  /** Setup'tan sonra bu kadar dakika üretim yapılırsa setup OK. */
+  startupRunMin: number
+  trendWeeks: number
+  topN: number
+}
+
+export const EMPTY_CONFIG: OeeConfig = {
+  areas: [],
+  costCenters: [],
+  shifts: [],
+  lossReasonCodes: [],
+  breakReasonCodes: [],
+  lossGroups: [],
+  setupTexts: [],
+  startupRunMin: 0,
+  trendWeeks: 0,
+  topN: 0,
+}
+
+/** Ayarda eksik olan ve kullanıcıya söylenmesi gereken konular. */
+export function configProblems(c: OeeConfig): string[] {
+  const out: string[] = []
+  if (!c.areas.length || !c.costCenters.length) out.push('Areas and cost centers are not defined.')
+  if (!c.shifts.length) out.push('Shift codes are not numbered.')
+  if (!c.lossReasonCodes.length) out.push('No Reason Code 1 is marked as a loss.')
+  if (!c.lossGroups.length) out.push('Loss groups are not named.')
+  if (!c.setupTexts.length) out.push('No downtime text is marked as a die setup.')
+  if (!(c.startupRunMin > 0)) out.push('Production time after a setup is not set.')
+  if (!(c.trendWeeks > 0) || !(c.topN > 0)) out.push('Trend length and list size are not set.')
+  return out
+}
+
+/** Ayarda olmayan masraf yerleri bu alanda toplanır — veri kaybolmaz. */
+export const UNASSIGNED = 'Unassigned'
+
+export const SPEED = 'Speed'
 
 // ---- oranlar -----------------------------------------------------------------
 
@@ -212,6 +243,8 @@ export function addTimes(a: OeeTimes, b: OeeTimes): OeeTimes {
 export function sumTimes(rows: OeeTimes[]): OeeTimes {
   return rows.reduce(addTimes, EMPTY_TIMES)
 }
+
+export const timesOf = (r: OeeTimes): OeeTimes => sumTimes([r])
 
 /** Toplam süreden oranlar (0–1). Loading yoksa oran yok. */
 export function ratios(t: OeeTimes): OeeRatios {
@@ -261,46 +294,97 @@ export function mondayOfWeek(year: number, week: number): string {
 
 export const weekKey = (year: number, week: number) => `${year}-W${String(week).padStart(2, '0')}`
 
-// ---- kapsam: PRS / APR, masraf yeri, makine --------------------------------------
+// ---- kapsam: alan, masraf yeri, makine ------------------------------------------
 
-export function areaOf(workCenter: string): Area | null {
-  const p = workCenter.trim().toUpperCase().slice(0, 3)
-  return p === 'PRS' || p === 'APR' ? p : null
-}
-
-/**
- * Seçim: PRS için masraf yeri (Transfer / Progressive) ya da hepsi; APR'de
- * hepsi aynı masraf yerinde olduğundan makine (iş merkezi) ya da hepsi.
- */
 export interface Scope {
-  area: Area
-  /** 'all', bir masraf yeri (PRS) ya da bir iş merkezi (APR). */
+  area: string
+  /** 'all', bir masraf yeri ya da bir iş merkezi (alanın seçim türüne göre). */
   key: string
 }
 
-export function inScope(row: { workCenter: string; costCenter: string }, scope: Scope): boolean {
-  if (areaOf(row.workCenter) !== scope.area) return false
+type Located = { workCenter: string; costCenter: string }
+
+export function areaOfCostCenter(cc: string, c: OeeConfig): string {
+  return c.costCenters.find((x) => x.code === cc)?.area || UNASSIGNED
+}
+
+export function pickOf(area: string, c: OeeConfig): Pick {
+  return c.areas.find((a) => a.name === area)?.pick ?? 'machine'
+}
+
+export function costCenterName(cc: string, c: OeeConfig): string {
+  return c.costCenters.find((x) => x.code === cc)?.name || cc
+}
+
+export function inScope(row: Located, scope: Scope, c: OeeConfig): boolean {
+  if (areaOfCostCenter(row.costCenter, c) !== scope.area) return false
   if (scope.key === 'all') return true
-  return scope.area === 'PRS' ? row.costCenter === scope.key : row.workCenter === scope.key
+  return pickOf(scope.area, c) === 'costCenter' ? row.costCenter === scope.key : row.workCenter === scope.key
 }
 
-export function scopeLabel(scope: Scope): string {
-  if (scope.key === 'all') return scope.area === 'PRS' ? 'All presses' : 'All APR machines'
-  return scope.area === 'PRS' ? COST_CENTERS[scope.key] ?? scope.key : scope.key
+/** Seçilebilir alanlar: ayardakiler + verideki tanımsız masraf yerleri için "Unassigned". */
+export function areaNames(rows: Located[], c: OeeConfig): string[] {
+  const names = c.areas.map((a) => a.name)
+  if (rows.some((r) => r.costCenter && areaOfCostCenter(r.costCenter, c) === UNASSIGNED)) names.push(UNASSIGNED)
+  return names
 }
 
-/** Kapsam seçenekleri: PRS'de verideki masraf yerleri, APR'de makineler. */
-export function scopeOptions(area: Area, rows: { workCenter: string; costCenter: string }[]): { key: string; label: string }[] {
-  const out = [{ key: 'all', label: area === 'PRS' ? 'All presses' : 'All APR machines' }]
-  const seen = new Set<string>()
+export function scopeLabel(scope: Scope, c: OeeConfig): string {
+  if (scope.key === 'all') return `${scope.area} — all`
+  return pickOf(scope.area, c) === 'costCenter' ? costCenterName(scope.key, c) : scope.key
+}
+
+/** Alanın seçenekleri: masraf yerleri ya da makineler (verideki). */
+export function scopeOptions(area: string, rows: Located[], c: OeeConfig): { key: string; label: string }[] {
+  const pick = pickOf(area, c)
+  const keys = new Set<string>()
   for (const r of rows) {
-    if (areaOf(r.workCenter) !== area) continue
-    const key = area === 'PRS' ? r.costCenter : r.workCenter
-    if (key && !seen.has(key)) seen.add(key)
+    if (!r.costCenter || areaOfCostCenter(r.costCenter, c) !== area) continue
+    keys.add(pick === 'costCenter' ? r.costCenter : r.workCenter)
   }
-  const keys = [...seen].sort((a, b) => (COST_CENTERS[a] ?? a).localeCompare(COST_CENTERS[b] ?? b))
-  for (const key of keys) out.push({ key, label: area === 'PRS' ? COST_CENTERS[key] ?? key : key })
-  return out
+  const label = (k: string) => (pick === 'costCenter' ? costCenterName(k, c) : k)
+  return [
+    { key: 'all', label: `${area} — all` },
+    ...[...keys].sort((a, b) => label(a).localeCompare(label(b))).map((k) => ({ key: k, label: label(k) })),
+  ]
+}
+
+/** İş merkezi → masraf yeri (Order Based'de masraf yeri yok; gün verisinden). */
+export function costCentersOf(rows: Located[]): Map<string, string> {
+  return new Map(rows.filter((r) => r.costCenter).map((r) => [r.workCenter, r.costCenter]))
+}
+
+// ---- gün tabanı ----------------------------------------------------------------
+
+/** Vardiya satırlarından gün × iş merkezi toplamı. */
+export function daysFromShifts(shifts: ShiftRow[]): DayRow[] {
+  const map = new Map<string, DayRow>()
+  for (const s of shifts) {
+    const key = `${s.date}|${s.workCenter}`
+    const cur = map.get(key)
+    map.set(key, {
+      date: s.date,
+      plantKey: s.plantKey,
+      responsible: s.responsible,
+      costCenter: s.costCenter,
+      workCenter: s.workCenter,
+      source: 'shiftly',
+      ...addTimes(cur ?? EMPTY_TIMES, s),
+    })
+  }
+  return [...map.values()]
+}
+
+export function dayFromDaily(d: DailyRow): DayRow {
+  return {
+    date: d.date,
+    plantKey: d.plantKey,
+    responsible: d.responsible,
+    costCenter: d.costCenter,
+    workCenter: d.workCenter,
+    source: 'daily',
+    ...timesOf(d),
+  }
 }
 
 // ---- seriler -----------------------------------------------------------------
@@ -314,215 +398,209 @@ export interface SeriesPoint {
 
 const point = (key: string, label: string, times: OeeTimes): SeriesPoint => ({ key, label, times, oee: oeeOf(times) })
 
+export interface PeriodTimes {
+  workCenter: string
+  costCenter: string
+  times: OeeTimes
+  source: 'days' | 'upload'
+}
+
 /**
- * Hafta × iş merkezi süreleri. Yüklenen haftalık satır (Weekly KPI /
- * Weekly KPI_fix) o hafta ve iş merkezi için varsa o geçerlidir — haftanın
- * tamamını kapsar. Yoksa hafta, vardiya satırlarının toplamıdır.
+ * Bir dönemin (hafta ya da ay) iş merkezi süreleri: günlerin toplamı ile
+ * yüklenen dönem satırından (Weekly / Monthly KPI) hangisi daha çok Loading
+ * kapsıyorsa o. İkisi aynı verinin toplamıdır; büyük olan daha eksiksizdir
+ * (ör. geçmişin başı yalnızca haftalık olarak var, ya da haftanın ilk günü
+ * günlük veride eksik).
  */
-export function weekTimesByWorkCenter(
-  shifts: ShiftRow[],
-  weekly: WeeklyRow[],
-): Map<string, { workCenter: string; costCenter: string; year: number; week: number; times: OeeTimes }> {
-  const out = new Map<string, { workCenter: string; costCenter: string; year: number; week: number; times: OeeTimes }>()
-  for (const r of shifts) {
-    const { year, week } = isoWeek(r.date)
-    const key = `${weekKey(year, week)}|${r.workCenter}`
-    const cur = out.get(key)
-    out.set(key, { workCenter: r.workCenter, costCenter: r.costCenter, year, week, times: addTimes(cur?.times ?? EMPTY_TIMES, r) })
+function choosePeriod(fromDays: Map<string, PeriodTimes>, uploaded: Map<string, PeriodTimes>): Map<string, PeriodTimes> {
+  const out = new Map(fromDays)
+  for (const [key, u] of uploaded) {
+    const d = out.get(key)
+    if (!d || u.times.loadingMin > d.times.loadingMin + 0.5) out.set(key, u)
   }
-  const uploaded = new Map<string, { workCenter: string; costCenter: string; year: number; week: number; times: OeeTimes }>()
-  for (const r of weekly) {
-    const key = `${weekKey(r.year, r.week)}|${r.workCenter}`
-    const cur = uploaded.get(key)
-    uploaded.set(key, { workCenter: r.workCenter, costCenter: r.costCenter, year: r.year, week: r.week, times: addTimes(cur?.times ?? EMPTY_TIMES, r) })
-  }
-  for (const [key, value] of uploaded) out.set(key, value)
   return out
 }
 
-/** Programdaki Weekly KPI_fix arşivi (src/lib/oeeWeeklyArchive.ts) → satırlar. */
-export function archiveRows(data: (string | number)[][], year: number): WeeklyRow[] {
-  const n = (v: string | number) => (typeof v === 'number' ? v : Number(v) || 0)
-  return data.map((r) => ({
-    year,
-    week: n(r[0]),
-    plantKey: String(r[1]),
-    responsible: String(r[2]),
-    costCenter: String(r[3]),
-    workCenter: String(r[4]),
-    good: n(r[5]),
-    scrap: n(r[6]),
-    reject: n(r[7]),
-    scheduledSec: n(r[8]),
-    scheduledMin: n(r[9]),
-    unscheduledMin: n(r[10]),
-    operatingMin: n(r[11]),
-    productionMin: n(r[12]),
-    loadingMin: n(r[13]),
-    availability: n(r[14]),
-    quality: n(r[15]),
-    performance: n(r[16]),
-    oee: n(r[17]),
-    source: 'archive',
-  }))
+function addTo(map: Map<string, PeriodTimes>, key: string, r: Located & OeeTimes, source: 'days' | 'upload') {
+  const cur = map.get(key)
+  map.set(key, { workCenter: r.workCenter, costCenter: r.costCenter || cur?.costCenter || '', times: addTimes(cur?.times ?? EMPTY_TIMES, r), source })
 }
 
-/**
- * Haftalık satırların birleşimi. Öncelik (yüksekten düşüğe): yüklenen
- * Weekly KPI_fix (arşiv düzeltmesi) > programdaki arşiv > yüklenen Weekly
- * KPI. Arşivde olan bir hafta yeni yüklemeyle silinmez ya da ezilmez;
- * arşivde olmayan haftalar yüklenen Weekly KPI'dan (o da yoksa vardiyadan).
- */
-export function mergeWeekly(archive: WeeklyRow[], uploaded: WeeklyRow[]): WeeklyRow[] {
-  const key = (r: WeeklyRow) => `${r.year}|${r.week}|${r.workCenter}`
-  const out = new Map<string, WeeklyRow>()
-  const archivedWeeks = new Set(archive.map((r) => `${r.year}|${r.week}`))
-  for (const r of uploaded) if (r.source !== 'archive' && !archivedWeeks.has(`${r.year}|${r.week}`)) out.set(key(r), r)
-  for (const r of archive) out.set(key(r), r)
-  for (const r of uploaded) if (r.source === 'archive') out.set(key(r), r)
-  return [...out.values()]
-}
-
-/** Son n hafta (seçilen hafta dahil), kapsamın toplamı ve iş merkezi başına. */
-export function weeklyTrend(
-  shifts: ShiftRow[],
-  weekly: WeeklyRow[],
-  scope: Scope,
-  endMonday: string,
-  n = 10,
-): { weeks: SeriesPoint[]; byWorkCenter: Map<string, SeriesPoint[]> } {
-  const all = weekTimesByWorkCenter(shifts, weekly)
-  const weeks: SeriesPoint[] = []
-  const byWc = new Map<string, SeriesPoint[]>()
-  const wcs = [...new Set([...all.values()].filter((v) => inScope(v, scope)).map((v) => v.workCenter))].sort()
-  for (const wc of wcs) byWc.set(wc, [])
-  for (let i = n - 1; i >= 0; i--) {
-    const monday = addDaysIso(endMonday, -7 * i)
-    const { year, week } = isoWeek(monday)
-    const wk = weekKey(year, week)
-    let total = EMPTY_TIMES
-    for (const wc of wcs) {
-      const hit = all.get(`${wk}|${wc}`)
-      const t = hit && inScope(hit, scope) ? hit.times : EMPTY_TIMES
-      total = addTimes(total, t)
-      byWc.get(wc)!.push(point(wk, `W${week}`, t))
-    }
-    weeks.push(point(wk, `W${week}`, total))
+/** Hafta × iş merkezi: `${yıl}-W${hafta}|${iş merkezi}`. */
+export function weekTimes(days: DayRow[], weekly: WeeklyRow[]): Map<string, PeriodTimes> {
+  const fromDays = new Map<string, PeriodTimes>()
+  for (const d of days) {
+    const { year, week } = isoWeek(d.date)
+    addTo(fromDays, `${weekKey(year, week)}|${d.workCenter}`, d, 'days')
   }
-  return { weeks, byWorkCenter: byWc }
+  const uploaded = new Map<string, PeriodTimes>()
+  for (const w of weekly) addTo(uploaded, `${weekKey(w.year, w.week)}|${w.workCenter}`, w, 'upload')
+  return choosePeriod(fromDays, uploaded)
+}
+
+export const monthKeyOf = (year: number, month: number | string) => `${year}-${String(month).padStart(2, '0')}`
+
+/** Ay × iş merkezi: `${yıl}-${ay}|${iş merkezi}`. */
+export function monthTimes(days: DayRow[], monthly: MonthlyRow[]): Map<string, PeriodTimes> {
+  const fromDays = new Map<string, PeriodTimes>()
+  for (const d of days) addTo(fromDays, `${d.date.slice(0, 7)}|${d.workCenter}`, d, 'days')
+  const uploaded = new Map<string, PeriodTimes>()
+  for (const m of monthly) addTo(uploaded, `${monthKeyOf(m.year, m.monthKey)}|${m.workCenter}`, m, 'upload')
+  return choosePeriod(fromDays, uploaded)
+}
+
+function trend(
+  all: Map<string, PeriodTimes>,
+  keys: { key: string; label: string }[],
+  scope: Scope,
+  c: OeeConfig,
+): { total: SeriesPoint[]; byWorkCenter: Map<string, SeriesPoint[]> } {
+  const inRange = new Set(keys.map((k) => k.key))
+  const wcs = [...new Set([...all].filter(([k, v]) => inRange.has(k.split('|')[0]) && inScope(v, scope, c)).map(([, v]) => v.workCenter))].sort()
+  const byWc = new Map<string, SeriesPoint[]>(wcs.map((wc) => [wc, []]))
+  const total: SeriesPoint[] = []
+  for (const { key, label } of keys) {
+    let sum = EMPTY_TIMES
+    for (const wc of wcs) {
+      const hit = all.get(`${key}|${wc}`)
+      const t = hit && inScope(hit, scope, c) ? hit.times : EMPTY_TIMES
+      sum = addTimes(sum, t)
+      byWc.get(wc)!.push(point(key, label, t))
+    }
+    total.push(point(key, label, sum))
+  }
+  return { total, byWorkCenter: byWc }
+}
+
+/** Son n hafta (seçilen hafta dahil). */
+export function weeklyTrend(days: DayRow[], weekly: WeeklyRow[], scope: Scope, c: OeeConfig, endMonday: string, n: number) {
+  const keys = Array.from({ length: n }, (_, i) => {
+    const { year, week } = isoWeek(addDaysIso(endMonday, -7 * (n - 1 - i)))
+    return { key: weekKey(year, week), label: `W${week}` }
+  })
+  return trend(weekTimes(days, weekly), keys, scope, c)
 }
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** Monthly KPI olduğu gibi: ay anahtarına göre, kapsamın toplamı ve iş merkezi başına. */
-export function monthlyTrend(
-  monthly: MonthlyRow[],
-  scope: Scope,
-): { months: SeriesPoint[]; byWorkCenter: Map<string, SeriesPoint[]> } {
-  const rows = monthly.filter((r) => inScope(r, scope))
-  const keys = [...new Set(rows.map((r) => r.monthKey))].sort()
-  const wcs = [...new Set(rows.map((r) => r.workCenter))].sort()
-  const label = (k: string) => MONTH_LABELS[Number(k) - 1] ?? k
-  const months = keys.map((k) => point(k, label(k), sumTimes(rows.filter((r) => r.monthKey === k))))
-  const byWc = new Map<string, SeriesPoint[]>()
-  for (const wc of wcs) {
-    byWc.set(
-      wc,
-      keys.map((k) => point(k, label(k), sumTimes(rows.filter((r) => r.monthKey === k && r.workCenter === wc)))),
-    )
-  }
-  return { months, byWorkCenter: byWc }
+/** Seçilen tarihin yılının ocağından o aya kadar. */
+export function monthlyTrend(days: DayRow[], monthly: MonthlyRow[], scope: Scope, c: OeeConfig, date: string) {
+  const year = Number(date.slice(0, 4))
+  const upTo = Number(date.slice(5, 7))
+  const keys = Array.from({ length: upTo }, (_, i) => ({ key: monthKeyOf(year, i + 1), label: MONTH_LABELS[i] }))
+  return trend(monthTimes(days, monthly), keys, scope, c)
 }
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-/** Seçilen haftanın 21 vardiyası (Pzt-1 … Paz-3), BoardReport'taki gibi. */
-export function weekShiftTrend(
-  shifts: ShiftRow[],
-  scope: Scope,
-  monday: string,
-): { slots: SeriesPoint[]; byWorkCenter: Map<string, SeriesPoint[]> } {
-  const rows = shifts.filter((r) => inScope(r, scope))
+/** Vardiya numarası ayardan; tanımsız kod null. */
+export const shiftNumber = (code: string, c: OeeConfig): number | null => c.shifts.find((s) => s.code === code)?.number ?? null
+
+/** Seçilen haftanın vardiyaları (Pzt-1 … Paz-n), BoardReport'taki gibi. */
+export function weekShiftTrend(shifts: ShiftRow[], scope: Scope, c: OeeConfig, monday: string) {
+  const rows = shifts.filter((r) => inScope(r, scope, c))
+  const numbers = [...new Set(c.shifts.map((s) => s.number))].sort((a, b) => a - b)
+  const unknown = [...new Set(rows.filter((r) => shiftNumber(r.shiftGroup, c) === null).map((r) => r.shiftGroup))]
   const wcs = [...new Set(rows.map((r) => r.workCenter))].sort()
   const slots: SeriesPoint[] = []
   const byWc = new Map<string, SeriesPoint[]>(wcs.map((wc) => [wc, []]))
   for (let d = 0; d < 7; d++) {
     const date = addDaysIso(monday, d)
-    for (let s = 1; s <= 3; s++) {
+    for (const s of numbers) {
       const key = `${date}|${s}`
       const label = `${DAY_LABELS[d]}-${s}`
-      const hit = rows.filter((r) => r.date === date && SHIFT_NUMBER[r.shiftGroup] === s)
+      const hit = rows.filter((r) => r.date === date && shiftNumber(r.shiftGroup, c) === s)
       slots.push(point(key, label, sumTimes(hit)))
       for (const wc of wcs) byWc.get(wc)!.push(point(key, label, sumTimes(hit.filter((r) => r.workCenter === wc))))
     }
   }
-  return { slots, byWorkCenter: byWc }
+  return { slots, byWorkCenter: byWc, unknown }
 }
 
-/** Bir günün (ya da gün aralığının) kapsam toplamı. */
-export function totalsFor(shifts: ShiftRow[], scope: Scope, from: string, to: string): OeeTimes {
-  return sumTimes(shifts.filter((r) => r.date >= from && r.date <= to && inScope(r, scope)))
+/** Gün aralığının kapsam toplamı. */
+export function totalsFor(days: DayRow[], scope: Scope, c: OeeConfig, from: string, to: string): OeeTimes {
+  return sumTimes(days.filter((r) => r.date >= from && r.date <= to && inScope(r, scope, c)))
 }
 
 // ---- kayıplar ----------------------------------------------------------------
 
-/** Duruş satırlarından gün × iş merkezi özeti (yüklemede bir kez hesaplanır). */
+/** Duruş satırlarından gün × iş merkezi özeti, ham kodlarla. */
 export function lossDayOf(day: DowntimeDay): LossDay {
-  const minutes: Record<string, number> = {}
-  const counts: Record<string, number> = {}
-  const reasons: Record<string, [number, number, string]> = {}
+  const codes: Record<string, [number, number]> = {}
+  const reasons: Record<string, [number, number]> = {}
   for (const e of day.events) {
-    const group = e.rc2 || '#'
-    // Excel Losses_Follow: gruplar yalnızca plansız duruşla; "#" bütün satırlarla.
-    const counted = group === '#' ? true : e.rc1 === 'UNSCD_DOWN'
-    if (!counted) continue
-    minutes[group] = (minutes[group] ?? 0) + e.minutes
-    counts[group] = (counts[group] ?? 0) + 1
-    const text = e.textEn || '#'
-    const cur = reasons[text] ?? [0, 0, group]
-    reasons[text] = [cur[0] + e.minutes, cur[1] + 1, group]
+    const k = `${e.rc1}|${e.rc2}`
+    const c = codes[k] ?? [0, 0]
+    codes[k] = [c[0] + e.minutes, c[1] + 1]
+    const rk = `${k}|${e.textEn}`
+    const r = reasons[rk] ?? [0, 0]
+    reasons[rk] = [r[0] + e.minutes, r[1] + 1]
   }
-  return { date: day.date, costCenter: day.costCenter, workCenter: day.workCenter, minutes, counts, reasons }
+  return { date: day.date, costCenter: day.costCenter, workCenter: day.workCenter, codes, reasons }
 }
+
+/** Grafik sütunları: ayardaki sıra; tanımsız grup "Unassigned"; en sonda Speed. */
+export function chartGroups(c: OeeConfig, lossDays: LossDay[] = []): string[] {
+  const out: string[] = []
+  for (const g of c.lossGroups) if (g.chart && !out.includes(g.chart)) out.push(g.chart)
+  const known = new Set(c.lossGroups.map((g) => g.code))
+  const hasUnknown = lossDays.some((d) =>
+    Object.keys(d.codes).some((k) => {
+      const [rc1, rc2] = k.split('|')
+      return c.lossReasonCodes.includes(rc1) && !known.has(rc2)
+    }),
+  )
+  if (hasUnknown && !out.includes(UNASSIGNED)) out.push(UNASSIGNED)
+  out.push(SPEED)
+  return out
+}
+
+export const groupLabel = (code: string, c: OeeConfig) => c.lossGroups.find((g) => g.code === code)?.label || code
 
 export interface LossBreakdown {
   loadingMin: number
-  /** Grup → dakika; "speed" = Production − Operation. */
-  minutes: Record<string, number>
-  /** Grup → Loading'e oran (0–1). */
-  share: Record<string, number>
+  /** Kayıp grubu kodu (Reason Code 2) → dakika. */
+  groups: Record<string, number>
+  counts: Record<string, number>
+  /** Grafik sütunu → dakika (Speed dahil). */
+  chart: Record<string, number>
   oee: number | null
 }
 
-/** Bir dönemin kayıpları: duruş dakikası ÷ Loading (Excel % of Loading). */
-export function lossBreakdown(times: OeeTimes, lossDays: LossDay[]): LossBreakdown {
-  const minutes: Record<string, number> = {}
-  for (const d of lossDays) for (const [g, m] of Object.entries(d.minutes)) minutes[g] = (minutes[g] ?? 0) + m
-  minutes.speed = Math.max(0, times.productionMin - times.operatingMin)
-  const share: Record<string, number> = {}
-  for (const [g, m] of Object.entries(minutes)) share[g] = times.loadingMin > 0 ? m / times.loadingMin : 0
-  return { loadingMin: times.loadingMin, minutes, share, oee: oeeOf(times) }
+/** Bir dönemin kayıpları: kayıp sayılan duruş dakikası ÷ Loading (% of Loading). */
+export function lossBreakdown(times: OeeTimes, lossDays: LossDay[], c: OeeConfig): LossBreakdown {
+  const groups: Record<string, number> = {}
+  const counts: Record<string, number> = {}
+  const chart: Record<string, number> = {}
+  for (const d of lossDays) {
+    for (const [k, [m, n]] of Object.entries(d.codes)) {
+      const [rc1, rc2] = k.split('|')
+      if (!c.lossReasonCodes.includes(rc1)) continue
+      groups[rc2] = (groups[rc2] ?? 0) + m
+      counts[rc2] = (counts[rc2] ?? 0) + n
+      const col = c.lossGroups.find((g) => g.code === rc2)?.chart || UNASSIGNED
+      chart[col] = (chart[col] ?? 0) + m
+    }
+  }
+  chart[SPEED] = Math.max(0, times.productionMin - times.operatingMin)
+  return { loadingMin: times.loadingMin, groups, counts, chart, oee: oeeOf(times) }
 }
 
-/** Grafik grubu payı (OTHERS birden çok kodu toplar). */
-export function chartShare(b: LossBreakdown, key: string): number {
-  const g = LOSS_CHART_GROUPS.find((x) => x.key === key)
-  if (!g) return 0
-  if (key === 'speed') return b.share.speed ?? 0
-  return g.codes.reduce((a, c) => a + (b.share[c] ?? 0), 0)
-}
+/** Grafik sütununun Loading'e oranı (0–1). */
+export const chartShare = (b: LossBreakdown, col: string) => (b.loadingMin > 0 ? (b.chart[col] ?? 0) / b.loadingMin : 0)
 
 export function lossForPeriod(
-  shifts: ShiftRow[],
+  days: DayRow[],
   lossDays: LossDay[],
   scope: Scope,
+  c: OeeConfig,
   from: string,
   to: string,
   workCenter?: string,
 ): LossBreakdown {
-  const sel = (r: { date: string; workCenter: string; costCenter: string }) =>
-    r.date >= from && r.date <= to && inScope(r, scope) && (!workCenter || r.workCenter === workCenter)
-  return lossBreakdown(sumTimes(shifts.filter(sel)), lossDays.filter(sel))
+  const sel = (r: { date: string } & Located) =>
+    r.date >= from && r.date <= to && inScope(r, scope, c) && (!workCenter || r.workCenter === workCenter)
+  return lossBreakdown(sumTimes(days.filter(sel)), lossDays.filter(sel), c)
 }
 
 export interface GapRow {
@@ -534,49 +612,39 @@ export interface GapRow {
 }
 
 /**
- * Bu hafta ile geçen haftanın karşılaştırması: masraf yeri toplamları ve
- * pres (iş merkezi) satırları. Fark = bu hafta − geçen hafta (puan).
+ * Bu hafta ile geçen hafta: masraf yeri toplamları (masraf yeri seçilen
+ * alanlarda) ya da alan toplamı, altında iş merkezleri. Fark = bu − geçen.
  */
-export function weekGap(shifts: ShiftRow[], lossDays: LossDay[], scope: Scope, monday: string): GapRow[] {
+export function weekGap(days: DayRow[], lossDays: LossDay[], scope: Scope, c: OeeConfig, monday: string): GapRow[] {
   const prev = addDaysIso(monday, -7)
   const cur = { from: monday, to: addDaysIso(monday, 6) }
   const old = { from: prev, to: addDaysIso(prev, 6) }
-  const rows = shifts.filter((r) => inScope(r, scope) && r.date >= old.from && r.date <= cur.to)
+  const rows = days.filter((r) => inScope(r, scope, c) && r.date >= old.from && r.date <= cur.to)
+  const pick = pickOf(scope.area, c)
+  const groupScopes: Scope[] =
+    pick === 'costCenter'
+      ? [...new Set(rows.map((r) => r.costCenter))].sort().map((cc) => ({ area: scope.area, key: cc }))
+      : [scope]
   const out: GapRow[] = []
-  const groups =
-    scope.area === 'PRS'
-      ? [...new Set(rows.map((r) => r.costCenter))].sort()
-      : scope.key === 'all'
-        ? ['all']
-        : []
-  for (const g of groups) {
-    const s: Scope = scope.area === 'PRS' ? { area: 'PRS', key: g } : { area: 'APR', key: 'all' }
+  for (const s of groupScopes) {
     out.push({
-      key: `group:${g}`,
-      label: scopeLabel(s),
+      key: `group:${s.key}`,
+      label: scopeLabel(s, c),
       isGroup: true,
-      current: lossForPeriod(shifts, lossDays, s, cur.from, cur.to),
-      previous: lossForPeriod(shifts, lossDays, s, old.from, old.to),
+      current: lossForPeriod(days, lossDays, s, c, cur.from, cur.to),
+      previous: lossForPeriod(days, lossDays, s, c, old.from, old.to),
     })
-    const wcs = [...new Set(rows.filter((r) => inScope(r, s)).map((r) => r.workCenter))].sort()
+    const wcs = [...new Set(rows.filter((r) => inScope(r, s, c)).map((r) => r.workCenter))].sort()
+    if (wcs.length === 1 && s.key === wcs[0]) continue
     for (const wc of wcs) {
       out.push({
         key: wc,
         label: wc,
         isGroup: false,
-        current: lossForPeriod(shifts, lossDays, s, cur.from, cur.to, wc),
-        previous: lossForPeriod(shifts, lossDays, s, old.from, old.to, wc),
+        current: lossForPeriod(days, lossDays, s, c, cur.from, cur.to, wc),
+        previous: lossForPeriod(days, lossDays, s, c, old.from, old.to, wc),
       })
     }
-  }
-  if (scope.area === 'APR' && scope.key !== 'all') {
-    out.push({
-      key: scope.key,
-      label: scope.key,
-      isGroup: false,
-      current: lossForPeriod(shifts, lossDays, scope, cur.from, cur.to),
-      previous: lossForPeriod(shifts, lossDays, scope, old.from, old.to),
-    })
   }
   return out
 }
@@ -589,16 +657,19 @@ export interface ReasonRow {
   previousMinutes: number
 }
 
-/** Duruş nedenleri (plansız), bu hafta ve geçen hafta, çoktan aza. */
-export function reasonPareto(lossDays: LossDay[], scope: Scope, monday: string): ReasonRow[] {
+/** Kayıp sayılan duruş nedenleri, bu hafta ve geçen hafta, çoktan aza. */
+export function reasonPareto(lossDays: LossDay[], scope: Scope, c: OeeConfig, monday: string): ReasonRow[] {
   const prev = addDaysIso(monday, -7)
   const end = addDaysIso(monday, 6)
   const map = new Map<string, ReasonRow>()
   for (const d of lossDays) {
-    if (!inScope(d, scope) || d.date < prev || d.date > end) continue
+    if (!inScope(d, scope, c) || d.date < prev || d.date > end) continue
     const current = d.date >= monday
-    for (const [text, [min, count, group]] of Object.entries(d.reasons)) {
-      const row = map.get(text) ?? { text, group, minutes: 0, count: 0, previousMinutes: 0 }
+    for (const [k, [min, count]] of Object.entries(d.reasons)) {
+      const [rc1, rc2, ...rest] = k.split('|')
+      if (!c.lossReasonCodes.includes(rc1)) continue
+      const text = rest.join('|') || rc2
+      const row = map.get(text) ?? { text, group: rc2, minutes: 0, count: 0, previousMinutes: 0 }
       if (current) {
         row.minutes += min
         row.count += count
@@ -622,19 +693,12 @@ export interface DieRow {
   orders: number
 }
 
-/** Kalıp (Equipment) × pres: adet ağırlıklı OEE ve speed loss (Excel TOTAL1). */
-export function dieTable(
-  orders: OrderRow[],
-  scope: Scope,
-  from: string,
-  to: string,
-  /** İş merkezi → masraf yeri (Order Based'de masraf yeri yok; vardiya verisinden). */
-  costCenterOf: Map<string, string>,
-): DieRow[] {
+/** Kalıp (Equipment) × iş merkezi: adet ağırlıklı OEE ve speed loss (Excel TOTAL1). */
+export function dieTable(orders: OrderRow[], scope: Scope, c: OeeConfig, from: string, to: string, costCenterOf: Map<string, string>): DieRow[] {
   const map = new Map<string, DieRow & { weighted: number; orderSet: Set<string> }>()
   for (const o of orders) {
     if (o.date < from || o.date > to) continue
-    if (!inScope({ workCenter: o.workCenter, costCenter: costCenterOf.get(o.workCenter) ?? '' }, scope)) continue
+    if (!inScope({ workCenter: o.workCenter, costCenter: costCenterOf.get(o.workCenter) ?? '' }, scope, c)) continue
     const key = `${o.workCenter}|${o.equipment}`
     const cur =
       map.get(key) ??
@@ -653,66 +717,38 @@ export function dieTable(
   }))
 }
 
-/** İş merkezi → masraf yeri, vardiya verisinden. */
-export function costCentersOf(rows: { workCenter: string; costCenter: string }[]): Map<string, string> {
-  return new Map(rows.filter((r) => r.costCenter).map((r) => [r.workCenter, r.costCenter]))
-}
-
-// ---- makine arızası: MTTR / MTBF ------------------------------------------------
+// ---- arızalar: MTTR / MTBF -------------------------------------------------------
 
 export interface ReliabilityRow {
   workCenter: string
-  breakdowns: number
-  breakdownMin: number
-  /** Ortalama onarım süresi (dk) = arıza dakikası ÷ arıza sayısı. */
-  mttrMin: number | null
-  /** Arızalar arası ortalama çalışma (dk) = Production ÷ arıza sayısı. */
-  mtbfMin: number | null
+  /** Grup kodu → [arıza sayısı, dakika, MTTR, MTBF]. */
+  groups: Record<string, { count: number; minutes: number; mttrMin: number | null; mtbfMin: number | null }>
 }
 
-export function reliability(
-  shifts: ShiftRow[],
-  lossDays: LossDay[],
-  scope: Scope,
-  from: string,
-  to: string,
-  group = 'ARZ',
-): ReliabilityRow[] {
-  const sel = (r: { date: string; workCenter: string; costCenter: string }) => r.date >= from && r.date <= to && inScope(r, scope)
-  const wcs = [...new Set(shifts.filter(sel).map((r) => r.workCenter))].sort()
+/**
+ * Ayarda "breakdown" işaretli her grup için: MTTR = arıza dakikası ÷ arıza
+ * sayısı, MTBF = Production ÷ arıza sayısı.
+ */
+export function reliability(days: DayRow[], lossDays: LossDay[], scope: Scope, c: OeeConfig, from: string, to: string): ReliabilityRow[] {
+  const sel = (r: { date: string } & Located) => r.date >= from && r.date <= to && inScope(r, scope, c)
+  const codes = c.lossGroups.filter((g) => g.breakdown).map((g) => g.code)
+  const wcs = [...new Set(days.filter(sel).map((r) => r.workCenter))].sort()
   return wcs.map((wc) => {
-    const days = lossDays.filter((d) => sel(d) && d.workCenter === wc)
-    const breakdowns = days.reduce((a, d) => a + (d.counts[group] ?? 0), 0)
-    const breakdownMin = days.reduce((a, d) => a + (d.minutes[group] ?? 0), 0)
-    const production = sumTimes(shifts.filter((r) => sel(r) && r.workCenter === wc)).productionMin
-    return {
-      workCenter: wc,
-      breakdowns,
-      breakdownMin,
-      mttrMin: breakdowns > 0 ? breakdownMin / breakdowns : null,
-      mtbfMin: breakdowns > 0 ? production / breakdowns : null,
+    const b = lossBreakdown(EMPTY_TIMES, lossDays.filter((d) => sel(d) && d.workCenter === wc), c)
+    const production = sumTimes(days.filter((r) => sel(r) && r.workCenter === wc)).productionMin
+    const groups: ReliabilityRow['groups'] = {}
+    for (const code of codes) {
+      const count = b.counts[code] ?? 0
+      const minutes = b.groups[code] ?? 0
+      groups[code] = { count, minutes, mttrMin: count ? minutes / count : null, mtbfMin: count ? production / count : null }
     }
+    return { workCenter: wc, groups }
   })
 }
 
 // ---- setup analizi -------------------------------------------------------------
 
-/**
- * Setup sayılan duruşlar: yalnızca planlı / plansız kalıp setup'ı (PRS
- * İngilizce, APR Rumence metin). Sensör ayarı, bobin setup'ı vb. setup
- * sayılmaz; setup'tan sonra olursa "üretime geçememe" nedenidir.
- */
-export const DIE_SETUP_TEXTS: Record<string, 'planned' | 'unplanned'> = {
-  'DIE SETUP - PLANNED': 'planned',
-  'DIE SETUP - UNPLANNED': 'unplanned',
-  'REGLAJ MATRITA - PLANIFICATA': 'planned',
-  'REGLAJ MATRITA - NEPLANIFICATA': 'unplanned',
-}
-
-/** Setup'tan sonra bu kadar üretim yapılırsa setup OK (planlamacının kararı). */
-export const STARTUP_RUN_MIN = 60
-
-/** Planlı duruş (mola) kaybı bu anahtarla ayrı tutulur. */
+/** Molalar (planlı duruş) setup sonrası kayıplarda bu anahtarla ayrı tutulur. */
 export const BREAK_KEY = 'BREAK'
 
 export type SetupStatus = 'ok' | 'nok' | 'open'
@@ -727,11 +763,11 @@ export interface SetupRow {
   kind: 'planned' | 'unplanned' | 'mixed'
   setupMin: number
   status: SetupStatus
-  /** Setup bitişinden STARTUP_RUN_MIN üretime ulaşana kadar geçen süre (OK ise). */
+  /** Setup bitişinden ayardaki üretim süresine ulaşana kadar geçen süre (OK ise). */
   timeToRunMin: number | null
-  /** Bir sonraki kalıp setup'ına kadar yapılabilen üretim (NOK ise < 60). */
+  /** Bir sonraki setup'a kadar yapılabilen üretim (en çok ayardaki süre). */
   runMin: number
-  /** Setup bitişinden 1 saat üretime (ya da sonraki setup'a) kadar duruşlar: grup → dk. */
+  /** Setup bitişinden o üretime (ya da sonraki setup'a) kadar duruşlar: grup → dk. */
   lost: Record<string, number>
   /** NOK'un ana nedeni: en çok kaybettiren grup; duruş yoksa "next-setup". */
   mainReason: string | null
@@ -749,19 +785,21 @@ interface Span {
 }
 
 /**
- * Setup'tan sonra üretime geçiş: kalıp setup'ı bittikten sonra, bir sonraki
- * kalıp setup'ından önce toplam STARTUP_RUN_MIN dakika üretim (duruş
+ * Setup'tan sonra üretime geçiş: setup (ayardaki setup metinleri) bittikten
+ * sonra, bir sonraki setup'tan önce ayardaki süre kadar üretim (duruş
  * olmayan süre) yapılabildiyse OK, yapılamadıysa NOK. Aradaki duruşlar
- * nedendir (KSD, STP, KLP …; molalar ayrı). Veri bitmeden sonuç belli
- * değilse "open". Arka arkaya setup kayıtları (araya üretim girmemişse —
- * vardiya değişimi, mola) tek setup sayılır; sipariş sonuncusudur. Setup'ı
- * [from, to] içinde başlayanlar.
+ * nedendir; molalar (ayardaki mola kodları) ayrı. Veri bitmeden sonuç belli
+ * değilse "open". Arada üretim olmayan setup kayıtları (vardiya değişimi,
+ * mola) tek setup sayılır. Setup'ı [from, to] içinde başlayanlar.
  */
-export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Scope, from: string, to: string): SetupRow[] {
+export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Scope, c: OeeConfig, from: string, to: string): SetupRow[] {
+  const setupKind = new Map(c.setupTexts.map((t) => [t.text.trim().toUpperCase(), t.kind]))
+  const need = c.startupRunMin
+  if (!setupKind.size || !(need > 0)) return []
   const byWc = new Map<string, Span[]>()
   let dataEnd = -Infinity
   for (const d of days) {
-    if (!inScope(d, scope)) continue
+    if (!inScope(d, scope, c)) continue
     const list = byWc.get(d.workCenter) ?? []
     for (const ev of d.events) {
       const s = toMin(ev.startDate || d.date, ev.startTime)
@@ -796,7 +834,7 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
       return Math.max(0, b - a - down)
     }
     /** a'dan itibaren `need` dakika üretimin tamamlandığı an (limit'e kadar). */
-    const reachRun = (a: number, need: number, limit: number): number | null => {
+    const reachRun = (a: number, limit: number): number | null => {
       let cur = a
       let run = 0
       for (const [s, e] of union) {
@@ -813,10 +851,9 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
       return cur + (need - run) <= limit ? cur + (need - run) : null
     }
 
-    // Kalıp setup blokları.
     const blocks: { s: number; e: number; order: string; material: string; kinds: Set<string>; min: number }[] = []
     for (const sp of spans) {
-      const kind = DIE_SETUP_TEXTS[sp.ev.textEn.trim().toUpperCase()]
+      const kind = setupKind.get(sp.ev.textEn.trim().toUpperCase())
       if (!kind) continue
       const last = blocks[blocks.length - 1]
       // Arada üretim yoksa (vardiya değişimi, mola, başka duruş) aynı setup sürüyor.
@@ -836,14 +873,14 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
       if (day < from || day > to) return
       const next = blocks[i + 1]
       const limit = next ? next.s : dataEnd
-      const reached = reachRun(b.e, STARTUP_RUN_MIN, limit)
+      const reached = reachRun(b.e, limit)
       const windowEnd = reached ?? limit
       const lost: Record<string, number> = {}
       for (const sp of spans) {
         if (sp.e <= b.e || sp.s >= windowEnd) continue
         const m = Math.min(sp.e, windowEnd) - Math.max(sp.s, b.e)
         if (m <= 0) continue
-        const key = sp.ev.rc1 === 'SCHED_DOWN' ? BREAK_KEY : sp.ev.rc2 || '#'
+        const key = c.breakReasonCodes.includes(sp.ev.rc1) ? BREAK_KEY : sp.ev.rc2 || '#'
         lost[key] = (lost[key] ?? 0) + m
       }
       const status: SetupStatus = reached !== null ? 'ok' : next ? 'nok' : 'open'
@@ -858,7 +895,7 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
         setupMin: b.min,
         status,
         timeToRunMin: reached !== null ? reached - b.e : null,
-        runMin: Math.min(STARTUP_RUN_MIN, runBetween(b.e, windowEnd)),
+        runMin: Math.min(need, runBetween(b.e, windowEnd)),
         lost,
         mainReason: status === 'nok' ? (reasons[0]?.[0] ?? 'next-setup') : null,
         nextSetup: next ? fmtMin(next.s) : null,
@@ -869,6 +906,82 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
   return out.sort((a, b) => a.workCenter.localeCompare(b.workCenter) || a.start.localeCompare(b.start))
 }
 
+// ---- ayar önerisi ----------------------------------------------------------------
+
+/**
+ * Verideki kodlardan ayar ÖNERİSİ. Kullanıcı görür, düzeltir ve kaydeder;
+ * kaydedilmeden hiçbir hesap bunu kullanmaz.
+ *  - Alan: iş merkezi adının ön eki (PRS-106 → PRS); tek masraf yerli alanda
+ *    makine, çok masraf yerli alanda masraf yeri seçilir.
+ *  - Vardiya: aynı masraf yerlerinde görülen kodlar sıralanıp 1, 2, 3 …
+ *  - Reason Code 1: adında "UN" geçen ya da "#" kayıp, diğerleri mola.
+ *  - Kayıp grupları: kayıp satırlarındaki Reason Code 2 değerleri (ad = kod).
+ *  - Setup: metninde SETUP ve PLAN geçenler (UNPLAN plansız); başka dildeki
+ *    metinleri kullanıcı Settings'te işaretler.
+ */
+export function suggestConfig(
+  input: { days: Located[]; shifts: { shiftGroup: string; costCenter: string }[]; downtimes: DowntimeDay[] },
+  current: OeeConfig,
+  defaults: { startupRunMin: number; trendWeeks: number; topN: number },
+): OeeConfig {
+  const prefix = (wc: string) => wc.split(/[-\s_]/)[0]?.toUpperCase() || wc
+  const ccArea = new Map<string, string>()
+  for (const d of input.days) if (d.costCenter && !ccArea.has(d.costCenter)) ccArea.set(d.costCenter, prefix(d.workCenter))
+  const costCenters = [...ccArea].map(([code, area]) => {
+    const cur = current.costCenters.find((x) => x.code === code)
+    return cur ?? { code, name: code, area }
+  })
+  const areaList = [...new Set(costCenters.map((c) => c.area))]
+  const areas = areaList.map((name) => {
+    const cur = current.areas.find((a) => a.name === name)
+    if (cur) return cur
+    const n = costCenters.filter((c) => c.area === name).length
+    return { name, pick: (n > 1 ? 'costCenter' : 'machine') as Pick }
+  })
+  const codeCcs = new Map<string, Set<string>>()
+  for (const s of input.shifts) {
+    if (!s.shiftGroup) continue
+    const set = codeCcs.get(s.shiftGroup) ?? new Set<string>()
+    set.add(s.costCenter)
+    codeCcs.set(s.shiftGroup, set)
+  }
+  const families = new Map<string, string[]>()
+  for (const [code, ccs] of codeCcs) {
+    const fam = [...ccs].sort().join(',')
+    families.set(fam, [...(families.get(fam) ?? []), code])
+  }
+  const shifts = [...families.values()].flatMap((codes) =>
+    codes.sort().map((code, i) => current.shifts.find((s) => s.code === code) ?? { code, number: i + 1 }),
+  )
+  const rc1 = new Set<string>()
+  const events = input.downtimes.flatMap((d) => d.events)
+  for (const e of events) rc1.add(e.rc1)
+  const isLoss = (v: string) => v === '#' || /UN/i.test(v)
+  const lossReasonCodes = current.lossReasonCodes.length ? current.lossReasonCodes : [...rc1].filter(isLoss).sort()
+  const breakReasonCodes = current.breakReasonCodes.length ? current.breakReasonCodes : [...rc1].filter((v) => v && !isLoss(v)).sort()
+  const rc2 = new Set(events.filter((e) => lossReasonCodes.includes(e.rc1)).map((e) => e.rc2 || '#'))
+  const lossGroups = [...rc2].sort().map((code) => current.lossGroups.find((g) => g.code === code) ?? { code, label: code, chart: code, breakdown: false })
+  const texts = new Set(events.map((e) => e.textEn.trim().toUpperCase()))
+  const setupTexts = current.setupTexts.length
+    ? current.setupTexts
+    : [...texts]
+        .filter((t) => /SETUP/.test(t) && /PLAN/.test(t))
+        .sort()
+        .map((text) => ({ text, kind: (/UNPLAN/.test(text) ? 'unplanned' : 'planned') as 'planned' | 'unplanned' }))
+  return {
+    areas,
+    costCenters,
+    shifts,
+    lossReasonCodes,
+    breakReasonCodes,
+    lossGroups,
+    setupTexts,
+    startupRunMin: current.startupRunMin || defaults.startupRunMin,
+    trendWeeks: current.trendWeeks || defaults.trendWeeks,
+    topN: current.topN || defaults.topN,
+  }
+}
+
 // ---- Excel'den okuma -------------------------------------------------------------
 
 /** Bir sayfanın satırları: ilk satır başlık (sheet_to_json header:1, raw). */
@@ -876,13 +989,14 @@ export type SheetRows = unknown[][]
 
 export const OEE_SHEET_NAMES = {
   shiftly: ['shiftly kpi'],
+  daily: ['daily kpi'],
   orders: ['shiftly order based kpi', 'shiftly base order kpi', 'shiftly order base kpi'],
   weekly: ['weekly kpi', 'weekly kpi_fix'],
   monthly: ['monthly kpi'],
   downtimes: ['downtimes'],
 } as const
 
-/** Sayfa adını türüne eşler; "Daily KPI" alınmaz (vardiyadan hesaplanır). */
+/** Sayfa adını türüne eşler (dosya biçimi; tesise özel değil). */
 export function sheetKind(name: string): keyof typeof OEE_SHEET_NAMES | null {
   const n = name.trim().toLowerCase()
   if (n.startsWith('downtimes')) return 'downtimes'
@@ -989,6 +1103,7 @@ function timesFrom(get: (row: unknown[], key: string) => unknown, row: unknown[]
 
 export interface ParsedOee {
   shifts: ShiftRow[]
+  daily: DailyRow[]
   orders: OrderRow[]
   weekly: WeeklyRow[]
   monthly: MonthlyRow[]
@@ -1004,7 +1119,7 @@ export interface ParsedOee {
  * son vardiya tarihinin haftasından büyükse bir önceki yıla aittir.
  */
 export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new Date().toISOString().slice(0, 10)): ParsedOee {
-  const out: ParsedOee = { shifts: [], orders: [], weekly: [], monthly: [], downtimes: [], read: [], problems: [] }
+  const out: ParsedOee = { shifts: [], daily: [], orders: [], weekly: [], monthly: [], downtimes: [], read: [], problems: [] }
   const byKind = new Map<string, [string, SheetRows][]>()
   for (const [name, rows] of Object.entries(sheets)) {
     const kind = sheetKind(name)
@@ -1044,8 +1159,42 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
     out.read.push({ sheet: name, kind: 'shiftly', rows: n })
   }
 
-  const lastShift = out.shifts.reduce((m, s) => (s.date > m ? s.date : m), '') || today
-  const ref = isoWeek(lastShift)
+  for (const [name, rows] of byKind.get('daily') ?? []) {
+    const r = reader(rows[0] ?? [], [
+      { key: 'date', names: ['Date'] },
+      { key: 'plant', names: ['Plant - Key'] },
+      { key: 'resp', names: ['Production Responsible'] },
+      { key: 'cc', names: ['Cost Center - Key', 'Cost Center'] },
+      { key: 'wc', names: ['Work Center'] },
+      { key: 'schedSec', names: ['Scheduled Downtime'] },
+      ...TIME_COLS,
+    ])
+    if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
+    let n = 0
+    for (const row of rows.slice(1)) {
+      const date = toIsoDate(r.get(row, 'date'))
+      const wc = str(r.get(row, 'wc'))
+      if (!date || !wc) continue
+      out.daily.push({
+        date,
+        plantKey: str(r.get(row, 'plant')),
+        responsible: str(r.get(row, 'resp')),
+        costCenter: str(r.get(row, 'cc')),
+        workCenter: wc,
+        scheduledSec: num(r.get(row, 'schedSec')),
+        ...timesFrom(r.get, row),
+      })
+      n++
+    }
+    out.read.push({ sheet: name, kind: 'daily', rows: n })
+  }
+
+  // Haftalık ve aylık sayfalarda yıl yok: dosyadaki en son günlük/vardiya
+  // tarihinden (yoksa bugünden) geriye doğru sayılır.
+  const lastDate = [...out.shifts, ...out.daily].reduce((m, s) => (s.date > m ? s.date : m), '') || today
+  const ref = isoWeek(lastDate)
+  const refYear = Number(lastDate.slice(0, 4))
+  const refMonth = Number(lastDate.slice(5, 7))
 
   for (const [name, rows] of byKind.get('orders') ?? []) {
     const r = reader(rows[0] ?? [], [
@@ -1090,10 +1239,9 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
     ...TIME_COLS,
   ]
 
-  // Aynı hafta iki sayfada varsa Weekly KPI_fix (arşiv) geçerlidir: Weekly KPI'ın
-  // ilk haftası yarım olabiliyor (ör. 36. hafta 31 Ağustos'suz), arşiv tamdır.
-  const isArchive = (name: string) => name.trim().toLowerCase() === 'weekly kpi_fix'
-  const weeklySheets = [...(byKind.get('weekly') ?? [])].sort(([a], [b]) => (isArchive(a) ? 1 : 0) - (isArchive(b) ? 1 : 0))
+  // Aynı hafta ve iş merkezi iki sayfada varsa (Weekly KPI, Weekly KPI_fix) daha çok
+  // Loading kapsayan satır alınır — daha eksiksizdir.
+  const weeklySheets = byKind.get('weekly') ?? []
   const weekly = new Map<string, WeeklyRow>()
   for (const [name, rows] of weeklySheets) {
     const r = reader(rows[0] ?? [], [{ key: 'week', names: ['Week'] }, ...periodCols])
@@ -1104,7 +1252,13 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
       const wc = str(r.get(row, 'wc'))
       if (!(week >= 1 && week <= 53) || !wc) continue
       const year = week > ref.week ? ref.year - 1 : ref.year
-      weekly.set(`${year}|${week}|${wc}`, {
+      const key = `${year}|${week}|${wc}`
+      const loading = num(r.get(row, 'loading'))
+      if ((weekly.get(key)?.loadingMin ?? -1) >= loading) {
+        n++
+        continue
+      }
+      weekly.set(key, {
         year,
         week,
         plantKey: str(r.get(row, 'plant')),
@@ -1113,7 +1267,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         workCenter: wc,
         scheduledSec: num(r.get(row, 'schedSec')),
         ...timesFrom(r.get, row),
-        source: isArchive(name) ? 'archive' : 'weekly',
+        sheet: name,
       })
       n++
     }
@@ -1129,9 +1283,12 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
       const wc = str(r.get(row, 'wc'))
       const rawKey = str(r.get(row, 'key'))
       if (!wc || !rawKey) continue
+      const monthKey = rawKey.padStart(2, '0')
       out.monthly.push({
+        // Yıl yok: ay, dosyadaki en son tarihin ayından büyükse bir önceki yıla aittir.
+        year: Number(monthKey) > refMonth ? refYear - 1 : refYear,
         month: str(r.get(row, 'month')),
-        monthKey: rawKey.padStart(2, '0'),
+        monthKey,
         plantKey: str(r.get(row, 'plant')),
         responsible: str(r.get(row, 'resp')),
         costCenter: str(r.get(row, 'cc')),
@@ -1233,8 +1390,8 @@ export const orderFormulas = (o: OrderRow) => ({ week: isoWeek(o.date).week, tot
  * Downtimes'daki formül sütunları: Shift = vardiya kodu → 1/2/3,
  * Week = ISOWEEKNUM(Date), material = Material, min = Stoppage Duration(Min).
  */
-export const downtimeFormulas = (date: string, e: DowntimeEvent) => ({
-  shift: SHIFT_NUMBER[e.shiftDefinition] ?? null,
+export const downtimeFormulas = (date: string, e: DowntimeEvent, c: OeeConfig) => ({
+  shift: shiftNumber(e.shiftDefinition, c),
   week: isoWeek(date).week,
   material: e.material,
   min: e.minutes,

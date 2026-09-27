@@ -1,16 +1,29 @@
+import { Link } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 
 import { api } from '../../convex/_generated/api'
 import { useMutation, useQuery } from '../lib/convexTransport'
 import { friendlyError } from '../lib/mutationErrors'
-import { addDaysIso, isoWeek, mondayOfIso, parseOeeWorkbook, scopeOptions, sheetKind, type Area, type Scope, type SheetRows } from '../lib/oee'
+import {
+  EMPTY_CONFIG,
+  addDaysIso,
+  areaNames,
+  configProblems,
+  isoWeek,
+  mondayOfIso,
+  parseOeeWorkbook,
+  scopeOptions,
+  sheetKind,
+  type OeeConfig,
+  type Scope,
+  type SheetRows,
+} from '../lib/oee'
 import { importOee, type OeeApi } from '../lib/oeeStore'
 
 /**
- * OEE sayfalarının ortak üst çubuğu: PRS / APR, masraf yeri ya da makine,
- * tarih (varsayılan dün) ve dosya yükleme düğmesi. Seçim tarayıcıda
- * saklanır; tarih her açılışta dün olur.
+ * OEE sayfalarının ortak parçaları: ayar (kullanıcının OEE ayarları), alan /
+ * masraf yeri / makine seçimi, tarih (varsayılan dün) ve yükleme düğmesi.
  */
 
 const KEY = 'oee-selection'
@@ -19,15 +32,22 @@ function localIso(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/** Kaydedilmiş OEE ayarları; yoksa boş ayar ve eksikler listesi. */
+export function useOeeConfig(): { config: OeeConfig; problems: string[]; loaded: boolean } {
+  const doc = useQuery(api.oee.settings) as { config: OeeConfig } | null | undefined
+  const config = doc?.config ?? EMPTY_CONFIG
+  return { config, problems: doc === undefined ? [] : configProblems(config), loaded: doc !== undefined }
+}
+
 export function useOeeSelection() {
   const [saved, setSaved] = useState<Scope>(() => {
     try {
       const v = JSON.parse(window.localStorage.getItem(KEY) ?? 'null')
-      if (v && (v.area === 'PRS' || v.area === 'APR') && typeof v.key === 'string') return v
+      if (v && typeof v.area === 'string' && typeof v.key === 'string') return v
     } catch {
       // Saklanamıyorsa varsayılan.
     }
-    return { area: 'PRS', key: 'all' }
+    return { area: '', key: 'all' }
   })
   const [date, setDate] = useState(() => {
     const d = new Date()
@@ -46,70 +66,92 @@ export function useOeeSelection() {
   return { scope: saved, setScope, date, setDate, monday, sunday: addDaysIso(monday, 6), week: isoWeek(date) }
 }
 
+/** Seçili alan ayarda yoksa ilk alan kullanılır. */
+export function effectiveScope(scope: Scope, areas: string[]): Scope {
+  if (areas.includes(scope.area)) return scope
+  return { area: areas[0] ?? '', key: 'all' }
+}
+
 export function OeeControls({
   selection,
   rows,
+  config,
 }: {
   selection: ReturnType<typeof useOeeSelection>
   /** Seçenekler için iş merkezi / masraf yeri listesi. */
   rows: { workCenter: string; costCenter: string }[]
+  config: OeeConfig
 }) {
-  const { scope, setScope, date, setDate, week } = selection
-  const options = useMemo(() => scopeOptions(scope.area, rows), [scope.area, rows])
-  const coverage = useQuery(api.oee.coverage) as
-    | { shifts: { from: string; to: string } | null; downtimes: { from: string; to: string } | null }
-    | undefined
-  const setArea = (area: Area) => setScope({ area, key: 'all' })
+  const { setScope, date, setDate, week } = selection
+  const areas = useMemo(() => areaNames(rows, config), [rows, config])
+  const scope = effectiveScope(selection.scope, areas)
+  const options = useMemo(() => scopeOptions(scope.area, rows, config), [scope.area, rows, config])
+  const coverage = useQuery(api.oee.coverage) as { days: { from: string; to: string } | null } | undefined
+  const problems = configProblems(config)
   return (
-    <div className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-border p-3 text-sm">
-      <div className="flex rounded-md border border-border p-0.5" role="group" aria-label="Area">
-        {(['PRS', 'APR'] as const).map((a) => (
-          <button
-            key={a}
-            type="button"
-            onClick={() => setArea(a)}
-            aria-pressed={scope.area === a}
-            className={`rounded px-3 py-1 text-xs font-semibold ${scope.area === a ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
-          >
-            {a}
-          </button>
-        ))}
+    <>
+      {problems.length > 0 && (
+        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <b>OEE settings are not complete:</b> {problems.join(' ')}{' '}
+          <Link to="/oee/settings" className="font-medium underline">
+            Open Settings →
+          </Link>
+        </div>
+      )}
+      <div className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-border p-3 text-sm">
+        {areas.length > 0 && (
+          <div className="flex flex-wrap rounded-md border border-border p-0.5" role="group" aria-label="Area">
+            {areas.map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => setScope({ area: a, key: 'all' })}
+                aria-pressed={scope.area === a}
+                className={`rounded px-3 py-1 text-xs font-semibold ${scope.area === a ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+        )}
+        {areas.length > 0 && (
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            {config.areas.find((a) => a.name === scope.area)?.pick === 'costCenter' ? 'Cost center' : 'Machine'}
+            <select
+              value={options.some((o) => o.key === scope.key) ? scope.key : 'all'}
+              onChange={(e) => setScope({ ...scope, key: e.target.value })}
+              className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+            >
+              {options.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          Date
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => e.target.value && setDate(e.target.value)}
+            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+          />
+        </label>
+        <span className="pb-2 text-xs text-muted-foreground">
+          Week <strong className="text-foreground">W{week.week}</strong>
+          {coverage?.days && ` · data ${coverage.days.from} – ${coverage.days.to}`}
+        </span>
+        <div className="ml-auto">
+          <OeeUploadButton />
+        </div>
       </div>
-      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-        {scope.area === 'PRS' ? 'Cost center' : 'Machine'}
-        <select
-          value={options.some((o) => o.key === scope.key) ? scope.key : 'all'}
-          onChange={(e) => setScope({ ...scope, key: e.target.value })}
-          className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
-        >
-          {options.map((o) => (
-            <option key={o.key} value={o.key}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-        Date
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => e.target.value && setDate(e.target.value)}
-          className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
-        />
-      </label>
-      <span className="pb-2 text-xs text-muted-foreground">
-        Week <strong className="text-foreground">W{week.week}</strong>
-        {coverage?.shifts && ` · data ${coverage.shifts.from} – ${coverage.shifts.to}`}
-      </span>
-      <div className="ml-auto">
-        <OeeUploadButton />
-      </div>
-    </div>
+    </>
   )
 }
 
-/** Tek düğme: dosyayı seç, gerekli sayfaları oku, yükle. */
+/** Tek düğme: dosyayı seç, tanınan sayfaları oku, ekle ya da güncelle. */
 export function OeeUploadButton() {
   const input = useRef<HTMLInputElement>(null)
   const [state, setState] = useState<{ kind: 'idle' } | { kind: 'busy'; step: string } | { kind: 'done'; text: string } | { kind: 'error'; text: string }>({
@@ -117,15 +159,14 @@ export function OeeUploadButton() {
   })
   const last = useQuery(api.oee.lastImport) as { fileName: string; uploadedAt: number; uploadedBy?: string } | null | undefined
   const calls: OeeApi = {
-    clearRange: useMutation(api.oee.clearRange),
-    insertShifts: useMutation(api.oee.insertShifts),
-    insertOrders: useMutation(api.oee.insertOrders),
-    insertWeekly: useMutation(api.oee.insertWeekly),
-    insertMonthly: useMutation(api.oee.insertMonthly),
-    insertDowntimeDays: useMutation(api.oee.insertDowntimeDays),
-    insertLossDays: useMutation(api.oee.insertLossDays),
+    upsertShifts: useMutation(api.oee.upsertShifts),
+    upsertDaily: useMutation(api.oee.upsertDaily),
+    upsertOrders: useMutation(api.oee.upsertOrders),
+    upsertWeekly: useMutation(api.oee.upsertWeekly),
+    upsertMonthly: useMutation(api.oee.upsertMonthly),
+    upsertDowntimeDays: useMutation(api.oee.upsertDowntimeDays),
     finishImport: useMutation(api.oee.finishImport),
-  } as unknown as OeeApi
+  }
 
   const onFile = async (file: File) => {
     setState({ kind: 'busy', step: 'Reading the file…' })
@@ -133,7 +174,9 @@ export function OeeUploadButton() {
       const buf = await file.arrayBuffer()
       const names = XLSX.read(buf, { type: 'array', bookSheets: true }).SheetNames
       const wanted = names.filter((n) => sheetKind(n))
-      if (!wanted.length) throw new Error('No OEE sheet in this file (Shiftly KPI, Order Based KPI, Downtimes, Weekly KPI, Monthly KPI).')
+      if (!wanted.length) {
+        throw new Error('No OEE sheet in this file (Shiftly KPI, Shiftly Order Based KPI, Downtimes, Daily KPI, Weekly KPI, Monthly KPI).')
+      }
       const book = XLSX.read(buf, { type: 'array', sheets: wanted, dense: true })
       const sheets: Record<string, SheetRows> = {}
       for (const n of wanted) {
@@ -144,7 +187,7 @@ export function OeeUploadButton() {
       await importOee(parsed, file.name, calls, (step) => setState({ kind: 'busy', step }))
       setState({
         kind: 'done',
-        text: `✓ Saved: ${parsed.read.map((r) => `${r.sheet} ${r.rows.toLocaleString('en-GB')}`).join(' · ')}`,
+        text: `✓ Added / updated: ${parsed.read.map((r) => `${r.sheet} ${r.rows.toLocaleString('en-GB')}`).join(' · ')}. Nothing was deleted.`,
       })
     } catch (e) {
       setState({ kind: 'error', text: friendlyError(e).message || 'Upload failed' })
@@ -173,15 +216,19 @@ export function OeeUploadButton() {
         {state.kind === 'busy' ? 'Uploading…' : 'Upload data'}
       </button>
       <span className="max-w-xs text-right text-[11px] text-muted-foreground">
-        {state.kind === 'busy'
-          ? state.step
-          : state.kind === 'done'
-            ? state.text
-            : state.kind === 'error'
-              ? <span className="text-destructive">Not saved: {state.text}</span>
-              : last
-                ? `Last: ${last.fileName} · ${new Date(last.uploadedAt).toLocaleString('en-GB')}${last.uploadedBy ? ` · ${last.uploadedBy}` : ''}`
-                : 'No data uploaded yet'}
+        {state.kind === 'busy' ? (
+          state.step
+        ) : state.kind === 'done' ? (
+          state.text
+        ) : state.kind === 'error' ? (
+          <span className="text-destructive">Not saved: {state.text}</span>
+        ) : last ? (
+          `Last: ${last.fileName} · ${new Date(last.uploadedAt).toLocaleString('en-GB')}${last.uploadedBy ? ` · ${last.uploadedBy}` : ''}`
+        ) : (
+          <>
+            No data yet — <Link to="/oee/guide" className="underline">how to start</Link>
+          </>
+        )}
       </span>
     </div>
   )

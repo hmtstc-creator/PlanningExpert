@@ -53,11 +53,15 @@ export const weeklyFields = {
   workCenter: v.string(),
   scheduledSec: v.number(),
   ...timeFields,
-  /** 'archive' = Weekly KPI_fix, 'weekly' = Weekly KPI. */
+  /** Hangi sayfadan geldiği (Weekly KPI / Weekly KPI_fix). */
+  sheet: v.optional(v.string()),
+  /** @deprecated eski yüklemelerden; okunmaz. */
   source: v.optional(v.union(v.literal('archive'), v.literal('weekly'))),
 }
 
 export const monthlyFields = {
+  /** Dosyada yok; yüklemede tarihlerden çıkarılır. Eski kayıtlarda boş olabilir. */
+  year: v.optional(v.number()),
   month: v.string(),
   monthKey: v.string(),
   plantKey: v.string(),
@@ -83,13 +87,69 @@ export const downtimeDayFields = {
   events: v.array(v.array(v.union(v.string(), v.number()))),
 }
 
-/** Gün × iş merkezi kayıp özeti. Alan adı olarak serbest metin kullanılmaz: diziler. */
+const cells = v.array(v.array(v.union(v.string(), v.number())))
+
+/**
+ * Gün × iş merkezi kayıp özeti, ham kodlarla (ayardan bağımsız). Alan adı
+ * olarak serbest metin kullanılmaz: diziler.
+ */
 export const lossDayFields = {
   date: v.string(),
   costCenter: v.string(),
   workCenter: v.string(),
-  /** [grup, dakika, adet] */
-  groups: v.array(v.array(v.union(v.string(), v.number()))),
-  /** [neden (EN), dakika, adet, grup] */
-  reasons: v.array(v.array(v.union(v.string(), v.number()))),
+  /** [rc1, rc2, dakika, adet] */
+  codes: v.optional(cells),
+  /** [rc1, rc2, metin, dakika, adet] */
+  reasonList: v.optional(cells),
+  /** @deprecated ilk biçim; okunmaz. */
+  groups: v.optional(cells),
+  /** @deprecated ilk biçim; okunmaz. */
+  reasons: v.optional(cells),
+}
+
+/** Daily KPI satırı (ilk kurulum geçmişi). */
+export const dailyFields = {
+  date: v.string(),
+  plantKey: v.string(),
+  responsible: v.string(),
+  costCenter: v.string(),
+  workCenter: v.string(),
+  scheduledSec: v.number(),
+  ...timeFields,
+}
+
+const plainTimes = {
+  good: v.number(),
+  scrap: v.number(),
+  reject: v.number(),
+  scheduledMin: v.number(),
+  unscheduledMin: v.number(),
+  operatingMin: v.number(),
+  productionMin: v.number(),
+  loadingMin: v.number(),
+}
+
+/** Gün × iş merkezi — hafta ve ay hesaplarının tabanı (vardiyalardan ya da Daily KPI). */
+export const dayFields = {
+  date: v.string(),
+  plantKey: v.string(),
+  responsible: v.string(),
+  costCenter: v.string(),
+  workCenter: v.string(),
+  source: v.union(v.literal('shiftly'), v.literal('daily')),
+  ...plainTimes,
+}
+
+/** OEE ayarları (src/lib/oee.ts OeeConfig). */
+export const configFields = {
+  areas: v.array(v.object({ name: v.string(), pick: v.union(v.literal('costCenter'), v.literal('machine')) })),
+  costCenters: v.array(v.object({ code: v.string(), name: v.string(), area: v.string() })),
+  shifts: v.array(v.object({ code: v.string(), number: v.number() })),
+  lossReasonCodes: v.array(v.string()),
+  breakReasonCodes: v.array(v.string()),
+  lossGroups: v.array(v.object({ code: v.string(), label: v.string(), chart: v.string(), breakdown: v.boolean() })),
+  setupTexts: v.array(v.object({ text: v.string(), kind: v.union(v.literal('planned'), v.literal('unplanned')) })),
+  startupRunMin: v.number(),
+  trendWeeks: v.number(),
+  topN: v.number(),
 }

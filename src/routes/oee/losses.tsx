@@ -1,48 +1,47 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { Legend, LineTrendChart, StackedShareChart, pct } from '../../components/OeeCharts'
-import { OeeControls, useOeeSelection } from '../../components/OeePanel'
+import { OeeControls, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import {
-  LOSS_CHART_GROUPS,
   BREAK_KEY,
-  LOSS_GROUPS,
-  STARTUP_RUN_MIN,
+  SPEED,
   addDaysIso,
+  areaNames,
+  chartGroups,
   chartShare,
   costCentersOf,
   dieTable,
-  isoWeek,
+  groupLabel,
   inScope,
+  isoWeek,
   lossBreakdown,
   lossForPeriod,
-  sumTimes,
-  weekTimesByWorkCenter,
   reasonPareto,
   reliability,
   scopeLabel,
   setupAnalysis,
+  sumTimes,
   weekGap,
+  weekTimes,
+  type DayRow,
   type LossBreakdown,
+  type OeeConfig,
   type OrderRow,
   type SetupRow,
   type SetupStatus,
-  type ShiftRow,
   type WeeklyRow,
 } from '../../lib/oee'
-import { fromStoredDay, fromStoredLoss, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
+import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
 
 export const Route = createFileRoute('/oee/losses')({
   component: LossesPage,
 })
 
-const WEEKS = 10
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-/** Tabloda ilk gösterilen satır sayısı (en kötü kalıplar, nedenler). */
-const TOP = 10
 
 const minutes = (m: number) => (m >= 90 ? `${(m / 60).toFixed(1)} h` : `${Math.round(m)} min`)
 /** Fark (puan). Kayıpta artış kötüdür (kırmızı); OEE'de artış iyidir. */
@@ -55,57 +54,61 @@ const gapText = (cur: number, prev: number, higherIsBetter = false) => {
 
 function LossesPage() {
   const sel = useOeeSelection()
-  const trendFrom = addDaysIso(sel.monday, -7 * (WEEKS - 1))
+  const { config } = useOeeConfig()
+  const weeksN = config.trendWeeks || 1
+  const trendFrom = addDaysIso(sel.monday, -7 * (weeksN - 1))
   const prevMonday = addDaysIso(sel.monday, -7)
-  const shifts = (useQuery(api.oee.shifts, { from: trendFrom, to: sel.sunday }) ?? []) as ShiftRow[]
+  const dayRows = (useQuery(api.oee.days, { from: trendFrom, to: sel.sunday }) ?? []) as DayRow[]
   const periods = useQuery(api.oee.periods) as { weekly: WeeklyRow[] } | undefined
   const lossRaw = (useQuery(api.oee.lossDays, { from: trendFrom, to: sel.sunday }) ?? []) as StoredLossDay[]
   const orders = (useQuery(api.oee.orders, { from: prevMonday, to: sel.sunday }) ?? []) as OrderRow[]
   // Pazar gecesi biten setup'ın ilk üretim saati Pazartesiye taşabilir: bir gün fazla.
   const downRaw = (useQuery(api.oee.downtimeDays, { from: sel.monday, to: addDaysIso(sel.sunday, 1) }) ?? []) as StoredDowntimeDay[]
-  const lossDays = useMemo(() => lossRaw.map(fromStoredLoss), [lossRaw])
+  const lossDays = useMemo(() => fromStoredLosses(lossRaw), [lossRaw])
   const downtimes = useMemo(() => downRaw.map(fromStoredDay), [downRaw])
-  const scope = sel.scope
-  const label = scopeLabel(scope)
+  const scope = effectiveScope(sel.scope, areaNames(dayRows, config))
+  const label = scopeLabel(scope, config)
+  const columns = useMemo(() => chartGroups(config, lossDays), [config, lossDays])
 
   const days = useMemo(
     () =>
       DAY_LABELS.map((d, i) => {
         const date = addDaysIso(sel.monday, i)
-        return { key: date, label: `${d} ${date.slice(8)}`, b: lossForPeriod(shifts, lossDays, scope, date, date) }
+        return { key: date, label: `${d} ${date.slice(8)}`, b: lossForPeriod(dayRows, lossDays, scope, config, date, date) }
       }),
-    [shifts, lossDays, scope, sel.monday],
+    [dayRows, lossDays, scope, config, sel.monday],
   )
-  const weekCur = lossForPeriod(shifts, lossDays, scope, sel.monday, sel.sunday)
-  const weekPrev = lossForPeriod(shifts, lossDays, scope, prevMonday, addDaysIso(prevMonday, 6))
-  const weekTimes = useMemo(() => weekTimesByWorkCenter(shifts, periods?.weekly ?? []), [shifts, periods])
+  const weekCur = lossForPeriod(dayRows, lossDays, scope, config, sel.monday, sel.sunday)
+  const weekPrev = lossForPeriod(dayRows, lossDays, scope, config, prevMonday, addDaysIso(prevMonday, 6))
+  const perWeek = useMemo(() => weekTimes(dayRows, periods?.weekly ?? []), [dayRows, periods])
   const trend = useMemo(
     () =>
-      Array.from({ length: WEEKS }, (_, i) => {
-        const monday = addDaysIso(sel.monday, -7 * (WEEKS - 1 - i))
+      Array.from({ length: weeksN }, (_, i) => {
+        const monday = addDaysIso(sel.monday, -7 * (weeksN - 1 - i))
         const { year, week } = isoWeek(monday)
         const end = addDaysIso(monday, 6)
-        // Hafta süreleri: arşiv / yüklenen hafta ya da vardiyalar (OEE Dashboard ile aynı).
-        const times = sumTimes([...weekTimes.values()].filter((w) => w.year === year && w.week === week && inScope(w, scope)).map((w) => w.times))
-        const days = lossDays.filter((d) => d.date >= monday && d.date <= end && inScope(d, scope))
-        // Duruş verisi olmayan haftada yalnızca Speed bilinir (arşivden); gruplar boş kalır.
-        return { label: `W${week}`, b: lossBreakdown(times, days), hasDowntime: days.length > 0 }
+        const key = `${year}-W${String(week).padStart(2, '0')}|`
+        // Hafta süreleri OEE Dashboard ile aynı kaynaktan (günler ya da yüklenen hafta).
+        const times = sumTimes([...perWeek].filter(([k, w]) => k.startsWith(key) && inScope(w, scope, config)).map(([, w]) => w.times))
+        const lds = lossDays.filter((d) => d.date >= monday && d.date <= end && inScope(d, scope, config))
+        // Duruş verisi olmayan haftada yalnızca Speed bilinir; gruplar boş kalır.
+        return { label: `W${week}`, b: lossBreakdown(times, lds, config), hasDowntime: lds.length > 0 }
       }),
-    [weekTimes, lossDays, scope, sel.monday],
+    [perWeek, lossDays, scope, config, sel.monday, weeksN],
   )
-  const gap = useMemo(() => weekGap(shifts, lossDays, scope, sel.monday), [shifts, lossDays, scope, sel.monday])
-  const reasons = useMemo(() => reasonPareto(lossDays, scope, sel.monday), [lossDays, scope, sel.monday])
-  const ccOf = useMemo(() => costCentersOf(shifts), [shifts])
-  const dies = useMemo(() => dieTable(orders, scope, sel.monday, sel.sunday, ccOf), [orders, scope, sel.monday, sel.sunday, ccOf])
-  const reli = useMemo(() => reliability(shifts, lossDays, scope, sel.monday, sel.sunday), [shifts, lossDays, scope, sel.monday, sel.sunday])
-  const dieBreak = useMemo(() => reliability(shifts, lossDays, scope, sel.monday, sel.sunday, 'KLP'), [shifts, lossDays, scope, sel.monday, sel.sunday])
-  const setups = useMemo(() => setupAnalysis(downtimes, orders, scope, sel.monday, sel.sunday), [downtimes, orders, scope, sel.monday, sel.sunday])
+  const gap = useMemo(() => weekGap(dayRows, lossDays, scope, config, sel.monday), [dayRows, lossDays, scope, config, sel.monday])
+  const reasons = useMemo(() => reasonPareto(lossDays, scope, config, sel.monday), [lossDays, scope, config, sel.monday])
+  const ccOf = useMemo(() => costCentersOf(dayRows), [dayRows])
+  const dies = useMemo(() => dieTable(orders, scope, config, sel.monday, sel.sunday, ccOf), [orders, scope, config, sel.monday, sel.sunday, ccOf])
+  const reli = useMemo(() => reliability(dayRows, lossDays, scope, config, sel.monday, sel.sunday), [dayRows, lossDays, scope, config, sel.monday, sel.sunday])
+  const setups = useMemo(() => setupAnalysis(downtimes, orders, scope, config, sel.monday, sel.sunday), [downtimes, orders, scope, config, sel.monday, sel.sunday])
+  const breakdownCodes = config.lossGroups.filter((g) => g.breakdown).map((g) => g.code)
 
   const stackParts = (b: LossBreakdown) => [
     { key: 'oee', label: 'OEE', value: b.oee ?? 0 },
-    ...LOSS_CHART_GROUPS.map((g) => ({ key: g.key, label: g.label, value: chartShare(b, g.key) })),
+    ...columns.map((col) => ({ key: col, label: col, value: chartShare(b, col) })),
   ]
-  const noData = shifts.length === 0 && lossDays.length === 0
+  const noData = dayRows.length === 0 && lossDays.length === 0
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
@@ -115,24 +118,25 @@ function LossesPage() {
         links={[
           { to: '/oee', label: 'OEE Dashboard' },
           { to: '/oee/data', label: 'Data' },
+          { to: '/oee/settings', label: 'Settings' },
         ]}
         info={
           <>
             <p>
-              A loss is its unscheduled downtime minutes (Downtimes, Reason Code 2) ÷ Loading time of
-              the same presses and days — the "% of Loading" of the BoardReport. <b>Speed</b> =
-              (Production − Operation) ÷ Loading. <b>Others</b> = Management + Logistic + Quality.
+              A loss is its downtime minutes (Downtimes; Reason Code 1 marked as a loss in Settings,
+              grouped by Reason Code 2) ÷ Loading time of the same machines and days — the "% of
+              Loading" of the BoardReport. <b>Speed</b> = (Production − Operation) ÷ Loading.
             </p>
             <p>
-              Groups: KLP die breakdown, STP setup, ARZ machine breakdown, KSD short stoppages, KON
-              quality, OFC logistic, YNT management, # undefined.
+              Group names and chart columns are set on <Link to="/oee/settings">OEE Settings</Link>;
+              a Reason Code 2 that is not named there shows as "Unassigned".
             </p>
             <p>Gap = this week − previous week, in percentage points: ▲ red is worse, ▼ green is better.</p>
           </>
         }
       />
 
-      <OeeControls selection={sel} rows={shifts} />
+      <OeeControls selection={sel} rows={dayRows} config={config} />
 
       {noData && (
         <p className="mt-6 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -141,7 +145,7 @@ function LossesPage() {
       )}
 
       <Section title={`Week W${sel.week.week} — daily % of Loading · ${label}`} note={`${sel.monday} – ${sel.sunday}`}>
-        <Legend items={[{ key: 'oee', label: 'OEE' }, ...LOSS_CHART_GROUPS]} />
+        <Legend items={[{ key: 'oee', label: 'OEE' }, ...columns.map((c) => ({ key: c, label: c }))]} />
         <StackedShareChart columns={days.map((d) => ({ key: d.key, label: d.label, parts: stackParts(d.b) }))} ariaLabel="Daily OEE and losses" />
         <div className="mt-2 overflow-x-auto rounded-md border border-border">
           <table className="w-full text-xs">
@@ -157,7 +161,7 @@ function LossesPage() {
               </tr>
             </thead>
             <tbody>
-              {[{ key: 'oee', label: 'OEE' }, ...LOSS_CHART_GROUPS].map((g) => {
+              {[{ key: 'oee', label: 'OEE' }, ...columns.map((c) => ({ key: c, label: c }))].map((g) => {
                 const v = (b: LossBreakdown) => (g.key === 'oee' ? b.oee ?? 0 : chartShare(b, g.key))
                 const gp = gapText(v(weekCur), v(weekPrev), g.key === 'oee')
                 return (
@@ -182,10 +186,10 @@ function LossesPage() {
           <table className="w-full text-xs">
             <thead className="bg-muted text-muted-foreground">
               <tr>
-                <th className="px-2 py-1.5 text-left font-medium">Press / cost center</th>
+                <th className="px-2 py-1.5 text-left font-medium">Machine / cost center</th>
                 <th className="px-2 py-1.5 text-right font-medium">OEE</th>
-                {LOSS_CHART_GROUPS.map((g) => (
-                  <th key={g.key} className="px-2 py-1.5 text-right font-medium">{g.label}</th>
+                {columns.map((c) => (
+                  <th key={c} className="px-2 py-1.5 text-right font-medium">{c}</th>
                 ))}
               </tr>
             </thead>
@@ -201,11 +205,11 @@ function LossesPage() {
                         {r.previous.loadingMin > 0 ? oeeGap.text : ''}
                       </span>
                     </td>
-                    {LOSS_CHART_GROUPS.map((g) => {
-                      const cur = chartShare(r.current, g.key)
-                      const gp = gapText(cur, chartShare(r.previous, g.key))
+                    {columns.map((col) => {
+                      const cur = chartShare(r.current, col)
+                      const gp = gapText(cur, chartShare(r.previous, col))
                       return (
-                        <td key={g.key} className="px-2 py-1 text-right tabular-nums">
+                        <td key={col} className="px-2 py-1 text-right tabular-nums">
                           {r.current.loadingMin > 0 ? pct(cur) : '—'}{' '}
                           <span className={`text-[10px] ${gp.tone}`}>{r.previous.loadingMin > 0 ? gp.text : ''}</span>
                         </td>
@@ -220,32 +224,32 @@ function LossesPage() {
       </Section>
 
       <Section
-        title={`Loss trend — last ${WEEKS} weeks · ${label}`}
-        info="Weeks before the downtime data starts come from the Weekly KPI_fix archive: only Speed is known there (Production − Operation); the downtime groups start with the uploaded Downtimes."
+        title={`Loss trend — last ${weeksN} weeks · ${label}`}
+        info="Weeks without uploaded downtimes (history from Weekly / Daily KPI) show only Speed (Production − Operation); the downtime groups start with the uploaded Downtimes."
       >
-        <Legend items={LOSS_CHART_GROUPS.map((g, i) => ({ ...g, slot: i + 1 }))} />
+        <Legend items={columns.map((c, i) => ({ key: c, label: c, slot: i + 1 }))} />
         <LineTrendChart
           labels={trend.map((t) => t.label)}
-          series={LOSS_CHART_GROUPS.map((g, i) => ({
-            key: g.key,
-            label: g.label,
+          series={columns.map((col, i) => ({
+            key: col,
+            label: col,
             // Yığılmış grafikte 1. renk OEE'nin; kayıplar aynı renkleri korur.
             slot: i + 1,
-            values: trend.map((t) => (t.b.loadingMin > 0 && (t.hasDowntime || g.key === 'speed') ? chartShare(t.b, g.key) : null)),
+            values: trend.map((t) => (t.b.loadingMin > 0 && (t.hasDowntime || col === SPEED) ? chartShare(t.b, col) : null)),
           }))}
           ariaLabel="Weekly loss trend"
         />
       </Section>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <Section title="Top downtime reasons" note={`W${sel.week.week}, unscheduled`} flush>
+        <Section title="Top downtime reasons" note={`W${sel.week.week}, counted as loss`} flush>
           <SimpleTable
             head={['Reason', 'Group', 'Count', 'This week', 'Previous', 'Change']}
-            rows={reasons.slice(0, 15).map((r) => {
+            rows={reasons.slice(0, config.topN || reasons.length).map((r) => {
               const d = r.minutes - r.previousMinutes
               return [
                 r.text,
-                LOSS_GROUPS.find((g) => g.code === r.group)?.label ?? r.group,
+                groupLabel(r.group, config),
                 String(r.count),
                 minutes(r.minutes),
                 minutes(r.previousMinutes),
@@ -258,39 +262,44 @@ function LossesPage() {
           />
         </Section>
 
-        <Section title="Breakdowns — MTTR and MTBF" note={`W${sel.week.week}`} flush info="MTTR = breakdown minutes ÷ breakdowns (average repair). MTBF = production time ÷ breakdowns (average running time between two breakdowns).">
-          <SimpleTable
-            head={['Press', 'Machine bd.', 'Machine min', 'MTTR', 'MTBF', 'Die bd.', 'Die min', 'Die MTTR']}
-            rows={reli.map((r, i) => {
-              const d = dieBreak[i]
-              return [
+        <Section
+          title="Breakdowns — MTTR and MTBF"
+          note={`W${sel.week.week}`}
+          flush
+          info="MTTR = breakdown minutes ÷ breakdowns (average repair). MTBF = production time ÷ breakdowns (average running time between two breakdowns). The loss groups shown here are ticked as 'breakdown' on OEE Settings."
+        >
+          {breakdownCodes.length === 0 ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              No loss group is marked as a breakdown on <Link to="/oee/settings" className="underline">Settings</Link>.
+            </p>
+          ) : (
+            <SimpleTable
+              head={['Machine', ...breakdownCodes.flatMap((c) => [`${groupLabel(c, config)} — count`, 'min', 'MTTR', 'MTBF'])]}
+              rows={reli.map((r) => [
                 r.workCenter,
-                String(r.breakdowns),
-                minutes(r.breakdownMin),
-                r.mttrMin === null ? '—' : minutes(r.mttrMin),
-                r.mtbfMin === null ? '—' : minutes(r.mtbfMin),
-                String(d?.breakdowns ?? 0),
-                minutes(d?.breakdownMin ?? 0),
-                d?.mttrMin == null ? '—' : minutes(d.mttrMin),
-              ]
-            })}
-          />
+                ...breakdownCodes.flatMap((c) => {
+                  const g = r.groups[c]
+                  return [String(g.count), minutes(g.minutes), g.mttrMin === null ? '—' : minutes(g.mttrMin), g.mtbfMin === null ? '—' : minutes(g.mtbfMin)]
+                }),
+              ])}
+            />
+          )}
         </Section>
       </div>
 
-      <DieSection dies={dies} week={sel.week.week} />
+      <DieSection dies={dies} week={sel.week.week} top={config.topN || 10} />
 
-      <SetupSection setups={setups} week={sel.week.week} loaded={downRaw.length > 0} />
+      <SetupSection setups={setups} week={sel.week.week} loaded={downRaw.length > 0} config={config} />
     </div>
   )
 }
 
-function DieSection({ dies, week }: { dies: ReturnType<typeof dieTable>; week: number }) {
+function DieSection({ dies, week, top }: { dies: ReturnType<typeof dieTable>; week: number; top: number }) {
   const [press, setPress] = useState('all')
   const presses = [...new Set(dies.map((d) => d.workCenter))].sort()
   const list = dies.filter((d) => press === 'all' || d.workCenter === press)
-  const worst = [...list].filter((d) => d.weightedOee !== null).sort((a, b) => a.weightedOee! - b.weightedOee!).slice(0, TOP)
-  const speed = [...list].sort((a, b) => b.speedLossMin - a.speedLossMin).filter((d) => d.speedLossMin > 0).slice(0, TOP)
+  const worst = [...list].filter((d) => d.weightedOee !== null).sort((a, b) => a.weightedOee! - b.weightedOee!).slice(0, top)
+  const speed = [...list].sort((a, b) => b.speedLossMin - a.speedLossMin).filter((d) => d.speedLossMin > 0).slice(0, top)
   return (
     <section className="mt-6 rounded-lg border border-border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -305,7 +314,7 @@ function DieSection({ dies, week }: { dies: ReturnType<typeof dieTable>; week: n
       </div>
       <div className="mt-2 grid gap-4 xl:grid-cols-2">
         <div>
-          <p className="text-xs font-medium text-muted-foreground">Worst {TOP} dies by OEE</p>
+          <p className="text-xs font-medium text-muted-foreground">Worst {top} dies by OEE</p>
           <SimpleTable
             head={['Die', 'Press', 'Orders', 'Good', 'Loading', 'OEE']}
             rows={worst.map((d) => [d.equipment, d.workCenter, String(d.orders), d.good.toLocaleString('en-GB'), minutes(d.loadingMin), pct(d.weightedOee)])}
@@ -324,21 +333,21 @@ function DieSection({ dies, week }: { dies: ReturnType<typeof dieTable>; week: n
 }
 
 const STATUS: Record<SetupStatus, { label: string; tone: string }> = {
-  ok: { label: 'OK — 1 h production', tone: 'text-emerald-700' },
-  nok: { label: 'NOK — no 1 h production before the next setup', tone: 'text-destructive' },
+  ok: { label: 'OK — produced after setup', tone: 'text-emerald-700' },
+  nok: { label: 'NOK — could not get into production', tone: 'text-destructive' },
   open: { label: 'Open — not known yet', tone: 'text-muted-foreground' },
 }
 
-const reasonLabel = (code: string) =>
-  code === BREAK_KEY ? 'Breaks' : code === 'next-setup' ? 'Next setup came' : LOSS_GROUPS.find((g) => g.code === code)?.label ?? code
+const reasonLabel = (code: string, c: OeeConfig) =>
+  code === BREAK_KEY ? 'Breaks' : code === 'next-setup' ? 'Next setup came' : groupLabel(code, c)
 
-const lostText = (lost: Record<string, number>) =>
+const lostText = (lost: Record<string, number>, c: OeeConfig) =>
   Object.entries(lost)
     .sort((a, b) => b[1] - a[1])
-    .map(([k, m]) => `${reasonLabel(k)} ${minutes(m)}`)
+    .map(([k, m]) => `${reasonLabel(k, c)} ${minutes(m)}`)
     .join(' · ') || '—'
 
-function SetupSection({ setups, week, loaded }: { setups: SetupRow[]; week: number; loaded: boolean }) {
+function SetupSection({ setups, week, loaded, config }: { setups: SetupRow[]; week: number; loaded: boolean; config: OeeConfig }) {
   const [press, setPress] = useState('all')
   const [status, setStatus] = useState<'all' | SetupStatus>('all')
   const presses = [...new Set(setups.map((s) => s.workCenter))].sort()
@@ -358,7 +367,7 @@ function SetupSection({ setups, week, loaded }: { setups: SetupRow[]; week: numb
       open: rows.filter((s) => s.status === 'open').length,
       avgSetup: avg(rows.map((s) => s.setupMin)),
       avgToRun: avg(rows.filter((s) => s.timeToRunMin !== null).map((s) => s.timeToRunMin!)),
-      reasons: [...main].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${reasonLabel(k)} ${n}`).join(', '),
+      reasons: [...main].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${reasonLabel(k, config)} ${n}`).join(', '),
     }
   })
   // NOK nedenleri: ana neden sayısı ve setup sonrası kaybedilen süre (seçilen pres).
@@ -384,16 +393,16 @@ function SetupSection({ setups, week, loaded }: { setups: SetupRow[]; week: numb
           Setups — W{week}
           <InfoTip label="About the setup analysis">
             <p>
-              Only planned and unplanned <b>die setups</b> count as a setup (DIE SETUP – PLANNED /
-              UNPLANNED; on APR REGLAJ MATRITA – PLANIFICATA / NEPLANIFICATA). Sensor, gripper, coil
-              and other adjustments are not a setup; after a setup they are a reason for not starting.
+              Only the downtime texts marked as a <b>setup</b> on OEE Settings count as a setup
+              ({config.setupTexts.map((t) => t.text).join(', ') || 'none yet'}). Other adjustments are
+              not a setup; after a setup they are a reason for not starting.
             </p>
             <p>
-              <b>OK</b>: after the setup ends, the press produced {STARTUP_RUN_MIN} minutes (time
-              without any downtime) before the next die setup. <b>NOK</b>: it did not — it could not
-              get into production. The downtimes between the end of the setup and that hour (or the
-              next setup) are the reasons: short stoppages, further setup work, die breakdown, …;
-              breaks are shown apart. <b>Open</b>: the data ends before it is known.
+              <b>OK</b>: after the setup ends, the machine produced {config.startupRunMin} minutes (time
+              without any downtime) before the next setup. <b>NOK</b>: it did not — it could not get
+              into production. The downtimes between the end of the setup and that point (or the next
+              setup) are the reasons; breaks are shown apart. <b>Open</b>: the data ends before it is
+              known.
             </p>
             <p>Setup records with no production between them (shift change, break) count as one setup.</p>
           </InfoTip>
@@ -417,7 +426,7 @@ function SetupSection({ setups, week, loaded }: { setups: SetupRow[]; week: numb
       {!loaded && <p className="mt-2 text-xs text-muted-foreground">No downtime rows for this week.</p>}
       {summary.length > 0 && (
         <SimpleTable
-          head={['Press', 'Setups', 'Planned', 'Unplanned', 'OK', 'NOK', 'Open', 'Avg setup', 'Avg to 1 h production', 'NOK main reasons']}
+          head={['Press', 'Setups', 'Planned', 'Unplanned', 'OK', 'NOK', 'Open', 'Avg setup', 'Avg to production', 'NOK main reasons']}
           rows={summary.map((s) => [
             s.press,
             String(s.count),
@@ -441,14 +450,14 @@ function SetupSection({ setups, week, loaded }: { setups: SetupRow[]; week: numb
           </p>
           <SimpleTable
             head={['Reason', 'Main reason of', 'Seen in NOK setups', 'Time lost after setup']}
-            rows={reasonRows.map(([k, v]) => [reasonLabel(k), `${v.main} setup(s)`, String(v.setups), v.lost ? minutes(v.lost) : '—'])}
+            rows={reasonRows.map(([k, v]) => [reasonLabel(k, config), `${v.main} setup(s)`, String(v.setups), v.lost ? minutes(v.lost) : '—'])}
           />
         </div>
       )}
       {list.length > 0 && (
         <div className="mt-3">
           <SimpleTable
-            head={['Press', 'Setup', 'Order', 'Die / material', 'Type', 'Setup time', 'Result', 'To 1 h production', 'Downtime after setup', 'Main reason', 'Good']}
+            head={['Press', 'Setup', 'Order', 'Die / material', 'Type', 'Setup time', 'Result', 'To production', 'Downtime after setup', 'Main reason', 'Good']}
             rows={list.map((s) => [
               s.workCenter,
               `${s.start.slice(5)} – ${s.end.slice(11)}`,
@@ -460,8 +469,8 @@ function SetupSection({ setups, week, loaded }: { setups: SetupRow[]; week: numb
               s.timeToRunMin !== null
                 ? minutes(s.timeToRunMin)
                 : `${minutes(s.runMin)} run${s.nextSetup ? ` · next setup ${s.nextSetup.slice(5)}` : ''}`,
-              lostText(s.lost),
-              s.mainReason ? reasonLabel(s.mainReason) : '—',
+              lostText(s.lost, config),
+              s.mainReason ? reasonLabel(s.mainReason, config) : '—',
               s.good.toLocaleString('en-GB'),
             ])}
           />

@@ -4,7 +4,6 @@
 
 import {
   dateRange,
-  lossDayOf,
   type DowntimeDay,
   type DowntimeEvent,
   type LossDay,
@@ -74,12 +73,18 @@ export interface StoredDowntimeDay {
 export const toStoredDay = (d: DowntimeDay): StoredDowntimeDay => ({ ...d, events: d.events.map(eventToTuple) })
 export const fromStoredDay = (d: StoredDowntimeDay): DowntimeDay => ({ ...d, events: d.events.map(tupleToEvent) })
 
+/**
+ * Kayıp özeti sunucuda diziyle durur: alan adında serbest metin olmaz.
+ * `codes`: [rc1, rc2, dakika, adet]; `reasonList`: [rc1, rc2, metin, dakika, adet].
+ * Eski biçimdeki (groups/reasons) kayıtlar okunmaz; o günler yeniden
+ * yüklenince yeni biçimle yazılır.
+ */
 export interface StoredLossDay {
   date: string
   costCenter: string
   workCenter: string
-  groups: Cell[][]
-  reasons: Cell[][]
+  codes?: Cell[][]
+  reasonList?: Cell[][]
 }
 
 export function toStoredLoss(l: LossDay): StoredLossDay {
@@ -87,46 +92,64 @@ export function toStoredLoss(l: LossDay): StoredLossDay {
     date: l.date,
     costCenter: l.costCenter,
     workCenter: l.workCenter,
-    groups: Object.keys(l.minutes).map((g) => [g, l.minutes[g], l.counts[g] ?? 0]),
-    reasons: Object.entries(l.reasons).map(([text, [min, count, group]]) => [text, min, count, group]),
+    codes: Object.entries(l.codes).map(([k, [m, c]]) => {
+      const [rc1, rc2] = k.split('|')
+      return [rc1, rc2, m, c]
+    }),
+    reasonList: Object.entries(l.reasons).map(([k, [m, c]]) => {
+      const [rc1, rc2, ...text] = k.split('|')
+      return [rc1, rc2, text.join('|'), m, c]
+    }),
   }
 }
 
-export function fromStoredLoss(l: StoredLossDay): LossDay {
-  const minutes: Record<string, number> = {}
-  const counts: Record<string, number> = {}
-  for (const [g, m, c] of l.groups) {
-    minutes[s(g)] = n(m)
-    counts[s(g)] = n(c)
-  }
-  const reasons: Record<string, [number, number, string]> = {}
-  for (const [text, m, c, g] of l.reasons) reasons[s(text)] = [n(m), n(c), s(g)]
-  return { date: l.date, costCenter: l.costCenter, workCenter: l.workCenter, minutes, counts, reasons }
+export function fromStoredLoss(l: StoredLossDay): LossDay | null {
+  if (!l.codes) return null
+  const codes: Record<string, [number, number]> = {}
+  for (const [rc1, rc2, m, c] of l.codes) codes[`${s(rc1)}|${s(rc2)}`] = [n(m), n(c)]
+  const reasons: Record<string, [number, number]> = {}
+  for (const [rc1, rc2, text, m, c] of l.reasonList ?? []) reasons[`${s(rc1)}|${s(rc2)}|${s(text)}`] = [n(m), n(c)]
+  return { date: l.date, costCenter: l.costCenter, workCenter: l.workCenter, codes, reasons }
+}
+
+/** Okunabilen (yeni biçimdeki) kayıp özetleri. */
+export const fromStoredLosses = (list: StoredLossDay[]): LossDay[] => list.map(fromStoredLoss).filter((x): x is LossDay => x !== null)
+
+/** Bir duruşun kimliği: aynı iş merkezinde aynı başlangıç anı ve sipariş aynı duruştur. */
+export const eventKey = (e: DowntimeEvent) => `${e.startDate}|${e.startTime}|${e.order}`
+
+/**
+ * Aynı gün × iş merkezinin eski ve yeni duruşları: yeni dosyadaki satır aynı
+ * duruşsa (eventKey) eskisinin yerine geçer (ör. nedeni sonradan
+ * düzeltilmiş), değilse eklenir. Eski satır silinmez. Sıra: başlangıç anı.
+ */
+export function mergeEvents(existing: DowntimeEvent[], incoming: DowntimeEvent[]): DowntimeEvent[] {
+  const map = new Map(existing.map((e) => [eventKey(e), e]))
+  for (const e of incoming) map.set(eventKey(e), e)
+  return [...map.values()].sort((a, b) => `${a.startDate} ${a.startTime}`.localeCompare(`${b.startDate} ${b.startTime}`))
 }
 
 // ---- yükleme -------------------------------------------------------------------
 
+/**
+ * Yükleme API'si — hepsi "ekle ya da güncelle": hiçbir çağrı geçmişi silmez.
+ * Aynı satır (anahtar) tekrar gelirse güncellenir, yeni satır eklenir.
+ */
 export interface OeeApi {
-  clearRange: (args: {
-    kind: 'shifts' | 'orders' | 'downtimes' | 'losses' | 'weekly' | 'monthly'
-    from?: string
-    to?: string
-    weeks?: { year: number; week: number }[]
-  }) => Promise<{ deleted: number; more: boolean }>
-  insertShifts: (args: { rows: unknown[] }) => Promise<number>
-  insertOrders: (args: { rows: unknown[] }) => Promise<number>
-  insertWeekly: (args: { rows: unknown[] }) => Promise<number>
-  insertMonthly: (args: { rows: unknown[] }) => Promise<number>
-  insertDowntimeDays: (args: { days: unknown[] }) => Promise<number>
-  insertLossDays: (args: { days: unknown[] }) => Promise<number>
-  finishImport: (args: { fileName: string; sheets: Cell[][]; ranges: string[][] }) => Promise<null>
+  upsertShifts: (args: { rows: unknown[] }) => Promise<unknown>
+  upsertDaily: (args: { rows: unknown[] }) => Promise<unknown>
+  upsertOrders: (args: { rows: unknown[] }) => Promise<unknown>
+  upsertWeekly: (args: { rows: unknown[] }) => Promise<unknown>
+  upsertMonthly: (args: { rows: unknown[] }) => Promise<unknown>
+  upsertDowntimeDays: (args: { days: unknown[] }) => Promise<unknown>
+  finishImport: (args: { fileName: string; sheets: Cell[][]; ranges: string[][] }) => Promise<unknown>
 }
 
 /** Bir çağrıda gönderilen en çok veri (bayt) — işlem sınırının altında. */
 const CHUNK_BYTES = 600_000
 
 /** Diziyi JSON boyutuna göre parçalar. */
-export function chunkBySize<T>(items: T[], maxBytes = CHUNK_BYTES, maxItems = 400): T[][] {
+export function chunkBySize<T>(items: T[], maxBytes = CHUNK_BYTES, maxItems = 200): T[][] {
   const out: T[][] = []
   let cur: T[] = []
   let size = 0
@@ -144,17 +167,10 @@ export function chunkBySize<T>(items: T[], maxBytes = CHUNK_BYTES, maxItems = 40
   return out
 }
 
-async function clearAll(api: OeeApi, args: Parameters<OeeApi['clearRange']>[0]) {
-  for (let i = 0; i < 10_000; i++) {
-    const { more } = await api.clearRange(args)
-    if (!more) return
-  }
-}
-
 /**
- * Yükleme sırası: her tür için önce dosyanın kapsadığı aralık silinir, sonra
- * yenisi yazılır. Daha eski tarihler kalır (geçmiş birikir). Aylık komple
- * yenilenir. İlerleme `onStep` ile bildirilir.
+ * Yükleme: dosyadaki her sayfa kendi anahtarıyla eklenir ya da güncellenir.
+ * Geçmiş hiçbir zaman silinmez; son iki haftayı tekrar tekrar yüklemek
+ * mükerrer kayıt yapmaz. İlerleme `onStep` ile bildirilir.
  */
 export async function importOee(
   parsed: ParsedOee,
@@ -163,47 +179,39 @@ export async function importOee(
   onStep: (text: string) => void = () => {},
 ): Promise<{ ranges: string[][] }> {
   const ranges: string[][] = []
-
-  const shiftRange = dateRange(parsed.shifts.map((r) => r.date))
-  if (shiftRange) {
-    onStep(`Shiftly KPI: ${shiftRange.from} – ${shiftRange.to}`)
-    await clearAll(api, { kind: 'shifts', ...shiftRange })
-    for (const rows of chunkBySize(parsed.shifts)) await api.insertShifts({ rows })
-    ranges.push(['shifts', shiftRange.from, shiftRange.to])
+  const range = (label: string, dates: string[]) => {
+    const r = dateRange(dates)
+    if (r) ranges.push([label, r.from, r.to])
+    return r
   }
 
-  const orderRange = dateRange(parsed.orders.map((r) => r.date))
-  if (orderRange) {
-    onStep(`Order Based KPI: ${orderRange.from} – ${orderRange.to}`)
-    await clearAll(api, { kind: 'orders', ...orderRange })
-    for (const rows of chunkBySize(parsed.orders)) await api.insertOrders({ rows })
-    ranges.push(['orders', orderRange.from, orderRange.to])
+  if (range('shifts', parsed.shifts.map((r) => r.date))) {
+    onStep(`Shiftly KPI: ${parsed.shifts.length} rows`)
+    for (const rows of chunkBySize(parsed.shifts)) await api.upsertShifts({ rows })
   }
-
-  const downRange = dateRange(parsed.downtimes.map((d) => d.date))
-  if (downRange) {
-    onStep(`Downtimes: ${downRange.from} – ${downRange.to}`)
-    await clearAll(api, { kind: 'downtimes', ...downRange })
-    await clearAll(api, { kind: 'losses', ...downRange })
-    for (const days of chunkBySize(parsed.downtimes.map(toStoredDay), CHUNK_BYTES, 60)) await api.insertDowntimeDays({ days })
-    for (const days of chunkBySize(parsed.downtimes.map((d) => toStoredLoss(lossDayOf(d))))) await api.insertLossDays({ days })
-    ranges.push(['downtimes', downRange.from, downRange.to])
+  if (range('daily', parsed.daily.map((r) => r.date))) {
+    onStep(`Daily KPI: ${parsed.daily.length} rows`)
+    for (const rows of chunkBySize(parsed.daily)) await api.upsertDaily({ rows })
   }
-
+  if (range('orders', parsed.orders.map((r) => r.date))) {
+    onStep(`Order Based KPI: ${parsed.orders.length} rows`)
+    for (const rows of chunkBySize(parsed.orders)) await api.upsertOrders({ rows })
+  }
+  if (range('downtimes', parsed.downtimes.map((d) => d.date))) {
+    const total = parsed.downtimes.reduce((a, d) => a + d.events.length, 0)
+    onStep(`Downtimes: ${total} rows`)
+    for (const days of chunkBySize(parsed.downtimes.map(toStoredDay), 400_000, 15)) await api.upsertDowntimeDays({ days })
+  }
   if (parsed.weekly.length) {
-    const weeks = [...new Map(parsed.weekly.map((w) => [`${w.year}-${w.week}`, { year: w.year, week: w.week }])).values()]
-    onStep(`Weekly KPI: ${weeks.length} week(s)`)
-    for (const part of chunkBySize(weeks, CHUNK_BYTES, 20)) await clearAll(api, { kind: 'weekly', weeks: part })
-    for (const rows of chunkBySize(parsed.weekly)) await api.insertWeekly({ rows })
-    const keys = weeks.map((w) => `${w.year}-W${String(w.week).padStart(2, '0')}`).sort()
+    onStep(`Weekly KPI: ${parsed.weekly.length} rows`)
+    for (const rows of chunkBySize(parsed.weekly)) await api.upsertWeekly({ rows })
+    const keys = parsed.weekly.map((w) => `${w.year}-W${String(w.week).padStart(2, '0')}`).sort()
     ranges.push(['weekly', keys[0], keys[keys.length - 1]])
   }
-
   if (parsed.monthly.length) {
-    onStep('Monthly KPI')
-    await clearAll(api, { kind: 'monthly' })
-    for (const rows of chunkBySize(parsed.monthly)) await api.insertMonthly({ rows })
-    const keys = [...new Set(parsed.monthly.map((m) => m.monthKey))].sort()
+    onStep(`Monthly KPI: ${parsed.monthly.length} rows`)
+    for (const rows of chunkBySize(parsed.monthly)) await api.upsertMonthly({ rows })
+    const keys = parsed.monthly.map((m) => `${m.year}-${m.monthKey}`).sort()
     ranges.push(['monthly', keys[0], keys[keys.length - 1]])
   }
 

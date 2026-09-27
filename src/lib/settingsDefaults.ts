@@ -51,3 +51,14 @@ export function resolveSettings(saved: Partial<Record<SettingKey, unknown>> | nu
   }
   return out as ResolvedSettings
 }
+
+/**
+ * OEE ayarları için ÖNERİ (OEE → Settings → "Suggest from data"). Hesaplar
+ * bunu kullanmaz; kullanıcı ayarı kaydedince onun değerleri geçerlidir.
+ * Setup sonrası 60 dk üretim planlamacının verdiği değerdir (2026-09-27).
+ */
+export const OEE_SUGGESTED = {
+  startupRunMin: 60,
+  trendWeeks: 10,
+  topN: 10,
+} as const

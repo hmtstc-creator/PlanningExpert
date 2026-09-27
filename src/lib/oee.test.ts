@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import fixture from './oee.fixture.json'
 import {
+  EMPTY_CONFIG,
   chartShare,
+  configProblems,
   costCentersOf,
+  daysFromShifts,
   dieTable,
+  inScope,
   isoWeek,
   lossDayOf,
   lossForPeriod,
@@ -13,23 +17,71 @@ import {
   ratios,
   setupAnalysis,
   sheetKind,
+  suggestConfig,
   sumTimes,
-  weeklyTrend,
   weekShiftTrend,
+  weekTimes,
+  weeklyTrend,
+  type OeeConfig,
   type SheetRows,
+  type WeeklyRow,
 } from './oee'
+import { OEE_SUGGESTED } from './settingsDefaults'
 
 // Veri: ASAKAI_2026_REV_12.xlsm'den kesit (Transfer 39. hafta vardiyaları,
 // Progressive 21 Eylül vardiya ve duruşları, PRS-110 39. hafta siparişleri).
-// Beklenen değerler Excel'in kendi hücrelerinden (BoardReport).
+// Beklenen değerler Excel'in kendi hücrelerinden (BoardReport, Losses_Follow).
 const parsed = parseOeeWorkbook(fixture as unknown as Record<string, SheetRows>)
+const days = daysFromShifts(parsed.shifts)
+
+/** Bu tesisin ayarı — programda değil, kullanıcının Settings sayfasında durur; burada yalnızca test için. */
+const plant: OeeConfig = {
+  areas: [
+    { name: 'PRS', pick: 'costCenter' },
+    { name: 'APR', pick: 'machine' },
+  ],
+  costCenters: [
+    { code: '51010171', name: 'Transfer', area: 'PRS' },
+    { code: '51010173', name: 'Progressive', area: 'PRS' },
+    { code: '51010172', name: 'APR', area: 'APR' },
+  ],
+  shifts: [
+    { code: 'UB61', number: 1 },
+    { code: 'UB62', number: 2 },
+    { code: 'UB63', number: 3 },
+    { code: 'UB64', number: 1 },
+    { code: 'UB65', number: 2 },
+    { code: 'UB66', number: 3 },
+  ],
+  lossReasonCodes: ['UNSCD_DOWN', '#'],
+  breakReasonCodes: ['SCHED_DOWN'],
+  lossGroups: [
+    { code: 'KLP', label: 'Die breakdown', chart: 'Die', breakdown: true },
+    { code: 'STP', label: 'Setup', chart: 'Setup', breakdown: false },
+    { code: 'ARZ', label: 'Machine breakdown', chart: 'Machine', breakdown: true },
+    { code: 'KSD', label: 'Short stoppages', chart: 'Short', breakdown: false },
+    { code: 'KON', label: 'Quality', chart: 'Others', breakdown: false },
+    { code: 'OFC', label: 'Logistic', chart: 'Others', breakdown: false },
+    { code: 'YNT', label: 'Management', chart: 'Others', breakdown: false },
+    { code: '#', label: 'Undefined', chart: 'Undefined', breakdown: false },
+  ],
+  setupTexts: [
+    { text: 'DIE SETUP - PLANNED', kind: 'planned' },
+    { text: 'DIE SETUP - UNPLANNED', kind: 'unplanned' },
+  ],
+  startupRunMin: 60,
+  trendWeeks: 10,
+  topN: 10,
+}
+const transfer = { area: 'PRS', key: '51010171' }
+const progressive = { area: 'PRS', key: '51010173' }
 
 describe('oee workbook', () => {
-  it('reads only the needed sheets; Daily KPI is calculated, not read', () => {
-    expect(sheetKind('Daily KPI')).toBeNull()
+  it('recognises the sheets by name', () => {
+    expect(sheetKind('Daily KPI')).toBe('daily')
     expect(sheetKind('Downtimes (1)')).toBe('downtimes')
     expect(sheetKind('Shiftly Base Order KPI')).toBe('orders')
-    expect(parsed.read.map((r) => r.kind).sort()).toEqual(['downtimes', 'orders', 'shiftly'])
+    expect(sheetKind('BoardReport')).toBeNull()
     expect(parsed.shifts.length).toBe(40)
   })
 
@@ -41,47 +93,75 @@ describe('oee workbook', () => {
     }
   })
 
-  it('weekly OEE of Transfer = Weekly KPI / Losses_Follow B6 (sum of operating ÷ sum of loading)', () => {
-    // BoardReport AQ30 aynı formül ama dosyada eski hesaplanmış değeri duruyor (0,6249).
-    const w = weeklyTrend(parsed.shifts, [], { area: 'PRS', key: '51010171' }, mondayOfWeek(2026, 39), 1)
-    expect(w.weeks[0].oee!).toBeCloseTo(0.6233499571596407, 10)
-    // Yüzde ortalaması farklı sonuç verir — kullanılmaz.
+  it('weekly OEE of Transfer = Weekly KPI / Losses_Follow B6 (sum ÷ sum, not an average)', () => {
+    const w = weeklyTrend(days, [], transfer, plant, mondayOfWeek(2026, 39), 1)
+    expect(w.total[0].oee!).toBeCloseTo(0.6233499571596407, 10)
     const avg = parsed.shifts.filter((s) => s.costCenter === '51010171').reduce((a, s) => a + s.oee, 0) / 30
-    expect(Math.abs(avg / 100 - w.weeks[0].oee!)).toBeGreaterThan(0.001)
+    expect(Math.abs(avg / 100 - w.total[0].oee!)).toBeGreaterThan(0.001)
   })
 
   it('daily % of loading for Progressive on 21 Sep = BoardReport row 46', () => {
-    const scope = { area: 'PRS' as const, key: '51010173' }
-    const b = lossForPeriod(parsed.shifts, parsed.downtimes.map(lossDayOf), scope, '2026-09-21', '2026-09-21')
+    const b = lossForPeriod(days, parsed.downtimes.map(lossDayOf), progressive, plant, '2026-09-21', '2026-09-21')
     expect(b.oee!).toBeCloseTo(0.6506578404424769, 10)
-    expect(chartShare(b, 'die')).toBeCloseTo(0.07397899179429981, 10)
-    expect(chartShare(b, 'setup')).toBeCloseTo(0.15476582503914701, 10)
-    expect(chartShare(b, 'machine')).toBeCloseTo(0.021303906612275648, 10)
-    expect(chartShare(b, 'short')).toBeCloseTo(0.027849649527214613, 10)
-    expect(chartShare(b, 'others')).toBeCloseTo(0.03757753748345089, 10)
-    expect(chartShare(b, 'speed')).toBeCloseTo(0.06763327710535716, 10)
+    expect(chartShare(b, 'Die')).toBeCloseTo(0.07397899179429981, 10)
+    expect(chartShare(b, 'Setup')).toBeCloseTo(0.15476582503914701, 10)
+    expect(chartShare(b, 'Machine')).toBeCloseTo(0.021303906612275648, 10)
+    expect(chartShare(b, 'Short')).toBeCloseTo(0.027849649527214613, 10)
+    expect(chartShare(b, 'Others')).toBeCloseTo(0.03757753748345089, 10)
+    expect(chartShare(b, 'Speed')).toBeCloseTo(0.06763327710535716, 10)
   })
 
   it('die OEE is weighted by good quantity (BoardReport AH78, PRS-110 week 39)', () => {
     const wk = mondayOfWeek(2026, 39)
-    const dies = dieTable(parsed.orders, { area: 'PRS', key: 'all' }, wk, '2026-09-27', costCentersOf(parsed.shifts))
+    const dies = dieTable(parsed.orders, { area: 'PRS', key: 'all' }, plant, wk, '2026-09-27', costCentersOf(days))
     const worst = dies.filter((d) => d.workCenter === 'PRS-110').sort((a, b) => a.weightedOee! - b.weightedOee!)[0]
     expect(worst.equipment).toBe('M250SP015RO')
     expect(worst.weightedOee!).toBeCloseTo(0.5492753430543721, 10)
   })
 
-  it('the week shift chart has 21 slots, Mon-1 … Sun-3', () => {
-    const t = weekShiftTrend(parsed.shifts, { area: 'PRS', key: '51010171' }, mondayOfWeek(2026, 39))
+  it('the week shift chart uses the shift numbers of the settings', () => {
+    const t = weekShiftTrend(parsed.shifts, transfer, plant, mondayOfWeek(2026, 39))
     expect(t.slots.length).toBe(21)
     expect(t.slots[0].label).toBe('Mon-1')
-    expect(t.slots[20].label).toBe('Sun-3')
-    expect(sumTimes(t.slots.map((s) => s.times)).loadingMin).toBeCloseTo(
-      sumTimes(parsed.shifts.filter((s) => s.costCenter === '51010171')).loadingMin,
-      6,
-    )
+    expect(t.unknown).toEqual([])
+    const none = weekShiftTrend(parsed.shifts, transfer, { ...plant, shifts: [] }, mondayOfWeek(2026, 39))
+    expect(none.unknown.sort()).toEqual(['UB64', 'UB65', 'UB66'])
   })
 
-  it('setup is OK when one hour of production follows it before the next die setup', () => {
+  it('without settings nothing is grouped by a value written in the program', () => {
+    expect(configProblems(EMPTY_CONFIG).length).toBeGreaterThan(0)
+    // Ayarsız: masraf yeri "Unassigned" alanına düşer, veri kaybolmaz.
+    expect(inScope(days[0], { area: 'Unassigned', key: 'all' }, EMPTY_CONFIG)).toBe(true)
+    const b = lossForPeriod(days, parsed.downtimes.map(lossDayOf), { area: 'Unassigned', key: 'all' }, EMPTY_CONFIG, '2026-09-21', '2026-09-21')
+    expect(Object.keys(b.groups)).toEqual([])
+  })
+
+  it('suggests the settings from the codes in the data', () => {
+    const s = suggestConfig({ days, shifts: parsed.shifts, downtimes: parsed.downtimes }, EMPTY_CONFIG, OEE_SUGGESTED)
+    expect(s.areas).toEqual([{ name: 'PRS', pick: 'costCenter' }])
+    expect(s.shifts).toEqual([
+      { code: 'UB64', number: 1 },
+      { code: 'UB65', number: 2 },
+      { code: 'UB66', number: 3 },
+    ])
+    expect(s.lossReasonCodes).toEqual(['#', 'UNSCD_DOWN'])
+    expect(s.breakReasonCodes).toEqual(['SCHED_DOWN'])
+    expect(s.startupRunMin).toBe(60)
+    // Kullanıcının verdiği ad öneride korunur.
+    const kept = suggestConfig({ days, shifts: parsed.shifts, downtimes: parsed.downtimes }, plant, OEE_SUGGESTED)
+    expect(kept.costCenters.find((c) => c.code === '51010171')!.name).toBe('Transfer')
+  })
+
+  it('a week is the sum of its days, or the uploaded week when that covers more loading', () => {
+    const wc = 'PRS-106'
+    const fromDays = sumTimes(days.filter((d) => d.workCenter === wc))
+    const partial: WeeklyRow = { ...parsed.shifts[0], year: 2026, week: 39, workCenter: wc, scheduledSec: 0, ...fromDays, loadingMin: fromDays.loadingMin - 100 }
+    const full: WeeklyRow = { ...partial, loadingMin: fromDays.loadingMin + 100 }
+    expect(weekTimes(days, [partial]).get(`2026-W39|${wc}`)!.source).toBe('days')
+    expect(weekTimes(days, [full]).get(`2026-W39|${wc}`)!.source).toBe('upload')
+  })
+
+  it('setup is OK when the set production time follows it before the next setup', () => {
     const ev = (start: string, end: string, rc1: string, rc2: string, text: string, order = '1') => ({
       order, material: 'M1', mold: '', shiftGroup: 'UB', shiftDefinition: 'UB64', rc1, rc2, rc3: '', rc4: '', rc5: '',
       textEn: text, textTr: '', seconds: 0,
@@ -101,16 +181,33 @@ describe('oee workbook', () => {
         ev('12:00:00', '14:00:00', 'UNSCD_DOWN', 'ARZ', 'PRESS', '3'),
       ],
     }
-    const rows = setupAnalysis([day], [], { area: 'PRS', key: 'all' }, '2026-09-21', '2026-09-21')
+    const rows = setupAnalysis([day], [], { area: 'PRS', key: 'all' }, plant, '2026-09-21', '2026-09-21')
     expect(rows.map((r) => r.status)).toEqual(['ok', 'nok', 'open'])
-    // 08:30 → 60 dk üretim: 10 dk KSD + 5 dk mola araya girer → 09:45.
     expect(rows[0].timeToRunMin).toBe(75)
     expect(rows[0].lost).toEqual({ KSD: 10, BREAK: 5 })
-    // Sensör ayarı setup sayılmaz; kalıp arızası üretime geçirmedi.
     expect(rows[1].setupMin).toBe(30)
     expect(rows[1].runMin).toBe(10)
     expect(rows[1].mainReason).toBe('KLP')
-    expect(rows[1].lost).toEqual({ STP: 10, KLP: 45 })
+    // Setup metni ayarda yoksa setup analizi yapılmaz.
+    expect(setupAnalysis([day], [], { area: 'PRS', key: 'all' }, { ...plant, setupTexts: [] }, '2026-09-21', '2026-09-21')).toEqual([])
+  })
+
+  it('weekly and monthly sheets get their year from the latest date in the file', () => {
+    const p = parseOeeWorkbook({
+      'Shiftly KPI': (fixture as unknown as Record<string, SheetRows>)['Shiftly KPI'],
+      'Monthly KPI': [
+        ['Month', 'Month Key', 'Plant - Key', 'Production Responsible', 'Cost Center - Key', 'Work Center', 'Loading Time(Min)'],
+        ['Ocak', '01', '5101', '601', '51010171', 'PRS-106', 100],
+        ['Aralık', '12', '5101', '601', '51010171', 'PRS-106', 100],
+      ],
+      'Weekly KPI': [
+        ['Week', 'Plant - Key', 'Production Responsible', 'Cost Center - Key', 'Work Center', 'Loading Time(Min)'],
+        [2, '5101', '601', '51010171', 'PRS-106', 100],
+        [52, '5101', '601', '51010171', 'PRS-106', 100],
+      ],
+    })
+    expect(p.monthly.map((m) => `${m.year}-${m.monthKey}`)).toEqual(['2026-01', '2025-12'])
+    expect(p.weekly.map((w) => `${w.year}-${w.week}`)).toEqual(['2026-2', '2025-52'])
   })
 
   it('ISO weeks', () => {
@@ -120,64 +217,49 @@ describe('oee workbook', () => {
   })
 })
 
-describe('oee store and import', () => {
+describe('oee store and upload — history is never deleted', () => {
   it('round-trips downtime and loss days', async () => {
     const { toStoredDay, fromStoredDay, toStoredLoss, fromStoredLoss } = await import('./oeeStore')
     const day = parsed.downtimes[0]
     expect(fromStoredDay(toStoredDay(day))).toEqual(day)
     const loss = lossDayOf(day)
     expect(fromStoredLoss(toStoredLoss(loss))).toEqual(loss)
+    // İlk biçimdeki kayıt okunmaz (yeniden yüklenince yeni biçimle yazılır).
+    expect(fromStoredLoss({ date: day.date, costCenter: '', workCenter: '' })).toBeNull()
   })
 
-  it('import replaces the file range per kind and records the upload', async () => {
-    const { importOee, chunkBySize } = await import('./oeeStore')
+  it('the same downtime uploaded twice is stored once; a changed reason updates it', async () => {
+    const { mergeEvents } = await import('./oeeStore')
+    const events = parsed.downtimes[0].events
+    const twice = mergeEvents(events, events)
+    expect(twice.length).toBe(events.length)
+    const recoded = { ...events[0], rc2: 'KLP', textEn: 'BURR' }
+    const merged = mergeEvents(events, [recoded])
+    expect(merged.length).toBe(events.length)
+    expect(merged.find((e) => e.startTime === recoded.startTime && e.order === recoded.order)!.rc2).toBe('KLP')
+    // Dosyada olmayan eski duruş silinmez.
+    expect(mergeEvents(events, []).length).toBe(events.length)
+  })
+
+  it('upload only adds or updates — the API has no delete', async () => {
+    const { importOee } = await import('./oeeStore')
     const calls: string[] = []
-    const inserted: Record<string, number> = {}
-    const add = (k: string) => async (a: { rows?: unknown[]; days?: unknown[] }) => {
-      inserted[k] = (inserted[k] ?? 0) + (a.rows ?? a.days ?? []).length
+    const rec = (k: string) => async (a: { rows?: unknown[]; days?: unknown[] }) => {
+      calls.push(`${k}:${(a.rows ?? a.days ?? []).length}`)
       return 0
     }
-    await importOee(parsed, 'test.xlsx', {
-      clearRange: async (a) => {
-        calls.push(`${a.kind}:${a.from ?? ''}:${a.to ?? ''}`)
-        return { deleted: 0, more: false }
-      },
-      insertShifts: add('shifts'),
-      insertOrders: add('orders'),
-      insertWeekly: add('weekly'),
-      insertMonthly: add('monthly'),
-      insertDowntimeDays: add('downtimes'),
-      insertLossDays: add('losses'),
+    const api = {
+      upsertShifts: rec('shifts'),
+      upsertDaily: rec('daily'),
+      upsertOrders: rec('orders'),
+      upsertWeekly: rec('weekly'),
+      upsertMonthly: rec('monthly'),
+      upsertDowntimeDays: rec('downtimes'),
       finishImport: async () => null,
-    })
-    expect(calls.some((c) => c.startsWith('shifts:2026-09-21:2026-09-2'))).toBe(true)
-    expect(calls).toContain('downtimes:2026-09-21:2026-09-21')
-    expect(inserted.shifts).toBe(parsed.shifts.length)
-    expect(inserted.orders).toBe(parsed.orders.length)
-    expect(inserted.downtimes).toBe(parsed.downtimes.length)
-    expect(inserted.losses).toBe(parsed.downtimes.length)
-    expect(inserted.monthly).toBeUndefined()
-    expect(chunkBySize([1, 2, 3], 1_000_000, 2)).toEqual([[1, 2], [3]])
-  })
-})
-
-describe('weekly archive (Weekly KPI_fix)', () => {
-  it('is kept in the program and wins over a partial uploaded week', async () => {
-    const { WEEKLY_ARCHIVE, WEEKLY_ARCHIVE_YEAR } = await import('./oeeWeeklyArchive')
-    const { archiveRows, mergeWeekly } = await import('./oee')
-    const archive = archiveRows(WEEKLY_ARCHIVE, WEEKLY_ARCHIVE_YEAR)
-    expect(archive.length).toBe(629)
-    // Weekly KPI_fix, 36. hafta PRS-106 Loading 6481,85 dk; Weekly KPI'da (yarım hafta) 5127,68.
-    const partial = { ...archive.find((r) => r.week === 36 && r.workCenter === 'PRS-106')!, loadingMin: 5127.68, source: 'weekly' as const }
-    const later = { ...partial, week: 38, source: 'weekly' as const }
-    const merged = mergeWeekly(archive, [partial, later])
-    expect(merged.find((r) => r.week === 36 && r.workCenter === 'PRS-106')!.loadingMin).toBeCloseTo(6481.85, 2)
-    expect(merged.find((r) => r.week === 38 && r.workCenter === 'PRS-106')!.loadingMin).toBeCloseTo(5127.68, 2)
-    // Yüklenen yeni bir Weekly KPI_fix arşivi düzeltir.
-    const fix = { ...partial, loadingMin: 7000, source: 'archive' as const }
-    expect(mergeWeekly(archive, [fix]).find((r) => r.week === 36 && r.workCenter === 'PRS-106')!.loadingMin).toBe(7000)
-    // Arşivli hafta dashboard'da görünür (Transfer 30. hafta).
-    const w = weeklyTrend([], merged, { area: 'PRS', key: '51010171' }, mondayOfWeek(2026, 30), 1)
-    expect(w.weeks[0].oee).not.toBeNull()
+    }
+    await importOee(parsed, 'test.xlsx', api)
+    expect(Object.keys(api).some((k) => /clear|delete|remove/i.test(k))).toBe(false)
+    expect(calls.filter((c) => c.startsWith('shifts')).reduce((a, c) => a + Number(c.split(':')[1]), 0)).toBe(parsed.shifts.length)
+    expect(calls.some((c) => c.startsWith('downtimes'))).toBe(true)
   })
 })

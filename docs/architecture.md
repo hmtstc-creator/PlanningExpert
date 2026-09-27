@@ -205,3 +205,5 @@ rm -rf convex/_generated .output
 | OEE Dashboard | `/oee` | aylık, 10 hafta, haftanın vardiyaları; yükleme | Losses Trend, Data |
 | Losses Trend | `/oee/losses` | kayıplar, gap, kalıplar, MTTR/MTBF, setup | OEE Dashboard |
 | OEE Data | `/oee/data` | yüklenen sayfalar, dosya sırasıyla | OEE Dashboard |
+| OEE Settings | `/oee/settings` | alan, masraf yeri, vardiya, kayıp grubu, setup, süreler | OEE sayfaları |
+| How to use (OEE) | `/oee/guide` | ilk kurulum, rutin yükleme, yüklü veri | OEE Settings |

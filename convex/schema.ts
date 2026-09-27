@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
-import { downtimeDayFields, lossDayFields, monthlyFields, orderFields, shiftFields, weeklyFields } from './oeeValidators'
+import { configFields, dayFields, downtimeDayFields, lossDayFields, monthlyFields, orderFields, shiftFields, weeklyFields } from './oeeValidators'
 
 export default defineSchema({
   // @deprecated kaldırıldı, sadece eski sözleşme uyumluluğu için tutuluyor
@@ -589,14 +589,27 @@ export default defineSchema({
     .index('by_uploadedAt', ['uploadedAt']),
 
   // ---- OEE Trend and Losses (docs/oeedashboard.md) ----
+  // Yüklemeler yalnızca ekler ya da günceller; geçmiş silinmez.
   oeeShifts: defineTable(shiftFields)
     .index('by_date', ['date'])
     .index('by_key', ['date', 'workCenter', 'shiftGroup']),
-  oeeOrders: defineTable(orderFields).index('by_date', ['date']),
-  oeeWeekly: defineTable(weeklyFields).index('by_week', ['year', 'week']),
-  oeeMonthly: defineTable(monthlyFields),
-  oeeDowntimeDays: defineTable(downtimeDayFields).index('by_date', ['date']),
-  oeeLossDays: defineTable(lossDayFields).index('by_date', ['date']),
+  oeeDays: defineTable(dayFields)
+    .index('by_date', ['date'])
+    .index('by_key', ['date', 'workCenter']),
+  oeeOrders: defineTable(orderFields)
+    .index('by_date', ['date'])
+    .index('by_key', ['date', 'workCenter', 'shift', 'order', 'equipment']),
+  oeeWeekly: defineTable(weeklyFields)
+    .index('by_week', ['year', 'week'])
+    .index('by_key', ['year', 'week', 'workCenter']),
+  oeeMonthly: defineTable(monthlyFields).index('by_key', ['workCenter', 'monthKey']),
+  oeeDowntimeDays: defineTable(downtimeDayFields)
+    .index('by_date', ['date'])
+    .index('by_key', ['date', 'workCenter']),
+  oeeLossDays: defineTable(lossDayFields)
+    .index('by_date', ['date'])
+    .index('by_key', ['date', 'workCenter']),
+  oeeSettings: defineTable({ key: v.string(), ...configFields, updatedAt: v.number(), updatedBy: v.optional(v.string()) }).index('by_key', ['key']),
   oeeImports: defineTable({
     fileName: v.string(),
     uploadedAt: v.number(),

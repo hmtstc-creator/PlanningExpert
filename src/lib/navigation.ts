@@ -115,6 +115,8 @@ export const MODULE_NAVS: ModuleNav[] = [
       { to: '/oee', label: 'OEE Dashboard', hint: 'Monthly, 10 weeks and the selected week' },
       { to: '/oee/losses', label: 'Losses Trend', hint: 'Losses, dies, breakdowns and setups' },
       { to: '/oee/data', label: 'Data', hint: 'The uploaded sheets, as in the file' },
+      { to: '/oee/settings', label: 'Settings', hint: 'Areas, cost centers, shifts, loss groups, setups' },
+      { to: '/oee/guide', label: 'How to use', hint: 'First setup and routine uploads' },
     ],
   },
 ]

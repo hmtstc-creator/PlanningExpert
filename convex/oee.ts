@@ -2,22 +2,29 @@ import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
 import {
+  configFields,
+  dailyFields,
   downtimeDayFields,
-  lossDayFields,
   monthlyFields,
   orderFields,
   shiftFields,
   weeklyFields,
 } from './oeeValidators'
-import { archiveRows, mergeWeekly } from '../src/lib/oee'
-import { WEEKLY_ARCHIVE, WEEKLY_ARCHIVE_YEAR } from '../src/lib/oeeWeeklyArchive'
+import { daysFromShifts, lossDayOf } from '../src/lib/oee'
+import { fromStoredDay, mergeEvents, toStoredDay, toStoredLoss } from '../src/lib/oeeStore'
 
 /**
- * OEE Trend and Losses — veri. Planlamacı sistemden indirdiği dosyayı
- * yükler; sayfa gerekli sayfaları okur (Daily KPI alınmaz, vardiyadan
- * hesaplanır). Yükleme kuralı: dosyadaki tarih aralığı eskisinin yerine
- * geçer, daha eski tarihler saklanır — böylece geçmiş birikir. Monthly KPI
- * her yüklemede komple yenilenir; haftalık satırlar hafta bazında.
+ * OEE Trend and Losses — veri.
+ *
+ * Kural (planlamacı, 2026-09-27): geçmiş hiçbir zaman silinmez. Her yükleme
+ * satırı kendi anahtarıyla EKLER ya da GÜNCELLER:
+ *   vardiya   tarih + iş merkezi + vardiya grubu
+ *   gün       tarih + iş merkezi (vardiyalardan; yoksa Daily KPI)
+ *   sipariş   tarih + iş merkezi + vardiya + sipariş + ekipman
+ *   duruş     iş merkezi + başlangıç tarihi/saati + sipariş (gün kaydında birleşir)
+ *   hafta     yıl + hafta + iş merkezi
+ *   ay        yıl + ay + iş merkezi
+ * Böylece son iki haftayı tekrar tekrar yüklemek mükerrer kayıt yapmaz.
  * Plan bu veriyi okumaz: `affectsPlan: false`.
  */
 
@@ -26,32 +33,8 @@ import { WEEKLY_ARCHIVE, WEEKLY_ARCHIVE_YEAR } from '../src/lib/oeeWeeklyArchive
 type Ctx = any
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/
-/**
- * Bir silme çağrısında en çok bu kadar kayıt (işlem sınırları için). Duruş
- * günleri büyük kayıtlar (yüzlerce duruş) olduğundan onlarda daha az.
- */
-const DELETE_BATCH = 400
-const DELETE_BATCH_BIG = 40
 /** Duruş olaylarını okuyan sorgu en çok bu kadar gün kapsar (okuma sınırı). */
 const MAX_EVENT_DAYS = 8
-
-const kindValidator = v.union(
-  v.literal('shifts'),
-  v.literal('orders'),
-  v.literal('downtimes'),
-  v.literal('losses'),
-  v.literal('weekly'),
-  v.literal('monthly'),
-)
-
-const TABLE: Record<string, string> = {
-  shifts: 'oeeShifts',
-  orders: 'oeeOrders',
-  downtimes: 'oeeDowntimeDays',
-  losses: 'oeeLossDays',
-  weekly: 'oeeWeekly',
-  monthly: 'oeeMonthly',
-}
 
 function checkRange(from?: string, to?: string) {
   if (!from || !to || !ISO.test(from) || !ISO.test(to) || from > to) {
@@ -59,104 +42,156 @@ function checkRange(from?: string, to?: string) {
   }
 }
 
-/**
- * Yükleme öncesi silme: tarih aralığı (vardiya, sipariş, duruş), hafta
- * listesi (haftalık) ya da hepsi (aylık). Parça parça: `more` true dönerse
- * tekrar çağrılır.
- */
-export const clearRange = guardedMutation({
-  args: {
-    kind: kindValidator,
-    from: v.optional(v.string()),
-    to: v.optional(v.string()),
-    weeks: v.optional(v.array(v.object({ year: v.number(), week: v.number() }))),
-  },
-  returns: v.object({ deleted: v.number(), more: v.boolean() }),
-  affectsPlan: false,
-  handler: async (ctx: Ctx, { kind, from, to, weeks }: Ctx) => {
-    const table = TABLE[kind]
-    const limit = kind === 'downtimes' ? DELETE_BATCH_BIG : DELETE_BATCH
-    let docs: Ctx[] = []
-    if (kind === 'monthly') {
-      docs = await ctx.db.query(table).take(limit + 1)
-    } else if (kind === 'weekly') {
-      for (const w of weeks ?? []) {
-        if (docs.length > limit) break
-        const hit = await ctx.db
-          .query(table)
-          .withIndex('by_week', (q: Ctx) => q.eq('year', w.year).eq('week', w.week))
-          .take(limit + 1 - docs.length)
-        docs.push(...hit)
-      }
-    } else {
-      checkRange(from, to)
-      docs = await ctx.db
-        .query(table)
-        .withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to))
-        .take(limit + 1)
-    }
-    const batch = docs.slice(0, limit)
-    for (const d of batch) await ctx.db.delete(d._id)
-    return { deleted: batch.length, more: docs.length > limit }
-  },
+async function upsert(ctx: Ctx, existing: Ctx | null, table: string, doc: Ctx) {
+  if (existing) await ctx.db.replace(existing._id, doc)
+  else await ctx.db.insert(table, doc)
+}
+
+const dayDoc = (d: Ctx) => ({
+  date: d.date,
+  plantKey: d.plantKey,
+  responsible: d.responsible,
+  costCenter: d.costCenter,
+  workCenter: d.workCenter,
+  source: d.source,
+  good: d.good,
+  scrap: d.scrap,
+  reject: d.reject,
+  scheduledMin: d.scheduledMin,
+  unscheduledMin: d.unscheduledMin,
+  operatingMin: d.operatingMin,
+  productionMin: d.productionMin,
+  loadingMin: d.loadingMin,
 })
 
-export const insertShifts = guardedMutation({
+/** Vardiyalar: ekle ya da güncelle; etkilenen günlerin toplamı yeniden hesaplanır. */
+export const upsertShifts = guardedMutation({
   args: { rows: v.array(v.object(shiftFields)) },
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { rows }: Ctx) => {
-    for (const r of rows) await ctx.db.insert('oeeShifts', r)
+    const touched = new Map<string, { date: string; workCenter: string }>()
+    for (const r of rows) {
+      const hit = await ctx.db
+        .query('oeeShifts')
+        .withIndex('by_key', (q: Ctx) => q.eq('date', r.date).eq('workCenter', r.workCenter).eq('shiftGroup', r.shiftGroup))
+        .first()
+      await upsert(ctx, hit, 'oeeShifts', r)
+      touched.set(`${r.date}|${r.workCenter}`, { date: r.date, workCenter: r.workCenter })
+    }
+    for (const { date, workCenter } of touched.values()) {
+      const all = await ctx.db
+        .query('oeeShifts')
+        .withIndex('by_key', (q: Ctx) => q.eq('date', date).eq('workCenter', workCenter))
+        .collect()
+      const [day] = daysFromShifts(all)
+      const hit = await ctx.db
+        .query('oeeDays')
+        .withIndex('by_key', (q: Ctx) => q.eq('date', date).eq('workCenter', workCenter))
+        .first()
+      if (day) await upsert(ctx, hit, 'oeeDays', dayDoc(day))
+    }
     return rows.length
   },
 })
 
-export const insertOrders = guardedMutation({
+/** Daily KPI (geçmiş): o günün vardiya verisi varsa vardiya toplamı geçerlidir. */
+export const upsertDaily = guardedMutation({
+  args: { rows: v.array(v.object(dailyFields)) },
+  returns: v.number(),
+  affectsPlan: false,
+  handler: async (ctx: Ctx, { rows }: Ctx) => {
+    let n = 0
+    for (const r of rows) {
+      const hit = await ctx.db
+        .query('oeeDays')
+        .withIndex('by_key', (q: Ctx) => q.eq('date', r.date).eq('workCenter', r.workCenter))
+        .first()
+      if (hit?.source === 'shiftly') continue
+      await upsert(ctx, hit, 'oeeDays', dayDoc({ ...r, source: 'daily' }))
+      n++
+    }
+    return n
+  },
+})
+
+export const upsertOrders = guardedMutation({
   args: { rows: v.array(v.object(orderFields)) },
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { rows }: Ctx) => {
-    for (const r of rows) await ctx.db.insert('oeeOrders', r)
+    for (const r of rows) {
+      const hit = await ctx.db
+        .query('oeeOrders')
+        .withIndex('by_key', (q: Ctx) =>
+          q.eq('date', r.date).eq('workCenter', r.workCenter).eq('shift', r.shift).eq('order', r.order).eq('equipment', r.equipment),
+        )
+        .first()
+      await upsert(ctx, hit, 'oeeOrders', r)
+    }
     return rows.length
   },
 })
 
-export const insertWeekly = guardedMutation({
+export const upsertWeekly = guardedMutation({
   args: { rows: v.array(v.object(weeklyFields)) },
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { rows }: Ctx) => {
-    for (const r of rows) await ctx.db.insert('oeeWeekly', r)
+    for (const r of rows) {
+      const hit = await ctx.db
+        .query('oeeWeekly')
+        .withIndex('by_key', (q: Ctx) => q.eq('year', r.year).eq('week', r.week).eq('workCenter', r.workCenter))
+        .first()
+      const { source: _legacy, ...doc } = r
+      await upsert(ctx, hit, 'oeeWeekly', doc)
+    }
     return rows.length
   },
 })
 
-export const insertMonthly = guardedMutation({
-  args: { rows: v.array(v.object(monthlyFields)) },
+export const upsertMonthly = guardedMutation({
+  args: { rows: v.array(v.object({ ...monthlyFields, year: v.number() })) },
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { rows }: Ctx) => {
-    for (const r of rows) await ctx.db.insert('oeeMonthly', r)
+    for (const r of rows) {
+      const same = await ctx.db
+        .query('oeeMonthly')
+        .withIndex('by_key', (q: Ctx) => q.eq('workCenter', r.workCenter).eq('monthKey', r.monthKey))
+        .collect()
+      // Yılı olmayan eski kayıt da aynı ay sayılır ve yıl eklenerek güncellenir.
+      const hit = same.find((m: Ctx) => m.year === r.year) ?? same.find((m: Ctx) => m.year === undefined) ?? null
+      await upsert(ctx, hit, 'oeeMonthly', r)
+    }
     return rows.length
   },
 })
 
-export const insertDowntimeDays = guardedMutation({
+/**
+ * Duruşlar: aynı gün × iş merkezinin eski duruşlarıyla birleşir (aynı duruş
+ * güncellenir, yenisi eklenir, eskisi silinmez); kayıp özeti yeniden hesaplanır.
+ */
+export const upsertDowntimeDays = guardedMutation({
   args: { days: v.array(v.object(downtimeDayFields)) },
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { days }: Ctx) => {
-    for (const d of days) await ctx.db.insert('oeeDowntimeDays', d)
-    return days.length
-  },
-})
-
-export const insertLossDays = guardedMutation({
-  args: { days: v.array(v.object(lossDayFields)) },
-  returns: v.number(),
-  affectsPlan: false,
-  handler: async (ctx: Ctx, { days }: Ctx) => {
-    for (const d of days) await ctx.db.insert('oeeLossDays', d)
+    for (const incoming of days) {
+      const hit = await ctx.db
+        .query('oeeDowntimeDays')
+        .withIndex('by_key', (q: Ctx) => q.eq('date', incoming.date).eq('workCenter', incoming.workCenter))
+        .first()
+      const next = fromStoredDay(incoming)
+      if (hit) next.events = mergeEvents(fromStoredDay(hit).events, next.events)
+      const stored = toStoredDay(next)
+      await upsert(ctx, hit, 'oeeDowntimeDays', stored)
+      const lossHit = await ctx.db
+        .query('oeeLossDays')
+        .withIndex('by_key', (q: Ctx) => q.eq('date', incoming.date).eq('workCenter', incoming.workCenter))
+        .first()
+      await upsert(ctx, lossHit, 'oeeLossDays', toStoredLoss(lossDayOf(next)))
+    }
     return days.length
   },
 })
@@ -175,6 +210,42 @@ export const finishImport = guardedMutation({
   },
 })
 
+// ---- ayarlar --------------------------------------------------------------------
+
+export const settings = guardedQuery({
+  args: {},
+  handler: async (ctx: Ctx) => {
+    const doc = await ctx.db
+      .query('oeeSettings')
+      .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
+      .first()
+    if (!doc) return null
+    const { _id, _creationTime, key: _key, updatedAt, updatedBy, ...config } = doc
+    return { config, updatedAt, updatedBy }
+  },
+})
+
+export const saveSettings = guardedMutation({
+  args: { config: v.object(configFields) },
+  returns: v.null(),
+  affectsPlan: false,
+  handler: async (ctx: Ctx, { config }: Ctx) => {
+    if (!(config.startupRunMin > 0) || !(config.trendWeeks > 0) || !(config.topN > 0)) {
+      throw new ConvexError('Production after setup, trend weeks and list size must be above 0')
+    }
+    const names = new Set(config.areas.map((a: Ctx) => a.name))
+    const missing = config.costCenters.filter((c: Ctx) => !names.has(c.area)).map((c: Ctx) => c.code)
+    if (missing.length) throw new ConvexError(`Choose an area for cost center ${missing.join(', ')}`)
+    const doc = { key: 'default', ...config, updatedAt: Date.now(), updatedBy: ctx.sessionUser?.name }
+    const hit = await ctx.db
+      .query('oeeSettings')
+      .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
+      .first()
+    await upsert(ctx, hit, 'oeeSettings', doc)
+    return null
+  },
+})
+
 // ---- okuma ----------------------------------------------------------------------
 
 const strip = ({ _id, _creationTime, ...rest }: Ctx) => rest
@@ -187,63 +258,42 @@ export const lastImport = guardedQuery({
   },
 })
 
-/** Bir tarih aralığının vardiya satırları (dashboard ve kayıplar). */
-export const shifts = guardedQuery({
-  args: { from: v.string(), to: v.string() },
-  handler: async (ctx: Ctx, { from, to }: Ctx) => {
-    checkRange(from, to)
-    const rows = await ctx.db
-      .query('oeeShifts')
-      .withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to))
-      .collect()
-    return rows.map(strip)
-  },
-})
+const byDate = (table: string) =>
+  guardedQuery({
+    args: { from: v.string(), to: v.string() },
+    handler: async (ctx: Ctx, { from, to }: Ctx) => {
+      checkRange(from, to)
+      const rows = await ctx.db
+        .query(table)
+        .withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to))
+        .collect()
+      return rows.map(strip)
+    },
+  })
 
-export const orders = guardedQuery({
-  args: { from: v.string(), to: v.string() },
-  handler: async (ctx: Ctx, { from, to }: Ctx) => {
-    checkRange(from, to)
-    const rows = await ctx.db
-      .query('oeeOrders')
-      .withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to))
-      .collect()
-    return rows.map(strip)
-  },
-})
+/** Gün × iş merkezi (hafta, ay, kutular ve kayıp oranlarının tabanı). */
+export const days = byDate('oeeDays')
+/** Vardiya satırları (haftanın vardiya grafiği). */
+export const shifts = byDate('oeeShifts')
+export const orders = byDate('oeeOrders')
+export const lossDays = byDate('oeeLossDays')
 
-/** Yüklenmiş haftalık satırlar (Weekly KPI / Weekly KPI_fix) ve aylık. */
-/**
- * Haftalık (programdaki Weekly KPI_fix arşivi + yüklenenler, bkz.
- * mergeWeekly) ve aylık satırlar.
- */
+/** Yüklenen haftalık ve aylık satırlar (yılı olmayan eski aylık kayıtlar hariç). */
 export const periods = guardedQuery({
   args: {},
   handler: async (ctx: Ctx) => ({
-    weekly: mergeWeekly(archiveRows(WEEKLY_ARCHIVE, WEEKLY_ARCHIVE_YEAR), (await ctx.db.query('oeeWeekly').collect()).map(strip)),
-    monthly: (await ctx.db.query('oeeMonthly').collect()).map(strip),
+    weekly: (await ctx.db.query('oeeWeekly').collect()).map(strip),
+    monthly: (await ctx.db.query('oeeMonthly').collect()).filter((m: Ctx) => m.year !== undefined).map(strip),
   }),
 })
 
-export const lossDays = guardedQuery({
-  args: { from: v.string(), to: v.string() },
-  handler: async (ctx: Ctx, { from, to }: Ctx) => {
-    checkRange(from, to)
-    const rows = await ctx.db
-      .query('oeeLossDays')
-      .withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to))
-      .collect()
-    return rows.map(strip)
-  },
-})
-
-/** Duruş satırları — en çok bir hafta (setup analizi ve veri görünümü). */
+/** Duruş satırları — en çok 8 gün (setup analizi ve veri görünümü). */
 export const downtimeDays = guardedQuery({
   args: { from: v.string(), to: v.string() },
   handler: async (ctx: Ctx, { from, to }: Ctx) => {
     checkRange(from, to)
-    const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1
-    if (days > MAX_EVENT_DAYS) throw new ConvexError(`Downtime rows can be read for at most ${MAX_EVENT_DAYS} days at a time`)
+    const n = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1
+    if (n > MAX_EVENT_DAYS) throw new ConvexError(`Downtime rows can be read for at most ${MAX_EVENT_DAYS} days at a time`)
     const rows = await ctx.db
       .query('oeeDowntimeDays')
       .withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to))
@@ -252,17 +302,23 @@ export const downtimeDays = guardedQuery({
   },
 })
 
-/** Veride hangi tarihler var: son gün (varsayılan "dün" yoksa buna göre). */
+/** Hangi tarihler yüklü: her tür için ilk ve son gün. */
 export const coverage = guardedQuery({
   args: {},
   handler: async (ctx: Ctx) => {
-    const first = await ctx.db.query('oeeShifts').withIndex('by_date').order('asc').first()
-    const last = await ctx.db.query('oeeShifts').withIndex('by_date').order('desc').first()
-    const firstDown = await ctx.db.query('oeeDowntimeDays').withIndex('by_date').order('asc').first()
-    const lastDown = await ctx.db.query('oeeDowntimeDays').withIndex('by_date').order('desc').first()
+    const span = async (table: string) => {
+      const first = await ctx.db.query(table).withIndex('by_date').order('asc').first()
+      const last = await ctx.db.query(table).withIndex('by_date').order('desc').first()
+      return first ? { from: first.date, to: last.date } : null
+    }
+    const weekFirst = await ctx.db.query('oeeWeekly').withIndex('by_week').order('asc').first()
+    const weekLast = await ctx.db.query('oeeWeekly').withIndex('by_week').order('desc').first()
     return {
-      shifts: first ? { from: first.date, to: last.date } : null,
-      downtimes: firstDown ? { from: firstDown.date, to: lastDown.date } : null,
+      days: await span('oeeDays'),
+      shifts: await span('oeeShifts'),
+      orders: await span('oeeOrders'),
+      downtimes: await span('oeeDowntimeDays'),
+      weekly: weekFirst ? { from: `${weekFirst.year}-W${weekFirst.week}`, to: `${weekLast.year}-W${weekLast.week}` } : null,
     }
   },
 })
