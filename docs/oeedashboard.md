@@ -225,6 +225,38 @@ Cevaplar gelince buraya yazılacak.
 15. İş merkezi adı = Press Definitions'taki pres adı (PRS-106 …), ada göre
     eşleşir.
 
+### Ek kararlar (2026-09-27, ikinci tur)
+
+16. Yükleme: planlamacı sistemden **ayrı, sade bir dosya** indirip yükler
+    (ASAKAI gibi karışık ve büyük değil). Dosya biçimi gelince sütunlar bu
+    notlara yazılacak.
+17. Masraf yeri grafiği **tek grafik**; masraf yeri bir seçimle değiştirilir
+    (Transfer / Progressive / APR). İçeriği BoardReport'taki gibi: seçilen
+    haftanın vardiya OEE'leri (Pzt-1 … Paz-3), ΣOperating ÷ ΣLoading.
+18. OEE Dashboard sayfa düzeni (yukarıdan aşağı):
+    1. **Aylık** OEE
+    2. **Son 10 hafta** trendi
+    3. **Mevcut hafta** trendi — hafta, seçilen tarihten gelir.
+19. Kayıplar ayrı bir **Losses Trend** sayfasında izlenir:
+    - Mevcut haftanın kayıp gidişatı, BoardReport'taki gibi (günlük kayıp
+      dağılımı: die, setup, machine, short, others, speed — Loading'e oran).
+    - Yanında **geçen haftanın** aynı değerleri: karşılaştırma, artış mı
+      azalış mı görünür.
+
+## Açık sorular (ikinci tur)
+
+1. Ayrı indirilecek dosya(lar): yalnızca Shiftly KPI mı? Losses Trend için
+   Downtimes da gerekir; Monthly KPI ve Weekly KPI_fix (geçmiş haftalar) bir
+   kez mi yüklenecek?
+2. PRS/APR seçimi ile masraf yeri seçimi: PRS seçilince Transfer /
+   Progressive / tümü; APR seçilince makine (APR-618 …) seçimi mi?
+3. Aylık ve 10 hafta grafikleri: seçilen masraf yerinin tek çizgisi mi, yoksa
+   preslerin ayrı çubukları + grup çizgisi mi (BoardReport'taki gibi)?
+4. Losses Trend: geçen hafta karşılaştırması gün gün mü (Pzt↔Pzt), yoksa
+   hafta toplamı kayıp grubu bazında mı (ör. Setup %18 → %15 ↓)?
+5. Losses Trend'de kalıp listeleri (en kötü 10 kalıp OEE, speed loss en çok
+   10 kalıp) olsun mu? Olursa Order Based dosyası da yüklenmeli.
+
 ## Bekleyen konular
 
 - Downtimes plansız duruş toplamı ile Shiftly Unscheduled Downtime farkı
