@@ -2,7 +2,8 @@
 
 Bu dosya programın nasıl kurulduğunu ve kodu değiştirirken uyulacak kuralları
 anlatır. Planlamacıyla alınan iş kararları `docs/decisions.md`'de, koddaki
-sabit sayılar `docs/fixeddefinitions.md`'dedir. Kullanıcıya dönük açıklama
+sabit sayılar `docs/fixeddefinitions.md`'dedir. Gelecek yapı (çok şirket / çok fabrika): `docs/plant-genisletme.md` (beklemede).
+Kullanıcıya dönük açıklama
 sitedeki **Planning Logic** sayfasıdır (`src/routes/planlogic.tsx`).
 
 Üçü birlikte güncel tutulur: bir kural değişirse kod + `decisions.md` +

@@ -164,5 +164,9 @@ düşebiliyordu; vinç kontrolü artık önceki günün kendi rezervasyonların�
 
 ## Açık sorular
 
+- **Plant genişletme** (çok şirket / çok fabrika, kiralama): taslak ve kararlar
+  `docs/plant-genisletme.md`. BEKLEMEDE — üzerinde geliştirme yapılacak, sonra
+  "programı düzelt" ile 1. aşamadan başlanacak.
+
 - Koddaki sabit sayılar: `docs/fixeddefinitions.md` — ileride
   değerlendirilecek.

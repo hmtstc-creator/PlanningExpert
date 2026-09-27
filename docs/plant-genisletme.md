@@ -1,6 +1,6 @@
-# Çok fabrikalı yapı (kiralama) — fikir ve taslak
+# Plant genişletme — çok şirket / çok fabrika (kiralama)
 
-Durum: **taslak, kod yazılmadı.** Kararlar netleşince "Kararlar" bölümüne
+Durum: **BEKLEMEDE — taslak, kod yazılmadı.** Planlamacı (2026-09-27): "Bu düzenlemeyi 'plant genişletme' olarak not al, daha sonra üzerinde geliştirme yapıp programı düzelteceğiz." Kararlar netleşince "Kararlar" bölümüne
 yazılır, sonra uygulanır. Tarih: 2026-09-27.
 
 ## Amaç (planlamacı / site yöneticisi)
