@@ -81,13 +81,36 @@ describe('oee workbook', () => {
     )
   })
 
-  it('setup analysis flags a die breakdown after the setup', () => {
-    const rows = setupAnalysis(parsed.downtimes, parsed.orders, { area: 'PRS', key: '51010173' }, '2026-09-21', '2026-09-21')
-    expect(rows.length).toBeGreaterThan(0)
-    for (const r of rows) {
-      expect(r.setupMin).toBeGreaterThan(0)
-      expect(r.status).toBe(r.dieIssueCount > 0 ? 'die-issue' : r.good > 0 ? 'running' : 'no-production')
+  it('setup is OK when one hour of production follows it before the next die setup', () => {
+    const ev = (start: string, end: string, rc1: string, rc2: string, text: string, order = '1') => ({
+      order, material: 'M1', mold: '', shiftGroup: 'UB', shiftDefinition: 'UB64', rc1, rc2, rc3: '', rc4: '', rc5: '',
+      textEn: text, textTr: '', seconds: 0,
+      minutes: (Date.parse(`2026-09-21T${end}Z`) - Date.parse(`2026-09-21T${start}Z`)) / 60000,
+      startDate: '2026-09-21', startTime: start, endDate: '2026-09-21', endTime: end,
+    })
+    const day = {
+      date: '2026-09-21', plant: '', plantKey: '', costCenter: '51010173', workCenter: 'PRS-104',
+      events: [
+        ev('08:00:00', '08:30:00', 'UNSCD_DOWN', 'STP', 'DIE SETUP - PLANNED'),
+        ev('08:40:00', '08:50:00', 'UNSCD_DOWN', 'KSD', 'SHORT DOWNTIMES'),
+        ev('09:00:00', '09:05:00', 'SCHED_DOWN', 'UTS', 'TEA BREAK (5 MIN)'),
+        ev('10:00:00', '10:30:00', 'UNSCD_DOWN', 'STP', 'DIE SETUP - UNPLANNED', '2'),
+        ev('10:30:00', '10:40:00', 'UNSCD_DOWN', 'STP', 'SENSOR ADJUSTMENT', '2'),
+        ev('10:45:00', '11:30:00', 'UNSCD_DOWN', 'KLP', 'BURR', '2'),
+        ev('11:35:00', '12:00:00', 'UNSCD_DOWN', 'STP', 'DIE SETUP - PLANNED', '3'),
+        ev('12:00:00', '14:00:00', 'UNSCD_DOWN', 'ARZ', 'PRESS', '3'),
+      ],
     }
+    const rows = setupAnalysis([day], [], { area: 'PRS', key: 'all' }, '2026-09-21', '2026-09-21')
+    expect(rows.map((r) => r.status)).toEqual(['ok', 'nok', 'open'])
+    // 08:30 → 60 dk üretim: 10 dk KSD + 5 dk mola araya girer → 09:45.
+    expect(rows[0].timeToRunMin).toBe(75)
+    expect(rows[0].lost).toEqual({ KSD: 10, BREAK: 5 })
+    // Sensör ayarı setup sayılmaz; kalıp arızası üretime geçirmedi.
+    expect(rows[1].setupMin).toBe(30)
+    expect(rows[1].runMin).toBe(10)
+    expect(rows[1].mainReason).toBe('KLP')
+    expect(rows[1].lost).toEqual({ STP: 10, KLP: 45 })
   })
 
   it('ISO weeks', () => {

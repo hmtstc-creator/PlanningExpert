@@ -48,4 +48,5 @@ projeksiyonundan gelir.
 | 32 | Trend uzunluğu | 10 hafta | `src/routes/oee/*.tsx` (WEEKS) |
 | 33 | Listelerde ilk gösterilen | en kötü 10 kalıp, 15 neden | `src/routes/oee/losses.tsx` |
 | 34 | Duruş satırı okuma sınırı | bir sorguda en çok 8 gün | `convex/oee.ts` |
-
+| 35 | Setup sayılan duruşlar | DIE SETUP - PLANNED/UNPLANNED, REGLAJ MATRITA - PLANIFICATA/NEPLANIFICATA | `src/lib/oee.ts` (DIE_SETUP_TEXTS) |
+| 36 | Setup sonrası OK için üretim | 60 dk (planlamacının kararı) | `src/lib/oee.ts` (STARTUP_RUN_MIN) |

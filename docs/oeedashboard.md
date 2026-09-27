@@ -311,10 +311,29 @@ B6; BoardReport AQ30'daki değer eski hesap), PRS-110 kalıp OEE (AH78).
 5. Losses Trend'de kalıp listeleri (en kötü 10 kalıp OEE, speed loss en çok
    10 kalıp) olsun mu? Olursa Order Based dosyası da yüklenmeli.
 
+### Setup kuralı (2026-09-27, planlamacı) — ~~ilk kısa duruş varsayımı~~ yerine
+
+- Setup yalnızca **planlı ya da plansız kalıp setup'ı**: PRS "DIE SETUP -
+  PLANNED / UNPLANNED", APR "REGLAJ MATRITA - PLANIFICATA / NEPLANIFICATA".
+  Sensör, gripper, bobin vb. ayarlar setup değil; setup'tan sonra olursa
+  üretime geçememe nedenidir.
+- Setup bittikten sonra, bir sonraki kalıp setup'ından önce **1 saat üretim**
+  (duruşsuz süre) yapıldıysa **OK**, yapılamadıysa **NOK** (üretime
+  başlayamamış). Setup bitişinden o 1 saate (ya da sonraki setup'a) kadarki
+  duruşlar nedendir: KSD, STP, KLP, …; molalar ayrı gösterilir. NOK'un ana
+  nedeni en çok süre kaybettiren grup; hiç duruş yoksa "sonraki setup geldi".
+- Arada üretim olmayan setup kayıtları (vardiya değişimi, mola) tek setup.
+- Veri bitmeden sonuç belli değilse "Open".
+
+Gerçek veri (1–25 Eylül):
+- PRS: 186 setup → 175 OK, 10 NOK, 1 open. NOK ana nedenleri: KLP 6, KSD 2,
+  YNT 1, sonraki setup 1. Setup bitişinden 1 saat üretime medyan 111 dk.
+- APR: 656 setup → 258 OK, 398 NOK; 343'ünde neden "sonraki setup geldi"
+  (APR'de siparişler kısa, 1 saat dolmadan sıradaki setup başlıyor).
+
 ## Bekleyen konular
 
-- Setup evresinin sonu = ilk kısa duruş (KSD) varsayımı planlamacıya
-  onaylatılacak.
+- APR için 1 saat kuralı uygun mu (kısa siparişler)? Planlamacıya sorulacak.
 
 - Downtimes plansız duruş toplamı ile Shiftly Unscheduled Downtime farkı
   (medyan 7,9 dk/vardiya, en çok 163 dk) — ayrıca incelenecek.

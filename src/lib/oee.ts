@@ -652,82 +652,173 @@ export function reliability(
 
 // ---- setup analizi -------------------------------------------------------------
 
-export type SetupStatus = 'die-issue' | 'running' | 'no-production'
+/**
+ * Setup sayılan duruşlar: yalnızca planlı / plansız kalıp setup'ı (PRS
+ * İngilizce, APR Rumence metin). Sensör ayarı, bobin setup'ı vb. setup
+ * sayılmaz; setup'tan sonra olursa "üretime geçememe" nedenidir.
+ */
+export const DIE_SETUP_TEXTS: Record<string, 'planned' | 'unplanned'> = {
+  'DIE SETUP - PLANNED': 'planned',
+  'DIE SETUP - UNPLANNED': 'unplanned',
+  'REGLAJ MATRITA - PLANIFICATA': 'planned',
+  'REGLAJ MATRITA - NEPLANIFICATA': 'unplanned',
+}
+
+/** Setup'tan sonra bu kadar üretim yapılırsa setup OK (planlamacının kararı). */
+export const STARTUP_RUN_MIN = 60
+
+/** Planlı duruş (mola) kaybı bu anahtarla ayrı tutulur. */
+export const BREAK_KEY = 'BREAK'
+
+export type SetupStatus = 'ok' | 'nok' | 'open'
 
 export interface SetupRow {
   workCenter: string
   order: string
   material: string
-  /** İlk setup duruşunun başlangıcı: "YYYY-MM-DD HH:MM:SS". */
+  /** "YYYY-MM-DD HH:MM" */
   start: string
+  end: string
+  kind: 'planned' | 'unplanned' | 'mixed'
   setupMin: number
-  setupReasons: string[]
-  approvalMin: number
-  /** Setup evresinde (üretim başlamadan) girilen kalıp arızası (KLP). */
-  dieIssueMin: number
-  dieIssueCount: number
-  dieIssueReasons: string[]
-  good: number
   status: SetupStatus
+  /** Setup bitişinden STARTUP_RUN_MIN üretime ulaşana kadar geçen süre (OK ise). */
+  timeToRunMin: number | null
+  /** Bir sonraki kalıp setup'ına kadar yapılabilen üretim (NOK ise < 60). */
+  runMin: number
+  /** Setup bitişinden 1 saat üretime (ya da sonraki setup'a) kadar duruşlar: grup → dk. */
+  lost: Record<string, number>
+  /** NOK'un ana nedeni: en çok kaybettiren grup; duruş yoksa "next-setup". */
+  mainReason: string | null
+  nextSetup: string | null
+  good: number
 }
 
-const stamp = (date: string, time: string) => `${date} ${time || '00:00:00'}`
+const toMin = (date: string, time: string) => Date.parse(`${date}T${time || '00:00:00'}Z`) / 60_000
+const fmtMin = (m: number) => new Date(m * 60_000).toISOString().slice(0, 16).replace('T', ' ')
+
+interface Span {
+  s: number
+  e: number
+  ev: DowntimeEvent
+}
 
 /**
- * Siparişin setup'ı: ilk setup (STP) duruşundan üretimin başladığı ana kadar
- * olan evre. Üretimin başladığı an = siparişin setup'tan sonraki ilk kısa
- * duruşu (KSD) — kısa duruş yalnızca pres çalışırken olur; yoksa siparişin
- * son duruşu. Bu evrede:
- *   setup    = STP duruşları
- *   onay     = kalite onayı (KON) duruşları
- *   KLP      = kalıp arızası → onay alınamadı
- * Üretim sırasındaki bobin setup'ı ve kalıp arızası burada sayılmaz (kayıp
- * grafiklerinde görünür). Setup'ı [from, to] içinde başlayan siparişler.
+ * Setup'tan sonra üretime geçiş: kalıp setup'ı bittikten sonra, bir sonraki
+ * kalıp setup'ından önce toplam STARTUP_RUN_MIN dakika üretim (duruş
+ * olmayan süre) yapılabildiyse OK, yapılamadıysa NOK. Aradaki duruşlar
+ * nedendir (KSD, STP, KLP …; molalar ayrı). Veri bitmeden sonuç belli
+ * değilse "open". Arka arkaya setup kayıtları (araya üretim girmemişse —
+ * vardiya değişimi, mola) tek setup sayılır; sipariş sonuncusudur. Setup'ı
+ * [from, to] içinde başlayanlar.
  */
 export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Scope, from: string, to: string): SetupRow[] {
-  const byOrder = new Map<string, { wc: string; cc: string; events: DowntimeEvent[] }>()
+  const byWc = new Map<string, Span[]>()
+  let dataEnd = -Infinity
   for (const d of days) {
     if (!inScope(d, scope)) continue
-    for (const e of d.events) {
-      if (!e.order || e.order === '#') continue
-      const key = `${d.workCenter}|${e.order}`
-      const cur = byOrder.get(key) ?? { wc: d.workCenter, cc: d.costCenter, events: [] }
-      cur.events.push(e)
-      byOrder.set(key, cur)
+    const list = byWc.get(d.workCenter) ?? []
+    for (const ev of d.events) {
+      const s = toMin(ev.startDate || d.date, ev.startTime)
+      let e = toMin(ev.endDate || ev.startDate || d.date, ev.endTime)
+      if (!Number.isFinite(s)) continue
+      if (!Number.isFinite(e) || e < s) e = s + ev.minutes
+      list.push({ s, e, ev })
+      dataEnd = Math.max(dataEnd, e)
     }
+    byWc.set(d.workCenter, list)
   }
   const goodBy = new Map<string, number>()
   for (const o of orders) goodBy.set(`${o.workCenter}|${o.order}`, (goodBy.get(`${o.workCenter}|${o.order}`) ?? 0) + o.good)
+
   const out: SetupRow[] = []
-  for (const [key, { wc, events }] of byOrder) {
-    const setups = events.filter((e) => e.rc2 === 'STP').sort((a, b) => stamp(a.startDate, a.startTime).localeCompare(stamp(b.startDate, b.startTime)))
-    if (!setups.length) continue
-    const start = stamp(setups[0].startDate, setups[0].startTime)
-    const day = start.slice(0, 10)
-    if (day < from || day > to) continue
-    const sorted = events
-      .map((e) => ({ e, at: stamp(e.startDate, e.startTime) }))
-      .filter((x) => x.at >= start)
-      .sort((a, b) => a.at.localeCompare(b.at))
-    const running = sorted.find((x) => x.e.rc2 === 'KSD')?.at ?? '9999'
-    const phase = sorted.filter((x) => x.at < running).map((x) => x.e)
-    const setupPhase = phase.filter((e) => e.rc2 === 'STP')
-    const die = phase.filter((e) => e.rc2 === 'KLP')
-    const approval = phase.filter((e) => e.rc2 === 'KON')
-    const good = goodBy.get(key) ?? 0
-    out.push({
-      workCenter: wc,
-      order: key.split('|')[1],
-      material: setups[0].material,
-      start,
-      setupMin: setupPhase.reduce((a, e) => a + e.minutes, 0),
-      setupReasons: [...new Set(setupPhase.map((e) => e.textEn))],
-      approvalMin: approval.reduce((a, e) => a + e.minutes, 0),
-      dieIssueMin: die.reduce((a, e) => a + e.minutes, 0),
-      dieIssueCount: die.length,
-      dieIssueReasons: [...new Set(die.map((e) => e.textEn))],
-      good,
-      status: die.length > 0 ? 'die-issue' : good > 0 ? 'running' : 'no-production',
+  for (const [wc, spans] of byWc) {
+    spans.sort((a, b) => a.s - b.s)
+    // Duruşların birleşimi: üretim = bu aralıkların dışında kalan süre.
+    const union: [number, number][] = []
+    for (const sp of spans) {
+      const last = union[union.length - 1]
+      if (last && sp.s <= last[1]) last[1] = Math.max(last[1], sp.e)
+      else union.push([sp.s, sp.e])
+    }
+    const runBetween = (a: number, b: number) => {
+      let down = 0
+      for (const [s, e] of union) {
+        if (e <= a) continue
+        if (s >= b) break
+        down += Math.min(e, b) - Math.max(s, a)
+      }
+      return Math.max(0, b - a - down)
+    }
+    /** a'dan itibaren `need` dakika üretimin tamamlandığı an (limit'e kadar). */
+    const reachRun = (a: number, need: number, limit: number): number | null => {
+      let cur = a
+      let run = 0
+      for (const [s, e] of union) {
+        if (e <= cur) continue
+        if (s >= limit) break
+        if (s > cur) {
+          const gap = s - cur
+          if (run + gap >= need) return cur + (need - run)
+          run += gap
+        }
+        cur = Math.max(cur, e)
+        if (cur >= limit) return null
+      }
+      return cur + (need - run) <= limit ? cur + (need - run) : null
+    }
+
+    // Kalıp setup blokları.
+    const blocks: { s: number; e: number; order: string; material: string; kinds: Set<string>; min: number }[] = []
+    for (const sp of spans) {
+      const kind = DIE_SETUP_TEXTS[sp.ev.textEn.trim().toUpperCase()]
+      if (!kind) continue
+      const last = blocks[blocks.length - 1]
+      // Arada üretim yoksa (vardiya değişimi, mola, başka duruş) aynı setup sürüyor.
+      if (last && runBetween(last.e, sp.s) < 1) {
+        last.e = Math.max(last.e, sp.e)
+        last.order = sp.ev.order || last.order
+        last.material = sp.ev.material || last.material
+        last.kinds.add(kind)
+        last.min += sp.ev.minutes
+      } else {
+        blocks.push({ s: sp.s, e: sp.e, order: sp.ev.order, material: sp.ev.material, kinds: new Set([kind]), min: sp.ev.minutes })
+      }
+    }
+
+    blocks.forEach((b, i) => {
+      const day = fmtMin(b.s).slice(0, 10)
+      if (day < from || day > to) return
+      const next = blocks[i + 1]
+      const limit = next ? next.s : dataEnd
+      const reached = reachRun(b.e, STARTUP_RUN_MIN, limit)
+      const windowEnd = reached ?? limit
+      const lost: Record<string, number> = {}
+      for (const sp of spans) {
+        if (sp.e <= b.e || sp.s >= windowEnd) continue
+        const m = Math.min(sp.e, windowEnd) - Math.max(sp.s, b.e)
+        if (m <= 0) continue
+        const key = sp.ev.rc1 === 'SCHED_DOWN' ? BREAK_KEY : sp.ev.rc2 || '#'
+        lost[key] = (lost[key] ?? 0) + m
+      }
+      const status: SetupStatus = reached !== null ? 'ok' : next ? 'nok' : 'open'
+      const reasons = Object.entries(lost).filter(([k]) => k !== BREAK_KEY).sort((x, y) => y[1] - x[1])
+      out.push({
+        workCenter: wc,
+        order: b.order,
+        material: b.material,
+        start: fmtMin(b.s),
+        end: fmtMin(b.e),
+        kind: b.kinds.size > 1 ? 'mixed' : (([...b.kinds][0] ?? 'planned') as 'planned' | 'unplanned'),
+        setupMin: b.min,
+        status,
+        timeToRunMin: reached !== null ? reached - b.e : null,
+        runMin: Math.min(STARTUP_RUN_MIN, runBetween(b.e, windowEnd)),
+        lost,
+        mainReason: status === 'nok' ? (reasons[0]?.[0] ?? 'next-setup') : null,
+        nextSetup: next ? fmtMin(next.s) : null,
+        good: goodBy.get(`${wc}|${b.order}`) ?? 0,
+      })
     })
   }
   return out.sort((a, b) => a.workCenter.localeCompare(b.workCenter) || a.start.localeCompare(b.start))

@@ -8,7 +8,9 @@ import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import {
   LOSS_CHART_GROUPS,
+  BREAK_KEY,
   LOSS_GROUPS,
+  STARTUP_RUN_MIN,
   addDaysIso,
   chartShare,
   costCentersOf,
@@ -22,6 +24,7 @@ import {
   weekGap,
   type LossBreakdown,
   type OrderRow,
+  type SetupRow,
   type SetupStatus,
   type ShiftRow,
 } from '../../lib/oee'
@@ -52,7 +55,8 @@ function LossesPage() {
   const shifts = (useQuery(api.oee.shifts, { from: trendFrom, to: sel.sunday }) ?? []) as ShiftRow[]
   const lossRaw = (useQuery(api.oee.lossDays, { from: trendFrom, to: sel.sunday }) ?? []) as StoredLossDay[]
   const orders = (useQuery(api.oee.orders, { from: prevMonday, to: sel.sunday }) ?? []) as OrderRow[]
-  const downRaw = (useQuery(api.oee.downtimeDays, { from: sel.monday, to: sel.sunday }) ?? []) as StoredDowntimeDay[]
+  // Pazar gecesi biten setup'ın ilk üretim saati Pazartesiye taşabilir: bir gün fazla.
+  const downRaw = (useQuery(api.oee.downtimeDays, { from: sel.monday, to: addDaysIso(sel.sunday, 1) }) ?? []) as StoredDowntimeDay[]
   const lossDays = useMemo(() => lossRaw.map(fromStoredLoss), [lossRaw])
   const downtimes = useMemo(() => downRaw.map(fromStoredDay), [downRaw])
   const scope = sel.scope
@@ -304,47 +308,78 @@ function DieSection({ dies, week }: { dies: ReturnType<typeof dieTable>; week: n
 }
 
 const STATUS: Record<SetupStatus, { label: string; tone: string }> = {
-  'die-issue': { label: 'Die breakdown in setup — not approved', tone: 'text-destructive' },
-  running: { label: 'Production started', tone: 'text-emerald-700' },
-  'no-production': { label: 'No production recorded', tone: 'text-amber-700' },
+  ok: { label: 'OK — 1 h production', tone: 'text-emerald-700' },
+  nok: { label: 'NOK — no 1 h production before the next setup', tone: 'text-destructive' },
+  open: { label: 'Open — not known yet', tone: 'text-muted-foreground' },
 }
 
-function SetupSection({ setups, week, loaded }: { setups: ReturnType<typeof setupAnalysis>; week: number; loaded: boolean }) {
+const reasonLabel = (code: string) =>
+  code === BREAK_KEY ? 'Breaks' : code === 'next-setup' ? 'Next setup came' : LOSS_GROUPS.find((g) => g.code === code)?.label ?? code
+
+const lostText = (lost: Record<string, number>) =>
+  Object.entries(lost)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, m]) => `${reasonLabel(k)} ${minutes(m)}`)
+    .join(' · ') || '—'
+
+function SetupSection({ setups, week, loaded }: { setups: SetupRow[]; week: number; loaded: boolean }) {
   const [press, setPress] = useState('all')
   const [status, setStatus] = useState<'all' | SetupStatus>('all')
   const presses = [...new Set(setups.map((s) => s.workCenter))].sort()
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
   const summary = presses.map((p) => {
     const rows = setups.filter((s) => s.workCenter === p)
-    const total = rows.reduce((a, s) => a + s.setupMin, 0)
+    const nok = rows.filter((s) => s.status === 'nok')
+    const main = new Map<string, number>()
+    for (const r of nok) main.set(r.mainReason ?? '', (main.get(r.mainReason ?? '') ?? 0) + 1)
     return {
       press: p,
       count: rows.length,
-      total,
-      avg: rows.length ? total / rows.length : 0,
-      longest: rows.reduce((m, s) => Math.max(m, s.setupMin), 0),
-      approval: rows.reduce((a, s) => a + s.approvalMin, 0),
-      issues: rows.filter((s) => s.status === 'die-issue').length,
-      none: rows.filter((s) => s.status === 'no-production').length,
+      planned: rows.filter((s) => s.kind !== 'unplanned').length,
+      unplanned: rows.filter((s) => s.kind === 'unplanned').length,
+      ok: rows.filter((s) => s.status === 'ok').length,
+      nok: nok.length,
+      open: rows.filter((s) => s.status === 'open').length,
+      avgSetup: avg(rows.map((s) => s.setupMin)),
+      avgToRun: avg(rows.filter((s) => s.timeToRunMin !== null).map((s) => s.timeToRunMin!)),
+      reasons: [...main].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${reasonLabel(k)} ${n}`).join(', '),
     }
   })
+  // NOK nedenleri: ana neden sayısı ve setup sonrası kaybedilen süre (seçilen pres).
+  const nokRows = setups.filter((s) => s.status === 'nok' && (press === 'all' || s.workCenter === press))
+  const reasonMap = new Map<string, { main: number; lost: number; setups: number }>()
+  for (const r of nokRows) {
+    const m = reasonMap.get(r.mainReason ?? '') ?? { main: 0, lost: 0, setups: 0 }
+    m.main += 1
+    reasonMap.set(r.mainReason ?? '', m)
+    for (const [k, v] of Object.entries(r.lost)) {
+      const x = reasonMap.get(k) ?? { main: 0, lost: 0, setups: 0 }
+      x.lost += v
+      x.setups += 1
+      reasonMap.set(k, x)
+    }
+  }
+  const reasonRows = [...reasonMap].filter(([k]) => k).sort((a, b) => b[1].main - a[1].main || b[1].lost - a[1].lost)
   const list = setups.filter((s) => (press === 'all' || s.workCenter === press) && (status === 'all' || s.status === status))
   return (
     <section className="mt-6 rounded-lg border border-border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           Setups — W{week}
-          <InfoTip label="About the setup list">
+          <InfoTip label="About the setup analysis">
             <p>
-              One row per order whose first setup (STP) started this week. The setup phase runs from
-              that setup until production starts — the order's first short stoppage (KSD), which only
-              happens while the press runs.
+              Only planned and unplanned <b>die setups</b> count as a setup (DIE SETUP – PLANNED /
+              UNPLANNED; on APR REGLAJ MATRITA – PLANIFICATA / NEPLANIFICATA). Sensor, gripper, coil
+              and other adjustments are not a setup; after a setup they are a reason for not starting.
             </p>
             <p>
-              In that phase: <b>Setup</b> = setup downtimes, <b>Approval</b> = quality (KON) downtimes,
-              <b> Not approved</b> = a die breakdown (KLP) was entered before production started.
-              <b> Production started</b> = the order has good pieces in Order Based KPI. Coil setups and
-              die breakdowns later in the run are in the loss charts above.
+              <b>OK</b>: after the setup ends, the press produced {STARTUP_RUN_MIN} minutes (time
+              without any downtime) before the next die setup. <b>NOK</b>: it did not — it could not
+              get into production. The downtimes between the end of the setup and that hour (or the
+              next setup) are the reasons: short stoppages, further setup work, die breakdown, …;
+              breaks are shown apart. <b>Open</b>: the data ends before it is known.
             </p>
+            <p>Setup records with no production between them (shift change, break) count as one setup.</p>
           </InfoTip>
         </h2>
         <div className="flex flex-wrap gap-2">
@@ -366,36 +401,52 @@ function SetupSection({ setups, week, loaded }: { setups: ReturnType<typeof setu
       {!loaded && <p className="mt-2 text-xs text-muted-foreground">No downtime rows for this week.</p>}
       {summary.length > 0 && (
         <SimpleTable
-          head={['Press', 'Setups', 'Total', 'Average', 'Longest', 'Approval', 'Not approved', 'No production']}
+          head={['Press', 'Setups', 'Planned', 'Unplanned', 'OK', 'NOK', 'Open', 'Avg setup', 'Avg to 1 h production', 'NOK main reasons']}
           rows={summary.map((s) => [
             s.press,
             String(s.count),
-            minutes(s.total),
-            minutes(s.avg),
-            minutes(s.longest),
-            minutes(s.approval),
-            <span key="i" className={s.issues ? 'font-semibold text-destructive' : ''}>
-              {s.issues} ({s.count ? Math.round((s.issues / s.count) * 100) : 0}%)
+            String(s.planned),
+            String(s.unplanned),
+            <span key="ok" className="text-emerald-700">{s.ok}</span>,
+            <span key="nok" className={s.nok ? 'font-semibold text-destructive' : ''}>
+              {s.nok} ({s.count ? Math.round((s.nok / s.count) * 100) : 0}%)
             </span>,
-            String(s.none),
+            String(s.open),
+            s.avgSetup === null ? '—' : minutes(s.avgSetup),
+            s.avgToRun === null ? '—' : minutes(s.avgToRun),
+            s.reasons || '—',
           ])}
         />
+      )}
+      {reasonRows.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-medium text-muted-foreground">
+            Why NOK setups did not start {press === 'all' ? '' : `— ${press}`}
+          </p>
+          <SimpleTable
+            head={['Reason', 'Main reason of', 'Seen in NOK setups', 'Time lost after setup']}
+            rows={reasonRows.map(([k, v]) => [reasonLabel(k), `${v.main} setup(s)`, String(v.setups), v.lost ? minutes(v.lost) : '—'])}
+          />
+        </div>
       )}
       {list.length > 0 && (
         <div className="mt-3">
           <SimpleTable
-            head={['Press', 'Start', 'Order', 'Die / material', 'Setup', 'Setup reason', 'Approval', 'Die breakdown before production', 'Good', 'Result']}
+            head={['Press', 'Setup', 'Order', 'Die / material', 'Type', 'Setup time', 'Result', 'To 1 h production', 'Downtime after setup', 'Main reason', 'Good']}
             rows={list.map((s) => [
               s.workCenter,
-              s.start.slice(5, 16),
+              `${s.start.slice(5)} – ${s.end.slice(11)}`,
               s.order,
               s.material,
+              s.kind,
               minutes(s.setupMin),
-              s.setupReasons.join(', '),
-              s.approvalMin ? minutes(s.approvalMin) : '—',
-              s.dieIssueCount ? `${s.dieIssueCount}× ${minutes(s.dieIssueMin)} — ${s.dieIssueReasons.join(', ')}` : '—',
+              <span key="r" className={STATUS[s.status].tone}>{s.status.toUpperCase()}</span>,
+              s.timeToRunMin !== null
+                ? minutes(s.timeToRunMin)
+                : `${minutes(s.runMin)} run${s.nextSetup ? ` · next setup ${s.nextSetup.slice(5)}` : ''}`,
+              lostText(s.lost),
+              s.mainReason ? reasonLabel(s.mainReason) : '—',
               s.good.toLocaleString('en-GB'),
-              <span key="r" className={STATUS[s.status].tone}>{STATUS[s.status].label}</span>,
             ])}
           />
         </div>
