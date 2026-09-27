@@ -158,6 +158,120 @@ sihirbazında girilen değerlere dönüşür:
    creator geçici şifreyle kullanıcı açsın mı?
 10. Ücretlendirme / fatura şimdilik kapsam dışı mı?
 
-## Kararlar
+## Kararlar (2026-09-27, planlamacı)
 
-(henüz yok)
+1. **Tek sistem** (seçenek B). Her müşteriye ayrı güncelleme yapılmaz; bir
+   güncelleme herkese aynı anda gider.
+2. Platform seviyesinde **General** grubu: site yöneticisiyle aynı seviye.
+   Generaller bütün şirketleri ve alt şirketlerini görür.
+3. Üstte **şirket** seviyesi var. Şirketteki bir kullanıcı şirketin bütün alt
+   fabrikalarını görebilir; başka bir üye yalnızca bir fabrikayla kısıtlı
+   kalabilir.
+4. General grubu her şeyi görür.
+5. Bir fabrikada / şirkette birden çok creator olabilir; creator başka
+   creator atayabilir.
+6. Modüller (PlanningExpert, OEE, Die, Machine) açılıp kapanabilir (kiralama
+   paketi).
+7. Kiralama bitince: salt okunur → dışa aktarım → belirli gün sonra silme.
+8. Herkes tek adresten girer (aşağıya bakın: ayrı VPS gerekmez).
+9. Kullanıcıyı creator **geçici şifreyle** açar (ilk girişte değiştirme).
+10. Ücretlendirme / fatura kapsam dışı.
+11. **Kullanıcı grupları** şirket ve alt şirket için tanımlanır. Örnek:
+    bir alt şirketin mühendisleri, müdürleri ve fabrika müdürü yalnızca kendi
+    alt şirketini görür; **Board member** grubu şirketin bütün alt
+    şirketlerini görür.
+
+## Taslak v2 — yetki modeli
+
+### Seviyeler
+
+```
+Platform (General grubu: sen ve seninle aynı seviyedekiler)
+ └─ Şirket (kiralayan müşteri, ör. "Martur")
+     ├─ Alt şirket / fabrika (ör. "Romanya", "Bursa")  ← veri burada durur
+     └─ Alt şirket / fabrika …
+```
+
+- **Veri her zaman bir fabrikaya aittir** (`plantId`). Şirket, fabrikaları
+  bir araya getirir; iki şirketin verisi birbirini hiçbir yoldan göremez.
+- Aynı şirketin iki fabrikası da ayrıdır; "şirketin tamamını görme" yetkisi
+  olan kişi ikisini birden (ayrı ayrı ya da toplamda) görür.
+
+### Kimler ne yapar
+
+| Kim | Kapsam | Ne yapar |
+|---|---|---|
+| **General** (platform) | Bütün şirketler | Şirket ve fabrika açar, askıya alır, modül açar/kapar, creator atar, her şeyi görür |
+| **Şirket creator'ı** | Şirketin bütün fabrikaları | Fabrika ekler, kullanıcı ve grup tanımlar, geçici şifre verir, fabrikaları kurar (bugün senin yaptığın gibi) |
+| **Fabrika creator'ı** | Yalnızca kendi fabrikası | O fabrikanın kurulumu, kullanıcıları ve grupları |
+| **Grup üyeleri** | Grubun kapsamı | Grubun izin verdiği ekranlar |
+
+### Kullanıcı grupları (creator tanımlar)
+
+Grup = **kapsam** + **ekran izinleri**:
+
+- **Kapsam:** "şirketin bütün fabrikaları" ya da seçilen fabrika(lar).
+- **Ekran izinleri:** her modül / ekran için *yok · görür · düzenler*.
+  Örnek:
+
+| Grup | Kapsam | Plan | SAP yükleme | Master data | OEE | OEE ayarları | Kalıp / Makine takip | Kullanıcılar |
+|---|---|---|---|---|---|---|---|---|
+| Board members | Bütün fabrikalar | görür | yok | yok | görür | yok | görür | yok |
+| Fabrika müdürü – Romanya | Romanya | görür | görür | görür | görür | düzenler | görür | yok |
+| Planlama mühendisleri – Romanya | Romanya | düzenler | düzenler | düzenler | görür | yok | görür | yok |
+| Bakım – Romanya | Romanya | görür | yok | yok | görür | yok | düzenler | yok |
+
+- Bir kişi birden çok grupta olabilir; izinler birleşir (en genişi geçerli).
+- Modül şirket/fabrika için kapalıysa grup izni ne olursa olsun görünmez.
+
+### Ekranda nasıl görünür
+
+- Giriş tek adres. Kullanıcı şirketini seçmez; hesabı hangi şirkete aitse
+  oraya girer.
+- Üst çubukta **fabrika seçici**: yalnızca yetkili olduğu fabrikalar. Birden
+  çok fabrikası olan (ör. Board member) için **"Bütün fabrikalar"** seçeneği:
+  toplamı anlamlı ekranlarda (OEE, kayıp, KPI) toplam ve fabrika karşılaştırması;
+  plan gibi fabrikaya özgü ekranlarda fabrika seçmesi istenir.
+- Menüde yalnızca izinli ekranlar görünür; izin yoksa sunucu da reddeder
+  (yalnızca menüyü gizlemek güvenlik değildir).
+
+### Tek adres — ayrı VPS gerekir mi?
+
+Gerekmez. Tek sistemde bütün şirketler aynı adresten girer; ayrım giriş
+yapan kişinin hesabından ve verideki fabrika anahtarından gelir. Ayrı sunucu
+(VPS) her şirkete ayrı kurulum ve ayrı güncelleme demektir — kararla (1)
+çelişir. İleride bir şirket kendi adıyla adres isterse (ör.
+martur.site-adi.com), bu aynı sisteme yönlenen bir takma ad olur; ayrı sunucu
+değil. Başlangıçta gerek yok.
+
+### Güvenlik (değişmedi, genişledi)
+
+- Her istekte sunucu: kullanıcı → şirket → istenen fabrika → kullanıcının o
+  fabrikadaki ekran izni. Biri eksikse reddedilir.
+- Veriye yalnızca fabrikaya kilitli erişimle ulaşılır (taslak v1, bölüm 2).
+- "Bütün fabrikalar" görünümü, sunucuda kullanıcının yetkili olduğu
+  fabrikaların listesiyle sınırlı okunur.
+- Otomatik test: iki şirket, her birinde iki fabrika, aynı kodlar; her rol ve
+  grup için başkasının verisine erişim denenir, hepsi reddedilmeli.
+- Kim neyi değiştirdi kaydı şirket bazında (bugünkü değişiklik kaydının
+  genişlemiş hâli).
+
+## Açık sorular (v2)
+
+1. Bir alt şirket = bir fabrika mı, yoksa bir alt şirketin birden çok
+   fabrikası olabilir mi?
+2. Creator iki seviyede mi olsun (şirket creator'ı + fabrika creator'ı), yoksa
+   yalnızca şirket seviyesinde mi?
+3. Ekran izinleri modül bazında mı (4 modül), yoksa ekran bazında mı (~20
+   ekran: plan, kapasite, hammadde, SAP yükleme, master data, pres, takvim,
+   depo, performans, OEE dashboard/kayıp/veri/ayar, kalıp, makine,
+   kullanıcılar …)?
+4. Board member için "Bütün fabrikalar" toplam görünümü hangi ekranlarda
+   gerekli (OEE, kayıplar, KPI …)? Yoksa yalnızca fabrikaları yan yana
+   karşılaştırma yeterli mi?
+5. Aynı şirketin fabrikaları ortak bir şey paylaşsın mı (ör. master data,
+   malzeme kodları), yoksa hepsi tamamen ayrı mı?
+6. Kiralama bitince silmeden önce kaç gün beklensin?
+7. General grubuna kimi yalnızca sen ekleyebilirsin, yoksa her general başka
+   general ekleyebilir mi?
+8. Kim neyi gördü (yalnızca değiştirdi değil) kaydı tutulsun mu?
