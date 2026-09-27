@@ -21,12 +21,8 @@ export const PORTAL_MODULES: PortalModule[] = [
   {
     to: '/oee',
     title: 'OEE Trend and Losses',
-    description: 'OEE over time per press and the losses behind it.',
-    ready: false,
-    related: [
-      { to: '/performans', label: 'Performance (plan versus actual)' },
-      { to: '/gerceklesen', label: 'Actual production' },
-    ],
+    description: 'OEE over time per press and cost center, and the losses behind it.',
+    ready: true,
   },
   {
     to: '/die-followup',

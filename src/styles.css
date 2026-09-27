@@ -141,3 +141,27 @@
     scrollbar-width: thin;
   }
 }
+
+/* OEE grafikleri: kategorik renkler (dataviz referans paleti, sırası sabit). */
+.oee-viz {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+  --viz-7: #4a3aa7;
+  --viz-grid: #e4e3df;
+  --viz-axis: #52514e;
+}
+.dark .oee-viz {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-6: #008300;
+  --viz-7: #9085e9;
+  --viz-grid: #34332f;
+  --viz-axis: #c3c2b7;
+}

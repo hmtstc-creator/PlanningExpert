@@ -37,3 +37,15 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 
 Not: Eski "14 gün stok = acil" kuralının kodu kaldırıldı; acil tanımı stok
 projeksiyonundan gelir.
+
+## OEE (docs/oeedashboard.md) — karar: programda sabit (şimdilik)
+
+| # | Konu | Değer | Kodda |
+|---|---|---|---|
+| 29 | Masraf yeri adları | 51010171 Transfer, 51010173 Progressive, 51010172 APR | `src/lib/oee.ts` (COST_CENTERS) |
+| 30 | Vardiya kodu → vardiya | UB61/UB64 = 1, UB62/UB65 = 2, UB63/UB66 = 3 | `src/lib/oee.ts` (SHIFT_NUMBER) |
+| 31 | Kayıp grupları | KLP, STP, ARZ, KSD, KON, OFC, YNT, # ; Others = YNT + OFC + KON | `src/lib/oee.ts` (LOSS_GROUPS) |
+| 32 | Trend uzunluğu | 10 hafta | `src/routes/oee/*.tsx` (WEEKS) |
+| 33 | Listelerde ilk gösterilen | en kötü 10 kalıp, 15 neden | `src/routes/oee/losses.tsx` |
+| 34 | Duruş satırı okuma sınırı | bir sorguda en çok 8 gün | `convex/oee.ts` |
+

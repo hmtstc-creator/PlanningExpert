@@ -243,7 +243,61 @@ Cevaplar gelince buraya yazılacak.
     - Yanında **geçen haftanın** aynı değerleri: karşılaştırma, artış mı
       azalış mı görünür.
 
-## Açık sorular (ikinci tur)
+### Üçüncü tur (2026-09-27) — "programı düzelt"
+
+20. Tek dosyada 6 sayfa gelir; program gerekli olanları okur (Daily KPI
+    okunmaz, vardiyadan hesaplanır).
+21. PRS seçilince masraf yeri (Transfer / Progressive / tümü), APR seçilince
+    makine seçimi.
+22. Aylık ve 10 hafta grafiği seçilen masraf yerini gösterir; altında pres
+    bazında tablo.
+23. Karşılaştırma: hafta farkı (gap) pres ve masraf yeri bazında.
+24. Losses Trend sayfası: kayıp trendleri, en kötü kalıplar, setup detayları
+    (setup'tan sonra üretim başlamış mı, KLP girilmiş mi = onay alınamamış),
+    pres bazında listeler ve gelişmiş raporlar.
+
+## Uygulama (2026-09-27)
+
+Sayfalar (portaldaki "OEE Trend and Losses" kartı):
+- **/oee — OEE Dashboard**: üstte PRS/APR, masraf yeri/makine, tarih
+  (varsayılan dün), **Upload data** düğmesi. Kutular: seçilen gün, hafta,
+  geçen hafta (fark), kalite. Grafikler: aylık (Monthly KPI), son 10 hafta,
+  seçilen haftanın 21 vardiyası (Pzt-1 … Paz-3); her birinin altında pres
+  bazında tablo.
+- **/oee/losses — Losses Trend**: haftanın günlük % of Loading grafiği (OEE +
+  Die, Setup, Machine, Short, Others, Speed) ve tablo (hafta, geçen hafta,
+  gap); pres ve masraf yeri bazında hafta gap tablosu; 10 haftalık kayıp
+  trendi; en çok duruş nedenleri (geçen haftayla); MTTR / MTBF (makine ve
+  kalıp arızası); en kötü 10 kalıp (adet ağırlıklı OEE) ve en çok speed loss;
+  setup listesi ve pres özeti.
+- **/oee/data — Data**: yüklenen sayfalar dosyadaki sütun sırasıyla; formül
+  sütunları dosyadaki formülle (Order Based WEEK, TOTAL1; Downtimes Shift,
+  Week, material, min). Daily ve Weekly hesaplanmış hâliyle.
+
+Yükleme kuralı: dosyanın kapsadığı tarih aralığı eskisinin yerine geçer,
+daha eski tarihler kalır (geçmiş birikir). Haftalık satırlar hafta bazında,
+Monthly KPI komple yenilenir. Haftalık sayfalarda yıl yok: hafta, dosyadaki
+son vardiya tarihinin haftasından büyükse önceki yıla sayılır.
+
+Hafta değeri: yüklenen haftalık satır (Weekly KPI / Weekly KPI_fix) o hafta
+ve iş merkezi için varsa o; yoksa vardiyaların toplamı.
+
+Setup evresi (varsayım — onaylanacak): ilk setup (STP) duruşundan siparişin
+ilk kısa duruşuna (KSD) kadar; kısa duruş yalnızca pres çalışırken olur. Bu
+evredeki KLP = onay alınamadı; KON = onay süresi. Örnek (PRS-105, sipariş
+6586416): 07:55 setup, 08:46 kalite onayı, 09:07 KLP "BURR" 74 dk.
+Gerçek dosyada 39. hafta: 57 setup; ilk kurallı hâliyle (setup'tan sonraki
+her KLP) 36'sı "onaysız" çıkıyordu — üretim sırasındaki kalıp arızaları da
+sayıldığı için bu evre tanımına geçildi.
+
+Kod: `src/lib/oee.ts` (hesaplar), `src/lib/oeeStore.ts` (kayıt biçimi ve
+yükleme sırası), `convex/oee.ts`, `convex/oeeValidators.ts`,
+`src/routes/oee/*`, `src/components/OeeCharts.tsx`, `OeePanel.tsx`.
+Testler Excel hücreleriyle birebir: Progressive 21 ve 22 Eylül % of Loading
+(BoardReport satır 46–47), Transfer 39. hafta OEE (Weekly KPI / Losses_Follow
+B6; BoardReport AQ30'daki değer eski hesap), PRS-110 kalıp OEE (AH78).
+
+## Açık sorular (ikinci tur) — cevaplandı
 
 1. Ayrı indirilecek dosya(lar): yalnızca Shiftly KPI mı? Losses Trend için
    Downtimes da gerekir; Monthly KPI ve Weekly KPI_fix (geçmiş haftalar) bir
@@ -258,6 +312,9 @@ Cevaplar gelince buraya yazılacak.
    10 kalıp) olsun mu? Olursa Order Based dosyası da yüklenmeli.
 
 ## Bekleyen konular
+
+- Setup evresinin sonu = ilk kısa duruş (KSD) varsayımı planlamacıya
+  onaylatılacak.
 
 - Downtimes plansız duruş toplamı ile Shiftly Unscheduled Downtime farkı
   (medyan 7,9 dk/vardiya, en çok 163 dk) — ayrıca incelenecek.

@@ -41,6 +41,7 @@ Saf hesap kütüphanesi (src/lib/*.ts — React'e de Convex'e de bağlı değil)
   planValidator.ts          BAĞIMSIZ doğrulama (motorla hiçbir kodu paylaşmaz)
   settingsDefaults.ts       AYAR VARSAYILANLARININ TEK YERİ
   mutationErrors.ts         sunucu hatasını kullanıcı diline çevirme
+  oee.ts / oeeStore.ts      OEE: toplam ÷ toplam oranlar, kayıplar, setup; yükleme
   navigation.ts             menü + sayfalar arası kısayollar (RELATED_PAGES)
 ```
 
@@ -201,3 +202,6 @@ rm -rf convex/_generated .output
 | Work Calendar | `/takvim` | pres takvimi, mesai, tatil, duruş, ayarlar | Capacity Dashboard, Presses, Plan |
 | Storage Locations | `/depolar` | depo matrisi | Stock, Raw Material Coverage |
 | Performance | `/performans` | plan / gerçekleşen, kapasite katsayısı | Actuals, Plan |
+| OEE Dashboard | `/oee` | aylık, 10 hafta, haftanın vardiyaları; yükleme | Losses Trend, Data |
+| Losses Trend | `/oee/losses` | kayıplar, gap, kalıplar, MTTR/MTBF, setup | OEE Dashboard |
+| OEE Data | `/oee/data` | yüklenen sayfalar, dosya sırasıyla | OEE Dashboard |

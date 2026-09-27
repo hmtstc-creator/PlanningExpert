@@ -108,6 +108,15 @@ export const MODULE_NAVS: ModuleNav[] = [
       { to: '/machine-followup/reports', label: 'Reports', hint: 'Pareto by press and problem' },
     ],
   },
+  {
+    prefix: '/oee',
+    title: 'OEE Trend and Losses',
+    links: [
+      { to: '/oee', label: 'OEE Dashboard', hint: 'Monthly, 10 weeks and the selected week' },
+      { to: '/oee/losses', label: 'Losses Trend', hint: 'Losses, dies, breakdowns and setups' },
+      { to: '/oee/data', label: 'Data', hint: 'The uploaded sheets, as in the file' },
+    ],
+  },
 ]
 
 export function moduleNavFor(pathname: string): ModuleNav | undefined {

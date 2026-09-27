@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
+import { downtimeDayFields, lossDayFields, monthlyFields, orderFields, shiftFields, weeklyFields } from './oeeValidators'
 
 export default defineSchema({
   // @deprecated kaldırıldı, sadece eski sözleşme uyumluluğu için tutuluyor
@@ -586,6 +587,24 @@ export default defineSchema({
     .index('by_material', ['material'])
     .index('by_date', ['postingDate'])
     .index('by_uploadedAt', ['uploadedAt']),
+
+  // ---- OEE Trend and Losses (docs/oeedashboard.md) ----
+  oeeShifts: defineTable(shiftFields)
+    .index('by_date', ['date'])
+    .index('by_key', ['date', 'workCenter', 'shiftGroup']),
+  oeeOrders: defineTable(orderFields).index('by_date', ['date']),
+  oeeWeekly: defineTable(weeklyFields).index('by_week', ['year', 'week']),
+  oeeMonthly: defineTable(monthlyFields),
+  oeeDowntimeDays: defineTable(downtimeDayFields).index('by_date', ['date']),
+  oeeLossDays: defineTable(lossDayFields).index('by_date', ['date']),
+  oeeImports: defineTable({
+    fileName: v.string(),
+    uploadedAt: v.number(),
+    uploadedBy: v.optional(v.string()),
+    /** [sayfa, tür, satır] */
+    sheets: v.array(v.array(v.union(v.string(), v.number()))),
+    ranges: v.array(v.array(v.string())),
+  }).index('by_uploadedAt', ['uploadedAt']),
 
   changeLog: defineTable({
     title: v.string(),

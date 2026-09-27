@@ -20,7 +20,6 @@ import { Route as KalipproblemRouteImport } from './routes/kalipproblem'
 import { Route as KayitlarRouteImport } from './routes/kayitlar'
 import { Route as KpiRouteImport } from './routes/kpi'
 import { Route as MakinelerRouteImport } from './routes/makineler'
-import { Route as OeeRouteImport } from './routes/oee'
 import { Route as PerformansRouteImport } from './routes/performans'
 import { Route as PlanlamaRouteImport } from './routes/planlama'
 import { Route as PlanlogicRouteImport } from './routes/planlogic'
@@ -41,6 +40,9 @@ import { Route as MachineFollowupIndexRouteImport } from './routes/machine-follo
 import { Route as MachineFollowupBreakdownsRouteImport } from './routes/machine-followup/breakdowns'
 import { Route as MachineFollowupMaintenanceRouteImport } from './routes/machine-followup/maintenance'
 import { Route as MachineFollowupReportsRouteImport } from './routes/machine-followup/reports'
+import { Route as OeeIndexRouteImport } from './routes/oee/index'
+import { Route as OeeDataRouteImport } from './routes/oee/data'
+import { Route as OeeLossesRouteImport } from './routes/oee/losses'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -95,11 +97,6 @@ const KpiRoute = KpiRouteImport.update({
 const MakinelerRoute = MakinelerRouteImport.update({
   id: '/makineler',
   path: '/makineler',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OeeRoute = OeeRouteImport.update({
-  id: '/oee',
-  path: '/oee',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PerformansRoute = PerformansRouteImport.update({
@@ -204,6 +201,21 @@ const MachineFollowupReportsRoute = MachineFollowupReportsRouteImport.update({
   path: '/machine-followup/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OeeIndexRoute = OeeIndexRouteImport.update({
+  id: '/oee/',
+  path: '/oee/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OeeDataRoute = OeeDataRouteImport.update({
+  id: '/oee/data',
+  path: '/oee/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OeeLossesRoute = OeeLossesRouteImport.update({
+  id: '/oee/losses',
+  path: '/oee/losses',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -217,7 +229,6 @@ export interface FileRoutesByFullPath {
   '/kayitlar': typeof KayitlarRoute
   '/kpi': typeof KpiRoute
   '/makineler': typeof MakinelerRoute
-  '/oee': typeof OeeRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
   '/planlogic': typeof PlanlogicRoute
@@ -236,8 +247,11 @@ export interface FileRoutesByFullPath {
   '/machine-followup/breakdowns': typeof MachineFollowupBreakdownsRoute
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
+  '/oee/data': typeof OeeDataRoute
+  '/oee/losses': typeof OeeLossesRoute
   '/die-followup/': typeof DieFollowupIndexRoute
   '/machine-followup/': typeof MachineFollowupIndexRoute
+  '/oee/': typeof OeeIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -251,7 +265,6 @@ export interface FileRoutesByTo {
   '/kayitlar': typeof KayitlarRoute
   '/kpi': typeof KpiRoute
   '/makineler': typeof MakinelerRoute
-  '/oee': typeof OeeRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
   '/planlogic': typeof PlanlogicRoute
@@ -270,8 +283,11 @@ export interface FileRoutesByTo {
   '/machine-followup/breakdowns': typeof MachineFollowupBreakdownsRoute
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
+  '/oee/data': typeof OeeDataRoute
+  '/oee/losses': typeof OeeLossesRoute
   '/die-followup': typeof DieFollowupIndexRoute
   '/machine-followup': typeof MachineFollowupIndexRoute
+  '/oee': typeof OeeIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -286,7 +302,6 @@ export interface FileRoutesById {
   '/kayitlar': typeof KayitlarRoute
   '/kpi': typeof KpiRoute
   '/makineler': typeof MakinelerRoute
-  '/oee': typeof OeeRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
   '/planlogic': typeof PlanlogicRoute
@@ -305,8 +320,11 @@ export interface FileRoutesById {
   '/machine-followup/breakdowns': typeof MachineFollowupBreakdownsRoute
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
+  '/oee/data': typeof OeeDataRoute
+  '/oee/losses': typeof OeeLossesRoute
   '/die-followup/': typeof DieFollowupIndexRoute
   '/machine-followup/': typeof MachineFollowupIndexRoute
+  '/oee/': typeof OeeIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -322,7 +340,6 @@ export interface FileRouteTypes {
     | '/kayitlar'
     | '/kpi'
     | '/makineler'
-    | '/oee'
     | '/performans'
     | '/planlama'
     | '/planlogic'
@@ -341,8 +358,11 @@ export interface FileRouteTypes {
     | '/machine-followup/breakdowns'
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
+    | '/oee/data'
+    | '/oee/losses'
     | '/die-followup/'
     | '/machine-followup/'
+    | '/oee/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -356,7 +376,6 @@ export interface FileRouteTypes {
     | '/kayitlar'
     | '/kpi'
     | '/makineler'
-    | '/oee'
     | '/performans'
     | '/planlama'
     | '/planlogic'
@@ -375,8 +394,11 @@ export interface FileRouteTypes {
     | '/machine-followup/breakdowns'
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
+    | '/oee/data'
+    | '/oee/losses'
     | '/die-followup'
     | '/machine-followup'
+    | '/oee'
   id:
     | '__root__'
     | '/'
@@ -390,7 +412,6 @@ export interface FileRouteTypes {
     | '/kayitlar'
     | '/kpi'
     | '/makineler'
-    | '/oee'
     | '/performans'
     | '/planlama'
     | '/planlogic'
@@ -409,8 +430,11 @@ export interface FileRouteTypes {
     | '/machine-followup/breakdowns'
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
+    | '/oee/data'
+    | '/oee/losses'
     | '/die-followup/'
     | '/machine-followup/'
+    | '/oee/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -425,7 +449,6 @@ export interface RootRouteChildren {
   KayitlarRoute: typeof KayitlarRoute
   KpiRoute: typeof KpiRoute
   MakinelerRoute: typeof MakinelerRoute
-  OeeRoute: typeof OeeRoute
   PerformansRoute: typeof PerformansRoute
   PlanlamaRoute: typeof PlanlamaRoute
   PlanlogicRoute: typeof PlanlogicRoute
@@ -444,8 +467,11 @@ export interface RootRouteChildren {
   MachineFollowupBreakdownsRoute: typeof MachineFollowupBreakdownsRoute
   MachineFollowupMaintenanceRoute: typeof MachineFollowupMaintenanceRoute
   MachineFollowupReportsRoute: typeof MachineFollowupReportsRoute
+  OeeDataRoute: typeof OeeDataRoute
+  OeeLossesRoute: typeof OeeLossesRoute
   DieFollowupIndexRoute: typeof DieFollowupIndexRoute
   MachineFollowupIndexRoute: typeof MachineFollowupIndexRoute
+  OeeIndexRoute: typeof OeeIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -525,13 +551,6 @@ declare module '@tanstack/react-router' {
       path: '/makineler'
       fullPath: '/makineler'
       preLoaderRoute: typeof MakinelerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/oee': {
-      id: '/oee'
-      path: '/oee'
-      fullPath: '/oee'
-      preLoaderRoute: typeof OeeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/performans': {
@@ -674,6 +693,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MachineFollowupReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oee/': {
+      id: '/oee/'
+      path: '/oee'
+      fullPath: '/oee/'
+      preLoaderRoute: typeof OeeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oee/data': {
+      id: '/oee/data'
+      path: '/oee/data'
+      fullPath: '/oee/data'
+      preLoaderRoute: typeof OeeDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oee/losses': {
+      id: '/oee/losses'
+      path: '/oee/losses'
+      fullPath: '/oee/losses'
+      preLoaderRoute: typeof OeeLossesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -689,7 +729,6 @@ const rootRouteChildren: RootRouteChildren = {
   KayitlarRoute: KayitlarRoute,
   KpiRoute: KpiRoute,
   MakinelerRoute: MakinelerRoute,
-  OeeRoute: OeeRoute,
   PerformansRoute: PerformansRoute,
   PlanlamaRoute: PlanlamaRoute,
   PlanlogicRoute: PlanlogicRoute,
@@ -708,8 +747,11 @@ const rootRouteChildren: RootRouteChildren = {
   MachineFollowupBreakdownsRoute: MachineFollowupBreakdownsRoute,
   MachineFollowupMaintenanceRoute: MachineFollowupMaintenanceRoute,
   MachineFollowupReportsRoute: MachineFollowupReportsRoute,
+  OeeDataRoute: OeeDataRoute,
+  OeeLossesRoute: OeeLossesRoute,
   DieFollowupIndexRoute: DieFollowupIndexRoute,
   MachineFollowupIndexRoute: MachineFollowupIndexRoute,
+  OeeIndexRoute: OeeIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
