@@ -256,22 +256,76 @@ değil. Başlangıçta gerek yok.
 - Kim neyi değiştirdi kaydı şirket bazında (bugünkü değişiklik kaydının
   genişlemiş hâli).
 
-## Açık sorular (v2)
+## Kararlar (2026-09-27, ikinci tur)
 
-1. Bir alt şirket = bir fabrika mı, yoksa bir alt şirketin birden çok
-   fabrikası olabilir mi?
-2. Creator iki seviyede mi olsun (şirket creator'ı + fabrika creator'ı), yoksa
-   yalnızca şirket seviyesinde mi?
-3. Ekran izinleri modül bazında mı (4 modül), yoksa ekran bazında mı (~20
-   ekran: plan, kapasite, hammadde, SAP yükleme, master data, pres, takvim,
-   depo, performans, OEE dashboard/kayıp/veri/ayar, kalıp, makine,
-   kullanıcılar …)?
-4. Board member için "Bütün fabrikalar" toplam görünümü hangi ekranlarda
-   gerekli (OEE, kayıplar, KPI …)? Yoksa yalnızca fabrikaları yan yana
-   karşılaştırma yeterli mi?
-5. Aynı şirketin fabrikaları ortak bir şey paylaşsın mı (ör. master data,
-   malzeme kodları), yoksa hepsi tamamen ayrı mı?
-6. Kiralama bitince silmeden önce kaç gün beklensin?
-7. General grubuna kimi yalnızca sen ekleyebilirsin, yoksa her general başka
-   general ekleyebilir mi?
-8. Kim neyi gördü (yalnızca değiştirdi değil) kaydı tutulsun mu?
+12. Alt şirket = fabrika; alt şirketin altında ayrıca fabrika seviyesi yok.
+13. Creator yalnızca **şirket** seviyesinde.
+14. İzinler **modül bazında**: PlanningExpert, OEE, Die Follow-up, Machine
+    Follow-up — her biri için *yok · görür · düzenler*.
+15. Board member için fabrikaları **yan yana karşılaştırma** ekranı yapılacak;
+    içeriği sonra konuşulacak.
+16. Aynı şirketin fabrikaları hiçbir şey paylaşmaz (master data, malzeme
+    kodları, ayarlar ayrı).
+17. Kiralama bitince silmeden önce **90 gün**.
+18. General grubuna **yalnızca site sahibi** üye ekler.
+19. "Kim neyi gördü" kaydı tutulmaz (değişiklik kaydı kalır).
+
+## Son taslak (v3)
+
+### Seviyeler ve roller
+
+```
+Platform — General grubu (site sahibi + onun eklediği generaller)
+ └─ Şirket — creator(lar)
+     └─ Fabrika (= alt şirket) — veri burada durur
+```
+
+| Kim | Nerede tanımlanır | Kapsam | Yetki |
+|---|---|---|---|
+| Site sahibi | ilk kurulum | her şey | General ekler / çıkarır + general yetkileri |
+| General | site sahibi ekler | bütün şirketler | şirket ve fabrika açar, askıya alır, modül açar/kapar, creator atar, her şeyi görür |
+| Creator | general atar; creator başka creator atayabilir | kendi şirketinin bütün fabrikaları | fabrika ekler/kurar, kullanıcı açar (geçici şifre), grup tanımlar, bütün modüllerde düzenler |
+| Grup üyesi | creator ekler | grubun fabrikaları | grubun modül izinleri |
+
+### Kullanıcı grubu
+
+- **Ad** (ör. "Board members", "Romanya — planlama mühendisleri").
+- **Fabrikalar:** "şirketin bütün fabrikaları" ya da seçilen fabrikalar.
+- **Modül izinleri:** PlanningExpert · OEE · Die Follow-up · Machine
+  Follow-up → yok / görür / düzenler.
+- Bir kişi birden çok grupta olabilir; her fabrika ve modül için en geniş
+  izin geçerli.
+- "Bütün fabrikalar" kapsamı, sonradan eklenen fabrikayı da otomatik kapsar.
+
+### Modül lisansı
+
+- General, şirket için hangi modüllerin açık olduğunu belirler (fabrika bazında
+  kapatılabilir). Kapalı modül kimseye görünmez; grup izni ne olursa olsun.
+
+### Kiralama bitişi
+
+1. General şirketi **askıya alır** → herkes salt okunur görür, yükleme ve
+   plan hesabı durur.
+2. **Dışa aktarım:** şirketin bütün verisi indirilebilir.
+3. **90 gün** sonra kalıcı silme (general onaylı; geri alınamaz).
+
+### Uygulama aşamaları (her aşama ayrı "programı düzelt" ve commit)
+
+1. **Çekirdek:** `companies`, `plants`, `memberships`/`groups`, oturumda aktif
+   fabrika, fabrikaya kilitli veri erişimi, izin denetimi, iki şirketli
+   güvenlik testi. Bugünkü bütün veri → "Şirket 1 / Fabrika 1"; site sahibi =
+   General + creator. (Görünür değişiklik yok.)
+2. **Modüller fabrika anahtarına geçer:** PlanningExpert (plan, SAP, takvim,
+   master data, depolar, performans …), OEE, Die / Machine Follow-up. Tek
+   kayıtlık ayarlar fabrika başına.
+3. **Plan motoru ve zamanlayıcı fabrika başına.**
+4. **Ekranlar:** fabrika seçici, izne göre menü, General paneli (şirket /
+   fabrika / modül / creator), creator paneli (kullanıcı, geçici şifre, grup).
+5. **Hard coding temizliği + kurulum listesi** (ülke, saat dilimi, depolar,
+   hol, ilk kullanıcı).
+6. **Askıya alma, dışa aktarım, 90 gün silme.**
+7. **Fabrika karşılaştırma ekranı** (içeriği ayrıca konuşulacak).
+
+## Açık sorular (v3)
+
+- Karşılaştırma ekranının içeriği (7. aşamadan önce konuşulacak).
