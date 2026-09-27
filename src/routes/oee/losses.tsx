@@ -16,7 +16,11 @@ import {
   costCentersOf,
   dieTable,
   isoWeek,
+  inScope,
+  lossBreakdown,
   lossForPeriod,
+  sumTimes,
+  weekTimesByWorkCenter,
   reasonPareto,
   reliability,
   scopeLabel,
@@ -27,6 +31,7 @@ import {
   type SetupRow,
   type SetupStatus,
   type ShiftRow,
+  type WeeklyRow,
 } from '../../lib/oee'
 import { fromStoredDay, fromStoredLoss, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
 
@@ -53,6 +58,7 @@ function LossesPage() {
   const trendFrom = addDaysIso(sel.monday, -7 * (WEEKS - 1))
   const prevMonday = addDaysIso(sel.monday, -7)
   const shifts = (useQuery(api.oee.shifts, { from: trendFrom, to: sel.sunday }) ?? []) as ShiftRow[]
+  const periods = useQuery(api.oee.periods) as { weekly: WeeklyRow[] } | undefined
   const lossRaw = (useQuery(api.oee.lossDays, { from: trendFrom, to: sel.sunday }) ?? []) as StoredLossDay[]
   const orders = (useQuery(api.oee.orders, { from: prevMonday, to: sel.sunday }) ?? []) as OrderRow[]
   // Pazar gecesi biten setup'ın ilk üretim saati Pazartesiye taşabilir: bir gün fazla.
@@ -72,13 +78,20 @@ function LossesPage() {
   )
   const weekCur = lossForPeriod(shifts, lossDays, scope, sel.monday, sel.sunday)
   const weekPrev = lossForPeriod(shifts, lossDays, scope, prevMonday, addDaysIso(prevMonday, 6))
+  const weekTimes = useMemo(() => weekTimesByWorkCenter(shifts, periods?.weekly ?? []), [shifts, periods])
   const trend = useMemo(
     () =>
       Array.from({ length: WEEKS }, (_, i) => {
         const monday = addDaysIso(sel.monday, -7 * (WEEKS - 1 - i))
-        return { label: `W${isoWeek(monday).week}`, b: lossForPeriod(shifts, lossDays, scope, monday, addDaysIso(monday, 6)) }
+        const { year, week } = isoWeek(monday)
+        const end = addDaysIso(monday, 6)
+        // Hafta süreleri: arşiv / yüklenen hafta ya da vardiyalar (OEE Dashboard ile aynı).
+        const times = sumTimes([...weekTimes.values()].filter((w) => w.year === year && w.week === week && inScope(w, scope)).map((w) => w.times))
+        const days = lossDays.filter((d) => d.date >= monday && d.date <= end && inScope(d, scope))
+        // Duruş verisi olmayan haftada yalnızca Speed bilinir (arşivden); gruplar boş kalır.
+        return { label: `W${week}`, b: lossBreakdown(times, days), hasDowntime: days.length > 0 }
       }),
-    [shifts, lossDays, scope, sel.monday],
+    [weekTimes, lossDays, scope, sel.monday],
   )
   const gap = useMemo(() => weekGap(shifts, lossDays, scope, sel.monday), [shifts, lossDays, scope, sel.monday])
   const reasons = useMemo(() => reasonPareto(lossDays, scope, sel.monday), [lossDays, scope, sel.monday])
@@ -206,7 +219,10 @@ function LossesPage() {
         </div>
       </Section>
 
-      <Section title={`Loss trend — last ${WEEKS} weeks · ${label}`}>
+      <Section
+        title={`Loss trend — last ${WEEKS} weeks · ${label}`}
+        info="Weeks before the downtime data starts come from the Weekly KPI_fix archive: only Speed is known there (Production − Operation); the downtime groups start with the uploaded Downtimes."
+      >
         <Legend items={LOSS_CHART_GROUPS.map((g, i) => ({ ...g, slot: i + 1 }))} />
         <LineTrendChart
           labels={trend.map((t) => t.label)}
@@ -215,7 +231,7 @@ function LossesPage() {
             label: g.label,
             // Yığılmış grafikte 1. renk OEE'nin; kayıplar aynı renkleri korur.
             slot: i + 1,
-            values: trend.map((t) => (t.b.loadingMin > 0 ? chartShare(t.b, g.key) : null)),
+            values: trend.map((t) => (t.b.loadingMin > 0 && (t.hasDowntime || g.key === 'speed') ? chartShare(t.b, g.key) : null)),
           }))}
           ariaLabel="Weekly loss trend"
         />

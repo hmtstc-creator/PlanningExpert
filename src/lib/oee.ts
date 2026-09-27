@@ -111,6 +111,8 @@ export interface WeeklyRow extends OeeTimes {
   quality: number
   performance: number
   oee: number
+  /** 'archive' = Weekly KPI_fix (geçmiş haftalar arşivi); yoksa Weekly KPI. */
+  source?: 'archive' | 'weekly'
 }
 
 export interface MonthlyRow extends OeeTimes {
@@ -336,6 +338,49 @@ export function weekTimesByWorkCenter(
   }
   for (const [key, value] of uploaded) out.set(key, value)
   return out
+}
+
+/** Programdaki Weekly KPI_fix arşivi (src/lib/oeeWeeklyArchive.ts) → satırlar. */
+export function archiveRows(data: (string | number)[][], year: number): WeeklyRow[] {
+  const n = (v: string | number) => (typeof v === 'number' ? v : Number(v) || 0)
+  return data.map((r) => ({
+    year,
+    week: n(r[0]),
+    plantKey: String(r[1]),
+    responsible: String(r[2]),
+    costCenter: String(r[3]),
+    workCenter: String(r[4]),
+    good: n(r[5]),
+    scrap: n(r[6]),
+    reject: n(r[7]),
+    scheduledSec: n(r[8]),
+    scheduledMin: n(r[9]),
+    unscheduledMin: n(r[10]),
+    operatingMin: n(r[11]),
+    productionMin: n(r[12]),
+    loadingMin: n(r[13]),
+    availability: n(r[14]),
+    quality: n(r[15]),
+    performance: n(r[16]),
+    oee: n(r[17]),
+    source: 'archive',
+  }))
+}
+
+/**
+ * Haftalık satırların birleşimi. Öncelik (yüksekten düşüğe): yüklenen
+ * Weekly KPI_fix (arşiv düzeltmesi) > programdaki arşiv > yüklenen Weekly
+ * KPI. Arşivde olan bir hafta yeni yüklemeyle silinmez ya da ezilmez;
+ * arşivde olmayan haftalar yüklenen Weekly KPI'dan (o da yoksa vardiyadan).
+ */
+export function mergeWeekly(archive: WeeklyRow[], uploaded: WeeklyRow[]): WeeklyRow[] {
+  const key = (r: WeeklyRow) => `${r.year}|${r.week}|${r.workCenter}`
+  const out = new Map<string, WeeklyRow>()
+  const archivedWeeks = new Set(archive.map((r) => `${r.year}|${r.week}`))
+  for (const r of uploaded) if (r.source !== 'archive' && !archivedWeeks.has(`${r.year}|${r.week}`)) out.set(key(r), r)
+  for (const r of archive) out.set(key(r), r)
+  for (const r of uploaded) if (r.source === 'archive') out.set(key(r), r)
+  return [...out.values()]
 }
 
 /** Son n hafta (seçilen hafta dahil), kapsamın toplamı ve iş merkezi başına. */
@@ -1045,8 +1090,10 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
     ...TIME_COLS,
   ]
 
-  // Aynı hafta iki sayfada varsa (Weekly KPI ve Weekly KPI_fix) "Weekly KPI" geçerlidir.
-  const weeklySheets = [...(byKind.get('weekly') ?? [])].sort(([a], [b]) => (a.toLowerCase() === 'weekly kpi' ? 1 : 0) - (b.toLowerCase() === 'weekly kpi' ? 1 : 0))
+  // Aynı hafta iki sayfada varsa Weekly KPI_fix (arşiv) geçerlidir: Weekly KPI'ın
+  // ilk haftası yarım olabiliyor (ör. 36. hafta 31 Ağustos'suz), arşiv tamdır.
+  const isArchive = (name: string) => name.trim().toLowerCase() === 'weekly kpi_fix'
+  const weeklySheets = [...(byKind.get('weekly') ?? [])].sort(([a], [b]) => (isArchive(a) ? 1 : 0) - (isArchive(b) ? 1 : 0))
   const weekly = new Map<string, WeeklyRow>()
   for (const [name, rows] of weeklySheets) {
     const r = reader(rows[0] ?? [], [{ key: 'week', names: ['Week'] }, ...periodCols])
@@ -1066,6 +1113,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         workCenter: wc,
         scheduledSec: num(r.get(row, 'schedSec')),
         ...timesFrom(r.get, row),
+        source: isArchive(name) ? 'archive' : 'weekly',
       })
       n++
     }

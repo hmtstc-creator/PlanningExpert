@@ -37,7 +37,7 @@ type SheetId = 'shiftly' | 'daily' | 'weekly' | 'monthly' | 'orders' | 'downtime
 const SHEETS: { id: SheetId; label: string; note: string }[] = [
   { id: 'shiftly', label: 'Shiftly KPI', note: 'as uploaded · selected week' },
   { id: 'daily', label: 'Daily KPI', note: 'calculated from Shiftly KPI · selected week' },
-  { id: 'weekly', label: 'Weekly KPI', note: 'uploaded weeks, otherwise calculated from Shiftly KPI · selected week' },
+  { id: 'weekly', label: 'Weekly KPI', note: 'archive (Weekly KPI_fix) or uploaded weeks, otherwise calculated from Shiftly KPI · selected week' },
   { id: 'monthly', label: 'Monthly KPI', note: 'as uploaded' },
   { id: 'orders', label: 'Shiftly Order Based KPI', note: 'as uploaded · selected week · WEEK and TOTAL1 by the file formulas' },
   { id: 'downtimes', label: 'Downtimes', note: 'as uploaded · selected day · Shift, Week, material, min by the file formulas' },
@@ -99,13 +99,13 @@ function OeeDataPage() {
     if (sheet === 'weekly') {
       const { year, week } = isoWeek(sel.monday)
       const all = weekTimesByWorkCenter(shifts, periods?.weekly ?? [])
-      const uploaded = new Set((periods?.weekly ?? []).filter((w) => w.year === year && w.week === week).map((w) => w.workCenter))
+      const source = new Map((periods?.weekly ?? []).filter((w) => w.year === year && w.week === week).map((w) => [w.workCenter, w.source === 'archive' ? 'archive (Weekly KPI_fix)' : 'uploaded (Weekly KPI)']))
       return {
         head: ['Week', 'Cost Center - Key', 'Work Center', 'Source', ...PERIOD_HEAD],
         rows: [...all.values()]
           .filter((w) => w.year === year && w.week === week && inScope(w, scope))
           .sort((a, b) => a.workCenter.localeCompare(b.workCenter))
-          .map((w) => [w.week, w.costCenter, w.workCenter, uploaded.has(w.workCenter) ? 'uploaded' : 'calculated', ...periodCells(w.times)]),
+          .map((w) => [w.week, w.costCenter, w.workCenter, source.get(w.workCenter) ?? 'calculated (Shiftly KPI)', ...periodCells(w.times)]),
       }
     }
     if (sheet === 'monthly') {

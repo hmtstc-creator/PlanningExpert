@@ -160,3 +160,24 @@ describe('oee store and import', () => {
     expect(chunkBySize([1, 2, 3], 1_000_000, 2)).toEqual([[1, 2], [3]])
   })
 })
+
+describe('weekly archive (Weekly KPI_fix)', () => {
+  it('is kept in the program and wins over a partial uploaded week', async () => {
+    const { WEEKLY_ARCHIVE, WEEKLY_ARCHIVE_YEAR } = await import('./oeeWeeklyArchive')
+    const { archiveRows, mergeWeekly } = await import('./oee')
+    const archive = archiveRows(WEEKLY_ARCHIVE, WEEKLY_ARCHIVE_YEAR)
+    expect(archive.length).toBe(629)
+    // Weekly KPI_fix, 36. hafta PRS-106 Loading 6481,85 dk; Weekly KPI'da (yarım hafta) 5127,68.
+    const partial = { ...archive.find((r) => r.week === 36 && r.workCenter === 'PRS-106')!, loadingMin: 5127.68, source: 'weekly' as const }
+    const later = { ...partial, week: 38, source: 'weekly' as const }
+    const merged = mergeWeekly(archive, [partial, later])
+    expect(merged.find((r) => r.week === 36 && r.workCenter === 'PRS-106')!.loadingMin).toBeCloseTo(6481.85, 2)
+    expect(merged.find((r) => r.week === 38 && r.workCenter === 'PRS-106')!.loadingMin).toBeCloseTo(5127.68, 2)
+    // Yüklenen yeni bir Weekly KPI_fix arşivi düzeltir.
+    const fix = { ...partial, loadingMin: 7000, source: 'archive' as const }
+    expect(mergeWeekly(archive, [fix]).find((r) => r.week === 36 && r.workCenter === 'PRS-106')!.loadingMin).toBe(7000)
+    // Arşivli hafta dashboard'da görünür (Transfer 30. hafta).
+    const w = weeklyTrend([], merged, { area: 'PRS', key: '51010171' }, mondayOfWeek(2026, 30), 1)
+    expect(w.weeks[0].oee).not.toBeNull()
+  })
+})

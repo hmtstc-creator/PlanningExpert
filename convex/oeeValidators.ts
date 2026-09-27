@@ -53,6 +53,8 @@ export const weeklyFields = {
   workCenter: v.string(),
   scheduledSec: v.number(),
   ...timeFields,
+  /** 'archive' = Weekly KPI_fix, 'weekly' = Weekly KPI. */
+  source: v.optional(v.union(v.literal('archive'), v.literal('weekly'))),
 }
 
 export const monthlyFields = {

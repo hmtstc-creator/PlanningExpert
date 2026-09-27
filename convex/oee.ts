@@ -9,6 +9,8 @@ import {
   shiftFields,
   weeklyFields,
 } from './oeeValidators'
+import { archiveRows, mergeWeekly } from '../src/lib/oee'
+import { WEEKLY_ARCHIVE, WEEKLY_ARCHIVE_YEAR } from '../src/lib/oeeWeeklyArchive'
 
 /**
  * OEE Trend and Losses — veri. Planlamacı sistemden indirdiği dosyayı
@@ -211,10 +213,14 @@ export const orders = guardedQuery({
 })
 
 /** Yüklenmiş haftalık satırlar (Weekly KPI / Weekly KPI_fix) ve aylık. */
+/**
+ * Haftalık (programdaki Weekly KPI_fix arşivi + yüklenenler, bkz.
+ * mergeWeekly) ve aylık satırlar.
+ */
 export const periods = guardedQuery({
   args: {},
   handler: async (ctx: Ctx) => ({
-    weekly: (await ctx.db.query('oeeWeekly').collect()).map(strip),
+    weekly: mergeWeekly(archiveRows(WEEKLY_ARCHIVE, WEEKLY_ARCHIVE_YEAR), (await ctx.db.query('oeeWeekly').collect()).map(strip)),
     monthly: (await ctx.db.query('oeeMonthly').collect()).map(strip),
   }),
 })

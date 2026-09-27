@@ -331,6 +331,19 @@ Gerçek veri (1–25 Eylül):
 - APR: 656 setup → 258 OK, 398 NOK; 343'ünde neden "sonraki setup geldi"
   (APR'de siparişler kısa, 1 saat dolmadan sıradaki setup başlıyor).
 
+### Haftalık arşiv (2026-09-27, planlamacı: "geçmiş haftaları Weekly KPI_fix'ten arşive al")
+
+- Weekly KPI_fix'in 629 satırı (2026, 2–37. haftalar; 33. hafta dosyada yok)
+  programın içinde kalıcı arşiv: `src/lib/oeeWeeklyArchive.ts`. Yükleme
+  gerekmez, yeni yüklemeler silmez.
+- Öncelik: yüklenen Weekly KPI_fix (arşiv düzeltmesi) > programdaki arşiv >
+  yüklenen Weekly KPI > vardiyalardan hesap. Arşivde olan hafta Weekly KPI
+  ile ezilmez: Weekly KPI'ın ilk haftası yarım gelebiliyor (36. hafta, 31
+  Ağustos yok; PRS-106 Loading 5 128 dk, arşivde 6 482 dk).
+- Losses Trend'in 10 haftalık grafiğinde arşiv haftaları için yalnızca Speed
+  gösterilir (Production − Operation); duruş grupları Downtimes yüklenen
+  haftalardan başlar.
+
 ## Bekleyen konular
 
 - APR için 1 saat kuralı uygun mu (kısa siparişler)? Planlamacıya sorulacak.
