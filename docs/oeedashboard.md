@@ -191,6 +191,41 @@ Cevaplar gelince buraya yazılacak.
 15. İş merkezi adları (PRS-106 …) Press Definitions'taki pres adlarıyla aynı —
     eşleştirme ada göre mi yapılsın?
 
-## Kararlar
+## Kararlar (2026-09-27, planlamacının cevapları)
 
-(henüz yok)
+1. Sekmeler doğru: Shiftly Order Based KPI ve Downtimes (1).
+2. Weekly KPI_fix de alınır (geçmiş haftalar).
+3. Monthly KPI olduğu gibi gösterilir (eksik aylar hesaplanmaz). Monthly komple
+   yüklenebilir.
+4. Az yükleme: planlamacı yalnızca Shiftly'yi yükleyebilmeli; Daily ve Weekly
+   program tarafından Shiftly'den hesaplanır (toplam ÷ toplam).
+   - Kontrol: Daily = günün vardiya toplamı (230/230). Weekly = ISO haftanın
+     vardiya toplamı — Shiftly'nin haftanın tamamını kapsadığı 38 ve 39.
+     haftalarda 19/19 birebir; 37. hafta dosyada yarım (10–12 Eylül), o yüzden
+     farklı. Sonuç: geçmiş birikirse (her yükleme eskiyi silmezse) haftalar
+     tam olur.
+5. İki seçim: **PRS** ve **APR**. Hesap ve mantık aynı; APR'de hepsi aynı
+   masraf yerinde (51010172) olduğundan makine (iş merkezi) bazlı gösterilir.
+6. Pres grupları Excel'deki cost center'dan: 51010171 Transfer, 51010173
+   Progressive (APR 51010172).
+7. Performance %100 üstü olduğu gibi kalır.
+8. Kalıp OEE'si adet ağırlıklı (ΣOEE×Good ÷ ΣGood, dosyadaki TOTAL1) —
+   dosyadaki gibi.
+9. Kayıp grubu adları programda sabit (ileride tabloya ayrılabilir).
+10. Downtimes ile Shiftly plansız duruş farkı grafikte gösterilmez —
+    **ayrıca incelenecek** (bekleyen konu).
+11. Grafikler:
+    - Masraf yeri bazlı OEE — 3 grafik.
+    - Aylık ve haftalık — 2 grafik.
+    - Tarih seçilir; seçilen tarihin haftasının trendi (BoardReport'taki gibi).
+12. OEE hedefi yok.
+13. Varsayılan gün: dün; tarih seçilebilir.
+14. Portaldaki **"OEE Trend and Losses"** kartına (/oee) basınca dashboard
+    açılır; veri yükleme için basit bir buton.
+15. İş merkezi adı = Press Definitions'taki pres adı (PRS-106 …), ada göre
+    eşleşir.
+
+## Bekleyen konular
+
+- Downtimes plansız duruş toplamı ile Shiftly Unscheduled Downtime farkı
+  (medyan 7,9 dk/vardiya, en çok 163 dk) — ayrıca incelenecek.
