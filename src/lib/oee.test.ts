@@ -13,6 +13,7 @@ import {
   lossDayOf,
   lossForPeriod,
   mondayOfWeek,
+  mondayStartProblem,
   parseOeeWorkbook,
   ratios,
   setupAnalysis,
@@ -211,14 +212,12 @@ describe('oee workbook', () => {
     expect(setupAnalysis([day], [], { area: 'PRS', key: 'all' }, { ...plant, setupTexts: [] }, '2026-09-21', '2026-09-21')).toEqual([])
   })
 
-  it('weekly and monthly sheets get their year from the latest date in the file', () => {
+  it('weekly year from the latest date; monthly year from its Year column', () => {
+    const shiftly = (fixture as unknown as Record<string, SheetRows>)['Shiftly KPI']
+    const monthHead = ['Year', 'Month', 'Month Key', 'Plant - Key', 'Production Responsible', 'Cost Center - Key', 'Work Center', 'Scheduled Downtime', 'Loading Time(Min)']
     const p = parseOeeWorkbook({
-      'Shiftly KPI': (fixture as unknown as Record<string, SheetRows>)['Shiftly KPI'],
-      'Monthly KPI': [
-        ['Month', 'Month Key', 'Plant - Key', 'Production Responsible', 'Cost Center - Key', 'Work Center', 'Loading Time(Min)'],
-        ['Ocak', '01', '5101', '601', '51010171', 'PRS-106', 100],
-        ['Aralık', '12', '5101', '601', '51010171', 'PRS-106', 100],
-      ],
+      'Shiftly KPI': shiftly,
+      'Monthly KPI': [monthHead, [2026, 'Ocak', '01', '5101', '601', '51010171', 'PRS-106', 0, 100], [2025, 'Aralık', '12', '5101', '601', '51010171', 'PRS-106', 0, 100]],
       'Weekly KPI': [
         ['Week', 'Plant - Key', 'Production Responsible', 'Cost Center - Key', 'Work Center', 'Loading Time(Min)'],
         [2, '5101', '601', '51010171', 'PRS-106', 100],
@@ -227,6 +226,25 @@ describe('oee workbook', () => {
     })
     expect(p.monthly.map((m) => `${m.year}-${m.monthKey}`)).toEqual(['2026-01', '2025-12'])
     expect(p.weekly.map((w) => `${w.year}-${w.week}`)).toEqual(['2026-2', '2025-52'])
+    // Year sütunu yoksa ya da boşsa dosya kabul edilmez.
+    const noYear = parseOeeWorkbook({ 'Monthly KPI': [monthHead.slice(1), ['Ocak', '01', '5101', '601', '51010171', 'PRS-106', 0, 100]] })
+    expect(noYear.problems.join()).toMatch(/Year/)
+    const blank = parseOeeWorkbook({ 'Monthly KPI': [monthHead, ['', 'Ocak', '01', '5101', '601', '51010171', 'PRS-106', 0, 100]] })
+    expect(blank.problems.join()).toMatch(/no valid Year in rows 2/)
+  })
+
+  it('dated sheets must start on a Monday (or on 1 January)', () => {
+    expect(mondayStartProblem('Shiftly KPI', ['2026-09-14', '2026-09-28'])).toBeNull()
+    expect(mondayStartProblem('Shiftly KPI', ['2026-01-01', '2026-01-05'])).toBeNull()
+    expect(mondayStartProblem('Downtimes(1)', ['2026-09-02', '2026-09-01'])).toBe(
+      'Downtimes(1) starts on Tuesday 01.09.2026 — export from a Monday (31.08.2026). The file was not uploaded.',
+    )
+    // Pazartesi'den başlamayan sayfa dosyanın tamamını durdurur.
+    const shiftly = (fixture as unknown as Record<string, SheetRows>)['Shiftly KPI']
+    const [head, ...body] = shiftly
+    const dateCol = head.indexOf('Date')
+    const late = [head, ...body.filter((r) => String(r[dateCol]) > '2026-09-21')]
+    expect(parseOeeWorkbook({ 'Shiftly KPI': late }).problems.join()).toMatch(/starts on Tuesday/)
   })
 
   it('ISO weeks', () => {

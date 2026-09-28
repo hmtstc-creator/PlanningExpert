@@ -390,9 +390,17 @@ son 2 hafta.
 - Var olan kayıt atlanmaz, **güncellenir** (sistemdeki düzeltmeler gelsin).
 - Duruşlar: dosyada bulunan her gün × makinenin duruşları dosyadakiyle
   **tamamen yenilenir** (saati değişen / bölünen duruş iki kez sayılmasın);
-  dosyada olmayan günlere dokunulmaz. → programda yapılacak.
-- Monthly KPI: **ilk sütun Year** olacak (planlamacı taslak formatı
-  güncelliyor); yıl tahmin edilmez, sütundan okunur. → programda yapılacak.
+  dosyada olmayan günlere dokunulmaz. → yapıldı (`upsertDowntimeDays`).
+- Monthly KPI: **ilk sütun Year**; yıl tahmin edilmez, sütundan okunur. Year
+  sütunu yoksa ya da bir satırda boşsa dosya yüklenmez. → yapıldı.
+- **Export Pazartesi'den başlar** (planlamacı, 2026-09-28): tarihli her sayfa
+  (Shiftly, Daily, Order Based, Downtimes) ilk günü Pazartesi değilse dosya
+  **hiç yüklenmez** ve uyarı verilir ("… starts on Tuesday 01.09.2026 —
+  export from a Monday (31.08.2026)"). İstisna: 1 Ocak (sene başından geçmiş).
+  Sebep: yarım başlayan hafta, kayıtlı tam haftanın üstüne yazılmasın
+  (`mondayStartProblem`). → yapıldı.
+- Weekly KPI: aynı dosyada iki haftalık sayfa varsa Loading'i büyük olan;
+  yüklemeler arasında yeni eskiyi ezer.
 
 ## Bekleyen konular
 

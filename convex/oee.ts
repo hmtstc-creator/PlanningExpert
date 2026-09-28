@@ -169,8 +169,10 @@ export const upsertMonthly = guardedMutation({
 })
 
 /**
- * Duruşlar: aynı gün × iş merkezinin eski duruşlarıyla birleşir (aynı duruş
- * güncellenir, yenisi eklenir, eskisi silinmez); kayıp özeti yeniden hesaplanır.
+ * Duruşlar: dosyada bulunan her gün × iş merkezinin duruşları dosyadakiyle
+ * tamamen yenilenir (sistemde saati değişen ya da bölünen duruş iki kez
+ * sayılmasın — planlamacı, 2026-09-28). Dosyada olmayan günlere dokunulmaz.
+ * Kayıp özeti yeniden hesaplanır.
  */
 export const upsertDowntimeDays = guardedMutation({
   args: { days: v.array(v.object(downtimeDayFields)) },
@@ -183,7 +185,8 @@ export const upsertDowntimeDays = guardedMutation({
         .withIndex('by_key', (q: Ctx) => q.eq('date', incoming.date).eq('workCenter', incoming.workCenter))
         .first()
       const next = fromStoredDay(incoming)
-      if (hit) next.events = mergeEvents(fromStoredDay(hit).events, next.events)
+      // Dosyanın kendi içindeki aynı satır bir kez sayılır.
+      next.events = mergeEvents([], next.events)
       const stored = toStoredDay(next)
       await upsert(ctx, hit, 'oeeDowntimeDays', stored)
       const lossHit = await ctx.db

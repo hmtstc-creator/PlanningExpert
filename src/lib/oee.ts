@@ -1157,9 +1157,30 @@ export interface ParsedOee {
  * Seçilen sayfaları okur. Haftalık sayfalarda yıl yok: hafta, dosyadaki en
  * son vardiya tarihinin haftasından büyükse bir önceki yıla aittir.
  */
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/**
+ * Tarihli sayfalar (Shiftly, Daily, Order Based, Downtimes) Pazartesi'den
+ * başlamalı: yarım başlayan hafta, kayıtlı tam haftanın üstüne yazılmasın
+ * (planlamacı, 2026-09-28). Yılın ilk günü de kabul edilir (sene başından
+ * geçmiş yüklemesi). Uymayan dosya hiç yüklenmez.
+ */
+export function mondayStartProblem(sheet: string, dates: string[]): string | null {
+  const first = dateRange(dates)?.from
+  if (!first) return null
+  const day = new Date(`${first}T00:00:00Z`).getUTCDay()
+  if (day === 1 || first.slice(5) === '01-01') return null
+  const fmt = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`
+  return `${sheet} starts on ${WEEKDAYS[day]} ${fmt(first)} — export from a Monday (${fmt(mondayOfIso(first))}). The file was not uploaded.`
+}
+
 export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new Date().toISOString().slice(0, 10)): ParsedOee {
   const out: ParsedOee = { shifts: [], daily: [], orders: [], weekly: [], monthly: [], downtimes: [], read: [], problems: [] }
   const byKind = new Map<string, [string, SheetRows][]>()
+  const checkMonday = (sheet: string, rows: { date: string }[]) => {
+    const p = mondayStartProblem(sheet, rows.map((r) => r.date))
+    if (p) out.problems.push(p)
+  }
   for (const [name, rows] of Object.entries(sheets)) {
     const kind = sheetKind(name)
     if (!kind) continue
@@ -1196,6 +1217,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
       n++
     }
     out.read.push({ sheet: name, kind: 'shiftly', rows: n })
+    checkMonday(name, out.shifts.slice(out.shifts.length - n))
   }
 
   for (const [name, rows] of byKind.get('daily') ?? []) {
@@ -1226,14 +1248,13 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
       n++
     }
     out.read.push({ sheet: name, kind: 'daily', rows: n })
+    checkMonday(name, out.daily.slice(out.daily.length - n))
   }
 
-  // Haftalık ve aylık sayfalarda yıl yok: dosyadaki en son günlük/vardiya
-  // tarihinden (yoksa bugünden) geriye doğru sayılır.
+  // Haftalık sayfada yıl yok: dosyadaki en son günlük/vardiya tarihinden
+  // (yoksa bugünden) geriye doğru sayılır. Aylıkta yıl sütunu var.
   const lastDate = [...out.shifts, ...out.daily].reduce((m, s) => (s.date > m ? s.date : m), '') || today
   const ref = isoWeek(lastDate)
-  const refYear = Number(lastDate.slice(0, 4))
-  const refMonth = Number(lastDate.slice(5, 7))
 
   for (const [name, rows] of byKind.get('orders') ?? []) {
     const r = reader(rows[0] ?? [], [
@@ -1267,6 +1288,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
       n++
     }
     out.read.push({ sheet: name, kind: 'orders', rows: n })
+    checkMonday(name, out.orders.slice(out.orders.length - n))
   }
 
   const periodCols: Col[] = [
@@ -1315,17 +1337,23 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
   out.weekly = [...weekly.values()]
 
   for (const [name, rows] of byKind.get('monthly') ?? []) {
-    const r = reader(rows[0] ?? [], [{ key: 'month', names: ['Month'] }, { key: 'key', names: ['Month Key'] }, ...periodCols])
+    // Yıl ilk sütunda (Year) gelir; tahmin edilmez (planlamacı, 2026-09-28).
+    const r = reader(rows[0] ?? [], [{ key: 'year', names: ['Year'] }, { key: 'month', names: ['Month'] }, { key: 'key', names: ['Month Key'] }, ...periodCols])
     if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
     let n = 0
-    for (const row of rows.slice(1)) {
+    const badYear: number[] = []
+    for (const [i, row] of rows.slice(1).entries()) {
       const wc = str(r.get(row, 'wc'))
       const rawKey = str(r.get(row, 'key'))
       if (!wc || !rawKey) continue
+      const year = Math.round(num(r.get(row, 'year')))
+      if (!(year >= 2000 && year <= 2100)) {
+        badYear.push(i + 2)
+        continue
+      }
       const monthKey = rawKey.padStart(2, '0')
       out.monthly.push({
-        // Yıl yok: ay, dosyadaki en son tarihin ayından büyükse bir önceki yıla aittir.
-        year: Number(monthKey) > refMonth ? refYear - 1 : refYear,
+        year,
         month: str(r.get(row, 'month')),
         monthKey,
         plantKey: str(r.get(row, 'plant')),
@@ -1337,9 +1365,12 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
       })
       n++
     }
+    if (badYear.length && !r.missing.includes('Year')) out.problems.push(`${name}: no valid Year in rows ${badYear.slice(0, 5).join(', ')}${badYear.length > 5 ? ' …' : ''}`)
     out.read.push({ sheet: name, kind: 'monthly', rows: n })
   }
 
+  // Bir gün × makinenin bütün duruşları tek kayıtta (yüklemede o günün duruşları bununla yenilenir).
+  const days = new Map<string, DowntimeDay>()
   for (const [name, rows] of byKind.get('downtimes') ?? []) {
     const r = reader(rows[0] ?? [], [
       { key: 'date', names: ['Date'] },
@@ -1367,7 +1398,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
       { key: 'etime', names: ['EndTime'] },
     ])
     if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
-    const days = new Map<string, DowntimeDay>()
+    const sheetDates: { date: string }[] = []
     let n = 0
     for (const row of rows.slice(1)) {
       const date = toIsoDate(r.get(row, 'date'))
@@ -1400,11 +1431,13 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         endTime: toTime(r.get(row, 'etime')),
       })
       days.set(key, day)
+      sheetDates.push({ date })
       n++
     }
-    out.downtimes.push(...days.values())
     out.read.push({ sheet: name, kind: 'downtimes', rows: n })
+    checkMonday(name, sheetDates)
   }
+  out.downtimes.push(...days.values())
   return out
 }
 

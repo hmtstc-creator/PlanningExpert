@@ -78,7 +78,7 @@ function OeeGuidePage() {
             <b>Weekly KPI</b> (and / or <b>Weekly KPI_fix</b>) — one row per week and machine.
           </li>
           <li>
-            <b>Monthly KPI</b> — one row per month and machine.
+            <b>Monthly KPI</b> — one row per month and machine; the <b>first column is Year</b>.
           </li>
           <li>
             <b>Shiftly KPI</b>, <b>Shiftly Order Based KPI</b> and <b>Downtimes</b> — as far back as your
@@ -88,6 +88,11 @@ function OeeGuidePage() {
         <p>
           Press <b>Upload data</b>. The program reads the sheets it knows by their names and ignores the
           rest; the columns are found by their titles, so the order of the columns does not matter.
+        </p>
+        <p>
+          <b>Every dated sheet must start on a Monday</b> (or on 1 January for the history from the start
+          of the year). A file that starts on another day is not uploaded at all — the first week would
+          be half a week and would overwrite the full week already stored.
         </p>
       </Step>
 
@@ -113,8 +118,9 @@ function OeeGuidePage() {
 
       <Step n={3} title="Every time — upload the last two weeks">
         <p>
-          Export <b>Shiftly KPI</b>, <b>Shiftly Order Based KPI</b> and <b>Downtimes</b> for the last two
-          weeks into one file and press <b>Upload data</b> — daily, weekly, whenever you like.
+          Export <b>Shiftly KPI</b>, <b>Shiftly Order Based KPI</b>, <b>Weekly KPI</b>, <b>Monthly KPI</b>{' '}
+          and <b>Downtimes</b> for the last two weeks, <b>starting on a Monday</b>, into one file and press{' '}
+          <b>Upload data</b> — daily, weekly, whenever you like.
         </p>
         <ul>
           <li>
@@ -125,7 +131,7 @@ function OeeGuidePage() {
             <ul>
               <li>shift: date + machine + shift group,</li>
               <li>order: date + machine + shift + order + equipment,</li>
-              <li>downtime: machine + start date and time + order,</li>
+              <li>downtime: all downtimes of a day and machine that is in the file are replaced by the file (a downtime moved or split in the system is not counted twice),</li>
               <li>week: year + week + machine; month: year + month + machine.</li>
             </ul>
           </li>
@@ -133,7 +139,7 @@ function OeeGuidePage() {
             A correction in the system (a reason code changed, a shift completed later) reaches the
             program the next time that day is in the file.
           </li>
-          <li>Daily KPI, Weekly KPI and Monthly KPI are not needed any more: days, weeks and months are calculated from the shifts.</li>
+          <li>Daily KPI is not needed any more: days are calculated from the shifts. A newer Weekly or Monthly row replaces the stored one.</li>
         </ul>
       </Step>
 
