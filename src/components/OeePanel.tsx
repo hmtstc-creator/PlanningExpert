@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 
 import { api } from '../../convex/_generated/api'
@@ -33,10 +33,10 @@ function localIso(d: Date) {
 }
 
 /** Kaydedilmiş OEE ayarları; yoksa boş ayar ve eksikler listesi. */
-export function useOeeConfig(): { config: OeeConfig; problems: string[]; loaded: boolean } {
-  const doc = useQuery(api.oee.settings) as { config: OeeConfig } | null | undefined
+export function useOeeConfig(): { config: OeeConfig; problems: string[]; loaded: boolean; savedAt: number | null } {
+  const doc = useQuery(api.oee.settings) as { config: OeeConfig; updatedAt: number } | null | undefined
   const config = doc?.config ?? EMPTY_CONFIG
-  return { config, problems: doc === undefined ? [] : configProblems(config), loaded: doc !== undefined }
+  return { config, problems: doc === undefined ? [] : configProblems(config), loaded: doc !== undefined, savedAt: doc?.updatedAt ?? null }
 }
 
 export function useOeeSelection() {
@@ -72,6 +72,50 @@ export function effectiveScope(scope: Scope, areas: string[]): Scope {
   return { area: areas[0] ?? '', key: 'all' }
 }
 
+/**
+ * İlk sürümle yüklenen veriyi (gün toplamları ve kayıp özetleri olmadan)
+ * sayfa açılınca bir kez tamamlar: yalnızca ekler, hiçbir şey silmez.
+ */
+export function OeeRebuildNotice() {
+  const coverage = useQuery(api.oee.coverage) as { needsRebuild?: { days: boolean; losses: boolean } } | undefined
+  const rebuild = useMutation(api.oee.rebuildStored)
+  const [state, setState] = useState<{ kind: 'idle' | 'done' } | { kind: 'busy'; text: string } | { kind: 'error'; text: string }>({ kind: 'idle' })
+  const started = useRef(false)
+  const need = coverage?.needsRebuild
+  useEffect(() => {
+    if (!need || (!need.days && !need.losses) || started.current) return
+    started.current = true
+    void (async () => {
+      try {
+        for (const step of ['days', 'losses'] as const) {
+          if (!need[step]) continue
+          let cursor: string | null = null
+          let n = 0
+          for (;;) {
+            const r = (await rebuild({ step, cursor })) as { cursor: string; isDone: boolean; count: number }
+            n += r.count
+            setState({ kind: 'busy', text: `${step === 'days' ? 'Day totals' : 'Loss summaries'}: ${n}` })
+            if (r.isDone) break
+            cursor = r.cursor
+          }
+        }
+        setState({ kind: 'done' })
+      } catch (e) {
+        started.current = false
+        setState({ kind: 'error', text: friendlyError(e).message })
+      }
+    })()
+  }, [need, rebuild])
+  if (state.kind === 'idle') return null
+  return (
+    <div className="mt-4 rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm text-sky-900">
+      {state.kind === 'busy' && <>Preparing the stored data from the shifts and downtimes (nothing is deleted)… {state.text}</>}
+      {state.kind === 'done' && <>✓ Stored data prepared — day totals and loss summaries are complete.</>}
+      {state.kind === 'error' && <span className="text-destructive">Could not prepare the stored data: {state.text}</span>}
+    </div>
+  )
+}
+
 export function OeeControls({
   selection,
   rows,
@@ -90,6 +134,7 @@ export function OeeControls({
   const problems = configProblems(config)
   return (
     <>
+      <OeeRebuildNotice />
       {problems.length > 0 && (
         <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           <b>OEE settings are not complete:</b> {problems.join(' ')}{' '}

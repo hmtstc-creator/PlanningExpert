@@ -196,6 +196,49 @@ export const upsertDowntimeDays = guardedMutation({
   },
 })
 
+/**
+ * İlk sürümle yüklenen veride gün toplamları (oeeDays) ve yeni biçim kayıp
+ * özetleri yoktur. Bu adım saklı vardiya ve duruşlardan onları kurar; hiçbir
+ * şey silinmez, tekrar çalışması zararsızdır. İstemci `isDone` gelene kadar
+ * imleçle çağırır.
+ */
+export const rebuildStored = guardedMutation({
+  args: { step: v.union(v.literal('days'), v.literal('losses')), cursor: v.union(v.string(), v.null()) },
+  returns: v.object({ cursor: v.string(), isDone: v.boolean(), count: v.number() }),
+  affectsPlan: false,
+  handler: async (ctx: Ctx, { step, cursor }: Ctx) => {
+    if (step === 'days') {
+      const page = await ctx.db.query('oeeShifts').withIndex('by_date').paginate({ cursor, numItems: 400 })
+      const keys = new Map<string, { date: string; workCenter: string }>()
+      for (const r of page.page) keys.set(`${r.date}|${r.workCenter}`, { date: r.date, workCenter: r.workCenter })
+      for (const { date, workCenter } of keys.values()) {
+        const all = await ctx.db
+          .query('oeeShifts')
+          .withIndex('by_key', (q: Ctx) => q.eq('date', date).eq('workCenter', workCenter))
+          .collect()
+        const [day] = daysFromShifts(all)
+        const hit = await ctx.db
+          .query('oeeDays')
+          .withIndex('by_key', (q: Ctx) => q.eq('date', date).eq('workCenter', workCenter))
+          .first()
+        if (day) await upsert(ctx, hit, 'oeeDays', dayDoc(day))
+      }
+      return { cursor: page.continueCursor, isDone: page.isDone, count: keys.size }
+    }
+    // Duruş kayıtları büyük: küçük sayfa.
+    const page = await ctx.db.query('oeeDowntimeDays').withIndex('by_date').paginate({ cursor, numItems: 40 })
+    for (const doc of page.page) {
+      const lossHit = await ctx.db
+        .query('oeeLossDays')
+        .withIndex('by_key', (q: Ctx) => q.eq('date', doc.date).eq('workCenter', doc.workCenter))
+        .first()
+      if (lossHit?.codes) continue
+      await upsert(ctx, lossHit, 'oeeLossDays', toStoredLoss(lossDayOf(fromStoredDay(doc))))
+    }
+    return { cursor: page.continueCursor, isDone: page.isDone, count: page.page.length }
+  },
+})
+
 export const finishImport = guardedMutation({
   args: {
     fileName: v.string(),
@@ -313,9 +356,20 @@ export const coverage = guardedQuery({
     }
     const weekFirst = await ctx.db.query('oeeWeekly').withIndex('by_week').order('asc').first()
     const weekLast = await ctx.db.query('oeeWeekly').withIndex('by_week').order('desc').first()
+    // İlk sürümle yüklenmiş veri: vardiya var ama gün yok, ya da kayıp özeti eski biçimde.
+    const lastLoss = await ctx.db.query('oeeLossDays').withIndex('by_date').order('desc').first()
+    const firstLoss = await ctx.db.query('oeeLossDays').withIndex('by_date').order('asc').first()
+    const lastDown = await ctx.db.query('oeeDowntimeDays').withIndex('by_date').order('desc').first()
+    const days = await span('oeeDays')
+    const shifts = await span('oeeShifts')
+    const oldLoss = (d: Ctx) => d && !d.codes
     return {
-      days: await span('oeeDays'),
-      shifts: await span('oeeShifts'),
+      needsRebuild: {
+        days: !!shifts && (!days || days.from > shifts.from || days.to < shifts.to),
+        losses: !!lastDown && (!lastLoss || oldLoss(lastLoss) || oldLoss(firstLoss)),
+      },
+      days,
+      shifts,
       orders: await span('oeeOrders'),
       downtimes: await span('oeeDowntimeDays'),
       weekly: weekFirst ? { from: `${weekFirst.year}-W${weekFirst.week}`, to: `${weekLast.year}-W${weekLast.week}` } : null,

@@ -362,6 +362,22 @@ Eski biçimdeki kayıtlar: ilk sürümün kayıp özetleri okunmaz; yılı olmay
 aylık satırlar okunmaz. İlk kurulum yüklemesi aynı günleri/ayları yeniden
 yazınca düzelir.
 
+### Settings düzeltmesi (2026-09-28, planlamacı: "Cost center ekleyemiyorum")
+
+- Sebep: ilk sürümle yüklenen veride gün toplamı (`oeeDays`) yoktu; öneri
+  masraf yerlerini yalnızca günlerden alıyordu → liste boş kaldı, kullanıcı
+  masraf yeri kodlarını alan adı olarak yazdı.
+- Öneri artık masraf yerlerini günler + vardiyalar + duruşlardan birlikte
+  alır (`dataCostCenters`); alan = makine adının en sık ön eki.
+- Eksik gün toplamları ve eski biçim kayıp özetleri OEE sayfaları açılınca
+  saklı vardiya/duruşlardan bir kez kurulur (`rebuildStored`, `coverage.needsRebuild`);
+  silme yok, tekrar çalışması zararsız.
+- Settings adımları: 1 Upload → 2 Suggest from data → 3 Check → 4 Save.
+  Masraf yeri elle eklenebilir; veride olup tanımlanmamış kodlar düğme
+  olarak çıkar. Alan adı bir masraf yeri koduysa uyarı + "Move to cost
+  centers" (kodlar masraf yerine taşınır, alan veriden önerilir).
+- Eksik mesajları ayrı: alan yok / masraf yeri yok / alanı olmayan masraf yeri.
+
 ## Bekleyen konular
 
 - APR için setup sonrası üretim süresi (şu an tek değer, Settings'te):

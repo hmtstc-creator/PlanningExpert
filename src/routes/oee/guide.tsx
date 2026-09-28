@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { OeeUploadButton } from '../../components/OeePanel'
+import { OeeRebuildNotice, OeeUploadButton } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 
@@ -34,6 +34,8 @@ function OeeGuidePage() {
           { to: '/oee/data', label: 'Data' },
         ]}
       />
+
+      <OeeRebuildNotice />
 
       <section className="mt-6 rounded-lg border border-border p-4">
         <h2 className="text-sm font-semibold text-foreground">What is stored now</h2>
@@ -95,7 +97,11 @@ function OeeGuidePage() {
           suggestion and correct it:
         </p>
         <ul>
-          <li>areas (the buttons on top of every page) and cost center names,</li>
+          <li>
+            cost centers — every cost center of your files gets a name and an <b>area</b>; an area is a
+            group of cost centers such as presses or assembly and becomes a button on top of every page
+            (do not type a cost center code as an area),
+          </li>
           <li>shift numbers of the Shift Group codes,</li>
           <li>which Reason Code 1 is a loss and which is a planned break,</li>
           <li>names of the loss groups (Reason Code 2), their chart columns and which are breakdowns,</li>

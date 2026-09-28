@@ -152,6 +152,25 @@ describe('oee workbook', () => {
     expect(kept.costCenters.find((c) => c.code === '51010171')!.name).toBe('Transfer')
   })
 
+  it('suggests cost centers from shifts and downtimes when no day totals are stored', () => {
+    const s = suggestConfig({ days: [], shifts: parsed.shifts, downtimes: parsed.downtimes }, EMPTY_CONFIG, OEE_SUGGESTED)
+    expect(s.costCenters.map((c) => c.code).sort()).toEqual(['51010171', '51010173'])
+    expect(s.areas).toEqual([{ name: 'PRS', pick: 'costCenter' }])
+    expect(configProblems(s).some((p) => /area|cost center/i.test(p))).toBe(false)
+  })
+
+  it('a cost center code typed as an area is replaced by the area of its machines', () => {
+    const wrong: OeeConfig = { ...EMPTY_CONFIG, areas: [{ name: '51010171', pick: 'costCenter' }, { name: '51010173', pick: 'costCenter' }] }
+    expect(configProblems(wrong)).toContain('No cost center is defined.')
+    const s = suggestConfig({ days: [], shifts: parsed.shifts, downtimes: [] }, wrong, OEE_SUGGESTED)
+    expect(s.areas.map((a) => a.name)).toEqual(['PRS'])
+    expect(s.costCenters.every((c) => c.area === 'PRS')).toBe(true)
+    // Adı verilmiş, alanı boş masraf yeri: ad kalır, alan önerilir.
+    const named = suggestConfig({ days: [], shifts: parsed.shifts, downtimes: [] }, { ...EMPTY_CONFIG, costCenters: [{ code: '51010171', name: 'Transfer', area: '' }] }, OEE_SUGGESTED)
+    expect(named.costCenters.find((c) => c.code === '51010171')).toEqual({ code: '51010171', name: 'Transfer', area: 'PRS' })
+    expect(configProblems({ ...plant, costCenters: [{ code: 'X', name: 'X', area: 'Nope' }] })).toContain('Cost center X has no area.')
+  })
+
   it('a week is the sum of its days, or the uploaded week when that covers more loading', () => {
     const wc = 'PRS-106'
     const fromDays = sumTimes(days.filter((d) => d.workCenter === wc))

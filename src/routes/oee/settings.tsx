@@ -2,11 +2,11 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { useOeeConfig } from '../../components/OeePanel'
+import { OeeRebuildNotice, OeeUploadButton, useOeeConfig } from '../../components/OeePanel'
 import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
-import { addDaysIso, configProblems, suggestConfig, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
+import { addDaysIso, configProblems, dataCostCenters, suggestConfig, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { OEE_SUGGESTED } from '../../lib/settingsDefaults'
 
@@ -22,7 +22,7 @@ export const Route = createFileRoute('/oee/settings')({
 const input = 'rounded-md border border-input bg-background px-2 py-1 text-sm'
 
 function OeeSettingsPage() {
-  const { config: saved, loaded } = useOeeConfig()
+  const { config: saved, loaded, savedAt } = useOeeConfig()
   const save = useMutation(api.oee.saveSettings)
   const coverage = useQuery(api.oee.coverage) as
     | { days: { from: string; to: string } | null; shifts: { from: string; to: string } | null; downtimes: { from: string; to: string } | null }
@@ -55,6 +55,33 @@ function OeeSettingsPage() {
 
   const suggest = () =>
     set(suggestConfig({ days, shifts, downtimes }, c, OEE_SUGGESTED))
+
+  // Verideki masraf yerleri ve makineleri (günler, vardiyalar, duruşlar).
+  const found = useMemo(() => dataCostCenters({ days, shifts, downtimes }), [days, shifts, downtimes])
+  const notDefined = [...found.keys()].filter((code) => !c.costCenters.some((x) => x.code === code))
+  // Alan adı olarak masraf yeri kodu yazılmışsa (ör. 51010171) düzeltme önerilir.
+  const codeAreas = c.areas.filter((a) => found.has(a.name))
+  const moveToCostCenters = () => {
+    const wrong = new Set(codeAreas.map((a) => a.name))
+    const fixed: OeeConfig = {
+      ...c,
+      areas: c.areas.filter((a) => !wrong.has(a.name)),
+      costCenters: [
+        ...c.costCenters.filter((x) => !wrong.has(x.code)).map((x) => (wrong.has(x.area) ? { ...x, area: '' } : x)),
+        ...[...wrong].filter((code) => !c.costCenters.some((x) => x.code === code)).map((code) => ({ code, name: code, area: '' })),
+      ],
+    }
+    // Alanlar veriden önerilir (makine adının ön eki); masraf yeri adları korunur.
+    set(suggestConfig({ days, shifts, downtimes }, fixed, OEE_SUGGESTED))
+  }
+  const addCostCenter = (code: string) => {
+    const k = code.trim()
+    if (!k || c.costCenters.some((x) => x.code === k)) return
+    const area = c.areas.find((a) => a.name === found.get(k)?.area)?.name ?? (c.areas.length === 1 ? c.areas[0].name : '')
+    set({ costCenters: [...c.costCenters, { code: k, name: k, area }] })
+  }
+  const [newCode, setNewCode] = useState('')
+  const hasData = !!(coverage?.shifts || coverage?.days || coverage?.downtimes)
 
   const onSave = async () => {
     setState({ kind: 'saving' })
@@ -90,36 +117,59 @@ function OeeSettingsPage() {
         }
       />
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={suggest} className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted">
-          Suggest from data
-        </button>
-        <button
-          type="button"
-          onClick={() => void onSave()}
-          disabled={!dirty || state.kind === 'saving'}
-          className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background disabled:opacity-40"
-        >
-          {state.kind === 'saving' ? 'Saving…' : 'Save'}
-        </button>
-        {dirty && (
-          <button type="button" onClick={() => setDraft(saved)} className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted">
-            Discard changes
-          </button>
-        )}
-        {dirty && <span className="text-xs font-medium text-amber-700">● Unsaved</span>}
-        {state.kind === 'saved' && <span className="text-xs text-emerald-700">✓ Saved</span>}
-        {state.kind === 'error' && <span className="text-xs text-destructive">Not saved: {state.text}</span>}
-        {!days.length && !events.length && (
-          <span className="text-xs text-muted-foreground">
-            No data yet — <Link to="/oee/guide" className="underline">upload first</Link>, then suggest.
-          </span>
-        )}
-      </div>
-      {problems.length > 0 && <p className="mt-2 text-xs text-amber-800">Still missing: {problems.join(' ')}</p>}
+      <OeeRebuildNotice />
 
-      <Card title="Areas" info="The buttons above every OEE page. 'Cost center' lets you pick a cost center of the area; 'Machine' lets you pick a single machine (when the area is one cost center).">
+      <ol className="mt-4 grid gap-2 text-sm sm:grid-cols-4">
+        <StepBox n={1} done={hasData} title="Upload data">
+          {hasData ? 'Data is stored.' : <OeeUploadButton />}
+        </StepBox>
+        <StepBox n={2} done={c.costCenters.length > 0 && c.shifts.length > 0} title="Suggest from data">
+          <button type="button" onClick={suggest} disabled={!hasData} className="rounded-md border border-border px-3 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40">
+            Suggest from data
+          </button>
+          <span className="block text-xs text-muted-foreground">Fills every list below from the codes in your files.</span>
+        </StepBox>
+        <StepBox n={3} done={problems.length === 0} title="Check and rename">
+          {problems.length ? <span className="text-amber-800">{problems.join(' ')}</span> : 'Everything is defined.'}
+        </StepBox>
+        <StepBox n={4} done={!!savedAt && !dirty} title="Save">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void onSave()}
+              disabled={!dirty || state.kind === 'saving'}
+              className="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background disabled:opacity-40"
+            >
+              {state.kind === 'saving' ? 'Saving…' : 'Save'}
+            </button>
+            {dirty && (
+              <button type="button" onClick={() => setDraft(saved)} className="text-xs underline">
+                Discard
+              </button>
+            )}
+          </div>
+          {dirty && <span className="block text-xs font-medium text-amber-700">● Unsaved changes</span>}
+          {state.kind === 'saved' && <span className="block text-xs text-emerald-700">✓ Saved</span>}
+          {state.kind === 'error' && <span className="block text-xs text-destructive">Not saved: {state.text}</span>}
+        </StepBox>
+      </ol>
+
+      {codeAreas.length > 0 && (
+        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <b>{codeAreas.map((a) => a.name).join(', ')}</b> {codeAreas.length > 1 ? 'are' : 'is'} a cost center, not an area. An area is a group of
+          cost centers (e.g. presses, assembly) and becomes a button on top of every page.{' '}
+          <button type="button" onClick={moveToCostCenters} className="font-medium underline">
+            Move to cost centers
+          </button>
+        </div>
+      )}
+
+      <Card
+        title="Areas"
+        info="A group of cost centers, e.g. presses (PRS) or assembly (APR); each area is a button above every OEE page. 'Cost center' lets you pick a cost center of the area; 'Machine' lets you pick a single machine (when the area is one cost center)."
+      >
         <Rows
+          empty="No area yet — press Suggest from data, or add one below."
           head={['Area name', 'Pick by', '']}
           rows={c.areas.map((a, i) => [
             <input
@@ -147,14 +197,23 @@ function OeeSettingsPage() {
         </button>
       </Card>
 
-      <Card title="Cost centers" info="Name shown in lists and charts, and the area it belongs to.">
+      <Card title="Cost centers" info="Every cost center of your files: the name shown in lists and charts, and the area it belongs to. Machines are read from the data.">
         <Rows
-          head={['Code', 'Name', 'Area', '']}
+          empty="No cost center yet — press Suggest from data, or add one below."
+          head={['Code', 'Machines in the data', 'Name', 'Area', '']}
           rows={c.costCenters.map((cc, i) => [
             cc.code,
+            <span key="m" className="text-muted-foreground">
+              {found.get(cc.code)?.workCenters.join(', ') || '—'}
+            </span>,
             <input key="n" className={input} value={cc.name} onChange={(e) => set({ costCenters: c.costCenters.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />,
-            <select key="a" className={input} value={cc.area} onChange={(e) => set({ costCenters: c.costCenters.map((x, j) => (j === i ? { ...x, area: e.target.value } : x)) })}>
-              <option value="">—</option>
+            <select
+              key="a"
+              className={`${input} ${c.areas.some((a) => a.name === cc.area) ? '' : 'border-amber-500'}`}
+              value={c.areas.some((a) => a.name === cc.area) ? cc.area : ''}
+              onChange={(e) => set({ costCenters: c.costCenters.map((x, j) => (j === i ? { ...x, area: e.target.value } : x)) })}
+            >
+              <option value="">— choose an area —</option>
               {c.areas.map((a) => (
                 <option key={a.name} value={a.name}>
                   {a.name}
@@ -164,6 +223,29 @@ function OeeSettingsPage() {
             <RemoveButton key="r" onClick={() => set({ costCenters: c.costCenters.filter((_, j) => j !== i) })} />,
           ])}
         />
+        {notDefined.length > 0 && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-amber-800">
+            In the data but not defined:
+            {notDefined.map((code) => (
+              <button key={code} type="button" onClick={() => addCostCenter(code)} className="rounded border border-amber-400 px-2 py-0.5 hover:bg-amber-50">
+                + {code}
+              </button>
+            ))}
+          </p>
+        )}
+        <form
+          className="mt-2 flex items-center gap-2 text-xs"
+          onSubmit={(e) => {
+            e.preventDefault()
+            addCostCenter(newCode)
+            setNewCode('')
+          }}
+        >
+          <input className={`${input} w-40`} placeholder="Cost center code" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
+          <button type="submit" disabled={!newCode.trim()} className="underline disabled:opacity-40">
+            + Add cost center
+          </button>
+        </form>
       </Card>
 
       <Card title="Shifts" info="Shift Group code of the files → shift number (1st, 2nd, 3rd …). Used for the week-by-shift chart and the downtime Shift column.">
@@ -281,8 +363,8 @@ function Card({ title, info, children }: { title: string; info?: string; childre
   )
 }
 
-function Rows({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
-  if (!rows.length) return <p className="text-xs text-muted-foreground">Nothing yet — upload data and press Suggest from data.</p>
+function Rows({ head, rows, empty }: { head: string[]; rows: ReactNode[][]; empty?: string }) {
+  if (!rows.length) return <p className="text-xs text-muted-foreground">{empty ?? 'Nothing yet — upload data and press Suggest from data.'}</p>
   return (
     <div className="max-h-96 overflow-auto rounded-md border border-border">
       <table className="w-full text-xs">
@@ -308,6 +390,20 @@ function Rows({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
         </tbody>
       </table>
     </div>
+  )
+}
+
+function StepBox({ n, done, title, children }: { n: number; done: boolean; title: string; children: ReactNode }) {
+  return (
+    <li className={`rounded-lg border p-3 ${done ? 'border-emerald-300 bg-emerald-50/50' : 'border-border'}`}>
+      <p className="mb-1 flex items-center gap-2 font-semibold text-foreground">
+        <span className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${done ? 'bg-emerald-600 text-white' : 'bg-foreground text-background'}`}>
+          {done ? '✓' : n}
+        </span>
+        {title}
+      </p>
+      <div className="space-y-1 text-xs">{children}</div>
+    </li>
   )
 }
 

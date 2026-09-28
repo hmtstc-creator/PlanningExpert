@@ -203,7 +203,11 @@ export const EMPTY_CONFIG: OeeConfig = {
 /** Ayarda eksik olan ve kullanıcıya söylenmesi gereken konular. */
 export function configProblems(c: OeeConfig): string[] {
   const out: string[] = []
-  if (!c.areas.length || !c.costCenters.length) out.push('Areas and cost centers are not defined.')
+  if (!c.areas.length) out.push('No area is defined.')
+  if (!c.costCenters.length) out.push('No cost center is defined.')
+  const areas = new Set(c.areas.map((a) => a.name))
+  const noArea = c.costCenters.filter((x) => !areas.has(x.area)).map((x) => x.code)
+  if (noArea.length) out.push(`Cost center ${noArea.join(', ')} has no area.`)
   if (!c.shifts.length) out.push('Shift codes are not numbered.')
   if (!c.lossReasonCodes.length) out.push('No Reason Code 1 is marked as a loss.')
   if (!c.lossGroups.length) out.push('Loss groups are not named.')
@@ -909,6 +913,32 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
 // ---- ayar önerisi ----------------------------------------------------------------
 
 /**
+ * Verideki masraf yerleri (günler, vardiyalar ve duruşlar birlikte — eski
+ * yüklemelerde günler olmayabilir) → makineleri ve önerilen alan (iş merkezi
+ * adının ön eki, PRS-106 → PRS).
+ */
+export function dataCostCenters(input: { days: Located[]; shifts: Located[]; downtimes: Located[] }): Map<string, { area: string; workCenters: string[] }> {
+  const prefix = (wc: string) => wc.split(/[-\s_]/)[0]?.toUpperCase() || wc
+  const wcs = new Map<string, Set<string>>()
+  for (const r of [...input.days, ...input.shifts, ...input.downtimes]) {
+    if (!r.costCenter) continue
+    const set = wcs.get(r.costCenter) ?? new Set<string>()
+    if (r.workCenter) set.add(r.workCenter)
+    wcs.set(r.costCenter, set)
+  }
+  const out = new Map<string, { area: string; workCenters: string[] }>()
+  for (const [code, set] of [...wcs].sort(([a], [b]) => a.localeCompare(b))) {
+    const workCenters = [...set].sort()
+    // En sık ön ek alan olur.
+    const count = new Map<string, number>()
+    for (const wc of workCenters) count.set(prefix(wc), (count.get(prefix(wc)) ?? 0) + 1)
+    const area = [...count].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? code
+    out.set(code, { area, workCenters })
+  }
+  return out
+}
+
+/**
  * Verideki kodlardan ayar ÖNERİSİ. Kullanıcı görür, düzeltir ve kaydeder;
  * kaydedilmeden hiçbir hesap bunu kullanmaz.
  *  - Alan: iş merkezi adının ön eki (PRS-106 → PRS); tek masraf yerli alanda
@@ -920,24 +950,33 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
  *    metinleri kullanıcı Settings'te işaretler.
  */
 export function suggestConfig(
-  input: { days: Located[]; shifts: { shiftGroup: string; costCenter: string }[]; downtimes: DowntimeDay[] },
+  input: { days: Located[]; shifts: (Located & { shiftGroup: string })[]; downtimes: DowntimeDay[] },
   current: OeeConfig,
   defaults: { startupRunMin: number; trendWeeks: number; topN: number },
 ): OeeConfig {
-  const prefix = (wc: string) => wc.split(/[-\s_]/)[0]?.toUpperCase() || wc
-  const ccArea = new Map<string, string>()
-  for (const d of input.days) if (d.costCenter && !ccArea.has(d.costCenter)) ccArea.set(d.costCenter, prefix(d.workCenter))
-  const costCenters = [...ccArea].map(([code, area]) => {
-    const cur = current.costCenters.find((x) => x.code === code)
-    return cur ?? { code, name: code, area }
-  })
-  const areaList = [...new Set(costCenters.map((c) => c.area))]
-  const areas = areaList.map((name) => {
-    const cur = current.areas.find((a) => a.name === name)
-    if (cur) return cur
-    const n = costCenters.filter((c) => c.area === name).length
-    return { name, pick: (n > 1 ? 'costCenter' : 'machine') as Pick }
-  })
+  const found = dataCostCenters(input)
+  // Tanımlı masraf yeri korunur (adı ve alanı kullanıcının); yenisi ön ek alanına.
+  // Alan seçimi boş kalmış ya da alanı silinmiş masraf yeri de ön ek alanına gider.
+  const areaNamesNow = new Set(current.areas.map((a) => a.name))
+  const costCenters = [
+    ...[...found].map(([code, f]) => {
+      const cur = current.costCenters.find((x) => x.code === code)
+      if (!cur) return { code, name: code, area: f.area }
+      return areaNamesNow.has(cur.area) && !found.has(cur.area) ? cur : { ...cur, area: f.area }
+    }),
+    ...current.costCenters.filter((x) => !found.has(x.code)),
+  ]
+  const used = new Set(costCenters.map((c) => c.area))
+  const areas = [
+    // Kullanıcının alanları kalır; yalnızca adı bir masraf yeri kodu olanlar (yanlışlıkla alan yazılmış) düşer.
+    ...current.areas.filter((a) => !found.has(a.name) && !costCenters.some((c) => c.code === a.name)),
+    ...[...used]
+      .filter((name) => !current.areas.some((a) => a.name === name))
+      .map((name) => {
+        const n = costCenters.filter((c) => c.area === name).length
+        return { name, pick: (n > 1 ? 'costCenter' : 'machine') as Pick }
+      }),
+  ]
   const codeCcs = new Map<string, Set<string>>()
   for (const s of input.shifts) {
     if (!s.shiftGroup) continue
