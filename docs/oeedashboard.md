@@ -402,6 +402,13 @@ son 2 hafta.
 - Weekly KPI: aynı dosyada iki haftalık sayfa varsa Loading'i büyük olan;
   yüklemeler arasında yeni eskiyi ezer.
 
+### Açıklanmayan duruşlar (2026-09-28, planlamacı)
+
+"#" işaretli duruşlar açıklanmayan duruşlardır: **grafiklerde gösterilmez,
+tablolarda kalır**. Kodda "#" yazılı değil: Settings → Loss groups → "In
+charts" işareti (`hidden`); öneri "#" grubunu gizli getirir. Bir grafik
+sütununun bütün grupları gizliyse sütun grafikten çıkar.
+
 ## Bekleyen konular
 
 - APR için setup sonrası üretim süresi (şu an tek değer, Settings'te):

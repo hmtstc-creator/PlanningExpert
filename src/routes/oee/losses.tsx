@@ -13,6 +13,7 @@ import {
   areaNames,
   chartGroups,
   chartShare,
+  visibleChartGroups,
   costCentersOf,
   dieTable,
   groupLabel,
@@ -69,6 +70,8 @@ function LossesPage() {
   const scope = effectiveScope(sel.scope, areaNames(dayRows, config))
   const label = scopeLabel(scope, config)
   const columns = useMemo(() => chartGroups(config, lossDays), [config, lossDays])
+  // Grafiklerde gizli gruplar (Settings → In charts) yalnızca tablolarda.
+  const chartColumns = useMemo(() => visibleChartGroups(columns, config), [columns, config])
 
   const days = useMemo(
     () =>
@@ -106,7 +109,7 @@ function LossesPage() {
 
   const stackParts = (b: LossBreakdown) => [
     { key: 'oee', label: 'OEE', value: b.oee ?? 0 },
-    ...columns.map((col) => ({ key: col, label: col, value: chartShare(b, col) })),
+    ...chartColumns.map((col) => ({ key: col, label: col, value: chartShare(b, col) })),
   ]
   const noData = dayRows.length === 0 && lossDays.length === 0
 
@@ -129,7 +132,8 @@ function LossesPage() {
             </p>
             <p>
               Group names and chart columns are set on <Link to="/oee/settings">OEE Settings</Link>;
-              a Reason Code 2 that is not named there shows as "Unassigned".
+              a Reason Code 2 that is not named there shows as "Unassigned". Groups unticked under "In
+              charts" (e.g. unexplained downtimes) are left out of the charts and shown in the tables.
             </p>
             <p>Gap = this week − previous week, in percentage points: ▲ red is worse, ▼ green is better.</p>
           </>
@@ -145,7 +149,7 @@ function LossesPage() {
       )}
 
       <Section title={`Week W${sel.week.week} — daily % of Loading · ${label}`} note={`${sel.monday} – ${sel.sunday}`}>
-        <Legend items={[{ key: 'oee', label: 'OEE' }, ...columns.map((c) => ({ key: c, label: c }))]} />
+        <Legend items={[{ key: 'oee', label: 'OEE' }, ...chartColumns.map((c) => ({ key: c, label: c }))]} />
         <StackedShareChart columns={days.map((d) => ({ key: d.key, label: d.label, parts: stackParts(d.b) }))} ariaLabel="Daily OEE and losses" />
         <div className="mt-2 overflow-x-auto rounded-md border border-border">
           <table className="w-full text-xs">
@@ -227,10 +231,10 @@ function LossesPage() {
         title={`Loss trend — last ${weeksN} weeks · ${label}`}
         info="Weeks without uploaded downtimes (history from Weekly / Daily KPI) show only Speed (Production − Operation); the downtime groups start with the uploaded Downtimes."
       >
-        <Legend items={columns.map((c, i) => ({ key: c, label: c, slot: i + 1 }))} />
+        <Legend items={chartColumns.map((c, i) => ({ key: c, label: c, slot: i + 1 }))} />
         <LineTrendChart
           labels={trend.map((t) => t.label)}
-          series={columns.map((col, i) => ({
+          series={chartColumns.map((col, i) => ({
             key: col,
             label: col,
             // Yığılmış grafikte 1. renk OEE'nin; kayıplar aynı renkleri korur.

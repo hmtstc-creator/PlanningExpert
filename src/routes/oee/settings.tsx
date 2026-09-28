@@ -293,14 +293,20 @@ function OeeSettingsPage() {
 
       <Card
         title="Loss groups"
-        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). Breakdown: shown in the MTTR / MTBF table."
+        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table."
       >
         <Rows
-          head={['Reason Code 2', 'Name', 'Chart column', 'Breakdown', '']}
+          head={['Reason Code 2', 'Name', 'Chart column', 'In charts', 'Breakdown', '']}
           rows={c.lossGroups.map((g, i) => [
             g.code,
             <input key="l" className={input} value={g.label} onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />,
             <input key="c" className={input} value={g.chart} onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, chart: e.target.value } : x)) })} />,
+            <input
+              key="h"
+              type="checkbox"
+              checked={!g.hidden}
+              onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, hidden: !e.target.checked } : x)) })}
+            />,
             <input
               key="b"
               type="checkbox"

@@ -178,7 +178,11 @@ export interface OeeConfig {
   lossReasonCodes: string[]
   breakReasonCodes: string[]
   /** Reason Code 2 → kayıp grubu; `chart`: grafikteki sütun adı; `breakdown`: MTTR/MTBF tablosunda. */
-  lossGroups: { code: string; label: string; chart: string; breakdown: boolean }[]
+  /**
+   * Reason Code 2 grupları. `hidden`: grafiklerde gösterilmez, tablolarda
+   * kalır (ör. açıklanmayan duruşlar — planlamacı, 2026-09-28).
+   */
+  lossGroups: { code: string; label: string; chart: string; breakdown: boolean; hidden?: boolean }[]
   /** Setup sayılan duruş metinleri (Reason Code Definition EN). */
   setupTexts: { text: string; kind: 'planned' | 'unplanned' }[]
   /** Setup'tan sonra bu kadar dakika üretim yapılırsa setup OK. */
@@ -557,6 +561,14 @@ export function chartGroups(c: OeeConfig, lossDays: LossDay[] = []): string[] {
   if (hasUnknown && !out.includes(UNASSIGNED)) out.push(UNASSIGNED)
   out.push(SPEED)
   return out
+}
+
+/** Grafiklerde gösterilen sütunlar: bütün grupları gizli olan sütun çıkar (tablolarda kalır). */
+export function visibleChartGroups(columns: string[], c: OeeConfig): string[] {
+  return columns.filter((col) => {
+    const groups = c.lossGroups.filter((g) => g.chart === col)
+    return !groups.length || groups.some((g) => !g.hidden)
+  })
 }
 
 export const groupLabel = (code: string, c: OeeConfig) => c.lossGroups.find((g) => g.code === code)?.label || code
@@ -945,7 +957,8 @@ export function dataCostCenters(input: { days: Located[]; shifts: Located[]; dow
  *    makine, çok masraf yerli alanda masraf yeri seçilir.
  *  - Vardiya: aynı masraf yerlerinde görülen kodlar sıralanıp 1, 2, 3 …
  *  - Reason Code 1: adında "UN" geçen ya da "#" kayıp, diğerleri mola.
- *  - Kayıp grupları: kayıp satırlarındaki Reason Code 2 değerleri (ad = kod).
+ *  - Kayıp grupları: kayıp satırlarındaki Reason Code 2 değerleri (ad = kod);
+ *    "#" (açıklanmayan duruş) grafiklerde gizli önerilir.
  *  - Setup: metninde SETUP ve PLAN geçenler (UNPLAN plansız); başka dildeki
  *    metinleri kullanıcı Settings'te işaretler.
  */
@@ -999,7 +1012,7 @@ export function suggestConfig(
   const lossReasonCodes = current.lossReasonCodes.length ? current.lossReasonCodes : [...rc1].filter(isLoss).sort()
   const breakReasonCodes = current.breakReasonCodes.length ? current.breakReasonCodes : [...rc1].filter((v) => v && !isLoss(v)).sort()
   const rc2 = new Set(events.filter((e) => lossReasonCodes.includes(e.rc1)).map((e) => e.rc2 || '#'))
-  const lossGroups = [...rc2].sort().map((code) => current.lossGroups.find((g) => g.code === code) ?? { code, label: code, chart: code, breakdown: false })
+  const lossGroups = [...rc2].sort().map((code) => current.lossGroups.find((g) => g.code === code) ?? { code, label: code, chart: code, breakdown: false, hidden: code === '#' })
   const texts = new Set(events.map((e) => e.textEn.trim().toUpperCase()))
   const setupTexts = current.setupTexts.length
     ? current.setupTexts

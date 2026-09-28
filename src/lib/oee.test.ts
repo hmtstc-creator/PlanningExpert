@@ -4,6 +4,7 @@ import fixture from './oee.fixture.json'
 import {
   EMPTY_CONFIG,
   chartShare,
+  chartGroups,
   configProblems,
   costCentersOf,
   daysFromShifts,
@@ -19,6 +20,7 @@ import {
   setupAnalysis,
   sheetKind,
   suggestConfig,
+  visibleChartGroups,
   sumTimes,
   weekShiftTrend,
   weekTimes,
@@ -245,6 +247,24 @@ describe('oee workbook', () => {
     const dateCol = head.indexOf('Date')
     const late = [head, ...body.filter((r) => String(r[dateCol]) > '2026-09-21')]
     expect(parseOeeWorkbook({ 'Shiftly KPI': late }).problems.join()).toMatch(/starts on Tuesday/)
+  })
+
+  it('a group hidden in charts stays in the tables', () => {
+    const c: OeeConfig = {
+      ...plant,
+      lossGroups: [
+        { code: 'KLP', label: 'Die', chart: 'Die', breakdown: true },
+        { code: '#', label: 'Unexplained', chart: '#', breakdown: false, hidden: true },
+        { code: 'A', label: 'A', chart: 'Others', breakdown: false, hidden: true },
+        { code: 'B', label: 'B', chart: 'Others', breakdown: false },
+      ],
+    }
+    const columns = chartGroups(c)
+    expect(columns).toEqual(['Die', '#', 'Others', 'Speed'])
+    // Sütunun bütün grupları gizliyse grafikten çıkar; biri görünüyorsa kalır.
+    expect(visibleChartGroups(columns, c)).toEqual(['Die', 'Others', 'Speed'])
+    const s = suggestConfig({ days, shifts: parsed.shifts, downtimes: parsed.downtimes }, EMPTY_CONFIG, OEE_SUGGESTED)
+    expect(s.lossGroups.filter((g) => g.hidden).map((g) => g.code)).toEqual(s.lossGroups.some((g) => g.code === '#') ? ['#'] : [])
   })
 
   it('ISO weeks', () => {

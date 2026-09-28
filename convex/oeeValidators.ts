@@ -147,7 +147,7 @@ export const configFields = {
   shifts: v.array(v.object({ code: v.string(), number: v.number() })),
   lossReasonCodes: v.array(v.string()),
   breakReasonCodes: v.array(v.string()),
-  lossGroups: v.array(v.object({ code: v.string(), label: v.string(), chart: v.string(), breakdown: v.boolean() })),
+  lossGroups: v.array(v.object({ code: v.string(), label: v.string(), chart: v.string(), breakdown: v.boolean(), hidden: v.optional(v.boolean()) })),
   setupTexts: v.array(v.object({ text: v.string(), kind: v.union(v.literal('planned'), v.literal('unplanned')) })),
   startupRunMin: v.number(),
   trendWeeks: v.number(),
