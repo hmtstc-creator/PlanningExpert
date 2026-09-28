@@ -378,6 +378,22 @@ yazınca düzelir.
   centers" (kodlar masraf yerine taşınır, alan veriden önerilir).
 - Eksik mesajları ayrı: alan yok / masraf yeri yok / alanı olmayan masraf yeri.
 
+### Rutin yükleme dosyası (2026-09-28, planlamacı)
+
+Dosya 5 sekme: **Shiftly KPI**, **Shiftly Order Based KPI**, **Weekly KPI**,
+**Monthly KPI**, **Downtimes(1)**. İlk seferde geçmişle birlikte, sonra hep
+son 2 hafta.
+
+- Weekly KPI ve Weekly KPI_fix ilk dosyada tek "Weekly KPI" sekmesinde
+  birleştirilir (anahtar yıl + hafta + makine, mükerrer yok). Kural: **yeni
+  eskiyi ezer** — sonraki yüklemelerde aynı satır gelirse günceller.
+- Var olan kayıt atlanmaz, **güncellenir** (sistemdeki düzeltmeler gelsin).
+- Duruşlar: dosyada bulunan her gün × makinenin duruşları dosyadakiyle
+  **tamamen yenilenir** (saati değişen / bölünen duruş iki kez sayılmasın);
+  dosyada olmayan günlere dokunulmaz. → programda yapılacak.
+- Monthly KPI: **ilk sütun Year** olacak (planlamacı taslak formatı
+  güncelliyor); yıl tahmin edilmez, sütundan okunur. → programda yapılacak.
+
 ## Bekleyen konular
 
 - APR için setup sonrası üretim süresi (şu an tek değer, Settings'te):
