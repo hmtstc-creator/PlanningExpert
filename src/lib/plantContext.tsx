@@ -90,6 +90,6 @@ export function moduleOfPath(pathname: string): Module | null {
   if (pathname.startsWith('/oee')) return 'oee'
   if (pathname.startsWith('/die-followup')) return 'die'
   if (pathname.startsWith('/machine-followup')) return 'machine'
-  if (pathname.startsWith('/kpi')) return null
+  if (pathname.startsWith('/kpi')) return 'kpi'
   return 'planning'
 }

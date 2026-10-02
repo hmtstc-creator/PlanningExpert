@@ -144,7 +144,7 @@ describe('fabrika ayrımı', () => {
     const dt = await session(t, m, 'dt')
     const c = await t.query(api.tenancy.context, { token: dt })
     expect(c.plants.map((p: Any) => p.name)).toEqual(['Plant 2'])
-    expect(c.active.access).toEqual({ planning: 'none', oee: 'none', die: 'edit', machine: 'view' })
+    expect(c.active.access).toEqual({ planning: 'none', oee: 'none', die: 'edit', machine: 'view', kpi: 'none' })
     await expect(t.mutation(api.tenancy.selectPlant, { token: dt, plantId: plants[0]._id })).rejects.toThrow(/no access/)
     await expect(t.query(api.planRuns.status, { token: dt })).rejects.toThrow(/view permission/)
     await t.mutation(api.moldProblems.report, { token: dt, material: 'M1', operation: 'OP10', problemType: 'Burr', occurredAt: '2026-10-01' })
@@ -298,5 +298,40 @@ describe('fabrika ayrımı', () => {
     await expect(t.mutation(api.oee.upsertShifts, { token: boss, rows: [row] })).rejects.toThrow(/not a cost center/)
     await t.mutation(api.platform.updatePlant, { token: boss, id: after.active.plantId, name: 'Plant 1', costCenters: [{ code: '51010171', name: 'Transfer' }] })
     await t.mutation(api.oee.upsertShifts, { token: boss, rows: [row] })
+  })
+
+  it('KPI: yalnızca fabrikanın masraf yerleri; dashboard yalnızca KPI izinli fabrikalar; OEE kök verisi', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const c = await t.query(api.tenancy.context, { token: boss })
+    const companyId = c.plants[0].companyId
+    const p1 = c.active.plantId
+    await t.mutation(api.platform.updatePlant, { token: boss, id: p1, name: 'Plant 1', costCenters: [{ code: 'CC1', name: 'Press' }] })
+    const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Plant 2', country: 'RO', timeZone: 'Europe/Bucharest', costCenters: [{ code: 'CC1', name: 'Press' }] })
+
+    const row = { costCenter: 'CC1', operatorType: 'direct', plan: { presenceHours: 100, overtimeHours: 10, oee: 0.8 }, actual: { presenceHours: 90, overtimeHours: 20 } }
+    await expect(t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [{ ...row, costCenter: 'X' }] })).rejects.toThrow(/not a cost center/)
+    await t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [row] })
+    await t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [{ ...row, actual: { presenceHours: 95 } }] })
+    const mine = await t.query(api.kpi.entries, { token: boss, period: 'month', year: 2026, num: 9 })
+    expect(mine.entries).toHaveLength(1)
+    expect(mine.entries[0].actual).toEqual({ presenceHours: 95 })
+    await t.run(async (ctx: Any) => {
+      await ctx.db.insert('oeeDays', { plantId: p1, date: '2026-09-21', plantKey: '', responsible: '', costCenter: 'CC1', workCenter: 'W', source: 'shiftly', good: 5, scrap: 0, reject: 0, scheduledMin: 0, unscheduledMin: 0, operatingMin: 60, productionMin: 90, loadingMin: 100 })
+    })
+    const d = await t.query(api.kpi.dashboard, { token: boss, period: 'month', year: 2026, num: 9, plantIds: [p1, p2] })
+    expect(d.slots).toHaveLength(12)
+    expect(d.plants.map((p: Any) => p.entries.length)).toEqual([1, 0])
+    expect(d.plants[0].oee).toEqual([{ costCenter: 'CC1', good: 5, operatingMin: 60, productionMin: 90, loadingMin: 100, slot: '2026-09' }])
+
+    // Yalnızca Plant 2'de KPI izni olan kullanıcı Plant 1'i dashboard'a ekleyemez.
+    const g = await t.mutation(api.users.saveGroup, { token: boss, companyId, name: 'KPI P2', allPlants: false, plantIds: [p2], permissions: { kpi: 'view' } })
+    const k = await session(t, await t.mutation(api.users.add, { token: boss, companyId, name: 'kp', groupIds: [g] }), 'kp')
+    await expect(t.query(api.kpi.dashboard, { token: k, period: 'month', year: 2026, num: 9, plantIds: [p1] })).rejects.toThrow(/no KPI access/)
+    expect((await t.query(api.kpi.plants, { token: k })).map((p: Any) => p.plantName)).toEqual(['Plant 2'])
+    await expect(t.mutation(api.kpi.save, { token: k, period: 'month', year: 2026, num: 9, rows: [row] })).rejects.toThrow(/edit permission/)
   })
 })

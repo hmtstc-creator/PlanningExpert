@@ -473,6 +473,11 @@ Yeni bir sohbet bu dosyayla devam edebilsin diye.
 - Sistem öncelikli: veriler yenilenebilir; eski MB51 satırları sorun değil.
   Sıradaki iş **plant genişletme** (docs/plant-genisletme.md).
 
+## KPI modülü (2026-10-02)
+
+Ayrıntı ve açık sorular: docs/kpi.md. Gerçekleşen OEE ve (girilmezse) üretim
+adedi / saati bu modülün günlerinden okunur.
+
 ## Bekleyen konular
 
 - ~~Veride eksikler (07–13.09, Ağustos/Eylül, 32–35. haftalar)~~ → veriye

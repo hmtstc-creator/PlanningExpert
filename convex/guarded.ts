@@ -44,7 +44,8 @@ type Any = any
 
 export const TABLES: readonly string[] = Object.keys((schema as Any).tables)
 
-export const ALL_MODULES: readonly Module[] = ['planning', 'oee', 'die', 'machine']
+export const ALL_MODULES: readonly Module[] = ['planning', 'oee', 'die', 'machine', 'kpi']
+export const KPI: readonly Module[] = ['kpi']
 export const DIE_OR_PLANNING: readonly Module[] = ['die', 'planning']
 export const MACHINE_OR_PLANNING: readonly Module[] = ['machine', 'planning']
 export const OEE: readonly Module[] = ['oee']

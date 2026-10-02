@@ -19,7 +19,6 @@ import { Route as HammaddeRouteImport } from './routes/hammadde'
 import { Route as KaliplarRouteImport } from './routes/kaliplar'
 import { Route as KalipproblemRouteImport } from './routes/kalipproblem'
 import { Route as KayitlarRouteImport } from './routes/kayitlar'
-import { Route as KpiRouteImport } from './routes/kpi'
 import { Route as MakinelerRouteImport } from './routes/makineler'
 import { Route as PerformansRouteImport } from './routes/performans'
 import { Route as PlanlamaRouteImport } from './routes/planlama'
@@ -38,6 +37,7 @@ import { Route as DieFollowupIndexRouteImport } from './routes/die-followup/inde
 import { Route as DieFollowupMaintenanceRouteImport } from './routes/die-followup/maintenance'
 import { Route as DieFollowupProblemsRouteImport } from './routes/die-followup/problems'
 import { Route as DieFollowupReportsRouteImport } from './routes/die-followup/reports'
+import { Route as KpiIndexRouteImport } from './routes/kpi/index'
 import { Route as MachineFollowupIndexRouteImport } from './routes/machine-followup/index'
 import { Route as MachineFollowupBreakdownsRouteImport } from './routes/machine-followup/breakdowns'
 import { Route as MachineFollowupMaintenanceRouteImport } from './routes/machine-followup/maintenance'
@@ -47,6 +47,10 @@ import { Route as OeeDataRouteImport } from './routes/oee/data'
 import { Route as OeeGuideRouteImport } from './routes/oee/guide'
 import { Route as OeeLossesRouteImport } from './routes/oee/losses'
 import { Route as OeeSettingsRouteImport } from './routes/oee/settings'
+import { Route as KpiMonthlyDashboardRouteImport } from './routes/kpi/monthly/dashboard'
+import { Route as KpiMonthlyEntryRouteImport } from './routes/kpi/monthly/entry'
+import { Route as KpiWeeklyDashboardRouteImport } from './routes/kpi/weekly/dashboard'
+import { Route as KpiWeeklyEntryRouteImport } from './routes/kpi/weekly/entry'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -96,11 +100,6 @@ const KalipproblemRoute = KalipproblemRouteImport.update({
 const KayitlarRoute = KayitlarRouteImport.update({
   id: '/kayitlar',
   path: '/kayitlar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KpiRoute = KpiRouteImport.update({
-  id: '/kpi',
-  path: '/kpi',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MakinelerRoute = MakinelerRouteImport.update({
@@ -193,6 +192,11 @@ const DieFollowupReportsRoute = DieFollowupReportsRouteImport.update({
   path: '/die-followup/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KpiIndexRoute = KpiIndexRouteImport.update({
+  id: '/kpi/',
+  path: '/kpi/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MachineFollowupIndexRoute = MachineFollowupIndexRouteImport.update({
   id: '/machine-followup/',
   path: '/machine-followup/',
@@ -240,6 +244,26 @@ const OeeSettingsRoute = OeeSettingsRouteImport.update({
   path: '/oee/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KpiMonthlyDashboardRoute = KpiMonthlyDashboardRouteImport.update({
+  id: '/kpi/monthly/dashboard',
+  path: '/kpi/monthly/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KpiMonthlyEntryRoute = KpiMonthlyEntryRouteImport.update({
+  id: '/kpi/monthly/entry',
+  path: '/kpi/monthly/entry',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KpiWeeklyDashboardRoute = KpiWeeklyDashboardRouteImport.update({
+  id: '/kpi/weekly/dashboard',
+  path: '/kpi/weekly/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KpiWeeklyEntryRoute = KpiWeeklyEntryRouteImport.update({
+  id: '/kpi/weekly/entry',
+  path: '/kpi/weekly/entry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -252,7 +276,6 @@ export interface FileRoutesByFullPath {
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
-  '/kpi': typeof KpiRoute
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
@@ -278,8 +301,13 @@ export interface FileRoutesByFullPath {
   '/oee/losses': typeof OeeLossesRoute
   '/oee/settings': typeof OeeSettingsRoute
   '/die-followup/': typeof DieFollowupIndexRoute
+  '/kpi/': typeof KpiIndexRoute
   '/machine-followup/': typeof MachineFollowupIndexRoute
   '/oee/': typeof OeeIndexRoute
+  '/kpi/monthly/dashboard': typeof KpiMonthlyDashboardRoute
+  '/kpi/monthly/entry': typeof KpiMonthlyEntryRoute
+  '/kpi/weekly/dashboard': typeof KpiWeeklyDashboardRoute
+  '/kpi/weekly/entry': typeof KpiWeeklyEntryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -292,7 +320,6 @@ export interface FileRoutesByTo {
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
-  '/kpi': typeof KpiRoute
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
@@ -318,8 +345,13 @@ export interface FileRoutesByTo {
   '/oee/losses': typeof OeeLossesRoute
   '/oee/settings': typeof OeeSettingsRoute
   '/die-followup': typeof DieFollowupIndexRoute
+  '/kpi': typeof KpiIndexRoute
   '/machine-followup': typeof MachineFollowupIndexRoute
   '/oee': typeof OeeIndexRoute
+  '/kpi/monthly/dashboard': typeof KpiMonthlyDashboardRoute
+  '/kpi/monthly/entry': typeof KpiMonthlyEntryRoute
+  '/kpi/weekly/dashboard': typeof KpiWeeklyDashboardRoute
+  '/kpi/weekly/entry': typeof KpiWeeklyEntryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -333,7 +365,6 @@ export interface FileRoutesById {
   '/kaliplar': typeof KaliplarRoute
   '/kalipproblem': typeof KalipproblemRoute
   '/kayitlar': typeof KayitlarRoute
-  '/kpi': typeof KpiRoute
   '/makineler': typeof MakinelerRoute
   '/performans': typeof PerformansRoute
   '/planlama': typeof PlanlamaRoute
@@ -359,8 +390,13 @@ export interface FileRoutesById {
   '/oee/losses': typeof OeeLossesRoute
   '/oee/settings': typeof OeeSettingsRoute
   '/die-followup/': typeof DieFollowupIndexRoute
+  '/kpi/': typeof KpiIndexRoute
   '/machine-followup/': typeof MachineFollowupIndexRoute
   '/oee/': typeof OeeIndexRoute
+  '/kpi/monthly/dashboard': typeof KpiMonthlyDashboardRoute
+  '/kpi/monthly/entry': typeof KpiMonthlyEntryRoute
+  '/kpi/weekly/dashboard': typeof KpiWeeklyDashboardRoute
+  '/kpi/weekly/entry': typeof KpiWeeklyEntryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -375,7 +411,6 @@ export interface FileRouteTypes {
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
-    | '/kpi'
     | '/makineler'
     | '/performans'
     | '/planlama'
@@ -401,8 +436,13 @@ export interface FileRouteTypes {
     | '/oee/losses'
     | '/oee/settings'
     | '/die-followup/'
+    | '/kpi/'
     | '/machine-followup/'
     | '/oee/'
+    | '/kpi/monthly/dashboard'
+    | '/kpi/monthly/entry'
+    | '/kpi/weekly/dashboard'
+    | '/kpi/weekly/entry'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -415,7 +455,6 @@ export interface FileRouteTypes {
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
-    | '/kpi'
     | '/makineler'
     | '/performans'
     | '/planlama'
@@ -441,8 +480,13 @@ export interface FileRouteTypes {
     | '/oee/losses'
     | '/oee/settings'
     | '/die-followup'
+    | '/kpi'
     | '/machine-followup'
     | '/oee'
+    | '/kpi/monthly/dashboard'
+    | '/kpi/monthly/entry'
+    | '/kpi/weekly/dashboard'
+    | '/kpi/weekly/entry'
   id:
     | '__root__'
     | '/'
@@ -455,7 +499,6 @@ export interface FileRouteTypes {
     | '/kaliplar'
     | '/kalipproblem'
     | '/kayitlar'
-    | '/kpi'
     | '/makineler'
     | '/performans'
     | '/planlama'
@@ -481,8 +524,13 @@ export interface FileRouteTypes {
     | '/oee/losses'
     | '/oee/settings'
     | '/die-followup/'
+    | '/kpi/'
     | '/machine-followup/'
     | '/oee/'
+    | '/kpi/monthly/dashboard'
+    | '/kpi/monthly/entry'
+    | '/kpi/weekly/dashboard'
+    | '/kpi/weekly/entry'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -496,7 +544,6 @@ export interface RootRouteChildren {
   KaliplarRoute: typeof KaliplarRoute
   KalipproblemRoute: typeof KalipproblemRoute
   KayitlarRoute: typeof KayitlarRoute
-  KpiRoute: typeof KpiRoute
   MakinelerRoute: typeof MakinelerRoute
   PerformansRoute: typeof PerformansRoute
   PlanlamaRoute: typeof PlanlamaRoute
@@ -522,8 +569,13 @@ export interface RootRouteChildren {
   OeeLossesRoute: typeof OeeLossesRoute
   OeeSettingsRoute: typeof OeeSettingsRoute
   DieFollowupIndexRoute: typeof DieFollowupIndexRoute
+  KpiIndexRoute: typeof KpiIndexRoute
   MachineFollowupIndexRoute: typeof MachineFollowupIndexRoute
   OeeIndexRoute: typeof OeeIndexRoute
+  KpiMonthlyDashboardRoute: typeof KpiMonthlyDashboardRoute
+  KpiMonthlyEntryRoute: typeof KpiMonthlyEntryRoute
+  KpiWeeklyDashboardRoute: typeof KpiWeeklyDashboardRoute
+  KpiWeeklyEntryRoute: typeof KpiWeeklyEntryRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -596,13 +648,6 @@ declare module '@tanstack/react-router' {
       path: '/kayitlar'
       fullPath: '/kayitlar'
       preLoaderRoute: typeof KayitlarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/kpi': {
-      id: '/kpi'
-      path: '/kpi'
-      fullPath: '/kpi'
-      preLoaderRoute: typeof KpiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/makineler': {
@@ -731,6 +776,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DieFollowupReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kpi/': {
+      id: '/kpi/'
+      path: '/kpi'
+      fullPath: '/kpi/'
+      preLoaderRoute: typeof KpiIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/machine-followup/': {
       id: '/machine-followup/'
       path: '/machine-followup'
@@ -794,6 +846,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OeeSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kpi/monthly/dashboard': {
+      id: '/kpi/monthly/dashboard'
+      path: '/kpi/monthly/dashboard'
+      fullPath: '/kpi/monthly/dashboard'
+      preLoaderRoute: typeof KpiMonthlyDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kpi/monthly/entry': {
+      id: '/kpi/monthly/entry'
+      path: '/kpi/monthly/entry'
+      fullPath: '/kpi/monthly/entry'
+      preLoaderRoute: typeof KpiMonthlyEntryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kpi/weekly/dashboard': {
+      id: '/kpi/weekly/dashboard'
+      path: '/kpi/weekly/dashboard'
+      fullPath: '/kpi/weekly/dashboard'
+      preLoaderRoute: typeof KpiWeeklyDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kpi/weekly/entry': {
+      id: '/kpi/weekly/entry'
+      path: '/kpi/weekly/entry'
+      fullPath: '/kpi/weekly/entry'
+      preLoaderRoute: typeof KpiWeeklyEntryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -808,7 +888,6 @@ const rootRouteChildren: RootRouteChildren = {
   KaliplarRoute: KaliplarRoute,
   KalipproblemRoute: KalipproblemRoute,
   KayitlarRoute: KayitlarRoute,
-  KpiRoute: KpiRoute,
   MakinelerRoute: MakinelerRoute,
   PerformansRoute: PerformansRoute,
   PlanlamaRoute: PlanlamaRoute,
@@ -834,8 +913,13 @@ const rootRouteChildren: RootRouteChildren = {
   OeeLossesRoute: OeeLossesRoute,
   OeeSettingsRoute: OeeSettingsRoute,
   DieFollowupIndexRoute: DieFollowupIndexRoute,
+  KpiIndexRoute: KpiIndexRoute,
   MachineFollowupIndexRoute: MachineFollowupIndexRoute,
   OeeIndexRoute: OeeIndexRoute,
+  KpiMonthlyDashboardRoute: KpiMonthlyDashboardRoute,
+  KpiMonthlyEntryRoute: KpiMonthlyEntryRoute,
+  KpiWeeklyDashboardRoute: KpiWeeklyDashboardRoute,
+  KpiWeeklyEntryRoute: KpiWeeklyEntryRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

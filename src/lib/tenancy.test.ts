@@ -12,15 +12,15 @@ const eng: GroupLike = { _id: 'g2', companyId: 'c1', allPlants: false, plantIds:
 describe('yetki kuralları', () => {
   it('gruplar birleşir, en geniş izin geçerli; fabrika kapsamı', () => {
     const u = { _id: 'u', companyId: 'c1', groupIds: ['g1', 'g2'] }
-    expect(accessFor(u, p1, company, [board, eng])).toEqual({ planning: 'edit', oee: 'view', die: 'none', machine: 'none' })
+    expect(accessFor(u, p1, company, [board, eng])).toEqual({ planning: 'edit', oee: 'view', die: 'none', machine: 'none', kpi: 'none' })
     // p2'de mühendis grubu yok; OEE bu fabrikada kapalı.
-    expect(accessFor(u, p2, company, [board, eng])).toEqual({ planning: 'view', oee: 'none', die: 'none', machine: 'none' })
+    expect(accessFor(u, p2, company, [board, eng])).toEqual({ planning: 'view', oee: 'none', die: 'none', machine: 'none', kpi: 'none' })
   })
 
   it('creator şirketin her yerinde düzenler; başka şirkette hiçbir şey', () => {
     const cr = { _id: 'c', companyId: 'c1', isCreator: true }
     expect(allows(accessFor(cr, p1, company, []), ['die'], 'edit')).toBe(true)
-    expect(accessFor(cr, { _id: 'x', companyId: 'c2' }, { ...company, _id: 'c2' }, [])).toEqual({ planning: 'none', oee: 'none', die: 'none', machine: 'none' })
+    expect(accessFor(cr, { _id: 'x', companyId: 'c2' }, { ...company, _id: 'c2' }, [])).toEqual({ planning: 'none', oee: 'none', die: 'none', machine: 'none', kpi: 'none' })
     expect(canManageCompany(cr, 'c1')).toBe(true)
     expect(canManageCompany(cr, 'c2')).toBe(false)
   })

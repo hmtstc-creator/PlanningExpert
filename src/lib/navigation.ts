@@ -109,6 +109,17 @@ export const MODULE_NAVS: ModuleNav[] = [
     ],
   },
   {
+    prefix: '/kpi',
+    title: 'KPI',
+    links: [
+      { to: '/kpi', label: 'Overview' },
+      { to: '/kpi/monthly/entry', label: 'Monthly entry', hint: 'Plan and actual per cost center and month' },
+      { to: '/kpi/monthly/dashboard', label: 'Monthly dashboard', hint: 'A3 page, 12 months' },
+      { to: '/kpi/weekly/entry', label: 'Weekly entry', hint: 'Plan and actual per cost center and week' },
+      { to: '/kpi/weekly/dashboard', label: 'Weekly dashboard', hint: 'A3 page, 13 weeks' },
+    ],
+  },
+  {
     prefix: '/oee',
     title: 'OEE Trend and Losses',
     links: [

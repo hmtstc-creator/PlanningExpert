@@ -46,13 +46,10 @@ export const PORTAL_MODULES: PortalModule[] = [
   },
   {
     to: '/kpi',
+    module: 'kpi',
     title: 'KPI',
-    description: 'Key plant figures on one page.',
-    ready: false,
-    related: [
-      { to: '/planningexpert', label: 'PlanningExpert overview' },
-      { to: '/performans', label: 'Performance' },
-    ],
+    description: 'Monthly and weekly KPIs per cost center — plan against actual, A3 dashboard and PDF.',
+    ready: true,
   },
 ]
 

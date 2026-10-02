@@ -12,7 +12,7 @@
  * platform (owner, general) her zaman görür ve düzenler.
  */
 
-export const MODULES = ['planning', 'oee', 'die', 'machine'] as const
+export const MODULES = ['planning', 'oee', 'die', 'machine', 'kpi'] as const
 export type Module = (typeof MODULES)[number]
 
 export const MODULE_LABELS: Record<Module, string> = {
@@ -20,6 +20,7 @@ export const MODULE_LABELS: Record<Module, string> = {
   oee: 'OEE',
   die: 'Die Follow-up',
   machine: 'Machine Follow-up',
+  kpi: 'KPI',
 }
 
 export const LEVELS = ['none', 'view', 'edit'] as const
@@ -30,8 +31,8 @@ export type Access = Record<Module, Level>
 export type PlatformRole = 'owner' | 'general'
 export type CompanyStatus = 'active' | 'suspended'
 
-export const NO_ACCESS: Access = { planning: 'none', oee: 'none', die: 'none', machine: 'none' }
-export const FULL_ACCESS: Access = { planning: 'edit', oee: 'edit', die: 'edit', machine: 'edit' }
+export const NO_ACCESS: Access = { planning: 'none', oee: 'none', die: 'none', machine: 'none', kpi: 'none' }
+export const FULL_ACCESS: Access = { planning: 'edit', oee: 'edit', die: 'edit', machine: 'edit', kpi: 'edit' }
 
 const RANK: Record<Level, number> = { none: 0, view: 1, edit: 2 }
 
@@ -131,5 +132,5 @@ export const LEGACY_ROLE_GROUPS: { role: string; name: string; level: Level }[] 
 ]
 
 export function uniformPermissions(level: Level): Record<Module, Level> {
-  return { planning: level, oee: level, die: level, machine: level }
+  return { planning: level, oee: level, die: level, machine: level, kpi: level }
 }

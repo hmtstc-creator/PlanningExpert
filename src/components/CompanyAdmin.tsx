@@ -252,7 +252,7 @@ function GroupPicker({ groups, value, onChange }: { groups: GroupRow[]; value: s
   )
 }
 
-const EMPTY_PERMS: Record<Module, Level> = { planning: 'none', oee: 'none', die: 'none', machine: 'none' }
+const EMPTY_PERMS: Record<Module, Level> = { planning: 'none', oee: 'none', die: 'none', machine: 'none', kpi: 'none' }
 
 export function CompanyGroups({ companyId, groups, plants }: { companyId: string; groups: GroupRow[]; plants: { _id: string; name: string }[] }) {
   const { run: saveGroup, error, clearError } = useSafeMutation(api.users.saveGroup)
@@ -325,7 +325,7 @@ export function CompanyGroups({ companyId, groups, plants }: { companyId: string
           <button
             className="underline"
             title="Sees every plant of the company (also plants added later), changes nothing"
-            onClick={() => setDraft({ ...blank, name: 'Board members', allPlants: true, permissions: { planning: 'view', oee: 'view', die: 'view', machine: 'view' } })}
+            onClick={() => setDraft({ ...blank, name: 'Board members', allPlants: true, permissions: { planning: 'view', oee: 'view', die: 'view', machine: 'view', kpi: 'view' } })}
           >
             + Board members (all plants, view)
           </button>
@@ -334,7 +334,7 @@ export function CompanyGroups({ companyId, groups, plants }: { companyId: string
               key={p._id}
               className="underline"
               title={`Sees only ${p.name}; edits OEE, views the rest`}
-              onClick={() => setDraft({ ...blank, name: `Plant manager — ${p.name}`, allPlants: false, plantIds: [p._id], permissions: { planning: 'view', oee: 'edit', die: 'view', machine: 'view' } })}
+              onClick={() => setDraft({ ...blank, name: `Plant manager — ${p.name}`, allPlants: false, plantIds: [p._id], permissions: { planning: 'view', oee: 'edit', die: 'view', machine: 'view', kpi: 'edit' } })}
             >
               + Plant manager — {p.name}
             </button>

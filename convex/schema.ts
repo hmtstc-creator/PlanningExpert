@@ -50,6 +50,7 @@ export default defineSchema({
       oee: v.optional(v.string()),
       die: v.optional(v.string()),
       machine: v.optional(v.string()),
+      kpi: v.optional(v.string()),
     }),
     createdAt: v.number(),
   }).index('by_company', ['companyId']),
@@ -760,6 +761,22 @@ export default defineSchema({
     sheets: v.array(v.array(v.union(v.string(), v.number()))),
     ranges: v.array(v.array(v.string())),
   }).index('by_uploadedAt', ['plantId', 'uploadedAt'])
+    .index('by_plant', ['plantId']),
+
+  // ---- KPI (docs/kpi.md): masraf yeri × ay ya da ISO hafta, plan ve gerçekleşen ----
+  kpiEntries: defineTable({
+    ...plantField,
+    period: v.string(), // 'month' | 'week'
+    year: v.number(),
+    num: v.number(), // ay 1–12 ya da ISO hafta
+    costCenter: v.string(),
+    operatorType: v.string(), // 'direct' | 'indirect'
+    plan: v.any(),
+    actual: v.any(),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.string()),
+  })
+    .index('by_period', ['plantId', 'period', 'year', 'num'])
     .index('by_plant', ['plantId']),
 
   changeLog: defineTable({
