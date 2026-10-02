@@ -12,7 +12,7 @@ export const Route = createFileRoute('/gerceklesen')({
 
 function GerceklesenPage() {
   // Yalnızca üretim hareketleri: üretim deposuna (Storage Locations'ta
-  // "Production receipt", varsayılan 2009) 101 girişleri eksi 102 iptalleri.
+  // "Production receipt" tikli depo) 101 girişleri eksi 102 iptalleri.
   const result = useQuery(api.actualProduction.listAll) as
     | { rows: { material: string; postingDate: string; quantity: number }[]; complete: boolean }
     | undefined
@@ -47,7 +47,7 @@ function GerceklesenPage() {
         info={
           <p>
             Only movements into the production receipt location count (ticked on{' '}
-            <Link to="/depolar">Storage Locations</Link>, 2009 by default). Other movements are not
+            <Link to="/depolar">Storage Locations</Link>). Other movements are not
             production. The same figure feeds plan versus actual, press performance and the mould
             shot counters. MB51 is uploaded on <Link to="/sapdata">SAP Data</Link>.
           </p>

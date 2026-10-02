@@ -378,7 +378,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
 
   // ---- ayarlar
   const s = inputs.settings ?? {}
-  const timeZone = s.timeZone || run.timeZone || 'Europe/Bucharest'
+  const timeZone = s.timeZone || run.timeZone || 'UTC'
   const shiftStart = s.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute
   const shiftLen = s.shiftMinutes ?? SETTINGS_DEFAULTS.shiftMinutes
   const cutoff = s.deliveryCutoffMinute ?? SETTINGS_DEFAULTS.deliveryCutoffMinute

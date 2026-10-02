@@ -97,7 +97,7 @@ function MakinelerPage() {
     try {
       ok = await upsert({
         name: n,
-        hall: hall.trim() || 'Hall 1',
+        hall: hall.trim(),
         category: category.trim() || undefined,
         feedsCoil,
       })
@@ -224,7 +224,7 @@ function MakinelerPage() {
                 onClick={() =>
                   void upsert({
                     name: p,
-                    hall: hall.trim() || 'Hall 1',
+                    hall: hall.trim(),
                     category: category.trim() || undefined,
                     feedsCoil,
                   })

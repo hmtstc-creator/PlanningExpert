@@ -312,7 +312,7 @@ function DataInUse({ status }: { status: UploadStatus | undefined }) {
         Data the plan is using
         <span className="ml-2 font-normal text-muted-foreground">
           {status.plan
-            ? `plan calculated ${formatPlantTime(status.plan.computedAt)} (Romania time)`
+            ? `plan calculated ${formatPlantTime(status.plan.computedAt)} (plant time)`
             : 'no plan calculated yet'}
         </span>
       </h2>

@@ -21,6 +21,7 @@ import { relatedPages } from '../lib/navigation'
 import { patternProblem, serverErrorText } from '../lib/pressCalendar'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { stopMinutesByShift } from '../lib/capacityModel'
+import { usePlant } from '../lib/plantContext'
 
 export const Route = createFileRoute('/capacity')({
   component: CapacityPage,
@@ -151,7 +152,7 @@ function CapacityPage() {
             <p>
               <b>Demand</b> is the ZPP requirement of the week — this week also carries the overdue
               backlog — after stock in locations{' '}
-              {(forecast?.stockLocations ?? ['2009', '1009']).join(', ')} is used up, earliest week
+              {(forecast?.stockLocations ?? []).join(', ') || 'the ticked locations'} is used up, earliest week
               first. Each part counts on its main press; a co-product pair counts once.
             </p>
             <p>
@@ -577,6 +578,7 @@ function OvertimeEditor({
   overrides: ({ press: string; weekStart: string } & Pattern)[]
   onClose: () => void
 }) {
+  const plantCountry = usePlant().ctx?.active?.country ?? ''
   const saveOverride = useMutation(api.pressCalendar.saveOverride)
   const clearOverride = useMutation(api.pressCalendar.clearOverride)
   const override = overrides.find((o) => o.press === press && o.weekStart === week.start)
@@ -588,7 +590,7 @@ function OvertimeEditor({
   })
   const settings = useQuery(api.pressCalendar.getGlobalSettings) as { shiftMinutes?: number; shiftStartMinute?: number; country?: string } | null | undefined
   const calendar = useQuery(api.workCalendar.get) as { holidays?: string[] } | null | undefined
-  const official = (useQuery(api.holidays.listByCountry, { country: settings?.country ?? SETTINGS_DEFAULTS.country }) ?? []) as { date: string }[]
+  const official = (useQuery(api.holidays.listByCountry, { country: settings?.country || plantCountry }) ?? []) as { date: string }[]
   const holidays = new Set<string>([...(calendar?.holidays ?? []), ...official.map((h) => h.date)])
   const shiftMinutes = settings?.shiftMinutes ?? SETTINGS_DEFAULTS.shiftMinutes
   const problem = patternProblem(draft, shiftMinutes)

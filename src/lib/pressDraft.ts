@@ -65,7 +65,8 @@ export interface PressPayload {
 export function pressPayload(name: string, draft: PressDraft): PressPayload {
   return {
     name,
-    hall: draft.hall.trim() || 'Hall 1',
+    // Hol zorunlu; boşsa sunucu reddeder (kodda varsayılan hol yok).
+    hall: draft.hall.trim(),
     category: draft.category.trim() || undefined,
     feedsCoil: draft.feedsCoil,
     frozenDays: optionalNumber(draft.frozenDays, 0),

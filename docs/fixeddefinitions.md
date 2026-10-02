@@ -17,7 +17,7 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 | 9 | "Çok rulo" uyarısı | bir işte 200'den fazla rulo | `planPipeline.ts` (MANY_COILS) | P | |
 | 10 | "Yer tutucu" rulo ağırlığı | 1 kg ve altı: rulo kuralı uygulanmaz | `planning.ts`, `planValidator.ts` | P | |
 | 11 | Genel çalışma günü seçilmemişse | — | — | Kaldırıldı: pres takvimi esas | — |
-| 12 | Hol adı boş bırakılırsa | "Hall 1" | `pressDraft.ts` | K (hol zorunlu) | |
+| 12 | ~~Hol adı boş bırakılırsa "Hall 1"~~ | hol zorunlu; boşsa kayıt reddedilir | `convex/presses.ts` | K | Kaldırıldı (2026-10-02, plant genişletme aşama 5) |
 | 13 | Bakiye ve bugünün ihtiyacı | ertesi iş günü, teslim saatinde | `planPipeline.ts` | P | |
 | 14 | Varış tarihi olmayan yoldaki rulo | bu hafta gelmiş sayılır | `rawMrp.ts`, `planning.ts` | P | |
 | 15 | Yoldakiler Excel'inde birim "TO" | tona çevrilir (×1000) | `sapParsers.ts` | P | |
@@ -33,7 +33,10 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 | 26 | Tekrarlayan mesai resmi tatilde | çalışmaz (tatilde mesai tarihli açılır) | `pressCalendar.ts` | P | P — onaylandı |
 | 27 | "İş günü" sayarken mesai | sayılmaz: yalnızca normal vardiyası olan gün | `capacityModel.ts` (isPlantWorkingDate) | P | P — onaylandı |
 | 28 | Normal vardiyayla ya da başka mesaiyle çakışan mesai | kaydedilmez | `pressCalendar.ts` | P | |
-| 25 | Varsayılan depolar (matriste tik yoksa) | bitmiş ürün ve hammadde: 2009, 1009; üretim girişi: 2009 | `stockLocations.ts` | P | |
+| 25 | ~~Varsayılan depolar 2009, 1009~~ | tiksiz depo sayılmaz; hiç "Finished goods" tiki yoksa plan uyarır | `stockLocations.ts` | K | Kaldırıldı (2026-10-02). Mevcut kurulumda geçiş tikleri veriye yazar |
+
+| 36 | ~~Ülke RO, saat dilimi Europe/Bucharest~~ | fabrika kaydında (`plants`), fabrika açılırken zorunlu; bilinmiyorsa UTC | `convex/plantLocale.ts` | K | Kaldırıldı (2026-10-02). Plant 1'e geçişte yazılır |
+| 37 | İlk kurulum kullanıcısı admin / admin | yalnızca platformun ilk kurulumu (hiç kullanıcı yokken); fabrikada kullanıcıyı creator geçici şifreyle açar | `convex/auth.ts` | P | Kalır |
 
 Not: Eski "14 gün stok = acil" kuralının kodu kaldırıldı; acil tanımı stok
 projeksiyonundan gelir.

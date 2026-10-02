@@ -16,6 +16,7 @@ import { capacityModel } from '../lib/capacityModel'
 import { useOvertimeData } from '../components/OvertimePanels'
 import { InfoTip, PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
+import { usePlant } from '../lib/plantContext'
 
 export const Route = createFileRoute('/performans')({
   component: PerformansPage,
@@ -27,6 +28,7 @@ function percent(v: number | null): string {
 }
 
 function PerformansPage() {
+  const plantCountry = usePlant().ctx?.active?.country ?? ''
   const today = useMemo(() => new Date(), [])
   const [from, setFrom] = useState(() => isoDate(addDays(mondayOf(today), -7)))
   const [to, setTo] = useState(() => isoDate(today))
@@ -114,7 +116,7 @@ function PerformansPage() {
     durationMinutes: number
   }[]
   const { definitions: overtimeDefinitions, pressOvertime } = useOvertimeData()
-  const country = globalSettings?.country ?? SETTINGS_DEFAULTS.country
+  const country = globalSettings?.country || plantCountry
   const officialHolidays = (useQuery(api.holidays.listByCountry, { country }) ?? []) as { date: string }[]
   const availableMinutes = useMemo(() => {
     const model = capacityModel({

@@ -14,10 +14,11 @@ function plant(overrides: Partial<PlanInputs> = {}): PlanInputs {
     ],
     weeklyDemand: [{ material: 'Z', overdue: -200, periods: [] }],
     stock: [],
-    locations: [],
+    // Tesisin depo tikleri (kodda varsayılan depo yok).
+    locations: [{ code: '2009', countFinished: true, countRaw: true }, { code: '1009', countFinished: true, countRaw: true }],
     presses: [{ name: '104', hall: 'H1' }],
     templates: [{ press: '104', workingDays: 5, shiftsPerDay: 1, overtimeShifts: 0 }],
-    settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0 },
+    settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0 },
     workCalendar: null,
     officialHolidays: [],
     latestSnapshot: null,

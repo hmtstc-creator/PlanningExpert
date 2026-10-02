@@ -32,7 +32,7 @@ function plant(overrides: Partial<PlanInputs> = {}): PlanInputs {
       { press: '104', workingDays: 5, shiftsPerDay: 2, overtimeShifts: 0 },
       { press: '105', workingDays: 5, shiftsPerDay: 2, overtimeShifts: 0 },
     ],
-    settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0 },
+    settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0 },
     workCalendar: null,
     officialHolidays: [],
     latestSnapshot: null,

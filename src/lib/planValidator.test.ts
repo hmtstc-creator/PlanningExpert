@@ -17,10 +17,11 @@ function plant(overrides: Partial<PlanInputs> = {}): PlanInputs {
     ],
     weeklyDemand: [{ material: 'Z', overdue: -200, periods: [] }],
     stock: [],
-    locations: [],
+    // Tesisin depo tikleri (kodda varsayılan depo yok).
+    locations: [{ code: '2009', countFinished: true, countRaw: true }, { code: '1009', countFinished: true, countRaw: true }],
     presses: [{ name: '104', hall: 'H1' }],
     templates: [{ press: '104', workingDays: 5, shiftsPerDay: 1, overtimeShifts: 0 }],
-    settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0, maxScenarios: 4 },
+    settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0, maxScenarios: 4 },
     workCalendar: null,
     officialHolidays: [],
     latestSnapshot: null,
@@ -188,7 +189,7 @@ describe('part 1 — independent stock simulation', () => {
 
   it('T3: frozen job runs after the need → frozen-late', () => {
     const inputs = plant({
-      settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0, frozenDays: 3, maxScenarios: 3 },
+      settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0, frozenDays: 3, maxScenarios: 3 },
       latestSnapshot: {
         createdAt: MONDAY_0700 - 3600_000,
         jobs: [
@@ -414,7 +415,7 @@ describe('part 2 — feasibility', () => {
       templates: presses.map((p) => ({ press: p.name, workingDays: 5, shiftsPerDay: 1, overtimeShifts: 0 })),
       products: presses.map((p, i) => ({ code: `M${i}`, moldCavities: 1, spm: 60, setupMinutes: 120, mainMachine: p.name })),
       weeklyDemand: presses.map((_, i) => ({ material: `M${i}`, overdue: -60, periods: [] })),
-      settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 1, safetyStockDays: 0, maxScenarios: 2, maxSetupsPlantWide: 1, maxSetupsPlantWideNormal: 1 },
+      settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 1, safetyStockDays: 0, maxScenarios: 2, maxSetupsPlantWide: 1, maxSetupsPlantWideNormal: 1 },
     })
     const v = validatePlan(inputs, computePlan(inputs, MONDAY_0700), MONDAY_0700)
     // 6 × 120 dk setup, tek ekip, Salı 08:00'e kadar 540 dk çalışma: en fazla 4 setup → en az 2 geç.
@@ -577,7 +578,7 @@ describe('part 4 — hard rules on the absolute time axis', () => {
         { material: 'Z', overdue: 0, periods: [{ label: 'W38', qty: 0 }, { label: 'W39', qty: 0 }, { label: 'W40', qty: 0 }, { label: 'W41', qty: -200 }] },
         { material: 'W', overdue: -500, periods: [] },
       ],
-      settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 4, safetyStockDays: 0 },
+      settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 4, safetyStockDays: 0 },
     })
     const v = validatePlan(inputs, fakeRun(inputs, [job('Z', '105', [S(D(0), 0, 30), R(D(0), 30, 50)], 200, { phase: 'fill' })]), MONDAY_0700)
     expect(rule(v, 'pull-forward').broken).toBe(1)
@@ -590,7 +591,7 @@ describe('part 4 — hard rules on the absolute time axis', () => {
       weeklyDemand: [
         { material: 'Y', overdue: 0, periods: [{ label: 'W38', qty: -1000 }, { label: 'W39', qty: 0 }, { label: 'W40', qty: -1000 }, { label: 'W41', qty: -1000 }] },
       ],
-      settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 4, safetyStockDays: 0 },
+      settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 4, safetyStockDays: 0 },
     })
     const lots = (secondDue: string) =>
       fakeRun(inputs, [
@@ -632,7 +633,7 @@ describe('part 4 — hard rules on the absolute time axis', () => {
   it('R10 frozen job changed, R12 die change without setup, R13 urgent before backlog', () => {
     const inputs = two({
       weeklyDemand: [{ material: 'Z', overdue: -1000, periods: [] }],
-      settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0, frozenDays: 1 },
+      settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 0, frozenDays: 1 },
       latestSnapshot: {
         createdAt: MONDAY_0700 - 3600_000,
         jobs: [{ material: 'W', press: '201', hall: 'H2', date: D(0), phase: 'fill', quantity: 500, shots: 500, coilsNeeded: 0, setupStartMinute: 0, endMinute: 80, segments: [S(D(0), 0, 30), R(D(0), 30, 80)], reason: 'ok' }],
@@ -756,7 +757,7 @@ function stress(seed: number, nMat: number): PlanInputs {
     stock,
     presses,
     templates: presses.map((p, i) => ({ press: p.name, workingDays: 5, shiftsPerDay: i % 3 === 0 ? 3 : 2, overtimeShifts: i === 2 ? 2 : 0 })),
-    settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 4, safetyStockDays: 1, maxScenarios: 4 },
+    settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 4, safetyStockDays: 1, maxScenarios: 4 },
     plannedStops: [
       { shiftIndex: 1, name: 'meal', kind: 'break', startMinute: 690, durationMinutes: 30 },
       { shiftIndex: 2, name: 'meal', kind: 'break', startMinute: 1170, durationMinutes: 30 },

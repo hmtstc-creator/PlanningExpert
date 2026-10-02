@@ -8,6 +8,7 @@ import {
   type OvertimeDefinition,
   type PressDaySources,
 } from '../src/lib/pressCalendar'
+import { withLocale } from './plantLocale'
 import { SETTINGS_DEFAULTS } from '../src/lib/settingsDefaults'
 
 /**
@@ -190,7 +191,7 @@ async function sources(ctx: Ctx): Promise<PressDaySources> {
     .query('workCalendar')
     .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
     .first()
-  const country = settings?.country ?? SETTINGS_DEFAULTS.country
+  const country = (await withLocale(ctx, settings ?? {})).country
   const official = await ctx.db
     .query('officialHolidays')
     .withIndex('by_country', (q: Ctx) => q.eq('country', country))

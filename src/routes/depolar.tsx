@@ -127,7 +127,7 @@ function DepolarPage() {
   /**
    * Deletes a storage location definition. A location that still appears in
    * MB52 stock does not disappear from the list — only its definition
-   * (ticks/note) is removed and it falls back to the defaults, because the
+   * (ticks/note) is removed and it counts for nothing, because the
    * stock data keeps producing that code.
    */
   async function deleteLocation(code: string) {
@@ -135,7 +135,7 @@ function DepolarPage() {
     if (!record) return
     const stillInStock = stockRows.some((s) => s.storageLocation === code)
     const message = stillInStock
-      ? `Delete the definition for storage location ${code}? It still appears in MB52 stock, so it will stay in the list but fall back to the default ticks.`
+      ? `Delete the definition for storage location ${code}? It still appears in MB52 stock, so it will stay in the list without ticks (not counted).`
       : `Remove storage location ${code} from the list entirely?`
     if (!window.confirm(message)) return
     setSaving(code)
@@ -172,9 +172,9 @@ function DepolarPage() {
               </li>
             </ul>
             <p>
-              Without a saved tick, 2009 and 1009 count for finished goods and raw material, and
-              2009 for production receipt. Stock in an unticked location is shown but never
-              netted.
+              A location without a tick counts for nothing — there are no built-in locations. Stock
+              in an unticked location is shown but never netted; with no "Finished goods" tick at
+              all the plan warns that it sees no stock.
             </p>
           </>
         }

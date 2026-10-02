@@ -24,7 +24,7 @@ export const Route = createFileRoute('/planlogic')({
 const FMEA_ROWS: [string, string, number, number, number, string][] = [
   ['Plan and demand both counted', 'Same steel ordered twice', 8, 8, 3, 'Plan-independent: demand only; the safety stock absorbs plan timing and coil surplus'],
   ['Finished stock not deducted', 'Over-ordering', 7, 5, 4, 'Locations ticked “Finished goods” on Storage Locations deducted first-in-first-out, the same as the plan'],
-  ['Coil stock on hand not deducted', 'Steel already in the plant is ordered again', 8, 6, 5, 'Coil stock in the locations ticked “Raw material” (default 2009 + 1009) is the opening stock'],
+  ['Coil stock on hand not deducted', 'Steel already in the plant is ordered again', 8, 6, 5, 'Coil stock in the locations ticked “Raw material” is the opening stock'],
   ['Co-product counted twice', 'Over-ordering on pairs', 6, 6, 5, 'Pair pressed once: strokes = larger need, steel on the primary part only'],
   ['Part without raw code / gross weight', 'Its steel silently missing → line stops', 10, 5, 8, 'Listed in red on the page with pieces; never silently dropped'],
   ['Gross weight in wrong unit (g / t)', 'Order 1000× off', 9, 3, 6, 'Weights above 50 kg or below 1 g per piece are flagged'],
@@ -194,7 +194,7 @@ function PlanLogicPage() {
             ['Sales days', 'ZPP_DAILY: one column per day — the day each quantity is sold', '/sapdata'],
             [
               'Stock',
-              'MB52 unrestricted stock, counted only in the locations ticked on Storage Locations: Finished goods for the plan and the Capacity Dashboard, Raw material for the coil check (default 2009 + 1009)',
+              'MB52 unrestricted stock, counted only in the locations ticked on Storage Locations: Finished goods for the plan and the Capacity Dashboard, Raw material for the coil check',
               '/depolar',
             ],
             ['Coils in transit', 'In-transit Excel list: each quantity arrives in its ETA week (no ETA = this week)', '/sapdata'],
@@ -708,7 +708,7 @@ function PlanLogicPage() {
             The safety stock absorbs the difference.
           </li>
           <li>
-            Supply: coil stock on hand in the locations ticked <i>Raw material</i> (default 2009 + 1009)
+            Supply: coil stock on hand in the locations ticked <i>Raw material</i>
             plus the in-transit list, each quantity in its ETA week (no ETA or a past ETA = this week).
           </li>
           <li>

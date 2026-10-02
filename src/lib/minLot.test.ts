@@ -14,7 +14,7 @@ function plant(product: Record<string, unknown>, overdue: number, nextWeek = 0):
     locations: [],
     presses: [{ name: '106', hall: 'Transfer', feedsCoil: false }],
     templates: [{ press: '106', workingDays: 5, shiftsPerDay: 3, overtimeShifts: 0 }],
-    settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 1 },
+    settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 1 },
     workCalendar: null,
     officialHolidays: [],
     latestSnapshot: null,

@@ -29,9 +29,9 @@ describe('pres taslağı', () => {
     expect(pressPayload(press.name, { ...cleared, frozenDays: '0' }).frozenDays).toBe(0)
   })
 
-  it('eksik alanlar varsayılana düşer', () => {
+  it('eksik alanlar varsayılana düşer; hol varsayılanı yok', () => {
     const payload = pressPayload('PRS-1', draftOf({ name: 'PRS-1', hall: '' }))
-    expect(payload.hall).toBe('Hall 1')
+    expect(payload.hall).toBe('')
     // feedsCoil yazılmamışsa progresif hat kabul edilir.
     expect(payload.feedsCoil).toBe(true)
     expect(payload.category).toBeUndefined()

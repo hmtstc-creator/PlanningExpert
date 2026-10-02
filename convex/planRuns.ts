@@ -5,6 +5,7 @@ import { ALL_MODULES, guardedMutation, guardedQuery, plantInternalMutation, plan
 import { planStatusDoc, requestRecompute } from './planQueue'
 import { withDefaults } from './products'
 import { liveRows } from './sapLive'
+import { withLocale } from './plantLocale'
 import { SETTINGS_DEFAULTS } from '../src/lib/settingsDefaults'
 import { countsFinished, countsProduction, countsRaw } from '../src/lib/stockLocations'
 import { currentUploads } from './sapUploads'
@@ -35,11 +36,15 @@ export const smallInputs = plantInternalQuery({
   args: {},
   returns: v.any(),
   handler: async (ctx: Ctx) => {
-    const settings = await ctx.db
-      .query('globalShiftSettings')
-      .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
-      .first()
-    const country = settings?.country ?? SETTINGS_DEFAULTS.country
+    // Ülke ve saat dilimi fabrika kaydından (plantLocale.ts).
+    const settings = await withLocale(
+      ctx,
+      (await ctx.db
+        .query('globalShiftSettings')
+        .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
+        .first()) ?? {},
+    )
+    const country = settings.country
     return {
       settings,
       presses: await ctx.db.query('presses').collect(),

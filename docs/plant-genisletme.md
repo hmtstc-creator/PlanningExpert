@@ -1,6 +1,6 @@
 # Plant genişletme — çok şirket / çok fabrika (kiralama)
 
-Durum: **UYGULANDI — aşama 1–4 (2026-10-02).** Planlamacı (2026-10-02):
+Durum: **UYGULANDI — aşama 1–5 (2026-10-02).** Planlamacı (2026-10-02):
 "önemli olan sistem, sistemi genişlet". Kalan: aşama 5 (hard coding
 temizliği + kurulum listesi), 6 (dışa aktarım, 90 gün sonra silme), 7
 (karşılaştırma ekranı). Ayrıntı en altta "Uygulama".
@@ -390,11 +390,22 @@ Platform — General grubu (site sahibi + onun eklediği generaller)
   seçim listeleri ve değişiklik kaydı fabrika bazında.
 - Kullanıcı adı bütün sistemde tektir (giriş adı).
 
+### Aşama 5 — hard coding temizliği ve kurulum listesi (2026-10-02)
+- Ülke ve saat dilimi: tek kaynak fabrika kaydı (`convex/plantLocale.ts`);
+  fabrika açılırken zorunlu (ISO ülke kodu, IANA saat dilimi). Work
+  Calendar'da değişince fabrika kaydı da güncellenir. Saatler ekranda
+  fabrikanın diliminde. Kodda dilim yoksa UTC.
+- Depolar: kodda 2009/1009 yok; tiksiz depo sayılmaz, hiç "Finished goods"
+  tiki yoksa plan uyarır. Mevcut kurulumun bugünkü tikleri geçişte veriye
+  yazılır (LEGACY_INSTALL, `convex/tenancy.ts` — yalnızca geçiş).
+- Hol: zorunlu; "Hall 1" varsayılanı kalktı.
+- admin / admin: yalnızca platformun ilk kurulumu (hiç kullanıcı yokken).
+- **Kurulum listesi** (creator, portal ana sayfası, `convex/setup.ts`):
+  ülke/saat dilimi, Press Definitions, Work Calendar, Storage Locations,
+  Master Data, SAP verisi, OEE ayarları + ilk yükleme, kullanıcılar — veriye
+  bakılarak tamam / eksik; hepsi tamamsa görünmez.
+
 ### Kalan (sıradaki aşamalar)
-- Aşama 5: kodda kalan fabrika varsayılanları (ülke RO, saat dilimi,
-  2009/1009 depoları, Hall 1, admin/admin) fabrika kaydına / kurulum
-  listesine; fabrikanın ülke ve saat dilimi bugün yalnızca bilgi — ayar
-  (Work Calendar) yine kendi değerini kullanır.
 - Aşama 6: şirket verisinin dışa aktarımı ve 90 gün sonra kalıcı silme
   (askıya alma ve silme tarihi hazır).
 - Aşama 7: Board member karşılaştırma ekranı (içeriği konuşulacak).

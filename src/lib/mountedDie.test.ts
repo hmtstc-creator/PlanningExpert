@@ -22,7 +22,7 @@ function plant(fillQty: number): PlanInputs {
     locations: [],
     presses: [{ name: '104', hall: 'H1' }],
     templates: [{ press: '104', workingDays: 5, shiftsPerDay: 1, overtimeShifts: 0 }],
-    settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 1 },
+    settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, safetyStockDays: 1 },
     workCalendar: null,
     officialHolidays: [],
     latestSnapshot: null,

@@ -8,7 +8,7 @@ it('backlog: two setups overlap in one hall and both independent checks accept i
     stock: [], locations: [],
     presses: ['104', '105', '106'].map((name) => ({ name, hall: 'H1' })),
     templates: ['104', '105', '106'].map((press) => ({ press, workingDays: 5, shiftsPerDay: 3, overtimeShifts: 0 })),
-    settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, maxScenarios: 2, maxSetupsPlantWide: 2, maxSetupsPlantWideNormal: 1, concurrentSetupsPerHall: 1 },
+    settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, maxScenarios: 2, maxSetupsPlantWide: 2, maxSetupsPlantWideNormal: 1, concurrentSetupsPerHall: 1 },
     workCalendar: null, officialHolidays: [], latestSnapshot: null, plannedStops: [], overrides: [], moldMaintenance: [], readiness: [], pressMaintenance: [], alarms: [], truncatedInputs: [],
   } as never, Date.UTC(2026, 8, 14, 4, 0))
   const setups = run.jobs.flatMap((j) => (j.segments ?? []).filter((s) => s.kind === 'setup').map((s) => `${j.press} ${s.date} ${s.start}-${s.end}`))

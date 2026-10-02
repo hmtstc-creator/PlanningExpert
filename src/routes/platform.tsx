@@ -53,6 +53,15 @@ const plantDraft = (p: PlantRow): PlantDraft => ({
 })
 const samePlant = (a: PlantDraft, b: PlantDraft) => JSON.stringify(a) === JSON.stringify(b)
 
+/** Tarayıcının bildiği saat dilimleri (öneri listesi). */
+const TIME_ZONES: string[] = (() => {
+  try {
+    return (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? []
+  } catch {
+    return []
+  }
+})()
+
 const input = 'rounded-md border border-input bg-background px-2 py-1.5 text-sm'
 const btn = 'rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40'
 
@@ -131,6 +140,8 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
   const { run: updateCompany, error, clearError } = useSafeMutation(api.platform.updateCompany)
   const { run: createPlant, error: plantError } = useSafeMutation(api.platform.createPlant)
   const [plantName, setPlantName] = useState('')
+  const [plantCountry, setPlantCountry] = useState('')
+  const [plantZone, setPlantZone] = useState('')
   const [companyName, setCompanyName] = useState(c.name)
   const { run: updatePlant } = useSafeMutation(api.platform.updatePlant)
   const drafts = useDraftRows(c.plants, (p) => p._id, plantDraft, samePlant)
@@ -222,16 +233,27 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <input className={`w-56 ${input}`} placeholder="New plant name" value={plantName} onChange={(e) => setPlantName(e.target.value)} />
+        <input className={`w-20 ${input}`} placeholder="Country" title="Two-letter code, e.g. RO, TR" value={plantCountry} onChange={(e) => setPlantCountry(e.target.value)} />
+        <input className={`w-44 ${input}`} placeholder="Time zone" title="e.g. Europe/Bucharest" value={plantZone} onChange={(e) => setPlantZone(e.target.value)} list="time-zones" />
+        <datalist id="time-zones">
+          {TIME_ZONES.map((z) => (
+            <option key={z} value={z} />
+          ))}
+        </datalist>
         <button
           className={btn}
-          disabled={!plantName.trim() || c.status !== 'active'}
+          disabled={!plantName.trim() || !plantCountry.trim() || !plantZone.trim() || c.status !== 'active'}
           onClick={async () => {
-            if (await createPlant({ companyId: c._id, name: plantName.trim() })) setPlantName('')
+            if (await createPlant({ companyId: c._id, name: plantName.trim(), country: plantCountry.trim(), timeZone: plantZone.trim() })) {
+              setPlantName('')
+              setPlantCountry('')
+              setPlantZone('')
+            }
           }}
         >
           Add plant
         </button>
-        <span className="text-xs text-muted-foreground">A new plant starts empty: set it up from Press Definitions, Work Calendar, Storage Locations and the uploads.</span>
+        <span className="text-xs text-muted-foreground">A new plant starts empty: select it in the header — the portal home shows its setup checklist.</span>
       </div>
 
       {isPlatform && (

@@ -1,5 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 
+import { api } from '../../convex/_generated/api'
+import { useQuery } from '../lib/convexTransport'
+import type { Module } from '../lib/tenancy'
+
 import { PORTAL_MODULES } from '../lib/portal'
 import { usePlant } from '../lib/plantContext'
 
@@ -32,6 +36,8 @@ function PortalHome() {
           </Link>
         </p>
       )}
+
+      {canManage && ctx?.active && <SetupChecklist can={can} />}
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {modules.map((m, i) => (
@@ -67,5 +73,39 @@ function PortalHome() {
         ))}
       </div>
     </div>
+  )
+}
+
+interface Step {
+  key: string
+  label: string
+  done: boolean
+  to: string
+  module: Module
+  hint: string
+}
+
+/** Fabrika kurulum listesi (creator): veriye bakılarak tamam / eksik. Hepsi tamamsa görünmez. */
+function SetupChecklist({ can }: { can: (m: Module) => boolean }) {
+  const steps = ((useQuery(api.setup.checklist) ?? []) as Step[]).filter((s) => can(s.module))
+  const open = steps.filter((s) => !s.done)
+  if (!open.length) return null
+  return (
+    <section className="mt-6 rounded-xl border border-amber-300 bg-amber-50/60 p-4">
+      <h2 className="text-sm font-semibold text-foreground">
+        Plant setup — {steps.length - open.length} of {steps.length} done
+      </h2>
+      <ol className="mt-2 space-y-1 text-sm">
+        {steps.map((s) => (
+          <li key={s.key} className="flex flex-wrap items-baseline gap-2">
+            <span className={s.done ? 'text-emerald-700' : 'text-amber-800'}>{s.done ? '✓' : '○'}</span>
+            <Link to={s.to} className={s.done ? 'text-muted-foreground' : 'font-medium text-foreground underline'}>
+              {s.label}
+            </Link>
+            {!s.done && <span className="text-xs text-muted-foreground">{s.hint}</span>}
+          </li>
+        ))}
+      </ol>
+    </section>
   )
 }

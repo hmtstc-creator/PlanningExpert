@@ -29,7 +29,7 @@ function inputs(overrides: Partial<PlanInputs> = {}): PlanInputs {
       { press: 'PRS-1', workingDays: 5, shiftsPerDay: 2, overtimeShifts: 0 },
       { press: 'PRS-2', workingDays: 5, shiftsPerDay: 2, overtimeShifts: 0 },
     ],
-    settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2 },
+    settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2 },
     workCalendar: null,
     officialHolidays: [],
     latestSnapshot: null,
@@ -53,10 +53,12 @@ describe('plantClock', () => {
     expect(d.getMinutes()).toBe(30)
   })
 
-  it('uses Romanian time by default, summer and winter', () => {
-    // Yaz saati UTC+3, kış saati UTC+2.
-    expect(plantClock(Date.UTC(2026, 6, 1, 4, 0)).getHours()).toBe(7)
-    expect(plantClock(Date.UTC(2026, 11, 1, 4, 0)).getHours()).toBe(6)
+  it('uses the plant zone, summer and winter; UTC when the plant has none', () => {
+    // Romanya: yaz saati UTC+3, kış saati UTC+2.
+    expect(plantClock(Date.UTC(2026, 6, 1, 4, 0), 'Europe/Bucharest').getHours()).toBe(7)
+    expect(plantClock(Date.UTC(2026, 11, 1, 4, 0), 'Europe/Bucharest').getHours()).toBe(6)
+    // Kodda fabrikaya özel dilim yok.
+    expect(plantClock(Date.UTC(2026, 6, 1, 4, 0)).getHours()).toBe(4)
   })
 
   it('falls back to the machine clock for an unknown zone', () => {
@@ -99,7 +101,7 @@ describe('computePlan', () => {
   it('keeps frozen jobs from the approved plan and deducts what they make', () => {
     const run = computePlan(
       inputs({
-        settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, frozenDays: 2 },
+        settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 2, frozenDays: 2 },
         latestSnapshot: {
           createdAt: NOW - 3600_000,
           jobs: [

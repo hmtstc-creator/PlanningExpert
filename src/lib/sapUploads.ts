@@ -96,8 +96,14 @@ export function planUsage(
   return pending ? { kind: 'recalculating' } : { kind: 'notYet' }
 }
 
-/** Tarih ve saat, fabrikanın saat diliminde (Romanya). */
-export function formatPlantTime(ms: number, timeZone = 'Europe/Bucharest'): string {
+/** Tarih ve saat, fabrikanın saat diliminde. */
+/** Ekranda saatlerin gösterildiği dilim: seçili fabrikanın (PlantProvider ayarlar). */
+let displayTimeZone = 'UTC'
+export function setDisplayTimeZone(timeZone: string) {
+  displayTimeZone = timeZone || 'UTC'
+}
+
+export function formatPlantTime(ms: number, timeZone = displayTimeZone): string {
   return new Date(ms).toLocaleString('en-GB', {
     timeZone,
     day: '2-digit',

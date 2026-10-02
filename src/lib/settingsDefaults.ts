@@ -10,7 +10,8 @@
 export const SETTINGS_DEFAULTS = {
   shiftMinutes: 480,
   overtimeShiftMinutes: 480,
-  country: 'RO',
+  // Ülke ve saat dilimi fabrika kaydındadır (plants); burada fabrikaya özel değer yok.
+  country: '',
   setupGapMinutes: 10,
   coilSetupGapMinutes: 30,
   concurrentSetupsPerHall: 1,
@@ -20,7 +21,7 @@ export const SETTINGS_DEFAULTS = {
   breakMinutesPerShift: 0,
   frozenDays: 0,
   safetyStockDays: 2,
-  timeZone: 'Europe/Bucharest',
+  timeZone: 'UTC',
   maxSetupsPlantWideNormal: 1,
   maxSetupsPlantWide: 2,
   setupsCrossShifts: true,

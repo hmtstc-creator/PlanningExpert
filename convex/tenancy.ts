@@ -21,6 +21,45 @@ type Any = any
 
 const MIGRATION_KEY = 'plantMigration'
 
+/**
+ * Fabrika anahtarından ÖNCEKİ tek kurulumun koddaki varsayılanları. Kod artık
+ * fabrikaya özel değer tutmuyor (aşama 5); bu kurulumun bugünkü davranışı
+ * bozulmasın diye geçişte bir kez veriye yazılır: ülke ve saat dilimi Plant
+ * 1'e, depo tikleri Storage Locations'a. Yeni fabrikalarda kullanılmaz.
+ */
+const LEGACY_INSTALL = {
+  country: 'RO',
+  timeZone: 'Europe/Bucharest',
+  /** Tiksiz hâlde bitmiş ürün + hammadde sayılan depolar; ilki üretim girişi. */
+  countedLocations: ['2009', '1009'],
+  productionLocation: '2009',
+}
+
+/** Eski kurulumun depo kurallarını açık tike çevirir (anahtarsız kayıtlar). */
+async function writeLegacyLocationTicks(db: Any) {
+  const rows: Any[] = await db
+    .query('storageLocations')
+    .withIndex('by_plant', (q: Any) => q.eq('plantId', undefined))
+    .collect()
+  const isDefault = (code: string) => LEGACY_INSTALL.countedLocations.includes(code.trim())
+  for (const l of rows) {
+    await db.patch(l._id, {
+      countFinished: l.countFinished ?? isDefault(l.code),
+      countRaw: l.countRaw ?? (l.category === 'raw_material' || isDefault(l.code)),
+      countProduction: l.countProduction ?? l.code.trim() === LEGACY_INSTALL.productionLocation,
+    })
+  }
+  for (const code of LEGACY_INSTALL.countedLocations) {
+    if (rows.some((l) => l.code.trim() === code)) continue
+    await db.insert('storageLocations', {
+      code,
+      countFinished: true,
+      countRaw: true,
+      countProduction: code === LEGACY_INSTALL.productionLocation,
+    })
+  }
+}
+
 /** Bir çağrıda en çok kaç kayıt işaretlenir; büyük kayıtlı tablolarda daha az. */
 const BATCH: Record<string, number> = { planRunChunks: 2, oeeDowntimeDays: 10, planSnapshots: 4, planRuns: 20 }
 const DEFAULT_BATCH = 200
@@ -68,10 +107,11 @@ export const startMigration = userMutation({
     const plantId = await db.insert('plants', {
       companyId,
       name: 'Plant 1',
-      country: legacySettings?.country,
-      timeZone: legacySettings?.timeZone,
+      country: legacySettings?.country || LEGACY_INSTALL.country,
+      timeZone: legacySettings?.timeZone || LEGACY_INSTALL.timeZone,
       createdAt: now,
     })
+    await writeLegacyLocationTicks(db)
     const groupIds = new Map<string, string>()
     for (const g of LEGACY_ROLE_GROUPS) {
       groupIds.set(
@@ -167,6 +207,8 @@ export const context = userQuery({
             companyId: active.company._id,
             companyName: active.company.name,
             companyStatus: active.company.status,
+            country: active.plant.country ?? '',
+            timeZone: active.plant.timeZone ?? '',
             access: active.access,
             // Askıdaki şirket: salt okunur; silinme tarihi.
             deleteAfter: active.company.deleteAfter ?? null,

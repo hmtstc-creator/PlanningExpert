@@ -19,6 +19,23 @@ export const DELETE_AFTER_DAYS = 90
 
 const moduleList = v.array(v.union(...MODULES.map((m) => v.literal(m))))
 
+/**
+ * Ülke (ISO kodu, resmi tatiller için) ve saat dilimi (IANA) fabrikanın tek
+ * kaynağıdır; kodda fabrikaya özel varsayılan yok — açılışta istenir.
+ */
+function checkLocale(country: string, timeZone: string) {
+  const c = country.trim().toUpperCase()
+  const tz = timeZone.trim()
+  if (!/^[A-Z]{2}$/.test(c)) throw new ConvexError('Country: a two-letter code, e.g. RO, TR, DE')
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz })
+  } catch {
+    throw new ConvexError('Time zone: an IANA name, e.g. Europe/Bucharest, Europe/Istanbul')
+  }
+  if (!tz) throw new ConvexError('Time zone is required')
+  return { country: c, timeZone: tz }
+}
+
 function requirePlatform(me: Any) {
   if (!isPlatform(me)) throw new ConvexError('Only a General can do this')
 }
@@ -95,8 +112,8 @@ export const createPlant = userMutation({
     companyId: v.id('companies'),
     name: v.string(),
     code: v.optional(v.string()),
-    country: v.optional(v.string()),
-    timeZone: v.optional(v.string()),
+    country: v.string(),
+    timeZone: v.string(),
   },
   returns: v.id('plants'),
   handler: async (ctx: Any, args: Any) => {
@@ -105,12 +122,12 @@ export const createPlant = userMutation({
     if (!company) throw new ConvexError('Company not found')
     if (company.status !== 'active') throw new ConvexError('The company is suspended')
     if (!args.name.trim()) throw new ConvexError('A plant name is required')
+    const locale = checkLocale(args.country, args.timeZone)
     return ctx.db.insert('plants', {
       companyId: args.companyId,
       name: args.name.trim(),
       code: args.code?.trim() || undefined,
-      country: args.country?.trim() || undefined,
-      timeZone: args.timeZone?.trim() || undefined,
+      ...locale,
       createdAt: Date.now(),
     })
   },
@@ -136,8 +153,9 @@ export const updatePlant = userMutation({
     const patch: Any = {
       name: args.name.trim(),
       code: args.code?.trim() || undefined,
-      country: args.country?.trim() || undefined,
-      timeZone: args.timeZone?.trim() || undefined,
+      ...(args.country?.trim() || args.timeZone?.trim()
+        ? checkLocale(args.country ?? plant.country ?? '', args.timeZone ?? plant.timeZone ?? '')
+        : {}),
     }
     if (args.disabledModules !== undefined) {
       const same = JSON.stringify([...args.disabledModules].sort()) === JSON.stringify([...(plant.disabledModules ?? [])].sort())

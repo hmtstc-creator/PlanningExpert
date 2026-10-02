@@ -41,13 +41,16 @@ export const upsert = guardedMutation({
   handler: async (ctx, args) => {
     const name = args.name.trim()
     if (!name) throw new ConvexError('Press name is required')
+    // Hol vinç kısıtıdır; kodda varsayılan hol adı yok.
+    const hall = args.hall.trim()
+    if (!hall) throw new ConvexError(`Enter the hall of ${name} — presses in one hall share the crane for setups`)
     const existing = await ctx.db
       .query('presses')
       .withIndex('by_name', (q) => q.eq('name', name))
       .first()
     if (existing) {
       await ctx.db.patch(existing._id, {
-        hall: args.hall,
+        hall,
         category: args.category,
         feedsCoil: args.feedsCoil,
         // Tonaj kaldırıldı: eski değer kayıtta kalmasın.
@@ -55,7 +58,7 @@ export const upsert = guardedMutation({
         frozenDays: args.frozenDays,
       })
     } else {
-      await ctx.db.insert('presses', { ...args, name })
+      await ctx.db.insert('presses', { ...args, name, hall })
     }
     return null
   },

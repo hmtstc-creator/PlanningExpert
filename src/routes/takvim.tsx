@@ -24,6 +24,7 @@ import {
   ShiftTable,
   useOvertimeData,
 } from '../components/OvertimePanels'
+import { usePlant } from '../lib/plantContext'
 
 export const Route = createFileRoute('/takvim')({
   component: TakvimPage,
@@ -96,6 +97,7 @@ function totalMinutes(p: WeekPattern, shiftMinutes: number, overtimeShiftMinutes
 }
 
 function PressCalendarSection() {
+  const plantCountry = usePlant().ctx?.active?.country ?? ''
   const { results: products } = usePaginatedQuery(
     api.products.list,
     {},
@@ -177,7 +179,7 @@ function PressCalendarSection() {
   // Vardiya süresi (dk) tüm presler için ortaktır.
   const [shiftMinutes, setShiftMinutes] = useState<number>(SETTINGS_DEFAULTS.shiftMinutes)
   const [overtimeShiftMinutes, setOvertimeShiftMinutes] = useState<number>(SETTINGS_DEFAULTS.overtimeShiftMinutes)
-  const [country, setCountry] = useState<string>(SETTINGS_DEFAULTS.country)
+  const [country, setCountry] = useState<string>(plantCountry)
   const [setupGapMinutes, setSetupGapMinutes] = useState<number>(SETTINGS_DEFAULTS.setupGapMinutes)
   // Fabrika geneli setup sınırları ve öne çekme (planlamacıyla netleşen kurallar).
   const [maxSetupsPlantWideNormal, setMaxSetupsPlantWideNormal] = useState<number>(SETTINGS_DEFAULTS.maxSetupsPlantWideNormal)

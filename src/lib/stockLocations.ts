@@ -1,14 +1,12 @@
 /**
  * Hangi depodaki stok neye sayılır — Storage Locations sayfasındaki matris.
  *
- * Her depo için iki tik vardır: bitmiş ürün (plan ve MRP netleştirmesi) ve
- * hammadde (bobin, MRP'de eldeki stok). Tik hiç verilmemişse varsayılan
- * geçerlidir: 2009 ve 1009 her ikisine de sayılır, "Raw Material"
- * kategorisindeki depo hammaddeye sayılır. Tanımlanmamış 2009/1009 da
- * varsayılanla sayılır ki depo listesi boşken plan stoksuz kalmasın.
+ * Her depo için üç tik vardır: bitmiş ürün (plan ve MRP netleştirmesi),
+ * hammadde (bobin, MRP'de eldeki stok) ve üretim girişi (MB51). Kodda
+ * fabrikaya özel depo yoktur (docs/plant-genisletme.md, aşama 5): tik
+ * verilmemiş depo sayılmaz; hiçbir depo tikli değilse plan uyarır. Eski
+ * "Raw Material" kategorisindeki depo hammaddeye sayılır.
  */
-
-export const DEFAULT_COUNTED_LOCATIONS = ['2009', '1009'] as const
 
 export type LocationFlags = {
   code: string
@@ -19,22 +17,16 @@ export type LocationFlags = {
   countProduction?: boolean
 }
 
-const DEFAULTS = new Set<string>(DEFAULT_COUNTED_LOCATIONS)
-
 export function countsFinished(l: LocationFlags): boolean {
-  return l.countFinished ?? DEFAULTS.has(l.code.trim())
+  return l.countFinished === true
 }
 
 export function countsRaw(l: LocationFlags): boolean {
-  return l.countRaw ?? (l.category === 'raw_material' || DEFAULTS.has(l.code.trim()))
+  return l.countRaw ?? l.category === 'raw_material'
 }
 
-/** Üretim girişi deposu varsayılanı (MB51 101/102). */
-export const DEFAULT_PRODUCTION_LOCATIONS = ['2009'] as const
-const PRODUCTION_DEFAULTS = new Set<string>(DEFAULT_PRODUCTION_LOCATIONS)
-
 export function countsProduction(l: LocationFlags): boolean {
-  return l.countProduction ?? PRODUCTION_DEFAULTS.has(l.code.trim())
+  return l.countProduction === true
 }
 
 export type CountedLocations = { finished: Set<string>; raw: Set<string>; production: Set<string> }
@@ -43,20 +35,12 @@ export function countedLocations(locations: readonly LocationFlags[]): CountedLo
   const finished = new Set<string>()
   const raw = new Set<string>()
   const production = new Set<string>()
-  const defined = new Set<string>()
   for (const l of locations) {
     const code = l.code.trim()
     if (!code) continue
-    defined.add(code)
     if (countsFinished(l)) finished.add(code)
     if (countsRaw(l)) raw.add(code)
     if (countsProduction(l)) production.add(code)
-  }
-  for (const code of PRODUCTION_DEFAULTS) if (!defined.has(code)) production.add(code)
-  for (const code of DEFAULTS) {
-    if (defined.has(code)) continue
-    finished.add(code)
-    raw.add(code)
   }
   return { finished, raw, production }
 }
@@ -75,7 +59,7 @@ export function isRawStockRow(counted: CountedLocations, storageLocation: string
 
 /**
  * MB51 satırının üretim adedi: yalnızca "Production receipt" tikli depoya
- * (varsayılan 2009) yapılan 101 (giriş, +) ve 102 (iptal, −) hareketleri.
+ * yapılan 101 (giriş, +) ve 102 (iptal, −) hareketleri.
  * Diğer satırlar üretim değildir (null). Hareket türü sütunu hiç gelmemiş
  * eski yüklemelerde satır olduğu gibi sayılır.
  */

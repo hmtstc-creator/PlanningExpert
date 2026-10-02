@@ -100,7 +100,7 @@ function HomePage() {
     if (undefinedLocs.size > 0) {
       list.push({
         level: 'medium',
-        text: `${undefinedLocs.size} storage locations in MB52 are not defined yet — only 2009 and 1009 count by default.`,
+        text: `${undefinedLocs.size} storage locations in MB52 are not defined yet — a location counts only when it is ticked on Storage Locations.`,
         link: '/depolar',
       })
     }

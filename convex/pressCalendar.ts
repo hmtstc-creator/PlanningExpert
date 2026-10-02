@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
+import { plantLocale, saveLocale, withLocale } from './plantLocale'
 import { patternProblem } from '../src/lib/pressCalendar'
 import { SETTINGS_DEFAULTS } from '../src/lib/settingsDefaults'
 
@@ -55,11 +56,15 @@ const globalSettingsValidator = v.union(
 export const getGlobalSettings = guardedQuery({
   args: {},
   returns: globalSettingsValidator,
+  // Ülke ve saat dilimi fabrika kaydından (plantLocale.ts).
   handler: async (ctx) =>
-    ctx.db
-      .query('globalShiftSettings')
-      .withIndex('by_key', (q) => q.eq('key', 'default'))
-      .first(),
+    withLocale(
+      ctx,
+      await ctx.db
+        .query('globalShiftSettings')
+        .withIndex('by_key', (q) => q.eq('key', 'default'))
+        .first(),
+    ),
 })
 
 export const saveGlobalSettings = guardedMutation({
@@ -114,6 +119,7 @@ export const saveGlobalSettings = guardedMutation({
     } else {
       await ctx.db.insert('globalShiftSettings', { key: 'default', ...args })
     }
+    await saveLocale(ctx, { country: args.country, timeZone: args.timeZone })
     return null
   },
 })
@@ -307,7 +313,7 @@ export const setCapacityFactor = guardedMutation({
         key: 'default',
         shiftMinutes: 480,
         overtimeShiftMinutes: 480,
-        country: 'RO',
+        country: (await plantLocale(ctx)).country,
         capacityFactor,
       })
     }

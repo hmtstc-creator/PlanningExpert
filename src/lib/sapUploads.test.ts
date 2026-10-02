@@ -59,7 +59,7 @@ describe('coverage', () => {
 describe('formatPlantTime', () => {
   it('shows Romania time, not the server or browser zone', () => {
     // 2026-09-25 09:30 UTC = 12:30 in Bucharest (summer time, UTC+3)
-    expect(formatPlantTime(Date.UTC(2026, 8, 25, 9, 30))).toContain('12:30')
+    expect(formatPlantTime(Date.UTC(2026, 8, 25, 9, 30), 'Europe/Bucharest')).toContain('12:30')
   })
 })
 

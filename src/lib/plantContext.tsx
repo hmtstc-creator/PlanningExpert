@@ -2,6 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { useQuery } from './convexTransport'
+import { setDisplayTimeZone } from './sapUploads'
 import { NO_ACCESS, atLeast, type Access, type Level, type Module } from './tenancy'
 
 /**
@@ -30,6 +31,9 @@ export interface TenancyContext {
     companyId: string
     companyName: string
     companyStatus: string
+    /** Fabrikanın ülkesi ve saat dilimi (tek kaynak: plants). */
+    country: string
+    timeZone: string
     access: Access
     deleteAfter: number | null
   } | null
@@ -55,6 +59,8 @@ const PlantContext = createContext<Value>({
 export function PlantProvider({ children }: { children: ReactNode }) {
   const ctx = useQuery(api.tenancy.context) as TenancyContext | undefined
   const access = ctx?.active?.access ?? NO_ACCESS
+  // Saatler fabrikanın diliminde gösterilir (formatPlantTime).
+  setDisplayTimeZone(ctx?.active?.timeZone || 'UTC')
   const isPlatform = ctx?.platformRole === 'owner' || ctx?.platformRole === 'general'
   const value: Value = {
     ctx,
@@ -68,6 +74,11 @@ export function PlantProvider({ children }: { children: ReactNode }) {
 
 export function usePlant(): Value {
   return useContext(PlantContext)
+}
+
+/** Seçili fabrikanın saat dilimi; bilinmiyorsa UTC. */
+export function usePlantTimeZone(): string {
+  return useContext(PlantContext).ctx?.active?.timeZone || 'UTC'
 }
 
 /** Sayfanın ait olduğu modül (yol önekine göre); yönetim sayfaları modülsüz. */

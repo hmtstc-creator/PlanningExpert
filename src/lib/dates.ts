@@ -61,8 +61,11 @@ function isoThursdayOf(date: Date): Date {
   return d
 }
 
-/** Tesisin saat dilimi. Ayarda başka bir dilim yazılmadıkça bu kullanılır. */
-export const DEFAULT_PLANT_TIME_ZONE = 'Europe/Bucharest'
+/**
+ * Saat dilimi bilinmiyorsa (fabrika kaydında yoksa). Fabrikaya özel değer
+ * kodda tutulmaz; fabrikanın dilimi plants.timeZone'dadır.
+ */
+export const DEFAULT_PLANT_TIME_ZONE = 'UTC'
 
 /**
  * `ms` anında tesisteki DUVAR SAATİNİ taşıyan bir Date.

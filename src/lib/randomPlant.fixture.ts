@@ -65,6 +65,7 @@ export function randomPlant(seed: number): PlanInputs {
       overtimeShifts: 0,
     })),
     settings: {
+      timeZone: 'Europe/Bucharest',
       shiftMinutes: 480,
       shiftStartMinute: 420,
       planningHorizonWeeks: 3,

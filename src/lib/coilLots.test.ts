@@ -51,7 +51,7 @@ function loadedPlant(): PlanInputs {
     locations: [],
     presses,
     templates: presses.map((p) => ({ press: p.name, workingDays: 5, shiftsPerDay: 2, overtimeShifts: 0 })),
-    settings: { shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 4 },
+    settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 4 },
     workCalendar: null,
     officialHolidays: [],
     latestSnapshot: null,

@@ -96,7 +96,7 @@ describe('fabrika ayrımı', () => {
 
     // General (owner) ikinci şirketi ve fabrikasını açar, creator atar.
     const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning', 'oee', 'die', 'machine'] })
-    const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa' })
+    const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
     const cr2 = await t.mutation(api.users.add, { token: boss, companyId: c2, name: 'cr2', isCreator: true })
     const other = await session(t, cr2, 'cr2')
 
@@ -134,7 +134,7 @@ describe('fabrika ayrımı', () => {
     await t.mutation(api.tenancy.startMigration, { token: boss })
     await settle(t)
     const { companyId, plants } = await t.query(api.tenancy.context, { token: boss }).then((c: Any) => ({ companyId: c.plants[0].companyId, plants: c.plants }))
-    const plant2 = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Plant 2' })
+    const plant2 = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Plant 2', country: 'RO', timeZone: 'Europe/Bucharest' })
     // Bakım grubu: yalnızca Plant 2, Die düzenler, PlanningExpert yok.
     const g = await t.mutation(api.users.saveGroup, {
       token: boss, companyId, name: 'Die team', allPlants: false, plantIds: [plant2],

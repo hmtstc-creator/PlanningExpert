@@ -384,8 +384,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const stockByMaterial = new Map<string, number>()
   const rawStockByMaterial = new Map<string, number>()
   const rawCodes = new Set(inputs.products.map((p) => p.rawMaterialCode?.trim() ?? '').filter(Boolean))
-  // Hangi depo neye sayılır Storage Locations matrisinden gelir; tik yoksa
-  // 2009/1009 varsayılandır. Deposu yazılmamış satır (eski/elle veri) sayılır.
+  // Hangi depo neye sayılır Storage Locations matrisinden gelir; tiksiz depo
+  // sayılmaz. Deposu yazılmamış satır (eski/elle veri) sayılır.
   const counted = countedLocations(inputs.locations)
   for (const row of inputs.stock) {
     if (isFinishedStockRow(counted, row.storageLocation)) sum(stockByMaterial, row.material, row.unrestricted ?? 0)
@@ -1379,6 +1379,11 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     warnings.push(
       'ZPP_DAILY is uploaded but none of its column headers could be read as dates — ' +
         'the plan uses the weekly ZPP only. Check the file on the SAP Data page.',
+    )
+  }
+  if (inputs.stock.length > 0 && counted.finished.size === 0) {
+    warnings.unshift(
+      'No storage location is ticked "Finished goods" on Storage Locations — MB52 stock is not counted and the plan assumes 0 stock.',
     )
   }
   // Lot kuralı eksik: ne minimum lot ne gerçek bir rulo ağırlığı var. Lot tam

@@ -3,14 +3,15 @@ import { describe, expect, it } from 'vitest'
 import { countedLocations, isFinishedStockRow, isRawStockRow, productionRows } from './stockLocations'
 
 describe('storage location matrix', () => {
-  it('defaults: 2009 and 1009 count for both, a Raw Material location for raw material', () => {
+  it('no plant defaults: an unticked location counts for nothing; old Raw Material category counts for raw', () => {
     const c = countedLocations([
       { code: '2009', category: 'finished_goods' },
       { code: '3001', category: 'raw_material' },
       { code: '4000', category: 'quality' },
     ])
-    expect([...c.finished].sort()).toEqual(['1009', '2009'])
-    expect([...c.raw].sort()).toEqual(['1009', '2009', '3001'])
+    expect([...c.finished]).toEqual([])
+    expect([...c.raw]).toEqual(['3001'])
+    expect([...c.production]).toEqual([])
   })
 
   it('ticks override the defaults', () => {
@@ -28,8 +29,8 @@ describe('storage location matrix', () => {
     expect(isFinishedStockRow(c, undefined)).toBe(true)
   })
 
-  it('MB51 production = 101 minus 102 into the production receipt location (2009 by default)', () => {
-    const c = countedLocations([])
+  it('MB51 production = 101 minus 102 into the production receipt location', () => {
+    const c = countedLocations([{ code: '2009', countProduction: true }])
     const rows = productionRows(c, [
       { material: 'A', quantity: 100, movementType: '101', storageLocation: '2009' },
       { material: 'A', quantity: -30, movementType: '102', storageLocation: '2009' },
