@@ -21,6 +21,19 @@ type Any = any
 export const DELETE_AFTER_DAYS = 90
 
 const moduleList = v.array(v.union(...MODULES.map((m) => v.literal(m))))
+const costCenterList = v.array(v.object({ code: v.string(), name: v.string() }))
+
+/** Masraf yerleri: kod zorunlu ve fabrikada tek; ad boşsa kod. */
+function checkCostCenters(list: { code: string; name: string }[]) {
+  const out: { code: string; name: string }[] = []
+  for (const cc of list) {
+    const code = cc.code.trim()
+    if (!code) throw new ConvexError('A cost center needs a code')
+    if (out.some((x) => x.code === code)) throw new ConvexError(`Cost center ${code} is listed twice`)
+    out.push({ code, name: cc.name.trim() || code })
+  }
+  return out
+}
 
 /**
  * Ülke (ISO kodu, resmi tatiller için) ve saat dilimi (IANA) fabrikanın tek
@@ -117,6 +130,7 @@ export const createPlant = userMutation({
     code: v.optional(v.string()),
     country: v.string(),
     timeZone: v.string(),
+    costCenters: v.optional(costCenterList),
   },
   returns: v.id('plants'),
   handler: async (ctx: Any, args: Any) => {
@@ -131,6 +145,7 @@ export const createPlant = userMutation({
       name: args.name.trim(),
       code: args.code?.trim() || undefined,
       ...locale,
+      costCenters: checkCostCenters(args.costCenters ?? []),
       createdAt: Date.now(),
     })
   },
@@ -145,6 +160,7 @@ export const updatePlant = userMutation({
     timeZone: v.optional(v.string()),
     /** Yalnızca General değiştirebilir. */
     disabledModules: v.optional(moduleList),
+    costCenters: v.optional(costCenterList),
   },
   returns: v.null(),
   handler: async (ctx: Any, args: Any) => {
@@ -160,6 +176,7 @@ export const updatePlant = userMutation({
         ? checkLocale(args.country ?? plant.country ?? '', args.timeZone ?? plant.timeZone ?? '')
         : {}),
     }
+    if (args.costCenters !== undefined) patch.costCenters = checkCostCenters(args.costCenters)
     if (args.disabledModules !== undefined) {
       const same = JSON.stringify([...args.disabledModules].sort()) === JSON.stringify([...(plant.disabledModules ?? [])].sort())
       if (!same) {

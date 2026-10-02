@@ -230,4 +230,33 @@ describe('fabrika ayrımı', () => {
     const mine = await t.query(api.compare.oeeWeeks, { token: pl, endDate: '2026-09-27', weeks: 2 })
     expect(mine.plants.map((p: Any) => p.plantName)).toEqual(['Plant 1'])
   })
+
+  it('board member şirketin bütün fabrikalarını, fabrika müdürü yalnızca kendi fabrikasını görür', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const c = await t.query(api.tenancy.context, { token: boss })
+    const companyId = c.plants[0].companyId
+    const plant1 = c.plants[0]._id
+    const plant2 = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Plant 2', country: 'RO', timeZone: 'Europe/Bucharest', costCenters: [{ code: '51010171', name: 'Transfer' }] })
+    const board = await t.mutation(api.users.saveGroup, { token: boss, companyId, name: 'Board members', allPlants: true, plantIds: [], permissions: { planning: 'view', oee: 'view', die: 'view', machine: 'view' } })
+    const pm = await t.mutation(api.users.saveGroup, { token: boss, companyId, name: 'Plant manager — Plant 2', allPlants: false, plantIds: [plant2], permissions: { planning: 'view', oee: 'edit', die: 'view', machine: 'view' } })
+    const b = await session(t, await t.mutation(api.users.add, { token: boss, companyId, name: 'board', groupIds: [board] }), 'board')
+    const m = await session(t, await t.mutation(api.users.add, { token: boss, companyId, name: 'pm', groupIds: [pm] }), 'pm')
+
+    expect((await t.query(api.tenancy.context, { token: b })).plants.map((p: Any) => p.name).sort()).toEqual(['Plant 1', 'Plant 2'])
+    await expect(t.mutation(api.presses.upsert, { token: b, name: 'X', hall: 'H' })).rejects.toThrow(/edit permission/)
+    const pmCtx = await t.query(api.tenancy.context, { token: m })
+    expect(pmCtx.plants.map((p: Any) => p.name)).toEqual(['Plant 2'])
+    expect(pmCtx.active.costCenters).toEqual([{ code: '51010171', name: 'Transfer' }])
+    await expect(t.mutation(api.tenancy.selectPlant, { token: m, plantId: plant1 })).rejects.toThrow(/no access/)
+    // Fabrika müdürü kendi fabrikasının presini görür, Plant 1'inkileri göremez.
+    expect(await t.query(api.presses.list, { token: m })).toEqual([])
+    // Board member de başka şirketi görmez.
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning'] })
+    await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
+    expect((await t.query(api.tenancy.context, { token: b })).plants.map((p: Any) => p.companyName)).not.toContain('Other')
+  })
 })

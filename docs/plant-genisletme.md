@@ -426,6 +426,22 @@ Platform — General grubu (site sahibi + onun eklediği generaller)
 - İçerik planlamacıyla genişletilecek (ör. kayıp grupları, plan uyumu,
   setup sayıları).
 
+### Düzeltmeler (2026-10-02, planlamacı)
+- **Company → Plant → Cost center:** her fabrikanın masraf yerleri (kod +
+  ad) Companies and plants'ta fabrika satırında tanımlanır (`plants.costCenters`).
+  Tek kaynak: OEE masraf yeri adlarını buradan okur, OEE ayarı yalnızca alanı
+  (area) tutar. Fabrikanın eski "Code" alanı ekrandan kaldırıldı (masraf yeri
+  değildi, fabrikanın kısa koduydu). Geçişte OEE ayarındaki masraf yerleri
+  Plant 1'e yazılır.
+- **Üst çubuk:** şirket ve fabrika ayrı seçim. Şirket seçimi yalnızca birden
+  çok şirketi görene (General / owner); fabrika listesi seçili şirketin
+  yetkili fabrikaları.
+- **Board member / fabrika müdürü:** Admin → User groups'ta şablon
+  düğmeleri: "Board members" (şirketin bütün fabrikaları, sonradan
+  eklenenler dahil, görür) ve "Plant manager — <fabrika>" (yalnızca o
+  fabrika; OEE düzenler, diğerleri görür). Test: fabrika müdürü başka
+  fabrikayı seçemez ve verisini göremez; board member başka şirketi görmez.
+
 ### Kalan (sıradaki aşamalar)
 - Karşılaştırma ekranının içeriği (aşama 7 ilk sürümü yalnızca OEE).
 - Platform değişiklik kaydı (kullanıcı açma / parola) bugün fabrika

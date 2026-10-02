@@ -21,6 +21,7 @@ import {
   setupAnalysis,
   startupRunOf,
   trendGaps,
+  withPlantCostCenters,
   sheetKind,
   suggestConfig,
   visibleChartGroups,
@@ -220,6 +221,14 @@ describe('oee workbook', () => {
     expect(setupAnalysis([day], [], { area: 'PRS', key: 'all' }, own, '2026-09-21', '2026-09-21').map((r) => r.status)).toEqual(['ok', 'ok', 'open'])
     // Setup metni ayarda yoksa setup analizi yapılmaz.
     expect(setupAnalysis([day], [], { area: 'PRS', key: 'all' }, { ...plant, setupTexts: [] }, '2026-09-21', '2026-09-21')).toEqual([])
+  })
+
+  it('cost center names come from the plant; OEE keeps the area', () => {
+    const merged = withPlantCostCenters(plant, [{ code: '51010171', name: 'Transfer line' }, { code: '999', name: 'New' }])
+    expect(merged.costCenters.find((x) => x.code === '51010171')).toEqual({ code: '51010171', name: 'Transfer line', area: 'PRS' })
+    expect(merged.costCenters.find((x) => x.code === '999')).toEqual({ code: '999', name: 'New', area: '' })
+    expect(merged.costCenters.some((x) => x.code === '51010172')).toBe(true)
+    expect(withPlantCostCenters(plant, [])).toBe(plant)
   })
 
   it('data notes: empty periods, missing machines and the KPI–Downtimes difference', () => {

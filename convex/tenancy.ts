@@ -109,6 +109,11 @@ export const startMigration = userMutation({
       name: 'Plant 1',
       country: legacySettings?.country || LEGACY_INSTALL.country,
       timeZone: legacySettings?.timeZone || LEGACY_INSTALL.timeZone,
+      // OEE ayarındaki masraf yerleri fabrikanın masraf yerleri olur (tek kaynak).
+      costCenters: ((await db
+        .query('oeeSettings')
+        .withIndex('by_key', (q: Any) => q.eq('plantId', undefined).eq('key', 'default'))
+        .first())?.costCenters ?? []).map((x: Any) => ({ code: x.code, name: x.name || x.code })),
       createdAt: now,
     })
     await writeLegacyLocationTicks(db)
@@ -208,6 +213,7 @@ export const context = userQuery({
             companyName: active.company.name,
             companyStatus: active.company.status,
             country: active.plant.country ?? '',
+            costCenters: active.plant.costCenters ?? [],
             timeZone: active.plant.timeZone ?? '',
             access: active.access,
             // Askıdaki şirket: salt okunur; silinme tarihi.

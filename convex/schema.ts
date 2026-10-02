@@ -31,6 +31,11 @@ export default defineSchema({
     timeZone: v.optional(v.string()),
     /** Bu fabrikada kapatılan modüller. */
     disabledModules: v.optional(v.array(v.string())),
+    /**
+     * Fabrikanın masraf yerleri (SAP cost center kodu + adı). Tek kaynak:
+     * OEE ve diğer modüller adı buradan okur (Company → Plant → Cost center).
+     */
+    costCenters: v.optional(v.array(v.object({ code: v.string(), name: v.string() }))),
     createdAt: v.number(),
   }).index('by_company', ['companyId']),
 

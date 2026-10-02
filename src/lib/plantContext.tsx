@@ -34,6 +34,8 @@ export interface TenancyContext {
     /** Fabrikanın ülkesi ve saat dilimi (tek kaynak: plants). */
     country: string
     timeZone: string
+    /** Fabrikanın masraf yerleri (Companies and plants'ta tanımlanır). */
+    costCenters: { code: string; name: string }[]
     access: Access
     deleteAfter: number | null
   } | null

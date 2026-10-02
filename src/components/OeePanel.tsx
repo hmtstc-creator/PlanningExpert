@@ -18,7 +18,9 @@ import {
   type OeeConfig,
   type Scope,
   type SheetRows,
+  withPlantCostCenters,
 } from '../lib/oee'
+import { usePlant } from '../lib/plantContext'
 import { importOee, type OeeApi } from '../lib/oeeStore'
 
 /**
@@ -35,7 +37,9 @@ function localIso(d: Date) {
 /** Kaydedilmiş OEE ayarları; yoksa boş ayar ve eksikler listesi. */
 export function useOeeConfig(): { config: OeeConfig; problems: string[]; loaded: boolean; savedAt: number | null } {
   const doc = useQuery(api.oee.settings) as { config: OeeConfig; updatedAt: number } | null | undefined
-  const config = doc?.config ?? EMPTY_CONFIG
+  // Masraf yeri adları fabrika tanımından (tek kaynak).
+  const plantCcs = usePlant().ctx?.active?.costCenters
+  const config = useMemo(() => withPlantCostCenters(doc?.config ?? EMPTY_CONFIG, plantCcs ?? []), [doc, plantCcs])
   return { config, problems: doc === undefined ? [] : configProblems(config), loaded: doc !== undefined, savedAt: doc?.updatedAt ?? null }
 }
 

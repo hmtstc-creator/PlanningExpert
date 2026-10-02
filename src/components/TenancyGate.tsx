@@ -99,32 +99,61 @@ export function TenancyGate({ children }: { children: ReactNode }) {
   )
 }
 
-/** Üst çubukta fabrika: birden çok fabrikası olana seçici, olmayana ad. */
+/**
+ * Üst çubukta şirket ve fabrika — iki ayrı seçim: şirket yalnızca birden çok
+ * şirketi görebilene (General, owner) çıkar; fabrika listesi seçili şirketin
+ * fabrikalarıdır. Tek seçenek varsa yalnızca ad görünür. Listeler sunucudan
+ * gelir: kullanıcı yalnızca yetkili olduğu şirket ve fabrikaları görür.
+ */
 export function PlantSwitch({ light = false }: { light?: boolean }) {
   const { ctx } = usePlant()
   const select = useMutation(api.tenancy.selectPlant)
   if (!ctx?.active) return null
+  const active = ctx.active
   const cls = light
     ? 'rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground'
-    : 'max-w-[14rem] rounded-md border border-white/25 bg-white/10 px-2 py-1 text-xs text-white'
-  const companies = new Set(ctx.plants.map((p) => p.companyId))
-  const label = (p: { name: string; companyName: string }) => (companies.size > 1 ? `${p.companyName} · ${p.name}` : p.name)
-  if (ctx.plants.length <= 1) {
-    return <span className={`${cls} border-transparent bg-transparent`} title={ctx.active.companyName}>{label({ name: ctx.active.plantName, companyName: ctx.active.companyName })}</span>
-  }
+    : 'max-w-[11rem] rounded-md border border-white/25 bg-white/10 px-2 py-1 text-xs text-white'
+  const plain = `${cls} border-transparent bg-transparent`
+  const companies = [...new Map(ctx.plants.map((p) => [p.companyId, p.companyName])).entries()]
+  const plants = ctx.plants.filter((p) => p.companyId === active.companyId)
   return (
-    <select
-      aria-label="Plant"
-      title="Plant — the data on every page belongs to this plant"
-      className={cls}
-      value={ctx.active.plantId}
-      onChange={(e) => void select({ plantId: e.target.value })}
-    >
-      {ctx.plants.map((p) => (
-        <option key={p._id} value={p._id} className="text-foreground">
-          {label(p)}
-        </option>
-      ))}
-    </select>
+    <span className="flex items-center gap-1">
+      {companies.length > 1 ? (
+        <select
+          aria-label="Company"
+          title="Company"
+          className={cls}
+          value={active.companyId}
+          onChange={(e) => {
+            const first = ctx.plants.find((p) => p.companyId === e.target.value)
+            if (first) void select({ plantId: first._id })
+          }}
+        >
+          {companies.map(([id, name]) => (
+            <option key={id} value={id} className="text-foreground">
+              {name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className={plain} title="Company">
+          {active.companyName}
+        </span>
+      )}
+      <span className={light ? 'text-muted-foreground' : 'text-white/50'}>/</span>
+      {plants.length > 1 ? (
+        <select aria-label="Plant" title="Plant — the data on every page belongs to this plant" className={cls} value={active.plantId} onChange={(e) => void select({ plantId: e.target.value })}>
+          {plants.map((p) => (
+            <option key={p._id} value={p._id} className="text-foreground">
+              {p.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className={plain} title="Plant">
+          {active.plantName}
+        </span>
+      )}
+    </span>
   )
 }

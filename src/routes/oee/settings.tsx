@@ -8,6 +8,7 @@ import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
 import { addDaysIso, configProblems, dataCostCenters, suggestConfig, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
+import { usePlant } from '../../lib/plantContext'
 import { OEE_SUGGESTED } from '../../lib/settingsDefaults'
 
 export const Route = createFileRoute('/oee/settings')({
@@ -23,6 +24,8 @@ const input = 'rounded-md border border-input bg-background px-2 py-1 text-sm'
 
 function OeeSettingsPage() {
   const { config: saved, loaded, savedAt } = useOeeConfig()
+  // Fabrikada tanımlı masraf yerleri: adı orada değişir, burada yalnızca alan.
+  const plantCcs = new Set((usePlant().ctx?.active?.costCenters ?? []).map((x) => x.code))
   const save = useMutation(api.oee.saveSettings)
   const coverage = useQuery(api.oee.coverage) as
     | { days: { from: string; to: string } | null; shifts: { from: string; to: string } | null; downtimes: { from: string; to: string } | null }
@@ -209,7 +212,7 @@ function OeeSettingsPage() {
         </button>
       </Card>
 
-      <Card title="Cost centers" info="Every cost center of your files: the name shown in lists and charts, and the area it belongs to. Machines are read from the data.">
+      <Card title="Cost centers" info="Every cost center of your files and the area it belongs to. The cost centers of the plant and their names are defined on Companies and plants (Company → Plant → Cost centers); a code only in the files can be named here. Machines are read from the data.">
         <Rows
           empty="No cost center yet — press Suggest from data, or add one below."
           head={['Code', 'Machines in the data', 'Name', 'Area', '']}
@@ -218,7 +221,11 @@ function OeeSettingsPage() {
             <span key="m" className="text-muted-foreground">
               {found.get(cc.code)?.workCenters.join(', ') || '—'}
             </span>,
-            <input key="n" className={input} value={cc.name} onChange={(e) => set({ costCenters: c.costCenters.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />,
+            plantCcs.has(cc.code) ? (
+              <span key="n" title="Named on Companies and plants (the plant's cost centers)">{cc.name}</span>
+            ) : (
+              <input key="n" className={input} value={cc.name} onChange={(e) => set({ costCenters: c.costCenters.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />
+            ),
             <select
               key="a"
               className={`${input} ${c.areas.some((a) => a.name === cc.area) ? '' : 'border-amber-500'}`}
@@ -232,7 +239,7 @@ function OeeSettingsPage() {
                 </option>
               ))}
             </select>,
-            <RemoveButton key="r" onClick={() => set({ costCenters: c.costCenters.filter((_, j) => j !== i) })} />,
+            plantCcs.has(cc.code) ? <span key="r" /> : <RemoveButton key="r" onClick={() => set({ costCenters: c.costCenters.filter((_, j) => j !== i) })} />,
           ])}
         />
         {notDefined.length > 0 && (

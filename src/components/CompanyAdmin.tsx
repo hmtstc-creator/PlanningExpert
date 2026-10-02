@@ -317,9 +317,29 @@ export function CompanyGroups({ companyId, groups, plants }: { companyId: string
         </table>
       </div>
       {!draft && (
-        <button className="mt-2 text-xs underline" onClick={() => setDraft(blank)}>
-          + Add group
-        </button>
+        <div className="mt-2 flex flex-wrap gap-3 text-xs">
+          <button className="underline" onClick={() => setDraft(blank)}>
+            + Add group
+          </button>
+          {/* Şablonlar: düzenlenip kaydedilir. */}
+          <button
+            className="underline"
+            title="Sees every plant of the company (also plants added later), changes nothing"
+            onClick={() => setDraft({ ...blank, name: 'Board members', allPlants: true, permissions: { planning: 'view', oee: 'view', die: 'view', machine: 'view' } })}
+          >
+            + Board members (all plants, view)
+          </button>
+          {plants.map((p) => (
+            <button
+              key={p._id}
+              className="underline"
+              title={`Sees only ${p.name}; edits OEE, views the rest`}
+              onClick={() => setDraft({ ...blank, name: `Plant manager — ${p.name}`, allPlants: false, plantIds: [p._id], permissions: { planning: 'view', oee: 'edit', die: 'view', machine: 'view' } })}
+            >
+              + Plant manager — {p.name}
+            </button>
+          ))}
+        </div>
       )}
       {draft && (
         <div className="mt-3 space-y-2 rounded-lg border border-border p-3 text-sm">

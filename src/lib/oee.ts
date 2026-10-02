@@ -207,6 +207,25 @@ export const EMPTY_CONFIG: OeeConfig = {
   topN: 0,
 }
 
+/**
+ * Fabrikanın masraf yerleri (Companies and plants → Plant → Cost centers)
+ * tek kaynaktır: ad oradan gelir, OEE ayarı yalnızca alanı (area) tutar.
+ * Fabrikada tanımlı olup OEE ayarında olmayan masraf yeri alansız eklenir
+ * (ayar eksik uyarısı çıkar); fabrikada olmayan eski kayıtlar kalır.
+ */
+export function withPlantCostCenters(c: OeeConfig, plant: { code: string; name: string }[]): OeeConfig {
+  if (!plant.length) return c
+  const own = new Map(c.costCenters.map((x) => [x.code, x]))
+  const codes = new Set(plant.map((p) => p.code))
+  return {
+    ...c,
+    costCenters: [
+      ...plant.map((p) => ({ code: p.code, name: p.name, area: own.get(p.code)?.area ?? '' })),
+      ...c.costCenters.filter((x) => !codes.has(x.code)),
+    ],
+  }
+}
+
 /** Ayarda eksik olan ve kullanıcıya söylenmesi gereken konular. */
 export function configProblems(c: OeeConfig): string[] {
   const out: string[] = []

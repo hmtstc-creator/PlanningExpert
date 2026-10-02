@@ -23,6 +23,12 @@ interface PlantRow {
   country?: string
   timeZone?: string
   disabledModules?: Module[]
+  costCenters?: CostCenter[]
+}
+
+interface CostCenter {
+  code: string
+  name: string
 }
 
 interface CompanyRow {
@@ -38,18 +44,18 @@ interface CompanyRow {
 
 interface PlantDraft {
   name: string
-  code: string
   country: string
   timeZone: string
   disabledModules: Module[]
+  costCenters: CostCenter[]
 }
 
 const plantDraft = (p: PlantRow): PlantDraft => ({
   name: p.name,
-  code: p.code ?? '',
   country: p.country ?? '',
   timeZone: p.timeZone ?? '',
   disabledModules: [...(p.disabledModules ?? [])].sort(),
+  costCenters: p.costCenters ?? [],
 })
 const samePlant = (a: PlantDraft, b: PlantDraft) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -146,7 +152,7 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
   const { run: updatePlant } = useSafeMutation(api.platform.updatePlant)
   const drafts = useDraftRows(c.plants, (p) => p._id, plantDraft, samePlant)
   const savePlant = (id: string) => (d: PlantDraft) =>
-    updatePlant({ id, name: d.name, code: d.code, country: d.country, timeZone: d.timeZone, ...(isPlatform ? { disabledModules: d.disabledModules } : {}) })
+    updatePlant({ id, name: d.name, country: d.country, timeZone: d.timeZone, costCenters: d.costCenters, ...(isPlatform ? { disabledModules: d.disabledModules } : {}) })
   const groups = (useQuery(api.users.listGroups, open ? { companyId: c._id } : 'skip') ?? []) as GroupRow[]
   const save = (patch: Partial<Pick<CompanyRow, 'name' | 'modules' | 'status'>>) =>
     void updateCompany({ id: c._id, name: patch.name ?? c.name, modules: patch.modules ?? c.modules, status: patch.status ?? c.status })
@@ -207,9 +213,9 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
           <thead className="bg-muted text-xs text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">Plant</th>
-              <th className="px-3 py-2 font-medium">Code</th>
               <th className="px-3 py-2 font-medium">Country</th>
               <th className="px-3 py-2 font-medium">Time zone</th>
+              <th className="px-3 py-2 font-medium">Cost centers (code — name)</th>
               {isPlatform && <th className="px-3 py-2 font-medium">Modules switched off here</th>}
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2" />
@@ -293,15 +299,17 @@ function PlantRowEdit({
   modules: Module[]
   isPlatform: boolean
 }) {
-  const text = (key: 'name' | 'code' | 'country' | 'timeZone', w: string) => (
+  const text = (key: 'name' | 'country' | 'timeZone', w: string) => (
     <input className={`${w} ${input}`} value={d[key]} onChange={(e) => onEdit({ [key]: e.target.value })} />
   )
   return (
     <tr className={`border-t border-border ${dirty ? 'bg-amber-50' : ''}`}>
       <td className="px-3 py-2">{text('name', 'w-40')}</td>
-      <td className="px-3 py-2">{text('code', 'w-20')}</td>
       <td className="px-3 py-2">{text('country', 'w-16')}</td>
       <td className="px-3 py-2">{text('timeZone', 'w-44')}</td>
+      <td className="px-3 py-2">
+        <CostCenterEditor value={d.costCenters} onChange={(costCenters) => onEdit({ costCenters })} />
+      </td>
       {isPlatform && (
         <td className="px-3 py-2 text-xs">
           <span className="flex flex-wrap gap-2">
@@ -329,6 +337,50 @@ function PlantRowEdit({
         </button>
       </td>
     </tr>
+  )
+}
+
+/**
+ * Fabrikanın masraf yerleri (SAP cost center): kod + ad. Tek kaynak; OEE ve
+ * diğer modüller adları buradan okur.
+ */
+function CostCenterEditor({ value, onChange }: { value: CostCenter[]; onChange: (v: CostCenter[]) => void }) {
+  const [code, setCode] = useState('')
+  const [name, setName] = useState('')
+  const add = () => {
+    const k = code.trim()
+    if (!k || value.some((x) => x.code === k)) return
+    onChange([...value, { code: k, name: name.trim() || k }])
+    setCode('')
+    setName('')
+  }
+  return (
+    <div className="min-w-64 space-y-1 text-xs">
+      {value.map((cc, i) => (
+        <div key={cc.code} className="flex items-center gap-1">
+          <span className="w-20 font-mono">{cc.code}</span>
+          <input
+            className={`w-36 ${input}`}
+            value={cc.name}
+            onChange={(e) => onChange(value.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+          />
+          <button
+            className="text-destructive"
+            title="Remove"
+            onClick={() => window.confirm(`Remove cost center ${cc.code}?`) && onChange(value.filter((_, j) => j !== i))}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <div className="flex items-center gap-1">
+        <input className={`w-20 ${input}`} placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <input className={`w-36 ${input}`} placeholder="Name (e.g. Transfer)" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <button className="underline" disabled={!code.trim()} onClick={add}>
+          + Add
+        </button>
+      </div>
+    </div>
   )
 }
 
