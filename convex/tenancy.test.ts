@@ -160,4 +160,74 @@ describe('fabrika ayrımı', () => {
     await t.mutation(api.platform.updateCompany, { token: boss, id: companyId, name: 'Company 1', modules: ['planning', 'oee', 'machine'], status: 'active' })
     await expect(t.query(api.moldProblems.list, { token: dt })).rejects.toThrow(/view permission/)
   })
+
+  it('dışa aktarım yalnızca kendi şirketi; kalıcı silme 90 gün sonra, yalnızca o şirketin verisi', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning'] })
+    const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
+    const cr2 = await t.mutation(api.users.add, { token: boss, companyId: c2, name: 'cr2', isCreator: true })
+    const other = await session(t, cr2, 'cr2')
+    await t.mutation(api.presses.upsert, { token: other, name: 'PRS-106', hall: 'B1' })
+
+    // Creator kendi şirketini dışa aktarır; başka şirketi aktaramaz.
+    const page = await t.query(api.platform.exportPage, { token: other, companyId: c2, plantId: p2, table: 'presses', cursor: null })
+    expect(page.page.map((p: Any) => p.hall)).toEqual(['B1'])
+    const c1 = (await t.query(api.tenancy.context, { token: boss })).plants.find((p: Any) => p.name === 'Plant 1')
+    await expect(t.query(api.platform.exportPage, { token: other, companyId: c1.companyId, plantId: c1._id, table: 'presses', cursor: null })).rejects.toThrow(/creator of this company/)
+    await expect(t.query(api.platform.exportPage, { token: other, companyId: c2, plantId: c1._id, table: 'presses', cursor: null })).rejects.toThrow(/Plant not found/)
+
+    // Silme: önce askı, sonra 90 gün.
+    await expect(t.mutation(api.platform.deleteCompany, { token: boss, id: c2, confirmName: 'Other' })).rejects.toThrow(/Suspend/)
+    await t.mutation(api.platform.updateCompany, { token: boss, id: c2, name: 'Other', modules: ['planning'], status: 'suspended' })
+    await expect(t.mutation(api.platform.deleteCompany, { token: boss, id: c2, confirmName: 'Other' })).rejects.toThrow(/after/)
+    vi.setSystemTime(Date.now() + 91 * 86_400_000)
+    // 91 gün sonra eski oturumlar düşmüştür: yeni oturum.
+    await session(t, u.admin, 'boss91')
+    await session(t, cr2, 'cr291')
+    await expect(t.mutation(api.platform.deleteCompany, { token: 'cr291', id: c2, confirmName: 'Other' })).rejects.toThrow(/General/)
+    await expect(t.mutation(api.platform.deleteCompany, { token: 'boss91', id: c2, confirmName: 'other' })).rejects.toThrow(/exactly/)
+    await t.mutation(api.platform.deleteCompany, { token: 'boss91', id: c2, confirmName: 'Other' })
+    for (let i = 0; i < 100; i++) {
+      const done = await t.run(async (ctx: Any) => (await ctx.db.query('platformState').withIndex('by_key', (q: Any) => q.eq('key', `purge:${c2}`)).first())?.value?.done)
+      if (done) break
+      await t.mutation(anyApi.platform.purge, { key: `purge:${c2}` })
+    }
+    const left = await t.run(async (ctx: Any) => ({
+      presses: (await ctx.db.query('presses').collect()).map((p: Any) => p.hall).sort(),
+      users: (await ctx.db.query('users').collect()).map((x: Any) => x.name).sort(),
+    }))
+    expect(left.presses).toEqual(['H1', 'H1'])
+    expect(left.users).not.toContain('cr2')
+    // Plant 1 etkilenmedi.
+    expect((await t.query(api.presses.list, { token: 'boss91' })).length).toBe(2)
+  })
+
+  it('karşılaştırma yalnızca OEE izni olan fabrikaları okur', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning', 'oee'] })
+    const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
+    const day = (plantId: string, op: number) => ({
+      plantId, date: '2026-09-21', plantKey: '', responsible: '', costCenter: 'X', workCenter: 'W', source: 'shiftly',
+      good: 1, scrap: 0, reject: 0, scheduledMin: 0, unscheduledMin: 0, operatingMin: op, productionMin: 100, loadingMin: 100,
+    })
+    const p1 = (await t.query(api.tenancy.context, { token: boss })).plants.find((p: Any) => p.name === 'Plant 1')._id
+    await t.run(async (ctx: Any) => {
+      await ctx.db.insert('oeeDays', day(p1, 60))
+      await ctx.db.insert('oeeDays', day(p2, 80))
+    })
+    const all = await t.query(api.compare.oeeWeeks, { token: boss, endDate: '2026-09-27', weeks: 2 })
+    expect(all.plants.map((p: Any) => [p.plantName, Math.round(p.total.oee * 100)])).toEqual([['Plant 1', 60], ['Bursa', 80]])
+    // Company 1'in planlamacısı yalnızca kendi fabrikasını görür.
+    const pl = await session(t, u.planner, 'pl')
+    const mine = await t.query(api.compare.oeeWeeks, { token: pl, endDate: '2026-09-27', weeks: 2 })
+    expect(mine.plants.map((p: Any) => p.plantName)).toEqual(['Plant 1'])
+  })
 })

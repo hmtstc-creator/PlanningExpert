@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlarmsRouteImport } from './routes/alarms'
 import { Route as CapacityRouteImport } from './routes/capacity'
+import { Route as CompareRouteImport } from './routes/compare'
 import { Route as DepolarRouteImport } from './routes/depolar'
 import { Route as GerceklesenRouteImport } from './routes/gerceklesen'
 import { Route as HammaddeRouteImport } from './routes/hammadde'
@@ -60,6 +61,11 @@ const AlarmsRoute = AlarmsRouteImport.update({
 const CapacityRoute = CapacityRouteImport.update({
   id: '/capacity',
   path: '/capacity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareRoute = CompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DepolarRoute = DepolarRouteImport.update({
@@ -239,6 +245,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alarms': typeof AlarmsRoute
   '/capacity': typeof CapacityRoute
+  '/compare': typeof CompareRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/hammadde': typeof HammaddeRoute
@@ -278,6 +285,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alarms': typeof AlarmsRoute
   '/capacity': typeof CapacityRoute
+  '/compare': typeof CompareRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/hammadde': typeof HammaddeRoute
@@ -318,6 +326,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alarms': typeof AlarmsRoute
   '/capacity': typeof CapacityRoute
+  '/compare': typeof CompareRoute
   '/depolar': typeof DepolarRoute
   '/gerceklesen': typeof GerceklesenRoute
   '/hammadde': typeof HammaddeRoute
@@ -359,6 +368,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alarms'
     | '/capacity'
+    | '/compare'
     | '/depolar'
     | '/gerceklesen'
     | '/hammadde'
@@ -398,6 +408,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alarms'
     | '/capacity'
+    | '/compare'
     | '/depolar'
     | '/gerceklesen'
     | '/hammadde'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alarms'
     | '/capacity'
+    | '/compare'
     | '/depolar'
     | '/gerceklesen'
     | '/hammadde'
@@ -477,6 +489,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlarmsRoute: typeof AlarmsRoute
   CapacityRoute: typeof CapacityRoute
+  CompareRoute: typeof CompareRoute
   DepolarRoute: typeof DepolarRoute
   GerceklesenRoute: typeof GerceklesenRoute
   HammaddeRoute: typeof HammaddeRoute
@@ -534,6 +547,13 @@ declare module '@tanstack/react-router' {
       path: '/capacity'
       fullPath: '/capacity'
       preLoaderRoute: typeof CapacityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare': {
+      id: '/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof CompareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/depolar': {
@@ -781,6 +801,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlarmsRoute: AlarmsRoute,
   CapacityRoute: CapacityRoute,
+  CompareRoute: CompareRoute,
   DepolarRoute: DepolarRoute,
   GerceklesenRoute: GerceklesenRoute,
   HammaddeRoute: HammaddeRoute,

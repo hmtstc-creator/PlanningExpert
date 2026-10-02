@@ -38,5 +38,6 @@ describe('yetki kuralları', () => {
     expect(moduleOfPath('/planlama')).toBe('planning')
     expect(moduleOfPath('/platform')).toBe(null)
     expect(moduleOfPath('/')).toBe(null)
+    expect(moduleOfPath('/compare')).toBe(null)
   })
 })

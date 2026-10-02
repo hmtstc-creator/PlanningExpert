@@ -6,7 +6,7 @@ import { CompanyGroups, CompanyUsers, type GroupRow } from '../components/Compan
 import { ErrorBanner } from '../components/ErrorBanner'
 import { PageHeader } from '../components/PageHeader'
 import { SaveStatus } from '../components/SaveStatus'
-import { useQuery } from '../lib/convexTransport'
+import { useQuery, useQueryOnce } from '../lib/convexTransport'
 import { usePlant } from '../lib/plantContext'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
@@ -184,6 +184,7 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
       {c.status !== 'active' && c.deleteAfter && (
         <p className="mt-1 text-xs text-amber-900">Suspended — data can be deleted after {new Date(c.deleteAfter).toISOString().slice(0, 10)}.</p>
       )}
+      <CompanyDataActions company={c} isPlatform={isPlatform} />
 
       {isPlatform && (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
@@ -328,5 +329,75 @@ function PlantRowEdit({
         </button>
       </td>
     </tr>
+  )
+}
+
+/**
+ * Dışa aktarım (creator ya da General): şirketin bütün fabrika verisi tek
+ * JSON dosyası. Kalıcı silme (General): askıdan 90 gün sonra, şirket adı
+ * yazılarak; geri alınamaz.
+ */
+function CompanyDataActions({ company: c, isPlatform }: { company: CompanyRow; isPlatform: boolean }) {
+  const tablesOf = useQueryOnce(api.platform.exportTables)
+  const pageOf = useQueryOnce(api.platform.exportPage)
+  const { run: deleteCompany, error, clearError } = useSafeMutation(api.platform.deleteCompany)
+  const [progress, setProgress] = useState<string | null>(null)
+  const [failed, setFailed] = useState<string | null>(null)
+  const canDelete = isPlatform && c.status === 'suspended' && !!c.deleteAfter && Date.now() >= c.deleteAfter
+
+  const exportAll = async () => {
+    setFailed(null)
+    try {
+      const tables = (await tablesOf({ companyId: c._id })) as string[]
+      const plants: Record<string, { name: string; tables: Record<string, unknown[]> }> = {}
+      for (const p of c.plants) {
+        plants[p._id] = { name: p.name, tables: {} }
+        for (const table of tables) {
+          const rows: unknown[] = []
+          let cursor: string | null = null
+          for (;;) {
+            setProgress(`${p.name} · ${table} · ${rows.length}`)
+            const r = (await pageOf({ companyId: c._id, plantId: p._id, table, cursor })) as { page: unknown[]; isDone: boolean; continueCursor: string }
+            rows.push(...r.page)
+            if (r.isDone) break
+            cursor = r.continueCursor
+          }
+          if (rows.length) plants[p._id].tables[table] = rows
+        }
+      }
+      const file = { company: { name: c.name, modules: c.modules, status: c.status }, exportedAt: new Date().toISOString(), plants }
+      const url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: 'application/json' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${c.name.replace(/[^\w-]+/g, '_')}_export_${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setFailed(e instanceof Error ? e.message : String(e))
+    } finally {
+      setProgress(null)
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+      <ErrorBanner message={error ?? failed} onDismiss={() => (clearError(), setFailed(null))} />
+      <button className="rounded-md border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" disabled={!!progress} onClick={() => void exportAll()}>
+        {progress ? `Exporting… ${progress}` : 'Export data (JSON)'}
+      </button>
+      {canDelete && (
+        <button
+          className="rounded-md border border-destructive px-2 py-1 text-destructive hover:bg-destructive/10"
+          onClick={() => {
+            // İki adım: onay, sonra şirket adını yazma (sunucu da adı denetler).
+            if (!window.confirm(`Delete ${c.name} and ALL its plant data permanently? This cannot be undone — export first.`)) return
+            const typed = window.prompt('Type the company name to confirm:')
+            if (typed !== null) void deleteCompany({ id: c._id, confirmName: typed })
+          }}
+        >
+          Delete permanently
+        </button>
+      )}
+    </div>
   )
 }

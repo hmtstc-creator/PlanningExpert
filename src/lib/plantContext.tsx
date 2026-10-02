@@ -83,7 +83,8 @@ export function usePlantTimeZone(): string {
 
 /** Sayfanın ait olduğu modül (yol önekine göre); yönetim sayfaları modülsüz. */
 export function moduleOfPath(pathname: string): Module | null {
-  if (pathname === '/' || pathname.startsWith('/platform') || pathname.startsWith('/yonetim')) return null
+  // Karşılaştırma birden çok fabrikayı okur; sunucu her fabrikanın OEE iznine bakar.
+  if (pathname === '/' || pathname.startsWith('/platform') || pathname.startsWith('/yonetim') || pathname.startsWith('/compare')) return null
   if (pathname.startsWith('/oee')) return 'oee'
   if (pathname.startsWith('/die-followup')) return 'die'
   if (pathname.startsWith('/machine-followup')) return 'machine'

@@ -413,4 +413,25 @@ export function useAction(fn: any): (args?: any) => Promise<any> {
   )
 }
 
+/**
+ * Tek seferlik sorgu (abonelik değil): ör. dışa aktarımda sayfa sayfa okuma.
+ * Jeton eklenir; iki taşıma modunda da çalışır.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function useQueryOnce(fn: any): (args?: any) => Promise<any> {
+  const { mode, http, token } = useTransport()
+  const convex = useConvex()
+  return useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async (args?: any) => {
+      const withAuth = withToken(args ?? {}, token)
+      if (mode === 'websocket') return convex.query(fn, withAuth)
+      if (!http) throw new Error('Veritabanı adresi tanımlı değil')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (http as any).query(fn, withAuth)
+    },
+    [mode, http, convex, fn, token],
+  )
+}
+
 export { useConvex } from 'convex/react'

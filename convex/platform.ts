@@ -1,6 +1,9 @@
 import { ConvexError, v } from 'convex/values'
 
-import { userMutation, userQuery } from './guarded'
+import { internal } from './_generated/api'
+import { internalMutation } from './_generated/server'
+import { TABLES, userMutation, userQuery } from './guarded'
+import { isPlantTable } from './plantDb'
 import { MODULES, canManageCompany, isPlatform } from '../src/lib/tenancy'
 
 /**
@@ -165,6 +168,144 @@ export const updatePlant = userMutation({
       }
     }
     await ctx.db.patch(args.id, patch)
+    return null
+  },
+})
+
+// ---- Aşama 6: dışa aktarım ve kalıcı silme -----------------------------------------
+
+/** Dışa aktarılmayan, yeniden hesaplanan tablolar (plan sonucu). */
+const DERIVED_TABLES = new Set(['planRuns', 'planRunChunks', 'planStatus'])
+
+async function requireCompanyExport(ctx: Any, companyId: string) {
+  if (!canManageCompany(ctx.sessionUser, companyId)) throw new ConvexError('Only a creator of this company or a General can export it')
+  const company = await ctx.db.get(companyId)
+  if (!company) throw new ConvexError('Company not found')
+  return company
+}
+
+/** Dışa aktarımın tabloları (fabrikaya ait, hesaplanmayan). */
+export const exportTables = userQuery({
+  args: { companyId: v.id('companies') },
+  returns: v.array(v.string()),
+  handler: async (ctx: Any, { companyId }: Any) => {
+    await requireCompanyExport(ctx, companyId)
+    return TABLES.filter((t) => isPlantTable(t) && !DERIVED_TABLES.has(t))
+  },
+})
+
+/**
+ * Bir fabrikanın bir tablosundan bir sayfa (ekran sayfa sayfa toplayıp tek
+ * JSON dosyası indirir). Kiralama bitince ya da yedek için.
+ */
+export const exportPage = userQuery({
+  args: { companyId: v.id('companies'), plantId: v.id('plants'), table: v.string(), cursor: v.union(v.string(), v.null()) },
+  returns: v.any(),
+  handler: async (ctx: Any, { companyId, plantId, table, cursor }: Any) => {
+    await requireCompanyExport(ctx, companyId)
+    const plant = await ctx.db.get(plantId)
+    if (!plant || plant.companyId !== companyId) throw new ConvexError('Plant not found')
+    if (!isPlantTable(table) || DERIVED_TABLES.has(table) || !TABLES.includes(table)) throw new ConvexError(`Unknown table ${table}`)
+    const r = await ctx.db
+      .query(table)
+      .withIndex('by_plant', (q: Any) => q.eq('plantId', plantId))
+      .paginate({ cursor, numItems: table === 'oeeDowntimeDays' ? 20 : 200 })
+    return { page: r.page, isDone: r.isDone, continueCursor: r.continueCursor }
+  },
+})
+
+/**
+ * Kalıcı silme: yalnızca General, şirket askıdayken ve silme tarihi
+ * (askıya alındıktan 90 gün sonra) geçtiyse; şirket adı yazılarak onaylanır.
+ * Önce kullanıcılar, gruplar ve fabrikalar kalkar (kimse giremez), sonra
+ * fabrika verisi arka planda parça parça silinir. Geri alınamaz.
+ */
+export const deleteCompany = userMutation({
+  args: { id: v.id('companies'), confirmName: v.string() },
+  returns: v.null(),
+  handler: async (ctx: Any, { id, confirmName }: Any) => {
+    requirePlatform(ctx.sessionUser)
+    const c = await ctx.db.get(id)
+    if (!c) throw new ConvexError('Company not found')
+    if (c.status !== 'suspended' || !c.deleteAfter) throw new ConvexError('Suspend the company first')
+    if (Date.now() < c.deleteAfter) throw new ConvexError(`The data can be deleted after ${new Date(c.deleteAfter).toISOString().slice(0, 10)}`)
+    if (confirmName.trim() !== c.name) throw new ConvexError('Type the company name exactly to confirm')
+    const plants: Any[] = await ctx.db
+      .query('plants')
+      .withIndex('by_company', (q: Any) => q.eq('companyId', id))
+      .collect()
+    const users: Any[] = await ctx.db
+      .query('users')
+      .withIndex('by_company', (q: Any) => q.eq('companyId', id))
+      .collect()
+    for (const u of users) {
+      if (u.platformRole) {
+        await ctx.db.patch(u._id, { companyId: undefined, isCreator: undefined, groupIds: undefined })
+        continue
+      }
+      const sessions: Any[] = await ctx.db
+        .query('sessions')
+        .withIndex('by_user', (q: Any) => q.eq('userId', u._id))
+        .collect()
+      for (const s of sessions) await ctx.db.delete(s._id)
+      await ctx.db.delete(u._id)
+    }
+    const groups: Any[] = await ctx.db
+      .query('userGroups')
+      .withIndex('by_company', (q: Any) => q.eq('companyId', id))
+      .collect()
+    for (const g of groups) await ctx.db.delete(g._id)
+    for (const p of plants) await ctx.db.delete(p._id)
+    await ctx.db.delete(id)
+    await ctx.db.insert('platformState', {
+      key: `purge:${id}`,
+      value: { companyName: c.name, plantIds: plants.map((p) => p._id), tableIndex: 0, deleted: 0, done: false },
+      updatedAt: Date.now(),
+    })
+    await ctx.scheduler.runAfter(0, internal.platform.purge, { key: `purge:${id}` })
+    return null
+  },
+})
+
+/** Silinen şirketin fabrika verisini parça parça siler (fotoğraflar dahil). */
+export const purge = internalMutation({
+  args: { key: v.string() },
+  returns: v.null(),
+  handler: async (ctx: Any, { key }: Any) => {
+    const state = await ctx.db
+      .query('platformState')
+      .withIndex('by_key', (q: Any) => q.eq('key', key))
+      .first()
+    if (!state || state.value.done) return null
+    const tables = TABLES.filter(isPlantTable)
+    let { tableIndex, deleted } = state.value
+    let budget = 300
+    while (tableIndex < tables.length && budget > 0) {
+      const table = tables[tableIndex]
+      let emptied = true
+      let checked = 0
+      for (const plantId of state.value.plantIds) {
+        checked++
+        const docs: Any[] = await ctx.db
+          .query(table)
+          .withIndex('by_plant', (q: Any) => q.eq('plantId', plantId))
+          .take(Math.min(budget, table === 'planRunChunks' || table === 'oeeDowntimeDays' ? 5 : 100))
+        for (const d of docs) {
+          for (const photo of d.photos ?? []) await ctx.storage.delete(photo).catch(() => {})
+          await ctx.db.delete(d._id)
+        }
+        deleted += docs.length
+        budget -= Math.max(docs.length, 1)
+        if (docs.length) emptied = false
+        if (budget <= 0) break
+      }
+      // Tablo ancak bütün fabrikalarda boşsa geçilir.
+      if (emptied && checked === state.value.plantIds.length) tableIndex++
+      else break
+    }
+    const done = tableIndex >= tables.length
+    await ctx.db.patch(state._id, { value: { ...state.value, tableIndex, deleted, done }, updatedAt: Date.now() })
+    if (!done) await ctx.scheduler.runAfter(0, internal.platform.purge, { key })
     return null
   },
 })

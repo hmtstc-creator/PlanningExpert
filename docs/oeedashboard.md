@@ -480,9 +480,11 @@ Yeni bir sohbet bu dosyayla devam edebilsin diye.
 - Avg setup'a birleşen setup kayıtları arasındaki süre de katılsın mı?
 - ~~planValidator "2009/1009" metni~~ → düzeltildi. 3 günlük stok yaşı
   uyarısı program kuralı olarak kaldı.
-- Plant genişletme: aşama 1–4 uygulandı (2026-10-02, docs/plant-genisletme.md
-  → "Uygulama"); kalan aşama 5–7. OEE verisi ve ayarları artık fabrika
-  başına.
+- Plant genişletme: aşama 1–6 ve 7'nin ilk sürümü uygulandı (2026-10-02,
+  docs/plant-genisletme.md → "Uygulama"). OEE verisi ve ayarları fabrika
+  başına; karşılaştırma ekranının içeriği konuşulacak.
+- Deploy (2026-10-02): Vercel, TanStack Start 1.168.54'teki XSS açığı yüzünden
+  build'i durdurdu → 1.168.60'a güncellendi.
 - ~~MB51 eski satırlar~~ → sorun değil, veriler yenilenebilir.
 - ~~APR setup süresi~~ → alan bazlı süre (APR 10 dk). Parça bazlı setup
   süresi Master Data'da — ileride.

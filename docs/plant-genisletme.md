@@ -1,6 +1,6 @@
 # Plant genişletme — çok şirket / çok fabrika (kiralama)
 
-Durum: **UYGULANDI — aşama 1–5 (2026-10-02).** Planlamacı (2026-10-02):
+Durum: **UYGULANDI — aşama 1–6, aşama 7 ilk sürüm (2026-10-02).** Planlamacı (2026-10-02):
 "önemli olan sistem, sistemi genişlet". Kalan: aşama 5 (hard coding
 temizliği + kurulum listesi), 6 (dışa aktarım, 90 gün sonra silme), 7
 (karşılaştırma ekranı). Ayrıntı en altta "Uygulama".
@@ -405,9 +405,28 @@ Platform — General grubu (site sahibi + onun eklediği generaller)
   Master Data, SAP verisi, OEE ayarları + ilk yükleme, kullanıcılar — veriye
   bakılarak tamam / eksik; hepsi tamamsa görünmez.
 
+### Aşama 6 — dışa aktarım ve kalıcı silme (2026-10-02)
+- **Export data (JSON)** (Companies and plants, şirket kartı; creator ya da
+  General): şirketin bütün fabrika verisi tek dosya (plan sonucu hariç —
+  yeniden hesaplanır). `platform.exportPage` yalnızca o şirketin
+  fabrikalarını okur.
+- **Delete permanently** (yalnızca General): şirket askıdayken ve silme
+  tarihi (askıdan 90 gün sonra) geçtiyse, şirket adı yazılarak. Önce
+  kullanıcılar, oturumlar, gruplar ve fabrikalar kalkar (kimse giremez),
+  sonra fabrika verisi ve fotoğraflar arka planda silinir
+  (`platform.purge`). Generaller silinmez, yalnızca şirketten ayrılır.
+  Geri alınamaz — önce dışa aktarım.
+
+### Aşama 7 — fabrika karşılaştırma (ilk sürüm, 2026-10-02)
+- **/compare — Compare plants** (birden çok fabrikası olana ana sayfada
+  bağlantı): OEE izni olan her fabrikanın son N haftalık OEE'si yan yana
+  (toplam ÷ toplam), dönem toplamı, haftanın en iyisi kalın; üzerine
+  gelince A ve P. Yalnızca yetkili fabrikalar okunur (test: planlamacı
+  yalnızca kendi fabrikasını görür).
+- İçerik planlamacıyla genişletilecek (ör. kayıp grupları, plan uyumu,
+  setup sayıları).
+
 ### Kalan (sıradaki aşamalar)
-- Aşama 6: şirket verisinin dışa aktarımı ve 90 gün sonra kalıcı silme
-  (askıya alma ve silme tarihi hazır).
-- Aşama 7: Board member karşılaştırma ekranı (içeriği konuşulacak).
+- Karşılaştırma ekranının içeriği (aşama 7 ilk sürümü yalnızca OEE).
 - Platform değişiklik kaydı (kullanıcı açma / parola) bugün fabrika
   kaydında görünmüyor.

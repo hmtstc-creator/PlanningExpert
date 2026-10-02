@@ -36,6 +36,13 @@ function PortalHome() {
           </Link>
         </p>
       )}
+      {(ctx?.plants.length ?? 0) > 1 && (
+        <p className="mt-1 text-sm">
+          <Link to="/compare" className="underline">
+            Compare plants
+          </Link>
+        </p>
+      )}
 
       {canManage && ctx?.active && <SetupChecklist can={can} />}
 

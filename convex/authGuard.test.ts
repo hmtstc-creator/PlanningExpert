@@ -94,6 +94,8 @@ describe('sunucu tarafı yetki denetimi', () => {
       'tenancy.ts': /./,
       'users.ts': /./,
       'platform.ts': /./,
+      // Yalnızca visiblePlants'taki fabrikalar, her biri kendi plantId'siyle.
+      'compare.ts': /./,
       'authInternal.ts': /internal(Query|Mutation)\(/,
     }
     for (const { name, source } of convexFiles()) {
