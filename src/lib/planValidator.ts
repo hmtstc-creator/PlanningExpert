@@ -875,6 +875,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const otherStock = new Map<string, Map<string, number>>()
   const stockAge = new Map<string, number>()
   const counted = countedLocations(inputs.locations ?? [])
+  const countedText = [...counted.finished].sort().join('/') || 'the counted locations'
   for (const r of inputs.stock) {
     const loc = r.storageLocation?.trim()
     if (!loc || counted.finished.has(loc)) stock0.set(r.material, (stock0.get(r.material) ?? 0) + (r.unrestricted ?? 0))
@@ -1387,7 +1388,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
         if (pos.length) flags.push(`${m}: ZPP has positive quantities (${pos.slice(0, 3).join(', ')}) — counted as demand.`)
         const backlog = Math.abs(w.overdue ?? 0)
         const st = stock0.get(m) ?? 0
-        if (backlog > 0 && backlog <= st) flags.push(`${m}: backlog ${Math.round(backlog)} ≤ stock ${Math.round(st)} in 2009/1009 — check whether it has already shipped.`)
+        if (backlog > 0 && backlog <= st) flags.push(`${m}: backlog ${Math.round(backlog)} ≤ stock ${Math.round(st)} in ${countedText} — check whether it has already shipped.`)
       }
       const daily = inputs.dailyDemand?.find((d) => d.material === m)
       if (daily?.periods.some((p) => Number(p.qty) > 0)) flags.push(`${m}: ZPP_DAILY has positive quantities — counted as demand.`)

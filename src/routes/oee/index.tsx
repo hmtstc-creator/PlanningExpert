@@ -3,7 +3,7 @@ import { useMemo, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { OeeBarChart, PeriodTable, pct } from '../../components/OeeCharts'
-import { OeeControls, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
+import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import {
@@ -14,6 +14,7 @@ import {
   ratios,
   scopeLabel,
   totalsFor,
+  trendGaps,
   weeklyTrend,
   weekShiftTrend,
   type DayRow,
@@ -88,6 +89,7 @@ function OeeDashboard() {
       />
 
       <OeeControls selection={sel} rows={scopeRows} config={config} />
+      <OeeDataNotice items={[...trendGaps(month).map((t) => `Monthly — ${t}`), ...trendGaps(weeks).map((t) => `Weekly — ${t}`)]} />
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Tile label={`${label} · ${sel.date}`} value={pct(day.oee)} hint={`A ${pct(day.availability)} · P ${pct(day.performance)}`} />

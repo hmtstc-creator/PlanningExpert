@@ -454,20 +454,35 @@ Yeni bir sohbet bu dosyayla devam edebilsin diye.
   duruş dakikaları toplamı ÷ setup adedi (birleşen kayıtlar arasındaki mola
   vb. sayılmaz — istenirse değiştirilecek).
 
+### Dördüncü tur (2026-10-02, planlamacı)
+
+- **APR setup süresi ayrı:** her alanın kendi "setup sonrası üretim" süresi
+  var (Settings → Areas, sütun "Production after a setup"); boşsa genel değer
+  (Numbers). Öneri makine bazlı alana (APR) **10 dk** yazar — planlamacının
+  geçici değeri. İleride parça bazlı setup süresi **Master Data**'da
+  tanımlanacak; APR kayıp analizlerinin çözümünü planlamacı bulacak, şimdilik
+  dikkate alınmaz.
+- **Veri eksikleri ve farklar → yalnızca ekranda bildirim** ("Data notes"):
+  - Dashboard: aylık / haftalık trendde verisi olmayan dönem ve o dönemde
+    verisi olmayan makine (`trendGaps`).
+  - Losses Trend: seçili haftada duruşu yüklenmemiş günler, vardiya verisi
+    olmayan duruş günleri, Shiftly KPI ile Downtimes plansız duruş farkı
+    (toplam ve en çok fark eden 5 makine; `lossCoverage`). Hesap değişmez.
+- planValidator metni sabit "2009/1009" yerine Storage Locations'ta sayılan
+  depoları yazar.
+- Sistem öncelikli: veriler yenilenebilir; eski MB51 satırları sorun değil.
+  Sıradaki iş **plant genişletme** (docs/plant-genisletme.md).
+
 ## Bekleyen konular
 
-- Veride eksikler: 07–13.09 için Shiftly / Order Based KPI yok (kayıp %
-  hesaplanamaz); Monthly KPI'da Ağustos ve Eylül yok; 32–35. haftalarda
-  makineler eksik, 33. hafta hiç yok (yaz tatili mi? — planlamacı teyit).
+- ~~Veride eksikler (07–13.09, Ağustos/Eylül, 32–35. haftalar)~~ → veriye
+  takılınmaz; ekranda "Data notes" olarak gösterilir.
 - Avg setup'a birleşen setup kayıtları arasındaki süre de katılsın mı?
-- planValidator metni "stock in 2009/1009" (sayılan lokasyonlar yazmalı) ve
-  3 günlük stok yaşı sabiti (program mı kullanıcı mı) — cevap bekleniyor.
-- Plant genişletme (docs/plant-genisletme.md) beklemede; karşılaştırma ekranı
-  sonra konuşulacak.
-- MB51 eski satırlar — beklemede.
-
-- APR için setup sonrası üretim süresi (şu an tek değer, Settings'te):
-  APR'ye ayrı süre gerekir mi? Planlamacıya sorulacak.
-
-- Downtimes plansız duruş toplamı ile Shiftly Unscheduled Downtime farkı
-  (medyan 7,9 dk/vardiya, en çok 163 dk) — ayrıca incelenecek.
+- ~~planValidator "2009/1009" metni~~ → düzeltildi. 3 günlük stok yaşı
+  uyarısı program kuralı olarak kaldı.
+- Plant genişletme: uygulanıyor (docs/plant-genisletme.md); karşılaştırma
+  ekranı sonra konuşulacak.
+- ~~MB51 eski satırlar~~ → sorun değil, veriler yenilenebilir.
+- ~~APR setup süresi~~ → alan bazlı süre (APR 10 dk). Parça bazlı setup
+  süresi Master Data'da — ileride.
+- ~~Downtimes / Shiftly plansız duruş farkı~~ → yalnızca ekranda bildirim.

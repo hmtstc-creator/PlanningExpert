@@ -166,11 +166,11 @@ function OeeSettingsPage() {
 
       <Card
         title="Areas"
-        info="A group of cost centers, e.g. presses (PRS) or assembly (APR); each area is a button above every OEE page. 'Cost center' lets you pick a cost center of the area; 'Machine' lets you pick a single machine (when the area is one cost center)."
+        info="A group of cost centers, e.g. presses (PRS) or assembly (APR); each area is a button above every OEE page. 'Cost center' lets you pick a cost center of the area; 'Machine' lets you pick a single machine (when the area is one cost center). 'Production after a setup' is the minutes of production that make a setup OK in this area; empty = the value under Numbers."
       >
         <Rows
           empty="No area yet — press Suggest from data, or add one below."
-          head={['Area name', 'Pick by', '']}
+          head={['Area name', 'Pick by', 'Production after a setup (min)', '']}
           rows={c.areas.map((a, i) => [
             <input
               key="n"
@@ -189,6 +189,18 @@ function OeeSettingsPage() {
               <option value="costCenter">Cost center</option>
               <option value="machine">Machine</option>
             </select>,
+            <input
+              key="s"
+              type="number"
+              min={1}
+              className={`${input} w-24`}
+              placeholder={c.startupRunMin ? String(c.startupRunMin) : ''}
+              value={a.startupRunMin || ''}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                set({ areas: c.areas.map((x, j) => (j === i ? { ...x, startupRunMin: v > 0 ? v : undefined } : x)) })
+              }}
+            />,
             <RemoveButton key="r" onClick={() => set({ areas: c.areas.filter((_, j) => j !== i) })} />,
           ])}
         />
@@ -348,7 +360,7 @@ function OeeSettingsPage() {
 
       <Card title="Numbers">
         <div className="flex flex-wrap gap-4 text-sm">
-          <NumberField label="Production after a setup for OK (min)" value={c.startupRunMin} onChange={(v) => set({ startupRunMin: v })} />
+          <NumberField label="Production after a setup for OK (min, areas without their own)" value={c.startupRunMin} onChange={(v) => set({ startupRunMin: v })} />
           <NumberField label="Weeks in the trends" value={c.trendWeeks} onChange={(v) => set({ trendWeeks: v })} />
           <NumberField label="Rows in the top lists" value={c.topN} onChange={(v) => set({ topN: v })} />
         </div>

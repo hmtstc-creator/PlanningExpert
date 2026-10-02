@@ -16,8 +16,11 @@ import {
   mondayOfWeek,
   mondayStartProblem,
   parseOeeWorkbook,
+  lossCoverage,
   ratios,
   setupAnalysis,
+  startupRunOf,
+  trendGaps,
   sheetKind,
   suggestConfig,
   visibleChartGroups,
@@ -210,8 +213,34 @@ describe('oee workbook', () => {
     expect(rows[1].setupMin).toBe(30)
     expect(rows[1].runMin).toBe(10)
     expect(rows[1].mainReason).toBe('KLP')
+    // Alanın kendi süresi (APR ayrı): 10 dk yeterse ikinci setup da OK.
+    const own = { ...plant, areas: plant.areas.map((a) => (a.name === 'PRS' ? { ...a, startupRunMin: 10 } : a)) }
+    expect(startupRunOf('PRS', own)).toBe(10)
+    expect(startupRunOf('APR', own)).toBe(60)
+    expect(setupAnalysis([day], [], { area: 'PRS', key: 'all' }, own, '2026-09-21', '2026-09-21').map((r) => r.status)).toEqual(['ok', 'ok', 'open'])
     // Setup metni ayarda yoksa setup analizi yapılmaz.
     expect(setupAnalysis([day], [], { area: 'PRS', key: 'all' }, { ...plant, setupTexts: [] }, '2026-09-21', '2026-09-21')).toEqual([])
+  })
+
+  it('data notes: empty periods, missing machines and the KPI–Downtimes difference', () => {
+    const t = (loadingMin: number) => ({ ...sumTimes([]), loadingMin })
+    const pt = (label: string, l: number) => ({ key: label, label, times: t(l), oee: null })
+    const gaps = trendGaps({
+      total: [pt('W31', 0), pt('W32', 100), pt('W33', 0), pt('W34', 200)],
+      byWorkCenter: new Map([
+        ['PRS-103', [pt('W31', 0), pt('W32', 100), pt('W33', 0), pt('W34', 100)]],
+        ['PRS-104', [pt('W31', 0), pt('W32', 0), pt('W33', 0), pt('W34', 100)]],
+      ]),
+    })
+    expect(gaps).toEqual(['No data: W33', 'W32: no data for PRS-104'])
+
+    const d0 = days.find((d) => d.costCenter === '51010173' && d.date === '2026-09-21')!
+    const loss = lossDayOf({ date: d0.date, plant: '', plantKey: '', costCenter: d0.costCenter, workCenter: d0.workCenter, events: [] })
+    loss.codes = { 'UNSCD_DOWN|KSD': [d0.unscheduledMin - 7, 3], 'SCHED_DOWN|UTS': [30, 1] }
+    const cov = lossCoverage([d0], [loss], progressive, plant, '2026-09-21', '2026-09-21')
+    expect(cov.unscheduledKpi - cov.unscheduledDowntimes).toBeCloseTo(7)
+    expect(cov.byWorkCenter[0].workCenter).toBe(d0.workCenter)
+    expect(lossCoverage([d0], [], progressive, plant, '2026-09-21', '2026-09-21').noDowntimes).toEqual(['2026-09-21'])
   })
 
   it('weekly year from the latest date; monthly year from its Year column', () => {

@@ -170,7 +170,7 @@ export type Pick = 'costCenter' | 'machine'
 /** Kullanıcının OEE ayarları (OEE → Settings). */
 export interface OeeConfig {
   /** Üstteki seçim düğmeleri; `pick`: masraf yeri mi makine mi seçilir. */
-  areas: { name: string; pick: Pick }[]
+  areas: { name: string; pick: Pick; startupRunMin?: number }[]
   costCenters: { code: string; name: string; area: string }[]
   /** Vardiya grubu kodu (Shift Group) → vardiya numarası (1, 2, 3 …). */
   shifts: { code: string; number: number }[]
@@ -185,7 +185,10 @@ export interface OeeConfig {
   lossGroups: { code: string; label: string; chart: string; breakdown: boolean; hidden?: boolean }[]
   /** Setup sayılan duruş metinleri (Reason Code Definition EN). */
   setupTexts: { text: string; kind: 'planned' | 'unplanned' }[]
-  /** Setup'tan sonra bu kadar dakika üretim yapılırsa setup OK. */
+  /**
+   * Setup'tan sonra bu kadar dakika üretim yapılırsa setup OK. Alanın kendi
+   * değeri (`areas[].startupRunMin`) varsa o geçerlidir (APR ayrı — 2026-10-02).
+   */
   startupRunMin: number
   trendWeeks: number
   topN: number
@@ -314,6 +317,12 @@ type Located = { workCenter: string; costCenter: string }
 
 export function areaOfCostCenter(cc: string, c: OeeConfig): string {
   return c.costCenters.find((x) => x.code === cc)?.area || UNASSIGNED
+}
+
+/** Alanın setup sonrası üretim süresi; alanda yoksa genel değer. */
+export function startupRunOf(area: string, c: OeeConfig): number {
+  const own = c.areas.find((a) => a.name === area)?.startupRunMin
+  return own && own > 0 ? own : c.startupRunMin
 }
 
 export function pickOf(area: string, c: OeeConfig): Pick {
@@ -810,12 +819,13 @@ interface Span {
  */
 export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Scope, c: OeeConfig, from: string, to: string): SetupRow[] {
   const setupKind = new Map(c.setupTexts.map((t) => [t.text.trim().toUpperCase(), t.kind]))
-  const need = c.startupRunMin
-  if (!setupKind.size || !(need > 0)) return []
+  if (!setupKind.size) return []
   const byWc = new Map<string, Span[]>()
+  const needBy = new Map<string, number>()
   let dataEnd = -Infinity
   for (const d of days) {
     if (!inScope(d, scope, c)) continue
+    needBy.set(d.workCenter, startupRunOf(areaOfCostCenter(d.costCenter, c), c))
     const list = byWc.get(d.workCenter) ?? []
     for (const ev of d.events) {
       const s = toMin(ev.startDate || d.date, ev.startTime)
@@ -832,6 +842,8 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
 
   const out: SetupRow[] = []
   for (const [wc, spans] of byWc) {
+    const need = needBy.get(wc) ?? 0
+    if (!(need > 0)) continue
     spans.sort((a, b) => a.s - b.s)
     // Duruşların birleşimi: üretim = bu aralıkların dışında kalan süre.
     const union: [number, number][] = []
@@ -965,7 +977,7 @@ export function dataCostCenters(input: { days: Located[]; shifts: Located[]; dow
 export function suggestConfig(
   input: { days: Located[]; shifts: (Located & { shiftGroup: string })[]; downtimes: DowntimeDay[] },
   current: OeeConfig,
-  defaults: { startupRunMin: number; trendWeeks: number; topN: number },
+  defaults: { startupRunMin: number; machineAreaStartupRunMin: number; trendWeeks: number; topN: number },
 ): OeeConfig {
   const found = dataCostCenters(input)
   // Tanımlı masraf yeri korunur (adı ve alanı kullanıcının); yenisi ön ek alanına.
@@ -980,7 +992,7 @@ export function suggestConfig(
     ...current.costCenters.filter((x) => !found.has(x.code)),
   ]
   const used = new Set(costCenters.map((c) => c.area))
-  const areas = [
+  const areas: OeeConfig['areas'] = ([
     // Kullanıcının alanları kalır; yalnızca adı bir masraf yeri kodu olanlar (yanlışlıkla alan yazılmış) düşer.
     ...current.areas.filter((a) => !found.has(a.name) && !costCenters.some((c) => c.code === a.name)),
     ...[...used]
@@ -989,7 +1001,7 @@ export function suggestConfig(
         const n = costCenters.filter((c) => c.area === name).length
         return { name, pick: (n > 1 ? 'costCenter' : 'machine') as Pick }
       }),
-  ]
+  ] as OeeConfig['areas']).map((a) => (a.startupRunMin || a.pick !== 'machine' ? a : { ...a, startupRunMin: defaults.machineAreaStartupRunMin }))
   const codeCcs = new Map<string, Set<string>>()
   for (const s of input.shifts) {
     if (!s.shiftGroup) continue
@@ -1481,3 +1493,80 @@ export const downtimeFormulas = (date: string, e: DowntimeEvent, c: OeeConfig) =
   material: e.material,
   min: e.minutes,
 })
+
+// ---- veri bildirimleri -------------------------------------------------------------
+
+/**
+ * Ekranda gösterilen veri uyarıları (planlamacı, 2026-10-02: "verilere
+ * takılma, ekranda bildirim ver"). Hesabı değiştirmez; yalnızca eksikleri ve
+ * farkları söyler.
+ */
+
+/** Trendde verisi olmayan dönemler ve o dönemde verisi olmayan iş merkezleri. */
+export function trendGaps(trend: { total: SeriesPoint[]; byWorkCenter: Map<string, SeriesPoint[]> }): string[] {
+  const out: string[] = []
+  const firstWithData = trend.total.findIndex((p) => p.times.loadingMin > 0)
+  if (firstWithData < 0) return out
+  const lastWithData = trend.total.length - 1 - [...trend.total].reverse().findIndex((p) => p.times.loadingMin > 0)
+  const empty: string[] = []
+  trend.total.forEach((p, i) => {
+    if (i < firstWithData || i > lastWithData) return
+    if (!(p.times.loadingMin > 0)) {
+      empty.push(p.label)
+      return
+    }
+    const missing = [...trend.byWorkCenter]
+      .filter(([, pts]) => !(pts[i].times.loadingMin > 0) && pts.some((x) => x.times.loadingMin > 0))
+      .map(([wc]) => wc)
+    if (missing.length) out.push(`${p.label}: no data for ${missing.join(', ')}`)
+  })
+  if (empty.length) out.unshift(`No data: ${empty.join(', ')}`)
+  return out
+}
+
+export interface LossCoverage {
+  /** Vardiya/gün verisi olup duruş verisi olmayan günler (kayıp yüzdesi eksik). */
+  noDowntimes: string[]
+  /** Duruş verisi olup vardiya/gün verisi olmayan günler (Loading yok, yüzde hesaplanamaz). */
+  noShifts: string[]
+  /** Plansız duruş: KPI'daki toplam ile Downtimes'taki kayıp duruşları (ikisi de olan günlerde). */
+  unscheduledKpi: number
+  unscheduledDowntimes: number
+  /** İş merkezi bazında fark (KPI − Downtimes), mutlak değere göre büyükten küçüğe. */
+  byWorkCenter: { workCenter: string; kpi: number; downtimes: number }[]
+}
+
+/** Gün aralığında KPI ile Downtimes verisinin karşılaştırması (kapsam içinde). */
+export function lossCoverage(days: DayRow[], lossDays: LossDay[], scope: Scope, c: OeeConfig, from: string, to: string): LossCoverage {
+  const sel = (r: { date: string } & Located) => r.date >= from && r.date <= to && inScope(r, scope, c)
+  const dayRows = days.filter((d) => sel(d) && d.loadingMin > 0)
+  const losses = lossDays.filter(sel)
+  const key = (r: { date: string; workCenter: string }) => `${r.date}|${r.workCenter}`
+  const lossBy = new Map(losses.map((l) => [key(l), l]))
+  const dayBy = new Map(dayRows.map((d) => [key(d), d]))
+  const dateList = (keys: string[]) => [...new Set(keys.map((k) => k.split('|')[0]))].sort()
+  const noDowntimes = dateList(dayRows.filter((d) => !lossBy.has(key(d))).map(key))
+  const noShifts = dateList(losses.filter((l) => !dayBy.has(key(l))).map(key))
+  const perWc = new Map<string, { kpi: number; downtimes: number }>()
+  for (const d of dayRows) {
+    const l = lossBy.get(key(d))
+    if (!l) continue
+    let dt = 0
+    for (const [k, [m]] of Object.entries(l.codes)) if (c.lossReasonCodes.includes(k.split('|')[0])) dt += m
+    const w = perWc.get(d.workCenter) ?? { kpi: 0, downtimes: 0 }
+    w.kpi += d.unscheduledMin
+    w.downtimes += dt
+    perWc.set(d.workCenter, w)
+  }
+  const byWorkCenter = [...perWc]
+    .map(([workCenter, v]) => ({ workCenter, ...v }))
+    .filter((r) => Math.abs(r.kpi - r.downtimes) >= 1)
+    .sort((a, b) => Math.abs(b.kpi - b.downtimes) - Math.abs(a.kpi - a.downtimes))
+  let kpi = 0
+  let dts = 0
+  for (const v of perWc.values()) {
+    kpi += v.kpi
+    dts += v.downtimes
+  }
+  return { noDowntimes, noShifts, unscheduledKpi: kpi, unscheduledDowntimes: dts, byWorkCenter }
+}

@@ -142,7 +142,7 @@ export const dayFields = {
 
 /** OEE ayarları (src/lib/oee.ts OeeConfig). */
 export const configFields = {
-  areas: v.array(v.object({ name: v.string(), pick: v.union(v.literal('costCenter'), v.literal('machine')) })),
+  areas: v.array(v.object({ name: v.string(), pick: v.union(v.literal('costCenter'), v.literal('machine')), startupRunMin: v.optional(v.number()) })),
   costCenters: v.array(v.object({ code: v.string(), name: v.string(), area: v.string() })),
   shifts: v.array(v.object({ code: v.string(), number: v.number() })),
   lossReasonCodes: v.array(v.string()),

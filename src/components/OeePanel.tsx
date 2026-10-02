@@ -116,6 +116,21 @@ export function OeeRebuildNotice() {
   )
 }
 
+/** Veri uyarıları: eksik dönemler, eksik makineler, KPI–Downtimes farkı. Hesabı değiştirmez. */
+export function OeeDataNotice({ items }: { items: string[] }) {
+  if (!items.length) return null
+  return (
+    <div className="mt-4 rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm text-sky-900" role="status">
+      <b>Data notes</b> (the numbers use what is uploaded):
+      <ul className="mt-1 list-disc pl-5">
+        {items.map((t) => (
+          <li key={t}>{t}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function OeeControls({
   selection,
   rows,

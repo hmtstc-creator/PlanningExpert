@@ -3,7 +3,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { Legend, LineTrendChart, StackedShareChart, pct } from '../../components/OeeCharts'
-import { OeeControls, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
+import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import {
@@ -20,11 +20,13 @@ import {
   inScope,
   isoWeek,
   lossBreakdown,
+  lossCoverage,
   lossForPeriod,
   reasonPareto,
   reliability,
   scopeLabel,
   setupAnalysis,
+  startupRunOf,
   sumTimes,
   weekGap,
   weekTimes,
@@ -72,6 +74,25 @@ function LossesPage() {
   const columns = useMemo(() => chartGroups(config, lossDays), [config, lossDays])
   // Grafiklerde gizli gruplar (Settings → In charts) yalnızca tablolarda.
   const chartColumns = useMemo(() => visibleChartGroups(columns, config), [columns, config])
+
+  const coverageNotes = useMemo(() => {
+    const cov = lossCoverage(dayRows, lossDays, scope, config, sel.monday, sel.sunday)
+    const dm = (d: string) => `${d.slice(8)}.${d.slice(5, 7)}`
+    const out: string[] = []
+    if (cov.noDowntimes.length) out.push(`No downtimes uploaded for ${cov.noDowntimes.map(dm).join(', ')} — losses of these days are missing from the percentages.`)
+    if (cov.noShifts.length) out.push(`Downtimes without shift data for ${cov.noShifts.map(dm).join(', ')} — no loading time, so no loss percentage for these days.`)
+    const diff = cov.unscheduledKpi - cov.unscheduledDowntimes
+    if (Math.abs(diff) >= 1) {
+      const top = cov.byWorkCenter
+        .slice(0, 5)
+        .map((r) => `${r.workCenter} ${r.kpi - r.downtimes > 0 ? '+' : ''}${Math.round(r.kpi - r.downtimes)}`)
+        .join(', ')
+      out.push(
+        `Unscheduled downtime W${sel.week.week}: ${Math.round(cov.unscheduledKpi)} min in Shiftly KPI, ${Math.round(cov.unscheduledDowntimes)} min in Downtimes (difference ${Math.round(diff)} min${top ? `; most: ${top}` : ''}). The loss groups show the Downtimes minutes.`,
+      )
+    }
+    return out
+  }, [dayRows, lossDays, scope, config, sel.monday, sel.sunday, sel.week.week])
 
   const days = useMemo(
     () =>
@@ -141,6 +162,7 @@ function LossesPage() {
       />
 
       <OeeControls selection={sel} rows={dayRows} config={config} />
+      <OeeDataNotice items={coverageNotes} />
 
       {noData && (
         <p className="mt-6 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
@@ -293,7 +315,7 @@ function LossesPage() {
 
       <DieSection dies={dies} week={sel.week.week} top={config.topN || 10} />
 
-      <SetupSection setups={setups} week={sel.week.week} loaded={downRaw.length > 0} config={config} />
+      <SetupSection area={scope.area} setups={setups} week={sel.week.week} loaded={downRaw.length > 0} config={config} />
     </div>
   )
 }
@@ -351,7 +373,7 @@ const lostText = (lost: Record<string, number>, c: OeeConfig) =>
     .map(([k, m]) => `${reasonLabel(k, c)} ${minutes(m)}`)
     .join(' · ') || '—'
 
-function SetupSection({ setups, week, loaded, config }: { setups: SetupRow[]; week: number; loaded: boolean; config: OeeConfig }) {
+function SetupSection({ setups, week, loaded, config, area }: { setups: SetupRow[]; week: number; loaded: boolean; config: OeeConfig; area: string }) {
   const [press, setPress] = useState('all')
   const [status, setStatus] = useState<'all' | SetupStatus>('all')
   const presses = [...new Set(setups.map((s) => s.workCenter))].sort()
@@ -402,7 +424,7 @@ function SetupSection({ setups, week, loaded, config }: { setups: SetupRow[]; we
               not a setup; after a setup they are a reason for not starting.
             </p>
             <p>
-              <b>OK</b>: after the setup ends, the machine produced {config.startupRunMin} minutes (time
+              <b>OK</b>: after the setup ends, the machine produced {startupRunOf(area, config)} minutes (time
               without any downtime) before the next setup. <b>NOK</b>: it did not — it could not get
               into production. The downtimes between the end of the setup and that point (or the next
               setup) are the reasons; breaks are shown apart. <b>Open</b>: the data ends before it is
