@@ -20,13 +20,19 @@ seçilebilsin; masraf yerleri fabrikanınkiler, kök veri aynı.
 - Kayıt: fabrika × dönem (ay ya da ISO hafta) × masraf yeri (`kpiEntries`).
   Masraf yerleri fabrikanınkiler (Company → Plant → Cost center, creator
   tanımlar); başka kod kaydedilmez.
-- Girilen (plan ve gerçekleşen): operatör sayısı + **Direct / Indirect**
-  seçimi (masraf yeri başına), üretim adedi, üretim saati, normal
-  mevcudiyet saati (fazla mesaisiz), fazla mesai saati, devamsızlık saati;
-  planda OEE hedefi (%).
+- Bir masraf yerinin **birden çok satırı** olabilir: "+ line" ile eklenir,
+  her satırda operatör tipi **Direct / Indirect** seçilir (ör. Transfer
+  Direct + Transfer Indirect). Satır kaldırılınca kaydı da silinir.
+- Girilen (plan ve gerçekleşen): operatör sayısı, üretim adedi, üretim
+  saati, normal mevcudiyet saati (fazla mesaisiz), fazla mesai saati,
+  **Absenteeism %** ve **Productivity %** (doğrudan yüzde); planda OEE
+  hedefi (%).
 - Hesaplanan: Overtime % = fazla mesai ÷ normal mevcudiyet; Total presence
-  = normal mevcudiyet + fazla mesai; Absenteeism % = devamsızlık ÷ (normal
-  mevcudiyet + devamsızlık); Productivity = üretim saati ÷ total presence.
+  = normal mevcudiyet + fazla mesai; **Efficiency** = üretim saati ÷ total
+  presence.
+- Birden çok satır / masraf yeri / fabrika: girilen yüzdeler saatle
+  ağırlıklı birleşir (Absenteeism normal mevcudiyetle, Productivity toplam
+  mevcudiyetle; saat yoksa eşit).
 - **Kök veri:** gerçekleşen OEE OEE modülünün günlerinden (Σ operating ÷ Σ
   loading); gerçekleşen üretim adedi / saati girilmemişse yine oradan (iyi
   adet, net üretim süresi).
@@ -37,6 +43,7 @@ seçilebilsin; masraf yerleri fabrikanınkiler, kök veri aynı.
 
 ## Dashboard
 
+- 11 KPI kartı + "How it is calculated" kartı (6 × 2).
 - A3 yatay (420 × 297 mm), ölçü sabit: aylıkta her zaman 12 ay
   (Ocak–Aralık), haftalıkta 13 hafta; tablo 10 masraf yeri satırı + toplam
   (fazlası toplamda, not düşülür).
@@ -53,13 +60,11 @@ seçilebilsin; masraf yerleri fabrikanınkiler, kök veri aynı.
 Yeni modül **KPI** (General şirkette açar; gruplara KPI izni verilir).
 Board members şablonu KPI'yi görür, Plant manager şablonu düzenler.
 
-## Planlamacıya sorulacaklar (varsayımlar)
+## Kararlar (2026-10-02, planlamacı)
 
-1. Productivity = üretim saati ÷ toplam mevcudiyet (%) mi, yoksa adet ÷
-   mevcudiyet saati (adet/saat) mi?
-2. Overtime %: fazla mesai ÷ normal mevcudiyet alındı (toplam mevcudiyete
-   bölünmesi istenirse değişir).
-3. Absenteeism % için devamsızlık **saati** giriliyor (yüzde girilseydi
-   masraf yerleri toplanamazdı).
-4. Operatör tipi masraf yeri başına tek seçim (Direct ya da Indirect); bir
-   masraf yerinde ikisi birden olacaksa iki ayrı sayı girilmeli mi?
+1. Productivity girilir (boş bırakılabilir); üretim saati ÷ toplam
+   mevcudiyet **Efficiency** adıyla hesaplanır.
+2. Overtime % = fazla mesai ÷ normal mevcudiyet — onaylandı.
+3. Absenteeism % doğrudan girilir.
+4. Bir masraf yerinin birden çok satırı olabilir; her satır Direct ya da
+   Indirect.

@@ -248,12 +248,24 @@ export const KpiSheet = forwardRef<
             {KPI_ROWS.map((row) => (
               <KpiCard key={row.key} row={row} slots={slots} results={view.bySlot} current={view.current} />
             ))}
+            {/* 12. kutu: tanımlar (ölçü sabit — 6 × 2). */}
+            <div className="kpi-card kpi-notes">
+              <div className="kpi-card-label">How it is calculated</div>
+              <ul>
+                <li>Overtime % = overtime ÷ normal presence</li>
+                <li>Total presence = normal presence + overtime</li>
+                <li>Efficiency = production hour ÷ total presence</li>
+                <li>OEE actual = Σ operating ÷ Σ loading (OEE data)</li>
+                <li>Absenteeism %, Productivity %: entered; several lines weighted by hours</li>
+                <li>Hours and pieces are added first, ratios once — never averaged</li>
+              </ul>
+            </div>
           </section>
           <CcTable rows={view.perCc} total={view.bySlot[view.current]} period={period} />
         </>
       )}
       <footer className="kpi-foot">
-        Overtime % = overtime ÷ normal presence · Total presence = normal presence + overtime · Absenteeism % = absence ÷ (normal presence + absence) · Productivity = production hour ÷ total presence · Actual OEE = Σ operating ÷ Σ loading (OEE data) · Sums first, then ratios.
+        Plan against actual per cost center · ▲▼ difference, “better / worse” by the direction of each KPI · empty = not entered
       </footer>
     </div>
   )
@@ -269,7 +281,9 @@ function KpiCard({ row, slots, results, current }: { row: (typeof KPI_ROWS)[numb
   const gapText = gap === null ? '—' : `${gap > 0 ? '▲ +' : gap < 0 ? '▼ ' : ''}${row.unit === '%' ? `${(gap * 100).toFixed(1)} pts` : formatKpi(gap, row.unit)}`
   return (
     <div className="kpi-card">
-      <div className="kpi-card-label">{row.label}</div>
+      <div className="kpi-card-label" title={row.label}>
+        {row.card ?? row.label}
+      </div>
       <div className="kpi-card-main">
         <span className="kpi-card-value">{fmt(actual)}</span>
         <span className="kpi-card-plan">plan {fmt(plan)}</span>

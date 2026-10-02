@@ -202,11 +202,12 @@
 .kpi-sw-plan { height: 2px; vertical-align: 3px; background: var(--kpi-plan); border-radius: 0; }
 .kpi-printed { margin-left: 10px; }
 .kpi-empty { font-size: 16px; color: var(--kpi-muted); padding: 20mm; }
-.kpi-cards { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(2, 72mm); gap: 3mm; }
+.kpi-cards { display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(2, 72mm); gap: 3mm; }
+.kpi-notes ul { margin: 2mm 0 0; padding-left: 4mm; font-size: 11px; color: var(--kpi-muted); line-height: 1.55; }
 .kpi-card { border: 1px solid var(--kpi-line); border-radius: 6px; padding: 2.5mm 3mm 1.5mm; display: flex; flex-direction: column; min-width: 0; }
 .kpi-card-label { font-size: 12px; font-weight: 600; color: var(--kpi-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-card-main { display: flex; align-items: baseline; gap: 8px; margin-top: 1px; }
-.kpi-card-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi-card-value { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .kpi-card-plan { font-size: 12px; color: var(--kpi-muted); font-variant-numeric: tabular-nums; }
 .kpi-card-gap { font-size: 11px; color: var(--kpi-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-good { color: var(--kpi-good); }
@@ -221,10 +222,10 @@
 .kpi-tick { font-size: 9px; fill: var(--kpi-muted); }
 .kpi-tick-sel { font-weight: 700; fill: var(--kpi-ink); }
 .kpi-table-wrap { min-height: 0; overflow: hidden; }
-.kpi-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.kpi-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10px; font-variant-numeric: tabular-nums; }
 .kpi-table th, .kpi-table td { border: 1px solid var(--kpi-line); padding: 2px 4px; height: 19px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi-table thead th { background: #f2f1ed; color: var(--kpi-ink); font-weight: 600; text-align: center; }
-.kpi-th-name { width: 44mm; }
+.kpi-th-name { width: 38mm; }
 .kpi-th-sub { font-weight: 500 !important; color: var(--kpi-muted) !important; }
 .kpi-table .kpi-td-name { text-align: left; }
 .kpi-total td { font-weight: 700; border-top: 2px solid var(--kpi-ink); }

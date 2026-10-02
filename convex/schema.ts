@@ -770,6 +770,8 @@ export default defineSchema({
     year: v.number(),
     num: v.number(), // ay 1–12 ya da ISO hafta
     costCenter: v.string(),
+    /** Aynı masraf yerinin satır sırası (Direct ve Indirect ayrı satır olabilir). */
+    line: v.optional(v.number()),
     operatorType: v.string(), // 'direct' | 'indirect'
     plan: v.any(),
     actual: v.any(),

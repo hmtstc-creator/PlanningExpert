@@ -20,7 +20,8 @@ const valuesV = v.object({
   productionHours: v.optional(v.number()),
   presenceHours: v.optional(v.number()),
   overtimeHours: v.optional(v.number()),
-  absenceHours: v.optional(v.number()),
+  absenteeism: v.optional(v.number()),
+  productivity: v.optional(v.number()),
   oee: v.optional(v.number()),
 })
 
@@ -35,6 +36,7 @@ const entryOut = (e: Any) => ({
   year: e.year,
   num: e.num,
   costCenter: e.costCenter,
+  line: e.line ?? 0,
   operatorType: e.operatorType,
   plan: e.plan ?? {},
   actual: e.actual ?? {},
@@ -75,7 +77,11 @@ export const entries = guardedQuery({
   },
 })
 
-/** Bir dönemin girişleri: masraf yeri başına bir kayıt (ekler ya da günceller). */
+/**
+ * Bir dönemin girişleri: ekrandaki bütün satırlar birlikte kaydedilir (bir
+ * masraf yerinin birden çok satırı olabilir — ör. Direct ve Indirect);
+ * ekrandan kaldırılan satır silinir.
+ */
 export const save = guardedMutation({
   modules: KPI,
   affectsPlan: false,
@@ -100,20 +106,33 @@ export const save = guardedMutation({
       .query('kpiEntries')
       .withIndex('by_period', (q: Any) => q.eq('period', period).eq('year', year).eq('num', num))
       .collect()
+    const PCT = new Set(['absenteeism', 'productivity', 'oee'])
+    const lines = new Map<string, number>()
+    const docs: Any[] = []
     for (const r of rows) {
       if (!codes.has(r.costCenter)) throw new ConvexError(`Cost center ${r.costCenter} is not a cost center of ${ctx.plant?.name ?? 'this plant'}`)
       for (const side of [r.plan, r.actual]) {
         for (const [k, val] of Object.entries(side)) {
           if (typeof val !== 'number' || !Number.isFinite(val) || val < 0) throw new ConvexError(`${k} must be a number ≥ 0`)
-          if (k === 'oee' && val > 2) throw new ConvexError('OEE target is a percentage (e.g. 85)')
+          if (PCT.has(k) && val > 2) throw new ConvexError(`${k} is a percentage (e.g. 85)`)
         }
       }
       if (r.actual.oee !== undefined) throw new ConvexError('Actual OEE comes from the OEE data')
-      const doc = { period, year, num, costCenter: r.costCenter, operatorType: r.operatorType, plan: r.plan, actual: r.actual, updatedAt: Date.now(), updatedBy: ctx.sessionUser?.name }
-      const old = existing.find((e) => e.costCenter === r.costCenter)
-      if (old) await ctx.db.patch(old._id, doc)
-      else await ctx.db.insert('kpiEntries', doc)
+      const line = lines.get(r.costCenter) ?? 0
+      lines.set(r.costCenter, line + 1)
+      docs.push({ period, year, num, costCenter: r.costCenter, line, operatorType: r.operatorType, plan: r.plan, actual: r.actual, updatedAt: Date.now(), updatedBy: ctx.sessionUser?.name })
     }
+    // Satırlar sırayla eşleşir: aynı masraf yerinin n. satırı günceller, fazlası silinir.
+    const key = (e: Any) => `${e.costCenter}|${e.line ?? 0}`
+    const old = new Map(existing.map((e) => [key(e), e]))
+    for (const d of docs) {
+      const prev = old.get(key(d))
+      if (prev) {
+        await ctx.db.replace(prev._id, d)
+        old.delete(key(d))
+      } else await ctx.db.insert('kpiEntries', d)
+    }
+    for (const e of old.values()) await ctx.db.delete(e._id)
     return null
   },
 })

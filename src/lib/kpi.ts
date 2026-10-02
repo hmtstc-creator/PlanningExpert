@@ -6,15 +6,20 @@
  * Toplama kuralı (OEE ile aynı): yüzdelerin ortalaması alınmaz — saat ve
  * adetler toplanır, oran toplamdan bir kez hesaplanır.
  *
- * Girilenler: operatör sayısı (direct / indirect), üretim adedi, üretim saati,
- * normal mevcudiyet saati (fazla mesaisiz), fazla mesai saati, devamsızlık
- * saati; planda ayrıca OEE hedefi.
+ * Bir masraf yerinin bir dönemde birden çok satırı olabilir (ör. bir Direct,
+ * bir Indirect satırı); her satırın operatör tipi kendi seçimidir.
+ *
+ * Girilenler (planlamacı, 2026-10-02): operatör sayısı, üretim adedi, üretim
+ * saati, normal mevcudiyet saati (fazla mesaisiz), fazla mesai saati,
+ * Absenteeism % ve Productivity (doğrudan %); planda ayrıca OEE hedefi.
  * Hesaplananlar:
  *   Total presence   = normal mevcudiyet + fazla mesai
  *   Overtime %       = fazla mesai ÷ normal mevcudiyet
- *   Absenteeism %    = devamsızlık ÷ (normal mevcudiyet + devamsızlık)
- *   Productivity     = üretim saati ÷ total presence
+ *   Efficiency       = üretim saati ÷ total presence
  *   OEE (gerçekleşen) = OEE modülünün kök verisi: Σ operating ÷ Σ loading
+ * Girilen yüzdeler (Absenteeism, Productivity) birden çok satırda saatle
+ * ağırlıklı birleşir: Absenteeism normal mevcudiyetle, Productivity toplam
+ * mevcudiyetle (saat yoksa eşit ağırlık).
  * Gerçekleşen üretim adedi ve saati girilmemişse OEE verisinden gelir (iyi
  * adet, net üretim süresi).
  */
@@ -29,7 +34,10 @@ export interface KpiValues {
   productionHours?: number
   presenceHours?: number
   overtimeHours?: number
-  absenceHours?: number
+  /** Kesir (0,034 = %3,4). */
+  absenteeism?: number
+  /** Kesir. */
+  productivity?: number
   oee?: number
 }
 
@@ -38,6 +46,8 @@ export interface KpiEntry {
   year: number
   num: number
   costCenter: string
+  /** Aynı masraf yerinin satır sırası (0, 1, …). */
+  line?: number
   operatorType: OperatorType
   plan: KpiValues
   actual: KpiValues
@@ -62,9 +72,9 @@ export interface KpiMetrics {
   overtimeHours: number | null
   totalPresenceHours: number | null
   overtimePct: number | null
-  absenceHours: number | null
   absenteeismPct: number | null
   productivity: number | null
+  efficiency: number | null
   oee: number | null
 }
 
@@ -76,28 +86,30 @@ export interface KpiResult {
 }
 
 /** Dashboard'daki sıra ve biçim. `higher`: artışı iyi mi (gap rengi). */
-export const KPI_ROWS: { key: keyof KpiMetrics; label: string; short?: string; unit: 'n' | 'h' | 'pcs' | '%'; higher: boolean | null }[] = [
+export const KPI_ROWS: { key: keyof KpiMetrics; label: string; short?: string; card?: string; unit: 'n' | 'h' | 'pcs' | '%'; higher: boolean | null }[] = [
   { key: 'operators', label: 'Operator number', unit: 'n', higher: null },
   { key: 'volume', label: 'Production volume', unit: 'pcs', higher: true },
   { key: 'productionHours', label: 'Production hour', unit: 'h', higher: true },
-  { key: 'presenceHours', label: 'Normal presence hour (w/o overtime)', short: 'Normal presence h', unit: 'h', higher: null },
+  { key: 'presenceHours', label: 'Normal presence hour (w/o overtime)', short: 'Normal presence h', card: 'Normal presence h (w/o overtime)', unit: 'h', higher: null },
   { key: 'overtimeHours', label: 'Overtime', unit: 'h', higher: false },
   { key: 'overtimePct', label: 'Overtime %', unit: '%', higher: false },
   { key: 'totalPresenceHours', label: 'Total presence hour', short: 'Total presence h', unit: 'h', higher: null },
   { key: 'absenteeismPct', label: 'Absenteeism %', unit: '%', higher: false },
   { key: 'productivity', label: 'Productivity', unit: '%', higher: true },
+  { key: 'efficiency', label: 'Efficiency', unit: '%', higher: true },
   { key: 'oee', label: 'OEE', unit: '%', higher: true },
 ]
 
 /** Giriş sayfasında girilen alanlar (planda OEE de). */
-export const KPI_INPUTS: { key: keyof KpiValues; label: string; unit: string; planOnly?: boolean }[] = [
+export const KPI_INPUTS: { key: keyof KpiValues; label: string; unit: string; planOnly?: boolean; pct?: boolean }[] = [
   { key: 'operators', label: 'Operator number', unit: 'persons' },
   { key: 'volume', label: 'Production volume', unit: 'pcs' },
   { key: 'productionHours', label: 'Production hour', unit: 'h' },
   { key: 'presenceHours', label: 'Normal presence hour (w/o overtime)', unit: 'h' },
   { key: 'overtimeHours', label: 'Overtime', unit: 'h' },
-  { key: 'absenceHours', label: 'Absence hour (for absenteeism %)', unit: 'h' },
-  { key: 'oee', label: 'OEE target', unit: '%', planOnly: true },
+  { key: 'absenteeism', label: 'Absenteeism', unit: '%', pct: true },
+  { key: 'productivity', label: 'Productivity', unit: '%', pct: true },
+  { key: 'oee', label: 'OEE target', unit: '%', planOnly: true, pct: true },
 ]
 
 const ratio = (a: number | null, b: number | null) => (a !== null && b !== null && b > 0 ? a / b : null)
@@ -114,7 +126,8 @@ function metrics(parts: {
   productionHours: number | null
   presence: number | null
   overtime: number | null
-  absence: number | null
+  absenteeism: number | null
+  productivity: number | null
   oee: number | null
 }): KpiMetrics {
   const total = parts.presence === null && parts.overtime === null ? null : (parts.presence ?? 0) + (parts.overtime ?? 0)
@@ -129,11 +142,20 @@ function metrics(parts: {
     overtimeHours: parts.overtime,
     totalPresenceHours: total,
     overtimePct: ratio(parts.overtime, parts.presence),
-    absenceHours: parts.absence,
-    absenteeismPct: parts.absence === null ? null : ratio(parts.absence, (parts.presence ?? 0) + parts.absence),
-    productivity: ratio(parts.productionHours, total),
+    absenteeismPct: parts.absenteeism,
+    productivity: parts.productivity,
+    efficiency: ratio(parts.productionHours, total),
     oee: parts.oee,
   }
+}
+
+/** Girilen yüzdenin ağırlıklı birleşimi (ağırlık yoksa eşit). */
+function weighted(items: { value: number | undefined; weight: number }[]): number | null {
+  const given = items.filter((i) => i.value !== undefined && i.value !== null && Number.isFinite(i.value))
+  if (!given.length) return null
+  const w = given.reduce((a, i) => a + (i.weight > 0 ? i.weight : 0), 0)
+  if (w > 0) return given.reduce((a, i) => a + (i.value as number) * (i.weight > 0 ? i.weight : 0), 0) / w
+  return given.reduce((a, i) => a + (i.value as number), 0) / given.length
 }
 
 /**
@@ -148,7 +170,6 @@ export function kpiFor(entries: KpiEntry[], oee: OeeSum[]): KpiResult {
     let productionHours: number | null = null
     let presence: number | null = null
     let overtime: number | null = null
-    let absence: number | null = null
     for (const e of entries) {
       const v = pick(e)
       if (e.operatorType === 'indirect') indirect = addOpt(indirect, v.operators)
@@ -157,9 +178,11 @@ export function kpiFor(entries: KpiEntry[], oee: OeeSum[]): KpiResult {
       productionHours = addOpt(productionHours, v.productionHours)
       presence = addOpt(presence, v.presenceHours)
       overtime = addOpt(overtime, v.overtimeHours)
-      absence = addOpt(absence, v.absenceHours)
     }
-    return { direct, indirect, volume, productionHours, presence, overtime, absence }
+    const rows = entries.map(pick)
+    const absenteeism = weighted(rows.map((v) => ({ value: v.absenteeism, weight: v.presenceHours ?? 0 })))
+    const productivity = weighted(rows.map((v) => ({ value: v.productivity, weight: (v.presenceHours ?? 0) + (v.overtimeHours ?? 0) })))
+    return { direct, indirect, volume, productionHours, presence, overtime, absenteeism, productivity }
   }
 
   // Plan OEE: masraf yerlerinin hedefleri, planlanan üretim saatiyle ağırlıklı

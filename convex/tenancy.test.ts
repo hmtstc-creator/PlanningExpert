@@ -315,10 +315,15 @@ describe('fabrika ayrımı', () => {
     const row = { costCenter: 'CC1', operatorType: 'direct', plan: { presenceHours: 100, overtimeHours: 10, oee: 0.8 }, actual: { presenceHours: 90, overtimeHours: 20 } }
     await expect(t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [{ ...row, costCenter: 'X' }] })).rejects.toThrow(/not a cost center/)
     await t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [row] })
-    await t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [{ ...row, actual: { presenceHours: 95 } }] })
-    const mine = await t.query(api.kpi.entries, { token: boss, period: 'month', year: 2026, num: 9 })
-    expect(mine.entries).toHaveLength(1)
+    // İki satır (Direct + Indirect), sonra birini kaldırma.
+    await t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [{ ...row, actual: { presenceHours: 95 } }, { ...row, operatorType: 'indirect', plan: { operators: 3, absenteeism: 0.04 } }] })
+    let mine = await t.query(api.kpi.entries, { token: boss, period: 'month', year: 2026, num: 9 })
+    expect(mine.entries.map((x: Any) => [x.line, x.operatorType])).toEqual([[0, 'direct'], [1, 'indirect']])
     expect(mine.entries[0].actual).toEqual({ presenceHours: 95 })
+    await expect(t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [{ ...row, plan: { absenteeism: 3.5 } }] })).rejects.toThrow(/percentage/)
+    await t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [{ ...row, actual: { presenceHours: 95 } }] })
+    mine = await t.query(api.kpi.entries, { token: boss, period: 'month', year: 2026, num: 9 })
+    expect(mine.entries).toHaveLength(1)
     await t.run(async (ctx: Any) => {
       await ctx.db.insert('oeeDays', { plantId: p1, date: '2026-09-21', plantKey: '', responsible: '', costCenter: 'CC1', workCenter: 'W', source: 'shiftly', good: 5, scrap: 0, reject: 0, scheduledMin: 0, unscheduledMin: 0, operatingMin: 60, productionMin: 90, loadingMin: 100 })
     })

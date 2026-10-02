@@ -17,28 +17,32 @@ import {
   type OeeSum,
   type OperatorType,
 } from '../lib/kpi'
-import { isoWeek } from '../lib/oee'
 import { usePlant } from '../lib/plantContext'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { KpiPeriodPicker, defaultSlot } from './KpiPeriodPicker'
 
 /**
- * KPI veri girişi (aylık ya da haftalık): seçili fabrikanın masraf yerleri
- * sütunlarda, her birinde Plan | Actual. Hesaplananlar (fazla mesai %, toplam
- * mevcudiyet, devamsızlık %, verimlilik, gerçekleşen OEE) salt okunur.
+ * KPI veri girişi (aylık ya da haftalık). Her satır bir masraf yeri ve
+ * operatör tipi (Direct / Indirect); bir masraf yerinin birden çok satırı
+ * olabilir. Her satırda Plan ve Actual alt satırı. Hesaplananlar (Overtime %,
+ * Total presence, Efficiency, gerçekleşen OEE) salt okunur.
  */
 
 type Side = Partial<Record<keyof KpiValues, string>>
-interface Draft {
+interface Line {
+  id: string
+  costCenter: string
   operatorType: OperatorType
   plan: Side
   actual: Side
 }
 
+const pctKeys = new Set(KPI_INPUTS.filter((i) => i.pct).map((i) => i.key))
+
 const toText = (v: KpiValues, key: keyof KpiValues) => {
   const x = v[key]
   if (x === undefined || x === null) return ''
-  return key === 'oee' ? String(Math.round(x * 1000) / 10) : String(x)
+  return pctKeys.has(key) ? String(Math.round(x * 1000) / 10) : String(x)
 }
 
 function toValues(side: Side): KpiValues {
@@ -48,90 +52,114 @@ function toValues(side: Side): KpiValues {
     if (!t) continue
     const n = Number(t)
     if (!Number.isFinite(n)) continue
-    out[k as keyof KpiValues] = k === 'oee' ? n / 100 : n
+    out[k as keyof KpiValues] = pctKeys.has(k as keyof KpiValues) ? n / 100 : n
   }
   return out
 }
 
-const input = 'w-24 rounded-md border border-input bg-background px-2 py-1 text-right text-sm tabular-nums disabled:opacity-60'
+const sideOf = (v: KpiValues) => Object.fromEntries(KPI_INPUTS.map((i) => [i.key, toText(v ?? {}, i.key)])) as Side
+let seq = 0
+const newId = () => `l${Date.now()}-${seq++}`
+
+const input = 'w-20 rounded-md border border-input bg-background px-1.5 py-1 text-right text-sm tabular-nums disabled:opacity-60'
+const sel = 'rounded-md border border-input bg-background px-1.5 py-1 text-sm disabled:opacity-60'
+
+const COMPUTED = [
+  ['Overtime %', 'overtimePct', '%'],
+  ['Total presence h', 'totalPresenceHours', 'h'],
+  ['Efficiency', 'efficiency', '%'],
+] as const
 
 export function KpiEntryPage({ period }: { period: KpiPeriod }) {
   const { ctx, can } = usePlant()
   const editable = can('kpi', 'edit')
-  const costCenters = ctx?.active?.costCenters ?? []
+  const costCenters = useMemo(() => ctx?.active?.costCenters ?? [], [ctx?.active?.costCenters])
   const [slot, setSlot] = useState(() => defaultSlot(period))
   const data = useQuery(api.kpi.entries, { period, year: slot.year, num: slot.num }) as { entries: Entry[]; oee: OeeSum[] } | undefined
   const { run: save, error, clearError } = useSafeMutation(api.kpi.save)
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
-  const [saved, setSaved] = useState<Record<string, Draft>>({})
+  const [lines, setLines] = useState<Line[]>([])
+  const [saved, setSaved] = useState<Line[]>([])
   const [justSaved, setJustSaved] = useState(false)
 
-  // Sunucudaki kayıtlar → taslak (dönem ya da veri değişince).
+  // Sunucudaki kayıtlar → satırlar; kaydı olmayan masraf yeri boş bir Direct satırla başlar.
   const serverSig = JSON.stringify(data?.entries ?? null)
   useEffect(() => {
     if (!data) return
-    const next: Record<string, Draft> = {}
+    const next: Line[] = []
     for (const cc of costCenters) {
-      const e = data.entries.find((x) => x.costCenter === cc.code)
-      const side = (v: KpiValues) => Object.fromEntries(KPI_INPUTS.map((i) => [i.key, toText(v ?? {}, i.key)])) as Side
-      next[cc.code] = { operatorType: e?.operatorType ?? 'direct', plan: side(e?.plan ?? {}), actual: side(e?.actual ?? {}) }
+      const own = data.entries.filter((e) => e.costCenter === cc.code).sort((a, b) => (a.line ?? 0) - (b.line ?? 0))
+      if (!own.length) next.push({ id: `${cc.code}-0`, costCenter: cc.code, operatorType: 'direct', plan: sideOf({}), actual: sideOf({}) })
+      own.forEach((e, i) => next.push({ id: `${cc.code}-${i}`, costCenter: cc.code, operatorType: e.operatorType, plan: sideOf(e.plan), actual: sideOf(e.actual) }))
     }
-    setDrafts(next)
+    setLines(next)
     setSaved(next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverSig, slotKey(slot), JSON.stringify(costCenters)])
 
-  const dirty = JSON.stringify(drafts) !== JSON.stringify(saved)
-  const edit = (cc: string, patch: Partial<Draft>) => {
-    setDrafts((d) => ({ ...d, [cc]: { ...d[cc], ...patch } }))
+  const dirty = JSON.stringify(lines) !== JSON.stringify(saved)
+  const patch = (id: string, p: Partial<Line>) => {
+    setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...p } : l)))
     setJustSaved(false)
   }
-  const setValue = (cc: string, side: 'plan' | 'actual', key: keyof KpiValues, text: string) =>
-    setDrafts((d) => ({ ...d, [cc]: { ...d[cc], [side]: { ...d[cc][side], [key]: text } } }))
+  const setValue = (id: string, side: 'plan' | 'actual', key: keyof KpiValues, text: string) =>
+    setLines((ls) => ls.map((l) => (l.id === id ? { ...l, [side]: { ...l[side], [key]: text } } : l)))
+  /** Aynı masraf yerinin altına yeni satır; tip varsayılanı diğerinin tersi. */
+  const addLine = (after: Line) =>
+    setLines((ls) => {
+      const i = ls.findIndex((l) => l.id === after.id)
+      const line: Line = { id: newId(), costCenter: after.costCenter, operatorType: after.operatorType === 'direct' ? 'indirect' : 'direct', plan: sideOf({}), actual: sideOf({}) }
+      return [...ls.slice(0, i + 1), line, ...ls.slice(i + 1)]
+    })
+  const removeLine = (id: string) => setLines((ls) => ls.filter((l) => l.id !== id))
 
+  const entryOf = (l: Line): Entry => ({ period, year: slot.year, num: slot.num, costCenter: l.costCenter, operatorType: l.operatorType, plan: toValues(l.plan), actual: toValues(l.actual) })
+  const oeeOf = (cc: string) => (data?.oee ?? []).filter((o) => o.costCenter === cc)
+  // Satır başına hesap; OEE kök verisi masraf yerinin ilk satırında gösterilir.
   const results = useMemo(() => {
-    const out: Record<string, ReturnType<typeof kpiFor>> = {}
-    for (const cc of costCenters) {
-      const d = drafts[cc.code]
-      if (!d) continue
-      const entry: Entry = { period, year: slot.year, num: slot.num, costCenter: cc.code, operatorType: d.operatorType, plan: toValues(d.plan), actual: toValues(d.actual) }
-      out[cc.code] = kpiFor([entry], (data?.oee ?? []).filter((o) => o.costCenter === cc.code))
-    }
-    return out
-  }, [drafts, costCenters, data, period, slot])
+    const seen = new Set<string>()
+    return Object.fromEntries(
+      lines.map((l) => {
+        const first = !seen.has(l.costCenter)
+        seen.add(l.costCenter)
+        return [l.id, kpiFor([entryOf(l)], first ? oeeOf(l.costCenter) : [])]
+      }),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, data])
+  const total = useMemo(() => kpiFor(lines.map(entryOf), data?.oee ?? []), [lines, data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSave = async () => {
-    const rows = costCenters
-      .filter((cc) => drafts[cc.code])
-      .map((cc) => ({ costCenter: cc.code, operatorType: drafts[cc.code].operatorType, plan: toValues(drafts[cc.code].plan), actual: toValues(drafts[cc.code].actual) }))
+    const rows = lines.map((l) => ({ costCenter: l.costCenter, operatorType: l.operatorType, plan: toValues(l.plan), actual: toValues(l.actual) }))
     if (await save({ period, year: slot.year, num: slot.num, rows })) {
-      setSaved(drafts)
+      setSaved(lines)
       setJustSaved(true)
     }
   }
 
-  const title = period === 'month' ? 'Monthly KPI — data entry' : 'Weekly KPI — data entry'
-  const oeeOf = (cc: string) => (data?.oee ?? []).find((o) => o.costCenter === cc)
+  const ccName = (code: string) => costCenters.find((c) => c.code === code)?.name ?? code
+  const inputs = KPI_INPUTS
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <PageHeader
-        title={title}
+        title={period === 'month' ? 'Monthly KPI — data entry' : 'Weekly KPI — data entry'}
         summary={`${ctx?.active?.plantName ?? ''} — plan and actual per cost center, ${period === 'month' ? 'one month' : 'one ISO week'} at a time.`}
         links={[{ to: period === 'month' ? '/kpi/monthly/dashboard' : '/kpi/weekly/dashboard', label: 'Dashboard' }]}
         info={
           <>
             <p>
-              The cost centers are those of the plant (Companies and plants → Plant → Cost centers). Hours and pieces are entered;
-              the rest is calculated from them — percentages are never averaged.
+              The cost centers are those of the plant (Companies and plants → Plant → Cost centers). A cost center can have
+              several lines — e.g. one Direct and one Indirect line: press “+ line” and choose the type.
             </p>
             <p>
-              Overtime % = overtime ÷ normal presence. Total presence = normal presence + overtime. Absenteeism % = absence ÷
-              (normal presence + absence). Productivity = production hour ÷ total presence.
+              Entered: operators, production volume and hour, normal presence, overtime, Absenteeism % and Productivity %; OEE
+              target in the plan. Calculated: Overtime % = overtime ÷ normal presence; Total presence = normal presence +
+              overtime; Efficiency = production hour ÷ total presence.
             </p>
             <p>
               Actual OEE comes from the OEE data (Σ operating ÷ Σ loading). Actual production volume and hour are taken from
-              the OEE data too when left empty (good pieces, net production time).
+              the OEE data when left empty. Several lines: hours and pieces are added; Absenteeism % is weighted by normal
+              presence, Productivity % by total presence.
             </p>
           </>
         }
@@ -145,15 +173,11 @@ export function KpiEntryPage({ period }: { period: KpiPeriod }) {
           {dirty && <span className="text-xs font-medium text-amber-700">● Unsaved changes</span>}
           {!dirty && justSaved && <span className="text-xs text-emerald-700">✓ Saved</span>}
           {dirty && (
-            <button className="text-xs underline" onClick={() => setDrafts(saved)}>
+            <button className="text-xs underline" onClick={() => setLines(saved)}>
               Discard
             </button>
           )}
-          <button
-            className="rounded-md bg-foreground px-4 py-1.5 text-sm font-medium text-background disabled:opacity-40"
-            disabled={!dirty || !editable}
-            onClick={() => void onSave()}
-          >
+          <button className="rounded-md bg-foreground px-4 py-1.5 text-sm font-medium text-background disabled:opacity-40" disabled={!dirty || !editable} onClick={() => void onSave()}>
             Save
           </button>
         </div>
@@ -173,107 +197,128 @@ export function KpiEntryPage({ period }: { period: KpiPeriod }) {
           <table className="text-sm">
             <thead className="bg-muted text-xs text-muted-foreground">
               <tr>
-                <th className="sticky left-0 bg-muted px-3 py-2 text-left font-medium" rowSpan={2}>
-                  KPI
-                </th>
-                {costCenters.map((cc) => (
-                  <th key={cc.code} colSpan={2} className="border-l border-border px-3 py-2 text-center font-semibold text-foreground">
-                    {cc.name} <span className="font-normal text-muted-foreground">({cc.code})</span>
+                <th className="px-2 py-2 text-left font-medium">Cost center</th>
+                <th className="px-2 py-2 text-left font-medium">Operator type</th>
+                <th className="px-2 py-2 font-medium" />
+                {inputs.map((i) => (
+                  <th key={i.key} className="px-2 py-2 text-right font-medium" title={i.label}>
+                    {i.label}
+                    <span className="block font-normal">({i.unit})</span>
                   </th>
                 ))}
-              </tr>
-              <tr>
-                {costCenters.map((cc) => [
-                  <th key={`${cc.code}p`} className="border-l border-border px-3 py-1 text-right font-medium">
-                    Plan
-                  </th>,
-                  <th key={`${cc.code}a`} className="px-3 py-1 text-right font-medium">
-                    Actual
-                  </th>,
-                ])}
+                {COMPUTED.map(([label]) => (
+                  <th key={label} className="bg-muted px-2 py-2 text-right font-medium">
+                    {label}
+                    <span className="block font-normal">(calculated)</span>
+                  </th>
+                ))}
+                <th className="px-2 py-2 text-right font-medium">
+                  OEE
+                  <span className="block font-normal">(OEE data)</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-t border-border">
-                <td className="sticky left-0 bg-background px-3 py-1.5">Operator type</td>
-                {costCenters.map((cc) => (
-                  <td key={cc.code} colSpan={2} className="border-l border-border px-3 py-1.5 text-center">
-                    <select
-                      className="rounded-md border border-input bg-background px-2 py-1 text-sm"
-                      disabled={!editable}
-                      value={drafts[cc.code]?.operatorType ?? 'direct'}
-                      onChange={(e) => edit(cc.code, { operatorType: e.target.value as OperatorType })}
-                    >
-                      <option value="direct">Direct</option>
-                      <option value="indirect">Indirect</option>
-                    </select>
-                  </td>
-                ))}
-              </tr>
-              {KPI_INPUTS.map((row) => (
-                <tr key={row.key} className="border-t border-border">
-                  <td className="sticky left-0 bg-background px-3 py-1.5 whitespace-nowrap">
-                    {row.label} <span className="text-xs text-muted-foreground">({row.unit})</span>
-                  </td>
-                  {costCenters.map((cc) => {
-                    const d = drafts[cc.code]
-                    const o = oeeOf(cc.code)
-                    const hint =
-                      row.key === 'volume' && o?.loadingMin ? `from OEE: ${Math.round(o.good).toLocaleString('en-GB')}` : row.key === 'productionHours' && o?.loadingMin ? `from OEE: ${Math.round(o.productionMin / 60)}` : ''
-                    return [
-                      <td key={`${cc.code}p`} className="border-l border-border px-2 py-1 text-right">
-                        <input className={input} inputMode="decimal" disabled={!editable || !d} value={d?.plan[row.key] ?? ''} onChange={(e) => setValue(cc.code, 'plan', row.key, e.target.value)} />
-                      </td>,
-                      <td key={`${cc.code}a`} className="px-2 py-1 text-right">
-                        {row.planOnly ? (
-                          <span className="text-xs text-muted-foreground" title="Actual OEE comes from the OEE data">
-                            {formatKpi(results[cc.code]?.actual.oee ?? null, '%')}
-                          </span>
-                        ) : (
+              {lines.map((l, idx) => {
+                const r = results[l.id]
+                const sameAsPrev = idx > 0 && lines[idx - 1].costCenter === l.costCenter
+                const o = oeeOf(l.costCenter)[0]
+                return (['plan', 'actual'] as const).map((side) => (
+                  <tr key={`${l.id}${side}`} className={side === 'plan' ? `border-t ${sameAsPrev ? 'border-border/50' : 'border-border'}` : ''}>
+                    {side === 'plan' && (
+                      <>
+                        <td rowSpan={2} className="px-2 py-1 align-top whitespace-nowrap">
+                          {sameAsPrev ? <span className="text-muted-foreground">↳ {ccName(l.costCenter)}</span> : <b>{ccName(l.costCenter)}</b>}
+                          <span className="block text-xs text-muted-foreground">{l.costCenter}</span>
+                        </td>
+                        <td rowSpan={2} className="px-2 py-1 align-top whitespace-nowrap">
+                          <select className={sel} disabled={!editable} value={l.operatorType} onChange={(e) => patch(l.id, { operatorType: e.target.value as OperatorType })}>
+                            <option value="direct">Direct</option>
+                            <option value="indirect">Indirect</option>
+                          </select>
+                          {editable && (
+                            <span className="mt-1 flex gap-2 text-xs">
+                              <button type="button" className="underline" onClick={() => addLine(l)}>
+                                + line
+                              </button>
+                              {lines.filter((x) => x.costCenter === l.costCenter).length > 1 && (
+                                <button
+                                  type="button"
+                                  className="text-destructive underline"
+                                  onClick={() => window.confirm(`Remove this ${l.operatorType} line of ${ccName(l.costCenter)}?`) && removeLine(l.id)}
+                                >
+                                  remove
+                                </button>
+                              )}
+                            </span>
+                          )}
+                        </td>
+                      </>
+                    )}
+                    <td className="px-2 py-1 text-xs text-muted-foreground">{side === 'plan' ? 'Plan' : 'Actual'}</td>
+                    {inputs.map((i) => {
+                      if (side === 'actual' && i.planOnly) return <td key={i.key} />
+                      const hint =
+                        side === 'actual' && !sameAsPrev && o?.loadingMin
+                          ? i.key === 'volume'
+                            ? `OEE: ${Math.round(o.good).toLocaleString('en-GB')}`
+                            : i.key === 'productionHours'
+                              ? `OEE: ${Math.round(o.productionMin / 60)}`
+                              : ''
+                          : ''
+                      return (
+                        <td key={i.key} className="px-1 py-0.5 text-right">
                           <input
                             className={input}
                             inputMode="decimal"
-                            disabled={!editable || !d}
+                            disabled={!editable}
                             placeholder={hint}
                             title={hint ? `Empty = ${hint}` : undefined}
-                            value={d?.actual[row.key] ?? ''}
-                            onChange={(e) => setValue(cc.code, 'actual', row.key, e.target.value)}
+                            value={l[side][i.key] ?? ''}
+                            onChange={(e) => setValue(l.id, side, i.key, e.target.value)}
                           />
-                        )}
-                      </td>,
-                    ]
+                        </td>
+                      )
+                    })}
+                    {COMPUTED.map(([label, key, unit]) => (
+                      <td key={label} className="bg-muted/40 px-2 py-1 text-right text-muted-foreground tabular-nums">
+                        {formatKpi(r?.[side][key] ?? null, unit)}
+                      </td>
+                    ))}
+                    <td className="px-2 py-1 text-right text-muted-foreground tabular-nums">{side === 'actual' && !sameAsPrev ? formatKpi(r?.actual.oee ?? null, '%') : ''}</td>
+                  </tr>
+                ))
+              })}
+              {(['plan', 'actual'] as const).map((side) => (
+                <tr key={`total${side}`} className={side === 'plan' ? 'border-t-2 border-foreground font-semibold' : 'font-semibold'}>
+                  {side === 'plan' && (
+                    <td colSpan={2} rowSpan={2} className="px-2 py-1 align-top">
+                      Total
+                    </td>
+                  )}
+                  <td className="px-2 py-1 text-xs text-muted-foreground">{side === 'plan' ? 'Plan' : 'Actual'}</td>
+                  {inputs.map((i) => {
+                    const key = i.key === 'absenteeism' ? 'absenteeismPct' : i.key === 'operators' ? 'operators' : (i.key as keyof typeof total.plan)
+                    const unit = i.pct ? '%' : i.key === 'operators' ? 'n' : i.key === 'volume' ? 'pcs' : 'h'
+                    return (
+                      <td key={i.key} className="px-2 py-1 text-right tabular-nums">
+                        {side === 'actual' && i.planOnly ? '' : formatKpi(total[side][key] ?? null, unit)}
+                      </td>
+                    )
                   })}
-                </tr>
-              ))}
-              {(
-                [
-                  ['Overtime %', 'overtimePct', '%'],
-                  ['Total presence hour', 'totalPresenceHours', 'h'],
-                  ['Absenteeism %', 'absenteeismPct', '%'],
-                  ['Productivity', 'productivity', '%'],
-                ] as const
-              ).map(([label, key, unit]) => (
-                <tr key={key} className="border-t border-border bg-muted/40 text-muted-foreground">
-                  <td className="sticky left-0 bg-muted px-3 py-1.5 whitespace-nowrap">
-                    {label} <span className="text-xs">(calculated)</span>
-                  </td>
-                  {costCenters.map((cc) => [
-                    <td key={`${cc.code}p`} className="border-l border-border px-3 py-1.5 text-right tabular-nums">
-                      {formatKpi(results[cc.code]?.plan[key] ?? null, unit)}
-                    </td>,
-                    <td key={`${cc.code}a`} className="px-3 py-1.5 text-right tabular-nums">
-                      {formatKpi(results[cc.code]?.actual[key] ?? null, unit)}
-                    </td>,
-                  ])}
+                  {COMPUTED.map(([label, key, unit]) => (
+                    <td key={label} className="bg-muted/40 px-2 py-1 text-right tabular-nums">
+                      {formatKpi(total[side][key] ?? null, unit)}
+                    </td>
+                  ))}
+                  <td className="px-2 py-1 text-right tabular-nums">{side === 'actual' ? formatKpi(total.actual.oee, '%') : ''}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-      <p className="mt-2 text-xs text-muted-foreground">
-        Week {isoWeek(new Date().toISOString().slice(0, 10)).week} is the current ISO week. Empty fields stay empty (not 0).
-      </p>
+      <p className="mt-2 text-xs text-muted-foreground">Empty fields stay empty (not 0). Percentages are entered as numbers, e.g. 3.5 for 3.5%.</p>
     </div>
   )
 }
