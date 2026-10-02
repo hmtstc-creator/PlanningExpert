@@ -21,7 +21,11 @@ import {
   setupAnalysis,
   startupRunOf,
   trendGaps,
+  PLANT_AREA,
+  areaNames,
+  totalsFor,
   withPlantCostCenters,
+  forPlantCostCenters,
   sheetKind,
   suggestConfig,
   visibleChartGroups,
@@ -168,7 +172,7 @@ describe('oee workbook', () => {
 
   it('a cost center code typed as an area is replaced by the area of its machines', () => {
     const wrong: OeeConfig = { ...EMPTY_CONFIG, areas: [{ name: '51010171', pick: 'costCenter' }, { name: '51010173', pick: 'costCenter' }] }
-    expect(configProblems(wrong)).toContain('No cost center is defined.')
+    expect(configProblems(wrong).some((p) => /no cost center/.test(p))).toBe(true)
     const s = suggestConfig({ days: [], shifts: parsed.shifts, downtimes: [] }, wrong, OEE_SUGGESTED)
     expect(s.areas.map((a) => a.name)).toEqual(['PRS'])
     expect(s.costCenters.every((c) => c.area === 'PRS')).toBe(true)
@@ -223,12 +227,30 @@ describe('oee workbook', () => {
     expect(setupAnalysis([day], [], { area: 'PRS', key: 'all' }, { ...plant, setupTexts: [] }, '2026-09-21', '2026-09-21')).toEqual([])
   })
 
+  it('All: every cost center of the plant together, also those without an area', () => {
+    const noArea = { ...plant, costCenters: plant.costCenters.map((x) => (x.code === '51010173' ? { ...x, area: '' } : x)) }
+    expect(areaNames(days, noArea)[0]).toBe(PLANT_AREA)
+    const all = totalsFor(days, { area: PLANT_AREA, key: 'all' }, noArea, '2026-01-01', '2026-12-31')
+    expect(all.loadingMin).toBeCloseTo(sumTimes(days).loadingMin)
+    const one = totalsFor(days, { area: PLANT_AREA, key: '51010173' }, noArea, '2026-01-01', '2026-12-31')
+    expect(one.loadingMin).toBeCloseTo(sumTimes(days.filter((d) => d.costCenter === '51010173')).loadingMin)
+  })
+
+  it('upload keeps only the rows of the plant cost centers', () => {
+    const { parsed: mine, skipped } = forPlantCostCenters(parsed, ['51010171'])
+    expect(mine.shifts.every((r) => r.costCenter === '51010171')).toBe(true)
+    expect(mine.shifts.length).toBeGreaterThan(0)
+    expect(skipped.some((x) => x.costCenter === '51010173')).toBe(true)
+    expect(mine.downtimes.every((d) => d.costCenter === '51010171')).toBe(true)
+  })
+
   it('cost center names come from the plant; OEE keeps the area', () => {
     const merged = withPlantCostCenters(plant, [{ code: '51010171', name: 'Transfer line' }, { code: '999', name: 'New' }])
     expect(merged.costCenters.find((x) => x.code === '51010171')).toEqual({ code: '51010171', name: 'Transfer line', area: 'PRS' })
     expect(merged.costCenters.find((x) => x.code === '999')).toEqual({ code: '999', name: 'New', area: '' })
-    expect(merged.costCenters.some((x) => x.code === '51010172')).toBe(true)
-    expect(withPlantCostCenters(plant, [])).toBe(plant)
+    // Fabrikada olmayan kod OEE'de yok.
+    expect(merged.costCenters.some((x) => x.code === '51010172')).toBe(false)
+    expect(withPlantCostCenters(plant, []).costCenters).toEqual([])
   })
 
   it('data notes: empty periods, missing machines and the KPI–Downtimes difference', () => {

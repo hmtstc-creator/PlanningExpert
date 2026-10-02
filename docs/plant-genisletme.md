@@ -442,6 +442,25 @@ Platform — General grubu (site sahibi + onun eklediği generaller)
   fabrika; OEE düzenler, diğerleri görür). Test: fabrika müdürü başka
   fabrikayı seçemez ve verisini göremez; board member başka şirketi görmez.
 
+### Masraf yerleri (2026-10-02, planlamacı — ikinci düzeltme)
+- Bir fabrikanın **birden çok masraf yeri** olur; fabrika her masraf yeri
+  için ayrı açılmaz. Aynı şirkette aynı adla ikinci fabrika ve aynı adla
+  ikinci şirket açılamaz (seçicide ad tekrarı olmaz). Fazladan açılmış
+  fabrika **Delete** ile silinir (creator / General, ad yazılarak; şirketin
+  son fabrikası silinemez; verisi arka planda silinir).
+- Masraf yerlerini **creator tanımlar**; program hiçbir yerden doldurmaz
+  (geçişteki otomatik doldurma kaldırıldı, OEE "Suggest" masraf yeri
+  eklemez, OEE Settings'te masraf yeri eklenemez — yalnızca alanı seçilir).
+- Fabrikanın **bütün masraf yerleri** hesaplara, ekranlara ve raporlara
+  girer: OEE'de birden çok alan varsa ilk düğme **All** (bütün fabrika;
+  içinde masraf yeri seçilir); alanı seçilmemiş masraf yeri "Unassigned"
+  alanında ve All'da sayılır. Karşılaştırma ekranı fabrikanın bütün
+  günlerini toplar.
+- **Yükleme:** dosyadan yalnızca seçili fabrikanın masraf yerlerinin
+  satırları alınır (bir dosyada birden çok fabrika olabilir); diğerleri
+  "Not this plant (skipped)" diye sayılır. Fabrikanın masraf yeri yoksa
+  yükleme yapılmaz. Sunucu da başka masraf yerinin satırını reddeder.
+
 ### Kalan (sıradaki aşamalar)
 - Karşılaştırma ekranının içeriği (aşama 7 ilk sürümü yalnızca OEE).
 - Platform değişiklik kaydı (kullanıcı açma / parola) bugün fabrika

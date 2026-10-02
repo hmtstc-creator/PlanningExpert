@@ -52,6 +52,24 @@ function checkLocale(country: string, timeZone: string) {
   return { country: c, timeZone: tz }
 }
 
+/** Şirket adı platformda, fabrika adı şirket içinde tektir (seçicide tekrar olmasın). */
+async function companyNameFree(db: Any, name: string, except?: string) {
+  const all: Any[] = await db.query('companies').collect()
+  if (all.some((c) => c._id !== except && c.name.trim().toLowerCase() === name.toLowerCase())) {
+    throw new ConvexError(`A company named ${name} already exists`)
+  }
+}
+
+async function plantNameFree(db: Any, companyId: string, name: string, except?: string) {
+  const plants: Any[] = await db
+    .query('plants')
+    .withIndex('by_company', (q: Any) => q.eq('companyId', companyId))
+    .collect()
+  if (plants.some((p) => p._id !== except && p.name.trim().toLowerCase() === name.toLowerCase())) {
+    throw new ConvexError(`${name} already exists in this company — add its cost centers to that plant instead of a second plant`)
+  }
+}
+
 function requirePlatform(me: Any) {
   if (!isPlatform(me)) throw new ConvexError('Only a General can do this')
 }
@@ -94,6 +112,7 @@ export const createCompany = userMutation({
   handler: async (ctx: Any, { name, modules }: Any) => {
     requirePlatform(ctx.sessionUser)
     if (!name.trim()) throw new ConvexError('A company name is required')
+    await companyNameFree(ctx.db, name.trim())
     return ctx.db.insert('companies', { name: name.trim(), status: 'active', modules, createdAt: Date.now() })
   },
 })
@@ -110,6 +129,7 @@ export const updateCompany = userMutation({
     const c = await ctx.db.get(args.id)
     if (!c) throw new ConvexError('Company not found')
     if (!args.name.trim()) throw new ConvexError('A company name is required')
+    await companyNameFree(ctx.db, args.name.trim(), args.id)
     const now = Date.now()
     const status =
       args.status === c.status
@@ -139,6 +159,7 @@ export const createPlant = userMutation({
     if (!company) throw new ConvexError('Company not found')
     if (company.status !== 'active') throw new ConvexError('The company is suspended')
     if (!args.name.trim()) throw new ConvexError('A plant name is required')
+    await plantNameFree(ctx.db, args.companyId, args.name.trim())
     const locale = checkLocale(args.country, args.timeZone)
     return ctx.db.insert('plants', {
       companyId: args.companyId,
@@ -169,6 +190,7 @@ export const updatePlant = userMutation({
     if (!plant) throw new ConvexError('Plant not found')
     if (!canManageCompany(me, plant.companyId)) throw new ConvexError('Only a creator of this company can change the plant')
     if (!args.name.trim()) throw new ConvexError('A plant name is required')
+    await plantNameFree(ctx.db, plant.companyId, args.name.trim(), args.id)
     const patch: Any = {
       name: args.name.trim(),
       code: args.code?.trim() || undefined,
@@ -280,6 +302,46 @@ export const deleteCompany = userMutation({
       updatedAt: Date.now(),
     })
     await ctx.scheduler.runAfter(0, internal.platform.purge, { key: `purge:${id}` })
+    return null
+  },
+})
+
+/**
+ * Fabrikayı siler (ör. yanlışlıkla ikinci kez açılan fabrika): General ya da
+ * şirketin creator'ı, fabrika adı yazılarak. Fabrika kaydı, gruplardaki yeri
+ * ve oturumlardaki seçimi hemen kalkar; verisi arka planda silinir. Şirketin
+ * son fabrikası silinemez. Geri alınamaz.
+ */
+export const deletePlant = userMutation({
+  args: { id: v.id('plants'), confirmName: v.string() },
+  returns: v.null(),
+  handler: async (ctx: Any, { id, confirmName }: Any) => {
+    const plant = await ctx.db.get(id)
+    if (!plant) throw new ConvexError('Plant not found')
+    if (!canManageCompany(ctx.sessionUser, plant.companyId)) throw new ConvexError('Only a creator of this company can delete a plant')
+    if (confirmName.trim() !== plant.name) throw new ConvexError('Type the plant name exactly to confirm')
+    const siblings: Any[] = await ctx.db
+      .query('plants')
+      .withIndex('by_company', (q: Any) => q.eq('companyId', plant.companyId))
+      .collect()
+    if (siblings.length <= 1) throw new ConvexError('The last plant of a company cannot be deleted')
+    const groups: Any[] = await ctx.db
+      .query('userGroups')
+      .withIndex('by_company', (q: Any) => q.eq('companyId', plant.companyId))
+      .collect()
+    for (const g of groups) {
+      if (g.plantIds.includes(id)) await ctx.db.patch(g._id, { plantIds: g.plantIds.filter((x: string) => x !== id) })
+    }
+    for (const s of await ctx.db.query('sessions').collect()) {
+      if (s.plantId === id) await ctx.db.patch(s._id, { plantId: undefined })
+    }
+    await ctx.db.delete(id)
+    await ctx.db.insert('platformState', {
+      key: `purge:plant:${id}`,
+      value: { plantName: plant.name, plantIds: [id], tableIndex: 0, deleted: 0, done: false },
+      updatedAt: Date.now(),
+    })
+    await ctx.scheduler.runAfter(0, internal.platform.purge, { key: `purge:plant:${id}` })
     return null
   },
 })

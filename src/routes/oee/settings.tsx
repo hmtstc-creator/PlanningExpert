@@ -6,7 +6,7 @@ import { OeeRebuildNotice, OeeUploadButton, useOeeConfig } from '../../component
 import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
-import { addDaysIso, configProblems, dataCostCenters, suggestConfig, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
+import { addDaysIso, configProblems, dataCostCenters, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { usePlant } from '../../lib/plantContext'
 import { OEE_SUGGESTED } from '../../lib/settingsDefaults'
@@ -25,7 +25,8 @@ const input = 'rounded-md border border-input bg-background px-2 py-1 text-sm'
 function OeeSettingsPage() {
   const { config: saved, loaded, savedAt } = useOeeConfig()
   // Fabrikada tanımlı masraf yerleri: adı orada değişir, burada yalnızca alan.
-  const plantCcs = new Set((usePlant().ctx?.active?.costCenters ?? []).map((x) => x.code))
+  const plantList = usePlant().ctx?.active?.costCenters ?? []
+  const plantCcs = new Set(plantList.map((x) => x.code))
   const save = useMutation(api.oee.saveSettings)
   const coverage = useQuery(api.oee.coverage) as
     | { days: { from: string; to: string } | null; shifts: { from: string; to: string } | null; downtimes: { from: string; to: string } | null }
@@ -56,34 +57,13 @@ function OeeSettingsPage() {
   const texts = [...new Set([...events.map((e) => e.textEn.trim().toUpperCase()), ...c.setupTexts.map((t) => t.text)])].filter(Boolean).sort()
   const [textFilter, setTextFilter] = useState('')
 
-  const suggest = () =>
-    set(suggestConfig({ days, shifts, downtimes }, c, OEE_SUGGESTED))
+  // Öneri yalnızca alanları ve kodları doldurur; masraf yerleri fabrikanınkiler kalır.
+  const suggest = () => set(withPlantCostCenters(suggestConfig({ days, shifts, downtimes }, c, OEE_SUGGESTED), plantList))
 
   // Verideki masraf yerleri ve makineleri (günler, vardiyalar, duruşlar).
   const found = useMemo(() => dataCostCenters({ days, shifts, downtimes }), [days, shifts, downtimes])
-  const notDefined = [...found.keys()].filter((code) => !c.costCenters.some((x) => x.code === code))
-  // Alan adı olarak masraf yeri kodu yazılmışsa (ör. 51010171) düzeltme önerilir.
-  const codeAreas = c.areas.filter((a) => found.has(a.name))
-  const moveToCostCenters = () => {
-    const wrong = new Set(codeAreas.map((a) => a.name))
-    const fixed: OeeConfig = {
-      ...c,
-      areas: c.areas.filter((a) => !wrong.has(a.name)),
-      costCenters: [
-        ...c.costCenters.filter((x) => !wrong.has(x.code)).map((x) => (wrong.has(x.area) ? { ...x, area: '' } : x)),
-        ...[...wrong].filter((code) => !c.costCenters.some((x) => x.code === code)).map((code) => ({ code, name: code, area: '' })),
-      ],
-    }
-    // Alanlar veriden önerilir (makine adının ön eki); masraf yeri adları korunur.
-    set(suggestConfig({ days, shifts, downtimes }, fixed, OEE_SUGGESTED))
-  }
-  const addCostCenter = (code: string) => {
-    const k = code.trim()
-    if (!k || c.costCenters.some((x) => x.code === k)) return
-    const area = c.areas.find((a) => a.name === found.get(k)?.area)?.name ?? (c.areas.length === 1 ? c.areas[0].name : '')
-    set({ costCenters: [...c.costCenters, { code: k, name: k, area }] })
-  }
-  const [newCode, setNewCode] = useState('')
+  // Veride olup bu fabrikanın masraf yeri olmayan kodlar (satırları yüklenmez).
+  const notOfPlant = [...found.keys()].filter((code) => !plantCcs.has(code))
   const hasData = !!(coverage?.shifts || coverage?.days || coverage?.downtimes)
 
   const onSave = async () => {
@@ -157,16 +137,6 @@ function OeeSettingsPage() {
         </StepBox>
       </ol>
 
-      {codeAreas.length > 0 && (
-        <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <b>{codeAreas.map((a) => a.name).join(', ')}</b> {codeAreas.length > 1 ? 'are' : 'is'} a cost center, not an area. An area is a group of
-          cost centers (e.g. presses, assembly) and becomes a button on top of every page.{' '}
-          <button type="button" onClick={moveToCostCenters} className="font-medium underline">
-            Move to cost centers
-          </button>
-        </div>
-      )}
-
       <Card
         title="Areas"
         info="A group of cost centers, e.g. presses (PRS) or assembly (APR); each area is a button above every OEE page. 'Cost center' lets you pick a cost center of the area; 'Machine' lets you pick a single machine (when the area is one cost center). 'Production after a setup' is the minutes of production that make a setup OK in this area; empty = the value under Numbers."
@@ -212,20 +182,16 @@ function OeeSettingsPage() {
         </button>
       </Card>
 
-      <Card title="Cost centers" info="Every cost center of your files and the area it belongs to. The cost centers of the plant and their names are defined on Companies and plants (Company → Plant → Cost centers); a code only in the files can be named here. Machines are read from the data.">
+      <Card title="Cost centers" info="The cost centers of this plant and the area each belongs to. Which cost centers a plant has, and their names, a creator defines on Companies and plants (Company → Plant → Cost centers); every one of them counts in the OEE pages — one without an area under Unassigned. Machines are read from the data.">
         <Rows
-          empty="No cost center yet — press Suggest from data, or add one below."
-          head={['Code', 'Machines in the data', 'Name', 'Area', '']}
+          empty="This plant has no cost center yet — a creator adds them on Companies and plants (Company → Plant → Cost centers)."
+          head={['Code', 'Machines in the data', 'Name', 'Area']}
           rows={c.costCenters.map((cc, i) => [
             cc.code,
             <span key="m" className="text-muted-foreground">
               {found.get(cc.code)?.workCenters.join(', ') || '—'}
             </span>,
-            plantCcs.has(cc.code) ? (
-              <span key="n" title="Named on Companies and plants (the plant's cost centers)">{cc.name}</span>
-            ) : (
-              <input key="n" className={input} value={cc.name} onChange={(e) => set({ costCenters: c.costCenters.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })} />
-            ),
+            <span key="n" title="Named on Companies and plants">{cc.name}</span>,
             <select
               key="a"
               className={`${input} ${c.areas.some((a) => a.name === cc.area) ? '' : 'border-amber-500'}`}
@@ -239,32 +205,14 @@ function OeeSettingsPage() {
                 </option>
               ))}
             </select>,
-            plantCcs.has(cc.code) ? <span key="r" /> : <RemoveButton key="r" onClick={() => set({ costCenters: c.costCenters.filter((_, j) => j !== i) })} />,
           ])}
         />
-        {notDefined.length > 0 && (
-          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-amber-800">
-            In the data but not defined:
-            {notDefined.map((code) => (
-              <button key={code} type="button" onClick={() => addCostCenter(code)} className="rounded border border-amber-400 px-2 py-0.5 hover:bg-amber-50">
-                + {code}
-              </button>
-            ))}
+        {notOfPlant.length > 0 && (
+          <p className="mt-2 text-xs text-amber-800">
+            In the uploaded data but not a cost center of this plant: {notOfPlant.join(', ')}. Rows of these cost centers are not uploaded
+            to this plant; if they belong here, a creator adds them on Companies and plants.
           </p>
         )}
-        <form
-          className="mt-2 flex items-center gap-2 text-xs"
-          onSubmit={(e) => {
-            e.preventDefault()
-            addCostCenter(newCode)
-            setNewCode('')
-          }}
-        >
-          <input className={`${input} w-40`} placeholder="Cost center code" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
-          <button type="submit" disabled={!newCode.trim()} className="underline disabled:opacity-40">
-            + Add cost center
-          </button>
-        </form>
       </Card>
 
       <Card title="Shifts" info="Shift Group code of the files → shift number (1st, 2nd, 3rd …). Used for the week-by-shift chart and the downtime Shift column.">

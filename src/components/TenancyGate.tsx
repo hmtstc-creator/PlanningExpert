@@ -143,9 +143,10 @@ export function PlantSwitch({ light = false }: { light?: boolean }) {
       <span className={light ? 'text-muted-foreground' : 'text-white/50'}>/</span>
       {plants.length > 1 ? (
         <select aria-label="Plant" title="Plant — the data on every page belongs to this plant" className={cls} value={active.plantId} onChange={(e) => void select({ plantId: e.target.value })}>
-          {plants.map((p) => (
+          {plants.map((p, i) => (
             <option key={p._id} value={p._id} className="text-foreground">
-              {p.name}
+              {/* Eski kayıtlarda aynı ad iki kez olabilir (artık açılamaz): ayırt edilsin. */}
+              {plants.findIndex((x) => x.name === p.name) === i ? p.name : `${p.name} (${i + 1})`}
             </option>
           ))}
         </select>

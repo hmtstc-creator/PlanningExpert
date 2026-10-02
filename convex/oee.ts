@@ -65,12 +65,24 @@ const dayDoc = (d: Ctx) => ({
 })
 
 /** Vardiyalar: ekle ya da güncelle; etkilenen günlerin toplamı yeniden hesaplanır. */
+/**
+ * Yalnızca seçili fabrikanın masraf yerleri (Company → Plant → Cost center).
+ * Ekran zaten süzer; bu sunucu tarafı güvencesi: başka fabrikanın satırı
+ * bu fabrikaya yazılamaz.
+ */
+function plantCostCentersOnly(ctx: Ctx, rows: { costCenter: string }[]) {
+  const codes = new Set((ctx.plant?.costCenters ?? []).map((c: Ctx) => c.code))
+  const foreign = [...new Set(rows.map((r) => r.costCenter).filter((c) => !codes.has(c)))]
+  if (foreign.length) throw new ConvexError(`Cost center ${foreign.join(', ')} is not a cost center of ${ctx.plant?.name ?? 'this plant'}`)
+}
+
 export const upsertShifts = guardedMutation({
   modules: OEE,
   args: { rows: v.array(v.object(shiftFields)) },
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { rows }: Ctx) => {
+    plantCostCentersOnly(ctx, rows)
     const touched = new Map<string, { date: string; workCenter: string }>()
     for (const r of rows) {
       const hit = await ctx.db
@@ -103,6 +115,7 @@ export const upsertDaily = guardedMutation({
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { rows }: Ctx) => {
+    plantCostCentersOnly(ctx, rows)
     let n = 0
     for (const r of rows) {
       const hit = await ctx.db
@@ -142,6 +155,7 @@ export const upsertWeekly = guardedMutation({
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { rows }: Ctx) => {
+    plantCostCentersOnly(ctx, rows)
     for (const r of rows) {
       const hit = await ctx.db
         .query('oeeWeekly')
@@ -160,6 +174,7 @@ export const upsertMonthly = guardedMutation({
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { rows }: Ctx) => {
+    plantCostCentersOnly(ctx, rows)
     for (const r of rows) {
       const same = await ctx.db
         .query('oeeMonthly')
@@ -185,6 +200,7 @@ export const upsertDowntimeDays = guardedMutation({
   returns: v.number(),
   affectsPlan: false,
   handler: async (ctx: Ctx, { days }: Ctx) => {
+    plantCostCentersOnly(ctx, days)
     for (const incoming of days) {
       const hit = await ctx.db
         .query('oeeDowntimeDays')

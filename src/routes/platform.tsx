@@ -149,7 +149,8 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
   const [plantCountry, setPlantCountry] = useState('')
   const [plantZone, setPlantZone] = useState('')
   const [companyName, setCompanyName] = useState(c.name)
-  const { run: updatePlant } = useSafeMutation(api.platform.updatePlant)
+  const { run: updatePlant, error: updatePlantError } = useSafeMutation(api.platform.updatePlant)
+  const { run: deletePlant, error: deletePlantError } = useSafeMutation(api.platform.deletePlant)
   const drafts = useDraftRows(c.plants, (p) => p._id, plantDraft, samePlant)
   const savePlant = (id: string) => (d: PlantDraft) =>
     updatePlant({ id, name: d.name, country: d.country, timeZone: d.timeZone, costCenters: d.costCenters, ...(isPlatform ? { disabledModules: d.disabledModules } : {}) })
@@ -159,7 +160,7 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
 
   return (
     <section className={`rounded-lg border p-4 ${c.status === 'active' ? 'border-border' : 'border-amber-400 bg-amber-50/40'}`}>
-      <ErrorBanner message={error ?? plantError} onDismiss={clearError} />
+      <ErrorBanner message={error ?? plantError ?? updatePlantError ?? deletePlantError} onDismiss={clearError} />
       <div className="flex flex-wrap items-center gap-3">
         {isPlatform ? (
           <span className="flex items-center gap-1">
@@ -215,7 +216,7 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
               <th className="px-3 py-2 font-medium">Plant</th>
               <th className="px-3 py-2 font-medium">Country</th>
               <th className="px-3 py-2 font-medium">Time zone</th>
-              <th className="px-3 py-2 font-medium">Cost centers (code — name)</th>
+              <th className="px-3 py-2 font-medium" title="All cost centers of the plant count in every calculation, screen and report of the plant">Cost centers (code — name)</th>
               {isPlatform && <th className="px-3 py-2 font-medium">Modules switched off here</th>}
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2" />
@@ -231,6 +232,15 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
                 justSaved={!!drafts.justSaved[p._id]}
                 onEdit={(patch) => drafts.edit(p._id, patch)}
                 onSave={() => void drafts.commit(p._id, savePlant(p._id))}
+                onDelete={
+                  c.plants.length > 1
+                    ? () => {
+                        if (!window.confirm(`Delete the plant ${p.name} and ALL its data permanently? This cannot be undone.`)) return
+                        const typed = window.prompt('Type the plant name to confirm:')
+                        if (typed !== null) void deletePlant({ id: p._id, confirmName: typed })
+                      }
+                    : undefined
+                }
                 modules={c.modules}
                 isPlatform={isPlatform}
               />
@@ -287,6 +297,7 @@ function PlantRowEdit({
   justSaved,
   onEdit,
   onSave,
+  onDelete,
   modules,
   isPlatform,
 }: {
@@ -296,6 +307,8 @@ function PlantRowEdit({
   justSaved: boolean
   onEdit: (patch: Partial<PlantDraft>) => void
   onSave: () => void
+  /** Yoksa silinemez (şirketin son fabrikası). */
+  onDelete?: () => void
   modules: Module[]
   isPlatform: boolean
 }) {
@@ -335,6 +348,11 @@ function PlantRowEdit({
         <button className={btn} disabled={!dirty || saving || !d.name.trim()} onClick={onSave}>
           Save
         </button>
+        {onDelete && (
+          <button className="ml-2 text-xs text-destructive hover:underline" onClick={onDelete}>
+            Delete
+          </button>
+        )}
       </td>
     </tr>
   )

@@ -259,4 +259,44 @@ describe('fabrika ayrımı', () => {
     await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
     expect((await t.query(api.tenancy.context, { token: b })).plants.map((p: Any) => p.companyName)).not.toContain('Other')
   })
+
+  it('aynı adla fabrika açılmaz; fazladan fabrika silinir; yükleme yalnızca fabrikanın masraf yerleri', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const c = await t.query(api.tenancy.context, { token: boss })
+    const companyId = c.plants[0].companyId
+    // Geçiş masraf yeri doldurmaz.
+    expect(c.active.costCenters).toEqual([])
+    await expect(t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'plant 1', country: 'RO', timeZone: 'Europe/Bucharest' })).rejects.toThrow(/already exists/)
+    await expect(t.mutation(api.platform.createCompany, { token: boss, name: 'company 1', modules: [] })).rejects.toThrow(/already exists/)
+    const extra = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Extra', country: 'RO', timeZone: 'Europe/Bucharest' })
+    await t.mutation(api.tenancy.selectPlant, { token: boss, plantId: extra })
+    await t.mutation(api.presses.upsert, { token: boss, name: 'P', hall: 'H' })
+    await expect(t.mutation(api.platform.deletePlant, { token: boss, id: extra, confirmName: 'extra' })).rejects.toThrow(/exactly/)
+    await t.mutation(api.platform.deletePlant, { token: boss, id: extra, confirmName: 'Extra' })
+    for (let i = 0; i < 100; i++) {
+      const done = await t.run(async (ctx: Any) => (await ctx.db.query('platformState').withIndex('by_key', (q: Any) => q.eq('key', `purge:plant:${extra}`)).first())?.value?.done)
+      if (done) break
+      await t.mutation(anyApi.platform.purge, { key: `purge:plant:${extra}` })
+    }
+    // Oturum Plant 1'e döner, Plant 1'in presleri durur, Extra'nınki silindi.
+    const after = await t.query(api.tenancy.context, { token: boss })
+    expect(after.active.plantName).toBe('Plant 1')
+    expect((await t.query(api.presses.list, { token: boss })).length).toBe(2)
+    expect((await t.run((ctx: Any) => ctx.db.query('presses').collect())) as Any[]).toHaveLength(2)
+    await expect(t.mutation(api.platform.deletePlant, { token: boss, id: after.active.plantId, confirmName: 'Plant 1' })).rejects.toThrow(/last plant/)
+
+    // Yükleme: fabrikanın masraf yeri olmayan satır reddedilir.
+    const row = {
+      date: '2026-09-21', plantKey: '', responsible: '', costCenter: '51010171', workCenter: 'PRS-106', shiftGroup: 'UB64', shiftDefinition: '',
+      good: 1, scrap: 0, reject: 0, scheduledMin: 0, unscheduledMin: 0, operatingMin: 1, productionMin: 1, loadingMin: 1,
+      availability: 0, quality: 0, performance: 0, oee: 0,
+    }
+    await expect(t.mutation(api.oee.upsertShifts, { token: boss, rows: [row] })).rejects.toThrow(/not a cost center/)
+    await t.mutation(api.platform.updatePlant, { token: boss, id: after.active.plantId, name: 'Plant 1', costCenters: [{ code: '51010171', name: 'Transfer' }] })
+    await t.mutation(api.oee.upsertShifts, { token: boss, rows: [row] })
+  })
 })

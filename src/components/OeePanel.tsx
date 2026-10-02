@@ -19,6 +19,7 @@ import {
   type Scope,
   type SheetRows,
   withPlantCostCenters,
+  forPlantCostCenters,
 } from '../lib/oee'
 import { usePlant } from '../lib/plantContext'
 import { importOee, type OeeApi } from '../lib/oeeStore'
@@ -221,6 +222,8 @@ export function OeeUploadButton() {
   const [state, setState] = useState<{ kind: 'idle' } | { kind: 'busy'; step: string } | { kind: 'done'; text: string } | { kind: 'error'; text: string }>({
     kind: 'idle',
   })
+  // Yalnızca bu fabrikanın masraf yerlerinin satırları yüklenir.
+  const plant = usePlant().ctx?.active
   const last = useQuery(api.oee.lastImport) as { fileName: string; uploadedAt: number; uploadedBy?: string } | null | undefined
   const calls: OeeApi = {
     upsertShifts: useMutation(api.oee.upsertShifts),
@@ -246,12 +249,20 @@ export function OeeUploadButton() {
       for (const n of wanted) {
         sheets[n] = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets[n], { header: 1, raw: true, defval: null, blankrows: false })
       }
-      const parsed = parseOeeWorkbook(sheets)
-      if (parsed.problems.length) throw new Error(parsed.problems.join(' · '))
+      const all = parseOeeWorkbook(sheets)
+      if (all.problems.length) throw new Error(all.problems.join(' · '))
+      const codes = (plant?.costCenters ?? []).map((c) => c.code)
+      if (!codes.length) {
+        throw new Error(`${plant?.plantName ?? 'This plant'} has no cost center yet — a creator adds them on Companies and plants (Company → Plant → Cost centers).`)
+      }
+      const { parsed, skipped } = forPlantCostCenters(all, codes)
+      const kept = parsed.shifts.length + parsed.daily.length + parsed.weekly.length + parsed.monthly.length + parsed.downtimes.length
+      if (!kept) throw new Error(`No row of this file belongs to the cost centers of ${plant?.plantName} (${codes.join(', ')}).`)
       await importOee(parsed, file.name, calls, (step) => setState({ kind: 'busy', step }))
+      const other = skipped.length ? ` Not this plant (skipped): ${skipped.map((s) => `${s.costCenter} ${s.rows.toLocaleString('en-GB')}`).join(', ')}.` : ''
       setState({
         kind: 'done',
-        text: `✓ Added / updated: ${parsed.read.map((r) => `${r.sheet} ${r.rows.toLocaleString('en-GB')}`).join(' · ')}. Nothing was deleted.`,
+        text: `✓ ${plant?.plantName}: added / updated ${parsed.shifts.length.toLocaleString('en-GB')} shifts, ${parsed.downtimes.reduce((a, d) => a + d.events.length, 0).toLocaleString('en-GB')} downtimes, ${parsed.orders.length.toLocaleString('en-GB')} order rows, ${parsed.weekly.length} weekly, ${parsed.monthly.length} monthly. Nothing was deleted.${other}`,
       })
     } catch (e) {
       setState({ kind: 'error', text: friendlyError(e).message || 'Upload failed' })

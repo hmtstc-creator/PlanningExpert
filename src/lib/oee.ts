@@ -208,29 +208,21 @@ export const EMPTY_CONFIG: OeeConfig = {
 }
 
 /**
- * Fabrikanın masraf yerleri (Companies and plants → Plant → Cost centers)
- * tek kaynaktır: ad oradan gelir, OEE ayarı yalnızca alanı (area) tutar.
- * Fabrikada tanımlı olup OEE ayarında olmayan masraf yeri alansız eklenir
- * (ayar eksik uyarısı çıkar); fabrikada olmayan eski kayıtlar kalır.
+ * Fabrikanın masraf yerleri (Companies and plants → Plant → Cost centers;
+ * creator tanımlar) tek kaynaktır: hangi masraf yerleri var ve adları oradan
+ * gelir; OEE ayarı yalnızca alanı (area) tutar. Fabrikada olmayan kod OEE'de
+ * yoktur. Alanı seçilmemiş masraf yeri "Unassigned" alanında yine hesaba girer.
  */
 export function withPlantCostCenters(c: OeeConfig, plant: { code: string; name: string }[]): OeeConfig {
-  if (!plant.length) return c
   const own = new Map(c.costCenters.map((x) => [x.code, x]))
-  const codes = new Set(plant.map((p) => p.code))
-  return {
-    ...c,
-    costCenters: [
-      ...plant.map((p) => ({ code: p.code, name: p.name, area: own.get(p.code)?.area ?? '' })),
-      ...c.costCenters.filter((x) => !codes.has(x.code)),
-    ],
-  }
+  return { ...c, costCenters: plant.map((p) => ({ code: p.code, name: p.name, area: own.get(p.code)?.area ?? '' })) }
 }
 
 /** Ayarda eksik olan ve kullanıcıya söylenmesi gereken konular. */
 export function configProblems(c: OeeConfig): string[] {
   const out: string[] = []
   if (!c.areas.length) out.push('No area is defined.')
-  if (!c.costCenters.length) out.push('No cost center is defined.')
+  if (!c.costCenters.length) out.push('The plant has no cost center — a creator adds them on Companies and plants (Company → Plant → Cost centers).')
   const areas = new Set(c.areas.map((a) => a.name))
   const noArea = c.costCenters.filter((x) => !areas.has(x.area)).map((x) => x.code)
   if (noArea.length) out.push(`Cost center ${noArea.join(', ')} has no area.`)
@@ -344,7 +336,14 @@ export function startupRunOf(area: string, c: OeeConfig): number {
   return own && own > 0 ? own : c.startupRunMin
 }
 
+/**
+ * Bütün fabrika: fabrikanın bütün masraf yerleri birlikte (alan seçimi
+ * gerekmeden). Birden çok alan varsa ilk düğmedir; içinde masraf yeri seçilir.
+ */
+export const PLANT_AREA = 'All'
+
 export function pickOf(area: string, c: OeeConfig): Pick {
+  if (area === PLANT_AREA) return 'costCenter'
   return c.areas.find((a) => a.name === area)?.pick ?? 'machine'
 }
 
@@ -353,6 +352,7 @@ export function costCenterName(cc: string, c: OeeConfig): string {
 }
 
 export function inScope(row: Located, scope: Scope, c: OeeConfig): boolean {
+  if (scope.area === PLANT_AREA) return scope.key === 'all' || row.costCenter === scope.key
   if (areaOfCostCenter(row.costCenter, c) !== scope.area) return false
   if (scope.key === 'all') return true
   return pickOf(scope.area, c) === 'costCenter' ? row.costCenter === scope.key : row.workCenter === scope.key
@@ -362,11 +362,11 @@ export function inScope(row: Located, scope: Scope, c: OeeConfig): boolean {
 export function areaNames(rows: Located[], c: OeeConfig): string[] {
   const names = c.areas.map((a) => a.name)
   if (rows.some((r) => r.costCenter && areaOfCostCenter(r.costCenter, c) === UNASSIGNED)) names.push(UNASSIGNED)
-  return names
+  return names.length > 1 ? [PLANT_AREA, ...names] : names
 }
 
 export function scopeLabel(scope: Scope, c: OeeConfig): string {
-  if (scope.key === 'all') return `${scope.area} — all`
+  if (scope.key === 'all') return scope.area === PLANT_AREA ? 'All cost centers' : `${scope.area} — all`
   return pickOf(scope.area, c) === 'costCenter' ? costCenterName(scope.key, c) : scope.key
 }
 
@@ -375,12 +375,12 @@ export function scopeOptions(area: string, rows: Located[], c: OeeConfig): { key
   const pick = pickOf(area, c)
   const keys = new Set<string>()
   for (const r of rows) {
-    if (!r.costCenter || areaOfCostCenter(r.costCenter, c) !== area) continue
+    if (!r.costCenter || (area !== PLANT_AREA && areaOfCostCenter(r.costCenter, c) !== area)) continue
     keys.add(pick === 'costCenter' ? r.costCenter : r.workCenter)
   }
   const label = (k: string) => (pick === 'costCenter' ? costCenterName(k, c) : k)
   return [
-    { key: 'all', label: `${area} — all` },
+    { key: 'all', label: area === PLANT_AREA ? 'All cost centers' : `${area} — all` },
     ...[...keys].sort((a, b) => label(a).localeCompare(label(b))).map((k) => ({ key: k, label: label(k) })),
   ]
 }
@@ -1588,4 +1588,42 @@ export function lossCoverage(days: DayRow[], lossDays: LossDay[], scope: Scope, 
     dts += v.downtimes
   }
   return { noDowntimes, noShifts, unscheduledKpi: kpi, unscheduledDowntimes: dts, byWorkCenter }
+}
+
+// ---- fabrikanın masraf yerleri -----------------------------------------------------
+
+/**
+ * Yüklenen dosyadan yalnızca seçili fabrikanın masraf yerlerinin satırları
+ * (Company → Plant → Cost center; masraf yerlerini creator tanımlar). Aynı
+ * dosyada başka fabrikaların satırları olabilir: atlanır ve sayılır.
+ * Sipariş satırlarında masraf yeri yok: iş merkezi, dosyada bu fabrikanın
+ * masraf yerlerinde görülen iş merkezlerindense alınır.
+ */
+export function forPlantCostCenters(
+  parsed: ParsedOee,
+  codes: readonly string[],
+): { parsed: ParsedOee; skipped: { costCenter: string; rows: number }[] } {
+  const allowed = new Set(codes)
+  const skipped = new Map<string, number>()
+  const keep = <T extends { costCenter: string }>(rows: T[], weight: (r: T) => number = () => 1) =>
+    rows.filter((r) => {
+      if (allowed.has(r.costCenter)) return true
+      skipped.set(r.costCenter || '(empty)', (skipped.get(r.costCenter || '(empty)') ?? 0) + weight(r))
+      return false
+    })
+  const shifts = keep(parsed.shifts)
+  const daily = keep(parsed.daily)
+  const weekly = keep(parsed.weekly)
+  const monthly = keep(parsed.monthly)
+  const downtimes = keep(parsed.downtimes, (d) => d.events.length)
+  const wcs = new Set([...shifts, ...daily, ...weekly, ...monthly, ...downtimes].map((r) => r.workCenter))
+  const orders = parsed.orders.filter((o) => wcs.has(o.workCenter))
+  const otherOrders = parsed.orders.length - orders.length
+  return {
+    parsed: { ...parsed, shifts, daily, weekly, monthly, downtimes, orders },
+    skipped: [
+      ...[...skipped].map(([costCenter, rows]) => ({ costCenter, rows })).sort((a, b) => a.costCenter.localeCompare(b.costCenter)),
+      ...(otherOrders ? [{ costCenter: 'order rows of other work centers', rows: otherOrders }] : []),
+    ],
+  }
 }
