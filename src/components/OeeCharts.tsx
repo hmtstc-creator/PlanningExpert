@@ -103,6 +103,12 @@ export function OeeBarChart({ points, height = 220, ariaLabel }: { points: Serie
                   opacity={hover === null || hover === i ? 1 : 0.55}
                 />
               )}
+              {p.oee !== null && hgt > 0 && (
+                // Değer çubuğun üstünde: kalın, siyah, arka plansız, % işaretsiz (60).
+                <text x={cx} y={Math.max(10, top - 4)} textAnchor="middle" fontSize={bar < 14 ? 9 : 11} fontWeight={700} fill="var(--viz-value)" pointerEvents="none">
+                  {Math.round(v * 100)}
+                </text>
+              )}
               {i % labelEvery === 0 && (
                 <text x={cx} y={base + 16} textAnchor="middle" fontSize={10} fill="var(--viz-axis)">
                   {p.label}

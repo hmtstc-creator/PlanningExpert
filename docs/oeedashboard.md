@@ -409,7 +409,62 @@ tablolarda kalır**. Kodda "#" yazılı değil: Settings → Loss groups → "In
 charts" işareti (`hidden`); öneri "#" grubunu gizli getirir. Bir grafik
 sütununun bütün grupları gizliyse sütun grafikten çıkar.
 
+### Dashboard grafikleri (2026-10-02, planlamacı)
+
+OEE değeri her çubuğun üstünde: arka plansız, siyah, kalın, küçük punto,
+yüzde işaretsiz tam sayı (ör. 60). Renk `--viz-value` (koyu temada açık).
+
+## Konuşma özeti ve kalıcı kurallar (2026-10-02 itibarıyla)
+
+Yeni bir sohbet bu dosyayla devam edebilsin diye.
+
+**Çalışma kuralları (planlamacı)**
+- Yalnızca planningexpert reposunda çalışılır (aksi söylenene kadar).
+- Onay beklenmez, iş sonuna kadar tamamlanır; cevaplar kısa ve Türkçe;
+  push sonrası "Ctrl+F5" hatırlatılır.
+- "Programı düzelt" denince kod düzeltilir ve commit/push yapılır; sadece
+  "fikre yorum yap" denirse kod yazılmaz.
+- Kodda tesise özel sabit değer ya da koşul olmaz; çıkarsa planlamacıya
+  sorulur (programda mı kalsın, kullanıcı mı tanımlasın). OEE'de hepsi
+  Settings'te.
+- ASAKAI dosyasında talimat dışında iş yapılmaz.
+- Şirket mail şifresi/kimlik bilgisi saklanmaz (mail = Outlook .eml taslağı).
+
+**Veri ve yükleme**
+- Rutin dosya 5 sekme: Shiftly KPI, Shiftly Order Based KPI, Weekly KPI,
+  Monthly KPI (ilk sütun Year), Downtimes(1); hep son 2 hafta,
+  **Pazartesi'den** başlar (değilse dosya reddedilir; istisna 1 Ocak).
+- Geçmiş silinmez; aynı anahtar gelirse yeni eskiyi ezer; duruşlar dosyadaki
+  gün × makine için tamamen yenilenir.
+- İlk sürümle yüklenen veride eksik gün toplamları / kayıp özetleri sayfa
+  açılınca bir kez kurulur (`rebuildStored`).
+- 28.09 ilk yükleme dosyası hazırlandı (OEE_upload_2026-09-28.xlsx):
+  Weekly KPI + Weekly KPI_fix birleşik (W36 fix'ten, Weekly KPI'da yarımdı),
+  Downtimes 07.09'dan (01–06.09 Pazartesi kuralı için çıkarıldı).
+
+**Settings**
+- Adımlar: Upload → Suggest from data → Check → Save. Masraf yerleri
+  gün + vardiya + duruştan önerilir; elle eklenebilir; alan adı olarak
+  yazılmış masraf yeri kodu "Move to cost centers" ile düzeltilir.
+- Loss groups'ta "In charts": "#" (açıklanmayan duruş) grafiklerde gizli,
+  tablolarda var. Planlamacı kayıtlı ayarda "#" işaretini bir kez kaldırmalı.
+
+**Hesap**
+- Avg setup = presin seçili haftada başlayan setup'larının setup metinli
+  duruş dakikaları toplamı ÷ setup adedi (birleşen kayıtlar arasındaki mola
+  vb. sayılmaz — istenirse değiştirilecek).
+
 ## Bekleyen konular
+
+- Veride eksikler: 07–13.09 için Shiftly / Order Based KPI yok (kayıp %
+  hesaplanamaz); Monthly KPI'da Ağustos ve Eylül yok; 32–35. haftalarda
+  makineler eksik, 33. hafta hiç yok (yaz tatili mi? — planlamacı teyit).
+- Avg setup'a birleşen setup kayıtları arasındaki süre de katılsın mı?
+- planValidator metni "stock in 2009/1009" (sayılan lokasyonlar yazmalı) ve
+  3 günlük stok yaşı sabiti (program mı kullanıcı mı) — cevap bekleniyor.
+- Plant genişletme (docs/plant-genisletme.md) beklemede; karşılaştırma ekranı
+  sonra konuşulacak.
+- MB51 eski satırlar — beklemede.
 
 - APR için setup sonrası üretim süresi (şu an tek değer, Settings'te):
   APR'ye ayrı süre gerekir mi? Planlamacıya sorulacak.

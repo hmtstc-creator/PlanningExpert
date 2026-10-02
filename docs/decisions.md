@@ -170,3 +170,7 @@ düşebiliyordu; vinç kontrolü artık önceki günün kendi rezervasyonların�
 
 - Koddaki sabit sayılar: `docs/fixeddefinitions.md` — ileride
   değerlendirilecek.
+
+- **OEE durum özeti (2026-10-02):** bütün OEE kararları, çalışma kuralları ve
+  açık konular `docs/oeedashboard.md` → "Konuşma özeti ve kalıcı kurallar"
+  ile "Bekleyen konular" bölümlerinde. Yeni sohbet oradan devam eder.

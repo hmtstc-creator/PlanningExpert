@@ -44,6 +44,11 @@ describe('OEE charts', () => {
     fireEvent.mouseEnter(groups[1])
     expect(getByText('Mon-1', { selector: 'p' })).toBeTruthy()
     expect(container.querySelectorAll('tbody tr').length).toBe(1 + t.byWorkCenter.size)
+    // OEE değeri çubuğun üstünde, % işaretsiz.
+    const first = t.slots.find((p) => p.oee !== null)!
+    const values = [...container.querySelectorAll('text[font-weight="700"]')].map((e) => e.textContent)
+    expect(values.length).toBe(t.slots.filter((p) => (p.oee ?? 0) > 0).length)
+    expect(values[0]).toBe(String(Math.round(first.oee! * 100)))
   })
 
   it('loss charts render', () => {

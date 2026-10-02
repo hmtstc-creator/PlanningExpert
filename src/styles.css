@@ -153,6 +153,8 @@
   --viz-7: #4a3aa7;
   --viz-grid: #e4e3df;
   --viz-axis: #52514e;
+  /* Çubuk üstü değer: siyah, kalın. */
+  --viz-value: #000000;
 }
 .dark .oee-viz {
   --viz-1: #3987e5;
@@ -164,4 +166,5 @@
   --viz-7: #9085e9;
   --viz-grid: #34332f;
   --viz-axis: #c3c2b7;
+  --viz-value: #f4f3ee;
 }
