@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { PORTAL_MODULES } from '../lib/portal'
+import { usePlant } from '../lib/plantContext'
 
 export const Route = createFileRoute('/')({
   component: PortalHome,
@@ -11,13 +12,29 @@ export const Route = createFileRoute('/')({
  * buradan her modül kendi sayfalarına açılır.
  */
 function PortalHome() {
+  const { ctx, can, canManage, isPlatform } = usePlant()
+  // Yalnızca bu fabrikada izni olan modüller.
+  const modules = PORTAL_MODULES.filter((m) => !m.module || can(m.module))
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
       <h1 className="text-2xl font-bold text-foreground">Production Portal</h1>
-      <p className="mt-1 text-muted-foreground">Choose a module.</p>
+      <p className="mt-1 text-muted-foreground">
+        {ctx?.active ? `${ctx.active.companyName} · ${ctx.active.plantName} — choose a module.` : 'Choose a module.'}
+      </p>
+      {(canManage || isPlatform) && (
+        <p className="mt-2 text-sm">
+          <Link to="/platform" className="underline">
+            {isPlatform ? 'Companies and plants' : 'Plants of your company'}
+          </Link>
+          {' · '}
+          <Link to="/yonetim" className="underline">
+            Users and groups
+          </Link>
+        </p>
+      )}
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {PORTAL_MODULES.map((m, i) => (
+        {modules.map((m, i) => (
           <Link
             key={m.to}
             to={m.to}

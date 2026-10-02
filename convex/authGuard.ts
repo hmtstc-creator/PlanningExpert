@@ -20,18 +20,14 @@ import { ConvexError, v } from 'convex/values'
 /** Her genel işlevin args'ına eklenen alan. */
 export const sessionArg = { token: v.optional(v.string()) }
 
-/** Rol adları. Yetki kontrolü bunlarla yapılır. */
-export const ROLES = ['admin', 'planner', 'maintenance', 'viewer'] as const
-export type Role = (typeof ROLES)[number]
-
 /**
- * Oturumu doğrular ve kullanıcıyı döner; geçersizse atar.
+ * Oturumu doğrular; kullanıcıyı ve oturum kaydını döner, geçersizse atar.
  *
  * `ctx` gevşek tiplenmiş: hem query hem mutation bağlamından çağrılıyor ve
  * üretilen Convex tipleri bu ortamda yok.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function requireUser(ctx: any, token: string | undefined) {
+export async function requireSession(ctx: any, token: string | undefined) {
   if (!token) throw new ConvexError('Not signed in')
 
   const session = await ctx.db
@@ -49,27 +45,10 @@ export async function requireUser(ctx: any, token: string | undefined) {
   // Pasife alınan kullanıcının açık jetonu işe yaramamalı.
   if (!user.active) throw new ConvexError('This account is no longer active')
 
-  return user
+  return { user, session }
 }
 
-/**
- * Belirli roller gerektirir.
- *
- * Rol, ekranda ne sunulduğunu değiştirmenin ötesinde artık gerçekten
- * kısıtlıyor: `viewer` hiçbir şey yazamaz, kullanıcı yönetimi yalnızca
- * `admin`'dedir.
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function requireRole(ctx: any, token: string | undefined, roles: readonly Role[]) {
-  const user = await requireUser(ctx, token)
-  if (!roles.includes(user.role)) {
-    throw new ConvexError(`This needs one of: ${roles.join(', ')} — you are ${user.role}`)
-  }
-  return user
+export async function requireUser(ctx: any, token: string | undefined) {
+  return (await requireSession(ctx, token)).user
 }
-
-/** Yazma yetkisi olan roller. `viewer` yalnızca okur. */
-export const CAN_WRITE = ['admin', 'planner', 'maintenance'] as const
-
-/** Yalnızca yöneticinin yapabileceği işler. */
-export const ADMIN_ONLY = ['admin'] as const

@@ -2,6 +2,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
 import { useCurrentUser } from '../lib/currentUser'
+import { PlantSwitch } from './TenancyGate'
 import { ALL_GROUPS, NAV_GROUPS, PRIMARY_LINKS, moduleNavFor } from '../lib/navigation'
 import { isPortalPath } from '../lib/portal'
 
@@ -75,10 +76,11 @@ export function Header() {
   // Masaüstü: kim giriş yaptı + çıkış. Telefonda `signedInMobile`.
   const signedIn = (
     <div className="ml-auto hidden shrink-0 items-center gap-3 lg:flex">
+      <PlantSwitch />
       <Link
         to="/yonetim"
         className="flex items-center gap-2 text-xs text-white/70 hover:text-white"
-        title="Signed-in user — manage accounts on the Admin page"
+        title="Signed-in user — users and groups on the Admin page"
       >
         <span className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-sm font-semibold uppercase text-white ring-1 ring-white/25">
           {(currentUser ?? '?').slice(0, 1)}
@@ -93,6 +95,7 @@ export function Header() {
   )
   const signedInMobile = (
     <div className="ml-auto flex shrink-0 items-center gap-2 lg:hidden">
+      <PlantSwitch />
       <span className="hidden text-xs text-white/75 sm:inline">{currentUser}</span>
       {signOutButton}
     </div>

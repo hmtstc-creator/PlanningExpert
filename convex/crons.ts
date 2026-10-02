@@ -11,7 +11,8 @@ const crons = cronJobs()
  * ilerlemesi için. Birinci vardiya genelde saat başında başladığı için
  * dakika 5'te çalışır — yeni gün açıldıktan hemen sonra.
  */
-crons.hourly('recompute plan', { minuteUTC: 5 }, internal.planEngine.recompute, {
+// Fabrika başına: tenancy.recomputeAll her fabrikanın hesabını ayrı kurar.
+crons.hourly('recompute plan', { minuteUTC: 5 }, internal.tenancy.recomputeAll, {
   trigger: 'clock',
 })
 

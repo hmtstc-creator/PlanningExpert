@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { guardedMutation, guardedQuery } from './guarded'
+import { ALL_MODULES, guardedMutation, guardedQuery } from './guarded'
 
 const pressValidator = v.object({
   _id: v.id('presses'),
@@ -15,6 +15,7 @@ const pressValidator = v.object({
 })
 
 export const list = guardedQuery({
+  modules: ALL_MODULES,
   args: {},
   returns: v.array(pressValidator),
   handler: async (ctx) => ctx.db.query('presses').collect(),

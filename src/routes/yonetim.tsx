@@ -2,36 +2,16 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { CompanyGroups, CompanyUsers, type GroupRow } from '../components/CompanyAdmin'
 import { ErrorBanner } from '../components/ErrorBanner'
-import { SaveStatus } from '../components/SaveStatus'
-import { UnsavedBar } from '../components/UnsavedBar'
-import { useAction, useMutation, useQuery } from '../lib/convexTransport'
-import { validatePassword } from '../lib/authRules'
+import { useMutation, useQuery } from '../lib/convexTransport'
 import { useCurrentUser } from '../lib/currentUser'
-import { useDraftRows } from '../lib/useDraftRows'
+import { usePlant } from '../lib/plantContext'
 import { useSafeMutation } from '../lib/useSafeMutation'
-import { friendlyError } from '../lib/mutationErrors'
 
 export const Route = createFileRoute('/yonetim')({
   component: AdminPage,
 })
-
-type User = {
-  _id: string
-  name: string
-  email?: string
-  role: string
-  active: boolean
-  hasPassword: boolean
-  mustChangePassword: boolean
-}
-
-const ROLES = [
-  { value: 'admin', label: 'Admin', hint: 'Manages users and the lists below' },
-  { value: 'planner', label: 'Planner', hint: 'Runs and approves the plan' },
-  { value: 'maintenance', label: 'Maintenance', hint: 'Press and mold maintenance' },
-  { value: 'viewer', label: 'Viewer', hint: 'Reads only' },
-]
 
 const LISTS = [
   { kind: 'operation', label: 'Operations', hint: 'OP10, OP20 … used on mold problem reports' },
@@ -40,28 +20,13 @@ const LISTS = [
   { kind: 'machineProblemType', label: 'Machine problem types', hint: 'Hydraulic, electrical … used on machine breakdown reports' },
 ]
 
-interface Draft {
-  name: string
-  email: string
-  role: string
-  active: boolean
-}
-
-function draftOf(user: User): Draft {
-  return { name: user.name, email: user.email ?? '', role: user.role, active: user.active }
-}
-
-function sameDraft(a: Draft, b: Draft): boolean {
-  return a.name === b.name && a.email === b.email && a.role === b.role && a.active === b.active
-}
-
 function AdminPage() {
-  const { name: currentUser, user: session, token, setToken } = useCurrentUser()
-  const users = (useQuery(api.authInternal.listWithPasswordState) ?? []) as User[]
-  const setPasswordAsAdmin = useAction(api.auth.setPasswordAsAdmin)
-  const [passwordFor, setPasswordFor] = useState<string | null>(null)
-  const [newPassword, setNewPassword] = useState('')
-  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const { name: currentUser, user: session, setToken } = useCurrentUser()
+  const { ctx, canManage } = usePlant()
+  const companyId = ctx?.active?.companyId ?? null
+  const groups = (useQuery(api.users.listGroups, canManage && companyId ? { companyId } : 'skip') ?? []) as GroupRow[]
+  const companies = (useQuery(api.platform.companies, canManage ? {} : 'skip') ?? []) as { _id: string; plants: { _id: string; name: string }[] }[]
+  const plants = companies.find((c) => c._id === companyId)?.plants ?? []
   const lookups = (useQuery(api.lookups.list) ?? []) as {
     _id: string
     kind: string
@@ -76,20 +41,11 @@ function AdminPage() {
     createdAt: number
   }[]
 
-  const { run: addUser, error: addError, clearError } = useSafeMutation(api.users.add)
-  const { run: updateUser, error: updateError } = useSafeMutation(api.users.update)
-  const { run: removeUser, error: removeError } = useSafeMutation(api.users.remove)
   const { run: addLookup, error: lookupError } = useSafeMutation(api.lookups.add)
   const { run: removeLookup } = useSafeMutation(api.lookups.remove)
   const seedDefaults = useMutation(api.lookups.seedDefaults)
 
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [role, setRole] = useState('planner')
-  const [saving, setSaving] = useState(false)
   const [newValue, setNewValue] = useState<Record<string, string>>({})
-
-  const drafts = useDraftRows(users, (u) => u._id, draftOf, sameDraft)
 
   const byKind = useMemo(() => {
     const map = new Map<string, typeof lookups>()
@@ -101,32 +57,7 @@ function AdminPage() {
     return map
   }, [lookups])
 
-  async function submitUser() {
-    if (!name.trim()) return
-    setSaving(true)
-    let ok = false
-    try {
-      ok = await addUser({ name: name.trim(), email: email.trim() || undefined, role })
-    } finally {
-      setSaving(false)
-    }
-    if (ok) {
-      setName('')
-      setEmail('')
-    }
-  }
-
-  const saveUser = (id: string) => (draft: Draft) =>
-    updateUser({
-      id,
-      name: draft.name,
-      email: draft.email.trim() || undefined,
-      role: draft.role,
-      active: draft.active,
-    })
-
   const inputClass = 'rounded-md border border-input bg-background px-3 py-2 text-sm'
-  const activeUsers = users.filter((u) => u.active)
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
@@ -160,8 +91,7 @@ function AdminPage() {
       </div>
 
       <ErrorBanner
-        message={addError ?? updateError ?? removeError ?? lookupError ?? passwordError}
-        onDismiss={clearError}
+        message={lookupError}
       />
 
       <div className="mt-6 rounded-lg border border-border p-4">
@@ -169,7 +99,11 @@ function AdminPage() {
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
           <span className="text-foreground">
             <strong>{currentUser}</strong>
-            <span className="text-muted-foreground"> · {session?.role}</span>
+            <span className="text-muted-foreground">
+              {' '}
+              · {session?.role}
+              {ctx?.active && ` · ${ctx.active.companyName} / ${ctx.active.plantName}`}
+            </span>
           </span>
           <button
             onClick={() => setToken(null)}
@@ -183,232 +117,19 @@ function AdminPage() {
         </p>
       </div>
 
-      <h2 className="mt-8 text-sm font-semibold text-foreground">Users</h2>
-      <p className="mt-1 text-xs text-muted-foreground">
-        A new user cannot sign in until you set a password for them. They are
-        asked to replace it the first time they sign in.
-      </p>
-      <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
-        <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Name</span>
-          <input
-            className={`mt-1 w-44 ${inputClass}`}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Ayşe Yılmaz"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void submitUser()
-            }}
-          />
-        </label>
-        <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Email (opt.)</span>
-          <input
-            className={`mt-1 w-56 ${inputClass}`}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Role</span>
-          <select
-            className={`mt-1 w-40 ${inputClass}`}
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-          >
-            {ROLES.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          onClick={() => void submitUser()}
-          disabled={!name.trim() || saving}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? 'Adding…' : 'Add user'}
-        </button>
-      </div>
-
-      {users.length === 0 ? (
-        <p className="mt-3 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          No users yet. Add the people who use this program so their changes
-          carry a name.
-        </p>
+      {canManage && companyId ? (
+        <>
+          <h2 className="mt-8 text-sm font-semibold text-foreground">Users — {ctx?.active?.companyName}</h2>
+          <CompanyUsers companyId={companyId} groups={groups} />
+          <h2 className="mt-8 text-sm font-semibold text-foreground">User groups</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            A group gives its members plants and a permission per module (no access · views · edits). A person in
+            several groups gets the widest permission. A creator needs no group.
+          </p>
+          <CompanyGroups companyId={companyId} groups={groups} plants={plants} />
+        </>
       ) : (
-        <div className="mt-3 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-muted text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Email</th>
-                <th className="px-3 py-2 font-medium">Role</th>
-                <th className="px-3 py-2 font-medium">Active</th>
-                <th className="px-3 py-2 font-medium">Password</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => {
-                const draft = drafts.draftFor(user)
-                const dirty = drafts.isDirty(user)
-                const busy = drafts.savingKey === user._id
-                const save = () => {
-                  if (dirty && !busy) void drafts.commit(user._id, saveUser(user._id))
-                }
-                return (
-                  <tr
-                    key={user._id}
-                    className={`border-t border-border ${dirty ? 'bg-amber-50' : ''}`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') save()
-                    }}
-                  >
-                    <td className="px-3 py-2">
-                      <input
-                        className={`w-40 ${inputClass}`}
-                        value={draft.name}
-                        onChange={(e) => drafts.edit(user._id, { name: e.target.value })}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        className={`w-52 ${inputClass}`}
-                        value={draft.email}
-                        onChange={(e) => drafts.edit(user._id, { email: e.target.value })}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        className={`w-36 ${inputClass}`}
-                        value={draft.role}
-                        onChange={(e) => drafts.edit(user._id, { role: e.target.value })}
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r.value} value={r.value}>
-                            {r.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={draft.active}
-                        onChange={(e) => drafts.edit(user._id, { active: e.target.checked })}
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-xs">
-                      {passwordFor === user._id ? (
-                        <div className="flex flex-wrap items-center gap-1">
-                          <input
-                            type="password"
-                            className="w-36 rounded-md border border-input bg-background px-2 py-1 text-sm"
-                            placeholder="New password"
-                            autoComplete="new-password"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                          />
-                          <button
-                            onClick={async () => {
-                              const problem = validatePassword(newPassword)
-                              if (problem) {
-                                setPasswordError(problem)
-                                return
-                              }
-                              setPasswordError(null)
-                              try {
-                                await setPasswordAsAdmin({
-                                  token: token ?? '',
-                                  userId: user._id,
-                                  newPassword,
-                                })
-                                setPasswordFor(null)
-                                setNewPassword('')
-                              } catch (e) {
-                                setPasswordError(
-                                  friendlyError(e).message || 'Could not set the password',
-                                )
-                              }
-                            }}
-                            className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:opacity-90"
-                          >
-                            Set
-                          </button>
-                          <button
-                            onClick={() => {
-                              setPasswordFor(null)
-                              setPasswordError(null)
-                            }}
-                            className="text-xs text-muted-foreground underline"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap items-center gap-2">
-                          {!user.hasPassword ? (
-                            <span className="text-destructive">cannot sign in</span>
-                          ) : user.mustChangePassword ? (
-                            <span className="text-amber-700">must change</span>
-                          ) : (
-                            <span className="text-muted-foreground">set</span>
-                          )}
-                          <button
-                            onClick={() => {
-                              setPasswordFor(user._id)
-                              setNewPassword('')
-                              setPasswordError(null)
-                            }}
-                            className="text-foreground underline hover:no-underline"
-                          >
-                            {user.hasPassword ? 'Reset' : 'Set password'}
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <SaveStatus
-                        dirty={dirty}
-                        saving={busy}
-                        justSaved={!!drafts.justSaved[user._id]}
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <button
-                        onClick={save}
-                        disabled={!dirty || busy}
-                        className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Delete ${user.name}? Their past entries keep their name; only the account goes.`,
-                            )
-                          ) {
-                            void removeUser({ id: user._id })
-                            // Kendini silen kullanıcı oturumda kalmamalı.
-                            if (currentUser === user.name) setToken(null)
-                          }
-                        }}
-                        className="ml-2 text-xs text-destructive hover:underline"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <p className="mt-8 text-sm text-muted-foreground">Users and groups are managed by a creator of your company.</p>
       )}
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -526,13 +247,6 @@ function AdminPage() {
         </div>
       )}
 
-      <UnsavedBar
-        count={drafts.dirtyKeys.length}
-        saving={drafts.savingKey !== null}
-        noun="user"
-        onSaveAll={() => void drafts.commitAll((id, draft) => saveUser(id)(draft))}
-        onDiscard={drafts.discardAll}
-      />
     </div>
   )
 }

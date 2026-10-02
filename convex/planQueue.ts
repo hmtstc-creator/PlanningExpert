@@ -20,6 +20,7 @@ export async function planStatusDoc(ctx: Ctx) {
     .first()
 }
 
+/** `ctx`: fabrikaya kilitli bağlam (`ctx.plantId`, convex/guarded.ts). */
 export async function requestRecompute(
   ctx: Ctx,
   delayMs: number = RECOMPUTE_DELAY_MS,
@@ -32,7 +33,7 @@ export async function requestRecompute(
   // dakikadan eski "bekleyen" kayıt takılmış sayılır ve yenisi kurulur.
   if (pending !== undefined && pending > now - 60_000 && pending <= now + delayMs) return
 
-  await ctx.scheduler.runAfter(delayMs, internal.planEngine.recompute, { trigger })
+  await ctx.scheduler.runAfter(delayMs, internal.planEngine.recompute, { trigger, plantId: ctx.plantId })
   const patch = { requestedAt: now, scheduledFor: now + delayMs }
   if (status) await ctx.db.patch(status._id, patch)
   else await ctx.db.insert('planStatus', { key: 'default', ...patch })

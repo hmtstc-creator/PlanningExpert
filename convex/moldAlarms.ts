@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { guardedMutation, guardedQuery } from './guarded'
+import { DIE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
 import { liveRows } from './sapLive'
 import { countedLocations, productionRows } from '../src/lib/stockLocations'
 
@@ -26,6 +26,7 @@ const rowValidator = v.object({
 })
 
 export const list = guardedQuery({
+  modules: DIE_OR_PLANNING,
   args: {},
   returns: v.array(rowValidator),
   handler: async (ctx) => ctx.db.query('moldAlarms').collect(),
@@ -153,6 +154,7 @@ export async function runSync(ctx: Ctx): Promise<{ opened: number; cleared: numb
 }
 
 export const sync = guardedMutation({
+  modules: DIE_OR_PLANNING,
   args: {},
   returns: v.object({ opened: v.number(), cleared: v.number() }),
   handler: async (ctx) => runSync(ctx),
@@ -165,6 +167,7 @@ export const sync = guardedMutation({
  * bir sonraki eşleme onu yeniden açmaz. Ancak sayaç sıfırlanınca düşer.
  */
 export const close = guardedMutation({
+  modules: DIE_OR_PLANNING,
   args: {
     id: v.id('moldAlarms'),
     reason: v.string(),
@@ -196,6 +199,7 @@ export const close = guardedMutation({
 
 /** Kapatılan alarmı yeniden açar — karar geri alınabilir olmalı. */
 export const reopen = guardedMutation({
+  modules: DIE_OR_PLANNING,
   args: { id: v.id('moldAlarms'), reopenedBy: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, args) => {

@@ -35,12 +35,14 @@ const CHUNK_ITEMS = 4000
 
 async function readTable(
   ctx: Ctx,
+  plantId: string,
   table: 'products' | 'demandWeekly' | 'demandDaily' | 'stock',
 ): Promise<{ rows: Ctx[]; complete: boolean }> {
   const rows: Ctx[] = []
   let cursor: string | null = null
   for (;;) {
     const page: Ctx = await ctx.runQuery(internal.planRuns.inputPage, {
+      plantId,
       table,
       cursor,
       numItems: PAGE_SIZE,
@@ -52,13 +54,13 @@ async function readTable(
   }
 }
 
-async function loadInputs(ctx: Ctx): Promise<PlanInputs> {
+async function loadInputs(ctx: Ctx, plantId: string): Promise<PlanInputs> {
   const [small, products, demand, daily, stock] = await Promise.all([
-    ctx.runQuery(internal.planRuns.smallInputs, {}),
-    readTable(ctx, 'products'),
-    readTable(ctx, 'demandWeekly'),
-    readTable(ctx, 'demandDaily'),
-    readTable(ctx, 'stock'),
+    ctx.runQuery(internal.planRuns.smallInputs, { plantId }),
+    readTable(ctx, plantId, 'products'),
+    readTable(ctx, plantId, 'demandWeekly'),
+    readTable(ctx, plantId, 'demandDaily'),
+    readTable(ctx, plantId, 'stock'),
   ])
   return {
     ...small,
@@ -96,7 +98,7 @@ export function chunkItems<T>(items: T[]): T[][] {
 
 const LIST_KINDS = ['jobs', 'unplanned', 'days', 'rawNeeds', 'maintenance'] as const
 
-async function storeRun(ctx: Ctx, run: PlanRun, startedAt: number, trigger?: string) {
+async function storeRun(ctx: Ctx, plantId: string, run: PlanRun, startedAt: number, trigger?: string) {
   // JSON turu: `undefined` alanları atar — Convex dizilerde undefined kabul
   // etmez.
   const plain = JSON.parse(JSON.stringify(run)) as Record<string, unknown>
@@ -110,6 +112,7 @@ async function storeRun(ctx: Ctx, run: PlanRun, startedAt: number, trigger?: str
     if (!(LIST_KINDS as readonly string[]).includes(key)) summary[key] = value
   }
   const runId = await ctx.runMutation(internal.planRuns.createRun, {
+    plantId,
     startedAt,
     computedAt: run.computedAt,
     trigger,
@@ -118,10 +121,11 @@ async function storeRun(ctx: Ctx, run: PlanRun, startedAt: number, trigger?: str
   let index = 0
   for (const kind of LIST_KINDS) {
     for (const items of chunkItems((plain[kind] as unknown[]) ?? [])) {
-      await ctx.runMutation(internal.planRuns.addChunk, { runId, index: index++, kind, items })
+      await ctx.runMutation(internal.planRuns.addChunk, { plantId, runId, index: index++, kind, items })
     }
   }
   await ctx.runMutation(internal.planRuns.completeRun, {
+    plantId,
     runId,
     chunkCount: index,
     durationMs: Date.now() - startedAt,
@@ -129,14 +133,17 @@ async function storeRun(ctx: Ctx, run: PlanRun, startedAt: number, trigger?: str
 }
 
 export const recompute = internalAction({
-  args: { trigger: v.optional(v.string()) },
+  // Fabrika başına hesap. `plantId` olmadan kurulmuş eski bir iş (fabrika
+  // anahtarından önce) hiçbir şey yapmaz.
+  args: { trigger: v.optional(v.string()), plantId: v.optional(v.id('plants')) },
   returns: v.null(),
-  handler: async (ctx: Ctx, { trigger }: Ctx) => {
-    const { proceed } = await ctx.runMutation(internal.planRuns.beginRun, { trigger })
+  handler: async (ctx: Ctx, { trigger, plantId }: Ctx) => {
+    if (!plantId) return null
+    const { proceed } = await ctx.runMutation(internal.planRuns.beginRun, { plantId, trigger })
     if (!proceed) return null
     const startedAt = Date.now()
     try {
-      const inputs = await loadInputs(ctx)
+      const inputs = await loadInputs(ctx, plantId)
       const run = computePlan(inputs, Date.now())
       // Hangi yüklemelerle hesaplandı: SAP Data sayfası "bu dosya planda mı"
       // sorusunu bu kayda bakarak cevaplar.
@@ -146,12 +153,12 @@ export const recompute = internalAction({
           { uploadedAt: u.uploadedAt, fileName: u.fileName },
         ]),
       )
-      await storeRun(ctx, Object.assign(run, { dataSources }), startedAt, trigger)
-      await ctx.runMutation(internal.planRuns.finishRun, { startedAt })
+      await storeRun(ctx, plantId, Object.assign(run, { dataSources }), startedAt, trigger)
+      await ctx.runMutation(internal.planRuns.finishRun, { plantId, startedAt })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error('Plan recompute failed', error)
-      await ctx.runMutation(internal.planRuns.finishRun, { startedAt, error: message })
+      await ctx.runMutation(internal.planRuns.finishRun, { plantId, startedAt, error: message })
     }
     return null
   },

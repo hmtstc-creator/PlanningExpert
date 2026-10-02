@@ -2,25 +2,83 @@ import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
 import { configFields, dayFields, downtimeDayFields, lossDayFields, monthlyFields, orderFields, shiftFields, weeklyFields } from './oeeValidators'
 
+/**
+ * Fabrika anahtarı (docs/plant-genisletme.md). Fabrikaya ait her tabloda
+ * var ve her index onunla başlar; erişim yalnızca convex/plantDb.ts'deki
+ * kilitli veritabanından yapılır. Geçiş bitene kadar eski kayıtlarda boş.
+ */
+const plantField = { plantId: v.optional(v.id('plants')) }
+
 export default defineSchema({
+  // ---- Platform (fabrikadan bağımsız) ----
+  companies: defineTable({
+    name: v.string(),
+    // 'active' | 'suspended' (askıda: salt okunur)
+    status: v.string(),
+    /** Açık modüller: 'planning' | 'oee' | 'die' | 'machine'. */
+    modules: v.array(v.string()),
+    suspendedAt: v.optional(v.number()),
+    /** Askıya alınınca +90 gün: bu tarihten sonra kalıcı silinebilir. */
+    deleteAfter: v.optional(v.number()),
+    createdAt: v.number(),
+  }),
+
+  plants: defineTable({
+    companyId: v.id('companies'),
+    name: v.string(),
+    code: v.optional(v.string()),
+    country: v.optional(v.string()),
+    timeZone: v.optional(v.string()),
+    /** Bu fabrikada kapatılan modüller. */
+    disabledModules: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+  }).index('by_company', ['companyId']),
+
+  userGroups: defineTable({
+    companyId: v.id('companies'),
+    name: v.string(),
+    /** Şirketin bütün fabrikaları (sonradan eklenenler dahil). */
+    allPlants: v.boolean(),
+    plantIds: v.array(v.id('plants')),
+    permissions: v.object({
+      planning: v.optional(v.string()),
+      oee: v.optional(v.string()),
+      die: v.optional(v.string()),
+      machine: v.optional(v.string()),
+    }),
+    createdAt: v.number(),
+  }).index('by_company', ['companyId']),
+
+  /** Tek seferlik platform durumu (ör. fabrika anahtarı geçişi). */
+  platformState: defineTable({
+    key: v.string(),
+    value: v.any(),
+    updatedAt: v.number(),
+  }).index('by_key', ['key']),
+
   // @deprecated kaldırıldı, sadece eski sözleşme uyumluluğu için tutuluyor
   machines: defineTable({
+    ...plantField,
     name: v.string(),
     hall: v.string(),
     hasCrane: v.boolean(),
     tonnage: v.number(),
-  }).index('by_name', ['name']),
+  }).index('by_name', ['plantId', 'name'])
+    .index('by_plant', ['plantId']),
 
   // @deprecated kaldırıldı, sadece eski sözleşme uyumluluğu için tutuluyor
   machinePriorities: defineTable({
+    ...plantField,
     productCode: v.string(),
     machineName: v.string(),
     priority: v.number(),
-  }).index('by_product', ['productCode']),
+  }).index('by_product', ['plantId', 'productCode'])
+    .index('by_plant', ['plantId']),
 
   // Planlamacının pres bazında müdahalesi: pres şu andan önce plana girmez
   // (operatör yok, hammadde yok…) ve/veya onaylı işleri geride/ileride.
   pressPlanStarts: defineTable({
+    ...plantField,
     press: v.string(),
     // Plan başlangıcı: takvim günü + saat (gece yarısından dakika).
     fromDate: v.optional(v.string()),
@@ -30,9 +88,11 @@ export default defineSchema({
     delayMinutes: v.optional(v.number()),
     updatedBy: v.optional(v.string()),
     updatedAt: v.number(),
-  }).index('by_press', ['press']),
+  }).index('by_press', ['plantId', 'press'])
+    .index('by_plant', ['plantId']),
 
   products: defineTable({
+    ...plantField,
     code: v.string(),
     coProduct: v.optional(v.string()),
     moldCavities: v.optional(v.number()),
@@ -62,16 +122,20 @@ export default defineSchema({
     name: v.optional(v.string()),
     material: v.optional(v.string()),
     cycleTimeSeconds: v.optional(v.number()),
-  }).index('by_code', ['code']),
+  }).index('by_code', ['plantId', 'code'])
+    .index('by_plant', ['plantId']),
 
   craneGroups: defineTable({
+    ...plantField,
     groupName: v.string(),
     machines: v.array(v.string()),
-  }),
+  })
+    .index('by_plant', ['plantId']),
 
   // Pres tanımları: hangi pres hangi holde. Aynı holdeki presler aynı anda
   // setup yapamaz (vinç kısıtı) — planlama motoru bunu buradan okur.
   presses: defineTable({
+    ...plantField,
     name: v.string(),
     // Hol vinç kısıtıdır: aynı holde eşzamanlı setup sınırlıdır.
     hall: v.string(),
@@ -86,27 +150,33 @@ export default defineSchema({
     // Bu presin planı kaç gün ileriye kadar dondurulmuş sayılsın.
     // Tanımsızsa global ayar geçerlidir.
     frozenDays: v.optional(v.number()),
-  }).index('by_name', ['name']),
+  }).index('by_name', ['plantId', 'name'])
+    .index('by_plant', ['plantId']),
 
   demandWeekly: defineTable({
+    ...plantField,
     material: v.string(),
     stockInStorage: v.optional(v.number()),
     overdue: v.optional(v.number()),
     periods: v.array(v.object({ label: v.string(), qty: v.number() })),
     uploadedAt: v.number(),
-  }).index('by_material', ['material'])
-    .index('by_uploadedAt', ['uploadedAt']),
+  }).index('by_material', ['plantId', 'material'])
+    .index('by_uploadedAt', ['plantId', 'uploadedAt'])
+    .index('by_plant', ['plantId']),
 
   demandDaily: defineTable({
+    ...plantField,
     material: v.string(),
     stockInStorage: v.optional(v.number()),
     overdue: v.optional(v.number()),
     periods: v.array(v.object({ label: v.string(), qty: v.number() })),
     uploadedAt: v.number(),
-  }).index('by_material', ['material'])
-    .index('by_uploadedAt', ['uploadedAt']),
+  }).index('by_material', ['plantId', 'material'])
+    .index('by_uploadedAt', ['plantId', 'uploadedAt'])
+    .index('by_plant', ['plantId']),
 
   stock: defineTable({
+    ...plantField,
     material: v.string(),
     plant: v.optional(v.string()),
     storageLocation: v.optional(v.string()),
@@ -117,13 +187,15 @@ export default defineSchema({
     returns: v.optional(v.number()),
     transit: v.optional(v.number()),
     uploadedAt: v.number(),
-  }).index('by_material', ['material'])
-    .index('by_uploadedAt', ['uploadedAt']),
+  }).index('by_material', ['plantId', 'material'])
+    .index('by_uploadedAt', ['plantId', 'uploadedAt'])
+    .index('by_plant', ['plantId']),
 
   // SAP dosyalarının son yüklemesi — hangi dosya, ne zaman, kim, kaç satır.
   // Veri tablolarında dosya adı yok; planın hangi dosyayla hesaplandığını
   // göstermenin tek yolu bu kayıt.
   sapUploads: defineTable({
+    ...plantField,
     key: v.string(), // 'weeklyDemand' | 'dailyDemand' | 'stock' | 'actuals'
     fileName: v.optional(v.string()),
     uploadedAt: v.number(),
@@ -138,9 +210,11 @@ export default defineSchema({
     // Kayıt, bu özellikten önce yüklenmiş verinin yerini tutuyor (dosya adı
     // bilinmiyor). uploadedAt 0 ise ortada hiç veri yok.
     legacy: v.optional(v.boolean()),
-  }).index('by_key', ['key']),
+  }).index('by_key', ['plantId', 'key'])
+    .index('by_plant', ['plantId']),
 
   storageLocations: defineTable({
+    ...plantField,
     code: v.string(),
     description: v.optional(v.string()),
     // @deprecated Yalnızca açıklamaydı; neyin sayılacağına tikler karar verir.
@@ -151,21 +225,25 @@ export default defineSchema({
     countRaw: v.optional(v.boolean()),
     /** MB51: bu depoya 101/102 hareketleri üretim sayılır. Boşsa varsayılan (2009). */
     countProduction: v.optional(v.boolean()),
-  }).index('by_code', ['code']),
+  }).index('by_code', ['plantId', 'code'])
+    .index('by_plant', ['plantId']),
 
   workCalendar: defineTable({
+    ...plantField,
     key: v.string(),
     // @deprecated Vardiya süresinin eski kopyası; tek kaynak globalShiftSettings.shiftMinutes.
     shiftMinutesPerDay: v.optional(v.number()),
     workingDays: v.array(v.string()),
     holidays: v.array(v.string()),
-  }).index('by_key', ['key']),
+  }).index('by_key', ['plantId', 'key'])
+    .index('by_plant', ['plantId']),
 
   // Vardiya süresi tüm presler için ortaktır (dakika); tatil ülkesi de
   // tek bir global seçimdir. Setup kısıtları da burada: aynı holde aynı
   // anda kaç setup yapılabilir ve ardışık setuplar arasında en az kaç
   // dakika olmalı.
   globalShiftSettings: defineTable({
+    ...plantField,
     key: v.string(),
     shiftMinutes: v.number(),
     overtimeShiftMinutes: v.number(),
@@ -222,12 +300,14 @@ export default defineSchema({
     migratedSetupGap10: v.optional(v.boolean()),
     // Pres takvimi v2: şablondaki mesai sayıları silindi, depo tikleri açık yazıldı.
     migratedCalendarV2: v.optional(v.boolean()),
-  }).index('by_key', ['key']),
+  }).index('by_key', ['plantId', 'key'])
+    .index('by_plant', ['plantId']),
 
   // Planlı duruşlar: vardiya devri, çay, yemek, günlük bakım. Her vardiya
   // için elle tanımlanır ve tüm presler için ortaktır. Üretim bu aralıklara
   // yerleştirilmez.
   plannedStops: defineTable({
+    ...plantField,
     // 1 = birinci vardiya, 2 = ikinci, 3 = üçüncü.
     shiftIndex: v.number(),
     name: v.string(),
@@ -236,12 +316,14 @@ export default defineSchema({
     // Gerçek saat (gece yarısından dakika), ör. 720 = 12:00.
     startMinute: v.number(),
     durationMinutes: v.number(),
-  }).index('by_shift', ['shiftIndex']),
+  }).index('by_shift', ['plantId', 'shiftIndex'])
+    .index('by_plant', ['plantId']),
 
   // Her presin "standart" haftalık düzeni: haftada kaç gün (Pazartesiden
   // sırayla), günde kaç vardiya ve her hafta tekrarlayan mesai. Özel olarak
   // düzenlenmemiş her hafta bu şablonu kullanır.
   pressTemplates: defineTable({
+    ...plantField,
     press: v.string(),
     workingDays: v.number(),
     shiftsPerDay: v.number(),
@@ -252,42 +334,50 @@ export default defineSchema({
     recurringOvertime: v.optional(
       v.array(v.object({ dayKey: v.string(), definitionId: v.id('overtimeDefinitions') })),
     ),
-  }).index('by_press', ['press']),
+  }).index('by_press', ['plantId', 'press'])
+    .index('by_plant', ['plantId']),
 
   // Mesai tanımları: tam mesai, yarım mesai… Mesai açılırken biri seçilir.
   overtimeDefinitions: defineTable({
+    ...plantField,
     name: v.string(),
     // ör. "hafta sonu mesaisi", "hafta içi mesaisi"
     description: v.optional(v.string()),
     // Saat (gece yarısından dakika) ve süre (dk).
     startMinute: v.number(),
     durationMinutes: v.number(),
-  }),
+  })
+    .index('by_plant', ['plantId']),
 
   // Tarihli mesai: bir presin bir üretim gününe açılan mesai.
   pressOvertime: defineTable({
+    ...plantField,
     press: v.string(),
     date: v.string(),
     definitionId: v.id('overtimeDefinitions'),
   })
-    .index('by_press_date', ['press', 'date'])
-    .index('by_date', ['date'])
-    .index('by_definition', ['definitionId']),
+    .index('by_press_date', ['plantId', 'press', 'date'])
+    .index('by_date', ['plantId', 'date'])
+    .index('by_definition', ['plantId', 'definitionId'])
+    .index('by_plant', ['plantId']),
 
   // İstisna haftalar: plan değişikliği olan belirli bir hafta için
   // şablonu geçersiz kılan kayıt.
   pressWeekOverrides: defineTable({
+    ...plantField,
     press: v.string(),
     weekStart: v.string(),
     workingDays: v.number(),
     shiftsPerDay: v.number(),
     // @deprecated Mesai artık tarihli açılır; okunmaz.
     overtimeShifts: v.optional(v.number()),
-  }).index('by_press_week', ['press', 'weekStart']),
+  }).index('by_press_week', ['plantId', 'press', 'weekStart'])
+    .index('by_plant', ['plantId']),
 
   // Kalıp bakım kayıtları. Kalıp ömrü sayacı son bakımdan sonraki
   // üretimi sayar; bakım kaydı yoksa eldeki tüm gerçekleşen üretim sayılır.
   moldMaintenance: defineTable({
+    ...plantField,
     material: v.string(),
     // Bakımın ilk günü. Tek günlük bakımda `dateTo` ile aynıdır.
     date: v.string(),
@@ -299,13 +389,15 @@ export default defineSchema({
     note: v.optional(v.string()),
     createdBy: v.optional(v.string()),
     createdAt: v.number(),
-  }).index('by_material', ['material']),
+  }).index('by_material', ['plantId', 'material'])
+    .index('by_plant', ['plantId']),
 
   // Kalıp ömrü alarmı. Kalıbın periyodik bakım limitini aşmasına izin
   // verilir — üretim ortasında kendiliğinden durdurmak sahayı durdurmak
   // olurdu — ama aşıldığı anda burada bir alarm doğar ve alarm açık olduğu
   // sürece o kalıp plana hiç alınmaz.
   moldAlarms: defineTable({
+    ...plantField,
     material: v.string(),
     // 'open' = plana alınmaz | 'closed' = elle onaylandı, çalışmaya devam
     status: v.string(),
@@ -318,12 +410,14 @@ export default defineSchema({
     /** Elle kapatılırken yazılan gerekçe. */
     closeReason: v.optional(v.string()),
   })
-    .index('by_material', ['material'])
-    .index('by_status', ['status']),
+    .index('by_material', ['plantId', 'material'])
+    .index('by_status', ['plantId', 'status'])
+    .index('by_plant', ['plantId']),
 
   // Kalıbın imalata hazır olup olmadığı. Hazır değilse plan o kalıbı
   // hazır olacağı tarihe kadar hiç kullanmaz — bakım bölümü burayı yönetir.
   moldReadiness: defineTable({
+    ...plantField,
     material: v.string(),
     ready: v.boolean(),
     // Hazır değilse üretime hazır olacağı tarih (YYYY-MM-DD).
@@ -333,12 +427,14 @@ export default defineSchema({
     reason: v.optional(v.string()),
     updatedBy: v.optional(v.string()),
     updatedAt: v.number(),
-  }).index('by_material', ['material']),
+  }).index('by_material', ['plantId', 'material'])
+    .index('by_plant', ['plantId']),
 
   // Pres bakımı: bakım departmanı hangi presin hangi gün hangi saatler
   // arasında kapalı olacağını buraya yazar. Plan bu aralığı doldurulmuş
   // kabul eder — o saatlerde o prese iş konmaz.
   pressMaintenance: defineTable({
+    ...plantField,
     press: v.string(),
     // Planlanan gün ve saat aralığı (gece yarısından dakika).
     date: v.string(),
@@ -358,12 +454,14 @@ export default defineSchema({
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
   })
-    .index('by_press', ['press'])
-    .index('by_date', ['date']),
+    .index('by_press', ['plantId', 'press'])
+    .index('by_date', ['plantId', 'date'])
+    .index('by_plant', ['plantId']),
 
   // Kalıp problem takibi: hangi kalıp, hangi operasyonda, hangi tarihte,
   // hangi problemi yaşadı; nasıl çözüldü.
   moldProblems: defineTable({
+    ...plantField,
     material: v.string(),
     // OP10, OP20 … — tanım listesinden seçilir.
     operation: v.string(),
@@ -383,8 +481,9 @@ export default defineSchema({
     /** Convex dosya deposundaki fotoğraf kimlikleri. */
     photos: v.optional(v.array(v.id('_storage'))),
   })
-    .index('by_material', ['material'])
-    .index('by_status', ['status']),
+    .index('by_material', ['plantId', 'material'])
+    .index('by_status', ['plantId', 'status'])
+    .index('by_plant', ['plantId']),
 
   // Kullanıcı tanımlı seçim listeleri: operasyonlar ve problem tipleri.
   // Admin sayfası yönetir; problem ekranı buradan okur.
@@ -393,6 +492,7 @@ export default defineSchema({
   // arıza çözülene (ya da beklenen devreye girişe) kadar plan o presi
   // kullanmaz.
   machineProblems: defineTable({
+    ...plantField,
     press: v.string(),
     problemType: v.string(),
     description: v.optional(v.string()),
@@ -415,16 +515,19 @@ export default defineSchema({
     downtimeMinutes: v.optional(v.number()),
     photos: v.optional(v.array(v.id('_storage'))),
   })
-    .index('by_press', ['press'])
-    .index('by_status', ['status']),
+    .index('by_press', ['plantId', 'press'])
+    .index('by_status', ['plantId', 'status'])
+    .index('by_plant', ['plantId']),
 
   lookups: defineTable({
+    ...plantField,
     // 'operation' | 'problemType' | 'maintenanceReason' | 'machineProblemType'
     kind: v.string(),
     value: v.string(),
     sortOrder: v.optional(v.number()),
     createdAt: v.number(),
-  }).index('by_kind', ['kind']),
+  }).index('by_kind', ['plantId', 'kind'])
+    .index('by_plant', ['plantId']),
 
   // Kullanıcılar. DİKKAT: burada parola yok ve bu bir kimlik DOĞRULAMA
   // değildir — kimin ne yaptığını kaydetmek (atıf) içindir. Gerçek giriş
@@ -445,7 +548,16 @@ export default defineSchema({
     /** Varsayılan parolayla oluşturuldu; değiştirmeden uygulamaya giremez. */
     mustChangePassword: v.optional(v.boolean()),
     createdAt: v.number(),
-  }).index('by_name', ['name']),
+    /** Platform seviyesi: site sahibi ya da general. Şirketsizdir. */
+    platformRole: v.optional(v.string()),
+    /** Kullanıcının şirketi (platform kullanıcılarında yok). */
+    companyId: v.optional(v.id('companies')),
+    /** Şirket creator'ı: şirketin bütün fabrikaları, bütün modüller. */
+    isCreator: v.optional(v.boolean()),
+    groupIds: v.optional(v.array(v.id('userGroups'))),
+  })
+    .index('by_name', ['name'])
+    .index('by_company', ['companyId']),
 
   // Açık oturumlar. Jeton tarayıcıda saklanır; süresi dolunca yeniden
   // giriş istenir.
@@ -454,6 +566,8 @@ export default defineSchema({
     userId: v.id('users'),
     createdAt: v.number(),
     expiresAt: v.number(),
+    /** Oturumda seçili fabrika. */
+    plantId: v.optional(v.id('plants')),
   })
     .index('by_token', ['token'])
     .index('by_user', ['userId']),
@@ -462,6 +576,7 @@ export default defineSchema({
   // hesaplanır; burada tutulan kurallar hesaba girdi olarak katılır, yani
   // müdahale kalıcıdır ama planın kendisi yine motordan çıkar.
   planOverrides: defineTable({
+    ...plantField,
     material: v.string(),
     // 'exclude' | 'pin' | 'priority'
     kind: v.string(),
@@ -469,7 +584,8 @@ export default defineSchema({
     date: v.optional(v.string()),
     note: v.optional(v.string()),
     createdAt: v.number(),
-  }).index('by_material', ['material']),
+  }).index('by_material', ['plantId', 'material'])
+    .index('by_plant', ['plantId']),
 
   // Nager.Date'ten çekilen resmi tatiller. Takvim ekranı bunları yazar,
   // planlama motoru okur — aksi halde tatiller sadece ekranda görünür,
@@ -490,6 +606,7 @@ export default defineSchema({
   // (convex/planEngine.ts); sayfa hazır sonucu okur. Büyük listeler
   // `planRunChunks` içinde parça parça durur — tek doküman ~1 MB ile sınırlı.
   planRuns: defineTable({
+    ...plantField,
     status: v.string(), // 'writing' | 'ready'
     startedAt: v.number(),
     computedAt: v.number(),
@@ -498,18 +615,22 @@ export default defineSchema({
     chunkCount: v.optional(v.number()),
     // PlanRun'ın büyük listeler dışındaki alanları (src/lib/planPipeline.ts).
     summary: v.any(),
-  }).index('by_status_computed', ['status', 'computedAt']),
+  }).index('by_status_computed', ['plantId', 'status', 'computedAt'])
+    .index('by_plant', ['plantId']),
 
   planRunChunks: defineTable({
+    ...plantField,
     runId: v.id('planRuns'),
     index: v.number(),
     // 'jobs' | 'unplanned' | 'days' | 'rawNeeds' | 'maintenance'
     kind: v.string(),
     items: v.any(),
-  }).index('by_run', ['runId', 'index']),
+  }).index('by_run', ['plantId', 'runId', 'index'])
+    .index('by_plant', ['plantId']),
 
   // Yeniden hesaplama kuyruğunun durumu — tek kayıt (key = 'default').
   planStatus: defineTable({
+    ...plantField,
     key: v.string(),
     requestedAt: v.optional(v.number()),
     scheduledFor: v.optional(v.number()),
@@ -518,9 +639,11 @@ export default defineSchema({
     lastDurationMs: v.optional(v.number()),
     lastError: v.optional(v.string()),
     lastErrorAt: v.optional(v.number()),
-  }).index('by_key', ['key']),
+  }).index('by_key', ['plantId', 'key'])
+    .index('by_plant', ['plantId']),
 
   planSnapshots: defineTable({
+    ...plantField,
     createdAt: v.number(),
     approvedBy: v.optional(v.string()),
     horizonStart: v.string(),
@@ -557,12 +680,14 @@ export default defineSchema({
         reason: v.string(),
       }),
     ),
-  }).index('by_created', ['createdAt']),
+  }).index('by_created', ['plantId', 'createdAt'])
+    .index('by_plant', ['plantId']),
 
   // MB51'den yüklenen gerçekleşen üretim hareketleri. Plan/gerçek
   // karşılaştırması ve performans faktörü buradan beslenir.
   // Yoldaki hammadde (rulo) — kullanıcının Excel listesi; MRP'de planlı giriş.
   rawInTransit: defineTable({
+    ...plantField,
     material: v.string(),
     quantityKg: v.number(),
     /** Tahmini varış (ISO). Yoksa ilk haftada gelmiş sayılır. */
@@ -571,10 +696,12 @@ export default defineSchema({
     supplier: v.optional(v.string()),
     uploadedAt: v.number(),
   })
-    .index('by_material', ['material'])
-    .index('by_uploadedAt', ['uploadedAt']),
+    .index('by_material', ['plantId', 'material'])
+    .index('by_uploadedAt', ['plantId', 'uploadedAt'])
+    .index('by_plant', ['plantId']),
 
   actualProduction: defineTable({
+    ...plantField,
     material: v.string(),
     postingDate: v.string(),
     quantity: v.number(),
@@ -584,47 +711,60 @@ export default defineSchema({
     orderNumber: v.optional(v.string()),
     uploadedAt: v.number(),
   })
-    .index('by_material', ['material'])
-    .index('by_date', ['postingDate'])
-    .index('by_uploadedAt', ['uploadedAt']),
+    .index('by_material', ['plantId', 'material'])
+    .index('by_date', ['plantId', 'postingDate'])
+    .index('by_uploadedAt', ['plantId', 'uploadedAt'])
+    .index('by_plant', ['plantId']),
 
   // ---- OEE Trend and Losses (docs/oeedashboard.md) ----
   // Yüklemeler yalnızca ekler ya da günceller; geçmiş silinmez.
-  oeeShifts: defineTable(shiftFields)
-    .index('by_date', ['date'])
-    .index('by_key', ['date', 'workCenter', 'shiftGroup']),
-  oeeDays: defineTable(dayFields)
-    .index('by_date', ['date'])
-    .index('by_key', ['date', 'workCenter']),
-  oeeOrders: defineTable(orderFields)
-    .index('by_date', ['date'])
-    .index('by_key', ['date', 'workCenter', 'shift', 'order', 'equipment']),
-  oeeWeekly: defineTable(weeklyFields)
-    .index('by_week', ['year', 'week'])
-    .index('by_key', ['year', 'week', 'workCenter']),
-  oeeMonthly: defineTable(monthlyFields).index('by_key', ['workCenter', 'monthKey']),
-  oeeDowntimeDays: defineTable(downtimeDayFields)
-    .index('by_date', ['date'])
-    .index('by_key', ['date', 'workCenter']),
-  oeeLossDays: defineTable(lossDayFields)
-    .index('by_date', ['date'])
-    .index('by_key', ['date', 'workCenter']),
-  oeeSettings: defineTable({ key: v.string(), ...configFields, updatedAt: v.number(), updatedBy: v.optional(v.string()) }).index('by_key', ['key']),
+  oeeShifts: defineTable({ ...shiftFields, ...plantField })
+    .index('by_date', ['plantId', 'date'])
+    .index('by_key', ['plantId', 'date', 'workCenter', 'shiftGroup'])
+    .index('by_plant', ['plantId']),
+  oeeDays: defineTable({ ...dayFields, ...plantField })
+    .index('by_date', ['plantId', 'date'])
+    .index('by_key', ['plantId', 'date', 'workCenter'])
+    .index('by_plant', ['plantId']),
+  oeeOrders: defineTable({ ...orderFields, ...plantField })
+    .index('by_date', ['plantId', 'date'])
+    .index('by_key', ['plantId', 'date', 'workCenter', 'shift', 'order', 'equipment'])
+    .index('by_plant', ['plantId']),
+  oeeWeekly: defineTable({ ...weeklyFields, ...plantField })
+    .index('by_week', ['plantId', 'year', 'week'])
+    .index('by_key', ['plantId', 'year', 'week', 'workCenter'])
+    .index('by_plant', ['plantId']),
+  oeeMonthly: defineTable({ ...monthlyFields, ...plantField }).index('by_key', ['plantId', 'workCenter', 'monthKey'])
+    .index('by_plant', ['plantId']),
+  oeeDowntimeDays: defineTable({ ...downtimeDayFields, ...plantField })
+    .index('by_date', ['plantId', 'date'])
+    .index('by_key', ['plantId', 'date', 'workCenter'])
+    .index('by_plant', ['plantId']),
+  oeeLossDays: defineTable({ ...lossDayFields, ...plantField })
+    .index('by_date', ['plantId', 'date'])
+    .index('by_key', ['plantId', 'date', 'workCenter'])
+    .index('by_plant', ['plantId']),
+  oeeSettings: defineTable({ ...plantField, key: v.string(), ...configFields, updatedAt: v.number(), updatedBy: v.optional(v.string()) }).index('by_key', ['plantId', 'key'])
+    .index('by_plant', ['plantId']),
   oeeImports: defineTable({
+    ...plantField,
     fileName: v.string(),
     uploadedAt: v.number(),
     uploadedBy: v.optional(v.string()),
     /** [sayfa, tür, satır] */
     sheets: v.array(v.array(v.union(v.string(), v.number()))),
     ranges: v.array(v.array(v.string())),
-  }).index('by_uploadedAt', ['uploadedAt']),
+  }).index('by_uploadedAt', ['plantId', 'uploadedAt'])
+    .index('by_plant', ['plantId']),
 
   changeLog: defineTable({
+    ...plantField,
     title: v.string(),
     detail: v.optional(v.string()),
     category: v.string(),
     // Kaydı kimin yaptığı. Kullanıcı seçili değilse boş kalır.
     author: v.optional(v.string()),
     createdAt: v.number(),
-  }).index('by_created', ['createdAt']),
+  }).index('by_created', ['plantId', 'createdAt'])
+    .index('by_plant', ['plantId']),
 })

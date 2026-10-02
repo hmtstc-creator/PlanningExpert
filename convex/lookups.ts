@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { adminMutation, guardedQuery } from './guarded'
+import { ALL_MODULES, adminMutation, guardedQuery } from './guarded'
 
 /**
  * Kullanıcı tanımlı seçim listeleri.
@@ -20,12 +20,14 @@ const rowValidator = v.object({
 })
 
 export const list = guardedQuery({
+  modules: ALL_MODULES,
   args: {},
   returns: v.array(rowValidator),
   handler: async (ctx) => ctx.db.query('lookups').collect(),
 })
 
 export const add = adminMutation({
+  modules: ALL_MODULES,
   affectsPlan: false,
   args: { kind: v.string(), value: v.string(), sortOrder: v.optional(v.number()) },
   returns: v.null(),
@@ -52,6 +54,7 @@ export const add = adminMutation({
 })
 
 export const remove = adminMutation({
+  modules: ALL_MODULES,
   affectsPlan: false,
   args: { id: v.id('lookups') },
   returns: v.null(),
@@ -68,6 +71,7 @@ export const remove = adminMutation({
  * Boş bir seçim listesiyle problem bildirilemeyeceği için bir kere çalışır.
  */
 export const seedDefaults = adminMutation({
+  modules: ALL_MODULES,
   affectsPlan: false,
   args: {},
   returns: v.number(),

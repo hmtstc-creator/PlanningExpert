@@ -4,7 +4,7 @@ import {
 } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
-import { adminMutation, guardedMutation, guardedQuery } from './guarded'
+import { DIE_OR_PLANNING, adminMutation, guardedMutation, guardedQuery } from './guarded'
 
 const productValidator = v.object({
   _id: v.id('products'),
@@ -101,6 +101,7 @@ export const list = guardedQuery({
  * reddeder — ekran o zaman planın eksik olduğunu söyler.
  */
 export const listAll = guardedQuery({
+  modules: DIE_OR_PLANNING,
   args: {},
   returns: v.object({
     rows: v.array(productValidator),

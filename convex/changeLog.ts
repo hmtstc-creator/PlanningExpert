@@ -4,7 +4,7 @@ import {
 } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
-import { guardedMutation, guardedQuery } from './guarded'
+import { ALL_MODULES, guardedMutation, guardedQuery } from './guarded'
 
 const logValidator = v.object({
   _id: v.id('changeLog'),
@@ -17,6 +17,7 @@ const logValidator = v.object({
 })
 
 export const list = guardedQuery({
+  modules: ALL_MODULES,
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(logValidator),
   handler: async (ctx, args) =>
@@ -30,6 +31,7 @@ export const list = guardedQuery({
  * ilgilidir, sayfalamayla değil.
  */
 export const recent = guardedQuery({
+  modules: ALL_MODULES,
   args: { limit: v.optional(v.number()) },
   returns: v.array(logValidator),
   handler: async (ctx, { limit }) =>
@@ -41,6 +43,7 @@ export const recent = guardedQuery({
 })
 
 export const create = guardedMutation({
+  modules: ALL_MODULES,
   affectsPlan: false,
   args: {
     title: v.string(),
@@ -57,6 +60,7 @@ export const create = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  modules: ALL_MODULES,
   affectsPlan: false,
   args: { id: v.id('changeLog') },
   returns: v.null(),

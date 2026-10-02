@@ -24,6 +24,7 @@ import { Route as PerformansRouteImport } from './routes/performans'
 import { Route as PlanlamaRouteImport } from './routes/planlama'
 import { Route as PlanlogicRouteImport } from './routes/planlogic'
 import { Route as PlanningexpertRouteImport } from './routes/planningexpert'
+import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as PresbakimRouteImport } from './routes/presbakim'
 import { Route as ReferanslarRouteImport } from './routes/referanslar'
 import { Route as SapdataRouteImport } from './routes/sapdata'
@@ -119,6 +120,11 @@ const PlanlogicRoute = PlanlogicRouteImport.update({
 const PlanningexpertRoute = PlanningexpertRouteImport.update({
   id: '/planningexpert',
   path: '/planningexpert',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlatformRoute = PlatformRouteImport.update({
+  id: '/platform',
+  path: '/platform',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PresbakimRoute = PresbakimRouteImport.update({
@@ -245,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/planlama': typeof PlanlamaRoute
   '/planlogic': typeof PlanlogicRoute
   '/planningexpert': typeof PlanningexpertRoute
+  '/platform': typeof PlatformRoute
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/sapdata': typeof SapdataRoute
@@ -283,6 +290,7 @@ export interface FileRoutesByTo {
   '/planlama': typeof PlanlamaRoute
   '/planlogic': typeof PlanlogicRoute
   '/planningexpert': typeof PlanningexpertRoute
+  '/platform': typeof PlatformRoute
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/sapdata': typeof SapdataRoute
@@ -322,6 +330,7 @@ export interface FileRoutesById {
   '/planlama': typeof PlanlamaRoute
   '/planlogic': typeof PlanlogicRoute
   '/planningexpert': typeof PlanningexpertRoute
+  '/platform': typeof PlatformRoute
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/sapdata': typeof SapdataRoute
@@ -362,6 +371,7 @@ export interface FileRouteTypes {
     | '/planlama'
     | '/planlogic'
     | '/planningexpert'
+    | '/platform'
     | '/presbakim'
     | '/referanslar'
     | '/sapdata'
@@ -400,6 +410,7 @@ export interface FileRouteTypes {
     | '/planlama'
     | '/planlogic'
     | '/planningexpert'
+    | '/platform'
     | '/presbakim'
     | '/referanslar'
     | '/sapdata'
@@ -438,6 +449,7 @@ export interface FileRouteTypes {
     | '/planlama'
     | '/planlogic'
     | '/planningexpert'
+    | '/platform'
     | '/presbakim'
     | '/referanslar'
     | '/sapdata'
@@ -477,6 +489,7 @@ export interface RootRouteChildren {
   PlanlamaRoute: typeof PlanlamaRoute
   PlanlogicRoute: typeof PlanlogicRoute
   PlanningexpertRoute: typeof PlanningexpertRoute
+  PlatformRoute: typeof PlatformRoute
   PresbakimRoute: typeof PresbakimRoute
   ReferanslarRoute: typeof ReferanslarRoute
   SapdataRoute: typeof SapdataRoute
@@ -605,6 +618,13 @@ declare module '@tanstack/react-router' {
       path: '/planningexpert'
       fullPath: '/planningexpert'
       preLoaderRoute: typeof PlanningexpertRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/platform': {
+      id: '/platform'
+      path: '/platform'
+      fullPath: '/platform'
+      preLoaderRoute: typeof PlatformRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/presbakim': {
@@ -773,6 +793,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlanlamaRoute: PlanlamaRoute,
   PlanlogicRoute: PlanlogicRoute,
   PlanningexpertRoute: PlanningexpertRoute,
+  PlatformRoute: PlatformRoute,
   PresbakimRoute: PresbakimRoute,
   ReferanslarRoute: ReferanslarRoute,
   SapdataRoute: SapdataRoute,

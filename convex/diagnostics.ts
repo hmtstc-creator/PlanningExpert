@@ -6,7 +6,7 @@
 import { v } from 'convex/values'
 
 import type { QueryCtx } from './_generated/server'
-import { guardedQuery } from './guarded'
+import { ALL_MODULES, guardedQuery } from './guarded'
 
 /** Sayım üst sınırı — büyük tablolarda bant genişliğini korur. */
 const COUNT_LIMIT = 5000
@@ -60,6 +60,7 @@ async function tableStats(ctx: QueryCtx, table: TableName) {
  * aynı sayıları görüyorsan aynı veritabanındasın demektir.
  */
 export const summary = guardedQuery({
+  modules: ALL_MODULES,
   args: {},
   returns: v.object({
     serverTime: v.number(),
@@ -84,6 +85,7 @@ export const summary = guardedQuery({
  * kayıt varsa mutation hata fırlatıyordu).
  */
 export const duplicates = guardedQuery({
+  modules: ALL_MODULES,
   args: {},
   returns: v.array(
     v.object({ table: v.string(), key: v.string(), count: v.number() }),

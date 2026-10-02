@@ -1,7 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
 import { internalMutation, internalQuery, query } from './_generated/server'
-import { guardedQuery } from './guarded'
 
 /**
  * Girişin veritabanı tarafı.
@@ -171,35 +170,5 @@ export const me = query({
       role: user.role,
       mustChangePassword: user.mustChangePassword === true,
     }
-  },
-})
-
-/** Yöneticinin kullanıcı listesinde parolanın durumu görünsün. */
-export const listWithPasswordState = guardedQuery({
-  args: {},
-  returns: v.array(
-    v.object({
-      _id: v.id('users'),
-      name: v.string(),
-      email: v.optional(v.string()),
-      role: v.string(),
-      active: v.boolean(),
-      hasPassword: v.boolean(),
-      mustChangePassword: v.boolean(),
-      createdAt: v.number(),
-    }),
-  ),
-  handler: async (ctx) => {
-    const users = await ctx.db.query('users').collect()
-    return users.map((user) => ({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      active: user.active,
-      hasPassword: !!user.passwordHash,
-      mustChangePassword: user.mustChangePassword === true,
-      createdAt: user.createdAt,
-    }))
   },
 })

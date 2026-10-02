@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { guardedMutation, guardedQuery } from './guarded'
+import { MACHINE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
 
 const rowValidator = v.object({
   _id: v.id('pressMaintenance'),
@@ -22,6 +22,7 @@ const rowValidator = v.object({
 })
 
 export const list = guardedQuery({
+  modules: MACHINE_OR_PLANNING,
   args: {},
   returns: v.array(rowValidator),
   handler: async (ctx) => ctx.db.query('pressMaintenance').collect(),
@@ -44,6 +45,7 @@ function requireDate(date: string, field: string): string {
 }
 
 export const add = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   args: {
     press: v.string(),
     date: v.string(),
@@ -87,6 +89,7 @@ export const add = guardedMutation({
 })
 
 export const update = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   args: {
     id: v.id('pressMaintenance'),
     date: v.string(),
@@ -126,6 +129,7 @@ export const update = guardedMutation({
  * geçmişe dönük saklandığı için silinmez, üzerine yazılır.
  */
 export const complete = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   args: {
     id: v.id('pressMaintenance'),
     actualDate: v.string(),
@@ -169,6 +173,7 @@ export const complete = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   args: { id: v.id('pressMaintenance') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

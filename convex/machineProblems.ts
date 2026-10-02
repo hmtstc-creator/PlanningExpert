@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { guardedMutation, guardedQuery } from './guarded'
+import { MACHINE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
 
 /**
  * Makine (pres) arızaları.
@@ -43,6 +43,7 @@ function checkMinute(value: number | undefined, field: string) {
 }
 
 export const list = guardedQuery({
+  modules: MACHINE_OR_PLANNING,
   args: {},
   returns: v.array(
     v.object({
@@ -62,6 +63,7 @@ export const list = guardedQuery({
 })
 
 export const generateUploadUrl = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   affectsPlan: false,
   args: {},
   returns: v.string(),
@@ -69,6 +71,7 @@ export const generateUploadUrl = guardedMutation({
 })
 
 export const report = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   args: {
     press: v.string(),
     problemType: v.string(),
@@ -135,6 +138,7 @@ export const report = guardedMutation({
 
 /** Beklenen devreye giriş zamanını günceller — plan buna göre yeniden kurulur. */
 export const setExpectedUp = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   args: {
     id: v.id('machineProblems'),
     expectedUpDate: v.optional(v.string()),
@@ -157,6 +161,7 @@ export const setExpectedUp = guardedMutation({
 })
 
 export const solve = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   args: {
     id: v.id('machineProblems'),
     solution: v.string(),
@@ -191,6 +196,7 @@ export const solve = guardedMutation({
 })
 
 export const reopen = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   args: { id: v.id('machineProblems') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -200,6 +206,7 @@ export const reopen = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  modules: MACHINE_OR_PLANNING,
   args: { id: v.id('machineProblems') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

@@ -4,7 +4,7 @@ import {
 } from 'convex/server'
 import { v } from 'convex/values'
 
-import { guardedQuery } from './guarded'
+import { DIE_OR_PLANNING, guardedQuery } from './guarded'
 import { liveRows } from './sapLive'
 import { countedLocations, productionRows } from '../src/lib/stockLocations'
 
@@ -41,6 +41,7 @@ const PLANNING_ROW_LIMIT = 20000
  * planın kapasitesini çarpar. Eksiklik saklanmaz, bildirilir.
  */
 export const listAll = guardedQuery({
+  modules: DIE_OR_PLANNING,
   args: {},
   returns: v.object({
     rows: v.array(rowValidator),

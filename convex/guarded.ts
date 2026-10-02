@@ -1,17 +1,37 @@
-import { v } from 'convex/values'
+import { ConvexError, v } from 'convex/values'
 
-import { mutation, query } from './_generated/server'
-import { ADMIN_ONLY, requireRole, requireUser, type Role } from './authGuard'
+import { internalMutation, internalQuery, mutation, query } from './_generated/server'
+import { requireSession } from './authGuard'
+import { plantDb } from './plantDb'
 import { requestRecompute } from './planQueue'
+import schema from './schema'
+import {
+  NO_ACCESS,
+  accessFor,
+  allows,
+  canManageCompany,
+  canSeePlant,
+  isPlatform,
+  type Access,
+  type Module,
+} from '../src/lib/tenancy'
 
 /**
- * Oturum denetimi yapan `query` / `mutation` sarmalayıcıları.
+ * Oturum ve fabrika denetimi yapan `query` / `mutation` sarmalayıcıları.
  *
  * Yüz küsur işlevin her birinin gövdesine elle denetim eklemek yerine
  * tanımın kendisi sarmalanıyor: çağrı `query(...)` yerine
  * `guardedQuery(...)` oluyor, gerisi aynı kalıyor. Böylece hiçbir handler
  * kesilip biçilmiyor ve bir işlevin korumasız kaldığı tek yerden görülüyor
  * — dosyada `query(` kalmışsa korumasızdır.
+ *
+ * Her istekte: kullanıcı → oturumdaki fabrika (yoksa ilk yetkili fabrika)
+ * → kullanıcının o fabrikadaki modül izni (docs/plant-genisletme.md).
+ * Handler'a yalnızca o fabrikaya kilitli veritabanı gider (plantDb.ts);
+ * ayrıca `ctx.plantId`, `ctx.sessionUser`, `ctx.access`.
+ *
+ * `modules`: işlevin ait olduğu modüller; biri yeterli (okumada "görür",
+ * yazmada "düzenler"). Varsayılan PlanningExpert.
  *
  * Denetimden muaf olması GEREKEN işlevler (giriş, ilk kurulum, çıkış ve
  * jetonun sahibini söyleyen sorgu) bilerek sarmalanmıyor; onlar `auth.ts`
@@ -21,6 +41,13 @@ import { requestRecompute } from './planQueue'
 // Convex'in üretilen tipleri bu ortamda yok; sarmalayıcı gevşek tiplenmiş.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
+
+export const TABLES: readonly string[] = Object.keys((schema as Any).tables)
+
+export const ALL_MODULES: readonly Module[] = ['planning', 'oee', 'die', 'machine']
+export const DIE_OR_PLANNING: readonly Module[] = ['die', 'planning']
+export const MACHINE_OR_PLANNING: readonly Module[] = ['machine', 'planning']
+export const OEE: readonly Module[] = ['oee']
 
 function withSessionArg(args: Any): Any {
   return { ...(args ?? {}), token: v.optional(v.string()) }
@@ -36,45 +63,197 @@ function withoutToken(args: Any): Any {
   return rest
 }
 
-/** Giriş yapmış herkesin çalıştırabileceği sorgu. */
+export interface PlantContext {
+  plant: Any
+  company: Any
+  access: Access
+}
+
+/** Şirketin grupları (kullanıcı grubu izinleri için). */
+async function groupsOf(db: Any, companyId: string): Promise<Any[]> {
+  return db
+    .query('userGroups')
+    .withIndex('by_company', (q: Any) => q.eq('companyId', companyId))
+    .collect()
+}
+
+/** Kullanıcının görebildiği fabrikalar, izinleriyle. Ham (kilitsiz) veritabanı. */
+export async function visiblePlants(db: Any, user: Any): Promise<PlantContext[]> {
+  const plants: Any[] = isPlatform(user)
+    ? await db.query('plants').collect()
+    : user.companyId
+      ? await db
+          .query('plants')
+          .withIndex('by_company', (q: Any) => q.eq('companyId', user.companyId))
+          .collect()
+      : []
+  const companies = new Map<string, Any>()
+  const groups = new Map<string, Any[]>()
+  const out: PlantContext[] = []
+  for (const plant of plants) {
+    if (!companies.has(plant.companyId)) companies.set(plant.companyId, await db.get(plant.companyId))
+    const company = companies.get(plant.companyId)
+    if (!company) continue
+    if (!groups.has(plant.companyId)) groups.set(plant.companyId, await groupsOf(db, plant.companyId))
+    const g = groups.get(plant.companyId)!
+    if (!canSeePlant(user, plant, company, g)) continue
+    out.push({ plant, company, access: accessFor(user, plant, company, g) })
+  }
+  return out
+}
+
+/** Oturumdaki fabrika; yoksa ya da yetki kalktıysa ilk yetkili fabrika. */
+export async function activePlant(db: Any, user: Any, session: Any): Promise<PlantContext | null> {
+  if (session.plantId) {
+    const plant = await db.get(session.plantId)
+    if (plant) {
+      const company = await db.get(plant.companyId)
+      if (company) {
+        const g = await groupsOf(db, plant.companyId)
+        if (canSeePlant(user, plant, company, g)) return { plant, company, access: accessFor(user, plant, company, g) }
+      }
+    }
+  }
+  return (await visiblePlants(db, user))[0] ?? null
+}
+
+async function migrationPending(db: Any): Promise<boolean> {
+  const state = await db
+    .query('platformState')
+    .withIndex('by_key', (q: Any) => q.eq('key', 'plantMigration'))
+    .first()
+  return !state?.value?.done
+}
+
+async function plantContext(ctx: Any, token: string | undefined) {
+  const { user, session } = await requireSession(ctx, token)
+  if (await migrationPending(ctx.db)) {
+    throw new ConvexError('The data is being prepared for multiple plants — please wait a moment')
+  }
+  const active = await activePlant(ctx.db, user, session)
+  if (!active) throw new ConvexError('Your account has no plant yet — ask your company creator')
+  return { user, ...active }
+}
+
+function needModules(spec: Any): readonly Module[] {
+  return spec.modules ?? ['planning']
+}
+
+function denied(modules: readonly Module[], need: string, access: Access): never {
+  const names = modules.join(' or ')
+  const have = modules.map((m) => `${m}: ${access[m] ?? 'none'}`).join(', ')
+  throw new ConvexError(`This needs ${need} permission on ${names} — you have ${have}`)
+}
+
+function scopedCtx(ctx: Any, c: { user: Any; plant: Any; company: Any; access: Access }): Any {
+  return {
+    ...ctx,
+    db: plantDb(ctx.db, c.plant._id, TABLES),
+    plantId: c.plant._id,
+    plant: c.plant,
+    company: c.company,
+    access: c.access,
+    sessionUser: c.user,
+  }
+}
+
+/** Fabrika verisini okuyan sorgu: modüllerden birinde en az "görür". */
 export function guardedQuery(spec: Any): Any {
+  const { modules: _m, ...definition } = spec
+  const modules = needModules(spec)
   return query({
-    ...spec,
-    args: withSessionArg(spec.args),
+    ...definition,
+    args: withSessionArg(definition.args),
     handler: async (ctx: Any, args: Any) => {
-      await requireUser(ctx, args.token)
-      return spec.handler(ctx, withoutToken(args))
+      const c = await plantContext(ctx, args.token)
+      if (!allows(c.access, modules, 'view')) denied(modules, 'view', c.access)
+      return definition.handler(scopedCtx(ctx, c), withoutToken(args))
     },
   })
 }
 
 /**
- * Yazma işlemi. Varsayılan olarak `viewer` dışındaki roller yapabilir —
- * salt okur bir kullanıcının veriyi değiştirebilmesi rolü anlamsız kılardı.
+ * Yazma işlemi: modüllerden birinde "düzenler". Askıdaki şirkette kimse
+ * düzenleyemez (izinler "görür"e iner).
  */
-export function guardedMutation(spec: Any, roles?: readonly Role[]): Any {
+export function guardedMutation(spec: Any, opts: { companyAdmin?: boolean } = {}): Any {
   // `affectsPlan: false` — planın okumadığı veriyi yazan işlevler (kullanıcılar,
   // kalıp problemleri, sözlükler…) planı yeniden hesaplatmaz.
-  const { affectsPlan = true, ...definition } = spec
+  const { affectsPlan = true, modules: _m, ...definition } = spec
+  const modules = needModules(spec)
   return mutation({
     ...definition,
     args: withSessionArg(definition.args),
     handler: async (ctx: Any, args: Any) => {
-      const user = roles
-        ? await requireRole(ctx, args.token, roles)
-        : await requireUser(ctx, args.token)
+      const c = await plantContext(ctx, args.token)
+      if (!allows(c.access, modules, 'edit')) denied(modules, 'edit', c.access)
+      if (opts.companyAdmin && !canManageCompany(c.user, c.plant.companyId)) {
+        throw new ConvexError('Only a company creator can do this')
+      }
+      const scoped = scopedCtx(ctx, c)
       // Yazanın kim olduğu handler'a `ctx.sessionUser` olarak gider (ör.
       // "bu dosyayı kim yükledi"); jetonun kendisi gitmez.
-      const result = await definition.handler({ ...ctx, sessionUser: user }, withoutToken(args))
+      const result = await definition.handler(scoped, withoutToken(args))
       // Plan sunucuda hesaplanıyor: girdisi değişince kısa bir gecikmeyle
       // yeniden hesaplanır. Art arda gelen yazmalar tek hesapta birleşir.
-      if (affectsPlan) await requestRecompute(ctx)
+      if (affectsPlan) await requestRecompute(scoped)
       return result
     },
   })
 }
 
-/** Yalnızca yöneticinin yapabileceği işler. */
+/** Yalnızca şirket creator'ının (ya da platformun) yapabileceği fabrika işleri. */
 export function adminMutation(spec: Any): Any {
-  return guardedMutation(spec, ADMIN_ONLY)
+  return guardedMutation(spec, { companyAdmin: true })
 }
+
+/**
+ * Fabrikadan bağımsız (platform / şirket yönetimi) işlevler: yalnızca oturum
+ * denetlenir, veritabanı kilitsizdir. Yetkiyi handler kendisi denetler
+ * (`ctx.sessionUser`, src/lib/tenancy.ts). Yalnızca convex/tenancy.ts.
+ */
+export function userQuery(spec: Any): Any {
+  return query({
+    ...spec,
+    args: withSessionArg(spec.args),
+    handler: async (ctx: Any, args: Any) => {
+      const { user, session } = await requireSession(ctx, args.token)
+      return spec.handler({ ...ctx, sessionUser: user, session }, withoutToken(args))
+    },
+  })
+}
+
+export function userMutation(spec: Any): Any {
+  return mutation({
+    ...spec,
+    args: withSessionArg(spec.args),
+    handler: async (ctx: Any, args: Any) => {
+      const { user, session } = await requireSession(ctx, args.token)
+      return spec.handler({ ...ctx, sessionUser: user, session }, withoutToken(args))
+    },
+  })
+}
+
+/**
+ * Sunucu içi (plan motoru, zamanlayıcı) fabrika işlevleri: `plantId`
+ * argümanı zorunlu, veritabanı o fabrikaya kilitli.
+ */
+export function plantInternalQuery(spec: Any): Any {
+  return internalQuery({
+    ...spec,
+    args: { ...(spec.args ?? {}), plantId: v.id('plants') },
+    handler: async (ctx: Any, { plantId, ...args }: Any) =>
+      spec.handler({ ...ctx, db: plantDb(ctx.db, plantId, TABLES), plantId }, args),
+  })
+}
+
+export function plantInternalMutation(spec: Any): Any {
+  return internalMutation({
+    ...spec,
+    args: { ...(spec.args ?? {}), plantId: v.id('plants') },
+    handler: async (ctx: Any, { plantId, ...args }: Any) =>
+      spec.handler({ ...ctx, db: plantDb(ctx.db, plantId, TABLES), plantId }, args),
+  })
+}
+
+export { NO_ACCESS }

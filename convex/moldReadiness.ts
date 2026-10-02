@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { guardedMutation, guardedQuery } from './guarded'
+import { DIE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
 
 const rowValidator = v.object({
   _id: v.id('moldReadiness'),
@@ -15,6 +15,7 @@ const rowValidator = v.object({
 })
 
 export const list = guardedQuery({
+  modules: DIE_OR_PLANNING,
   args: {},
   returns: v.array(rowValidator),
   handler: async (ctx) => ctx.db.query('moldReadiness').collect(),
@@ -28,6 +29,7 @@ export const list = guardedQuery({
  * eski tarih kayıtta kalır ve ileride yanıltır.
  */
 export const set = guardedMutation({
+  modules: DIE_OR_PLANNING,
   args: {
     material: v.string(),
     ready: v.boolean(),

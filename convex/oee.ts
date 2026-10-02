@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { guardedMutation, guardedQuery } from './guarded'
+import { OEE, guardedMutation, guardedQuery } from './guarded'
 import {
   configFields,
   dailyFields,
@@ -66,6 +66,7 @@ const dayDoc = (d: Ctx) => ({
 
 /** Vardiyalar: ekle ya da güncelle; etkilenen günlerin toplamı yeniden hesaplanır. */
 export const upsertShifts = guardedMutation({
+  modules: OEE,
   args: { rows: v.array(v.object(shiftFields)) },
   returns: v.number(),
   affectsPlan: false,
@@ -97,6 +98,7 @@ export const upsertShifts = guardedMutation({
 
 /** Daily KPI (geçmiş): o günün vardiya verisi varsa vardiya toplamı geçerlidir. */
 export const upsertDaily = guardedMutation({
+  modules: OEE,
   args: { rows: v.array(v.object(dailyFields)) },
   returns: v.number(),
   affectsPlan: false,
@@ -116,6 +118,7 @@ export const upsertDaily = guardedMutation({
 })
 
 export const upsertOrders = guardedMutation({
+  modules: OEE,
   args: { rows: v.array(v.object(orderFields)) },
   returns: v.number(),
   affectsPlan: false,
@@ -134,6 +137,7 @@ export const upsertOrders = guardedMutation({
 })
 
 export const upsertWeekly = guardedMutation({
+  modules: OEE,
   args: { rows: v.array(v.object(weeklyFields)) },
   returns: v.number(),
   affectsPlan: false,
@@ -151,6 +155,7 @@ export const upsertWeekly = guardedMutation({
 })
 
 export const upsertMonthly = guardedMutation({
+  modules: OEE,
   args: { rows: v.array(v.object({ ...monthlyFields, year: v.number() })) },
   returns: v.number(),
   affectsPlan: false,
@@ -175,6 +180,7 @@ export const upsertMonthly = guardedMutation({
  * Kayıp özeti yeniden hesaplanır.
  */
 export const upsertDowntimeDays = guardedMutation({
+  modules: OEE,
   args: { days: v.array(v.object(downtimeDayFields)) },
   returns: v.number(),
   affectsPlan: false,
@@ -206,6 +212,7 @@ export const upsertDowntimeDays = guardedMutation({
  * imleçle çağırır.
  */
 export const rebuildStored = guardedMutation({
+  modules: OEE,
   args: { step: v.union(v.literal('days'), v.literal('losses')), cursor: v.union(v.string(), v.null()) },
   returns: v.object({ cursor: v.string(), isDone: v.boolean(), count: v.number() }),
   affectsPlan: false,
@@ -243,6 +250,7 @@ export const rebuildStored = guardedMutation({
 })
 
 export const finishImport = guardedMutation({
+  modules: OEE,
   args: {
     fileName: v.string(),
     sheets: v.array(v.array(v.union(v.string(), v.number()))),
@@ -259,6 +267,7 @@ export const finishImport = guardedMutation({
 // ---- ayarlar --------------------------------------------------------------------
 
 export const settings = guardedQuery({
+  modules: OEE,
   args: {},
   handler: async (ctx: Ctx) => {
     const doc = await ctx.db
@@ -272,6 +281,7 @@ export const settings = guardedQuery({
 })
 
 export const saveSettings = guardedMutation({
+  modules: OEE,
   args: { config: v.object(configFields) },
   returns: v.null(),
   affectsPlan: false,
@@ -297,6 +307,7 @@ export const saveSettings = guardedMutation({
 const strip = ({ _id, _creationTime, ...rest }: Ctx) => rest
 
 export const lastImport = guardedQuery({
+  modules: OEE,
   args: {},
   handler: async (ctx: Ctx) => {
     const doc = await ctx.db.query('oeeImports').withIndex('by_uploadedAt').order('desc').first()
@@ -306,6 +317,7 @@ export const lastImport = guardedQuery({
 
 const byDate = (table: string) =>
   guardedQuery({
+    modules: OEE,
     args: { from: v.string(), to: v.string() },
     handler: async (ctx: Ctx, { from, to }: Ctx) => {
       checkRange(from, to)
@@ -326,6 +338,7 @@ export const lossDays = byDate('oeeLossDays')
 
 /** Yüklenen haftalık ve aylık satırlar (yılı olmayan eski aylık kayıtlar hariç). */
 export const periods = guardedQuery({
+  modules: OEE,
   args: {},
   handler: async (ctx: Ctx) => ({
     weekly: (await ctx.db.query('oeeWeekly').collect()).map(strip),
@@ -335,6 +348,7 @@ export const periods = guardedQuery({
 
 /** Duruş satırları — en çok 8 gün (setup analizi ve veri görünümü). */
 export const downtimeDays = guardedQuery({
+  modules: OEE,
   args: { from: v.string(), to: v.string() },
   handler: async (ctx: Ctx, { from, to }: Ctx) => {
     checkRange(from, to)
@@ -350,6 +364,7 @@ export const downtimeDays = guardedQuery({
 
 /** Hangi tarihler yüklü: her tür için ilk ve son gün. */
 export const coverage = guardedQuery({
+  modules: OEE,
   args: {},
   handler: async (ctx: Ctx) => {
     const span = async (table: string) => {

@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { guardedMutation, guardedQuery } from './guarded'
+import { DIE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
 
 const rowValidator = v.object({
   _id: v.id('moldProblems'),
@@ -21,6 +21,7 @@ const rowValidator = v.object({
 })
 
 export const list = guardedQuery({
+  modules: DIE_OR_PLANNING,
   args: {},
   returns: v.array(
     v.object({
@@ -44,6 +45,7 @@ export const list = guardedQuery({
 
 /** Fotoğrafın doğrudan tarayıcıdan yükleneceği tek kullanımlık adres. */
 export const generateUploadUrl = guardedMutation({
+  modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: {},
   returns: v.string(),
@@ -51,6 +53,7 @@ export const generateUploadUrl = guardedMutation({
 })
 
 export const report = guardedMutation({
+  modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: {
     material: v.string(),
@@ -101,6 +104,7 @@ export const report = guardedMutation({
 })
 
 export const solve = guardedMutation({
+  modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: {
     id: v.id('moldProblems'),
@@ -132,6 +136,7 @@ export const solve = guardedMutation({
 })
 
 export const reopen = guardedMutation({
+  modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: { id: v.id('moldProblems') },
   returns: v.null(),
@@ -146,6 +151,7 @@ export const reopen = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: { id: v.id('moldProblems') },
   returns: v.null(),

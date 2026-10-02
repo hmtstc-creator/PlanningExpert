@@ -1,8 +1,7 @@
 import { v } from 'convex/values'
 
 import { internal } from './_generated/api'
-import { internalMutation, internalQuery } from './_generated/server'
-import { guardedMutation, guardedQuery } from './guarded'
+import { ALL_MODULES, guardedMutation, guardedQuery, plantInternalMutation, plantInternalQuery } from './guarded'
 import { planStatusDoc, requestRecompute } from './planQueue'
 import { withDefaults } from './products'
 import { liveRows } from './sapLive'
@@ -32,7 +31,7 @@ const RUN_TIMEOUT_MS = 10 * 60_000
 // ---- Girdi -------------------------------------------------------------------
 
 /** Planın okuduğu küçük tablolar, tek seferde. */
-export const smallInputs = internalQuery({
+export const smallInputs = plantInternalQuery({
   args: {},
   returns: v.any(),
   handler: async (ctx: Ctx) => {
@@ -104,7 +103,7 @@ const KEY_OF = { demandWeekly: 'weeklyDemand', demandDaily: 'dailyDemand', stock
  * duruyordu; action birden çok sorgu çalıştırabildiği için burada öyle bir
  * sınır yok.
  */
-export const inputPage = internalQuery({
+export const inputPage = plantInternalQuery({
   args: {
     table: v.union(...BIG_TABLES.map((t) => v.literal(t))),
     cursor: v.union(v.string(), v.null()),
@@ -175,7 +174,7 @@ async function migrateSettings(ctx: Ctx) {
  * Hesap başlıyor. Başka bir hesap sürüyorsa bu hesap biraz sonraya
  * ertelenir — iki hesabın aynı anda yazması boşa iş olur.
  */
-export const beginRun = internalMutation({
+export const beginRun = plantInternalMutation({
   args: { trigger: v.optional(v.string()) },
   returns: v.object({ proceed: v.boolean() }),
   handler: async (ctx: Ctx, { trigger }: Ctx) => {
@@ -184,7 +183,7 @@ export const beginRun = internalMutation({
     const status = await planStatusDoc(ctx)
     if (status?.runningSince && now - status.runningSince < RUN_TIMEOUT_MS) {
       if (!status.scheduledFor || status.scheduledFor < now) {
-        await ctx.scheduler.runAfter(15_000, internal.planEngine.recompute, { trigger })
+        await ctx.scheduler.runAfter(15_000, internal.planEngine.recompute, { trigger, plantId: ctx.plantId })
         await ctx.db.patch(status._id, { scheduledFor: now + 15_000 })
       }
       return { proceed: false }
@@ -198,7 +197,7 @@ export const beginRun = internalMutation({
   },
 })
 
-export const finishRun = internalMutation({
+export const finishRun = plantInternalMutation({
   args: { startedAt: v.number(), error: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx: Ctx, { startedAt, error }: Ctx) => {
@@ -217,7 +216,7 @@ export const finishRun = internalMutation({
 
 // ---- Sonucun yazılması --------------------------------------------------------
 
-export const createRun = internalMutation({
+export const createRun = plantInternalMutation({
   args: {
     startedAt: v.number(),
     computedAt: v.number(),
@@ -229,7 +228,7 @@ export const createRun = internalMutation({
     ctx.db.insert('planRuns', { ...args, status: 'writing' }),
 })
 
-export const addChunk = internalMutation({
+export const addChunk = plantInternalMutation({
   args: { runId: v.id('planRuns'), index: v.number(), kind: v.string(), items: v.any() },
   returns: v.null(),
   handler: async (ctx: Ctx, args: Ctx) => {
@@ -248,7 +247,7 @@ async function deleteRun(ctx: Ctx, runId: Ctx) {
 }
 
 /** Hesap tamamlandı: yayınla, eskileri temizle. */
-export const completeRun = internalMutation({
+export const completeRun = plantInternalMutation({
   args: { runId: v.id('planRuns'), chunkCount: v.number(), durationMs: v.number() },
   returns: v.null(),
   handler: async (ctx: Ctx, { runId, chunkCount, durationMs }: Ctx) => {
@@ -319,6 +318,8 @@ export const latest = guardedQuery({
  * alsın diye. Alarmlar özet dokümanında durur, parçalara bakılmaz.
  */
 export const latestAlarms = guardedQuery({
+  // Kalıp ve makine takip sayfaları da plan alarmlarını gösterir.
+  modules: ALL_MODULES,
   args: {},
   returns: v.any(),
   handler: async (ctx: Ctx) => {

@@ -2,7 +2,7 @@
 
 Bu dosya programın nasıl kurulduğunu ve kodu değiştirirken uyulacak kuralları
 anlatır. Planlamacıyla alınan iş kararları `docs/decisions.md`'de, koddaki
-sabit sayılar `docs/fixeddefinitions.md`'dedir. Gelecek yapı (çok şirket / çok fabrika): `docs/plant-genisletme.md` (beklemede).
+sabit sayılar `docs/fixeddefinitions.md`'dedir. Çok şirket / çok fabrika: `docs/plant-genisletme.md` (uygulandı, aşama 1–4).
 Kullanıcıya dönük açıklama
 sitedeki **Planning Logic** sayfasıdır (`src/routes/planlogic.tsx`).
 
@@ -21,7 +21,10 @@ Tarayıcı (React 19, TanStack Start/Router, Tailwind v4)
         ▼
 Convex (sunucu, veritabanı)
   convex/schema.ts          bütün tablolar
-  convex/*.ts               guardedQuery / guardedMutation (oturum denetimi)
+  convex/*.ts               guardedQuery / guardedMutation (oturum + fabrika + modül izni)
+  convex/plantDb.ts         fabrikaya kilitli veritabanı (her sorgu plantId ile)
+  convex/tenancy.ts         fabrika bağlamı, fabrika seçimi, geçiş, saat başı hesap
+  convex/platform.ts        şirketler ve fabrikalar; users.ts: kullanıcılar ve gruplar
   convex/planQueue.ts       girdi değişince 4 sn sonra tek hesap kuyruğu
   convex/crons.ts           saat başı (dk 5) yeniden hesap
   convex/planEngine.ts      Node action: planı hesaplar, planRuns'a yazar
@@ -43,6 +46,7 @@ Saf hesap kütüphanesi (src/lib/*.ts — React'e de Convex'e de bağlı değil)
   settingsDefaults.ts       AYAR VARSAYILANLARININ TEK YERİ
   mutationErrors.ts         sunucu hatasını kullanıcı diline çevirme
   oee.ts / oeeStore.ts      OEE: toplam ÷ toplam oranlar, kayıplar, setup; yükleme
+  tenancy.ts                YETKİNİN TEK KURALI (platform, creator, grup × fabrika × modül)
   navigation.ts             menü + sayfalar arası kısayollar (RELATED_PAGES)
 ```
 

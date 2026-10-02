@@ -17,7 +17,7 @@ const OPEN_BY_DESIGN: Record<string, string[]> = {
   'authInternal.ts': ['me'],
 }
 
-const SKIP = new Set(['schema.ts', 'authGuard.ts', 'guarded.ts', 'uploadFilter.ts'])
+const SKIP = new Set(['schema.ts', 'authGuard.ts', 'guarded.ts', 'uploadFilter.ts', 'plantDb.ts'])
 
 function convexFiles(): { name: string; source: string }[] {
   return readdirSync('convex')
@@ -74,14 +74,32 @@ describe('sunucu tarafı yetki denetimi', () => {
     }
   })
 
-  it('kullanıcı ve liste yönetimi yalnızca yöneticide', () => {
+  it('kullanıcı yönetimi creator / platform denetimli; listeler creator\'da', () => {
     const users = readFileSync('convex/users.ts', 'utf-8')
-    for (const fn of ['add', 'update', 'remove']) {
-      expect(users).toContain(`export const ${fn} = adminMutation({`)
+    for (const fn of ['add', 'update', 'remove', 'saveGroup', 'removeGroup']) {
+      const start = users.indexOf(`export const ${fn} = userMutation({`)
+      expect(start, fn).toBeGreaterThan(-1)
+      expect(users.slice(start, start + 1500), fn).toContain('requireManager(')
     }
     const lookups = readFileSync('convex/lookups.ts', 'utf-8')
     for (const fn of ['add', 'remove', 'seedDefaults']) {
       expect(lookups).toContain(`export const ${fn} = adminMutation({`)
+    }
+  })
+
+  it('fabrika kilidi olmayan sarmalayıcılar yalnızca platform dosyalarında', () => {
+    // userQuery / userMutation ve ham internal işlevler veritabanını kilitsiz
+    // verir: fabrika verisi okuyan bir dosyada görünmemeli.
+    const allowed: Record<string, RegExp> = {
+      'tenancy.ts': /./,
+      'users.ts': /./,
+      'platform.ts': /./,
+      'authInternal.ts': /internal(Query|Mutation)\(/,
+    }
+    for (const { name, source } of convexFiles()) {
+      const hit = /= (userQuery|userMutation|internalQuery|internalMutation)\(/.exec(source)
+      if (!hit) continue
+      expect(allowed[name], `${name}: ${hit[1]} fabrika kilidini atlar`).toBeDefined()
     }
   })
 

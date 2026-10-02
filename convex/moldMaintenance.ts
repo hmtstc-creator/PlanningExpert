@@ -1,7 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
 import { runSync } from './moldAlarms'
-import { guardedMutation, guardedQuery } from './guarded'
+import { DIE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
 
 const recordValidator = v.object({
   _id: v.id('moldMaintenance'),
@@ -16,12 +16,14 @@ const recordValidator = v.object({
 })
 
 export const list = guardedQuery({
+  modules: DIE_OR_PLANNING,
   args: {},
   returns: v.array(recordValidator),
   handler: async (ctx) => ctx.db.query('moldMaintenance').collect(),
 })
 
 export const add = guardedMutation({
+  modules: DIE_OR_PLANNING,
   args: {
     material: v.string(),
     date: v.string(),
@@ -76,6 +78,7 @@ export const add = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  modules: DIE_OR_PLANNING,
   args: { id: v.id('moldMaintenance') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

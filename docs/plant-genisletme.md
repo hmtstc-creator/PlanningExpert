@@ -1,7 +1,9 @@
 # Plant genişletme — çok şirket / çok fabrika (kiralama)
 
-Durum: **BEKLEMEDE — taslak, kod yazılmadı.** Planlamacı (2026-09-27): "Bu düzenlemeyi 'plant genişletme' olarak not al, daha sonra üzerinde geliştirme yapıp programı düzelteceğiz." Kararlar netleşince "Kararlar" bölümüne
-yazılır, sonra uygulanır. Tarih: 2026-09-27.
+Durum: **UYGULANDI — aşama 1–4 (2026-10-02).** Planlamacı (2026-10-02):
+"önemli olan sistem, sistemi genişlet". Kalan: aşama 5 (hard coding
+temizliği + kurulum listesi), 6 (dışa aktarım, 90 gün sonra silme), 7
+(karşılaştırma ekranı). Ayrıntı en altta "Uygulama".
 
 ## Amaç (planlamacı / site yöneticisi)
 
@@ -329,3 +331,72 @@ Platform — General grubu (site sahibi + onun eklediği generaller)
 ## Açık sorular (v3)
 
 - Karşılaştırma ekranının içeriği (7. aşamadan önce konuşulacak).
+
+## Uygulama (2026-10-02) — aşama 1–4
+
+### Veri ve güvenlik
+- Platform tabloları: `companies` (ad, durum, kiralanan modüller, askı ve
+  silme tarihi), `plants` (şirket, ad, kod, ülke, saat dilimi, fabrikada
+  kapalı modüller), `userGroups` (şirket, ad, bütün fabrikalar / seçilenler,
+  modül izinleri), `platformState` (geçiş durumu). `users`: `platformRole`
+  (owner / general), `companyId`, `isCreator`, `groupIds`. `sessions.plantId`
+  = seçili fabrika.
+- Fabrikaya ait **bütün** tablolarda `plantId`; her index `plantId` ile
+  başlar, ayrıca `by_plant`. Ortak olanlar yalnızca: companies, plants,
+  userGroups, platformState, users, sessions, officialHolidays
+  (`convex/plantDb.ts` PLATFORM_TABLES).
+- `convex/plantDb.ts`: kilitli veritabanı — okuma `plantId = aktif fabrika`
+  ile başlar, ekleme `plantId` koyar, başka fabrikanın kaydı get'te görünmez,
+  patch / replace / delete'te "Record not found". Sonuçlarda `plantId`
+  dönmez (sayfalar ve dönüş doğrulayıcıları değişmedi).
+- `convex/guarded.ts`: her istekte kullanıcı → oturumdaki fabrika (yoksa ilk
+  yetkili) → o fabrikadaki modül izni. Okuma "görür", yazma "düzenler"
+  ister. İşlevin modülü: varsayılan PlanningExpert; OEE dosyası OEE; kalıp
+  dosyaları Die **ya da** PlanningExpert; makine arızası / pres bakımı
+  Machine ya da PlanningExpert; pres listesi, listeler, değişiklik kaydı ve
+  plan alarmları her modül. `adminMutation` = şirket creator'ı.
+- Kural `src/lib/tenancy.ts` (`accessFor`): platform her şey; creator kendi
+  şirketinin her fabrikası, her modül; diğerleri gruplarının en genişi;
+  kapalı modül yok; askıdaki şirket en çok "görür".
+- Plan motoru, kuyruk ve saat başı hesap fabrika başına
+  (`tenancy.recomputeAll`: aktif şirketlerin PlanningExpert'i açık
+  fabrikaları, birer dakika arayla; birinin hatası diğerini durdurmaz).
+- Test: `convex/tenancy.test.ts` (convex-test) — geçiş, iki şirket aynı pres
+  adlarıyla (okuma, silme, kullanıcı yönetimi denemeleri reddedilir), grup ×
+  fabrika × modül izni, askı, modül kapatma. `convex/authGuard.test.ts`:
+  kilitsiz sarmalayıcılar (userQuery / userMutation / ham internal) yalnızca
+  tenancy.ts, users.ts, platform.ts, authInternal.ts'te.
+
+### Geçiş (mevcut veri)
+- Yeni sürüm açıldığında ilk giriş yapan kişinin ekranı geçişi başlatır
+  (ilerleme çubuğu; bir kez). Bütün veri **Company 1 / Plant 1** olur; ülke
+  ve saat dilimi mevcut ayardan. Silinen bir şey yok.
+- En eski aktif admin = **site sahibi (owner)** + creator; diğer adminler
+  creator; planner → "Planners", maintenance → "Maintenance" (ikisi de her
+  modülde düzenler — bugünkü gibi), viewer → "Viewers" (görür) grubuna.
+- Şirket ve fabrika adlarını owner **Companies and plants** sayfasında
+  değiştirir.
+
+### Ekranlar
+- Üst çubukta **fabrika seçici** (birden çok fabrikası olana); ana sayfada
+  yalnızca izinli modüller; izni olmayan sayfa açılmaz; askıdaki şirkette
+  üstte "read only" bandı.
+- **/platform — Companies and plants**: General şirket açar, ad / kiralanan
+  modüller / askıya alma, fabrika ekler, fabrikada modül kapatır, her
+  şirketin kullanıcı ve gruplarını yönetir; owner Generalleri ekler.
+  Creator kendi şirketinin fabrikalarını ekler ve düzenler.
+- **/yonetim — Admin**: creator için şirket kullanıcıları (creator işareti,
+  gruplar, geçici şifre) ve kullanıcı grupları (fabrikalar × modül izni);
+  seçim listeleri ve değişiklik kaydı fabrika bazında.
+- Kullanıcı adı bütün sistemde tektir (giriş adı).
+
+### Kalan (sıradaki aşamalar)
+- Aşama 5: kodda kalan fabrika varsayılanları (ülke RO, saat dilimi,
+  2009/1009 depoları, Hall 1, admin/admin) fabrika kaydına / kurulum
+  listesine; fabrikanın ülke ve saat dilimi bugün yalnızca bilgi — ayar
+  (Work Calendar) yine kendi değerini kullanır.
+- Aşama 6: şirket verisinin dışa aktarımı ve 90 gün sonra kalıcı silme
+  (askıya alma ve silme tarihi hazır).
+- Aşama 7: Board member karşılaştırma ekranı (içeriği konuşulacak).
+- Platform değişiklik kaydı (kullanıcı açma / parola) bugün fabrika
+  kaydında görünmüyor.

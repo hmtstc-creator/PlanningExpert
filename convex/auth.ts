@@ -174,7 +174,7 @@ export const resetPassword = internalAction({
 })
 
 /**
- * Yöneticinin başkasının parolasını belirlemesi.
+ * Creator'ın (ya da platformun) başkasına geçici parola vermesi.
  *
  * Eski parola sorulmaz — zaten bilinmiyor olabilir — ama kullanıcı ilk
  * girişte kendi parolasını koymaya zorlanır.
@@ -184,10 +184,11 @@ export const setPasswordAsAdmin = action({
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
     assertPassword(args.newPassword)
+    // Şirket creator'ı kendi şirketinin, owner generallerin parolasını verir (users.ts).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const me: any = await ctx.runQuery(api.authInternal.me, { token: args.token })
-    if (!me) throw new ConvexError('Your session has expired — sign in again')
-    if (me.role !== 'admin') throw new ConvexError('Only an admin can set another password')
+    const check: any = await ctx.runQuery(internal.users.canSetPassword, { token: args.token, userId: args.userId })
+    if (!check.ok) throw new ConvexError('You cannot set this password')
+    const me = { name: check.actor }
 
     const salt = randomBytes(16).toString('hex')
     await ctx.runMutation(internal.authInternal.storePassword, {

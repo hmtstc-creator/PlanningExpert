@@ -6,6 +6,8 @@ import { ConnectionBanner } from '../components/ConnectionBanner'
 import { Header } from '../components/Header'
 import { LoginGate } from '../components/LoginGate'
 import { MutationErrorToast } from '../components/MutationErrorToast'
+import { TenancyGate } from '../components/TenancyGate'
+import { PlantProvider } from '../lib/plantContext'
 import AppConvexProvider from '@/components/convex-client-provider'
 
 const rootMeta = siteMetadata['/']
@@ -37,15 +39,18 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           {/* Nothing of the app renders until somebody is signed in — the
               header included, since it names the current user. */}
           <LoginGate>
-            {/* One sticky stack: the banner sits under the header without a
-                hard-coded offset, which broke when the header changed height
-                between breakpoints. */}
-            <div className="sticky top-0 z-50">
-              <Header />
-              <ConnectionBanner />
-            </div>
-            {children}
-            <MutationErrorToast />
+            <PlantProvider>
+              {/* One sticky stack: the banner sits under the header without a
+                  hard-coded offset, which broke when the header changed height
+                  between breakpoints. */}
+              <div className="sticky top-0 z-50">
+                <Header />
+                <ConnectionBanner />
+              </div>
+              {/* Şirket / fabrika: geçiş, fabrika yok, sayfanın modülüne izin yok. */}
+              <TenancyGate>{children}</TenancyGate>
+              <MutationErrorToast />
+            </PlantProvider>
           </LoginGate>
         </AppConvexProvider>
         <Scripts />
