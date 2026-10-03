@@ -206,7 +206,7 @@ export function KpiDashboardPage({ period }: { period: KpiPeriod }) {
       </div>
       {!ctx?.active?.costCenters?.length && (
         <p className="mt-3 text-xs text-muted-foreground">
-          The cost centers of a plant are defined on <Link to="/platform" className="underline">Companies and plants</Link>.
+          The cost centers of a plant are defined on <Link to="/settings" className="underline">Company settings</Link>.
         </p>
       )}
     </div>

@@ -182,16 +182,16 @@ function OeeSettingsPage() {
         </button>
       </Card>
 
-      <Card title="Cost centers" info="The cost centers of this plant and the area each belongs to. Which cost centers a plant has, and their names, a creator defines on Companies and plants (Plant → Department → Cost centers); every one of them counts in the OEE pages — one without an area under Unassigned. Machines are read from the data.">
+      <Card title="Cost centers" info="The cost centers of this plant and the area each belongs to. Which cost centers a plant has, and their names, a creator defines on Company settings → Organization; every one of them counts in the OEE pages — one without an area under Unassigned. Machines are read from the data.">
         <Rows
-          empty="This plant has no cost center yet — a creator adds them on Companies and plants (Plant → Department → Cost centers)."
+          empty="This plant has no cost center yet — a creator adds them on Company settings → Organization."
           head={['Code', 'Machines in the data', 'Name', 'Area']}
           rows={c.costCenters.map((cc, i) => [
             cc.code,
             <span key="m" className="text-muted-foreground">
               {found.get(cc.code)?.workCenters.join(', ') || '—'}
             </span>,
-            <span key="n" title="Named on Companies and plants">{cc.name}</span>,
+            <span key="n" title="Named on Company settings">{cc.name}</span>,
             <select
               key="a"
               className={`${input} ${c.areas.some((a) => a.name === cc.area) ? '' : 'border-amber-500'}`}
@@ -210,7 +210,7 @@ function OeeSettingsPage() {
         {notOfPlant.length > 0 && (
           <p className="mt-2 text-xs text-amber-800">
             In the uploaded data but not a cost center of this plant: {notOfPlant.join(', ')}. Rows of these cost centers are not uploaded
-            to this plant; if they belong here, a creator adds them on Companies and plants.
+            to this plant; if they belong here, a creator adds them on Company settings.
           </p>
         )}
       </Card>

@@ -3,7 +3,7 @@
  * Work center (docs/board.md → Organizasyon ağacı). Tepeden aşağı kurulur: şirket bir
  * holding'in, masraf yeri bir bölümün altında açılır.
  *
- * Saf fonksiyonlar: Companies and plants sayfası ağacı, uyarıları ve
+ * Saf fonksiyonlar: Company settings sayfası ağacı, uyarıları ve
  * "kim bu fabrikayı görüyor" tablosunu buradan alır.
  */
 

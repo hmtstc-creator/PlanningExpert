@@ -57,7 +57,7 @@ export const upsert = guardedMutation({
     const costCenter = args.costCenter?.trim() || undefined
     const codes = new Set(((ctx as { plant?: { costCenters?: { code: string }[] } }).plant?.costCenters ?? []).map((c) => c.code))
     if (costCenter && !codes.has(costCenter)) {
-      throw new ConvexError(`${costCenter} is not a cost center of this plant — add it on Companies and plants first`)
+      throw new ConvexError(`${costCenter} is not a cost center of this plant — add it on Company settings first`)
     }
     if (!costCenter && (!existing || existing.costCenter)) {
       throw new ConvexError(`Choose the cost center of ${name} — every work center belongs to one`)

@@ -7,7 +7,7 @@ import { isPlatform } from '../src/lib/tenancy'
  * Uygulama içi hata kaydı (todolist.md 4.1 — izleme): ekranda yakalanan
  * hatalar (sayfa çöktü, yakalanmamış hata) ve plan motoru hataları. Aynı
  * kaynak + mesaj 24 saat içinde tekrar gelirse yeni satır açılmaz, sayaç
- * artar. Yalnızca General görür (Companies and plants → System errors).
+ * artar. Yalnızca General görür (Administration → System errors).
  * Dış servis (Sentry vb.) bağlanırsa bu kayıt yine kalır.
  */
 

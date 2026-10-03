@@ -93,7 +93,7 @@ describe('girdi sayfaları', () => {
       'src/routes/depolar.tsx',
       'src/routes/machine-followup/maintenance.tsx',
       'src/components/CompanyAdmin.tsx',
-      'src/routes/platform.tsx',
+      'src/components/org/OrgAdmin.tsx',
       'src/components/PlannedStopsEditor.tsx',
     ]
     for (const path of editablePages) {

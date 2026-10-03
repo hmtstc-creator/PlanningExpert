@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountRouteImport } from './routes/account'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AlarmsRouteImport } from './routes/alarms'
 import { Route as BoardRouteImport } from './routes/board'
 import { Route as CapacityRouteImport } from './routes/capacity'
@@ -29,6 +31,7 @@ import { Route as PlatformRouteImport } from './routes/platform'
 import { Route as PresbakimRouteImport } from './routes/presbakim'
 import { Route as ReferanslarRouteImport } from './routes/referanslar'
 import { Route as SapdataRouteImport } from './routes/sapdata'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SiparislerRouteImport } from './routes/siparisler'
 import { Route as StoklarRouteImport } from './routes/stoklar'
 import { Route as TakvimRouteImport } from './routes/takvim'
@@ -56,6 +59,16 @@ import { Route as KpiWeeklyEntryRouteImport } from './routes/kpi/weekly/entry'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlarmsRoute = AlarmsRouteImport.update({
@@ -151,6 +164,11 @@ const ReferanslarRoute = ReferanslarRouteImport.update({
 const SapdataRoute = SapdataRouteImport.update({
   id: '/sapdata',
   path: '/sapdata',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SiparislerRoute = SiparislerRouteImport.update({
@@ -273,6 +291,8 @@ const KpiWeeklyEntryRoute = KpiWeeklyEntryRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
   '/alarms': typeof AlarmsRoute
   '/board': typeof BoardRoute
   '/capacity': typeof CapacityRoute
@@ -292,6 +312,7 @@ export interface FileRoutesByFullPath {
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/sapdata': typeof SapdataRoute
+  '/settings': typeof SettingsRoute
   '/siparisler': typeof SiparislerRoute
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
@@ -318,6 +339,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
   '/alarms': typeof AlarmsRoute
   '/board': typeof BoardRoute
   '/capacity': typeof CapacityRoute
@@ -337,6 +360,7 @@ export interface FileRoutesByTo {
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/sapdata': typeof SapdataRoute
+  '/settings': typeof SettingsRoute
   '/siparisler': typeof SiparislerRoute
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
@@ -364,6 +388,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/admin': typeof AdminRoute
   '/alarms': typeof AlarmsRoute
   '/board': typeof BoardRoute
   '/capacity': typeof CapacityRoute
@@ -383,6 +409,7 @@ export interface FileRoutesById {
   '/presbakim': typeof PresbakimRoute
   '/referanslar': typeof ReferanslarRoute
   '/sapdata': typeof SapdataRoute
+  '/settings': typeof SettingsRoute
   '/siparisler': typeof SiparislerRoute
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
@@ -411,6 +438,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account'
+    | '/admin'
     | '/alarms'
     | '/board'
     | '/capacity'
@@ -430,6 +459,7 @@ export interface FileRouteTypes {
     | '/presbakim'
     | '/referanslar'
     | '/sapdata'
+    | '/settings'
     | '/siparisler'
     | '/stoklar'
     | '/takvim'
@@ -456,6 +486,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account'
+    | '/admin'
     | '/alarms'
     | '/board'
     | '/capacity'
@@ -475,6 +507,7 @@ export interface FileRouteTypes {
     | '/presbakim'
     | '/referanslar'
     | '/sapdata'
+    | '/settings'
     | '/siparisler'
     | '/stoklar'
     | '/takvim'
@@ -501,6 +534,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/account'
+    | '/admin'
     | '/alarms'
     | '/board'
     | '/capacity'
@@ -520,6 +555,7 @@ export interface FileRouteTypes {
     | '/presbakim'
     | '/referanslar'
     | '/sapdata'
+    | '/settings'
     | '/siparisler'
     | '/stoklar'
     | '/takvim'
@@ -547,6 +583,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRoute
+  AdminRoute: typeof AdminRoute
   AlarmsRoute: typeof AlarmsRoute
   BoardRoute: typeof BoardRoute
   CapacityRoute: typeof CapacityRoute
@@ -566,6 +604,7 @@ export interface RootRouteChildren {
   PresbakimRoute: typeof PresbakimRoute
   ReferanslarRoute: typeof ReferanslarRoute
   SapdataRoute: typeof SapdataRoute
+  SettingsRoute: typeof SettingsRoute
   SiparislerRoute: typeof SiparislerRoute
   StoklarRoute: typeof StoklarRoute
   TakvimRoute: typeof TakvimRoute
@@ -598,6 +637,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alarms': {
@@ -731,6 +784,13 @@ declare module '@tanstack/react-router' {
       path: '/sapdata'
       fullPath: '/sapdata'
       preLoaderRoute: typeof SapdataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/siparisler': {
@@ -899,6 +959,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRoute,
+  AdminRoute: AdminRoute,
   AlarmsRoute: AlarmsRoute,
   BoardRoute: BoardRoute,
   CapacityRoute: CapacityRoute,
@@ -918,6 +980,7 @@ const rootRouteChildren: RootRouteChildren = {
   PresbakimRoute: PresbakimRoute,
   ReferanslarRoute: ReferanslarRoute,
   SapdataRoute: SapdataRoute,
+  SettingsRoute: SettingsRoute,
   SiparislerRoute: SiparislerRoute,
   StoklarRoute: StoklarRoute,
   TakvimRoute: TakvimRoute,

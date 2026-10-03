@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { accessFor, allows, canManageCompany, type CompanyLike, type GroupLike, type PlantLike } from './tenancy'
-import { moduleOfPath } from './plantContext'
+import { boardAllows, moduleOfPath } from './plantContext'
 
 const company: CompanyLike = { _id: 'c1', status: 'active', modules: ['planning', 'oee', 'die', 'machine'] }
 const p1: PlantLike = { _id: 'p1', companyId: 'c1' }
@@ -39,5 +39,17 @@ describe('yetki kuralları', () => {
     expect(moduleOfPath('/platform')).toBe(null)
     expect(moduleOfPath('/')).toBe(null)
     expect(moduleOfPath('/compare')).toBe(null)
+    expect(moduleOfPath('/admin')).toBe(null)
+    expect(moduleOfPath('/settings')).toBe(null)
+    expect(moduleOfPath('/account')).toBe(null)
+    expect(moduleOfPath('/tani')).toBe(null)
+  })
+
+  it('board görünümü: dashboard\'lar, hesap ve teşhis açık; giriş sayfaları kapalı', () => {
+    expect(boardAllows('/board')).toBe(true)
+    expect(boardAllows('/account')).toBe(true)
+    expect(boardAllows('/tani/')).toBe(true)
+    expect(boardAllows('/settings')).toBe(false)
+    expect(boardAllows('/kpi/monthly/entry')).toBe(false)
   })
 })

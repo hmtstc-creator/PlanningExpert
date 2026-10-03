@@ -38,7 +38,7 @@ export interface TenancyContext {
     /** Fabrikanın ülkesi ve saat dilimi (tek kaynak: plants). */
     country: string
     timeZone: string
-    /** Fabrikanın masraf yerleri (Companies and plants'ta tanımlanır). */
+    /** Fabrikanın masraf yerleri (Company settings'ta tanımlanır). */
     costCenters: { code: string; name: string; department?: string }[]
     access: Access
     deleteAfter: number | null
@@ -86,7 +86,9 @@ export function usePlant(): Value {
 export const BOARD_PATHS = ['/board', '/kpi', '/kpi/monthly/dashboard', '/kpi/weekly/dashboard', '/oee']
 
 export function boardAllows(pathname: string): boolean {
-  return pathname === '/' || BOARD_PATHS.includes(pathname.replace(/\/$/, '') || '/')
+  const p = pathname.replace(/\/$/, '') || '/'
+  // Hesap ve bağlantı teşhisi herkese açık.
+  return p === '/' || p === '/account' || p === '/tani' || BOARD_PATHS.includes(p)
 }
 
 /** Seçili fabrikanın saat dilimi; bilinmiyorsa UTC. */
@@ -97,7 +99,9 @@ export function usePlantTimeZone(): string {
 /** Sayfanın ait olduğu modül (yol önekine göre); yönetim sayfaları modülsüz. */
 export function moduleOfPath(pathname: string): Module | null {
   // Karşılaştırma birden çok fabrikayı okur; sunucu her fabrikanın OEE iznine bakar.
-  if (pathname === '/' || pathname.startsWith('/board') || pathname.startsWith('/platform') || pathname.startsWith('/yonetim') || pathname.startsWith('/compare')) return null
+  // Modülsüz: portal, Board, yönetim (Administration, Company settings), hesap, teşhis, karşılaştırma.
+  const free = ['/board', '/admin', '/settings', '/account', '/tani', '/platform', '/yonetim', '/compare']
+  if (pathname === '/' || free.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null
   if (pathname.startsWith('/oee')) return 'oee'
   if (pathname.startsWith('/die-followup')) return 'die'
   if (pathname.startsWith('/machine-followup')) return 'machine'

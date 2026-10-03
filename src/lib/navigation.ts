@@ -1,14 +1,18 @@
-// Single definition of the navigation, shared by the desktop bar and the
-// mobile drawer so the two can never drift apart.
+// Menünün tek tanımı: üst çubuk, telefon çekmecesi ve modül değiştirici aynı
+// listeden okur, ikisi birbirinden kopamaz.
 //
-// Grouping follows how the work is actually done rather than the order the
-// pages were built: the plan is the destination, data feeds it, the shop
-// floor definitions constrain it, and analysis checks it afterwards.
+// Yapı: portal → alan (modül ya da ayarlar) → alanın menüsü. Her alanın
+// başlığı, ana sayfası ve menüsü burada; hangi alanda olunduğu yoldan çıkar.
+// Yönetim iki ayrı alandır: Company settings (creator: kendi şirketi) ve
+// Administration (General: holding, şirket, platform). Modül menülerinde
+// yönetim yoktur; kullanıcı menüsünden açılır.
+
+import type { Module } from './tenancy'
 
 export interface NavItem {
   to: string
   label: string
-  /** Shown in the mobile drawer, where there is room for a line of context. */
+  /** Açılan menüde ve telefon çekmecesinde bir satırlık açıklama. */
   hint?: string
 }
 
@@ -17,136 +21,134 @@ export interface NavGroup {
   items: NavItem[]
 }
 
-/** Always visible, never inside a menu — these are the daily destinations. */
-export const PRIMARY_LINKS: NavItem[] = [
-  { to: '/planlama', label: 'Plan', hint: 'The weekly production plan' },
-  { to: '/planningexpert', label: 'Overview', hint: 'Daily status and warnings' },
-]
+export type AreaKey = 'portal' | 'planning' | 'oee' | 'die' | 'machine' | 'kpi' | 'board' | 'settings' | 'admin'
 
-/** Planlama başlığının geri kalanı: veri girişi ve motorun açıklaması. */
-export const PLANNING_LINKS: NavItem[] = [
-  { to: '/capacity', label: 'Capacity Dashboard', hint: 'Weekly capacity vs demand by work center group' },
-  { to: '/hammadde', label: 'Raw Material Coverage', hint: 'Steel requirement and orders per week up to the last ZPP week' },
-  { to: '/alarms', label: 'Alarms', hint: 'Dies and machines that hold up the plan' },
-  { to: '/sapdata', label: 'SAP Data', hint: 'Upload ZPP, ZPP_DAILY, MB52 and MB51' },
-  { to: '/planlogic', label: 'Planning Logic', hint: 'How the plan is calculated' },
-]
-
-export const NAV_GROUPS: NavGroup[] = [
-  {
-    label: 'Planning',
-    items: [{ to: '/planlama', label: 'Production Plan', hint: 'The weekly production plan' }, ...PLANNING_LINKS],
-  },
-  {
-    label: 'Data',
-    items: [
-      { to: '/siparisler', label: 'Demand', hint: 'Weekly and daily net requirements' },
-      { to: '/stoklar', label: 'Stock', hint: 'Stock by material and location' },
-      { to: '/gerceklesen', label: 'Actuals', hint: 'Posted production movements' },
-      { to: '/referanslar', label: 'Master Data', hint: 'Cavities, SPM, weights, machines' },
-    ],
-  },
-  {
-    label: 'Shop floor',
-    items: [
-      { to: '/makineler', label: 'Work Centers', hint: 'Cost center, hall, category, coil feed' },
-      { to: '/takvim', label: 'Work Calendar', hint: 'Shifts, stops, capacity' },
-      { to: '/depolar', label: 'Storage Locations', hint: 'Which stock counts' },
-    ],
-  },
-  {
-    label: 'Analysis',
-    items: [
-      { to: '/performans', label: 'Performance', hint: 'Plan versus actual' },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { to: '/yonetim', label: 'Admin', hint: 'Users, lists, who changed what' },
-      { to: '/kayitlar', label: 'Change Log', hint: 'Decisions and rules' },
-      { to: '/tani', label: 'Connection Diagnostics', hint: 'Is this device connected?' },
-    ],
-  },
-]
-
-/** Every route in the navigation, for the mobile drawer's flat rendering. */
-export const ALL_GROUPS: NavGroup[] = [
-  { label: 'Planning', items: [...PRIMARY_LINKS, ...PLANNING_LINKS] },
-  ...NAV_GROUPS.filter((group) => group.label !== 'Planning'),
-]
-
-/**
- * Portaldaki takip modüllerinin kendi menüleri. Kalıp ve makine konuları
- * PlanningExpert'ten çıkıp buraya taşındı; PlanningExpert'te yalnızca planı
- * etkileyen alarmlar kaldı.
- */
-export interface ModuleNav {
-  prefix: string
+export interface Area {
+  key: AreaKey
   title: string
-  links: NavItem[]
+  /** Logonun altında küçük satır. */
+  subtitle: string
+  home: string
+  /** İzin modülü (src/lib/tenancy.ts); yoksa modül değil (portal, ayarlar). */
+  module?: Module
+  /** Çubukta doğrudan görünen bağlantılar. */
+  primary: NavItem[]
+  /** Açılan gruplar (yalnızca PlanningExpert'te). */
+  groups: NavGroup[]
 }
 
-/** Board görünümünün menüsü (board kullanıcısında her sayfada bu). */
-export const BOARD_NAV: ModuleNav = {
-  prefix: '/board',
-  title: 'Board',
-  links: [
-    { to: '/board', label: 'Board Dashboard', hint: 'Group, company, plant — results and trends' },
-    { to: '/kpi/monthly/dashboard', label: 'KPI monthly', hint: 'A3 page, 12 months' },
-    { to: '/kpi/weekly/dashboard', label: 'KPI weekly', hint: 'A3 page, 13 weeks' },
-    { to: '/oee', label: 'OEE', hint: 'Monthly, weeks and shifts' },
+const PLANNING: Area = {
+  key: 'planning',
+  title: 'PlanningExpert',
+  subtitle: 'Production planning',
+  home: '/planningexpert',
+  module: 'planning',
+  primary: [
+    { to: '/planlama', label: 'Plan', hint: 'The weekly production plan' },
+    { to: '/planningexpert', label: 'Overview', hint: 'Daily status and warnings' },
+  ],
+  groups: [
+    {
+      label: 'Planning',
+      items: [
+        { to: '/capacity', label: 'Capacity Dashboard', hint: 'Weekly capacity vs demand by work center group' },
+        { to: '/hammadde', label: 'Raw Material Coverage', hint: 'Steel requirement and orders per week up to the last ZPP week' },
+        { to: '/alarms', label: 'Alarms', hint: 'Dies and machines that hold up the plan' },
+        { to: '/performans', label: 'Performance', hint: 'Plan versus actual' },
+        { to: '/planlogic', label: 'Planning Logic', hint: 'How the plan is calculated' },
+        { to: '/kayitlar', label: 'Decision Log', hint: 'Decisions, rules and open issues of the plant' },
+      ],
+    },
+    {
+      label: 'Data',
+      items: [
+        { to: '/sapdata', label: 'SAP Data', hint: 'Upload ZPP, ZPP_DAILY, MB52 and MB51' },
+        { to: '/siparisler', label: 'Demand', hint: 'Weekly and daily net requirements' },
+        { to: '/stoklar', label: 'Stock', hint: 'Stock by material and location' },
+        { to: '/gerceklesen', label: 'Actuals', hint: 'Posted production movements' },
+        { to: '/referanslar', label: 'Master Data', hint: 'Cavities, SPM, weights, machines' },
+      ],
+    },
+    {
+      label: 'Shop floor',
+      items: [
+        { to: '/makineler', label: 'Work Centers', hint: 'Cost center, hall, category, coil feed' },
+        { to: '/takvim', label: 'Work Calendar', hint: 'Shifts, stops, capacity' },
+        { to: '/depolar', label: 'Storage Locations', hint: 'Which stock counts' },
+      ],
+    },
   ],
 }
 
-export const MODULE_NAVS: ModuleNav[] = [
-  BOARD_NAV,
-  {
-    prefix: '/die-followup',
-    title: 'Die Follow-up',
-    links: [
-      { to: '/die-followup', label: 'Overview' },
-      { to: '/die-followup/problems', label: 'Problems', hint: 'Report, solve, history' },
-      { to: '/die-followup/maintenance', label: 'Maintenance & readiness', hint: 'Ready flag, bookings, shot limits' },
-      { to: '/die-followup/reports', label: 'Reports', hint: 'Pareto by die, problem, operation' },
-    ],
-  },
-  {
-    prefix: '/machine-followup',
-    title: 'Machine Follow-up',
-    links: [
-      { to: '/machine-followup', label: 'Overview' },
-      { to: '/machine-followup/breakdowns', label: 'Breakdowns', hint: 'Report, solve, history' },
-      { to: '/machine-followup/maintenance', label: 'Maintenance', hint: 'Planned work center maintenance' },
-      { to: '/machine-followup/reports', label: 'Reports', hint: 'Pareto by work center and problem' },
-    ],
-  },
-  {
-    prefix: '/kpi',
-    title: 'KPI',
-    links: [
-      { to: '/kpi', label: 'Overview' },
-      { to: '/kpi/monthly/entry', label: 'Monthly entry', hint: 'Plan and actual per cost center and month' },
-      { to: '/kpi/monthly/dashboard', label: 'Monthly dashboard', hint: 'A3 page, 12 months' },
-      { to: '/kpi/weekly/entry', label: 'Weekly entry', hint: 'Plan and actual per cost center and week' },
-      { to: '/kpi/weekly/dashboard', label: 'Weekly dashboard', hint: 'A3 page, 13 weeks' },
-    ],
-  },
-  {
-    prefix: '/oee',
-    title: 'OEE Trend and Losses',
-    links: [
-      { to: '/oee', label: 'OEE Dashboard', hint: 'Monthly, 10 weeks and the selected week' },
-      { to: '/oee/losses', label: 'Losses Trend', hint: 'Losses, dies, breakdowns and setups' },
-      { to: '/oee/data', label: 'Data', hint: 'The uploaded sheets, as in the file' },
-      { to: '/oee/settings', label: 'Settings', hint: 'Areas, cost centers, shifts, loss groups, setups' },
-      { to: '/oee/guide', label: 'How to use', hint: 'First setup and routine uploads' },
-    ],
-  },
+const flat = (key: AreaKey, title: string, home: string, module: Module | undefined, primary: NavItem[]): Area => ({
+  key,
+  title,
+  subtitle: 'Production Portal',
+  home,
+  module,
+  primary,
+  groups: [],
+})
+
+/** Board görünümünün menüsü (board kullanıcısında her sayfada bu). */
+export const BOARD_AREA: Area = flat('board', 'Board', '/board', 'kpi', [
+  { to: '/board', label: 'Board Dashboard', hint: 'Group, company, plant — results and trends' },
+  { to: '/kpi/monthly/dashboard', label: 'KPI monthly', hint: 'A3 page, 12 months' },
+  { to: '/kpi/weekly/dashboard', label: 'KPI weekly', hint: 'A3 page, 13 weeks' },
+  { to: '/oee', label: 'OEE', hint: 'Monthly, weeks and shifts' },
+])
+
+/** Modül değiştiricideki sıra: portalın modülleri. */
+export const MODULE_AREAS: Area[] = [
+  PLANNING,
+  flat('oee', 'OEE', '/oee', 'oee', [
+    { to: '/oee', label: 'Dashboard', hint: 'Monthly, 10 weeks and the selected week' },
+    { to: '/oee/losses', label: 'Losses Trend', hint: 'Losses, dies, breakdowns and setups' },
+    { to: '/oee/data', label: 'Data', hint: 'The uploaded sheets, as in the file' },
+    { to: '/oee/settings', label: 'Settings', hint: 'Areas, cost centers, shifts, loss groups, setups' },
+    { to: '/oee/guide', label: 'How to use', hint: 'First setup and routine uploads' },
+  ]),
+  flat('die', 'Die Follow-up', '/die-followup', 'die', [
+    { to: '/die-followup', label: 'Overview' },
+    { to: '/die-followup/problems', label: 'Problems', hint: 'Report, solve, history' },
+    { to: '/die-followup/maintenance', label: 'Maintenance & readiness', hint: 'Ready flag, bookings, shot limits' },
+    { to: '/die-followup/reports', label: 'Reports', hint: 'Pareto by die, problem, operation' },
+  ]),
+  flat('machine', 'Machine Follow-up', '/machine-followup', 'machine', [
+    { to: '/machine-followup', label: 'Overview' },
+    { to: '/machine-followup/breakdowns', label: 'Breakdowns', hint: 'Report, solve, history' },
+    { to: '/machine-followup/maintenance', label: 'Maintenance', hint: 'Planned work center maintenance' },
+    { to: '/machine-followup/reports', label: 'Reports', hint: 'Pareto by work center and problem' },
+  ]),
+  flat('kpi', 'KPI', '/kpi', 'kpi', [
+    { to: '/kpi', label: 'Overview' },
+    { to: '/kpi/monthly/entry', label: 'Monthly entry', hint: 'Plan and actual per cost center and month' },
+    { to: '/kpi/monthly/dashboard', label: 'Monthly dashboard', hint: 'A3 page, 12 months' },
+    { to: '/kpi/weekly/entry', label: 'Weekly entry', hint: 'Plan and actual per cost center and week' },
+    { to: '/kpi/weekly/dashboard', label: 'Weekly dashboard', hint: 'A3 page, 13 weeks' },
+  ]),
+  { ...BOARD_AREA, primary: [BOARD_AREA.primary[0]] },
 ]
 
-export function moduleNavFor(pathname: string): ModuleNav | undefined {
-  return MODULE_NAVS.find((m) => pathname === m.prefix || pathname.startsWith(`${m.prefix}/`))
+export const PORTAL_AREA: Area = { ...flat('portal', 'Production Portal', '/', undefined, []), subtitle: 'Planning · OEE · Dies · Machines · KPI' }
+export const SETTINGS_AREA: Area = flat('settings', 'Company settings', '/settings', undefined, [])
+export const ADMIN_AREA: Area = flat('admin', 'Administration', '/admin', undefined, [])
+
+const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+
+/** Yolun alanı: menü, başlık ve modül değiştiricideki seçili modül buradan. */
+export function areaFor(pathname: string): Area {
+  if (pathname === '/' || under(pathname, '/account') || under(pathname, '/tani') || under(pathname, '/compare')) return PORTAL_AREA
+  if (under(pathname, '/admin')) return ADMIN_AREA
+  if (under(pathname, '/settings')) return SETTINGS_AREA
+  if (under(pathname, '/board')) return BOARD_AREA
+  for (const a of MODULE_AREAS) if (a.key !== 'planning' && a.key !== 'board' && under(pathname, a.home)) return a
+  return PLANNING
+}
+
+/** Bir alanın bütün bağlantıları (telefon çekmecesi ve etkin grup için). */
+export function areaLinks(area: Area): NavItem[] {
+  return [...area.primary, ...area.groups.flatMap((g) => g.items)]
 }
 
 /**
@@ -177,11 +179,7 @@ const EXTRA_LABELS: Record<string, string> = {
 }
 
 export function pageLabel(to: string): string {
-  for (const group of [...NAV_GROUPS, { label: '', items: PRIMARY_LINKS }]) {
-    const hit = group.items.find((i) => i.to === to)
-    if (hit) return hit.label
-  }
-  return EXTRA_LABELS[to] ?? to
+  return areaLinks(PLANNING).find((i) => i.to === to)?.label ?? EXTRA_LABELS[to] ?? to
 }
 
 /** Bir sayfanın kısayolları: { to, label }. */

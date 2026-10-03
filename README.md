@@ -30,7 +30,7 @@ Holding → Company → Plant → Department → Cost center → Work center
 ```
 
 Tepeden aşağı kurulur: şirket bir holding'in, cost center bir bölümün, work
-center bir cost center'ın altında açılır (Companies and plants, Work Center
+center bir cost center'ın altında açılır (Company settings → Organization, Work Center
 Definitions). Kiralama birimi şirkettir: kullanıcılar, gruplar, modüller.
 Yetki = grup × plant × modül (*yok · görür · düzenler*).
 
@@ -63,13 +63,22 @@ Site VPS'e taşınıyor: adımlar ve "Convex nerede çalışacak" kararı
   Restore*: periyodik (günlük) yedek açılır; plan bunu desteklemiyorsa en
   azından her büyük değişiklikten önce *Backup now*. Ayda bir, yedek boş bir
   deployment'a geri yüklenerek denenir (todolist.md 4.1).
-- **Şirket dışa aktarımı:** Companies and plants → şirket → *Export data
+- **Şirket dışa aktarımı:** Company settings → Organization → şirket → *Export data
   (JSON)*: o şirketin bütün plant verisi tek dosya (kiralama bitince ya da
   elle yedek).
 
+## Ekranın yapısı
+
+- Üst çubuk her yerde aynı: logo (portal) · modül ▾ · modülün menüsü ·
+  Şirket › Plant ▾ · kullanıcı ▾.
+- Kullanıcı menüsü: **My account** (herkes; parola), **Company settings**
+  (creator: plant / bölüm / cost center, kullanıcılar, gruplar, listeler,
+  geçmiş), **Administration** (yalnızca General: holding, şirket, General'ler,
+  platform geçmişi, sistem hataları), Connection diagnostics, Sign out.
+
 ## İzleme ve kayıtlar
 
-- **System errors** (Companies and plants, yalnızca General): çöken sayfalar
+- **System errors** (Administration, yalnızca General): çöken sayfalar
   ve başarısız plan hesapları.
 - **History / Platform history**: kullanıcı, parola, yetki, şirket, plant,
   bölüm ve cost center değişiklikleri (kim, ne zaman, eski → yeni).

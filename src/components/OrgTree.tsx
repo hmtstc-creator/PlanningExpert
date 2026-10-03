@@ -41,8 +41,9 @@ export function LevelChip({ level, className = '' }: { level: Level; className?:
 }
 
 /** Seviyelerin zinciri: sayfanın üstünde yapının kendisi. */
-export function LevelLegend() {
-  const levels: Level[] = ['holding', 'company', 'plant', 'department', 'costCenter', 'workCenter']
+export function LevelLegend({ from = 'holding' }: { from?: Level }) {
+  const all: Level[] = ['holding', 'company', 'plant', 'department', 'costCenter', 'workCenter']
+  const levels = all.slice(all.indexOf(from))
   return (
     <ol className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" aria-label="Levels">
       {levels.map((l, i) => (
@@ -65,9 +66,11 @@ interface Props {
   onSelect: (n: OrgNode) => void
   /** General: holding'siz şirketi bir holding'e bağlayabilir. */
   canLink: boolean
+  /** Şirket kapsamı (Company settings): ağaç şirketten başlar, holding yok. */
+  companyRoot?: boolean
 }
 
-export function OrgTree({ holdings, companies, selected, onSelect, canLink }: Props) {
+export function OrgTree({ holdings, companies, selected, onSelect, canLink, companyRoot = false }: Props) {
   // Açık / kapalı düğümler; plant'e kadar açık başlar, bölümler kapalı.
   const [closed, setClosed] = useState<Set<string>>(() => new Set())
   const [openDepts, setOpenDepts] = useState<Set<string>>(() => new Set())
@@ -156,6 +159,7 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink }: Pr
     </Row>
   )
 
+  if (companyRoot) return <div className="text-sm">{companies.map(company)}</div>
   const orphans = orphanCompanies(holdings, companies)
   return (
     <div className="text-sm">

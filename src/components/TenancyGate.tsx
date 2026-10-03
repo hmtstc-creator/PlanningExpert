@@ -16,7 +16,7 @@ import { MODULE_LABELS } from '../lib/tenancy'
  * 3. Sayfanın modülünde izni yoksa sayfayı açmaz.
  */
 export function TenancyGate({ children }: { children: ReactNode }) {
-  const { ctx, can, isPlatform } = usePlant()
+  const { ctx, can, isPlatform, canManage } = usePlant()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const start = useMutation(api.tenancy.startMigration)
   const status = useQuery(api.tenancy.migrationStatus, ctx && !ctx.migration.done ? {} : 'skip') as
@@ -54,14 +54,16 @@ export function TenancyGate({ children }: { children: ReactNode }) {
     )
   }
 
-  const adminPage = pathname.startsWith('/platform') || pathname.startsWith('/yonetim')
-  if (!ctx.active && !(isPlatform && adminPage)) {
+  const under = (p: string) => pathname === p || pathname.startsWith(`${p}/`)
+  // Plant'siz de açılan sayfalar: hesap, teşhis; General için Administration.
+  const plantless = under('/account') || under('/tani') || (isPlatform && (under('/admin') || under('/platform')))
+  if (!ctx.active && !plantless) {
     return (
       <div className="mx-auto w-full max-w-md px-4 py-16 text-center text-sm text-muted-foreground">
         <p className="text-foreground">Your account has no plant yet.</p>
         <p className="mt-1">
           {isPlatform ? (
-            <Link to="/platform" className="underline">
+            <Link to="/admin" className="underline">
               Add a company and a plant
             </Link>
           ) : (
@@ -71,6 +73,10 @@ export function TenancyGate({ children }: { children: ReactNode }) {
       </div>
     )
   }
+
+  // Administration yalnızca General; Company settings şirketi yöneten (creator ya da General).
+  if (under('/admin') && !isPlatform) return <NoAccess text="Administration is for Generals only." />
+  if (under('/settings') && !canManage) return <NoAccess text="Company settings are managed by a creator of your company." />
 
   // Board görünümü: yalnızca özet ve dashboard'lar.
   if (ctx.isBoard && !boardAllows(pathname)) {
@@ -111,62 +117,13 @@ export function TenancyGate({ children }: { children: ReactNode }) {
   )
 }
 
-/**
- * Üst çubukta şirket ve fabrika — iki ayrı seçim: şirket yalnızca birden çok
- * şirketi görebilene (General, owner) çıkar; fabrika listesi seçili şirketin
- * fabrikalarıdır. Tek seçenek varsa yalnızca ad görünür. Listeler sunucudan
- * gelir: kullanıcı yalnızca yetkili olduğu şirket ve fabrikaları görür.
- */
-export function PlantSwitch({ light = false }: { light?: boolean }) {
-  const { ctx } = usePlant()
-  const select = useMutation(api.tenancy.selectPlant)
-  if (!ctx?.active) return null
-  const active = ctx.active
-  const cls = light
-    ? 'rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground'
-    : 'max-w-[11rem] rounded-md border border-white/25 bg-white/10 px-2 py-1 text-xs text-white'
-  const plain = `${cls} border-transparent bg-transparent`
-  const companies = [...new Map(ctx.plants.map((p) => [p.companyId, p.companyName])).entries()]
-  const plants = ctx.plants.filter((p) => p.companyId === active.companyId)
+function NoAccess({ text }: { text: string }) {
   return (
-    <span className="flex items-center gap-1">
-      {companies.length > 1 ? (
-        <select
-          aria-label="Company"
-          title="Company"
-          className={cls}
-          value={active.companyId}
-          onChange={(e) => {
-            const first = ctx.plants.find((p) => p.companyId === e.target.value)
-            if (first) void select({ plantId: first._id })
-          }}
-        >
-          {companies.map(([id, name]) => (
-            <option key={id} value={id} className="text-foreground">
-              {name}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <span className={plain} title="Company">
-          {active.companyName}
-        </span>
-      )}
-      <span className={light ? 'text-muted-foreground' : 'text-white/50'}>/</span>
-      {plants.length > 1 ? (
-        <select aria-label="Plant" title="Plant — the data on every page belongs to this plant" className={cls} value={active.plantId} onChange={(e) => void select({ plantId: e.target.value })}>
-          {plants.map((p, i) => (
-            <option key={p._id} value={p._id} className="text-foreground">
-              {/* Eski kayıtlarda aynı ad iki kez olabilir (artık açılamaz): ayırt edilsin. */}
-              {plants.findIndex((x) => x.name === p.name) === i ? p.name : `${p.name} (${i + 1})`}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <span className={plain} title="Plant">
-          {active.plantName}
-        </span>
-      )}
-    </span>
+    <div className="mx-auto w-full max-w-md px-4 py-16 text-center text-sm text-muted-foreground">
+      <p className="text-foreground">{text}</p>
+      <Link to="/" className="mt-2 inline-block underline">
+        Back to the portal
+      </Link>
+    </div>
   )
 }

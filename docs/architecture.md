@@ -171,6 +171,18 @@ Bunlar kodu değiştiren herkes (ve Claude) için bağlayıcıdır.
 17. Kayıt `useSafeMutation` / `friendlyError` ile; hata "Not saved" + neden
     olarak gösterilir, "[CONVEX …]" metni kullanıcıya çıkmaz.
 18. Silme işlemleri `window.confirm` ister (uiGuards testi denetler).
+18a. **Menü ve yönetim yapısı** (2026-10-03): tek tanım `src/lib/navigation.ts`
+    (alanlar: portal, PlanningExpert, OEE, Die, Machine, KPI, Board, Company
+    settings, Administration). Üst çubuk her alanda aynı: logo (portal) ·
+    alan ▾ (izinli modüller) · alanın menüsü · Şirket › Plant ▾ · kullanıcı ▾.
+    Yönetim modül menülerinde yoktur; kullanıcı menüsünden açılır:
+    - `/account` — herkes: kimlik, izinler, parola değiştirme.
+    - `/settings` — Company settings (creator; General seçili şirkette):
+      Organization (plant → bölüm → cost center), Users & groups, Selection
+      lists, Change history. Holding / şirket yönetimi burada **yok**.
+    - `/admin` — Administration (yalnızca General): holding'ler, şirketler,
+      kiralanan modüller, General'ler, platform geçmişi, sistem hataları.
+    Eski adresler `/platform`, `/yonetim` yönlendirir. Kapı: TenancyGate.
 19. Her sayfa `PageHeader` ile başlar (`src/components/PageHeader.tsx`):
     başlık, tek satır özet, uzun açıklama mavi **i** (`InfoTip`) içinde —
     üzerine gelince (dokunmatikte tıklayınca) açılır. Sayfa içindeki uzun

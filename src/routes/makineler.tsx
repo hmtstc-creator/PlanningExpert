@@ -178,7 +178,7 @@ function MakinelerPage() {
           <>
             <p>
               <b>Cost center:</b> every work center belongs to one cost center of the plant (Plant → Department →
-              Cost center → Work center). The cost centers are defined on Companies and plants; when the OEE data
+              Cost center → Work center). The cost centers are defined on Company settings; when the OEE data
               shows a work center under another cost center, the row says so.
             </p>
             <p>
@@ -218,8 +218,8 @@ function MakinelerPage() {
         <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
           This plant has no cost center yet. Every work center belongs to a cost center — add the departments and cost
           centers on{' '}
-          <Link to="/platform" className="underline">
-            Companies and plants
+          <Link to="/settings" className="underline">
+            Company settings
           </Link>{' '}
           first.
         </div>

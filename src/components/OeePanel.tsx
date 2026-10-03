@@ -257,7 +257,7 @@ export function OeeUploadButton() {
       if (all.problems.length) throw new Error(all.problems.join(' · '))
       const codes = (plant?.costCenters ?? []).map((c) => c.code)
       if (!codes.length) {
-        throw new Error(`${plant?.plantName ?? 'This plant'} has no cost center yet — a creator adds them on Companies and plants (Plant → Department → Cost centers).`)
+        throw new Error(`${plant?.plantName ?? 'This plant'} has no cost center yet — a creator adds them on Company settings → Organization.`)
       }
       const { parsed, skipped } = forPlantCostCenters(all, codes)
       const kept = parsed.shifts.length + parsed.daily.length + parsed.weekly.length + parsed.monthly.length + parsed.downtimes.length

@@ -59,9 +59,3 @@ export const PORTAL_MODULES: PortalModule[] = [
     ready: true,
   },
 ]
-
-/** Portal düzeyindeki sayfalar — PlanningExpert menüsü bunlarda gösterilmez. */
-export function isPortalPath(pathname: string): boolean {
-  if (pathname === '/') return true
-  return PORTAL_MODULES.some((m) => !m.ready && pathname === m.to)
-}

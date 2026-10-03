@@ -21,7 +21,7 @@ trendler önemli — KPI ve OEE. Birden çok şirketi olan kişi için yapı?
 
 | Kim | Nasıl tanımlanır | Görür |
 |---|---|---|
-| Holding board üyesi | Companies and plants → Holdings → Board members (General) | Holding'e bağlı bütün şirketlerin bütün plantleri: KPI ve OEE, salt okunur |
+| Holding board üyesi | Administration → holding → Board members (General) | Holding'e bağlı bütün şirketlerin bütün plantleri: KPI ve OEE, salt okunur |
 | Şirket board üyesi | Admin → User groups → "Board members" şablonu (Board view işaretli grup) | Şirketin grubun kapsadığı plantleri; grubun izinleri |
 
 Board görünümünde (holding board üyesi ya da yalnızca "Board view"
@@ -84,7 +84,7 @@ Kararlar:
    altında listelenir; kurulum listesinde "Departments and cost centers"
    adımı work center adımından önce gelir.
 
-Ekran (Companies and plants): solda ağaç (diyagram; renkli harf: H, C, P, D,
+Ekran (Administration ve Company settings → Organization): solda ağaç (diyagram; renkli harf: H, C, P, D,
 CC), sağda (telefonda altta) seçili düğümün paneli:
 
 | Düğüm | Panel |

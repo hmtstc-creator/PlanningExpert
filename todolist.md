@@ -8,6 +8,25 @@ geliştirme.
 
 ---
 
+## 0. Senden karar bekleyenler (özet)
+
+Ayrıntı ve gerekçe ilgili maddede; karar verilince madde güncellenir.
+
+| # | Karar | Madde |
+|---|---|---|
+| K1 | VPS: Convex bulutta mı (A), VPS'te mi (B)? | 4.1 |
+| K2 | Yedek hedefi: kabul edilen veri kaybı (RPO) ve geri dönüş süresi (RTO) | 4.1 |
+| K3 | Bölüm ile OEE Area birleşsin mi? | 2, 4.2 |
+| K4 | Organizasyon tarihli olsun mu (geçmiş raporlar eski yapıyla kalsın)? | 4.2 |
+| K5 | Work center kodu değişince OEE geçmişi de taşınsın mı? | 4.2 |
+| K6 | Eski kısa parolalar bir sonraki girişte değiştirilmeye zorlansın mı? | 4.3 |
+| K7 | Board / KPI kırılımına bölüm seviyesi; bölüm sorumlusu; holding hedefi; Board PDF | 2 |
+| K8 | KPI ağırlıkları (Absenteeism, Productivity birimi, saati boş satır) | 2 |
+| K9 | OEE: Avg setup'a ara süreler; kayıp grubu adları | 2 |
+| K10 | Koddaki sabit sayılar: programda mı, kullanıcıda mı (P/K) | 2 |
+| K11 | Fabrika karşılaştırma ekranının içeriği | 2 |
+| K12 | "Doğrudan main" yerine PR + inceleme düzeni | 4.1 |
+
 ## 1. Hemen — senin yapacakların (yeni yapıya geçiş)
 
 Organizasyon artık tepeden aşağı tek zincir:
@@ -129,7 +148,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 - [x] ✅ **P0 — İzleme yoktu** (2026-10-03, uygulama içi ilk adım):
   çöken sayfa, yakalanmamış ekran hatası ve plan hesabı hatası `errorLog`'a
   düşer (convex/errors.ts). Aynı hata 24 saatte tek satır + sayaç; kural
-  mesajları ve ağ kopmaları gönderilmez. General: Companies and plants →
+  mesajları ve ağ kopmaları gönderilmez. General: Administration →
   **System errors**.
   - [ ] **[S]** Dış izleme: erişilebilirlik alarmı (ör. UptimeRobot,
     ücretsiz) ve istenirse Sentry hesabı. Hesap açılınca bağlarım.
@@ -183,8 +202,9 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 - [ ] **P1 — Tarihsiz organizasyon.** Bir masraf yeri başka bölüme
   taşınınca geçmiş raporlar da yeni yapıya göre toplanıyor; geçmiş
   değişiyor.
-  → "Geçerlilik başlangıcı" olan organizasyon kayıtları. En azından ağaç
-  değişikliklerinin kaydı tutulsun.
+  - [x] ✅ Ağaç değişikliklerinin kaydı tutuluyor (denetim kaydı: bölüm,
+    masraf yeri eski → yeni).
+  - [ ] **[K]** "Geçerlilik başlangıcı" olan organizasyon kayıtları (K4).
 - [ ] **P1 — Bölümler ad listesi.** Bugün plant kaydında metin dizisi olarak
   duruyor; hedef, sorumlu ya da yetki eklenecekse ayrı bir tablo (ID) olmalı.
 - [ ] **P1 — Eski alanlar.** Şemada 8 `@deprecated` alan, kullanıcıda eski
@@ -259,6 +279,18 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   Rumen. → Dil katmanı (i18n); önce TR / EN.
 
 ### 4.5 Ürün
+
+- [x] ✅ **Header ve menü karışıktı** (2026-10-03): tek üst çubuk her
+  alanda aynı (logo · modül ▾ · modül menüsü · Şirket › Plant ▾ ·
+  kullanıcı ▾); PlanningExpert'te "System" ve tek sayfalık "Analysis"
+  grupları kalktı (Performance ve Decision Log → Planning); telefonda
+  çekmece. Tanım tek yerde: `src/lib/navigation.ts`.
+- [x] ✅ **Yönetim sayfaları ayrıldı** (2026-10-03): `/admin`
+  Administration (yalnızca General: holding, şirket, General, platform
+  geçmişi, sistem hataları), `/settings` Company settings (creator:
+  organizasyon, kullanıcı ve gruplar, seçim listeleri, geçmiş — holding /
+  şirket yönetimi yok), `/account` My account (herkes: izinler, parola).
+  Eski `/platform`, `/yonetim` yönlendirir.
 
 - [x] ✅ **Kurulum listesi organizasyonu kapsamıyordu** (2026-10-03
   düzeltildi): yeni adım "Departments and cost centers"; work center adımı

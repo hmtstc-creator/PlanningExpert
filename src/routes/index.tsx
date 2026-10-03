@@ -16,7 +16,7 @@ export const Route = createFileRoute('/')({
  * buradan her modül kendi sayfalarına açılır.
  */
 function PortalHome() {
-  const { ctx, can, canManage, isPlatform } = usePlant()
+  const { ctx, can, canManage } = usePlant()
   // Board görünümü doğrudan Board Dashboard'la açılır.
   if (ctx?.isBoard) return <Navigate to="/board" />
   // Yalnızca bu fabrikada izni olan modüller.
@@ -27,17 +27,6 @@ function PortalHome() {
       <p className="mt-1 text-muted-foreground">
         {ctx?.active ? `${ctx.active.companyName} · ${ctx.active.plantName} — choose a module.` : 'Choose a module.'}
       </p>
-      {(canManage || isPlatform) && (
-        <p className="mt-2 text-sm">
-          <Link to="/platform" className="underline">
-            {isPlatform ? 'Companies and plants' : 'Plants of your company'}
-          </Link>
-          {' · '}
-          <Link to="/yonetim" className="underline">
-            Users and groups
-          </Link>
-        </p>
-      )}
       {(ctx?.plants.length ?? 0) > 1 && (
         <p className="mt-1 text-sm">
           <Link to="/compare" className="underline">
