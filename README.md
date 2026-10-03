@@ -1,121 +1,117 @@
-# Üretim Planlama
+# PlanningExpert
 
-Preshane üretim planlama sistemi (Claude/Macaly'de geliştirildi, buradan
-Claude Code ile devam edilebilir).
+Pres üretimi için kiralanan, çok şirketli üretim planlama portalı:
+PlanningExpert (plan), OEE, KPI, Die Follow-up, Machine Follow-up ve Board
+Dashboard. Tek sistem, tek adres; her plant'in verisi ayrıdır.
 
-## Kurulum
+- Arayüz: React 19 + TanStack Start/Router + Tailwind v4 (Vercel)
+- Sunucu ve veritabanı: Convex
+- Hesap kütüphanesi: `src/lib` (saf TypeScript, React'e ve Convex'e bağlı değil)
+
+## Belgeler
+
+| Dosya | İçerik |
+|---|---|
+| `todolist.md` | **Bütün açık işler ve kararlar** — tek liste |
+| `docs/architecture.md` | Katmanlar, tek kaynak haritası, geliştirme kuralları |
+| `docs/decisions.md` | Planlama kararları (takvim, kapasite, setup, hammadde) |
+| `docs/fixeddefinitions.md` | Koddaki sabit sayılar (programda mı, kullanıcıda mı) |
+| `docs/plant-genisletme.md` | Çok şirket / çok plant ve yetki modeli |
+| `docs/board.md` | Holding, Board Dashboard, organizasyon ağacı |
+| `docs/oeedashboard.md` | OEE kararları ve dosya biçimi |
+| `docs/kpi.md` | KPI modülü |
+| Sitede **Planning Logic** | Kullanıcıya dönük plan kuralları |
+
+## Organizasyon
+
+```
+Holding → Company → Plant → Department → Cost center → Work center
+```
+
+Tepeden aşağı kurulur: şirket bir holding'in, cost center bir bölümün, work
+center bir cost center'ın altında açılır (Companies and plants, Work Center
+Definitions). Kiralama birimi şirkettir: kullanıcılar, gruplar, modüller.
+Yetki = grup × plant × modül (*yok · görür · düzenler*).
+
+## Kurulum ve geliştirme
 
 ```bash
 npm install
+npm run dev            # arayüz (http://localhost:3000)
+npx convex dev         # Convex işlevlerini izler ve deploy eder (.env.local)
 ```
 
-Bu proje mevcut Convex backend'ine (`.env.local` içinde tanımlı) bağlanacak
-şekilde ayarlı — yani Referanslar, Siparişler, Stoklar vb. sayfalara daha
-önce girdiğin tüm veri korunuyor, sıfırdan kurulum gerekmiyor.
-
-## Geliştirme
+## Doğrulama (her değişiklikten önce)
 
 ```bash
-npm run dev
+npm run verify         # tip kontrolü + bütün testler + build
 ```
 
-Ayrıca arka planda Convex fonksiyonlarını izlemek ve deploy etmek için:
+Aynısı her push'ta GitHub Actions'ta koşar (`.github/workflows/ci.yml`).
+Kırmızı CI = main bozuk; önce o düzeltilir.
 
-```bash
-npx convex dev
-```
+## Yayın (deploy)
 
-## Önemli notlar
-
-- Bu proje Macaly Cloud'dan dışa aktarıldı. `@macaly/bridge` ve
-  `@macaly/static-tagger` paketleri (Macaly'ye özel) kaldırıldı; bunlar
-  olmadan proje normal şekilde çalışır.
-- `src/components/ui/*` klasörü (shadcn/ui bileşenleri) bu pakette YOK —
-  şu anki sayfalar bunlara ihtiyaç duymuyor. İleride ihtiyaç olursa:
-  `npx shadcn@latest add <bileşen-adı>`
-- Convex şemasında bazı alanlar `@deprecated` olarak işaretli
-  (`machines`, `machinePriorities` tabloları, `products` içindeki `name`,
-  `material`, `cycleTimeSeconds`) — bunlar eski sürümlerden kalma,
-  geriye dönük uyumluluk için tutuluyor, silersen mevcut veriler bozulabilir.
-
-## Sayfalar
-
-- `/` — Özet (dashboard)
-- `/siparisler` — ZPP / ZPP_DAILY yükleme ve görüntüleme
-- `/stoklar` — MB52 stok yükleme, özet/detay görünüm
-- `/referanslar` — Kalıp/makine referans verisi
-- `/planlama` — Talep oluşturma (ZPP'den otomatik veya elle) + plan üretme
-- `/depolar` — Depo yeri kategorileri (planlamaya dahil / satılmış-buffer / hariç)
-- `/takvim` — Vardiya, çalışma günleri, tatiller
-- `/kayitlar` — Karar/kural/geliştirme/sorun kayıtları
-
-## Sayfalar
-
-| Sayfa | Ne yapar |
-| --- | --- |
-| Özet | Günlük durum, bakiye, uyarılar, akış adımları |
-| Siparişler | ZPP / ZPP_DAILY talep yükleme |
-| Stoklar | MB52 stok yükleme |
-| Gerçekleşen | MB51 gerçekleşen üretim yükleme |
-| Referanslar | Kalıp/makine kartları, göz sayısı, SPM, ağırlıklar, max shot |
-| Planlama | Otomatik plan, müdahale, onay |
-| Performans | Plan/gerçekleşen karşılaştırması, kapasite katsayısı |
-| Makine Tanımları | Pres ve hol tanımları (vinç kısıtı buradan) |
-| Kalıp Ömrü | Kalıp vuruş sayacı ve bakım kayıtları |
-| Depo Tanımları | Depo yerlerinin kategorilendirilmesi |
-| Çalışma Takvimi | Vardiya, mola, tatil, plan ufku, pres bazlı takvim |
-| Bağlantı Teşhisi | Hangi veritabanına bağlı olduğunu gösterir |
-
-## Planlama motoru
-
-Plan tamamen otomatik hesaplanır; elle plan girilmez. Öncelik sırası:
-
-1. **Bakiye** (gecikmiş talep) — plan başından itibaren üretilebilir.
-2. **Acil** — stoğu en çabuk bitecek malzemeler (stok kaç gün yetiyor).
-3. **Dolgu** — kalan kapasite; bu kalemler kendi ihtiyaç haftasından önce
-   üretilmez, aksi halde erken üretim stok şişirir.
-
-Gözetilen kısıtlar:
-
-- Aynı holdeki presler aynı anda setup yapamaz (vinç); ardışık setuplar
-  arasında en az `setupGapMinutes` bırakılır.
-- Aynı kalıp aynı anda iki preste çalışamaz (dakika aralığı bazlı kontrol);
-  aynı gün içinde ardışık çalışabilir.
-- Kalıp maksimum baskı limiti aşılıyorsa üretim partilere bölünür.
-- Rulo sayısı brüt ağırlık ve rulo ağırlığından hesaplanır; her rulo için
-  rulo setup süresi eklenir.
-- Eş üründen (aynı vuruşta çıkan parça) üretilen miktar, eş ürünün
-  talebinden düşülür.
-- Resmi tatiller ve çalışma günü tanımı kapasiteyi sıfırlar/kısar; vardiya
-  başına mola süresi her vardiyadan düşülür.
-
-Hesaplama katmanı Convex ve React'ten bağımsızdır (`src/lib/`), bu yüzden
-birim testi yazılabilir:
-
-```bash
-npm test
-```
-
-## "Telefonda girdiğim veri bilgisayarda görünmüyor"
-
-Bunun tek sebebi vardır: iki cihaz farklı Convex deployment'ına bakıyordur.
-
-1. **Ayarlar → Bağlantı Teşhisi** sayfasını hem telefonda hem bilgisayarda aç.
-2. **Deployment** satırındaki adı karşılaştır.
-3. Adlar farklıysa Vercel projesindeki `CONVEX_DEPLOY_KEY` bir `preview:`
-   anahtarıdır. Preview anahtarı her dal için ayrı ve geçici bir veritabanı
-   oluşturur. Convex panelinden `prod:` ile başlayan production anahtarını
-   alıp Vercel'de değiştir.
-4. Adlar aynıysa ve kayıt sayıları farklıysa tarayıcı önbelleğidir —
-   sayfayı yenile.
-
-Yazma hatası olursa artık ekranın altında uyarı çıkar; sessizce kaybolmaz.
-
-## Vercel build komutu
-
-`convex deploy --cmd`, build komutunu codegen'den ÖNCE çalıştırır; bu yüzden
-codegen ayrıca çağrılmalıdır:
+`main`'e giden her commit Vercel'de production'a çıkar. Vercel build komutu:
 
 ```
 npx convex codegen && npx convex deploy --cmd 'npm run build' --cmd-url-env-var-name VITE_CONVEX_URL
 ```
+
+- Vercel **Production** ortamında `CONVEX_DEPLOY_KEY` = Convex'in `prod:`
+  anahtarı.
+- **Preview** (PR) yayınları için Preview ortamına ayrı bir Convex *preview*
+  anahtarı gerekir; yoksa PR build'i düşer (production'a dokunmaz).
+- Yayından sonra kullanıcıya Ctrl+F5.
+
+## Yedek ve geri yükleme
+
+- **Convex yedeği:** Convex panelinde production deployment → *Backup &
+  Restore*: periyodik (günlük) yedek açılır; plan bunu desteklemiyorsa en
+  azından her büyük değişiklikten önce *Backup now*. Ayda bir, yedek boş bir
+  deployment'a geri yüklenerek denenir (todolist.md 4.1).
+- **Şirket dışa aktarımı:** Companies and plants → şirket → *Export data
+  (JSON)*: o şirketin bütün plant verisi tek dosya (kiralama bitince ya da
+  elle yedek).
+
+## İzleme ve kayıtlar
+
+- **System errors** (Companies and plants, yalnızca General): çöken sayfalar
+  ve başarısız plan hesapları.
+- **History / Platform history**: kullanıcı, parola, yetki, şirket, plant,
+  bölüm ve cost center değişiklikleri (kim, ne zaman, eski → yeni).
+- **Change Log** (System menüsü): plant içindeki değişiklikler.
+
+## Giriş ve güvenlik
+
+- Parolalar PBKDF2-SHA512 + kullanıcıya özel tuzla saklanır; oturum 12 saat.
+- Yeni parola en az 8 karakter, harf + rakam; art arda 5 hatalı parolada
+  hesap 15 dakika kilitlenir (creator yeni parola verince açılır).
+- Boş kurulumda ilk hesap `admin` / `admin` olarak açılır ve ilk girişte
+  değiştirilmesi zorunludur. Parola unutulursa: creator yeni geçici parola
+  verir; site sahibinin parolası Convex panelinden `auth:resetPassword` ile
+  sıfırlanır.
+
+## Yeni plant kurulumu
+
+Portal ana sayfasındaki kurulum listesi sırayla yol gösterir: ülke ve saat
+dilimi → bölümler ve cost center'lar → work center'lar (cost center + hol) →
+Work Calendar → Storage Locations → Master Data → SAP verileri → OEE →
+kullanıcılar ve gruplar.
+
+## Sorun giderme: "Telefonda girdiğim veri bilgisayarda görünmüyor"
+
+İki cihaz farklı Convex deployment'ına bakıyordur.
+
+1. **System → Connection Diagnostics** sayfasını iki cihazda da aç.
+2. **Deployment** adlarını karşılaştır.
+3. Farklıysa Vercel'deki `CONVEX_DEPLOY_KEY` bir `preview:` anahtarıdır;
+   Convex panelinden `prod:` anahtarını alıp Vercel'de değiştir.
+4. Aynıysa ve sayılar farklıysa tarayıcı önbelleğidir — sayfayı yenile.
+
+## Notlar
+
+- Proje Macaly'den dışa aktarıldı; `src/components/ui` (shadcn) pakette yok,
+  gerekirse `npx shadcn@latest add <bileşen>`.
+- Şemada `@deprecated` işaretli alanlar eski verinin okunması için duruyor;
+  silinmeleri bir geçiş gerektirir (todolist.md 4.2).

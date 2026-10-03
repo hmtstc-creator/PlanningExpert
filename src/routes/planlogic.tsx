@@ -203,7 +203,7 @@ function PlanLogicPage() {
               'Cavities, strokes per minute (SPM), setup and coil change times, quality approval time, coil and gross weight, mould shot limit, main and alternative work centers, Flexible work center tick, co-product, Accepted OEE',
               '/referanslar',
             ],
-            ['Presses', 'The single work center list: hall (crane and setup team), category (Gantt and Capacity Dashboard groups), coil fed, frozen days', '/makineler'],
+            ['Work Centers', 'The single work center list: cost center, hall (crane and setup team), category (Gantt and Capacity Dashboard groups), coil fed, frozen days', '/makineler'],
             ['Work calendar', 'Per work center: weekly pattern (days from Monday × shifts), exception weeks, overtime (dated or recurring, from an overtime type); planned stops; public and manual holidays; planning settings', '/takvim'],
             ['Dies', 'Readiness (date and time), maintenance days, shot-limit alarms — from Die Follow-up', '/die-followup/maintenance'],
             ['Machines', 'Planned work center maintenance hours and open breakdowns that stop a work center — from Machine Follow-up', '/machine-followup/breakdowns'],

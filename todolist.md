@@ -119,10 +119,12 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   → Convex preview deploy key'i Vercel Preview ortamına ekle. Mümkünse
   anonimleştirilmiş veriyle sürekli bir staging tut.
 - [ ] **P0 — Yedek yok.** Tek koruma, şirket bazında elle alınan JSON
-  dışa aktarımı; geri yükleme hiç denenmedi.
-  → Convex'te zamanlanmış yedek (snapshot export) kur ve ayda bir geri
-  yükleme provası yap. Geri dönüş süresi (RTO) ve göze alınan veri kaybı
-  (RPO) yazılı olsun.
+  dışa aktarımı; geri yükleme hiç denenmedi. Kodla çözülemez, Convex
+  hesabından açılır — adımlar README → "Yedek ve geri yükleme".
+  - [ ] **[S]** Convex panel → production → Backup & Restore: günlük yedek.
+  - [ ] **[S]** İlk geri yükleme provası (boş bir deployment'a).
+  - [ ] **[K]** Göze alınan veri kaybı (RPO, ör. 24 saat) ve geri dönüş
+    süresi (RTO, ör. 4 saat) — müşteri sözleşmesine girecek değerler.
 - [x] ✅ **P0 — İzleme yoktu** (2026-10-03, uygulama içi ilk adım):
   çöken sayfa, yakalanmamış ekran hatası ve plan hesabı hatası `errorLog`'a
   düşer (convex/errors.ts). Aynı hata 24 saatte tek satır + sayaç; kural
@@ -207,10 +209,12 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 
 - [ ] **P1 — Dağınık karar defteri.** Kararlar 7 dosyaya yayılmış
   (decisions, oeedashboard 509 satır, plant-genisletme 473 satır …).
-  "Açık sorular" bölümlerinin çoğu aslında cevaplanmış. README eski:
-  Macaly notları, iki kez "Sayfalar" başlığı, OEE / KPI / Board yok.
-  → Kararlar tek "karar günlüğü"nde (tarih + karar + gerekçe), açık işler
-  yalnızca bu dosyada, README güncel kurulum ve sayfa listesi.
+  "Açık sorular" bölümlerinin çoğu aslında cevaplanmış.
+  - [x] ✅ README yeniden yazıldı (2026-10-03): belgeler haritası,
+    organizasyon, doğrulama, yayın, yedek, izleme, güvenlik, yeni plant
+    kurulumu. Açık işler yalnızca bu dosyada.
+  - [ ] **[G]** Kararları tek "karar günlüğü"ne (tarih + karar + gerekçe)
+    taşımak; eski "Açık sorular" bölümlerini kapatmak.
 - [ ] **P1 — Dev dosyalar.** `planlama.tsx` 2000, `scheduler.ts` 2146,
   `planValidator.ts` 2005, `takvim.tsx` 1371, `platform.tsx` ~1200 satır.
   İncelemek ve değiştirmek zor.
@@ -219,7 +223,8 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   alan adı yazım hatası derlemede yakalanmıyor.
   → Convex'in ürettiği tipleri (`DataModel`) kullan, `Any`'yi kademeli
   kaldır, ESLint ekle (projede lint yok).
-- [ ] **P2 — Ad karmaşası.** Ekran "work center" diyor; tablo `presses`,
+- [ ] **P2 — Ad karmaşası.** (Menüde kalan "Presses" → "Work Centers"
+  düzeltildi, 2026-10-03.) Ekran "work center" diyor; tablo `presses`,
   alan `press`. Rotalar Türkçe (`/makineler`, `/takvim`, `/referanslar`),
   arayüz İngilizce, yorumlar Türkçe.
   → Rotaları İngilizceye çevir (eski adresler yönlendirsin); kodda
