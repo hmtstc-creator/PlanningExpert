@@ -12,6 +12,8 @@ export interface PressRecord {
   category?: string
   feedsCoil?: boolean
   frozenDays?: number
+  /** Bağlı masraf yeri (fabrikanın cost center kodu). */
+  costCenter?: string
 }
 
 /**
@@ -23,6 +25,7 @@ export interface PressDraft {
   category: string
   feedsCoil: boolean
   frozenDays: string
+  costCenter: string
 }
 
 export function draftOf(press: PressRecord): PressDraft {
@@ -32,6 +35,7 @@ export function draftOf(press: PressRecord): PressDraft {
     // Alan hiç yazılmamışsa rulo beslemeli kabul edilir.
     feedsCoil: press.feedsCoil !== false,
     frozenDays: press.frozenDays === undefined ? '' : String(press.frozenDays),
+    costCenter: press.costCenter ?? '',
   }
 }
 
@@ -40,7 +44,8 @@ export function sameDraft(a: PressDraft, b: PressDraft): boolean {
     a.hall === b.hall &&
     a.category === b.category &&
     a.feedsCoil === b.feedsCoil &&
-    a.frozenDays === b.frozenDays
+    a.frozenDays === b.frozenDays &&
+    a.costCenter === b.costCenter
   )
 }
 
@@ -59,6 +64,7 @@ export interface PressPayload {
   category: string | undefined
   feedsCoil: boolean
   frozenDays: number | undefined
+  costCenter: string | undefined
 }
 
 /** Taslağı, sunucuya gidecek eksiksiz kayda çevirir. */
@@ -70,5 +76,7 @@ export function pressPayload(name: string, draft: PressDraft): PressPayload {
     category: draft.category.trim() || undefined,
     feedsCoil: draft.feedsCoil,
     frozenDays: optionalNumber(draft.frozenDays, 0),
+    // Zorunlu (yeni kayıtta); boşsa sunucu reddeder.
+    costCenter: draft.costCenter.trim() || undefined,
   }
 }

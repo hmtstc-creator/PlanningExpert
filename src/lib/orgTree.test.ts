@@ -11,6 +11,8 @@ import {
   renameDepartment,
   structureIssues,
   unassignedOf,
+  unlinkedWorkCenters,
+  workCentersOf,
   type OrgCompany,
   type OrgGroup,
   type OrgPlant,
@@ -26,6 +28,7 @@ const plant: OrgPlant = {
     { code: 'B', name: 'Press B', department: 'Stamping' },
     { code: 'OLD', name: 'Legacy' },
   ],
+  workCenters: [{ name: 'PRS-106', costCenter: 'A' }, { name: 'PRS-107', costCenter: 'A' }, { name: 'PRS-108' }, { name: 'PRS-109', costCenter: 'GONE' }],
 }
 const company: OrgCompany = { _id: 'c1', name: 'Metal', status: 'active', modules: ['planning', 'oee', 'kpi'], holdingId: 'h1', plants: [plant] }
 
@@ -36,7 +39,10 @@ describe('organizasyon ağacı', () => {
       ['Welding', []],
     ])
     expect(unassignedOf(plant).map((c) => c.code)).toEqual(['OLD'])
-    expect(countsOf([company])).toEqual({ companies: 1, plants: 1, departments: 2, costCenters: 3 })
+    expect(countsOf([company])).toEqual({ companies: 1, plants: 1, departments: 2, costCenters: 3, workCenters: 4 })
+    expect(workCentersOf(plant, 'A').map((w) => w.name)).toEqual(['PRS-106', 'PRS-107'])
+    // Bağsız ya da fabrikada olmayan koda bağlı work center.
+    expect(unlinkedWorkCenters(plant).map((w) => w.name)).toEqual(['PRS-108', 'PRS-109'])
   })
 
   it('eksikler tepeden aşağı: holding’siz şirket, boş holding, aynı adlı plant, boş bölüm, bölümsüz masraf yeri', () => {
@@ -49,6 +55,7 @@ describe('organizasyon ağacı', () => {
       'Empty has no company yet',
       'Metal › Romania › Welding: no cost center yet',
       'Metal › Romania: 1 cost center without a department',
+      'Metal › Romania: 2 work centers without a cost center (PRS-108, PRS-109)',
       'Hala5 › Smartcar: no department yet',
       'Twin: two plants are named stamping  — merge or rename one',
     ])

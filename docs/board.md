@@ -52,7 +52,7 @@ Planlamacı: "ilişki yapısını güçlendir; tepeden aşağı kurulsun, her ş
 önce holding tanımı gerekir; kullanıcıları her seviyenin altında görelim."
 
 ```
-Holding → Company → Plant → Department → Cost center
+Holding → Company → Plant → Department → Cost center → Work center
 ```
 
 Kararlar:
@@ -74,6 +74,15 @@ Kararlar:
    sonra konuşulacak.
 5. Yetki seviyesi değişmedi: erişim plant × modül (gruplar). Bölüm ve masraf
    yeri seviyesinde ayrı yetki yok.
+6. **Her work center bir masraf yerine bağlıdır** (2026-10-03, planlamacı;
+   `presses.costCenter`). Bağ Work Center Definitions'ta seçilir. Yeni work
+   center masraf yerisiz açılmaz, bağ boşaltılamaz, plant'in olmayan kodu
+   kabul edilmez; work center'ı olan masraf yeri kaldırılamaz. Eski bağsız
+   work center'lar uyarıda kalır (planlamacı düzeltir). OEE verisindeki
+   masraf yeri tanımdan farklıysa satırda "OEE data: … · use" görünür;
+   program kendiliğinden değiştirmez. Ağaçta work center'lar masraf yerinin
+   altında listelenir; kurulum listesinde "Departments and cost centers"
+   adımı work center adımından önce gelir.
 
 Ekran (Companies and plants): solda ağaç (diyagram; renkli harf: H, C, P, D,
 CC), sağda (telefonda altta) seçili düğümün paneli:

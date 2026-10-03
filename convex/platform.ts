@@ -94,6 +94,15 @@ async function plantNameFree(db: Any, companyId: string, name: string, except?: 
   }
 }
 
+/** Fabrikanın work center'ları (ad + masraf yeri), ada göre. */
+async function workCentersOf(db: Any, plantId: string): Promise<{ name: string; costCenter?: string }[]> {
+  const rows: Any[] = await db
+    .query('presses')
+    .withIndex('by_name', (q: Any) => q.eq('plantId', plantId))
+    .collect()
+  return rows.map((r) => ({ name: r.name, ...(r.costCenter ? { costCenter: r.costCenter } : {}) }))
+}
+
 function requirePlatform(me: Any) {
   if (!isPlatform(me)) throw new ConvexError('Only a General can do this')
 }
@@ -111,10 +120,13 @@ export const companies = userQuery({
         : []
     const out: Any[] = []
     for (const c of all) {
-      const plants = await ctx.db
+      const plantDocs: Any[] = await ctx.db
         .query('plants')
         .withIndex('by_company', (q: Any) => q.eq('companyId', c._id))
         .collect()
+      // Work center'lar ağacın en alt seviyesi: masraf yerine bağlı (organizasyon teyidi).
+      const plants: Any[] = []
+      for (const p of plantDocs) plants.push({ ...p, workCenters: await workCentersOf(ctx.db, p._id) })
       const users = await ctx.db
         .query('users')
         .withIndex('by_company', (q: Any) => q.eq('companyId', c._id))
@@ -243,6 +255,13 @@ export const updatePlant = userMutation({
         }
       }
       patch.costCenters = checkCostCenters(costCenters, departments, before)
+      // Work center'ı bağlı olan masraf yeri kaldırılamaz.
+      const kept = new Set(patch.costCenters.map((c: CostCenter) => c.code))
+      const orphaned = (await workCentersOf(ctx.db, args.id)).filter((w) => w.costCenter && !kept.has(w.costCenter))
+      if (orphaned.length) {
+        const cc = orphaned[0].costCenter
+        throw new ConvexError(`Cost center ${cc} still has work centers (${orphaned.filter((w) => w.costCenter === cc).map((w) => w.name).join(', ')}) — move them on Work Center Definitions first`)
+      }
     }
     if (args.disabledModules !== undefined) {
       const same = JSON.stringify([...args.disabledModules].sort()) === JSON.stringify([...(plant.disabledModules ?? [])].sort())

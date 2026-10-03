@@ -37,7 +37,22 @@ export const checklist = guardedQuery({
       .first()
     return [
       { key: 'plant', module: 'planning', label: 'Country and time zone of the plant', to: '/platform', done: !!ctx.plant.country && !!ctx.plant.timeZone, hint: 'Holidays and every date and hour of the plan use them.' },
-      { key: 'presses', module: 'planning', label: 'Work Center Definitions — work centers and halls', to: '/makineler', done: presses.length > 0 && presses.every((p) => !!p.hall?.trim()), hint: 'Every work center needs a hall (crane constraint).' },
+      {
+        key: 'organization',
+        module: 'planning',
+        label: 'Departments and cost centers of the plant',
+        to: '/platform',
+        done: (ctx.plant.costCenters ?? []).length > 0 && (ctx.plant.costCenters ?? []).every((c: Any) => !!c.department && (ctx.plant.departments ?? []).includes(c.department)),
+        hint: 'Plant → Department → Cost center: every cost center belongs to a department.',
+      },
+      {
+        key: 'presses',
+        module: 'planning',
+        label: 'Work Center Definitions — cost center and hall of every work center',
+        to: '/makineler',
+        done: presses.length > 0 && presses.every((p) => !!p.hall?.trim() && (ctx.plant.costCenters ?? []).some((c: Any) => c.code === p.costCenter)),
+        hint: 'Every work center belongs to a cost center and needs a hall (crane constraint).',
+      },
       { key: 'calendar', module: 'planning', label: 'Work Calendar — shift length, days and shifts per work center', to: '/takvim', done: !!settings && (await any(db.query('pressTemplates'))), hint: 'Without a pattern a work center has no capacity.' },
       { key: 'locations', module: 'planning', label: 'Storage Locations — which stock counts', to: '/depolar', done: locations.some((l) => l.countFinished === true), hint: 'No location is counted until it is ticked.' },
       { key: 'master', module: 'planning', label: 'Master Data — parts, work centers, cycle and lot rules', to: '/referanslar', done: await any(db.query('products')), hint: 'Upload or enter the part master.' },

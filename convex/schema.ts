@@ -172,6 +172,12 @@ export default defineSchema({
     // Bu presin planı kaç gün ileriye kadar dondurulmuş sayılsın.
     // Tanımsızsa global ayar geçerlidir.
     frozenDays: v.optional(v.number()),
+    /**
+     * Bağlı olduğu masraf yeri (fabrikanın cost center kodu). Her work
+     * center bir masraf yerine aittir: Plant → Department → Cost center →
+     * Work center. Boş olan eski kayıtlar düzeltilene kadar uyarı verir.
+     */
+    costCenter: v.optional(v.string()),
   }).index('by_name', ['plantId', 'name'])
     .index('by_plant', ['plantId']),
 

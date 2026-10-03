@@ -1,0 +1,225 @@
+# PlanningExpert — yapılacaklar listesi
+
+Tek liste. Dağınık duran açık notlar buraya toplandı (2026-10-03); her
+maddenin yanında geldiği yer yazıyor. Bir madde bitince ✅ ile işaretlenir,
+yeni karar ilgili docs dosyasına da yazılır. Kısaltmalar: **[S]** sen
+(planlamacı / site sahibi) yaparsın · **[K]** karar gerekiyor · **[G]**
+geliştirme.
+
+---
+
+## 1. Hemen — senin yapacakların (yeni yapıya geçiş)
+
+Organizasyon artık tepeden aşağı tek zincir:
+
+```
+Holding → Company → Plant → Department → Cost center → Work center
+```
+
+- [ ] **[S]** Bir holding aç; holding'siz şirketleri (Metal Stamping, Hala5)
+  şirket panelinde holding'e bağla.
+- [ ] **[S]** Aynı şirkette iki "Stamping" plant'i var: biri fazlaysa sil
+  (verisi olanı tut), değilse adını değiştir.
+- [ ] **[S]** Her plant'e bölümleri ekle; "Without a department" altındaki
+  masraf yerlerini bölümlerine taşı.
+- [ ] **[S]** Work Center Definitions'ta her work center'ın masraf yerini
+  seç. Bağsız olanlar sayfanın üstünde ve ağaçta uyarı verir. OEE verisi
+  başka bir masraf yeri gösteriyorsa satırda "OEE data: … · use" çıkar.
+- [ ] **[S]** "Things to finish" listesi boşalana kadar devam et.
+
+### Organizasyon teyidi (2026-10-03)
+
+| Bağ | Durum | Nasıl korunuyor |
+|---|---|---|
+| Company → Holding | ✅ zorunlu | şirket holding içinde açılır, holding'siz bırakılamaz; şirketi olan holding silinmez |
+| Plant → Company | ✅ zorunlu | baştan beri |
+| Department → Plant | ✅ | plant kaydında, ad fabrikada tek |
+| Cost center → Department | ✅ yeni kayıtta zorunlu | bölümsüz yeni masraf yeri kaydedilmez; masraf yeri olan bölüm silinmez; eski kayıtlar "Without a department" uyarısında |
+| Work center → Cost center | ✅ yeni kayıtta zorunlu (bu tur) | yeni work center masraf yerisiz açılmaz, bağ boşaltılamaz, başka plant'in kodu kabul edilmez; work center'ı olan masraf yeri kaldırılamaz; eski kayıtlar uyarıda |
+| OEE verisi → Cost center | ✅ | yüklemede yalnızca plant'in masraf yerleri alınır |
+| KPI → Cost center | ✅ | kayıtta plant'in masraf yeri olmayan satır reddedilir |
+| Work center tanımı ↔ OEE verisi | ⚠️ yalnızca uyarı | tanım ile verideki masraf yeri farklıysa ekranda yazar, program düzeltmez |
+| Master data makine adları → Work center | ⚠️ serbest metin | tanımsız makine Work Center Definitions'ta uyarı olarak çıkar; bağ ad üzerinden (bkz. 4.2) |
+
+---
+
+## 2. Açık kararlar (konuşulacak)
+
+### Organizasyon ve Board
+- [ ] **[K]** Board Dashboard ve KPI kırılımına bölüm seviyesi (plant →
+  bölüm → masraf yeri) eklensin mi? *(docs/board.md)*
+- [ ] **[K]** Bölüm ile OEE **Area** birleşsin mi? Şu an iki ayrı gruplama
+  var (bkz. 4.2). *(docs/board.md)*
+- [ ] **[K]** Bölüme sorumlu kullanıcı atansın mı? *(docs/board.md)*
+- [ ] **[K]** Holding'e kendi hedefi (ör. grup OEE hedefi) girilsin mi,
+  yoksa yalnızca şirket planlarının toplamı mı kullanılsın? *(docs/board.md)*
+- [ ] **[K]** Board Dashboard'un A3 / PDF çıktısı (KPI dashboard'undaki
+  gibi). *(docs/board.md)*
+- [ ] **[K]** Fabrika karşılaştırma ekranının içeriği (ilk sürüm yalnızca
+  OEE). *(docs/plant-genisletme.md — aşama 7)*
+
+### KPI
+- [ ] **[K]** Absenteeism % ağırlığı: normal mevcudiyet saati mi, operatör
+  sayısı mı? *(docs/kpi.md → Açık notlar)*
+- [ ] **[K]** Productivity'nin birimi (adet/saat, adet/kişi …): birime göre
+  doğru ağırlık değişir. *(docs/kpi.md)*
+- [ ] **[K]** Saati boş satırın ağırlığı (bugün: hiçbirinde saat yoksa
+  eşit, bazılarında varsa 0). *(docs/kpi.md)*
+
+### OEE
+- [ ] **[K]** Avg setup'a, birleşen setup kayıtları arasındaki süre de
+  katılsın mı? *(docs/oeedashboard.md → Bekleyen konular)*
+- [ ] **[G]** Parça bazlı setup süresi Master Data'da (APR için şimdilik
+  alan bazlı 10 dk). *(docs/oeedashboard.md)*
+- [ ] **[K]** Kayıp grubu adları programda mı kalsın, tabloya mı
+  ayrılsın? *(docs/oeedashboard.md, soru 9)*
+
+### Planlama ve sabit değerler
+- [ ] **[K]** Koddaki sabit sayılar için P (programda kalır) / K
+  (kullanıcı tanımlar) kararı — kararı boş olan satırlar: 1–10, 13–21, 23,
+  24, 28. Öneriler tabloda var. *(docs/fixeddefinitions.md)*
+- [ ] **[G]** Hammadde: talep yoksa sipariş yok; kanban ileride ayrı
+  kural. *(docs/decisions.md, src/lib/rawMrp.ts)*
+
+### Platform
+- [ ] **[G]** Platform değişiklik kaydı: kullanıcı açma, parola, yetki,
+  askıya alma bugün hiçbir kayıtta görünmüyor. *(docs/plant-genisletme.md
+  → Kalan)*
+
+---
+
+## 3. Kapanmış ama izlenecek
+
+- MB51'de hareket türü olmayan eski satırlar: sorun değil, veriler
+  yenilenebilir. *(docs/decisions.md, madde 13 → oeedashboard.md)*
+- Deploy: Vercel güvenlik açığı nedeniyle TanStack Start 1.168.60'a
+  yükseltildi; paket güncellemeleri düzenli izlenmeli (bkz. 4.1).
+
+---
+
+## 4. Kurumsallaşma — acımasız eleştiri ve yapılacaklar
+
+Kısaca: program işlevsel olarak zengin. Ancak **tek kişi + tek ajan +
+doğrudan production** ile yürüyor. Bir müşteriye "kurumsal ürün" diye
+kiralanacaksa en zayıf yer kod değil; güvence: test kapısı, yedek,
+güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan önce,
+**P1** = ilk aylarda, **P2** = büyürken.
+
+### 4.1 Güvence ve operasyon
+
+- [ ] **P0 — CI yok.** 600'den fazla test var, ama yalnızca biri elle
+  çalıştırırsa koşuyor. `main`'e giden her push doğrudan bütün
+  müşterilerin production'ına çıkıyor ve arada hiçbir kapı yok.
+  → GitHub Actions: her push'ta `tsc`, `vitest`, `vite build`. Kırmızıysa
+  deploy etme.
+- [ ] **P0 — Staging yok, preview kırık.** Vercel Preview'da Convex anahtarı
+  yok; PR açınca build düşüyor. Değişikliği gerçek veriye benzer bir yerde
+  denemenin yolu yok.
+  → Convex preview deploy key'i Vercel Preview ortamına ekle. Mümkünse
+  anonimleştirilmiş veriyle sürekli bir staging tut.
+- [ ] **P0 — Yedek yok.** Tek koruma, şirket bazında elle alınan JSON
+  dışa aktarımı; geri yükleme hiç denenmedi.
+  → Convex'te zamanlanmış yedek (snapshot export) kur ve ayda bir geri
+  yükleme provası yap. Geri dönüş süresi (RTO) ve göze alınan veri kaybı
+  (RPO) yazılı olsun.
+- [ ] **P0 — İzleme yok.** Hata takibi (Sentry vb.) ve erişilebilirlik
+  alarmı yok; bir hatayı ancak kullanıcı fark ederse öğreniyoruz.
+  → İstemci ve sunucu hata takibi; plan motoru ve saat başı hesap için
+  "çalışmadı" alarmı.
+- [ ] **P1 — Kod incelemesi yok, bus factor 1.** 51 commit'in hepsi aynı
+  yazardan, hiçbiri incelenmedi.
+  → Önemli değişiklik PR ile gelsin; CI yeşilse ve en az bir okuma
+  yapıldıysa merge edilsin (bu, "doğrudan main" kuralını değiştirir — karar
+  senin).
+- [ ] **P1 — Sürüm notu yok.** "Bir güncelleme herkese aynı anda gider"
+  kararı doğru, ama müşteri neyin değiştiğini bilmiyor.
+  → Kullanıcıya dönük değişiklik günlüğü (sürüm notları). Riskli
+  özellikler için şirket bazında aç/kapa bayrağı.
+- [ ] **P1 — Bağımlılık güncelliği.** Vercel'in build'i durdurmasıyla
+  öğrendik. → Dependabot / Renovate ve aylık güncelleme günü.
+- [ ] **P2 — Test kalitesi.** Uçtan uca (ekran) test yok; vitest kapanışta
+  takılıyor ("something prevents Vite server from exiting") ve
+  "module is not defined" gürültüsü var.
+  → Kritik akışlar için Playwright testleri: giriş, plan onayı, OEE
+  yükleme, KPI kaydı.
+
+### 4.2 Veri modeli ve bütünlük
+
+- [ ] **P0 — İlişkiler ad üzerinden.** Master data'nın ana/alternatif
+  makineleri, OEE `workCenter`, kalıp ve makine kayıtları work center'a
+  **adıyla** bağlı; ID yok. Bir work center'ın adı değişirse geçmiş kopar.
+  Masraf yeri ve bölüm de kod/ad metniyle bağlı.
+  → Değişmez kod alanı (ID) + görünen ad ayrımı ve kontrollü "yeniden
+  adlandır" işlemi.
+- [ ] **P1 — Dört ayrı gruplama ekseni.** Work center için hol (vinç),
+  kategori (hat), bölüm (organizasyon) ve OEE Area var. Kullanıcı hangisinin
+  neye yaradığını bilmek zorunda.
+  → Area'yı bölümle birleştir ya da Area'yı bölümden türet. Hol ve
+  kategoriyi "teknik özellik" olarak ayrı bir başlık altında topla.
+- [ ] **P1 — Tarihsiz organizasyon.** Bir masraf yeri başka bölüme
+  taşınınca geçmiş raporlar da yeni yapıya göre toplanıyor; geçmiş
+  değişiyor.
+  → "Geçerlilik başlangıcı" olan organizasyon kayıtları. En azından ağaç
+  değişikliklerinin kaydı tutulsun.
+- [ ] **P1 — Bölümler ad listesi.** Bugün plant kaydında metin dizisi olarak
+  duruyor; hedef, sorumlu ya da yetki eklenecekse ayrı bir tablo (ID) olmalı.
+- [ ] **P1 — Eski alanlar.** Şemada 8 `@deprecated` alan, kullanıcıda eski
+  `role` alanı (gruplardan önceki model) hâlâ var.
+  → Bir kerelik geçişle temizle; iki yetki modeli yan yana durmasın.
+- [ ] **P2 — Ortak tatil tablosu.** Resmi tatiller ülke bazında ortak;
+  plant'e özel kapanış (bayram köprüsü vb.) tatil olarak girilemiyor,
+  planlı duruşla çözülüyor.
+
+### 4.3 Güvenlik ve erişim
+
+- [ ] **P0 — Zayıf parola kuralı.** En kısa parola 4 karakter; ilk
+  kurulum `admin/admin`; girişte deneme sınırı ya da kilitleme yok.
+  → En az 10 karakter, art arda hatalı girişte bekletme / kilit, şüpheli
+  giriş kaydı.
+- [ ] **P1 — Kurumsal kimlik yok.** Müşteriler Azure AD / Google ile
+  girmek isteyecek; parolayı creator elle veriyor, "parolamı unuttum" yok.
+  → SSO (OIDC) ve e-postayla davet / parola sıfırlama.
+- [ ] **P1 — Denetim kaydı eksik.** Platform düzeyindeki işlemler (kullanıcı,
+  parola, yetki, askı, holding) kaydedilmiyor (bkz. 2 → Platform).
+  → Kim, ne zaman, neyi, eski → yeni değer; silinemez ve dışa
+  aktarılabilir bir kayıt.
+- [ ] **P2 — Yetki yalnızca plant × modül.** Bölüm ya da masraf yeri
+  bazında yetki yok; onay akışı da yok (ör. master data ya da plan onayında
+  dört göz).
+- [ ] **P2 — Kişisel veri.** Kullanıcı adı ve e-posta, KPI'da devamsızlık
+  gibi hassas veriler var; saklama süresi ve KVKK/GDPR metni yazılı değil.
+
+### 4.4 Kod ve dokümantasyon düzeni
+
+- [ ] **P1 — Dağınık karar defteri.** Kararlar 7 dosyaya yayılmış
+  (decisions, oeedashboard 509 satır, plant-genisletme 473 satır …).
+  "Açık sorular" bölümlerinin çoğu aslında cevaplanmış. README eski:
+  Macaly notları, iki kez "Sayfalar" başlığı, OEE / KPI / Board yok.
+  → Kararlar tek "karar günlüğü"nde (tarih + karar + gerekçe), açık işler
+  yalnızca bu dosyada, README güncel kurulum ve sayfa listesi.
+- [ ] **P1 — Dev dosyalar.** `planlama.tsx` 2000, `scheduler.ts` 2146,
+  `planValidator.ts` 2005, `takvim.tsx` 1371, `platform.tsx` ~1200 satır.
+  İncelemek ve değiştirmek zor.
+  → Sayfaları bileşenlere, motoru kural modüllerine böl.
+- [ ] **P1 — Sunucuda tip yok.** 11 Convex dosyasında `type Any = any`;
+  alan adı yazım hatası derlemede yakalanmıyor.
+  → Convex'in ürettiği tipleri (`DataModel`) kullan, `Any`'yi kademeli
+  kaldır, ESLint ekle (projede lint yok).
+- [ ] **P2 — Ad karmaşası.** Ekran "work center" diyor; tablo `presses`,
+  alan `press`. Rotalar Türkçe (`/makineler`, `/takvim`, `/referanslar`),
+  arayüz İngilizce, yorumlar Türkçe.
+  → Rotaları İngilizceye çevir (eski adresler yönlendirsin); kodda
+  `workCenter` adını kademeli kullan.
+- [ ] **P2 — Tek dil.** Arayüz yalnızca İngilizce; kullanıcılar Türk ve
+  Rumen. → Dil katmanı (i18n); önce TR / EN.
+
+### 4.5 Ürün
+
+- [x] ✅ **Kurulum listesi organizasyonu kapsamıyordu** (2026-10-03
+  düzeltildi): yeni adım "Departments and cost centers"; work center adımı
+  ancak her work center bir masraf yerine bağlıysa tamamlanır.
+- [ ] **P2 — SAP entegrasyonu elle.** ZPP / MB52 / MB51 Excel'le yükleniyor.
+  → Zamanlanmış içe alma (SAP export klasörü ya da API) ve "veri ne kadar
+  eski" göstergesi.
+- [ ] **P2 — Bildirim yok.** Alarm, geciken iş ya da kalıp ömrü için
+  e-posta / mobil bildirim yok; kullanıcı sayfayı açınca görüyor.

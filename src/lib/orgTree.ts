@@ -1,6 +1,6 @@
 /**
- * Organizasyon ağacı: Holding → Company → Plant → Department → Cost center
- * (docs/board.md → Organizasyon ağacı). Tepeden aşağı kurulur: şirket bir
+ * Organizasyon ağacı: Holding → Company → Plant → Department → Cost center →
+ * Work center (docs/board.md → Organizasyon ağacı). Tepeden aşağı kurulur: şirket bir
  * holding'in, masraf yeri bir bölümün altında açılır.
  *
  * Saf fonksiyonlar: Companies and plants sayfası ağacı, uyarıları ve
@@ -15,6 +15,12 @@ export interface OrgCostCenter {
   department?: string
 }
 
+export interface OrgWorkCenter {
+  name: string
+  /** Bağlı masraf yeri kodu (Work Center Definitions'ta seçilir). */
+  costCenter?: string
+}
+
 export interface OrgPlant {
   _id: string
   companyId: string
@@ -24,6 +30,7 @@ export interface OrgPlant {
   disabledModules?: string[]
   departments?: string[]
   costCenters?: OrgCostCenter[]
+  workCenters?: OrgWorkCenter[]
 }
 
 export interface OrgCompany {
@@ -73,6 +80,17 @@ export function unassignedOf(plant: OrgPlant): OrgCostCenter[] {
   return (plant.costCenters ?? []).filter((c) => !c.department || !names.has(c.department))
 }
 
+/** Masraf yerine bağlı work center'lar. */
+export function workCentersOf(plant: OrgPlant, costCenter: string): OrgWorkCenter[] {
+  return (plant.workCenters ?? []).filter((w) => w.costCenter === costCenter)
+}
+
+/** Masraf yeri olmayan ya da fabrikada olmayan bir koda bağlı work center'lar. */
+export function unlinkedWorkCenters(plant: OrgPlant): OrgWorkCenter[] {
+  const codes = new Set((plant.costCenters ?? []).map((c) => c.code))
+  return (plant.workCenters ?? []).filter((w) => !w.costCenter || !codes.has(w.costCenter))
+}
+
 /** Holding'in şirketleri (ad sırasıyla). */
 export function companiesOf(holdingId: string, companies: OrgCompany[]): OrgCompany[] {
   return companies.filter((c) => c.holdingId === holdingId).sort((a, b) => a.name.localeCompare(b.name))
@@ -89,6 +107,7 @@ export interface OrgCounts {
   plants: number
   departments: number
   costCenters: number
+  workCenters: number
 }
 
 export function countsOf(companies: OrgCompany[]): OrgCounts {
@@ -98,6 +117,7 @@ export function countsOf(companies: OrgCompany[]): OrgCounts {
     plants: plants.length,
     departments: plants.reduce((n, p) => n + (p.departments?.length ?? 0), 0),
     costCenters: plants.reduce((n, p) => n + (p.costCenters?.length ?? 0), 0),
+    workCenters: plants.reduce((n, p) => n + (p.workCenters?.length ?? 0), 0),
   }
 }
 
@@ -109,7 +129,7 @@ export interface OrgIssue {
 /**
  * Ağaçtaki eksikler, tepeden aşağı: holding'siz şirket, şirketsiz holding,
  * aynı adlı iki plant, bölümsüz plant, masraf yeri olmayan bölüm, bölümsüz
- * masraf yeri.
+ * masraf yeri, masraf yerine bağlı olmayan work center.
  */
 export function structureIssues(holdings: OrgHolding[], companies: OrgCompany[]): OrgIssue[] {
   const out: OrgIssue[] = []
@@ -134,6 +154,13 @@ export function structureIssues(holdings: OrgHolding[], companies: OrgCompany[])
         out.push({
           text: `${c.name} › ${p.name}: ${loose.length} cost center${loose.length === 1 ? '' : 's'} without a department`,
           node: { kind: 'department', plantId: p._id, department: null },
+        })
+      }
+      const wc = unlinkedWorkCenters(p)
+      if (wc.length) {
+        out.push({
+          text: `${c.name} › ${p.name}: ${wc.length} work center${wc.length === 1 ? '' : 's'} without a cost center (${wc.map((w) => w.name).join(', ')})`,
+          node: { kind: 'plant', id: p._id },
         })
       }
     }

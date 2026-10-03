@@ -8,6 +8,7 @@ const press: PressRecord = {
   category: 'Transfer press',
   feedsCoil: false,
   frozenDays: 3,
+  costCenter: '51010171',
 }
 
 describe('pres taslağı', () => {
@@ -35,6 +36,7 @@ describe('pres taslağı', () => {
     // feedsCoil yazılmamışsa progresif hat kabul edilir.
     expect(payload.feedsCoil).toBe(true)
     expect(payload.category).toBeUndefined()
+    expect(payload.costCenter).toBeUndefined()
   })
 
   it('negatif dondurulmuş gün sıfıra çekilir', () => {
@@ -47,5 +49,6 @@ describe('pres taslağı', () => {
     expect(sameDraft(base, draftOf(press))).toBe(true)
     expect(sameDraft(base, { ...base, category: 'Progressive 800 t' })).toBe(false)
     expect(sameDraft(base, { ...base, feedsCoil: true })).toBe(false)
+    expect(sameDraft(base, { ...base, costCenter: '51010173' })).toBe(false)
   })
 })

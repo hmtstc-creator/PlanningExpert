@@ -2,7 +2,8 @@
 
 Bu dosya programın nasıl kurulduğunu ve kodu değiştirirken uyulacak kuralları
 anlatır. Planlamacıyla alınan iş kararları `docs/decisions.md`'de, koddaki
-sabit sayılar `docs/fixeddefinitions.md`'dedir. Çok şirket / çok fabrika: `docs/plant-genisletme.md` (uygulandı, aşama 1–4).
+sabit sayılar `docs/fixeddefinitions.md`'dedir. Bütün açık işler ve
+kararlar tek listede: `todolist.md` (kök dizin). Çok şirket / çok fabrika: `docs/plant-genisletme.md` (uygulandı, aşama 1–4).
 Kullanıcıya dönük açıklama
 sitedeki **Planning Logic** sayfasıdır (`src/routes/planlogic.tsx`).
 
@@ -80,6 +81,7 @@ Aynı değer farklı sayfalarda farklı görünmemeli. Her bilgi tek yerden geli
 | Ayar varsayılanları | `settingsDefaults.ts` (`resolveSettings`) | motor, doğrulama, tüm sayfalar |
 | Kayıtlı ayarlar | `globalShiftSettings` (key `default`) | hepsi |
 | Work center listesi (eski adıyla pres) | Work Center Definitions (`presses` tablosu; kod adı değişmedi) | Work Calendar, Capacity Dashboard, mesai, Gantt |
+| Organizasyon: Holding → Company → Plant → Department → Cost center → Work center | Companies and plants (`holdings`, `companies`, `plants.departments`, `plants.costCenters`) + work center'ın `costCenter`'ı | ağaç, OEE, KPI, Board, kurulum listesi (`src/lib/orgTree.ts`) |
 | Pres grupları | presin **kategorisi** (`groupPresses`) | Gantt gruplaması, Capacity Dashboard toplamları |
 | Hol | presin holü | setup ekibi, vinç kuralı |
 | Pres takvimi | şablon + istisna hafta + mesai (`pressCalendar.ts`) | motor, doğrulama, Work Calendar, Capacity Dashboard, Performance |

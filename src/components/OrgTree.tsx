@@ -7,6 +7,8 @@ import {
   orphanCompanies,
   sameNode,
   unassignedOf,
+  unlinkedWorkCenters,
+  workCentersOf,
   type OrgCompany,
   type OrgHolding,
   type OrgNode,
@@ -18,7 +20,7 @@ import {
  * sağdaki (telefonda alttaki) panel o düğümü yönetir.
  */
 
-export type Level = 'holding' | 'company' | 'plant' | 'department' | 'costCenter'
+export type Level = 'holding' | 'company' | 'plant' | 'department' | 'costCenter' | 'workCenter'
 
 export const LEVEL_INFO: Record<Level, { label: string; short: string; chip: string }> = {
   holding: { label: 'Holding', short: 'H', chip: 'bg-indigo-600 text-white' },
@@ -26,6 +28,7 @@ export const LEVEL_INFO: Record<Level, { label: string; short: string; chip: str
   plant: { label: 'Plant', short: 'P', chip: 'bg-emerald-600 text-white' },
   department: { label: 'Department', short: 'D', chip: 'bg-amber-500 text-white' },
   costCenter: { label: 'Cost center', short: 'CC', chip: 'bg-slate-500 text-white' },
+  workCenter: { label: 'Work center', short: 'WC', chip: 'bg-rose-600 text-white' },
 }
 
 export function LevelChip({ level, className = '' }: { level: Level; className?: string }) {
@@ -39,7 +42,7 @@ export function LevelChip({ level, className = '' }: { level: Level; className?:
 
 /** Seviyelerin zinciri: sayfanın üstünde yapının kendisi. */
 export function LevelLegend() {
-  const levels: Level[] = ['holding', 'company', 'plant', 'department', 'costCenter']
+  const levels: Level[] = ['holding', 'company', 'plant', 'department', 'costCenter', 'workCenter']
   return (
     <ol className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" aria-label="Levels">
       {levels.map((l, i) => (
@@ -103,8 +106,8 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink }: Pr
             key={p._id}
             level="plant"
             label={p.name}
-            meta={`${depts.length} dept · ${p.costCenters?.length ?? 0} CC`}
-            warn={!depts.length || loose.length > 0}
+            meta={`${depts.length} dept · ${p.costCenters?.length ?? 0} CC · ${p.workCenters?.length ?? 0} WC`}
+            warn={!depts.length || loose.length > 0 || unlinkedWorkCenters(p).length > 0}
             selected={sameNode(selected, { kind: 'plant', id: p._id })}
             onSelect={() => onSelect({ kind: 'plant', id: p._id })}
             open={!closed.has(p._id)}
@@ -125,7 +128,7 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink }: Pr
                   onToggle={d.costCenters.length ? () => toggleDept(key) : undefined}
                 >
                   {d.costCenters.map((cc) => (
-                    <Leaf key={cc.code} code={cc.code} name={cc.name} onSelect={() => onSelect({ kind: 'department', plantId: p._id, department: d.name })} />
+                    <Leaf key={cc.code} code={cc.code} name={cc.name} workCenters={workCentersOf(p, cc.code).map((w) => w.name)} onSelect={() => onSelect({ kind: 'department', plantId: p._id, department: d.name })} />
                   ))}
                 </Row>
               )
@@ -143,7 +146,7 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink }: Pr
                 onToggle={() => toggleDept(`${p._id}|`)}
               >
                 {loose.map((cc) => (
-                  <Leaf key={cc.code} code={cc.code} name={cc.name} onSelect={() => onSelect({ kind: 'department', plantId: p._id, department: null })} />
+                  <Leaf key={cc.code} code={cc.code} name={cc.name} workCenters={workCentersOf(p, cc.code).map((w) => w.name)} onSelect={() => onSelect({ kind: 'department', plantId: p._id, department: null })} />
                 ))}
               </Row>
             )}
@@ -239,14 +242,26 @@ function Row({
   )
 }
 
-function Leaf({ code, name, onSelect }: { code: string; name: string; onSelect: () => void }) {
+/** Masraf yeri yaprağı; altında bağlı work center'lar. */
+function Leaf({ code, name, workCenters, onSelect }: { code: string; name: string; workCenters: string[]; onSelect: () => void }) {
   return (
     <div className="relative">
       <button type="button" onClick={onSelect} className="flex w-full items-center gap-1.5 rounded-md py-1 pr-1.5 pl-6 text-left hover:bg-muted">
         <LevelChip level="costCenter" />
         <span className="font-mono text-xs">{code}</span>
         <span className="truncate text-xs text-muted-foreground">{name !== code ? name : ''}</span>
+        <span className="ml-auto shrink-0 pl-2 text-[11px] text-muted-foreground">{workCenters.length} WC</span>
       </button>
+      {workCenters.length > 0 && (
+        <div className="mb-1 ml-[33px] flex flex-wrap gap-1 border-l border-border pl-2.5">
+          {workCenters.map((w) => (
+            <span key={w} className="flex items-center gap-1 rounded border border-border bg-background px-1 py-px text-[11px]">
+              <LevelChip level="workCenter" className="h-4 min-w-4 text-[8px]" />
+              {w}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

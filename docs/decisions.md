@@ -164,6 +164,9 @@ düşebiliyordu; vinç kontrolü artık önceki günün kendi rezervasyonların�
 
 ## Açık sorular
 
+> 2026-10-03: bütün açık işler ve kararlar tek listede toplandı —
+> **`todolist.md`** (kök dizin). Aşağıdakiler tarihçe için kalır.
+
 - **Plant genişletme** (çok şirket / çok fabrika, kiralama): taslak ve kararlar
   `docs/plant-genisletme.md`. BEKLEMEDE — üzerinde geliştirme yapılacak, sonra
   "programı düzelt" ile 1. aşamadan başlanacak.

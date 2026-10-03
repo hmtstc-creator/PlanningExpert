@@ -39,7 +39,7 @@ export interface TenancyContext {
     country: string
     timeZone: string
     /** Fabrikanın masraf yerleri (Companies and plants'ta tanımlanır). */
-    costCenters: { code: string; name: string }[]
+    costCenters: { code: string; name: string; department?: string }[]
     access: Access
     deleteAfter: number | null
   } | null

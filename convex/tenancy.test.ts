@@ -26,6 +26,11 @@ async function holding(t: Any, token: string, name = 'Group') {
   return t.mutation(anyApi.platform.saveHolding, { token, name })
 }
 
+/** Fabrikaya bir bölüm ve masraf yeri (CC) — work center masraf yerisiz açılmaz. */
+async function withCostCenter(t: Any, plantId: string, code = 'CC') {
+  await t.run((ctx: Any) => ctx.db.patch(plantId, { departments: ['D'], costCenters: [{ code, name: code, department: 'D' }] }))
+}
+
 async function settle(t: Any) {
   // Geçişin arka plan işlerini bitir (plan motoru bu testte yok: zamanlanmış hesap atlanır).
   for (let i = 0; i < 50; i++) {
@@ -83,7 +88,8 @@ describe('fabrika ayrımı', () => {
 
     const pl = await session(t, u.planner, 'pl')
     expect((await t.query(api.presses.list, { token: pl })).length).toBe(2)
-    await t.mutation(api.presses.upsert, { token: pl, name: 'PRS-108', hall: 'H2' })
+    await withCostCenter(t, (await t.query(api.tenancy.context, { token: pl })).active.plantId)
+    await t.mutation(api.presses.upsert, { token: pl, name: 'PRS-108', hall: 'H2', costCenter: 'CC' })
     const vw = await session(t, u.viewer, 'vw')
     expect((await t.query(api.presses.list, { token: vw })).length).toBe(3)
     await expect(t.mutation(api.presses.upsert, { token: vw, name: 'PRS-109', hall: 'H2' })).rejects.toThrow(/edit permission/)
@@ -107,7 +113,8 @@ describe('fabrika ayrımı', () => {
 
     // Yeni fabrika boş başlar; aynı adla pres ekler.
     expect(await t.query(api.presses.list, { token: other })).toEqual([])
-    await t.mutation(api.presses.upsert, { token: other, name: 'PRS-106', hall: 'B1' })
+    await withCostCenter(t, p2)
+    await t.mutation(api.presses.upsert, { token: other, name: 'PRS-106', hall: 'B1', costCenter: 'CC' })
     const mine = await t.query(api.presses.list, { token: other })
     expect(mine.map((p: Any) => `${p.name}/${p.hall}`)).toEqual(['PRS-106/B1'])
 
@@ -176,7 +183,8 @@ describe('fabrika ayrımı', () => {
     const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
     const cr2 = await t.mutation(api.users.add, { token: boss, companyId: c2, name: 'cr2', isCreator: true })
     const other = await session(t, cr2, 'cr2')
-    await t.mutation(api.presses.upsert, { token: other, name: 'PRS-106', hall: 'B1' })
+    await withCostCenter(t, p2)
+    await t.mutation(api.presses.upsert, { token: other, name: 'PRS-106', hall: 'B1', costCenter: 'CC' })
 
     // Creator kendi şirketini dışa aktarır; başka şirketi aktaramaz.
     const page = await t.query(api.platform.exportPage, { token: other, companyId: c2, plantId: p2, table: 'presses', cursor: null })
@@ -279,7 +287,8 @@ describe('fabrika ayrımı', () => {
     await expect(t.mutation(api.platform.createCompany, { token: boss, name: 'company 1', modules: [], holdingId: await holding(t, boss, 'H company 1') })).rejects.toThrow(/already exists/)
     const extra = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Extra', country: 'RO', timeZone: 'Europe/Bucharest' })
     await t.mutation(api.tenancy.selectPlant, { token: boss, plantId: extra })
-    await t.mutation(api.presses.upsert, { token: boss, name: 'P', hall: 'H' })
+    await withCostCenter(t, extra)
+    await t.mutation(api.presses.upsert, { token: boss, name: 'P', hall: 'H', costCenter: 'CC' })
     await expect(t.mutation(api.platform.deletePlant, { token: boss, id: extra, confirmName: 'extra' })).rejects.toThrow(/exactly/)
     await t.mutation(api.platform.deletePlant, { token: boss, id: extra, confirmName: 'Extra' })
     for (let i = 0; i < 100; i++) {
@@ -423,5 +432,31 @@ describe('fabrika ayrımı', () => {
     expect((await plant()).code).toBe('P1')
     // Bağlam masraf yerlerini bölümüyle verir (OEE / KPI kodla okur).
     expect((await t.query(api.tenancy.context, { token: boss })).active.costCenters.map((x: Any) => x.code)).toEqual(['OLD', 'CC1'])
+  })
+  it('work center bir masraf yerine bağlı: yenisi bağsız açılmaz, bağlı masraf yeri kaldırılamaz', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const id = (await t.query(api.tenancy.context, { token: boss })).active.plantId
+    await t.mutation(api.platform.updatePlant, {
+      token: boss, id, name: 'Plant 1', departments: ['Stamping'],
+      costCenters: [{ code: 'TR', name: 'Transfer', department: 'Stamping' }, { code: 'PG', name: 'Progressive', department: 'Stamping' }],
+    })
+    await expect(t.mutation(api.presses.upsert, { token: boss, name: 'PRS-110', hall: 'H1' })).rejects.toThrow(/Choose the cost center/)
+    await expect(t.mutation(api.presses.upsert, { token: boss, name: 'PRS-110', hall: 'H1', costCenter: 'XX' })).rejects.toThrow(/not a cost center of this plant/)
+    await t.mutation(api.presses.upsert, { token: boss, name: 'PRS-110', hall: 'H1', costCenter: 'PG' })
+    // Geçişten gelen bağsız work center düzeltilene kadar bağsız kaydedilebilir; bağlanınca boşaltılamaz.
+    await t.mutation(api.presses.upsert, { token: boss, name: 'PRS-106', hall: 'H2' })
+    await t.mutation(api.presses.upsert, { token: boss, name: 'PRS-106', hall: 'H1', costCenter: 'TR' })
+    await expect(t.mutation(api.presses.upsert, { token: boss, name: 'PRS-106', hall: 'H1' })).rejects.toThrow(/Choose the cost center/)
+    // Ağaç work center'ları masraf yerleriyle verir.
+    const companies = await t.query(api.platform.companies, { token: boss })
+    expect(companies[0].plants[0].workCenters).toEqual([{ name: 'PRS-106', costCenter: 'TR' }, { name: 'PRS-107' }, { name: 'PRS-110', costCenter: 'PG' }])
+    // Work center'ı bağlı masraf yeri kaldırılamaz.
+    await expect(
+      t.mutation(api.platform.updatePlant, { token: boss, id, name: 'Plant 1', costCenters: [{ code: 'PG', name: 'Progressive', department: 'Stamping' }] }),
+    ).rejects.toThrow(/TR still has work centers \(PRS-106\)/)
   })
 })

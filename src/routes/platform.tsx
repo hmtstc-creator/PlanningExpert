@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -23,6 +23,8 @@ import {
   renameDepartment,
   structureIssues,
   unassignedOf,
+  unlinkedWorkCenters,
+  workCentersOf,
   type OrgCompany,
   type OrgCostCenter,
   type OrgGroup,
@@ -115,13 +117,14 @@ function PlatformPage() {
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <PageHeader
         title={isPlatform ? 'Companies and plants' : 'Plants of your company'}
-        summary="Built from the top down: every company sits in a holding, every cost center in a department of a plant."
+        summary="Built from the top down: every company sits in a holding, every cost center in a department of a plant, every work center in a cost center."
         info={
           <>
             <p>
-              <b>Holding</b> → <b>Company</b> → <b>Plant</b> → <b>Department</b> → <b>Cost center</b>. A holding comes first;
-              a company is opened inside a holding, a plant inside a company, a department inside a plant and a cost center
-              inside a department.
+              <b>Holding</b> → <b>Company</b> → <b>Plant</b> → <b>Department</b> → <b>Cost center</b> → <b>Work center</b>. A
+              holding comes first; a company is opened inside a holding, a plant inside a company, a department inside a
+              plant and a cost center inside a department. Each work center is linked to its cost center on Work Center
+              Definitions.
             </p>
             <p>Every plant keeps its own data, settings and plan; two plants never see each other's data.</p>
             <p>
@@ -745,6 +748,7 @@ function PlantPanel({ plant: p, company: c, isPlatform, onSelect }: { plant: Org
   const depts = departmentsOf(p)
   const loose = unassignedOf(p)
   const access = plantAccessRows(p, c, people.orgUsers, people.orgGroups)
+  const unlinked = unlinkedWorkCenters(p)
   const disabled = p.disabledModules ?? []
 
   return (
@@ -806,9 +810,34 @@ function PlantPanel({ plant: p, company: c, isPlatform, onSelect }: { plant: Org
         items={[
           { label: 'Departments', value: depts.length, level: 'department' },
           { label: 'Cost centers', value: p.costCenters?.length ?? 0, level: 'costCenter' },
+          { label: 'Work centers', value: p.workCenters?.length ?? 0, level: 'workCenter' },
           { label: 'Users with access', value: access.length },
         ]}
       />
+
+      {unlinked.length > 0 && (
+        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+          <p className="font-medium">
+            {unlinked.length} work center{unlinked.length === 1 ? '' : 's'} without a cost center
+          </p>
+          <p className="mt-1 flex flex-wrap gap-1">
+            {unlinked.map((w) => (
+              <span key={w.name} className="flex items-center gap-1 rounded border border-amber-300 bg-background px-1 py-px">
+                <LevelChip level="workCenter" className="h-4 min-w-4 text-[8px]" />
+                {w.name}
+                {w.costCenter && <span className="text-amber-800">({w.costCenter} is not a cost center here)</span>}
+              </span>
+            ))}
+          </p>
+          <p className="mt-1">
+            Select {p.name} in the header, then choose each one's cost center on{' '}
+            <Link to="/makineler" className="underline">
+              Work Center Definitions
+            </Link>
+            .
+          </p>
+        </div>
+      )}
 
       <Block title="Departments" hint="Every cost center belongs to one department. Open a department to add its cost centers.">
         <div className="grid gap-2 sm:grid-cols-2">
@@ -968,7 +997,7 @@ function DepartmentPanel({ plant: p, department, onSelect }: { plant: OrgPlant; 
       </p>
 
       <div className="mt-3">
-        <Table head={[<LevelChip key="c" level="costCenter" />, 'Code', 'Name', 'Department', '']} empty={!list.length && (department === null ? 'Nothing left here.' : 'No cost center yet — add the first one below.')}>
+        <Table head={[<LevelChip key="c" level="costCenter" />, 'Code', 'Name', 'Department', 'Work centers', '']} empty={!list.length && (department === null ? 'Nothing left here.' : 'No cost center yet — add the first one below.')}>
           {list.map((cc) => (
             <CostCenterRow
               key={cc.code}
@@ -978,6 +1007,7 @@ function DepartmentPanel({ plant: p, department, onSelect }: { plant: OrgPlant; 
               saving={drafts.savingKey === cc.code}
               justSaved={!!drafts.justSaved[cc.code]}
               departments={departments}
+              workCenters={workCentersOf(p, cc.code).map((w) => w.name)}
               busy={structure.pending}
               onEdit={(name) => drafts.edit(cc.code, { name })}
               onSave={() => void drafts.commit(cc.code, (d) => structure.save(editCostCenter(p, cc.code, { name: d.name.trim() || cc.code })))}
@@ -1013,6 +1043,7 @@ function CostCenterRow({
   saving,
   justSaved,
   departments,
+  workCenters,
   busy,
   onEdit,
   onSave,
@@ -1025,6 +1056,8 @@ function CostCenterRow({
   saving: boolean
   justSaved: boolean
   departments: string[]
+  /** Bu masraf yerine bağlı work center'lar (Work Center Definitions). */
+  workCenters: string[]
   busy: boolean
   onEdit: (name: string) => void
   onSave: () => void
@@ -1062,8 +1095,24 @@ function CostCenterRow({
           ))}
         </select>
       </td>
+      <td className={td}>
+        <span className="flex flex-wrap gap-1">
+          {workCenters.map((w) => (
+            <span key={w} className="flex items-center gap-1 rounded border border-border px-1 py-px text-[11px]">
+              <LevelChip level="workCenter" className="h-4 min-w-4 text-[8px]" />
+              {w}
+            </span>
+          ))}
+          {!workCenters.length && <span className="text-xs text-muted-foreground">—</span>}
+        </span>
+      </td>
       <td className={`${td} text-right`}>
-        <button className="text-xs text-destructive hover:underline" onClick={onRemove}>
+        <button
+          className="text-xs text-destructive hover:underline disabled:opacity-40 disabled:hover:no-underline"
+          disabled={workCenters.length > 0}
+          title={workCenters.length ? 'Move its work centers to another cost center first' : undefined}
+          onClick={onRemove}
+        >
           Remove
         </button>
       </td>
