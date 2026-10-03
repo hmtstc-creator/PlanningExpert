@@ -153,12 +153,22 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 
 ### 4.2 Veri modeli ve bütünlük
 
-- [ ] **P0 — İlişkiler ad üzerinden.** Master data'nın ana/alternatif
-  makineleri, OEE `workCenter`, kalıp ve makine kayıtları work center'a
-  **adıyla** bağlı; ID yok. Bir work center'ın adı değişirse geçmiş kopar.
-  Masraf yeri ve bölüm de kod/ad metniyle bağlı.
-  → Değişmez kod alanı (ID) + görünen ad ayrımı ve kontrollü "yeniden
-  adlandır" işlemi.
+- [x] ✅ **P0 — İlişkiler kodla, bütünlük yoktu** (2026-10-03). Kayıtlar
+  work center'a SAP kodu (PRS-106) ile bağlı — SAP'deki gibi, kodun kendisi
+  anahtar; eksik olan bütünlüktü:
+  - Kullanımdaki work center artık silinmez (master data, takvim şablonu,
+    mesai, istisna hafta, bakım, arıza, plan başlangıcı, plan pini, vinç
+    grubu); hata nerede kullanıldığını sayar. Önceden sessizce siliniyor,
+    kayıtlar sahipsiz kalıyordu.
+  - **Change code**: kod değişikliği bütün bağlı kayıtlara birlikte yazılır,
+    değişiklik kaydına düşer; yüklenen OEE verisi ve plan arşivi eski
+    koduyla kalır (geçmiş değişmez).
+  - KPI girişi olan cost center kaldırılamaz (geçmişi sessizce hesaptan
+    düşerdi); work center'ı bağlı cost center kaldırılamaz.
+  - [ ] **[K]** OEE geçmişi de kod değişikliğiyle yeni koda taşınsın mı?
+    (Bugün taşınmaz; SAP dosyası eski kodu taşır.)
+  - [ ] **[G]** Kalıp (malzeme kodu) için aynı bütünlük: master data'dan
+    silinen parçanın kalıp kayıtları.
 - [ ] **P1 — Dört ayrı gruplama ekseni.** Work center için hol (vinç),
   kategori (hat), bölüm (organizasyon) ve OEE Area var. Kullanıcı hangisinin
   neye yaradığını bilmek zorunda.

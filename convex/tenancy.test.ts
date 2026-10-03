@@ -458,6 +458,18 @@ describe('fabrika ayrımı', () => {
     await expect(
       t.mutation(api.platform.updatePlant, { token: boss, id, name: 'Plant 1', costCenters: [{ code: 'PG', name: 'Progressive', department: 'Stamping' }] }),
     ).rejects.toThrow(/TR still has work centers \(PRS-106\)/)
+    // KPI girişi olan masraf yeri de kaldırılamaz.
+    await t.mutation(api.platform.updatePlant, {
+      token: boss, id, name: 'Plant 1', departments: ['Stamping'],
+      costCenters: [{ code: 'TR', name: 'Transfer', department: 'Stamping' }, { code: 'PG', name: 'Progressive', department: 'Stamping' }, { code: 'K', name: 'Kpi only', department: 'Stamping' }],
+    })
+    await t.run((ctx: Any) => ctx.db.insert('kpiEntries', { plantId: id, period: 'month', year: 2026, num: 9, costCenter: 'K', operatorType: 'direct', plan: {}, actual: {}, updatedAt: Date.now() }))
+    await expect(
+      t.mutation(api.platform.updatePlant, {
+        token: boss, id, name: 'Plant 1',
+        costCenters: [{ code: 'TR', name: 'Transfer', department: 'Stamping' }, { code: 'PG', name: 'Progressive', department: 'Stamping' }],
+      }),
+    ).rejects.toThrow(/K has KPI entries/)
   })
   it('denetim kaydı: platform işlemleri eski → yeni yazılır; creator yalnızca kendi şirketini görür', async () => {
     const t = convexTest(schema, modules)
@@ -510,5 +522,51 @@ describe('fabrika ayrımı', () => {
       ['planEngine', 'No capacity', 1, null, 'Plant 1'],
     ])
     await expect(t.query(api.errors.list, { token: pl })).rejects.toThrow(/General/)
+  })
+  it('work center bütünlüğü: kullanımdaki silinmez; kod değişikliği bağlı kayıtlara birlikte yazılır, başka plant\'e dokunmaz', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const p1 = (await t.query(api.tenancy.context, { token: boss })).active.plantId
+    // Başka şirketin plant'inde aynı kod.
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning'], holdingId: await holding(t, boss, 'H') })
+    const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
+    await t.run(async (ctx: Any) => {
+      await ctx.db.insert('products', { plantId: p1, code: 'M1', mainMachine: 'PRS-106', altMachine1: 'PRS-107' })
+      await ctx.db.insert('pressTemplates', { plantId: p1, press: 'PRS-106', workingDays: 5, shiftsPerDay: 2 })
+      await ctx.db.insert('craneGroups', { plantId: p1, groupName: 'Hall', machines: ['PRS-106', 'PRS-107'] })
+      await ctx.db.insert('presses', { plantId: p2, name: 'PRS-106', hall: 'B' })
+      await ctx.db.insert('products', { plantId: p2, code: 'M1', mainMachine: 'PRS-106' })
+    })
+    const list = await t.query(api.presses.list, { token: boss })
+    const p106 = list.find((p: Any) => p.name === 'PRS-106')
+    expect(await t.query(api.presses.usage, { token: boss, name: 'PRS-106' })).toEqual([
+      { label: 'master data (1 part)', count: 1 },
+      { label: 'Work Calendar pattern', count: 1 },
+      { label: 'crane groups', count: 1 },
+    ])
+    await expect(t.mutation(api.presses.remove, { token: boss, id: p106._id })).rejects.toThrow(/PRS-106 is still used in master data \(1 part\), Work Calendar pattern \(1\), crane groups \(1\)/)
+    await expect(t.mutation(api.presses.rename, { token: boss, id: p106._id, to: 'PRS-107' })).rejects.toThrow(/already exists/)
+
+    expect(await t.mutation(api.presses.rename, { token: boss, id: p106._id, to: 'PRS-106A' })).toBe(3)
+    const after = await t.run(async (ctx: Any) => ({
+      product1: (await ctx.db.query('products').collect()).find((p: Any) => p.plantId === p1),
+      product2: (await ctx.db.query('products').collect()).find((p: Any) => p.plantId === p2),
+      template: await ctx.db.query('pressTemplates').first(),
+      crane: await ctx.db.query('craneGroups').first(),
+    }))
+    expect(after.product1.mainMachine).toBe('PRS-106A')
+    expect(after.product1.altMachine1).toBe('PRS-107')
+    expect(after.template.press).toBe('PRS-106A')
+    expect(after.crane.machines).toEqual(['PRS-106A', 'PRS-107'])
+    // Başka plant'in aynı kodu değişmez.
+    expect(after.product2.mainMachine).toBe('PRS-106')
+    expect((await t.query(api.presses.list, { token: boss })).map((p: Any) => p.name).sort()).toEqual(['PRS-106A', 'PRS-107'])
+    // Kullanılmayan work center silinir.
+    await t.run(async (ctx: Any) => ctx.db.insert('presses', { plantId: p1, name: 'SPARE', hall: 'H1' }))
+    const spare = (await t.query(api.presses.list, { token: boss })).find((p: Any) => p.name === 'SPARE')
+    await t.mutation(api.presses.remove, { token: boss, id: spare._id })
   })
 })

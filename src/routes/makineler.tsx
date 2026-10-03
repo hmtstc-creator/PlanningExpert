@@ -91,6 +91,7 @@ function MakinelerPage() {
     clearError,
   } = useSafeMutation(api.presses.upsert)
   const { run: remove, error: removeError } = useSafeMutation(api.presses.remove)
+  const { run: rename, error: renameError } = useSafeMutation(api.presses.rename)
   const { results: products } = usePaginatedQuery(
     api.products.list,
     {},
@@ -211,7 +212,7 @@ function MakinelerPage() {
         Edits are saved with Save on the row, or Save all at the bottom.
       </p>
 
-      <ErrorBanner message={upsertError ?? removeError} onDismiss={clearError} />
+      <ErrorBanner message={upsertError ?? removeError ?? renameError} onDismiss={clearError} />
 
       {costCenters.length === 0 ? (
         <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
@@ -461,11 +462,25 @@ function MakinelerPage() {
                                 Save
                               </button>
                               <button
+                                className="ml-3 text-xs underline"
+                                title="Change the code everywhere it is used (master data, calendar, overtime, maintenance, breakdowns, plan pins, crane groups)"
+                                disabled={dirty}
+                                onClick={() => {
+                                  const to = window.prompt(
+                                    `New code for ${p.name}. Every linked record changes with it; uploaded OEE data and plan archives keep the old code.`,
+                                    p.name,
+                                  )
+                                  if (to !== null && to.trim() && to.trim() !== p.name) void rename({ id: p._id as never, to: to.trim() })
+                                }}
+                              >
+                                Change code
+                              </button>
+                              <button
                                 className="ml-3 text-xs text-destructive hover:underline"
                                 onClick={() => {
                                   if (
                                     window.confirm(
-                                      `Delete work center ${p.name}? This cannot be undone.`,
+                                      `Delete work center ${p.name}? This cannot be undone. A work center still used in master data, the calendar or records cannot be deleted.`,
                                     )
                                   ) {
                                     void remove({ id: p._id as never })

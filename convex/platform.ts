@@ -282,6 +282,16 @@ export const updatePlant = userMutation({
         const cc = orphaned[0].costCenter
         throw new ConvexError(`Cost center ${cc} still has work centers (${orphaned.filter((w) => w.costCenter === cc).map((w) => w.name).join(', ')}) — move them on Work Center Definitions first`)
       }
+      // KPI girişi olan masraf yeri kaldırılırsa girişler sessizce hesaptan düşerdi.
+      const removed = new Set(((plant.costCenters ?? []) as CostCenter[]).map((c) => c.code).filter((c) => !kept.has(c)))
+      if (removed.size) {
+        const kpi: Any[] = await ctx.db
+          .query('kpiEntries')
+          .withIndex('by_plant', (q: Any) => q.eq('plantId', args.id))
+          .collect()
+        const used = [...removed].filter((code) => kpi.some((e) => e.costCenter === code))
+        if (used.length) throw new ConvexError(`Cost center ${used[0]} has KPI entries — it cannot be removed (its history would stop counting)`)
+      }
     }
     if (args.disabledModules !== undefined) {
       const same = JSON.stringify([...args.disabledModules].sort()) === JSON.stringify([...(plant.disabledModules ?? [])].sort())

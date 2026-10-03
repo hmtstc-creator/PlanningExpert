@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
 import { ALL_MODULES, guardedMutation, guardedQuery } from './guarded'
+import { renameEverywhere, usageText, whereUsed } from './workCenterRefs'
 
 const pressValidator = v.object({
   _id: v.id('presses'),
@@ -78,12 +79,63 @@ export const upsert = guardedMutation({
   },
 })
 
+/**
+ * Work center'ı siler — yalnızca hiçbir yerde kullanılmıyorsa (master data,
+ * takvim, mesai, bakım, arıza, plan …). Kullanılıyorsa nerede olduğunu
+ * söyler; kayıtlar sahipsiz kalmaz.
+ */
 export const remove = guardedMutation({
   args: { id: v.id('presses') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    const press = await ctx.db.get(id)
+    // Başka plant'in kaydı görünmez: kilitli veritabanıyla aynı hata.
+    if (!press) throw new ConvexError('Record not found')
+    const usage = await whereUsed(ctx.db, press.name)
+    if (usage.length) throw new ConvexError(`${usageText(press.name, usage)} — move or remove those first, or change its code instead`)
     await ctx.db.delete(id)
     return null
+  },
+})
+
+/** Work center'ın kullanıldığı yerler (silmeden önce ekranda gösterilir). */
+export const usage = guardedQuery({
+  modules: ALL_MODULES,
+  args: { name: v.string() },
+  returns: v.array(v.object({ label: v.string(), count: v.number() })),
+  handler: async (ctx, { name }) => whereUsed(ctx.db, name),
+})
+
+/**
+ * Work center kodunu değiştirir (ör. yazım hatası, SAP'de yeni kod): kayıt ve
+ * bağlı bütün kayıtlar (master data, takvim, mesai, bakım, arıza, plan
+ * müdahaleleri, vinç grupları) birlikte. Yüklenen OEE verisi ve plan arşivi
+ * eski koduyla kalır (geçmiş değişmez).
+ */
+export const rename = guardedMutation({
+  args: { id: v.id('presses'), to: v.string() },
+  returns: v.number(),
+  handler: async (ctx, { id, to }) => {
+    const press = await ctx.db.get(id)
+    if (!press) throw new ConvexError('Work center not found')
+    const name = to.trim()
+    if (!name) throw new ConvexError('Enter the new code')
+    if (name === press.name) return 0
+    const clash = await ctx.db
+      .query('presses')
+      .withIndex('by_name', (q) => q.eq('name', name))
+      .first()
+    if (clash) throw new ConvexError(`${name} already exists`)
+    const changed = await renameEverywhere(ctx.db, press.name, name)
+    await ctx.db.patch(id, { name })
+    await ctx.db.insert('changeLog', {
+      title: `Work center code changed — ${press.name} → ${name}`,
+      detail: `${changed} linked record(s) updated. Uploaded OEE data and plan archives keep the old code.`,
+      category: 'system',
+      author: (ctx as { sessionUser?: { name?: string } }).sessionUser?.name,
+      createdAt: Date.now(),
+    })
+    return changed
   },
 })
 
