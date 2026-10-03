@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 
 import { internal } from './_generated/api'
+import { recordError } from './errors'
 import { ALL_MODULES, guardedMutation, guardedQuery, plantInternalMutation, plantInternalQuery } from './guarded'
 import { planStatusDoc, requestRecompute } from './planQueue'
 import { withDefaults } from './products'
@@ -209,6 +210,8 @@ export const finishRun = plantInternalMutation({
     const now = Date.now()
     const status = await planStatusDoc(ctx)
     if (!status) return null
+    // Plan hesabı hatası platform hata kaydına da düşer (General görür).
+    if (error) await recordError(ctx.db, { source: 'planEngine', message: error, plant: (await ctx.db.get(ctx.plantId))?.name })
     await ctx.db.patch(status._id, {
       runningSince: undefined,
       ...(error

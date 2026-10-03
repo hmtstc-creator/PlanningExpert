@@ -123,10 +123,15 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   → Convex'te zamanlanmış yedek (snapshot export) kur ve ayda bir geri
   yükleme provası yap. Geri dönüş süresi (RTO) ve göze alınan veri kaybı
   (RPO) yazılı olsun.
-- [ ] **P0 — İzleme yok.** Hata takibi (Sentry vb.) ve erişilebilirlik
-  alarmı yok; bir hatayı ancak kullanıcı fark ederse öğreniyoruz.
-  → İstemci ve sunucu hata takibi; plan motoru ve saat başı hesap için
-  "çalışmadı" alarmı.
+- [x] ✅ **P0 — İzleme yoktu** (2026-10-03, uygulama içi ilk adım):
+  çöken sayfa, yakalanmamış ekran hatası ve plan hesabı hatası `errorLog`'a
+  düşer (convex/errors.ts). Aynı hata 24 saatte tek satır + sayaç; kural
+  mesajları ve ağ kopmaları gönderilmez. General: Companies and plants →
+  **System errors**.
+  - [ ] **[S]** Dış izleme: erişilebilirlik alarmı (ör. UptimeRobot,
+    ücretsiz) ve istenirse Sentry hesabı. Hesap açılınca bağlarım.
+  - [ ] **[G]** Hata olunca bildirim (e-posta) — bildirim altyapısıyla
+    birlikte (bkz. 4.5).
 - [ ] **P1 — Kod incelemesi yok, bus factor 1.** 51 commit'in hepsi aynı
   yazardan, hiçbiri incelenmedi.
   → Önemli değişiklik PR ile gelsin; CI yeşilse ve en az bir okuma

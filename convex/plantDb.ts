@@ -28,6 +28,8 @@ export const PLATFORM_TABLES = new Set([
   'sessions',
   // Platform denetim kaydı (şirket / holding düzeyinde).
   'auditLog',
+  // Uygulama içi hata kaydı (platform düzeyinde, yalnızca General görür).
+  'errorLog',
   // Ülke resmi tatilleri: ortak referans.
   'officialHolidays',
 ])

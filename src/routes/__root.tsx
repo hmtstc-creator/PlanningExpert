@@ -3,6 +3,7 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import '../styles.css'
 import siteMetadata from '../metadata.json'
 import { ConnectionBanner } from '../components/ConnectionBanner'
+import { ErrorReporter } from '../components/ErrorReporter'
 import { Header } from '../components/Header'
 import { LoginGate } from '../components/LoginGate'
 import { MutationErrorToast } from '../components/MutationErrorToast'
@@ -50,6 +51,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               {/* Şirket / fabrika: geçiş, fabrika yok, sayfanın modülüne izin yok. */}
               <TenancyGate>{children}</TenancyGate>
               <MutationErrorToast />
+              <ErrorReporter />
             </PlantProvider>
           </LoginGate>
         </AppConvexProvider>

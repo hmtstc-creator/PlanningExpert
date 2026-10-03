@@ -169,8 +169,9 @@ function PlatformPage() {
       </div>
 
       {isPlatform && (
-        <section className="mt-10">
+        <section className="mt-10 space-y-6">
           <CollapsibleHistory />
+          <CollapsibleErrors />
         </section>
       )}
 
@@ -1253,5 +1254,59 @@ function CollapsibleHistory() {
         </div>
       )}
     </>
+  )
+}
+
+interface ErrorRow {
+  _id: string
+  source: string
+  message: string
+  detail?: string
+  url?: string
+  user?: string
+  plant?: string
+  count: number
+  firstAt: number
+  lastAt: number
+}
+
+/** General: uygulama içi hata kaydı (convex/errors.ts) — çöken sayfalar, plan hesabı hataları. */
+function CollapsibleErrors() {
+  const [open, setOpen] = useState(false)
+  const rows = (useQuery(api.errors.list, open ? {} : 'skip') ?? []) as ErrorRow[]
+  return (
+    <div>
+      <button className="flex items-center gap-2 text-sm font-semibold text-foreground" onClick={() => setOpen(!open)}>
+        System errors <span className="text-xs font-normal text-muted-foreground underline">{open ? 'hide' : 'show'}</span>
+      </button>
+      {open && (
+        <div className="mt-2">
+          <p className="text-xs text-muted-foreground">
+            Pages that crashed and plan calculations that failed, on every plant — the same error within a day is one row with a count.
+          </p>
+          <div className="mt-2">
+            <Table head={['Last', 'Count', 'Source', 'Error', 'Where']} empty={!rows.length && 'No error recorded.'}>
+              {rows.map((r) => (
+                <tr key={r._id} className="border-t border-border align-top">
+                  <td className={`${td} text-xs whitespace-nowrap text-muted-foreground tabular-nums`}>{fmtAt(r.lastAt)}</td>
+                  <td className={`${td} text-xs tabular-nums`}>{r.count}</td>
+                  <td className={`${td} font-mono text-[11px]`}>{r.source}</td>
+                  <td className={`${td} text-xs break-words`}>
+                    {r.message}
+                    {r.detail && (
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-[11px] text-muted-foreground">details</summary>
+                        <pre className="mt-1 max-h-40 overflow-auto text-[10px] whitespace-pre-wrap text-muted-foreground">{r.detail}</pre>
+                      </details>
+                    )}
+                  </td>
+                  <td className={`${td} text-xs text-muted-foreground`}>{[r.plant, r.user, r.url].filter(Boolean).join(' · ') || '—'}</td>
+                </tr>
+              ))}
+            </Table>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

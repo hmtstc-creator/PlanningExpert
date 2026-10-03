@@ -1,7 +1,11 @@
 import { useRouter, type ErrorComponentProps } from '@tanstack/react-router'
 
+import { useReportCrash } from './ErrorReporter'
+
 export function ErrorBoundary({ error }: ErrorComponentProps) {
   const router = useRouter()
+  // Çöken sayfa platform hata kaydına düşer (General görür).
+  useReportCrash(error)
   const message = error instanceof Error ? error.message : String(error)
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-4 p-6 text-center">

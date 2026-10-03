@@ -100,6 +100,8 @@ describe('sunucu tarafı yetki denetimi', () => {
       'kpi.ts': /./,
       // overview: yalnızca visiblePlants, her plant kendi plantId'siyle; KPI / OEE izni ayrı.
       'board.ts': /./,
+      // Yalnızca platform tablosu errorLog'a yazar / okur.
+      'errors.ts': /./,
       'authInternal.ts': /internal(Query|Mutation)\(/,
     }
     for (const { name, source } of convexFiles()) {

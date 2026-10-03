@@ -87,6 +87,22 @@ export default defineSchema({
     .index('by_at', ['at'])
     .index('by_company', ['companyId', 'at']),
 
+  /** Uygulama içi hata kaydı (convex/errors.ts); aynı hata 24 saatte bir satır. */
+  errorLog: defineTable({
+    key: v.string(),
+    source: v.string(),
+    message: v.string(),
+    detail: v.optional(v.string()),
+    url: v.optional(v.string()),
+    user: v.optional(v.string()),
+    plant: v.optional(v.string()),
+    count: v.number(),
+    firstAt: v.number(),
+    lastAt: v.number(),
+  })
+    .index('by_key', ['key', 'lastAt'])
+    .index('by_last', ['lastAt']),
+
   /** Tek seferlik platform durumu (ör. fabrika anahtarı geçişi). */
   platformState: defineTable({
     key: v.string(),

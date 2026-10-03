@@ -491,4 +491,24 @@ describe('fabrika ayrımı', () => {
     await expect(t.query(api.platform.auditLog, { token: a2, companyId: c2 })).rejects.toThrow(/creator of this company/)
     await expect(t.query(api.platform.auditLog, { token: a2 })).rejects.toThrow(/General/)
   })
+  it('hata kaydı: ekran hatası ve plan hatası kayda düşer, aynısı sayılır; yalnızca General görür', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const pl = await session(t, u.planner, 'pl')
+    await t.mutation(api.errors.report, { token: pl, message: 'x is undefined', url: '/planlama', plant: 'Plant 1' })
+    await t.mutation(api.errors.report, { token: pl, message: 'x is undefined', url: '/planlama' })
+    // Plan motoru hatası (finishRun) da kayda düşer.
+    const plantId = (await t.query(api.tenancy.context, { token: boss })).active.plantId
+    await t.run((ctx: Any) => ctx.db.insert('planStatus', { plantId, key: 'default' }))
+    await t.mutation(anyApi.planRuns.finishRun, { plantId, startedAt: Date.now(), error: 'No capacity' })
+    const rows = await t.query(api.errors.list, { token: boss })
+    expect(rows.map((r: Any) => [r.source, r.message, r.count, r.user ?? null, r.plant ?? null]).sort()).toEqual([
+      ['client', 'x is undefined', 2, 'pl', 'Plant 1'],
+      ['planEngine', 'No capacity', 1, null, 'Plant 1'],
+    ])
+    await expect(t.query(api.errors.list, { token: pl })).rejects.toThrow(/General/)
+  })
 })
