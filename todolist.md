@@ -167,8 +167,13 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
     düşerdi); work center'ı bağlı cost center kaldırılamaz.
   - [ ] **[K]** OEE geçmişi de kod değişikliğiyle yeni koda taşınsın mı?
     (Bugün taşınmaz; SAP dosyası eski kodu taşır.)
-  - [ ] **[G]** Kalıp (malzeme kodu) için aynı bütünlük: master data'dan
-    silinen parçanın kalıp kayıtları.
+  - [x] ✅ Parça (malzeme kodu) için aynı bütünlük: kalıp bakım /
+    problem / hazırlık / alarm kaydı, plan müdahalesi ya da eş ürün bağı
+    olan parça silinmez, kodu değiştirilmez. Master data'da makine alanına
+    elle yalnızca tanımlı work center yazılır (toplu yüklemede tanımsız olan
+    Work Center Definitions'ta uyarıyla çıkar).
+  - [x] ✅ CI'daki `convex/_generated` taslağı artık veri modelini şemadan
+    türetir (Doc, Id, tipli query/mutation) — gerçek kod üretimine yakın.
 - [ ] **P1 — Dört ayrı gruplama ekseni.** Work center için hol (vinç),
   kategori (hat), bölüm (organizasyon) ve OEE Area var. Kullanıcı hangisinin
   neye yaradığını bilmek zorunda.

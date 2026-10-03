@@ -569,4 +569,27 @@ describe('fabrika ayrımı', () => {
     const spare = (await t.query(api.presses.list, { token: boss })).find((p: Any) => p.name === 'SPARE')
     await t.mutation(api.presses.remove, { token: boss, id: spare._id })
   })
+  it('parça bütünlüğü: kalıp geçmişi olan parça silinmez, kodu değişmez; makine alanına tanımsız work center yazılmaz', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const p1 = (await t.query(api.tenancy.context, { token: boss })).active.plantId
+    const ids = await t.run(async (ctx: Any) => {
+      const a = await ctx.db.insert('products', { plantId: p1, code: 'M1' })
+      const b = await ctx.db.insert('products', { plantId: p1, code: 'M2', coProduct: 'M3' })
+      const c = await ctx.db.insert('products', { plantId: p1, code: 'M3' })
+      const d = await ctx.db.insert('products', { plantId: p1, code: 'FREE' })
+      await ctx.db.insert('moldMaintenance', { plantId: p1, material: 'M1', date: '2026-09-01', createdAt: Date.now() })
+      return { a, b, c, d }
+    })
+    await expect(t.mutation(api.products.remove, { token: boss, id: ids.a })).rejects.toThrow(/M1 is used in die maintenance \(1\)/)
+    await expect(t.mutation(api.products.updateField, { token: boss, id: ids.a, field: 'code', value: 'M1X' })).rejects.toThrow(/cannot be changed/)
+    await expect(t.mutation(api.products.remove, { token: boss, id: ids.c })).rejects.toThrow(/co-product of other parts \(1\)/)
+    await expect(t.mutation(api.products.updateField, { token: boss, id: ids.d, field: 'mainMachine', value: 'PRS-999' })).rejects.toThrow(/not defined on Work Center Definitions/)
+    await t.mutation(api.products.updateField, { token: boss, id: ids.d, field: 'mainMachine', value: 'PRS-106' })
+    await t.mutation(api.products.updateField, { token: boss, id: ids.d, field: 'code', value: 'FREE2' })
+    await t.mutation(api.products.remove, { token: boss, id: ids.d })
+  })
 })

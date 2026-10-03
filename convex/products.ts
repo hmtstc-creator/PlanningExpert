@@ -4,6 +4,8 @@ import {
 } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
+import { materialUsage, materialUsageText } from './materialRefs'
+
 import { DIE_OR_PLANNING, adminMutation, guardedMutation, guardedQuery } from './guarded'
 
 const productValidator = v.object({
@@ -159,10 +161,15 @@ export const bulkUpsert = guardedMutation({
   },
 })
 
+/** Parçayı siler — kalıp kayıtları, plan müdahalesi ya da eş ürün bağı yoksa. */
 export const remove = guardedMutation({
   args: { id: v.id('products') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    const product = await ctx.db.get(id)
+    if (!product) throw new ConvexError('Record not found')
+    const usage = await materialUsage(ctx.db, product.code)
+    if (usage.length) throw new ConvexError(`${materialUsageText(product.code, usage)} — the part cannot be deleted while its history points to it`)
     await ctx.db.delete(id)
     return null
   },
@@ -237,8 +244,22 @@ export const updateField = guardedMutation({
     }
 
     const text = String(value).trim()
+    // Makine alanına yalnızca tanımlı work center yazılır (elle düzenleme; toplu
+    // yüklemede tanımsız olan Work Center Definitions'ta uyarı olarak çıkar).
+    if (text && ['mainMachine', 'altMachine1', 'altMachine2', 'altMachine3', 'altMachine4'].includes(field)) {
+      const defined = await ctx.db
+        .query('presses')
+        .withIndex('by_name', (q) => q.eq('name', text))
+        .first()
+      if (!defined) throw new ConvexError(`${text} is not defined on Work Center Definitions — define the work center first`)
+    }
     if (field === 'code') {
       if (!text) throw new ConvexError('Material code cannot be empty')
+      const current = await ctx.db.get(id)
+      if (current && current.code !== text) {
+        const usage = await materialUsage(ctx.db, current.code)
+        if (usage.length) throw new ConvexError(`${materialUsageText(current.code, usage)} — its code cannot be changed`)
+      }
       // A duplicate code would make bulk upload and planning ambiguous.
       const clash = await ctx.db
         .query('products')
