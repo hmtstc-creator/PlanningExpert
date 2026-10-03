@@ -165,9 +165,10 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   özellikler için şirket bazında aç/kapa bayrağı.
 - [ ] **P1 — Bağımlılık güncelliği.** Vercel'in build'i durdurmasıyla
   öğrendik. → Dependabot / Renovate ve aylık güncelleme günü.
-- [ ] **P2 — Test kalitesi.** Uçtan uca (ekran) test yok; vitest kapanışta
-  takılıyor ("something prevents Vite server from exiting") ve
-  "module is not defined" gürültüsü var.
+- [ ] **P2 — Test kalitesi.** Uçtan uca (ekran) test yok.
+  - [x] ✅ vitest kapanışta takılması ve "module is not defined" gürültüsü
+    giderildi (2026-10-03): testler yalın `vitest.config.ts` ile koşar
+    (uygulamanın sunucu eklentileri yüklenmez); tam doğrulama ~25 sn.
   → Kritik akışlar için Playwright testleri: giriş, plan onayı, OEE
   yükleme, KPI kaydı.
 
