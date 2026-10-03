@@ -1,0 +1,58 @@
+# Dağıtım (deploy) — VPS
+
+Durum (2026-10-03): site Vercel'den bir VPS'e taşınacak. Program iki
+parçadır; ikisi ayrı düşünülür:
+
+| Parça | Ne | Nerede çalışır |
+|---|---|---|
+| **Arayüz** | TanStack Start (Vite + Nitro) — sayfalar ve sunucu tarafı render | VPS'te Node süreci (`node .output/server/index.mjs`) |
+| **Sunucu + veritabanı** | Convex: bütün `convex/*.ts` işlevleri, tablolar, zamanlayıcı (saat başı plan), dosyalar (fotoğraflar), Node action'ları (`auth.ts`, `planEngine.ts`) | A) Convex Cloud **ya da** B) VPS'te kendi barındırılan Convex |
+
+Kodda Vercel'e bağlı bir şey yok; Nitro VPS'te varsayılan Node sunucusu
+üretir.
+
+## Karar: Convex nerede? **[K]** (todolist.md)
+
+| | A) Arayüz VPS, Convex Cloud | B) Hepsi VPS (self-hosted Convex) |
+|---|---|---|
+| Kurulum | En kolay: yalnızca arayüz taşınır | Convex backend (Docker) + veritabanı (Postgres önerilir) + dashboard |
+| Veri | Convex'te (ABD/AB bölgesi) | Tamamen sizin sunucunuzda (KVKK / müşteri isteği için güçlü) |
+| Yedek | Convex panelinden | **Sizin işiniz**: Postgres yedeği + Convex dışa aktarımı, zamanlanmış |
+| Güncelleme | Convex yapar | Backend imajını siz güncellersiniz |
+| Maliyet | Convex planı | VPS kaynakları (plan motoru CPU ister) |
+| Risk | Dış bağımlılık | Tek sunucu = tek arıza noktası; izleme ve yedek şart |
+
+Öneri: müşteriye "veri bizim sunucumuzda" denecekse **B**, değilse
+geçişi hızlı yapmak için önce **A**, sonra B.
+
+## Yayın adımları (her iki seçenekte)
+
+```bash
+npm ci
+npm run verify                         # tip + test + build; kırmızıysa yayınlama
+npx convex deploy                      # önce Convex işlevleri ve şema
+VITE_CONVEX_URL=<convex adresi> npm run build
+node .output/server/index.mjs          # systemd / pm2 ile, önünde nginx/caddy (HTTPS)
+```
+
+- **Sıra önemli:** önce `convex deploy`, sonra arayüz. Tersi olursa arayüz
+  henüz olmayan işlevi çağırır (ekranda "function has not been pushed").
+- **A** için `CONVEX_DEPLOY_KEY` = Convex panelinden `prod:` anahtarı.
+- **B** için Convex CLI self-hosted backend'in adresi ve admin anahtarıyla
+  çalışır (Convex self-hosting belgesindeki ortam değişkenleri; kurulumda
+  doğrulanacak). `VITE_CONVEX_URL` = backend'in dışarıdan erişilen adresi.
+- Şema değişikliği geriye uyumludur (docs/architecture.md kural 12): yeni
+  alan `v.optional`. Alan kaldırmak iki adımda yapılır: önce veri temizlenir,
+  sonra şemadan silinir.
+
+## B seçilirse VPS'te olması gerekenler
+
+- Convex backend + Postgres (Docker Compose), Convex dashboard (yalnızca
+  VPN / IP kısıtlı).
+- Günlük otomatik yedek (Postgres dump + dosya deposu) başka bir yere
+  (S3 vb.); ayda bir geri yükleme provası.
+- HTTPS (caddy / nginx + Let's Encrypt), güvenlik duvarı (yalnızca 443).
+- İzleme: sunucu ayakta mı (dış uptime kontrolü), disk / CPU alarmı; uygulama
+  hataları zaten System errors'ta.
+- Saat başı plan hesabı (`convex/crons.ts`) backend'le birlikte çalışır;
+  ayrı cron gerekmez.

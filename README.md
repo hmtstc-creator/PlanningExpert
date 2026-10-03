@@ -20,6 +20,7 @@ Dashboard. Tek sistem, tek adres; her plant'in verisi ayrıdır.
 | `docs/board.md` | Holding, Board Dashboard, organizasyon ağacı |
 | `docs/oeedashboard.md` | OEE kararları ve dosya biçimi |
 | `docs/kpi.md` | KPI modülü |
+| `docs/deployment.md` | VPS'e dağıtım, Convex Cloud / self-hosted kararı |
 | Sitede **Planning Logic** | Kullanıcıya dönük plan kuralları |
 
 ## Organizasyon
@@ -52,17 +53,9 @@ Kırmızı CI = main bozuk; önce o düzeltilir.
 
 ## Yayın (deploy)
 
-`main`'e giden her commit Vercel'de production'a çıkar. Vercel build komutu:
-
-```
-npx convex codegen && npx convex deploy --cmd 'npm run build' --cmd-url-env-var-name VITE_CONVEX_URL
-```
-
-- Vercel **Production** ortamında `CONVEX_DEPLOY_KEY` = Convex'in `prod:`
-  anahtarı.
-- **Preview** (PR) yayınları için Preview ortamına ayrı bir Convex *preview*
-  anahtarı gerekir; yoksa PR build'i düşer (production'a dokunmaz).
-- Yayından sonra kullanıcıya Ctrl+F5.
+Site VPS'e taşınıyor: adımlar ve "Convex nerede çalışacak" kararı
+**docs/deployment.md**'de. Özet: `npm run verify` → `npx convex deploy` →
+`npm run build` → `node .output/server/index.mjs`.
 
 ## Yedek ve geri yükleme
 
@@ -105,8 +98,8 @@ kullanıcılar ve gruplar.
 
 1. **System → Connection Diagnostics** sayfasını iki cihazda da aç.
 2. **Deployment** adlarını karşılaştır.
-3. Farklıysa Vercel'deki `CONVEX_DEPLOY_KEY` bir `preview:` anahtarıdır;
-   Convex panelinden `prod:` anahtarını alıp Vercel'de değiştir.
+3. Farklıysa build başka bir Convex deployment'ına bakıyordur (preview
+   anahtarı ya da başka adres); production'ınkiyle yeniden build et.
 4. Aynıysa ve sayılar farklıysa tarayıcı önbelleğidir — sayfayı yenile.
 
 ## Notlar

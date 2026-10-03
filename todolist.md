@@ -110,14 +110,15 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   tip kontrolü, testler ve build çalıştırır (`.github/workflows/ci.yml`);
   yerelde aynısı `npm run verify`. Tip kontrolündeki iki sahte hata
   (`QueryCtx`) giderildi.
-  - [ ] **[S]** Vercel'in yalnızca CI yeşilken deploy etmesi: GitHub'da
-    `main` için branch protection + "Require status checks" (CI), ya da
-    Vercel'de "Ignored Build Step". İkisi de senin hesabından açılır.
-- [ ] **P0 — Staging yok, preview kırık.** Vercel Preview'da Convex anahtarı
-  yok; PR açınca build düşüyor. Değişikliği gerçek veriye benzer bir yerde
-  denemenin yolu yok.
-  → Convex preview deploy key'i Vercel Preview ortamına ekle. Mümkünse
-  anonimleştirilmiş veriyle sürekli bir staging tut.
+  - [ ] **[S]** VPS'te yayın yalnızca CI yeşilken: yayın betiği önce
+    `npm run verify` çalıştırır (docs/deployment.md); GitHub'da `main` için
+    "Require status checks".
+- [ ] **[K] P0 — VPS'e taşıma: Convex nerede çalışacak?** A) arayüz VPS +
+  Convex Cloud, B) hepsi VPS (self-hosted Convex + Postgres). Karşılaştırma
+  ve adımlar: docs/deployment.md. B seçilirse yedek ve izleme tamamen bizde.
+- [ ] **P0 — Staging yok.** Değişikliği gerçek veriye benzer bir yerde
+  denemenin yolu yok. → VPS'te ayrı bir staging Convex deployment'ı +
+  arayüz kopyası, anonimleştirilmiş veriyle.
 - [ ] **P0 — Yedek yok.** Tek koruma, şirket bazında elle alınan JSON
   dışa aktarımı; geri yükleme hiç denenmedi. Kodla çözülemez, Convex
   hesabından açılır — adımlar README → "Yedek ve geri yükleme".

@@ -119,7 +119,7 @@ function TaniPage() {
       body: (
         <>
           <code>VITE_CONVEX_URL</code> is not set. This is not a network problem
-          but a missing Vercel build setting. The build command must be:{' '}
+          but a missing build setting (docs/deployment.md). The build command must be:{' '}
           <code className="break-all">
             npx convex codegen &amp;&amp; npx convex deploy --cmd 'npm run build'
             --cmd-url-env-var-name VITE_CONVEX_URL
@@ -298,8 +298,8 @@ function TaniPage() {
           </li>
           <li>
             Both connected but the <strong>Deployment</strong> names differ: the
-            <code>CONVEX_DEPLOY_KEY</code> in Vercel is a <code>preview:</code> key.
-            Replace it with the <code>prod:</code> key from the Convex dashboard.
+            build points at another Convex deployment (a <code>preview:</code> deploy key, or another
+            self-hosted URL). Build with the production deployment's key or URL.
           </li>
           <li>
             Same deployment but different row counts: browser cache — reload the

@@ -32,7 +32,7 @@ export class QueryCatcher extends Component<
             <p className="mt-2 text-xs text-destructive/90">
               This function has not been pushed to the database yet. The site was
               updated to a new version but the Convex functions were not deployed —
-              the Vercel build command must run <code>npx convex deploy</code>.
+              every release must also run <code>npx convex deploy</code> (docs/deployment.md).
             </p>
           )}
         </div>
