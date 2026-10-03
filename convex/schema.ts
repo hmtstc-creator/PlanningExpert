@@ -110,7 +110,7 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index('by_key', ['key']),
 
-  // @deprecated kaldırıldı, sadece eski sözleşme uyumluluğu için tutuluyor
+  // @deprecated Ekranı ve API'si kaldırıldı (2026-10-03); eski veri silinene kadar şemada.
   machines: defineTable({
     ...plantField,
     name: v.string(),
@@ -120,7 +120,7 @@ export default defineSchema({
   }).index('by_name', ['plantId', 'name'])
     .index('by_plant', ['plantId']),
 
-  // @deprecated kaldırıldı, sadece eski sözleşme uyumluluğu için tutuluyor
+  // @deprecated Ekranı ve API'si kaldırıldı (2026-10-03); eski veri silinene kadar şemada.
   machinePriorities: defineTable({
     ...plantField,
     productCode: v.string(),

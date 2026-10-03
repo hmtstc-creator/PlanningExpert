@@ -210,7 +210,11 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   duruyor; hedef, sorumlu ya da yetki eklenecekse ayrı bir tablo (ID) olmalı.
 - [ ] **P1 — Eski alanlar.** Şemada 8 `@deprecated` alan, kullanıcıda eski
   `role` alanı (gruplardan önceki model) hâlâ var.
-  → Bir kerelik geçişle temizle; iki yetki modeli yan yana durmasın.
+  - [x] ✅ Kullanılmayan `machines` / `machinePriorities` API'leri silindi
+    (2026-10-03); tablolar veri temizlenene kadar şemada.
+  - [ ] **[G]** İki adımlı temizlik: (1) geçiş alanları boşaltır, (2) bir
+    sonraki yayında şemadan çıkarılır (Convex, alanı taşıyan kayıt varken
+    şemadan silmeye izin vermez).
 - [ ] **P2 — Ortak tatil tablosu.** Resmi tatiller ülke bazında ortak;
   plant'e özel kapanış (bayram köprüsü vb.) tatil olarak girilemiyor,
   planlı duruşla çözülüyor.
@@ -256,7 +260,12 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   - [x] ✅ `planlama.tsx` 2000 → 955 satır (2026-10-03): geç işler, plan
     başlangıcı, veri kapsamı, bağımsız denetim / optimizasyon ve özet
     panelleri `src/components/plan/` altına taşındı (davranış aynı).
-  - [ ] **[G]** `takvim.tsx` 1371, `platform.tsx` ~1350 satır: aynı yöntemle.
+  - [x] ✅ `platform.tsx` → `src/components/org/OrgAdmin.tsx` + ince
+    `/admin` ve `/settings` sayfaları (2026-10-03).
+  - [ ] **[G]** `takvim.tsx` 1371 satır: 1100 satırı tek bileşen
+    (PressCalendarSection) ve iç durumu paylaşıyor — mekanik taşıma değil,
+    yeniden düzenleme ister; gerçek veriyle ekran testi gerektiği için ayrı
+    ve dikkatli yapılacak.
   - [ ] **[G]** Motor: `scheduler.ts` 2146, `planValidator.ts` 2005 —
     kural modüllerine bölünecek (validator bağımsızlığı korunarak; yoğun
     testli olduğu için ayrı ve dikkatli bir iş).
