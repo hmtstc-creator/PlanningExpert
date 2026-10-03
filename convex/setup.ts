@@ -37,10 +37,10 @@ export const checklist = guardedQuery({
       .first()
     return [
       { key: 'plant', module: 'planning', label: 'Country and time zone of the plant', to: '/platform', done: !!ctx.plant.country && !!ctx.plant.timeZone, hint: 'Holidays and every date and hour of the plan use them.' },
-      { key: 'presses', module: 'planning', label: 'Press Definitions — presses and halls', to: '/makineler', done: presses.length > 0 && presses.every((p) => !!p.hall?.trim()), hint: 'Every press needs a hall (crane constraint).' },
-      { key: 'calendar', module: 'planning', label: 'Work Calendar — shift length, days and shifts per press', to: '/takvim', done: !!settings && (await any(db.query('pressTemplates'))), hint: 'Without a pattern a press has no capacity.' },
+      { key: 'presses', module: 'planning', label: 'Work Center Definitions — work centers and halls', to: '/makineler', done: presses.length > 0 && presses.every((p) => !!p.hall?.trim()), hint: 'Every work center needs a hall (crane constraint).' },
+      { key: 'calendar', module: 'planning', label: 'Work Calendar — shift length, days and shifts per work center', to: '/takvim', done: !!settings && (await any(db.query('pressTemplates'))), hint: 'Without a pattern a work center has no capacity.' },
       { key: 'locations', module: 'planning', label: 'Storage Locations — which stock counts', to: '/depolar', done: locations.some((l) => l.countFinished === true), hint: 'No location is counted until it is ticked.' },
-      { key: 'master', module: 'planning', label: 'Master Data — parts, presses, cycle and lot rules', to: '/referanslar', done: await any(db.query('products')), hint: 'Upload or enter the part master.' },
+      { key: 'master', module: 'planning', label: 'Master Data — parts, work centers, cycle and lot rules', to: '/referanslar', done: await any(db.query('products')), hint: 'Upload or enter the part master.' },
       { key: 'sap', module: 'planning', label: 'SAP Data — ZPP demand and MB52 stock', to: '/sapdata', done: uploaded('weeklyDemand') && uploaded('stock'), hint: 'The plan is calculated from the uploaded demand and stock.' },
       { key: 'oee', module: 'oee', label: 'OEE — settings and first upload', to: '/oee/settings', done: !!oeeSettings && (await any(db.query('oeeDays'))), hint: 'Upload the OEE file, then Suggest from data and Save.' },
       { key: 'users', module: 'planning', label: 'Users and groups', to: '/yonetim', done: users.length > 1, hint: 'Open the users of the plant and give them groups.' },

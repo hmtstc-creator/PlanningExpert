@@ -211,7 +211,7 @@ export function buildPlanAlarms(input: {
       affected: unique,
       explanation:
         m.kind === 'fault-running'
-          ? 'Fault reported but the press keeps running — the plan still uses it.'
+          ? 'Fault reported but the work center keeps running — the plan still uses it.'
           : critical
             ? `${unique.length} part(s) that can run on ${m.press} will be late or cannot be planned.`
             : m.until === undefined

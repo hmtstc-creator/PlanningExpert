@@ -28,7 +28,7 @@ type Press = {
 // Suggestions only — any text is accepted, since every shop names its press
 // types differently.
 const CATEGORY_SUGGESTIONS = [
-  'Transfer press',
+  'Transfer work center',
   'Progressive 800 t',
   'Progressive 500 t',
   'Progressive 400 t',
@@ -116,33 +116,33 @@ function MakinelerPage() {
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <PageHeader
-        title="Press Definitions"
-        summary="Hall, category and coil feed of every press — the single press list of the program."
+        title="Work Center Definitions"
+        summary="Hall, category and coil feed of every work center — the single work center list of the program."
         links={relatedPages('/makineler')}
         info={
           <>
             <p>
-              <b>Hall:</b> presses in the same hall cannot set up at the same time — the crane
+              <b>Hall:</b> work centers in the same hall cannot set up at the same time — the crane
               constraint the planner relies on.
             </p>
             <p>
-              <b>Category</b> groups presses into lines: the Gantt groups by it and the Capacity
-              Dashboard adds up presses with the same category (e.g. Transfer = 106 + 107). It does
+              <b>Category</b> groups work centers into lines: the Gantt groups by it and the Capacity
+              Dashboard adds up work centers with the same category (e.g. Transfer = 106 + 107). It does
               not decide where a part runs — that comes from the main and alternative machines in
               master data.
             </p>
             <p>
               <b>Coil fed</b> marks a progressive line: the first coil goes on during setup and every
-              coil after it costs a coil change. A transfer press runs blanks, so it has a single
+              coil after it costs a coil change. A transfer work center runs blanks, so it has a single
               setup and no coil changes — untick it there.
             </p>
             <p>
-              <b>Frozen days</b> locks that press's plan for the given number of days; leave it
+              <b>Frozen days</b> locks that work center's plan for the given number of days; leave it
               empty to use the global setting.
             </p>
             <p>
-              Only presses defined here appear on the Work Calendar, the Capacity Dashboard and the
-              overtime lists. Each press also needs a Work Calendar pattern, otherwise it has no
+              Only work centers defined here appear on the Work Calendar, the Capacity Dashboard and the
+              overtime lists. Each work center also needs a Work Calendar pattern, otherwise it has no
               capacity.
             </p>
           </>
@@ -156,7 +156,7 @@ function MakinelerPage() {
 
       <div className="mt-6 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Press name</span>
+          <span className="block text-xs text-muted-foreground">Work center name</span>
           <input
             className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
             placeholder="PRS-107"
@@ -200,7 +200,7 @@ function MakinelerPage() {
           />
           <span className="text-xs text-muted-foreground">
             Coil fed
-            <span className="block text-[10px]">uncheck for transfer presses</span>
+            <span className="block text-[10px]">uncheck for transfer work centers</span>
           </span>
         </label>
         <button
@@ -208,14 +208,14 @@ function MakinelerPage() {
           disabled={!name.trim() || saving}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
-          {saving ? 'Adding…' : 'Add press'}
+          {saving ? 'Adding…' : 'Add work center'}
         </button>
       </div>
 
       {undefinedPresses.length > 0 && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-medium text-amber-900">
-            Presses referenced in master data but not yet defined
+            Work centers referenced in master data but not yet defined
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {undefinedPresses.map((p) => (
@@ -236,7 +236,7 @@ function MakinelerPage() {
             ))}
           </div>
           <p className="mt-2 text-xs text-amber-800">
-            Clicking adds the press with the hall, category and coil setting
+            Clicking adds the work center with the hall, category and coil setting
             entered in the boxes above.
           </p>
         </div>
@@ -244,7 +244,7 @@ function MakinelerPage() {
 
       {presses.length === 0 ? (
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          No presses defined yet.
+          No work centers defined yet.
         </p>
       ) : (
         <div className="mt-8 space-y-6">
@@ -253,23 +253,23 @@ function MakinelerPage() {
               <h2 className="text-sm font-semibold text-foreground">
                 {hallName}{' '}
                 <span className="font-normal text-muted-foreground">
-                  ({list.length} presses — one setup at a time)
+                  ({list.length} work centers — one setup at a time)
                 </span>
               </h2>
               <div className="mt-2 overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-muted text-muted-foreground">
                     <tr>
-                      <th className="px-3 py-2 font-medium">Press</th>
+                      <th className="px-3 py-2 font-medium">Work center</th>
                       <th className="px-3 py-2 font-medium">Hall</th>
                       <th className="px-3 py-2 font-medium">Category</th>
                       <th
                         className="px-3 py-2 font-medium"
-                        title="Progressive lines are coil fed; transfer presses run blanks and have a single setup"
+                        title="Progressive lines are coil fed; transfer work centers run blanks and have a single setup"
                       >
                         Coil fed
                       </th>
-                      <th className="px-3 py-2 font-medium" title="Days of this press's plan that stay locked">
+                      <th className="px-3 py-2 font-medium" title="Days of this work center's plan that stay locked">
                         Frozen days
                       </th>
                       <th className="px-3 py-2 font-medium">Status</th>
@@ -352,7 +352,7 @@ function MakinelerPage() {
                                 onClick={() => {
                                   if (
                                     window.confirm(
-                                      `Delete press ${p.name}? This cannot be undone.`,
+                                      `Delete work center ${p.name}? This cannot be undone.`,
                                     )
                                   ) {
                                     void remove({ id: p._id as never })
@@ -376,7 +376,7 @@ function MakinelerPage() {
       <UnsavedBar
         count={rows.dirtyKeys.length}
         saving={rows.savingKey !== null}
-        noun="press"
+        noun="work center"
         onSaveAll={() => void rows.commitAll((id, draft) => savePress(id)(draft))}
         onDiscard={rows.discardAll}
       />

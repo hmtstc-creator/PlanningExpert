@@ -54,8 +54,8 @@ function MachineReports() {
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <h1 className="text-2xl font-bold text-foreground">Machine Reports</h1>
       <p className="mt-1 text-muted-foreground">
-        Which presses break down, how often and why. Blue bars are the few that
-        make up 80% of the total — start there. Click a press to see only its
+        Which work centers break down, how often and why. Blue bars are the few that
+        make up 80% of the total — start there. Click a work center to see only its
         breakdowns.
       </p>
 
@@ -69,9 +69,9 @@ function MachineReports() {
           <input type="date" className={inputClass} value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Press</span>
+          <span className="block text-xs text-muted-foreground">Work center</span>
           <select className={inputClass} value={press} onChange={(e) => setPress(e.target.value)}>
-            <option value="">All presses</option>
+            <option value="">All work centers</option>
             {presses.map((p) => (
               <option key={p.name} value={p.name}>
                 {p.name}
@@ -106,7 +106,7 @@ function MachineReports() {
 
       <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <ParetoChart
-          title="Breakdowns by press"
+          title="Breakdowns by work center"
           unit="breakdowns"
           groups={count((r) => r.press)}
           selected={press}
@@ -114,7 +114,7 @@ function MachineReports() {
         />
         <ParetoChart title="Breakdowns by type" unit="breakdowns" groups={count((r) => r.problemType)} />
         <ParetoChart
-          title="Production lost by press"
+          title="Production lost by work center"
           unit="min"
           groups={downtime((r) => r.press)}
           selected={press}
@@ -125,11 +125,11 @@ function MachineReports() {
 
       <div className="mt-4">
         <ProblemMatrix
-          title="Which press, how many times, for which problem"
+          title="Which work center, how many times, for which problem"
           rows={filtered}
           rowKey={(r) => r.press}
           colKey={(r) => r.problemType}
-          rowLabel="Press"
+          rowLabel="Work center"
         />
       </div>
     </div>

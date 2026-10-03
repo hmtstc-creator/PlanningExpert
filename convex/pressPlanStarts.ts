@@ -46,7 +46,7 @@ export const set = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new ConvexError('Press is required')
+    if (!press) throw new ConvexError('Work center is required')
     if (args.fromDate !== undefined && !DATE.test(args.fromDate)) throw new ConvexError('Date must be YYYY-MM-DD')
     if (args.fromMinute !== undefined && (!Number.isFinite(args.fromMinute) || args.fromMinute < 0 || args.fromMinute >= 1440)) {
       throw new ConvexError('Time must be between 00:00 and 23:59')

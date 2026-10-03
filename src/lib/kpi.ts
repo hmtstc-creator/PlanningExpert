@@ -11,15 +11,16 @@
  *
  * Girilenler (planlamacı, 2026-10-02): operatör sayısı, üretim adedi, üretim
  * saati, normal mevcudiyet saati (fazla mesaisiz), fazla mesai saati,
- * Absenteeism % ve Productivity (doğrudan %); planda ayrıca OEE hedefi.
+ * Absenteeism % (doğrudan %) ve Productivity (sayısal değer); planda ayrıca
+ * OEE hedefi.
  * Hesaplananlar:
  *   Total presence   = normal mevcudiyet + fazla mesai
  *   Overtime %       = fazla mesai ÷ normal mevcudiyet
  *   Efficiency       = üretim saati ÷ total presence
  *   OEE (gerçekleşen) = OEE modülünün kök verisi: Σ operating ÷ Σ loading
- * Girilen yüzdeler (Absenteeism, Productivity) birden çok satırda saatle
- * ağırlıklı birleşir: Absenteeism normal mevcudiyetle, Productivity toplam
- * mevcudiyetle (saat yoksa eşit ağırlık).
+ * Girilen Absenteeism % ve Productivity birden çok satırda saatle ağırlıklı
+ * birleşir: Absenteeism normal mevcudiyetle, Productivity toplam mevcudiyetle
+ * (saat yoksa eşit ağırlık). Açık not: docs/kpi.md → "Ağırlıklı birleşim".
  * Gerçekleşen üretim adedi ve saati girilmemişse OEE verisinden gelir (iyi
  * adet, net üretim süresi).
  */
@@ -36,7 +37,7 @@ export interface KpiValues {
   overtimeHours?: number
   /** Kesir (0,034 = %3,4). */
   absenteeism?: number
-  /** Kesir. */
+  /** Sayısal değer (yüzde değil; planlamacı 2026-10-03). */
   productivity?: number
   oee?: number
 }
@@ -95,7 +96,7 @@ export const KPI_ROWS: { key: keyof KpiMetrics; label: string; short?: string; c
   { key: 'overtimePct', label: 'Overtime %', unit: '%', higher: false },
   { key: 'totalPresenceHours', label: 'Total presence hour', short: 'Total presence h', unit: 'h', higher: null },
   { key: 'absenteeismPct', label: 'Absenteeism %', unit: '%', higher: false },
-  { key: 'productivity', label: 'Productivity', unit: '%', higher: true },
+  { key: 'productivity', label: 'Productivity', unit: 'n', higher: true },
   { key: 'efficiency', label: 'Efficiency', unit: '%', higher: true },
   { key: 'oee', label: 'OEE', unit: '%', higher: true },
 ]
@@ -108,7 +109,7 @@ export const KPI_INPUTS: { key: keyof KpiValues; label: string; unit: string; pl
   { key: 'presenceHours', label: 'Normal presence hour (w/o overtime)', unit: 'h' },
   { key: 'overtimeHours', label: 'Overtime', unit: 'h' },
   { key: 'absenteeism', label: 'Absenteeism', unit: '%', pct: true },
-  { key: 'productivity', label: 'Productivity', unit: '%', pct: true },
+  { key: 'productivity', label: 'Productivity', unit: 'value' },
   { key: 'oee', label: 'OEE target', unit: '%', planOnly: true, pct: true },
 ]
 
@@ -317,7 +318,7 @@ export function periodTitle(period: KpiPeriod, year: number, num: number): strin
 export function formatKpi(v: number | null | undefined, unit: 'n' | 'h' | 'pcs' | '%'): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return '—'
   if (unit === '%') return `${(v * 100).toFixed(1)}%`
-  if (unit === 'n') return Number.isInteger(v) ? String(v) : v.toFixed(1)
+  if (unit === 'n') return Number.isInteger(v) ? String(v) : Number(v.toFixed(2)).toLocaleString('en-GB')
   return Math.round(v).toLocaleString('en-GB')
 }
 

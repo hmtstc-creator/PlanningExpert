@@ -164,11 +164,11 @@ function PressMaintenancePage() {
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Press Maintenance</h1>
+      <h1 className="text-2xl font-bold text-foreground">Work center Maintenance</h1>
       <p className="mt-2 text-muted-foreground">
-        The maintenance department books which press is down, on which day and
+        The maintenance department books which work center is down, on which day and
         between which hours. The planner does not enter this and cannot plan
-        over it: the hours are taken out of that press automatically and work
+        over it: the hours are taken out of that work center automatically and work
         flows around them. After the job is finished, record the hours it
         actually took — the difference between planned and actual is the
         performance figure below, and every record is kept.
@@ -181,14 +181,14 @@ function PressMaintenancePage() {
 
       {presses.length === 0 && (
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          No presses are defined yet, so there is nothing to book maintenance
+          No work centers are defined yet, so there is nothing to book maintenance
           against.
         </p>
       )}
 
       <div className="mt-6 flex flex-wrap items-end gap-2 rounded-lg border border-border p-4">
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Press</span>
+          <span className="block text-xs text-muted-foreground">Work center</span>
           <select
             className={`mt-1 w-36 ${inputClass}`}
             value={press}
@@ -377,7 +377,7 @@ function MaintenanceTable(props: TableProps) {
           <table className="w-full text-left text-sm">
             <thead className="bg-muted text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 font-medium">Press</th>
+                <th className="px-3 py-2 font-medium">Work center</th>
                 <th className="px-3 py-2 font-medium">Date</th>
                 <th className="px-3 py-2 font-medium">From</th>
                 <th className="px-3 py-2 font-medium">To</th>

@@ -139,10 +139,10 @@ function OeeSettingsPage() {
 
       <Card
         title="Areas"
-        info="A group of cost centers, e.g. presses (PRS) or assembly (APR); each area is a button above every OEE page. 'Cost center' lets you pick a cost center of the area; 'Machine' lets you pick a single machine (when the area is one cost center). 'Production after a setup' is the minutes of production that make a setup OK in this area; empty = the value under Numbers."
+        info="A group of cost centers, e.g. work centers (PRS) or assembly (APR); each area is a button above every OEE page. 'Cost center' lets you pick a cost center of the area; 'Machine' lets you pick a single machine (when the area is one cost center). 'Production after a setup' is the minutes of production that make a setup OK in this area; empty = the value under Numbers."
       >
         <Rows
-          empty="No area yet — press Suggest from data, or add one below."
+          empty="No area yet — work center Suggest from data, or add one below."
           head={['Area name', 'Pick by', 'Production after a setup (min)', '']}
           rows={c.areas.map((a, i) => [
             <input

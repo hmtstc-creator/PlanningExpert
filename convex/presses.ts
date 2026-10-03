@@ -40,10 +40,10 @@ export const upsert = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const name = args.name.trim()
-    if (!name) throw new ConvexError('Press name is required')
+    if (!name) throw new ConvexError('Work center name is required')
     // Hol vinç kısıtıdır; kodda varsayılan hol adı yok.
     const hall = args.hall.trim()
-    if (!hall) throw new ConvexError(`Enter the hall of ${name} — presses in one hall share the crane for setups`)
+    if (!hall) throw new ConvexError(`Enter the hall of ${name} — work centers in one hall share the crane for setups`)
     const existing = await ctx.db
       .query('presses')
       .withIndex('by_name', (q) => q.eq('name', name))

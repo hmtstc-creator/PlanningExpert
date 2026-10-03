@@ -46,7 +46,7 @@ function backlog(material: string, qty: number): DemandEntry {
 }
 
 describe('placement decision', () => {
-  it('puts a job on the alternative press when that finishes it earlier, and says why', () => {
+  it('puts a job on the alternative work center when that finishes it earlier, and says why', () => {
     const products = new Map([
       ['BIG', product('BIG', '104')],
       ['A', product('A', '104', '105')],
@@ -78,7 +78,7 @@ describe('placement decision', () => {
     ).toBe(true)
   })
 
-  it('records why a press could not take the job', () => {
+  it('records why a work center could not take the job', () => {
     const products = new Map([['A', product('A', '104', '105')]])
     const result = schedule(
       [backlog('A', 500)],
@@ -101,7 +101,7 @@ describe('placement decision', () => {
     })
   })
 
-  it('places the part with fewer eligible presses first when the priority is equal', () => {
+  it('places the part with fewer eligible work centers first when the priority is equal', () => {
     // X 104 veya 105'te, Y yalnızca 104'te yapılabilir. İkisi de bakiye ve
     // dosyada X önce geliyor. X önce yerleşseydi 104'ü alır, Y onun arkasına
     // düşerdi. Tek presli Y önce yerleşir, X 105'e gider.
@@ -129,7 +129,7 @@ describe('placement decision', () => {
     expect(y.setupStartMinute).toBe(0)
   })
 
-  it('keeps a part that is not marked flexible on its main press, even when late', () => {
+  it('keeps a part that is not marked flexible on its main work center, even when late', () => {
     // A'nın alternatifi 105 tanımlı ama "esnek" işaretli değil: kalite
     // gereği yalnızca 104. 104 dolu olsa bile 105'e gitmez.
     const products = new Map([
@@ -163,6 +163,6 @@ describe('placement decision', () => {
       { setupGapMinutes: 60, concurrentSetupsPerHall: 1 },
     )
     expect(result.jobs).toHaveLength(0)
-    expect(result.unplanned[0].reason).toContain('Flexible press')
+    expect(result.unplanned[0].reason).toContain('Flexible work center')
   })
 })

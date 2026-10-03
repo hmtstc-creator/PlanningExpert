@@ -207,7 +207,7 @@ function LossesPage() {
         </div>
       </Section>
 
-      <Section title={`Week gap by press and cost center — W${sel.week.week} vs W${isoWeek(prevMonday).week}`} info="Each cell: this week's loss share, and the change against the previous week in percentage points.">
+      <Section title={`Week gap by work center and cost center — W${sel.week.week} vs W${isoWeek(prevMonday).week}`} info="Each cell: this week's loss share, and the change against the previous week in percentage points.">
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full text-xs">
             <thead className="bg-muted text-muted-foreground">
@@ -509,7 +509,7 @@ function SetupSection({ setups, week, loaded, config, area }: { setups: SetupRow
 function PressPicker({ presses, value, onChange }: { presses: string[]; value: string; onChange: (v: string) => void }) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} className="rounded-md border border-input bg-background px-2 py-1 text-xs">
-      <option value="all">All presses</option>
+      <option value="all">All work centers</option>
       {presses.map((p) => (
         <option key={p} value={p}>
           {p}

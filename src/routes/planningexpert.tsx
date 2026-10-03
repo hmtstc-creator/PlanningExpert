@@ -120,7 +120,7 @@ function HomePage() {
     if (calendarReady && templates.length === 0) {
       list.push({
         level: 'medium',
-        text: 'No press has a weekly pattern yet — every press defaults to 1 shift.',
+        text: 'No work center has a weekly pattern yet — every work center defaults to 1 shift.',
         link: '/takvim',
       })
     }
@@ -128,7 +128,7 @@ function HomePage() {
     if (presses.length === 0) {
       list.push({
         level: 'high',
-        text: 'No presses defined — a plan cannot be produced.',
+        text: 'No work centers defined — a plan cannot be produced.',
         link: '/makineler',
       })
     }
@@ -171,7 +171,7 @@ function HomePage() {
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="PlanningExpert — Overview"
-        summary="Press shop production planning — daily status overview."
+        summary="Plant production planning — daily status overview."
         links={relatedPages('/planningexpert')}
       />
 
@@ -185,7 +185,7 @@ function HomePage() {
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard label="Materials" value={products.length} hint="with a master data record" to="/referanslar" />
-        <StatCard label="Presses" value={presses.length} hint={`${new Set(presses.map((p) => p.hall)).size} halls`} to="/makineler" />
+        <StatCard label="Work centers" value={presses.length} hint={`${new Set(presses.map((p) => p.hall)).size} halls`} to="/makineler" />
         <StatCard
           label="Backlog"
           value={Math.round(backlogQty).toLocaleString('en-GB')}
@@ -253,7 +253,7 @@ function HomePage() {
         <ol className="mt-3 space-y-2">
           <StepItem n={1} done={weekly.length > 0} title="Upload SAP data" desc="ZPP and ZPP_DAILY → Demand, MB52 → Stock" to="/siparisler" />
           <StepItem n={2} done={locations.length > 0} title="Check storage locations" desc="Which stock do we really have?" to="/depolar" />
-          <StepItem n={3} done={presses.length > 0} title="Define presses" desc="Which press is in which hall — the crane constraint" to="/makineler" />
+          <StepItem n={3} done={presses.length > 0} title="Define work centers" desc="Which work center is in which hall — the crane constraint" to="/makineler" />
           <StepItem n={4} done={calendarReady} title="Verify the work calendar" desc="Shifts, working days, breaks, holidays — then Save all settings" to="/takvim" />
           <StepItem n={5} done={!!snapshot} title="Review and approve the plan" desc="The plan is generated automatically; you review and approve" to="/planlama" />
           <StepItem n={6} done={false} title="Upload actuals and compare" desc="MB51 → performance factor and mold life" to="/performans" />

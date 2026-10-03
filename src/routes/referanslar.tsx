@@ -198,7 +198,7 @@ function ReferanslarPage() {
       altMachine3: s(row['Alternative 3'] ?? row['Alternatif Makine 3'] ?? row['altMachine3']),
       altMachine4: s(row['Alternative 4'] ?? row['Alternatif Makine 4'] ?? row['altMachine4']),
       // Sütun yoksa undefined kalır ve mevcut işaret korunur.
-      flexiblePress: flag(row['Flexible'] ?? row['Flexible Press'] ?? row['Esnek'] ?? row['flexiblePress']),
+      flexiblePress: flag(row['Flexible'] ?? row['Flexible Work Center'] ?? row['Esnek'] ?? row['flexiblePress']),
       maxShots: n(
         row['Max Shot'] ??
           row['Max Shots'] ??
@@ -230,7 +230,7 @@ function ReferanslarPage() {
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="Master Data"
-        summary="The main part list: cavities, SPM, coil data, setup times, presses and Accepted OEE."
+        summary="The main part list: cavities, SPM, coil data, setup times, work centers and Accepted OEE."
         links={relatedPages('/referanslar')}
         info={
           <>
@@ -243,7 +243,7 @@ function ReferanslarPage() {
             <p>
               <b>Lot:</b> gross weight is per piece, so a coil yields coil weight ÷ gross weight
               pieces — that is the lot unit, shown in the Pcs/coil column. Where the coil quantity
-              is flexible (transfer presses), enter <b>Min. lot</b> instead: the lot is then at
+              is flexible (transfer work centers), enter <b>Min. lot</b> instead: the lot is then at
               least that many pieces, otherwise exactly the need, and the coil weight is ignored (it
               may stay empty). A part with neither is flagged and planned at exactly the need.
             </p>
@@ -261,11 +261,11 @@ function ReferanslarPage() {
       />
 
       <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-        <strong>Flexible press.</strong> A part runs only on its <strong>main press</strong>{' '}
+        <strong>Flexible work center.</strong> A part runs only on its <strong>main work center</strong>{' '}
         unless it is ticked <strong>Flexible</strong>.{' '}
-        <InfoTip label="About Flexible press">
-          Quality approval is usually tied to one press, so the alternatives are used only for parts
-          you mark. Ticked parts may go to whichever of their presses finishes them first. The Excel
+        <InfoTip label="About Flexible work center">
+          Quality approval is usually tied to one work center, so the alternatives are used only for parts
+          you mark. Ticked parts may go to whichever of their work centers finishes them first. The Excel
           upload keeps the ticks unless the file has a Flexible column.
         </InfoTip>
       </p>
@@ -325,7 +325,7 @@ function ReferanslarPage() {
               checked={form.flexiblePress === 'yes'}
               onChange={(e) => update('flexiblePress', e.target.checked ? 'yes' : '')}
             />
-            Flexible press — may run on the alternatives
+            Flexible work center — may run on the alternatives
           </label>
           <Field label="Periodic maintenance limit (shots)" value={form.maxShots} onChange={(v) => update('maxShots', v)} type="number" placeholder="500000" />
           <Field label="Quality Approval (min)" value={form.qualityApprovalMinutes} onChange={(v) => update('qualityApprovalMinutes', v)} type="number" placeholder="10" />
@@ -372,7 +372,7 @@ function ReferanslarPage() {
               </th>
               <th
                 className="px-3 py-2 font-medium"
-                title="Minimum lot in pieces. When set, the coil is not used for lot sizing (e.g. transfer presses)"
+                title="Minimum lot in pieces. When set, the coil is not used for lot sizing (e.g. transfer work centers)"
               >
                 Min. lot
               </th>
@@ -388,7 +388,7 @@ function ReferanslarPage() {
               <th className="px-3 py-2 font-medium">Alternatives</th>
               <th
                 className="px-3 py-2 font-medium"
-                title="Ticked: the plan may use the alternative presses. Not ticked: always the main press (quality)."
+                title="Ticked: the plan may use the alternative work centers. Not ticked: always the main work center (quality)."
               >
                 Flexible
               </th>
@@ -491,7 +491,7 @@ function ReferanslarPage() {
                   <td className="px-3 py-1 text-center">
                     <input
                       type="checkbox"
-                      aria-label={`Flexible press for ${p.code}`}
+                      aria-label={`Flexible work center for ${p.code}`}
                       checked={draft.flexiblePress === 'yes'}
                       onChange={(e) =>
                         rows.edit(rowId, { flexiblePress: e.target.checked ? 'yes' : '' })

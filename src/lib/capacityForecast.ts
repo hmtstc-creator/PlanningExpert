@@ -197,7 +197,7 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
     if (!press || !pressSet.has(press)) {
       unassigned.push({
         material,
-        reason: press ? `main press ${press} is not defined` : 'no main press',
+        reason: press ? `main work center ${press} is not defined` : 'no main work center',
         quantity: total,
       })
       continue

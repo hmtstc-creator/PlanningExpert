@@ -1199,7 +1199,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
         gapMinutes: 0,
         needQty: round1(need.qty),
         needMinutes: 0,
-        reason: 'No eligible press in the plan (main press missing, or alternatives without Flexible press).',
+        reason: 'No eligible work center in the plan (main work center missing, or alternatives without Flexible work center).',
       }
     }
     // a) Tek başına en iyi preste.
@@ -1217,7 +1217,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
         gapMinutes: Math.round(b.w - b.cap),
         needQty: round1(need.qty),
         needMinutes: Math.round(b.w),
-        reason: `Even alone on ${b.press} it needs ${hours(b.w)} h before ${labelOfAbs(T)}; only ${hours(b.cap)} h of free press time is left.`,
+        reason: `Even alone on ${b.press} it needs ${hours(b.w)} h before ${labelOfAbs(T)}; only ${hours(b.cap)} h of free work center time is left.`,
       }
     }
     // b) Tek presli aile: Moore–Hodgson.
@@ -1230,7 +1230,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
           gapMinutes: Math.round(fam.overload),
           needQty: round1(need.qty),
           needMinutes: Math.round(b.w),
-          reason: `${presses[0]} is overloaded: at least ${fam.minLate} of its ${fam.members.size} single-press parts must be late (${hours(fam.overload)} h short); the plan has ${fam.planLate}.`,
+          reason: `${presses[0]} is overloaded: at least ${fam.minLate} of its ${fam.members.size} single-work center parts must be late (${hours(fam.overload)} h short); the plan has ${fam.planLate}.`,
         }
       }
     }
@@ -1247,7 +1247,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
         gapMinutes: Math.round(load - cap),
         needQty: round1(need.qty),
         needMinutes: Math.round(b.w),
-        reason: `Presses ${presses.join('/')} need ${hours(load)} h for ${family.length} parts due by ${labelOfAbs(T)} but have ${hours(cap)} h; at least one must be late.`,
+        reason: `Work centers ${presses.join('/')} need ${hours(load)} h for ${family.length} parts due by ${labelOfAbs(T)} but have ${hours(cap)} h; at least one must be late.`,
       }
     }
     // d) Setup ekibi: fabrika ve hol (Moore–Hodgson, sayı alt sınırı).
@@ -1401,7 +1401,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const primary = primaryOf(g)
     if (primary) {
       if (!(primary.spm && primary.spm > 0)) flags.push(`${primary.code}: no SPM in master data.`)
-      if (!primary.mainMachine?.trim()) flags.push(`${primary.code}: no main press in master data.`)
+      if (!primary.mainMachine?.trim()) flags.push(`${primary.code}: no main work center in master data.`)
       if (!((primary.minLotQty ?? 0) > 0) && piecesPerCoil(primary) <= 0) flags.push(`${primary.code}: no Min. lot and no real coil weight — lot size unknown.`)
     }
     return flags
@@ -1604,7 +1604,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const overlap = (a: Block, b: Block) => Math.min(a.end, b.end) - Math.max(a.start, b.start)
 
   // R1 pres çakışması (süren onaylı işler ve bakım dahil)
-  const r1 = rule('press-overlap', 'A press runs one job at a time (incl. jobs still running from earlier days and maintenance)')
+  const r1 = rule('press-overlap', 'A work center runs one job at a time (incl. jobs still running from earlier days and maintenance)')
   for (const [press, list] of jobsByPress) {
     const items = [
       ...list.flatMap((j) => j.segs.map((x) => ({ start: x.start, end: x.end, id: j.id, j }))),
@@ -1621,7 +1621,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   }
 
   // R2 kalıp iki preste
-  const r2 = rule('mould-twice', 'A mould is on one press at a time (a job holds its die from first to last segment)')
+  const r2 = rule('mould-twice', 'A mould is on one work center at a time (a job holds its die from first to last segment)')
   const byGroup = new Map<string, AJob[]>()
   for (const j of jobs) if (j.segs.length) byGroup.set(j.group, [...(byGroup.get(j.group) ?? []), j])
   for (const [g, list] of byGroup) {
@@ -1699,7 +1699,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   }
 
   // R5 uygun pres
-  const r5 = rule('eligible-press', 'Non-flexible parts only on their main press (or the pinned press); flexible parts only on main/alternatives')
+  const r5 = rule('eligible-press', 'Non-flexible parts only on their main work center (or the pinned work center); flexible parts only on main/alternatives')
   for (const j of planJobs) {
     r5.check()
     const allowed = eligibleOf(j.group)
@@ -1756,7 +1756,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   }
 
   // R8 lot fiziği
-  const r8 = rule('lot-rules', 'Whole coils (or ≥ Min. lot), mould shot limit, run not faster than SPM, no coil changes on transfer presses')
+  const r8 = rule('lot-rules', 'Whole coils (or ≥ Min. lot), mould shot limit, run not faster than SPM, no coil changes on transfer work centers')
   const lotSums = new Map<string, { qty: number; jobs: AJob[] }>()
   for (const j of planJobs) {
     const key = `${j.material}|${j.job?.bucketLabel ?? ''}|${j.job?.dueDate ?? ''}`
@@ -1782,7 +1782,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const spm = p.spm && p.spm > 0 ? p.spm : 0
     const runMin = j.runSegs.reduce((x, b) => x + (b.end - b.start), 0)
     if (spm > 0 && runMin < j.shots / spm - 0.5) r8.fail(`${j.id}: runs ${Math.round(runMin)} min, faster than ${spm} SPM allows (${Math.round(j.shots / spm)} min).`)
-    if (pressByName.get(j.press)?.feedsCoil === false && j.coilSegs.length > 0) r8.fail(`${j.id}: coil change on transfer press ${j.press}.`)
+    if (pressByName.get(j.press)?.feedsCoil === false && j.coilSegs.length > 0) r8.fail(`${j.id}: coil change on transfer work center ${j.press}.`)
   }
   for (const [key, e] of lotSums) {
     const p = productBy.get(key.split('|')[0])
@@ -1883,7 +1883,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   r11.check(Math.max(0, groupsAll.size - shortAtEnd.size))
 
   // R12 setup'sız kalıp değişimi
-  const r12 = rule('die-change-without-setup', 'A job without a setup follows the same die on the same press, and the die has not been elsewhere in between')
+  const r12 = rule('die-change-without-setup', 'A job without a setup follows the same die on the same work center, and the die has not been elsewhere in between')
   for (const j of planJobs) {
     const p = primaryOf(j.group)
     if (j.setupSegs.length > 0 || !j.segs.length || !((p?.setupMinutes ?? 0) > 0)) continue
@@ -1904,7 +1904,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   // başlayabilecekken (pres uygun, kalıp hazır ve boşta) arkada kaldıysa.
   const r13 = rule(
     'backlog-first',
-    'A backlog part that runs out is not left behind an urgent lot on a press where it could have started (die ready and free; unless priority/pinned/moved forward)',
+    'A backlog part that runs out is not left behind an urgent lot on a work center where it could have started (die ready and free; unless priority/pinned/moved forward)',
   )
   const prioritised = new Set(inputs.overrides.filter((o) => o.kind === 'priority' || o.kind === 'pin').map((o) => o.material))
   const dieHeld = new Set<string>([

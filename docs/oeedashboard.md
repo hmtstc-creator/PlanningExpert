@@ -478,7 +478,20 @@ Yeni bir sohbet bu dosyayla devam edebilsin diye.
 Ayrıntı ve açık sorular: docs/kpi.md. Gerçekleşen OEE ve (girilmezse) üretim
 adedi / saati bu modülün günlerinden okunur.
 
+## Kurumsal yapı: pres → work center (2026-10-03, planlamacı)
+
+"Artık kurumsal yapıya dönüyoruz; sadece pres tanımla diyemeyiz, burası work
+center olacak." Ekranlardaki bütün "press / presses" ifadeleri "work center /
+work centers" oldu (Press Definitions → Work Center Definitions, hata ve
+uyarı metinleri, Planning Logic dahil; "Save'e bas" gibi fiil anlamı
+korundu). Veritabanı ve kod adları (`presses` tablosu, `press` alanı) aynı
+kaldı — kayıtlı veri değişmedi, geçiş gerekmez. Kayıtlı eski plan gerekçeleri
+bir sonraki plan hesabında yeni metinle yazılır.
+
 ## Bekleyen konular
+
+- KPI ağırlıklı birleşim (Absenteeism %, Productivity) — docs/kpi.md →
+  "Açık notlar", değerlendirilecek.
 
 - ~~Veride eksikler (07–13.09, Ağustos/Eylül, 32–35. haftalar)~~ → veriye
   takılınmaz; ekranda "Data notes" olarak gösterilir.

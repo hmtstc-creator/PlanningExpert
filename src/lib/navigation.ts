@@ -25,7 +25,7 @@ export const PRIMARY_LINKS: NavItem[] = [
 
 /** Planlama başlığının geri kalanı: veri girişi ve motorun açıklaması. */
 export const PLANNING_LINKS: NavItem[] = [
-  { to: '/capacity', label: 'Capacity Dashboard', hint: 'Weekly capacity vs demand by press group' },
+  { to: '/capacity', label: 'Capacity Dashboard', hint: 'Weekly capacity vs demand by work center group' },
   { to: '/hammadde', label: 'Raw Material Coverage', hint: 'Steel requirement and orders per week up to the last ZPP week' },
   { to: '/alarms', label: 'Alarms', hint: 'Dies and machines that hold up the plan' },
   { to: '/sapdata', label: 'SAP Data', hint: 'Upload ZPP, ZPP_DAILY, MB52 and MB51' },
@@ -104,8 +104,8 @@ export const MODULE_NAVS: ModuleNav[] = [
     links: [
       { to: '/machine-followup', label: 'Overview' },
       { to: '/machine-followup/breakdowns', label: 'Breakdowns', hint: 'Report, solve, history' },
-      { to: '/machine-followup/maintenance', label: 'Maintenance', hint: 'Planned press maintenance' },
-      { to: '/machine-followup/reports', label: 'Reports', hint: 'Pareto by press and problem' },
+      { to: '/machine-followup/maintenance', label: 'Maintenance', hint: 'Planned work center maintenance' },
+      { to: '/machine-followup/reports', label: 'Reports', hint: 'Pareto by work center and problem' },
     ],
   },
   {

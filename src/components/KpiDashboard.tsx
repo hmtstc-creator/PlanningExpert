@@ -256,7 +256,7 @@ export const KpiSheet = forwardRef<
                 <li>Total presence = normal presence + overtime</li>
                 <li>Efficiency = production hour ÷ total presence</li>
                 <li>OEE actual = Σ operating ÷ Σ loading (OEE data)</li>
-                <li>Absenteeism %, Productivity %: entered; several lines weighted by hours</li>
+                <li>Absenteeism % and Productivity (value): entered; several lines weighted by hours</li>
                 <li>Hours and pieces are added first, ratios once — never averaged</li>
               </ul>
             </div>

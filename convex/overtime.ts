@@ -116,7 +116,7 @@ export const addPressOvertime = guardedMutation({
   returns: v.null(),
   handler: async (ctx: Ctx, args: Ctx) => {
     const press = args.press.trim()
-    if (!press) throw new ConvexError('Press is required')
+    if (!press) throw new ConvexError('Work center is required')
     if (!ISO.test(args.date)) throw new ConvexError('Date must be YYYY-MM-DD')
     await requireDefinedPress(ctx, press)
     if (!(await hasCalendar(ctx, press))) {
@@ -227,7 +227,7 @@ async function requireDefinedPress(ctx: Ctx, press: string) {
     .query('presses')
     .withIndex('by_name', (q: Ctx) => q.eq('name', press))
     .first()
-  if (!found) throw new ConvexError(`${press} is not defined on Press Definitions — define the press first.`)
+  if (!found) throw new ConvexError(`${press} is not defined on Work Center Definitions — define the work center first.`)
 }
 
 async function hasCalendar(ctx: Ctx, press: string) {

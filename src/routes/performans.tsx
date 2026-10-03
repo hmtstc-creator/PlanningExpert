@@ -242,7 +242,7 @@ function PerformansPage() {
               if (
                 !window.confirm(
                   `Set the capacity factor to ${Math.round(value * 100)}%? ` +
-                    'This scales the available capacity of every press in the plan.',
+                    'This scales the available capacity of every work center in the plan.',
                 )
               ) {
                 return
@@ -304,7 +304,7 @@ function PerformansPage() {
           <strong className="text-destructive">This attainment rate is unreliable.</strong>{' '}
           There is more actual production than one query can read, so it is
           computed from part of the data. Do not write it into the capacity
-          factor — that factor scales the capacity of every press in the plan.
+          factor — that factor scales the capacity of every work center in the plan.
         </p>
       )}
 

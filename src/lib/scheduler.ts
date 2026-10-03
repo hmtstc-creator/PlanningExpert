@@ -865,7 +865,7 @@ export function schedule(
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
-        reason: 'No presses defined',
+        reason: 'No work centers defined',
       })),
     }
   }
@@ -1006,8 +1006,8 @@ export function schedule(
         dueDate: entry.dueDate,
         reason:
           !product.flexiblePress && hasAlternatives
-            ? 'No main press defined — alternatives are used only when "Flexible press" is ticked'
-            : 'No eligible press (main and alternative machines are undefined)',
+            ? 'No main work center defined — alternatives are used only when "Flexible work center" is ticked'
+            : 'No eligible work center (main and alternative machines are undefined)',
       })
       continue
     }
@@ -1023,7 +1023,7 @@ export function schedule(
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
-        reason: `Pinned press is not defined: ${pin.press}`,
+        reason: `Pinned work center is not defined: ${pin.press}`,
       })
       continue
     }
@@ -1126,7 +1126,7 @@ export function schedule(
           phase: entry.phase,
           dueDate: entry.dueDate,
           reason: pin
-            ? 'Not enough free capacity on the pinned press/day'
+            ? 'Not enough free capacity on the pinned work center/day'
             : 'Not enough free capacity in the visible calendar',
           decision,
         })
@@ -1147,7 +1147,7 @@ export function schedule(
       job.setupStartMinute = setup[0].start
       job.spansDays = job.endDate !== job.date
       job.continued = false
-      job.reason += ' · setup needed again: another die runs on this press before it'
+      job.reason += ' · setup needed again: another die runs on this work center before it'
     }
   }
 
@@ -1424,7 +1424,7 @@ function reserveSlot(
     }
     waits?.push(
       crossShifts
-        ? `${type === 'mold' ? 'setup' : 'coil change'} would not finish before the press stops for the day`
+        ? `${type === 'mold' ? 'setup' : 'coil change'} would not finish before the work center stops for the day`
         : `${type === 'mold' ? 'setup' : 'coil change'} would not finish before the shift change`,
     )
     cursor = day.offset + (shiftEnd - day.startNet)
@@ -2088,7 +2088,7 @@ function placeRun(
   }
   if (pinned) reasonParts.push('pinned by user')
   if (entry.boost) reasonParts.push('moved forward so it is not late')
-  if (pulledForward) reasonParts.push(`pulled forward from ${entry.earliestDate} so the press is not idle`)
+  if (pulledForward) reasonParts.push(`pulled forward from ${entry.earliestDate} so the work center is not idle`)
   if (bestIsContinuation) reasonParts.push('continues the die already mounted — no new setup')
   if (best.urgent && !sameMaterial) reasonParts.push('urgent: setup may overlap another setup (plant-wide limit)')
 

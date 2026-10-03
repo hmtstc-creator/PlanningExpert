@@ -118,7 +118,7 @@ export function PlannedStopsEditor({
         <InfoTip label="About planned stops">
           <p>
             Enter the real clock time of each handover, tea and meal break for every shift. They are
-            the same for all presses. Capacity is reduced shift by shift, so shifts with different
+            the same for all work centers. Capacity is reduced shift by shift, so shifts with different
             stops are worth different amounts. Stops inside overtime are deducted too.
           </p>
           <p>Changing a time or a duration marks that stop until you press Save.</p>

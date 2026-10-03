@@ -290,7 +290,7 @@ describe('schedule', () => {
       options,
     )
     expect(result.jobs).toHaveLength(0)
-    expect(result.unplanned[0].reason).toContain('No eligible press')
+    expect(result.unplanned[0].reason).toContain('No eligible work center')
   })
 
   it('kapasite yetmezse planlanamadı listesine gerekçe yazar', () => {
@@ -380,7 +380,7 @@ describe('schedule', () => {
       { ...options, overrides },
     )
     expect(result.jobs).toHaveLength(0)
-    expect(result.unplanned[0].reason).toContain('Pinned press is not defined')
+    expect(result.unplanned[0].reason).toContain('Pinned work center is not defined')
   })
 
   it('öne alınan malzemeyi faz sırasından bağımsız olarak ilk sıraya koyar', () => {

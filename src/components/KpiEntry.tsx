@@ -152,14 +152,14 @@ export function KpiEntryPage({ period }: { period: KpiPeriod }) {
               several lines — e.g. one Direct and one Indirect line: press “+ line” and choose the type.
             </p>
             <p>
-              Entered: operators, production volume and hour, normal presence, overtime, Absenteeism % and Productivity %; OEE
+              Entered: operators, production volume and hour, normal presence, overtime, Absenteeism % and Productivity (a value, not %); OEE
               target in the plan. Calculated: Overtime % = overtime ÷ normal presence; Total presence = normal presence +
               overtime; Efficiency = production hour ÷ total presence.
             </p>
             <p>
               Actual OEE comes from the OEE data (Σ operating ÷ Σ loading). Actual production volume and hour are taken from
               the OEE data when left empty. Several lines: hours and pieces are added; Absenteeism % is weighted by normal
-              presence, Productivity % by total presence.
+              presence, Productivity by total presence (open point, see the KPI notes).
             </p>
           </>
         }
@@ -299,7 +299,7 @@ export function KpiEntryPage({ period }: { period: KpiPeriod }) {
                   <td className="px-2 py-1 text-xs text-muted-foreground">{side === 'plan' ? 'Plan' : 'Actual'}</td>
                   {inputs.map((i) => {
                     const key = i.key === 'absenteeism' ? 'absenteeismPct' : i.key === 'operators' ? 'operators' : (i.key as keyof typeof total.plan)
-                    const unit = i.pct ? '%' : i.key === 'operators' ? 'n' : i.key === 'volume' ? 'pcs' : 'h'
+                    const unit = i.pct ? '%' : i.key === 'operators' || i.key === 'productivity' ? 'n' : i.key === 'volume' ? 'pcs' : 'h'
                     return (
                       <td key={i.key} className="px-2 py-1 text-right tabular-nums">
                         {side === 'actual' && i.planOnly ? '' : formatKpi(total[side][key] ?? null, unit)}
@@ -318,7 +318,7 @@ export function KpiEntryPage({ period }: { period: KpiPeriod }) {
           </table>
         </div>
       )}
-      <p className="mt-2 text-xs text-muted-foreground">Empty fields stay empty (not 0). Percentages are entered as numbers, e.g. 3.5 for 3.5%.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Empty fields stay empty (not 0). Percentages are entered as numbers, e.g. 3.5 for 3.5%. Productivity is a plain value.</p>
     </div>
   )
 }

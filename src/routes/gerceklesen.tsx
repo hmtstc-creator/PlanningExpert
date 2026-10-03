@@ -48,7 +48,7 @@ function GerceklesenPage() {
           <p>
             Only movements into the production receipt location count (ticked on{' '}
             <Link to="/depolar">Storage Locations</Link>). Other movements are not
-            production. The same figure feeds plan versus actual, press performance and the mould
+            production. The same figure feeds plan versus actual, work center performance and the mould
             shot counters. MB51 is uploaded on <Link to="/sapdata">SAP Data</Link>.
           </p>
         }

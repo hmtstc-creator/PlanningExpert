@@ -13,20 +13,20 @@ export function fixForUnplanned(reason: string): UnplannedFix {
   if (reason.startsWith('Mould held')) {
     return { label: 'Check the die', to: '/die-followup/maintenance' }
   }
-  if (reason.includes('No main press')) {
-    return { label: 'Set main press or tick Flexible', to: '/referanslar' }
+  if (reason.includes('No main work center')) {
+    return { label: 'Set main work center or tick Flexible', to: '/referanslar' }
   }
   if (reason.includes('master data')) {
     return { label: 'Add master data', to: '/referanslar' }
   }
-  if (reason.includes('eligible press') || reason.includes('Pinned press')) {
+  if (reason.includes('eligible work center') || reason.includes('Pinned work center')) {
     return { label: 'Set its machines', to: '/referanslar' }
   }
   if (reason.includes('Excluded')) {
     return { label: 'Remove the rule' }
   }
-  if (reason.includes('No presses defined')) {
-    return { label: 'Define presses', to: '/makineler' }
+  if (reason.includes('No work centers defined')) {
+    return { label: 'Define work centers', to: '/makineler' }
   }
   if (reason.includes('capacity')) {
     return { label: 'Add shifts', to: '/takvim' }

@@ -79,7 +79,7 @@ Aynı değer farklı sayfalarda farklı görünmemeli. Her bilgi tek yerden geli
 |---|---|---|
 | Ayar varsayılanları | `settingsDefaults.ts` (`resolveSettings`) | motor, doğrulama, tüm sayfalar |
 | Kayıtlı ayarlar | `globalShiftSettings` (key `default`) | hepsi |
-| Pres listesi | Press Definitions (`presses` tablosu) | Work Calendar, Capacity Dashboard, mesai, Gantt |
+| Work center listesi (eski adıyla pres) | Work Center Definitions (`presses` tablosu; kod adı değişmedi) | Work Calendar, Capacity Dashboard, mesai, Gantt |
 | Pres grupları | presin **kategorisi** (`groupPresses`) | Gantt gruplaması, Capacity Dashboard toplamları |
 | Hol | presin holü | setup ekibi, vinç kuralı |
 | Pres takvimi | şablon + istisna hafta + mesai (`pressCalendar.ts`) | motor, doğrulama, Work Calendar, Capacity Dashboard, Performance |

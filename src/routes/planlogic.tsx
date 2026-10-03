@@ -200,14 +200,14 @@ function PlanLogicPage() {
             ['Coils in transit', 'In-transit Excel list: each quantity arrives in its ETA week (no ETA = this week)', '/sapdata'],
             [
               'Master data',
-              'Cavities, strokes per minute (SPM), setup and coil change times, quality approval time, coil and gross weight, mould shot limit, main and alternative presses, Flexible press tick, co-product, Accepted OEE',
+              'Cavities, strokes per minute (SPM), setup and coil change times, quality approval time, coil and gross weight, mould shot limit, main and alternative work centers, Flexible work center tick, co-product, Accepted OEE',
               '/referanslar',
             ],
-            ['Presses', 'The single press list: hall (crane and setup team), category (Gantt and Capacity Dashboard groups), coil fed, frozen days', '/makineler'],
-            ['Work calendar', 'Per press: weekly pattern (days from Monday × shifts), exception weeks, overtime (dated or recurring, from an overtime type); planned stops; public and manual holidays; planning settings', '/takvim'],
+            ['Presses', 'The single work center list: hall (crane and setup team), category (Gantt and Capacity Dashboard groups), coil fed, frozen days', '/makineler'],
+            ['Work calendar', 'Per work center: weekly pattern (days from Monday × shifts), exception weeks, overtime (dated or recurring, from an overtime type); planned stops; public and manual holidays; planning settings', '/takvim'],
             ['Dies', 'Readiness (date and time), maintenance days, shot-limit alarms — from Die Follow-up', '/die-followup/maintenance'],
-            ['Machines', 'Planned press maintenance hours and open breakdowns that stop a press — from Machine Follow-up', '/machine-followup/breakdowns'],
-            ['Your rules', 'Exclude, pin to a press/day, or move to the front', '/planlama'],
+            ['Machines', 'Planned work center maintenance hours and open breakdowns that stop a work center — from Machine Follow-up', '/machine-followup/breakdowns'],
+            ['Your rules', 'Exclude, pin to a work center/day, or move to the front', '/planlama'],
             ['Approved plan', 'The last approved plan, for the frozen days', '/planlama'],
           ]}
         />
@@ -232,7 +232,7 @@ function PlanLogicPage() {
             covers, demand falls on the exact date in the file: 5 000 shipped
             on Wednesday is 5 000 on Wednesday, not 1 000 a day. Beyond the
             file's last day, the weekly ZPP is spread evenly over the plant's
-            working days — not a holiday and at least one press has normal
+            working days — not a holiday and at least one work center has normal
             shifts; overtime does not make a working day (a partly covered week
             gets the rest of its weekly total on the uncovered days). The backlog
             is due today.
@@ -245,7 +245,7 @@ function PlanLogicPage() {
           <li>
             <b>Safety stock.</b> The lot may start{' '}
             <b>{current.safety} working day(s)</b> before its stock-out day, and
-            not earlier, so stock does not pile up and the press stays free
+            not earlier, so stock does not pile up and the work center stays free
             for parts that need it. If that day is already today or past, the
             lot is <b>urgent</b>; otherwise it is <b>fill</b>.
           </li>
@@ -262,7 +262,7 @@ function PlanLogicPage() {
             made separately. For each week, the pair is made for the larger of
             the two requirements, and the pair is <b>one lot and one job</b> —
             on the part that names the other as its co-product. The job shows
-            both quantities; press time and setup are counted once.
+            both quantities; work center time and setup are counted once.
           </li>
           <li>
             <b>Whole coils — always.</b> A mounted coil is run to the end, so
@@ -274,7 +274,7 @@ function PlanLogicPage() {
           </li>
           <li>
             <b>Min. lot instead of the coil.</b> Where the coil quantity is
-            flexible (transfer presses 106/107), a <b>Min. lot (pcs)</b> is entered
+            flexible (transfer work centers 106/107), a <b>Min. lot (pcs)</b> is entered
             in master data. It replaces the coil: the lot is at least that many
             pieces, and above it exactly the need (need 300, min. lot 2 000 → 2 000;
             need 2 500 → 2 500). The surplus covers the following weeks. The coil
@@ -298,13 +298,13 @@ function PlanLogicPage() {
       </div>
 
       <Step n={3} id="capacity" title="Build the capacity">
-        <p>For every press and every day of the horizon:</p>
+        <p>For every work center and every day of the horizon:</p>
         <Formula>
           net minutes = normal shifts × shift length + overtime windows − planned stops → × capacity factor
         </Formula>
         <ul>
           <li>
-            Each press has <b>one calendar</b>: its standard week ("N days" are filled from
+            Each work center has <b>one calendar</b>: its standard week ("N days" are filled from
             Monday: 5 = Mon–Fri, 6 = Mon–Sat; shifts per day), a <b>week exception</b> when
             there is one, and the <b>overtime</b> opened on dates (or every week on the pattern)
             with an overtime definition — start time and length. Overtime opened on the
@@ -321,8 +321,8 @@ function PlanLogicPage() {
             or another overtime.
           </li>
           <li>
-            A press without a Work Calendar pattern has no capacity; the Production Plan shows
-            a red alarm. A day never exceeds 24 hours (planned stops included), so a press week
+            A work center without a Work Calendar pattern has no capacity; the Production Plan shows
+            a red alarm. A day never exceeds 24 hours (planned stops included), so a work center week
             never exceeds 168 hours — longer entries are refused when saved.
           </li>
           <li>Planned stops falling inside overtime are deducted too.</li>
@@ -333,7 +333,7 @@ function PlanLogicPage() {
             still belongs to the previous day.
           </li>
           <li>
-            Each press is one continuous timeline: a job that does not finish
+            Each work center is one continuous timeline: a job that does not finish
             before the shift or day ends simply continues in the next shift.
           </li>
         </ul>
@@ -347,14 +347,14 @@ function PlanLogicPage() {
             from demand. The engine plans only the free time around them.
           </li>
           <li>
-            <b>Press maintenance</b> takes those clock hours out of that
-            press's day; jobs flow around it.
+            <b>Work center maintenance</b> takes those clock hours out of that
+            work center's day; jobs flow around it.
           </li>
           <li>
             <b>Machine breakdown</b> (reported in Machine Follow-up with "the
-            press is stopped"): the press is closed from the breakdown until
+            work center is stopped"): the work center is closed from the breakdown until
             the expected time it is back — or, with no expected time, until
-            the breakdown is solved. A fault that does not stop the press does
+            the breakdown is solved. A fault that does not stop the work center does
             not change the plan.
           </li>
           <li>
@@ -394,13 +394,13 @@ function PlanLogicPage() {
           <li>
             <b>Fill</b> — every other lot: future days and weeks. It may start{' '}
             {current.safety} working day(s) before its stock runs out, or up to{' '}
-            {current.pullForward} days earlier when a press would stand idle.
+            {current.pullForward} days earlier when a work center would stand idle.
           </li>
         </ol>
         <p>
           Backlog always goes before urgent, even when both are due at the same
           moment. <b>One exception — the mounted die:</b> when an urgent job would
-          need a setup on a press whose mounted die still has a fill lot waiting,
+          need a setup on a work center whose mounted die still has a fill lot waiting,
           that fill lot runs on first without a setup, as long as the urgent job
           is still ready by its delivery time. Otherwise the die would be taken
           off for the urgent job and mounted again later — two setups instead of
@@ -409,19 +409,19 @@ function PlanLogicPage() {
         <p>
           Within each group, the lot whose stock runs out first goes first.
           When that is equal too, the part that can run on the <b>fewest
-          presses</b> goes first: a single-press part takes its slot before a
-          part with alternatives, which then spreads to the presses that are
+          work centers</b> goes first: a single-work center part takes its slot before a
+          part with alternatives, which then spreads to the work centers that are
           left. Whoever is placed first gets the best slots.
         </p>
       </Step>
 
       <Step n={6} id="place" title="Place each job">
         <p>
-          The candidates are the material's main press — plus its
-          alternatives <b>only if the part is ticked Flexible press</b> in
-          master data (or only the pinned press). A part that is not flexible
-          always runs on its main press, even if that makes it late: its
-          quality approval belongs to that press. On each candidate the engine looks for
+          The candidates are the material's main work center — plus its
+          alternatives <b>only if the part is ticked Flexible work center</b> in
+          master data (or only the pinned work center). A part that is not flexible
+          always runs on its main work center, even if that makes it late: its
+          quality approval belongs to that work center. On each candidate the engine looks for
           the earliest free time — also in gaps left earlier — and builds the
           job:
         </p>
@@ -447,7 +447,7 @@ function PlanLogicPage() {
         <p>It has to respect every rule at once:</p>
         <ul>
           <li>
-            If the same mould is already on the press, the setup is skipped.
+            If the same mould is already on the work center, the setup is skipped.
           </li>
           <li>
             {current.crossShifts
@@ -458,7 +458,7 @@ function PlanLogicPage() {
             <b>Setups run on through tea and meal breaks.</b> The setup team is
             indirect and takes its break after the setup. A 30-minute setup that
             meets a 15-minute tea break after 15 minutes still takes 30 minutes;
-            production starts right after the break, and the break costs the press
+            production starts right after the break, and the break costs the work center
             nothing. Shift handover and maintenance stops do pause a setup.
           </li>
           <li>
@@ -469,16 +469,16 @@ function PlanLogicPage() {
             urgent work is placed, setups go back to one after the other.
           </li>
           <li>
-            <b>No idle press while work is waiting</b>: a lot may start up to{' '}
-            {current.pullForward} day(s) before it is needed when its press would
+            <b>No idle work center while work is waiting</b>: a lot may start up to{' '}
+            {current.pullForward} day(s) before it is needed when its work center would
             otherwise stand idle, so the plan fills the working days you opened on the
             Work Calendar — the same hours the Capacity Dashboard counts. If nothing is
-            urgent, the die already on the press keeps running for its next lot first, so
+            urgent, the die already on the work center keeps running for its next lot first, so
             no extra setup is made.
           </li>
           <li>
             Every idle gap on the plan chart shows why it is there (setup team busy, die
-            on another press, not allowed yet, …).
+            on another work center, not allowed yet, …).
           </li>
           <li>
             <b>Crane</b>: in one hall, mould setups are at least{' '}
@@ -486,7 +486,7 @@ function PlanLogicPage() {
             time; coil changes are at least {current.coilGap} min apart; a mould
             setup and a coil change never overlap.
           </li>
-          <li>A mould cannot be on two presses at the same time.</li>
+          <li>A mould cannot be on two work centers at the same time.</li>
           <li>
             If the quantity needs more strokes than the mould's shot limit, it
             is split into batches at <b>whole coils</b> — a coil is never split
@@ -500,11 +500,11 @@ function PlanLogicPage() {
           </li>
         </ul>
         <p>
-          <b>The press that finishes the job earliest wins</b> — with one
+          <b>The work center that finishes the job earliest wins</b> — with one
           exception: when nothing is urgent, continuing the die already mounted
           (no setup) is preferred. For backlog, or a job that would otherwise
           start after its stock runs out, the engine also tries the dynamic
-          setup rule and keeps whichever finishes sooner. The chosen press
+          setup rule and keeps whichever finishes sooner. The chosen work center
           time, crane slots, setup slot and mould are then booked, and the
           next requirement is placed.
         </p>
@@ -527,7 +527,7 @@ function PlanLogicPage() {
           </li>
           <li>
             What does not fit anywhere goes to <b>Unplanned</b>, with the
-            reason and a link to the fix (no master data, no eligible press, no
+            reason and a link to the fix (no master data, no eligible work center, no
             free capacity…).
           </li>
           <li>
@@ -542,7 +542,7 @@ function PlanLogicPage() {
             .
           </li>
           <li>
-            Warnings list whatever changed the plan: moulds held out, presses
+            Warnings list whatever changed the plan: moulds held out, work centers
             in maintenance, missing data.
           </li>
         </ul>
@@ -559,7 +559,7 @@ function PlanLogicPage() {
           <li>
             <b>Move the late lot forward</b> within its own group: a late fill lot
             goes to the head of the fill lots, never ahead of backlog. It then
-            tries every eligible press again, so an alternative press that is
+            tries every eligible work center again, so an alternative work center that is
             free earlier is found.
           </li>
           <li>
@@ -587,9 +587,9 @@ function PlanLogicPage() {
           Whatever is still late is listed at the top of the Production Plan in
           red, <b>once per material</b>: when it is needed, how many pieces, when
           they are ready, how many hours late, and a suggestion — how many hours
-          are missing on its press before the deadline, i.e. how many overtime
-          shifts would cover it, or ticking Flexible press so it may use its
-          alternative presses.
+          are missing on its work center before the deadline, i.e. how many overtime
+          shifts would cover it, or ticking Flexible work center so it may use its
+          alternative work centers.
         </p>
       </section>
 
@@ -603,11 +603,11 @@ function PlanLogicPage() {
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
             <b>Order</b> within the same urgency: stock-out day (standard),
-            shortest job first, longest job first, parts with the fewest presses
+            shortest job first, longest job first, parts with the fewest work centers
             first, and shuffled orders.
           </li>
           <li>
-            <b>Press choice</b>: the press that finishes first (standard), the
+            <b>Work center choice</b>: the work center that finishes first (standard), the
             one that can start first, or the least loaded one.
           </li>
           <li>
@@ -617,8 +617,8 @@ function PlanLogicPage() {
             over a late part.
           </li>
           <li>
-            <b>Utilisation</b> = busy press hours ÷ available hours (working
-            calendar minus maintenance) in the next 7 days, all presses together.
+            <b>Utilisation</b> = busy work center hours ÷ available hours (working
+            calendar minus maintenance) in the next 7 days, all work centers together.
           </li>
           <li>
             <b>It stops</b> as soon as {current.target}% is reached with nothing
@@ -626,13 +626,13 @@ function PlanLogicPage() {
             {current.maxScenarios} scenarios, after 25 scenarios without an
             improvement, or after two minutes. The Production Plan then shows
             the level reached (e.g. "best of {current.maxScenarios} scenarios
-            reaches 90%"), the utilisation of each press and the scenarios
+            reaches 90%"), the utilisation of each work center and the scenarios
             compared.
           </li>
           <li>
             <b>Local search</b> then works on each late part directly: move it
             1, 2 or 4 days forward in its group, switch its "moved forward" mark,
-            or move a non-late part that runs before it on the same press 2 days
+            or move a non-late part that runs before it on the same work center 2 days
             back. Each move rebuilds the whole plan and is kept only if the plan
             gets better (at most 150 moves or one minute).
           </li>
@@ -640,21 +640,21 @@ function PlanLogicPage() {
       </section>
 
       <section id="press-start" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Planner's hand — press start and delays</h2>
+        <h2 className="text-sm font-semibold text-foreground">Planner's hand — work center start and delays</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Unless you say otherwise every press is planned from now. At the top of the Production
-          Plan (<b>Plan settings</b>) you can set, per press, before recalculating:
+          Unless you say otherwise every work center is planned from now. At the top of the Production
+          Plan (<b>Plan settings</b>) you can set, per work center, before recalculating:
         </p>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
             <b>Plan from</b> (date and time) with a reason — no operator, no raw material… The
-            press takes no new work before it; approved jobs that would start earlier are released
+            work center takes no new work before it; approved jobs that would start earlier are released
             and planned again after it.
           </li>
           <li>
             <b>Behind / ahead</b> (hours): the line did not keep to the approved plan. +3 h moves
             the approved (frozen and running) jobs 3 hours later and closes the first 3 hours as
-            "Behind plan"; −2 h brings them forward, never before now. "All presses" sets it for
+            "Behind plan"; −2 h brings them forward, never before now. "All work centers" sets it for
             the whole line at once.
           </li>
         </ul>
@@ -673,7 +673,7 @@ function PlanLogicPage() {
           </li>
           <li>
             <b>Demand hours</b> = pieces ÷ cavities ÷ SPM ÷ OEE, after finished stock, earliest week
-            first; this week carries the backlog. Groups are the press <b>categories</b>.
+            first; this week carries the backlog. Groups are the work center <b>categories</b>.
           </li>
           <li>
             <b>A) Prediction OEE</b> — one rate for every part ({current.predictionOee}%), set on the
@@ -720,7 +720,7 @@ function PlanLogicPage() {
           <li>No demand, no order: after the last ZPP week the need is zero; nothing is forecast (kanban comes later).</li>
           <li>
             Now: N = {current.rawCoverage} working days, extra = {current.rawExtra.toLocaleString('en-GB')} kg. Working
-            days are the plant's working days (not a holiday, at least one press with normal shifts).
+            days are the plant's working days (not a holiday, at least one work center with normal shifts).
           </li>
         </ol>
         <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">FMEA — what can go wrong and how the method guards it</h3>
@@ -777,16 +777,16 @@ function PlanLogicPage() {
           </li>
           <li>
             <b>Asks "could any plan have avoided it?"</b> for each short part: is
-            there enough press time before the deadline on its presses, even
+            there enough work center time before the deadline on its work centers, even
             alone? Can the setup team and hall cranes do all setups needed by
             then? The answer is "No" (proven by capacity), "Yes" (a free slot
             existed) or "not proven". It also gives the proven minimum number of
             short parts that no plan can go below.
           </li>
           <li>
-            <b>Re-checks every rule</b> on the real clock: two jobs on one press,
-            one die on two presses (also overnight), two setups in one hall (also
-            across 07:00), plant-wide setups, eligible press, working time and
+            <b>Re-checks every rule</b> on the real clock: two jobs on one work center,
+            one die on two work centers (also overnight), two setups in one hall (also
+            across 07:00), plant-wide setups, eligible work center, working time and
             maintenance, whole coils / Min. lot, pull-forward window, a die change
             without a setup, backlog before urgent.
           </li>
@@ -817,7 +817,7 @@ function PlanLogicPage() {
           <li>
             <b className="text-foreground">Holding up the plan</b> — a die is not
             ready, has no ready date, has a shot-limit alarm or is in
-            maintenance, or a press is down or in maintenance, <b className="text-foreground">and</b>{' '}
+            maintenance, or a work center is down or in maintenance, <b className="text-foreground">and</b>{' '}
             a part's stock runs out before it is available (or its job is late
             or cannot be planned). Example: die ready the day after tomorrow at
             10:00, 1 000 parts to ship tomorrow.
@@ -856,16 +856,16 @@ function PlanLogicPage() {
 // ---- Tek kaynak: her bilgi nerede tanımlanır -------------------------------
 
 const SOURCES: [string, string, string, string][] = [
-  ['Presses, halls, categories', 'Press Definitions', '/makineler', 'Work Calendar, Capacity Dashboard, overtime, Gantt, setup and crane rules'],
-  ['Press calendar and overtime', 'Work Calendar', '/takvim', 'Plan, Capacity Dashboard (same record), Performance'],
+  ['Work centers, halls, categories', 'Work Center Definitions', '/makineler', 'Work Calendar, Capacity Dashboard, overtime, Gantt, setup and crane rules'],
+  ['Work center calendar and overtime', 'Work Calendar', '/takvim', 'Plan, Capacity Dashboard (same record), Performance'],
   ['Planned stops, holidays, settings', 'Work Calendar', '/takvim', 'Plan, capacity, raw material working days'],
-  ['Parts, presses per part, Accepted OEE', 'Master Data', '/referanslar', 'Plan, Capacity Dashboard B, raw material'],
+  ['Parts, work centers per part, Accepted OEE', 'Master Data', '/referanslar', 'Plan, Capacity Dashboard B, raw material'],
   ['Which stock counts', 'Storage Locations', '/depolar', 'Plan, raw material, Capacity Dashboard, MB51 production'],
   ['Demand, stock, movements, in transit', 'SAP Data', '/sapdata', 'Plan, raw material, Actuals, Performance'],
   ['Prediction OEE', 'Capacity Dashboard', '/capacity', 'That dashboard view only'],
   ['Capacity factor', 'Performance', '/performans', 'Plan capacity'],
   ['Die readiness and maintenance', 'Die Follow-up', '/die-followup/maintenance', 'Plan, Alarms'],
-  ['Breakdowns and press maintenance', 'Machine Follow-up', '/machine-followup/breakdowns', 'Plan, Alarms'],
+  ['Breakdowns and work center maintenance', 'Machine Follow-up', '/machine-followup/breakdowns', 'Plan, Alarms'],
 ]
 
 function SingleSource() {
@@ -875,7 +875,7 @@ function SingleSource() {
       <p className="mt-1 text-xs text-muted-foreground">
         Each value is entered in one place only; every page and the plan read that same record, so
         the same number never differs between pages. Nothing is hard-coded — groups, for example,
-        come from the press category.
+        come from the work center category.
       </p>
       <div className="mt-2 overflow-x-auto rounded-md border border-border">
         <table className="w-full text-left text-xs">
@@ -985,36 +985,36 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
           <Box tone="border-border bg-muted/50 text-foreground" title="2 · Sort the list">
             Moved to front → Backlog → Urgent (already below safety stock) →
             Fill. Same group: the stock that runs out first goes first. Still
-            equal → the part with the fewest eligible presses goes first.
+            equal → the part with the fewest eligible work centers goes first.
           </Box>
           <Down label="take the next item from the top" />
-          <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · Try EVERY press it is allowed on">
-            Not ticked Flexible press → only the main press (quality). Ticked →
-            main press and all alternatives (e.g. 104, 105, 108, 110). On each
+          <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · Try EVERY work center it is allowed on">
+            Not ticked Flexible work center → only the main work center (quality). Ticked →
+            main work center and all alternatives (e.g. 104, 105, 108, 110). On each
             one, find the earliest free slot that respects all the rules: shift
             ends, crane, mould, maintenance.
           </Box>
-          <Down label="each press gives a finish time" />
-          <Box tone="border-emerald-300 bg-emerald-50 text-emerald-950" title="4 · Choose the press that finishes first">
-            Not "the first press in the list" and not "the main press" — the
+          <Down label="each work center gives a finish time" />
+          <Box tone="border-emerald-300 bg-emerald-50 text-emerald-950" title="4 · Choose the work center that finishes first">
+            Not "the first work center in the list" and not "the main work center" — the
             one where the job is done soonest. When nothing is urgent, keeping
             the mounted die running (no setup) wins.
           </Box>
           <Down label="book it" />
           <Box tone="border-border bg-muted/50 text-foreground" title="5 · Book the slot">
-            That press time, the crane slots and the mould are now taken for
+            That work center time, the crane slots and the mould are now taken for
             all the items that follow.
           </Box>
           <Down label="back to 3 with the next item, until the list is empty" />
           <Box tone="border-amber-300 bg-amber-50 text-amber-950" title="6 · Anything late? → plan again">
             A job that starts after its stock runs out stops the customer. Late
-            lots are moved to the front (they try every press again) and may
+            lots are moved to the front (they try every work center again) and may
             overlap their setup with another one. Coils are never cut. Up to 6
             rounds; the best plan is kept.
           </Box>
           <Down label="whatever is still late or does not fit" />
           <Box tone="border-destructive/40 bg-destructive/10 text-foreground" title="Late jobs / Unplanned">
-            Shown in red on the Production Plan with the presses tried and
+            Shown in red on the Production Plan with the work centers tried and
             what would fix it.
           </Box>
         </div>
@@ -1022,7 +1022,7 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
         <div className="rounded-lg border border-border p-4">
           <p className="text-sm font-semibold text-foreground">Example — decision #12</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Part A has a backlog, is ticked Flexible press and can run on 104
+            Part A has a backlog, is ticked Flexible work center and can run on 104
             (main), 105 and 108. Eleven
             jobs are already booked. Grey = already booked, coloured = where A
             would go.
@@ -1034,9 +1034,9 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
             A goes to <b className="text-foreground">105</b>, even though 104 is
-            its main press, because 105 finishes it a shift and a half
+            its main work center, because 105 finishes it a shift and a half
             earlier. On the Production Plan, the job list shows exactly this
-            line for every job in the <b className="text-foreground">Why this press</b>{' '}
+            line for every job in the <b className="text-foreground">Why this work center</b>{' '}
             column:
           </p>
           <p className="mt-2 rounded bg-muted px-2 py-1 font-mono text-[11px] text-foreground">
@@ -1046,8 +1046,8 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
           <p className="mt-4 text-sm font-semibold text-foreground">What this means for your question</p>
           <ul className="mt-1 ml-5 list-disc space-y-1 text-xs text-muted-foreground">
             <li>
-              A part is never written onto a press just because it is first in a
-              list. Each job is compared on all of its presses at the moment
+              A part is never written onto a work center just because it is first in a
+              list. Each job is compared on all of its work centers at the moment
               it is placed.
             </li>
             <li>
@@ -1075,16 +1075,16 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
               <b className="text-foreground">Plan check</b> (Production Plan page): after
               every calculation, checking code that is separate from the engine goes
               through every job again and checks each rule — parts that are not
-              flexible only on their main press, one job per press
-              at a time, earliest press chosen, crane gaps, setups at once in the
-              plant, whole coils only, one mould on one press, maintenance, no lot
+              flexible only on their main work center, one job per work center
+              at a time, earliest work center chosen, crane gaps, setups at once in the
+              plant, whole coils only, one mould on one work center, maintenance, no lot
               before its pull-forward window, nothing in the past. A broken rule
               shows in red with the job named.
             </li>
             <li>
-              <b className="text-foreground">Why this press</b> (job list): pick any job
+              <b className="text-foreground">Why this work center</b> (job list): pick any job
               you doubt and read its decision: its order number and the
-              finish time on every eligible press.
+              finish time on every eligible work center.
             </li>
             <li>
               <b className="text-foreground">Automatic tests</b>: before any change goes live,
@@ -1106,28 +1106,28 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
           <ul className="mt-2 ml-5 list-disc space-y-1 text-xs text-amber-900">
             <li>
               A booked job is never moved. Placing parts with fewer eligible
-              presses first when the priority is equal prevents most cases
-              where a flexible part takes a single-press part's slot, but not
+              work centers first when the priority is equal prevents most cases
+              where a flexible part takes a single-work center part's slot, but not
               every one.
             </li>
             <li>
               Items equal in everything — group, stock-out day and number of
-              presses — keep the row order of the ZPP file.
+              work centers — keep the row order of the ZPP file.
             </li>
             <li>
               Because a coil is never cut, an overloaded week can end with a late
               job that a half coil would have saved. That is deliberate: the fix
-              is capacity (overtime on the Capacity Dashboard) or another press.
+              is capacity (overtime on the Capacity Dashboard) or another work center.
             </li>
             <li>
               After the last day in ZPP_DAILY, only weekly totals exist, so
               those weeks are spread evenly over the plant's working days (not a holiday and at
-              least one press has normal shifts).
+              least one work center has normal shifts).
             </li>
             <li>
               Re-planning to remove late jobs is a set of trials, not a full
               search: if 6 rounds cannot remove a late job, the fix is capacity
-              (overtime, another press) — the plan says so.
+              (overtime, another work center) — the plan says so.
             </li>
             <li>
               Between an approved plan and the next MB52 upload, the engine
@@ -1201,7 +1201,7 @@ function StockExample({ safetyDays }: { safetyDays: number }) {
           straight after the first coil, and not after the stock is gone.
         </li>
         <li>
-          If the press is busy then, the job moves later; if it starts after{' '}
+          If the work center is busy then, the job moves later; if it starts after{' '}
           {days[stockout].label} it is marked late.
         </li>
       </ul>

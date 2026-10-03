@@ -32,7 +32,7 @@ const COLORS = {
   // Bakım kategorik paletten renk almıyor: nötr gri + çapraz tarama. Presin
   // kapalı olması bir üretim türü değil, üretimin yokluğudur; renkli olsaydı
   // grafikte bir iş gibi okunurdu.
-  maintenance: { fill: '#475569', label: 'Press maintenance' },
+  maintenance: { fill: '#475569', label: 'Work center maintenance' },
   other: { fill: '#475569', label: 'Other stop' },
   // Boş pres: renk değil, kesikli çerçeve — üzerine gelince nedeni yazar.
   idle: { fill: 'transparent', label: 'Idle (hover for why)' },
@@ -579,7 +579,7 @@ export function WeekGantt({
                 }}
               />
             }
-            label="Press maintenance"
+            label="Work center maintenance"
           />
         )}
         {jobs.some((j) => j.late) && (

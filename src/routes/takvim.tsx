@@ -50,14 +50,14 @@ function TakvimPage() {
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <PageHeader
         title="Work Calendar"
-        summary="When each press runs."
+        summary="When each work center runs."
         links={relatedPages('/takvim')}
         info={
           <>
             <p>
-              Each press has one calendar: its weekly pattern (days from Monday, shifts per day),
+              Each work center has one calendar: its weekly pattern (days from Monday, shifts per day),
               exception weeks and overtime. A public holiday is a day off — open overtime if the
-              press should work.
+              work center should work.
             </p>
             <p>
               Open or delete overtime at the top; every section can be shown or hidden with its
@@ -585,7 +585,7 @@ function PressCalendarSection() {
   return (
     <div className="mt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-semibold text-foreground">Per-press Calendar</h2>
+        <h2 className="font-semibold text-foreground">Per-work-center Calendar</h2>
         <div className="flex items-center gap-3">
           {sharedDirty ? (
             <span className="text-sm font-medium text-amber-700">● Unsaved changes</span>
@@ -615,9 +615,9 @@ function PressCalendarSection() {
       {undefinedPresses.length > 0 && (
         <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
           <p className="font-semibold">
-            Presses used in Master Data but not defined on{' '}
+            Work centers used in Master Data but not defined on{' '}
             <Link to="/makineler" className="underline">
-              Press Definitions
+              Work Center Definitions
             </Link>
             : {undefinedPresses.map((u) => u.name).join(', ')}
           </p>
@@ -637,7 +637,7 @@ function PressCalendarSection() {
         <OvertimeEntryPanel presses={pressOptions} />
       </CollapsibleSection>
 
-      <CollapsibleSection id="takvim-grid" title="Capacity overview" hint="all presses, all weeks — click a week to change it" defaultOpen>
+      <CollapsibleSection id="takvim-grid" title="Capacity overview" hint="all work centers, all weeks — click a week to change it" defaultOpen>
       <div className="mt-4">
         <CapacityGrid
           presses={definedPresses}
@@ -685,10 +685,10 @@ function PressCalendarSection() {
 
       </CollapsibleSection>
 
-      <CollapsibleSection id="takvim-press" title="Press pattern and weeks" hint="days, shifts, recurring overtime, exception weeks" defaultOpen>
+      <CollapsibleSection id="takvim-press" title="Work center pattern and weeks" hint="days, shifts, recurring overtime, exception weeks" defaultOpen>
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Press</span>
+          <span className="block text-xs text-muted-foreground">Work center</span>
           <select
             className="mt-1 w-48 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={press}
@@ -704,9 +704,9 @@ function PressCalendarSection() {
           </select>
         </label>
         <p className="text-xs text-muted-foreground">
-          To add presses or define halls, use{' '}
+          To add work centers or define halls, use{' '}
           <Link to="/makineler" className="font-medium underline">
-            Press Definitions
+            Work Center Definitions
           </Link>{' '}
           .
         </p>
@@ -763,7 +763,7 @@ function PressCalendarSection() {
                 disabled={!templateDirty || !!templateProblem}
                 className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90 disabled:opacity-40"
               >
-                Save press pattern
+                Save work center pattern
               </button>
               {templateDirty && (
                 <span className="pb-2 text-xs font-medium text-amber-700">● Unsaved</span>
@@ -786,7 +786,7 @@ function PressCalendarSection() {
 
           <details className="mt-4">
             <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-              Week-by-week detail for {press} (the grid above covers all presses)
+              Week-by-week detail for {press} (the grid above covers all work centers)
             </summary>
           <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
             <div className="overflow-x-auto rounded-md border border-border">
@@ -932,7 +932,7 @@ function PressCalendarSection() {
       <div className="mt-4 flex flex-wrap items-end gap-3 rounded-md border border-border p-3">
         <label className="text-sm">
           <span className="block text-xs text-muted-foreground">
-            Shift length (min) — shared by all presses
+            Shift length (min) — shared by all work centers
           </span>
           <input
             type="number"
@@ -1163,17 +1163,17 @@ function PressCalendarSection() {
             <li>
               <b>Frozen days:</b> the first {frozenDays} day(s) of the plan are taken from the
               approved plan instead of being recalculated, so the shop floor's preparation is not
-              disturbed. A press can override this on Press Definitions. 0 turns it off.
+              disturbed. A work center can override this on Work Center Definitions. 0 turns it off.
             </li>
             <li>
               <b>Safety stock:</b> the next lot of a part may start {safetyStockDays} working day(s)
               before its projected stock runs out — not earlier, so stock does not pile up.
             </li>
             <li>
-              <b>Crane:</b> presses in the same hall run at most {concurrentSetupsPerHall} setup(s) at
+              <b>Crane:</b> work centers in the same hall run at most {concurrentSetupsPerHall} setup(s) at
               a time, at least {setupGapMinutes} min between mould setups and{' '}
               {coilSetupGapMinutes} min between coil changes. A mould setup and a coil change may
-              follow each other but never overlap. Halls come from Press Definitions.
+              follow each other but never overlap. Halls come from Work Center Definitions.
             </li>
             <li>
               <b>Plant-wide:</b> without backlog at most {maxSetupsPlantWideNormal} mould setup(s) at
@@ -1184,7 +1184,7 @@ function PressCalendarSection() {
                 : 'A setup must finish within the shift it starts in.'}
             </li>
             <li>
-              <b>Pull forward:</b> when a press would stand idle, work may start up to{' '}
+              <b>Pull forward:</b> when a work center would stand idle, work may start up to{' '}
               {pullForwardDays} day(s) before it is needed; if nothing is urgent the mounted die
               keeps running first, so no extra setup is made.
             </li>
@@ -1199,7 +1199,7 @@ function PressCalendarSection() {
               working day(s) are listed on the Production Plan.
             </li>
             <li>
-              <b>Scenarios:</b> up to {maxScenarios} plan variants; stops as soon as the presses are{' '}
+              <b>Scenarios:</b> up to {maxScenarios} plan variants; stops as soon as the work centers are{' '}
               {utilisationTarget}% busy in the next 7 days, otherwise reports the best level reached.
             </li>
           </ul>

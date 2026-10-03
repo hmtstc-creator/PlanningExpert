@@ -58,7 +58,7 @@ export const add = guardedMutation({
   returns: v.id('pressMaintenance'),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new ConvexError('Press is required')
+    if (!press) throw new ConvexError('Work center is required')
     const reason = args.reason.trim()
     if (!reason) throw new ConvexError('A reason is required')
     const date = requireDate(args.date, 'Date')
@@ -78,8 +78,8 @@ export const add = guardedMutation({
       createdAt: Date.now(),
     })
     await ctx.db.insert('changeLog', {
-      title: `Press maintenance planned — ${press}`,
-      detail: `${date}, ${reason}. The plan keeps that press free for the window.`,
+      title: `Work center maintenance planned — ${press}`,
+      detail: `${date}, ${reason}. The plan keeps that work center free for the window.`,
       category: 'maintenance',
       author: args.createdBy,
       createdAt: Date.now(),
@@ -159,7 +159,7 @@ export const complete = guardedMutation({
     const planned = row.endMinute - row.startMinute
     const actual = end - start
     await ctx.db.insert('changeLog', {
-      title: `Press maintenance completed — ${row.press}`,
+      title: `Work center maintenance completed — ${row.press}`,
       detail:
         `${row.reason} on ${args.actualDate}. ` +
         `Planned ${planned} min, took ${actual} min ` +

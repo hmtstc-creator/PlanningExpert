@@ -5,12 +5,12 @@ import { fixForUnplanned } from './unplannedFix'
 // Motorun ürettiği gerçek sebep metinleri — scheduler.ts ile aynı olmalı.
 const REASONS = [
   'No master data record found',
-  'No eligible press (main and alternative machines are undefined)',
-  'Pinned press is not defined: PRS-9',
+  'No eligible work center (main and alternative machines are undefined)',
+  'Pinned work center is not defined: PRS-9',
   'Excluded from planning by the user',
-  'No presses defined',
+  'No work centers defined',
   'Not enough free capacity in the visible calendar',
-  'Not enough free capacity on the pinned press/day',
+  'Not enough free capacity on the pinned work center/day',
 ]
 
 describe('planlanamayan kalemin çaresi', () => {
@@ -24,9 +24,9 @@ describe('planlanamayan kalemin çaresi', () => {
   it('sebebi doğru sayfaya yönlendirir', () => {
     expect(fixForUnplanned('No master data record found').to).toBe('/referanslar')
     expect(
-      fixForUnplanned('No eligible press (main and alternative machines are undefined)').to,
+      fixForUnplanned('No eligible work center (main and alternative machines are undefined)').to,
     ).toBe('/referanslar')
-    expect(fixForUnplanned('No presses defined').to).toBe('/makineler')
+    expect(fixForUnplanned('No work centers defined').to).toBe('/makineler')
     expect(fixForUnplanned('Not enough free capacity in the visible calendar').to).toBe(
       '/takvim',
     )
@@ -40,11 +40,11 @@ describe('planlanamayan kalemin çaresi', () => {
   })
 })
 
-describe('flexible press', () => {
-  it('sends a part with no main press to master data', () => {
+describe('flexible work center', () => {
+  it('sends a part with no main work center to master data', () => {
     expect(
-      fixForUnplanned('No main press defined — alternatives are used only when "Flexible press" is ticked'),
-    ).toEqual({ label: 'Set main press or tick Flexible', to: '/referanslar' })
+      fixForUnplanned('No main work center defined — alternatives are used only when "Flexible work center" is ticked'),
+    ).toEqual({ label: 'Set main work center or tick Flexible', to: '/referanslar' })
   })
 })
 

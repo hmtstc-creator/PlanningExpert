@@ -88,7 +88,7 @@ export const report = guardedMutation({
   returns: v.id('machineProblems'),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new ConvexError('A press is required')
+    if (!press) throw new ConvexError('A work center is required')
     const problemType = args.problemType.trim()
     if (!problemType) throw new ConvexError('A problem type is required')
     if (!DATE.test(args.occurredAt)) throw new ConvexError('The date must be in YYYY-MM-DD format')
@@ -96,7 +96,7 @@ export const report = guardedMutation({
       throw new ConvexError('The expected date must be in YYYY-MM-DD format')
     }
     if (args.expectedUpDate && args.expectedUpDate < args.occurredAt) {
-      throw new ConvexError('The press cannot be back before the breakdown happened')
+      throw new ConvexError('The work center cannot be back before the breakdown happened')
     }
     checkMinute(args.occurredMinute, 'The time')
     checkMinute(args.expectedUpMinute, 'The expected time')
@@ -125,8 +125,8 @@ export const report = guardedMutation({
       detail:
         `${problemType} on ${args.occurredAt}.` +
         (args.stopsPress
-          ? ` Press stopped${args.expectedUpDate ? `, expected back ${args.expectedUpDate}` : ' until solved'}.`
-          : ' Press keeps running.') +
+          ? ` Work center stopped${args.expectedUpDate ? `, expected back ${args.expectedUpDate}` : ' until solved'}.`
+          : ' Work center keeps running.') +
         (args.description ? ` ${args.description}` : ''),
       category: 'maintenance',
       author: args.reportedBy,

@@ -982,12 +982,12 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
 
   const variants: { label: string; variant: ScheduleVariant }[] = [
     { label: 'Short jobs first', variant: { orderStrategy: 'spt' } },
-    { label: 'Fewest presses first', variant: { orderStrategy: 'fewestPresses' } },
+    { label: 'Fewest work centers first', variant: { orderStrategy: 'fewestPresses' } },
     { label: 'Fill gaps first', variant: { pressRule: 'earliestStart' } },
     { label: 'Spread the load', variant: { pressRule: 'leastLoaded' } },
     { label: 'Long jobs first', variant: { orderStrategy: 'lpt' } },
     { label: 'Short jobs + fill gaps', variant: { orderStrategy: 'spt', pressRule: 'earliestStart' } },
-    { label: 'Fewest presses + fill gaps', variant: { orderStrategy: 'fewestPresses', pressRule: 'earliestStart' } },
+    { label: 'Fewest work centers + fill gaps', variant: { orderStrategy: 'fewestPresses', pressRule: 'earliestStart' } },
     { label: 'Short jobs + spread the load', variant: { orderStrategy: 'spt', pressRule: 'leastLoaded' } },
   ]
   const variantPressRules: ScheduleVariant['pressRule'][] = ['earliestFinish', 'earliestStart', 'leastLoaded']
@@ -1283,7 +1283,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         suggestion:
           `≈${Math.round(maxLate * 10) / 10} h more on ${presses.join('/')} before ${first.deadlineLabel ?? first.dueDate}: ` +
           `${shiftsNeeded} overtime shift${shiftsNeeded > 1 ? 's' : ''} (${Math.round(shiftNetHours * 10) / 10} h net each)` +
-          (canFlex ? ', or tick Flexible press so it may use its alternative presses' : ''),
+          (canFlex ? ', or tick Flexible work center so it may use its alternative work centers' : ''),
       }
     })
     .sort((a, b) => b.lateHours - a.lateHours)
@@ -1358,7 +1358,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const pressesWithoutCalendar = presses.filter((p) => !capModel.hasCalendar(p.name)).map((p) => p.name)
   if (pressesWithoutCalendar.length > 0) {
     warnings.unshift(
-      `No Work Calendar pattern for ${pressesWithoutCalendar.join(', ')} — these presses have no capacity until their days and shifts are defined.`,
+      `No Work Calendar pattern for ${pressesWithoutCalendar.join(', ')} — these work centers have no capacity until their days and shifts are defined.`,
     )
   }
   for (const press of presses) {
@@ -1471,7 +1471,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
               ? `expected back ${b.expectedUpDate}${b.expectedUpMinute !== undefined ? ` ${hhmm(b.expectedUpMinute)}` : ''}`
               : 'down until solved (no expected time)'
           }`
-        : `Fault: ${b.problemType} — press still running`,
+        : `Fault: ${b.problemType} — work center still running`,
     })
   }
   for (const m of inputs.pressMaintenance) {
@@ -1754,7 +1754,7 @@ function buildWarnings(ctx: {
   const { inputs, todayIso } = ctx
   const list: string[] = []
   if (inputs.presses.length === 0)
-    list.push('No presses defined — add them on the Press Definitions page.')
+    list.push('No work centers defined — add them on the Work Center Definitions page.')
   if (inputs.weeklyDemand.length === 0) list.push('No ZPP weekly demand data uploaded.')
   if (inputs.stock.length === 0)
     list.push('No MB52 stock data uploaded — planning without deducting stock.')
@@ -1794,7 +1794,7 @@ function buildWarnings(ctx: {
   )
   if (pressDown.length > 0)
     list.push(
-      `${pressDown.length} press(es) have maintenance booked in the horizon and ` +
+      `${pressDown.length} work center(s) have maintenance booked in the horizon and ` +
         `are unavailable for those hours: ${listed(pressDown)}.`,
     )
   const upcoming = ctx.moldBlackouts.filter((b) => b.date >= todayIso)

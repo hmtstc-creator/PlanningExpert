@@ -111,9 +111,9 @@ function clock(date: string, minute: number) {
 }
 
 export function auditPlan(input: AuditInputs): PlanAudit {
-  const pressOverlap = rule('press-overlap', 'A press runs one job at a time')
-  const maintenance = rule('press-maintenance', 'Nothing runs during press maintenance')
-  const mouldTwice = rule('mould-twice', 'A mould is never on two presses at the same time')
+  const pressOverlap = rule('press-overlap', 'A work center runs one job at a time')
+  const maintenance = rule('press-maintenance', 'Nothing runs during work center maintenance')
+  const mouldTwice = rule('mould-twice', 'A mould is never on two work centers at the same time')
   const mouldBlackout = rule('mould-blackout', 'Nothing runs on a mould maintenance or not-ready day')
   const crane = rule('crane', 'Crane: setup gaps and simultaneous setups per hall')
   const fillEarly = rule(
@@ -125,11 +125,11 @@ export function auditPlan(input: AuditInputs): PlanAudit {
   const past = rule('past', 'Nothing is planned in the past')
   const mainPress = rule(
     'main-press',
-    'Parts not marked "Flexible press" run only on their main press',
+    'Parts not marked "Flexible work center" run only on their main work center',
   )
   const earliest = rule(
     'earliest-press',
-    'Each job went to the eligible press that finished it earliest at that moment',
+    'Each job went to the eligible work center that finished it earliest at that moment',
   )
 
   // pres|tarih → dolu aralıklar (işler + bakım)
@@ -156,7 +156,7 @@ export function auditPlan(input: AuditInputs): PlanAudit {
       mainPress.check()
       const allowed = pressRule.flexible || job.press === pressRule.main || job.press === pressRule.pinned
       if (!allowed) {
-        mainPress.fail(`${job.material} is on ${job.press}, but its main press is ${pressRule.main} and it is not flexible`)
+        mainPress.fail(`${job.material} is on ${job.press}, but its main work center is ${pressRule.main} and it is not flexible`)
       }
     }
     const earliestRule = (input.pressRule ?? 'earliestFinish') === 'earliestFinish'

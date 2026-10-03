@@ -39,7 +39,7 @@ export const set = guardedMutation({
       throw new ConvexError(`Unknown override type: ${args.kind}`)
     }
     if (args.kind === 'pin' && !args.press?.trim()) {
-      throw new ConvexError('A press must be selected to pin a material')
+      throw new ConvexError('A work center must be selected to pin a material')
     }
 
     const existing = await ctx.db
@@ -64,7 +64,7 @@ export const set = guardedMutation({
           ? 'Excluded from planning'
           : args.kind === 'priority'
             ? 'Moved to the front of the queue'
-            : `Pinned to press ${args.press}${args.date ? ` (${args.date})` : ''}`,
+            : `Pinned to work center ${args.press}${args.date ? ` (${args.date})` : ''}`,
       category: 'decision',
       createdAt: Date.now(),
     })

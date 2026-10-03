@@ -91,7 +91,7 @@ describe('buildCapacityForecast', () => {
     )
     expect(f.unassigned).toEqual([
       { material: 'B', reason: 'no SPM', quantity: 20 },
-      { material: 'A', reason: 'main press PRS-999 is not defined', quantity: 10 },
+      { material: 'A', reason: 'main work center PRS-999 is not defined', quantity: 10 },
       { material: 'C', reason: 'not in master data', quantity: 5 },
     ])
   })
@@ -110,7 +110,7 @@ describe('capacityRows', () => {
 })
 
 describe('groups', () => {
-  it('groups presses by their Press Definitions category, presses without one on their own', () => {
+  it('groups work centers by their Work Center Definitions category, work centers without one on their own', () => {
     expect(pressNumber('PRS-106')).toBe('106')
     const groups = groupPresses([
       { name: 'PRS-103' },
@@ -127,7 +127,7 @@ describe('groups', () => {
     ])
   })
 
-  it('sums press series into the group', () => {
+  it('sums work center series into the group', () => {
     expect(sumSeries([{ capacity: [1, 2], demand: [3, 4] }, { capacity: [10, 20], demand: [0, 1] }], 2)).toEqual({
       capacity: [11, 22],
       demand: [3, 5],

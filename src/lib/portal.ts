@@ -20,14 +20,14 @@ export const PORTAL_MODULES: PortalModule[] = [
     to: '/planningexpert',
     module: 'planning',
     title: 'PlanningExpert',
-    description: 'Automatic press shop production plan, SAP data, maintenance and mould follow-up.',
+    description: 'Automatic plant production plan, SAP data, maintenance and mould follow-up.',
     ready: true,
   },
   {
     to: '/oee',
     module: 'oee',
     title: 'OEE Trend and Losses',
-    description: 'OEE over time per press and cost center, and the losses behind it.',
+    description: 'OEE over time per work center and cost center, and the losses behind it.',
     ready: true,
   },
   {
@@ -41,7 +41,7 @@ export const PORTAL_MODULES: PortalModule[] = [
     to: '/machine-followup',
     module: 'machine',
     title: 'Machine Follow-up',
-    description: 'Press breakdowns and their history, planned maintenance and Pareto reports.',
+    description: 'Work center breakdowns and their history, planned maintenance and Pareto reports.',
     ready: true,
   },
   {

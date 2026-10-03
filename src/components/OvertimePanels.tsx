@@ -46,7 +46,7 @@ export function ShiftTable({ shiftStartMinute, shiftMinutes }: { shiftStartMinut
   const count = shiftMinutes > 0 ? Math.floor(DAY_MINUTES / shiftMinutes) : 0
   return (
     <div className="text-xs text-muted-foreground">
-      <p className="font-medium text-foreground">Shift table (all presses)</p>
+      <p className="font-medium text-foreground">Shift table (all work centers)</p>
       <ul className="mt-1 flex flex-wrap gap-2">
         {Array.from({ length: Math.min(count, 6) }, (_, i) => {
           const start = shiftStartMinute + i * shiftMinutes
@@ -59,7 +59,7 @@ export function ShiftTable({ shiftStartMinute, shiftMinutes }: { shiftStartMinut
       </ul>
       <p className="mt-1">
         At most {count} shift(s) of {hours(shiftMinutes)} fit in a day — a day never exceeds 24 hours,
-        so a press week never exceeds 168 hours. A press picks how many of these shifts it runs.
+        so a work center week never exceeds 168 hours. A work center picks how many of these shifts it runs.
       </p>
     </div>
   )
@@ -271,7 +271,7 @@ export function RecurringOvertimePanel({
           disabled={disabled || !definitionId}
           onClick={() => void update([...recurring, { dayKey, definitionId }])}
           className="rounded-md bg-foreground px-3 py-1 font-medium text-background disabled:opacity-40"
-          title={disabled ? 'Save the press pattern first' : undefined}
+          title={disabled ? 'Save the work center pattern first' : undefined}
         >
           Add recurring overtime
         </button>
@@ -408,7 +408,7 @@ export function PressWeekDays({
           })}
           {recurringHere.map((r, j) => (
             <li key={`r${j}`} className="text-muted-foreground">
-              {dayText(r.iso)} · {defBy.get(r.definitionId)?.name ?? '?'} — every week (change it on the press pattern)
+              {dayText(r.iso)} · {defBy.get(r.definitionId)?.name ?? '?'} — every week (change it on the work center pattern)
             </li>
           ))}
         </ul>
@@ -485,7 +485,7 @@ export function OvertimeEntryPanel({ presses }: { presses: string[] }) {
     <div className="text-sm">
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-xs">
-          <span className="block text-muted-foreground">Press</span>
+          <span className="block text-muted-foreground">Work center</span>
           <select
             className="mt-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             value={chosenPress}
@@ -529,7 +529,7 @@ export function OvertimeEntryPanel({ presses }: { presses: string[] }) {
           <thead className="bg-muted text-muted-foreground">
             <tr>
               <th className="px-2 py-1.5 font-medium">Date</th>
-              <th className="px-2 py-1.5 font-medium">Press</th>
+              <th className="px-2 py-1.5 font-medium">Work center</th>
               <th className="px-2 py-1.5 font-medium">Overtime</th>
               <th className="px-2 py-1.5 font-medium">Time</th>
               <th className="px-2 py-1.5" />

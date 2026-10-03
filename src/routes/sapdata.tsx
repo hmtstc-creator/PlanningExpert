@@ -180,7 +180,7 @@ function SapDataPage() {
           title={SAP_UPLOAD_LABELS.actuals}
           dataKey="actuals"
           status={status}
-          feeds="Plan versus actual, measured press performance and mould shot counters (maintenance alarms)."
+          feeds="Plan versus actual, measured work center performance and mould shot counters (maintenance alarms)."
           view={{ to: '/gerceklesen', label: 'View actuals' }}
         >
           <ExcelUpload

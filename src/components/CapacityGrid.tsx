@@ -137,7 +137,7 @@ export function CapacityGrid(props: CapacityGridProps) {
   if (props.presses.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-        No presses defined yet.
+        No work centers defined yet.
       </p>
     )
   }
@@ -183,7 +183,7 @@ export function CapacityGrid(props: CapacityGridProps) {
           <thead>
             <tr>
               <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-medium text-muted-foreground">
-                Press
+                Work center
               </th>
               {props.weekStarts.map((w) => {
                 const iso = isoDate(w)
@@ -280,8 +280,8 @@ export function CapacityGrid(props: CapacityGridProps) {
             </p>
             <p className="text-xs text-muted-foreground">
               {editingCell.overridden
-                ? 'Exception week — differs from the press template.'
-                : 'Currently follows the press template.'}
+                ? 'Exception week — differs from the work center template.'
+                : 'Currently follows the work center template.'}
               {editingCell.holidayCount > 0 &&
                 ` ${editingCell.holidayCount} holiday(s) in this week.`}
             </p>
@@ -338,7 +338,7 @@ export function CapacityGrid(props: CapacityGridProps) {
               onClick={() => {
                 if (
                   window.confirm(
-                    `Reset ${editingCell.press} week of ${editingCell.weekStart} back to the press template?`,
+                    `Reset ${editingCell.press} week of ${editingCell.weekStart} back to the work center template?`,
                   )
                 ) {
                   void clear()

@@ -28,7 +28,7 @@ function AlarmsPage() {
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="Alarms"
-        summary={`Dies and presses that cannot be used, checked against the plan${
+        summary={`Dies and work centers that cannot be used, checked against the plan${
           data?.computedAt ? ` · updated ${new Date(data.computedAt).toLocaleString('en-GB')}` : ''
         }.`}
         links={relatedPages('/alarms')}
@@ -39,7 +39,7 @@ function AlarmsPage() {
               after tomorrow at 10:00 while 1 000 parts must ship tomorrow.
             </p>
             <p>
-              The lists below are for information: the die or press is not available, but the plan
+              The lists below are for information: the die or work center is not available, but the plan
               is not held up. Updated with every plan calculation.
             </p>
           </>
@@ -77,18 +77,18 @@ function AlarmsPage() {
           <h2 className="mt-10 text-lg font-semibold text-foreground">Machines</h2>
           <MachineTable
             title={`Holding up the plan (${criticalMachines.length})`}
-            empty="No press breakdown or maintenance is holding up a delivery."
+            empty="No work center breakdown or maintenance is holding up a delivery."
             tone="critical"
             rows={criticalMachines}
           />
           <MachineTable
             title={`For information — plan not affected (${infoMachines.length})`}
-            empty="No press is down or booked for maintenance."
+            empty="No work center is down or booked for maintenance."
             tone="info"
             rows={infoMachines}
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            Report breakdowns and set the expected time a press is back on{' '}
+            Report breakdowns and set the expected time a work center is back on{' '}
             <Link to="/machine-followup/breakdowns" className="underline">
               Machine Follow-up → Breakdowns
             </Link>
@@ -199,7 +199,7 @@ function MachineTable({
           <table className="w-full text-left text-sm">
             <thead className="text-muted-foreground">
               <tr>
-                <th className="px-4 py-2 font-medium">Press</th>
+                <th className="px-4 py-2 font-medium">Work center</th>
                 <th className="px-4 py-2 font-medium">Status</th>
                 <th className="px-4 py-2 font-medium">Parts affected</th>
                 <th className="px-4 py-2 font-medium">Why</th>

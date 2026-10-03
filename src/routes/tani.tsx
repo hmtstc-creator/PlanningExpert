@@ -28,7 +28,7 @@ function formatTime(ms: number | null): string {
 const TABLE_LABELS: Record<string, string> = {
   presses: 'Presses',
   products: 'Materials',
-  pressTemplates: 'Press calendar templates',
+  pressTemplates: 'Work center calendar templates',
   pressWeekOverrides: 'Week overrides',
   globalShiftSettings: 'Shift settings',
   workCalendar: 'Work calendar',

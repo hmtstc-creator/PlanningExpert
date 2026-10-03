@@ -10,8 +10,8 @@ describe('KPI hesapları', () => {
   it('saatler toplanır; Efficiency ve Overtime % toplamdan; girilen yüzdeler saatle ağırlıklı', () => {
     const r = kpiFor(
       [
-        e('A', { presenceHours: 1000, overtimeHours: 100, productionHours: 880, absenteeism: 0.03, productivity: 0.9, operators: 10, oee: 0.8 }, { presenceHours: 900, overtimeHours: 200, productionHours: 770, absenteeism: 0.05, operators: 9 }),
-        e('A', { presenceHours: 100, overtimeHours: 50, productionHours: 75, absenteeism: 0.1, productivity: 0.6, operators: 2, oee: 0.6 }, { presenceHours: 100, overtimeHours: 0, productionHours: 50, operators: 3 }, 'indirect'),
+        e('A', { presenceHours: 1000, overtimeHours: 100, productionHours: 880, absenteeism: 0.03, productivity: 12.5, operators: 10, oee: 0.8 }, { presenceHours: 900, overtimeHours: 200, productionHours: 770, absenteeism: 0.05, operators: 9 }),
+        e('A', { presenceHours: 100, overtimeHours: 50, productionHours: 75, absenteeism: 0.1, productivity: 8, operators: 2, oee: 0.6 }, { presenceHours: 100, overtimeHours: 0, productionHours: 50, operators: 3 }, 'indirect'),
       ],
       [],
     )
@@ -19,7 +19,7 @@ describe('KPI hesapları', () => {
     expect(r.plan.totalPresenceHours).toBe(1250)
     expect(r.plan.efficiency).toBeCloseTo(955 / 1250)
     expect(r.plan.absenteeismPct).toBeCloseTo((0.03 * 1000 + 0.1 * 100) / 1100)
-    expect(r.plan.productivity).toBeCloseTo((0.9 * 1100 + 0.6 * 150) / 1250)
+    expect(r.plan.productivity).toBeCloseTo((12.5 * 1100 + 8 * 150) / 1250)
     // Yalnızca bir satırda girilmiş: o değer.
     expect(r.actual.absenteeismPct).toBeCloseTo(0.05)
     expect(r.actual.productivity).toBeNull()

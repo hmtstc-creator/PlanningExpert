@@ -134,7 +134,7 @@ function CapacityPage() {
     <div className="mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 xl:w-2/3 xl:px-0">
       <PageHeader
         title="Capacity Dashboard"
-        summary="Weekly capacity against demand for every press group and press."
+        summary="Weekly capacity against demand for every work center group and work center."
         links={relatedPages('/capacity')}
         info={
           <>
@@ -147,13 +147,13 @@ function CapacityPage() {
             <p>
               Planned stops deducted per shift (tea, meal, handover):{' '}
               <b>{stopsByShift.map((m, i) => `${i + 1}. shift ${m} min`).join(' · ')}</b>. The Gantt
-              shows the same stops on every press.
+              shows the same stops on every work center.
             </p>
             <p>
               <b>Demand</b> is the ZPP requirement of the week — this week also carries the overdue
               backlog — after stock in locations{' '}
               {(forecast?.stockLocations ?? []).join(', ') || 'the ticked locations'} is used up, earliest week
-              first. Each part counts on its main press; a co-product pair counts once.
+              first. Each part counts on its main work center; a co-product pair counts once.
             </p>
             <p>
               <b>Hours</b> = pieces ÷ cavities ÷ SPM ÷ OEE (10 h at 60 % counts as 16.7 h; setup and
@@ -292,7 +292,7 @@ function viewOptions(forecast: CapacityForecast): ViewOption[] {
     .map((g) => ({ key: `line:${g.name}`, label: g.name, kind: 'line', presses: g.presses }))
   const presses: ViewOption[] = forecast.groups
     .flatMap((g) => g.presses)
-    .map((p) => ({ key: `press:${p}`, label: p, kind: 'press', presses: [p] }))
+    .map((p) => ({ key: `work center:${p}`, label: p, kind: 'press', presses: [p] }))
   return [...lines, ...presses]
 }
 
@@ -412,7 +412,7 @@ function SelectedView({
           className="rounded-md border border-input bg-background px-2 py-1.5 text-sm font-semibold text-foreground"
         >
           {lines.length > 0 && (
-            <optgroup label="Categories (Press Definitions)">
+            <optgroup label="Categories (Work Center Definitions)">
               {lines.map((o) => (
                 <option key={o.key} value={o.key}>
                   {o.label}
@@ -420,7 +420,7 @@ function SelectedView({
               ))}
             </optgroup>
           )}
-          <optgroup label="Presses">
+          <optgroup label="Work centers">
             {presses.map((o) => (
               <option key={o.key} value={o.key}>
                 {o.label}
@@ -431,7 +431,7 @@ function SelectedView({
         {selection.kind === 'line' && (
           <span className="text-xs text-muted-foreground">
             {selection.presses.join(' + ')}
-            {selection.presses.length > 1 && ' — pick a single press to change a week or open overtime.'}
+            {selection.presses.length > 1 && ' — pick a single work center to change a week or open overtime.'}
           </span>
         )}
       </div>
@@ -642,7 +642,7 @@ function OvertimeEditor({
           ? 'This week has an exception on the Work Calendar.'
           : base
             ? `Standard week: ${base.workingDays} days from Monday × ${base.shiftsPerDay} shifts.`
-            : 'This press has no Work Calendar pattern yet — it has no capacity.'}{' '}
+            : 'This work center has no Work Calendar pattern yet — it has no capacity.'}{' '}
         <InfoTip label="About this editor">
           <p>
             Days and shifts below change this week only (the same week exception as the Work
@@ -711,7 +711,7 @@ function Unassigned({ forecast }: { forecast: CapacityForecast }) {
         <Link to="/referanslar" className="underline">
           Master Data
         </Link>{' '}
-        (main press and SPM) so their hours count.
+        (main work center and SPM) so their hours count.
       </p>
       <ul className="mt-2 grid grid-cols-1 gap-x-6 gap-y-0.5 text-xs sm:grid-cols-2 lg:grid-cols-3">
         {forecast.unassigned.map((u) => (

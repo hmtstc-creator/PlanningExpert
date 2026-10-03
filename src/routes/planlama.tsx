@@ -265,7 +265,7 @@ function PlanlamaPage() {
               <b>Lot size: Min. lot if set, otherwise whole coils.</b> A mounted coil is run out, so
               quantities are rounded up to whole coils and the surplus covers the following weeks
               rather than triggering a second coil. Where a <b>Min. lot</b> is set in master data
-              (e.g. transfer presses), the lot is at least that many pieces and the coil is ignored.
+              (e.g. transfer work centers), the lot is at least that many pieces and the coil is ignored.
               Parts with neither are planned to the exact need and flagged. A coil is never cut
               short, not even to save a late job — late jobs are moved forward instead. A co-product
               pair is one job: one stroke makes both parts.
@@ -359,8 +359,8 @@ function PlanlamaPage() {
             They are taken from the approved plan instead of being recalculated, so the shop floor's
             preparation is not disturbed. They are drawn hatched below and the quantity they produce
             is deducted from the requirement. Change the frozen day count on the{' '}
-            <Link to="/takvim">Work Calendar</Link>, or per press on{' '}
-            <Link to="/makineler">Press Definitions</Link>.
+            <Link to="/takvim">Work Calendar</Link>, or per work center on{' '}
+            <Link to="/makineler">Work Center Definitions</Link>.
           </InfoTip>
         </p>
       )}
@@ -378,11 +378,11 @@ function PlanlamaPage() {
       {(run?.pressesWithoutCalendar?.length ?? 0) > 0 && (
         <div className="mt-4 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm">
           <p className="font-semibold text-destructive">
-            {run!.pressesWithoutCalendar!.length} press(es) have no Work Calendar pattern:{' '}
+            {run!.pressesWithoutCalendar!.length} work center(s) have no Work Calendar pattern:{' '}
             {run!.pressesWithoutCalendar!.join(', ')}
           </p>
           <p className="mt-1 text-xs text-foreground">
-            These presses get no capacity and nothing is planned on them until their days and shifts
+            These work centers get no capacity and nothing is planned on them until their days and shifts
             are defined on the{' '}
             <Link to="/takvim" className="underline">
               Work Calendar
@@ -567,14 +567,14 @@ function PlanlamaPage() {
               onChange={(e) => setOvKind(e.target.value)}
             >
               <option value="priority">Move to front</option>
-              <option value="pin">Pin to press</option>
+              <option value="pin">Pin to work center</option>
               <option value="exclude">Exclude from planning</option>
             </select>
           </label>
           {ovKind === 'pin' && (
             <>
               <label className="text-sm">
-                <span className="block text-xs text-muted-foreground">Press</span>
+                <span className="block text-xs text-muted-foreground">Work center</span>
                 <select
                   className="mt-1 w-36 rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={ovPress}
@@ -663,7 +663,7 @@ function PlanlamaPage() {
         <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           No jobs to plan. Make sure ZPP demand, MB52 stock and{' '}
           <Link to="/makineler" className="underline">
-            press definitions
+            work center definitions
           </Link>{' '}
           have been uploaded.
         </p>
@@ -744,7 +744,7 @@ function PlanlamaPage() {
                 <thead className="bg-muted text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-medium">Day</th>
-                    <th className="px-3 py-2 font-medium">Press</th>
+                    <th className="px-3 py-2 font-medium">Work center</th>
                     <th className="px-3 py-2 font-medium">Material</th>
                     <th className="px-3 py-2 font-medium">Required</th>
                     <th className="px-3 py-2 font-medium">Qty</th>
@@ -753,8 +753,8 @@ function PlanlamaPage() {
                     <th className="px-3 py-2 font-medium">Setup start</th>
                     <th className="px-3 py-2 font-medium">End</th>
                     <th className="px-3 py-2 font-medium">Reason</th>
-                    <th className="px-3 py-2 font-medium" title="Order in which the engine placed the job, and when each eligible press would have finished it at that moment">
-                      Why this press
+                    <th className="px-3 py-2 font-medium" title="Order in which the engine placed the job, and when each eligible work center would have finished it at that moment">
+                      Why this work center
                     </th>
                   </tr>
                 </thead>
@@ -897,7 +897,7 @@ function PlanlamaPage() {
                   <th className="px-3 py-2 font-medium">Phase</th>
                   <th className="px-3 py-2 font-medium">Required week</th>
                   <th className="px-3 py-2 font-medium">Reason</th>
-                  <th className="px-3 py-2 font-medium">Presses tried</th>
+                  <th className="px-3 py-2 font-medium">Work centers tried</th>
                   <th className="px-3 py-2 font-medium">Fix</th>
                 </tr>
               </thead>
@@ -989,10 +989,10 @@ function AlarmBanner({ alarms }: { alarms: PlanAlarms }) {
         <strong className="text-destructive">
           {dies > 0 && `${dies} die(s)`}
           {dies > 0 && machines > 0 && ' and '}
-          {machines > 0 && `${machines} press(es)`} holding up deliveries.
+          {machines > 0 && `${machines} work center(s)`} holding up deliveries.
         </strong>
       ) : (
-        <span className="text-muted-foreground">No die or press is holding up a delivery.</span>
+        <span className="text-muted-foreground">No die or work center is holding up a delivery.</span>
       )}{' '}
       {info > 0 && <span className="text-muted-foreground">{info} more for information. </span>}
       <Link to="/alarms" className="font-medium text-foreground underline">
@@ -1198,10 +1198,10 @@ function PressStartPanel({ presses }: { presses: string[] }) {
     <div className={`mt-4 rounded-lg border p-3 ${active.length > 0 ? 'border-sky-300 bg-sky-50/60' : 'border-border'}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
-          <span className="font-semibold text-foreground">Plan settings — press start &amp; delays</span>{' '}
+          <span className="font-semibold text-foreground">Plan settings — work center start &amp; delays</span>{' '}
           <span className="text-muted-foreground">
             {active.length === 0
-              ? '· every press is planned from now'
+              ? '· every work center is planned from now'
               : `· ${active
                   .map((r) =>
                     [
@@ -1228,9 +1228,9 @@ function PressStartPanel({ presses }: { presses: string[] }) {
         <div className="mt-3">
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
             How these work
-            <InfoTip label="About press start and delays">
+            <InfoTip label="About work center start and delays">
               <p>
-                <b>Plan from</b>: the press takes no new work before this date and time (no operator,
+                <b>Plan from</b>: the work center takes no new work before this date and time (no operator,
                 no raw material…). Approved jobs on it that would start earlier are released and
                 planned again after it.
               </p>
@@ -1243,7 +1243,7 @@ function PressStartPanel({ presses }: { presses: string[] }) {
           </p>
           <div className="mt-2 flex flex-wrap items-end gap-2 text-xs">
             <label>
-              <span className="block text-muted-foreground">All presses behind (+) / ahead (−), hours</span>
+              <span className="block text-muted-foreground">All work centers behind (+) / ahead (−), hours</span>
               <input
                 type="number"
                 step="0.5"
@@ -1273,7 +1273,7 @@ function PressStartPanel({ presses }: { presses: string[] }) {
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('Clear the start and delay settings of every press? The plan is recalculated from now.')) void clearAll({})
+                  if (window.confirm('Clear the start and delay settings of every work center? The plan is recalculated from now.')) void clearAll({})
                 }}
                 className="rounded-md border border-input bg-background px-3 py-1 font-medium text-destructive hover:bg-muted"
               >
@@ -1285,7 +1285,7 @@ function PressStartPanel({ presses }: { presses: string[] }) {
             <table className="w-full text-left text-sm">
               <thead className="bg-muted/60 text-xs text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Press</th>
+                  <th className="px-3 py-2 font-medium">Work center</th>
                   <th className="px-3 py-2 font-medium">Plan from (date, time)</th>
                   <th className="px-3 py-2 font-medium">Reason</th>
                   <th className="px-3 py-2 font-medium">Behind / ahead (h)</th>
@@ -1549,7 +1549,7 @@ function IndependentCheck({ v }: { v: PlanValidation }) {
         <CheckStat
           label="Minimum any plan can reach"
           value={sm.lateLowerBound}
-          hint={`press load ${sm.lateLowerBoundBy.press} · setup crew ${sm.lateLowerBoundBy.setupCrew} · hall crane ${sm.lateLowerBoundBy.hallCrane}`}
+          hint={`work center load ${sm.lateLowerBoundBy.press} · setup crew ${sm.lateLowerBoundBy.setupCrew} · hall crane ${sm.lateLowerBoundBy.hallCrane}`}
         />
         <CheckStat
           label="Late list vs replay"
@@ -1699,7 +1699,7 @@ function OptimisationPanel({ opt }: { opt: PlanOptimisation }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">
-          Press utilisation {pct(opt.achieved)}{' '}
+          Work center utilisation {pct(opt.achieved)}{' '}
           <span className="font-normal text-muted-foreground">
             (target {pct(opt.target)}, next {opt.windowDays} days)
           </span>
@@ -1729,7 +1729,7 @@ function OptimisationPanel({ opt }: { opt: PlanOptimisation }) {
             <table className="w-full text-left text-sm">
               <thead className="bg-muted/60 text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Press</th>
+                  <th className="px-3 py-2 font-medium">Work center</th>
                   <th className="px-3 py-2 text-right font-medium">Available h</th>
                   <th className="px-3 py-2 text-right font-medium">Busy h</th>
                   <th className="px-3 py-2 text-right font-medium">Utilisation</th>
@@ -1815,7 +1815,7 @@ function LateJobsBody({
         The first plan had {repair.lateBefore} job(s) starting after their stock runs
         out. The engine re-planned {repair.rounds} time(s)
         {repair.boosted.length > 0 && `: moved ${repair.boosted.length} part(s) forward`}
-        . Every moved job tried all of its presses again; coils are never cut short.{' '}
+        . Every moved job tried all of its work centers again; coils are never cut short.{' '}
         {fixed > 0 ? `${fixed} fixed` : 'None could be fixed this way'}
         {jobs.length > 0 ? `, ${jobs.length} still late.` : '.'}
       </p>
@@ -1828,7 +1828,7 @@ function LateJobsBody({
                 <th className="px-3 py-2 font-medium">Stock runs out</th>
                 <th className="px-3 py-2 font-medium">Starts</th>
                 <th className="px-3 py-2 font-medium">Late</th>
-                <th className="px-3 py-2 font-medium">Presses tried (finish)</th>
+                <th className="px-3 py-2 font-medium">Work centers tried (finish)</th>
                 <th className="px-3 py-2 font-medium">What would fix it</th>
               </tr>
             </thead>
@@ -1857,7 +1857,7 @@ function LateJobsBody({
                     <Link to="/takvim" className="underline">
                       Work Calendar
                     </Link>
-                    ), tick Flexible press or add another press in its{' '}
+                    ), tick Flexible work center or add another work center in its{' '}
                     <Link to="/referanslar" className="underline">
                       master data
                     </Link>

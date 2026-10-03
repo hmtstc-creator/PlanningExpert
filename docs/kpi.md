@@ -25,14 +25,13 @@ seçilebilsin; masraf yerleri fabrikanınkiler, kök veri aynı.
   Direct + Transfer Indirect). Satır kaldırılınca kaydı da silinir.
 - Girilen (plan ve gerçekleşen): operatör sayısı, üretim adedi, üretim
   saati, normal mevcudiyet saati (fazla mesaisiz), fazla mesai saati,
-  **Absenteeism %** ve **Productivity %** (doğrudan yüzde); planda OEE
-  hedefi (%).
+  **Absenteeism %** (doğrudan yüzde) ve **Productivity** (sayısal değer,
+  yüzde değil); planda OEE hedefi (%).
 - Hesaplanan: Overtime % = fazla mesai ÷ normal mevcudiyet; Total presence
   = normal mevcudiyet + fazla mesai; **Efficiency** = üretim saati ÷ total
   presence.
-- Birden çok satır / masraf yeri / fabrika: girilen yüzdeler saatle
-  ağırlıklı birleşir (Absenteeism normal mevcudiyetle, Productivity toplam
-  mevcudiyetle; saat yoksa eşit).
+- Birden çok satır / masraf yeri / fabrika: girilen Absenteeism % ve
+  Productivity saatle ağırlıklı birleşir — **açık not**, aşağıda.
 - **Kök veri:** gerçekleşen OEE OEE modülünün günlerinden (Σ operating ÷ Σ
   loading); gerçekleşen üretim adedi / saati girilmemişse yine oradan (iyi
   adet, net üretim süresi).
@@ -68,3 +67,32 @@ Board members şablonu KPI'yi görür, Plant manager şablonu düzenler.
 3. Absenteeism % doğrudan girilir.
 4. Bir masraf yerinin birden çok satırı olabilir; her satır Direct ya da
    Indirect.
+
+### Karar (2026-10-03)
+
+5. Productivity yüzde değil **sayısal değer** olarak girilir (ör. 12,5).
+
+## Açık notlar — değerlendirilecek
+
+### Ağırlıklı birleşim (Absenteeism %, Productivity)
+
+Bu iki değer saat ya da adet gibi toplanamaz; birden çok satır, masraf
+yeri, fabrika ya da dönem birleşince **saatle ağırlıklı ortalama**
+alınıyor (`src/lib/kpi.ts`, `weighted`):
+
+| Değer | Ağırlık | Formül |
+|---|---|---|
+| Absenteeism % | normal mevcudiyet saati (aynı satırın, aynı taraf: plan ya da gerçekleşen) | Σ(Absenteeism % × normal mevcudiyet) ÷ Σ normal mevcudiyet |
+| Productivity | toplam mevcudiyet saati (normal + fazla mesai) | Σ(Productivity × toplam mevcudiyet) ÷ Σ toplam mevcudiyet |
+| Plan OEE hedefi | planlanan üretim saati | Σ(OEE hedefi × üretim saati) ÷ Σ üretim saati |
+
+- Değer girilmemiş satır hesaba girmez (ne değer ne ağırlık).
+- Değer girilmiş ama saati boş satırlar: hiçbir satırda saat yoksa **eşit
+  ağırlık** (düz ortalama); bazılarında saat varsa saati olmayan satırın
+  ağırlığı 0 olur (sonuca etkisi olmaz).
+- Örnek: Transfer Direct %3 (1000 h), Transfer Indirect %10 (100 h) →
+  (3 × 1000 + 10 × 100) ÷ 1100 = **%3,6** (düz ortalama %6,5 olurdu).
+- Değerlendirilecek: (a) Absenteeism için ağırlık operatör sayısı mı olsun,
+  (b) Productivity'nin birimi ne (adet/saat, adet/kişi …) — birimine göre
+  doğru ağırlık değişir; adet/saat ise ağırlık toplam mevcudiyet doğru,
+  adet/kişi ise operatör sayısı olmalı, (c) saati boş satırın ağırlığı.

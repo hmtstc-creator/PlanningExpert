@@ -86,7 +86,7 @@ function OeeGuidePage() {
           </li>
         </ul>
         <p>
-          Press <b>Upload data</b>. The program reads the sheets it knows by their names and ignores the
+          Work center <b>Upload data</b>. The program reads the sheets it knows by their names and ignores the
           rest; the columns are found by their titles, so the order of the columns does not matter.
         </p>
         <p>
@@ -104,7 +104,7 @@ function OeeGuidePage() {
         <ul>
           <li>
             cost centers — every cost center of your files gets a name and an <b>area</b>; an area is a
-            group of cost centers such as presses or assembly and becomes a button on top of every page
+            group of cost centers such as work centers or assembly and becomes a button on top of every page
             (do not type a cost center code as an area),
           </li>
           <li>shift numbers of the Shift Group codes,</li>
@@ -113,7 +113,7 @@ function OeeGuidePage() {
           <li>which downtime texts are a planned or unplanned setup,</li>
           <li>production time after a setup for OK, weeks in the trends, rows in the top lists.</li>
         </ul>
-        <p>Press Save. Nothing specific to your plant is written in the program — it is all here.</p>
+        <p>Work center Save. Nothing specific to your plant is written in the program — it is all here.</p>
       </Step>
 
       <Step n={3} title="Every time — upload the last two weeks">

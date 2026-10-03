@@ -172,12 +172,12 @@ export const saveTemplate = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new ConvexError('Press name is required')
+    if (!press) throw new ConvexError('Work center name is required')
     const defined = await ctx.db
       .query('presses')
       .withIndex('by_name', (q) => q.eq('name', press))
       .first()
-    if (!defined) throw new ConvexError(`${press} is not defined on Press Definitions — define the press first.`)
+    if (!defined) throw new ConvexError(`${press} is not defined on Work Center Definitions — define the work center first.`)
     const problem = patternProblem(args, await shiftMinutesOf(ctx))
     if (problem) throw new ConvexError(problem)
     const existing = await ctx.db
@@ -227,12 +227,12 @@ export const saveOverride = guardedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const press = args.press.trim()
-    if (!press) throw new ConvexError('Press name is required')
+    if (!press) throw new ConvexError('Work center name is required')
     const defined = await ctx.db
       .query('presses')
       .withIndex('by_name', (q) => q.eq('name', press))
       .first()
-    if (!defined) throw new ConvexError(`${press} is not defined on Press Definitions — define the press first.`)
+    if (!defined) throw new ConvexError(`${press} is not defined on Work Center Definitions — define the work center first.`)
     const problem = patternProblem(args, await shiftMinutesOf(ctx))
     if (problem) throw new ConvexError(problem)
     const existing = await ctx.db

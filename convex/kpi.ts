@@ -106,7 +106,8 @@ export const save = guardedMutation({
       .query('kpiEntries')
       .withIndex('by_period', (q: Any) => q.eq('period', period).eq('year', year).eq('num', num))
       .collect()
-    const PCT = new Set(['absenteeism', 'productivity', 'oee'])
+    // Productivity sayısal değerdir; yalnızca bunlar yüzde (kesir).
+    const PCT = new Set(['absenteeism', 'oee'])
     const lines = new Map<string, number>()
     const docs: Any[] = []
     for (const r of rows) {

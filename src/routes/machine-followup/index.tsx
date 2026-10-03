@@ -37,7 +37,7 @@ function MachineOverview() {
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <h1 className="text-2xl font-bold text-foreground">Machine Follow-up</h1>
-      <p className="mt-1 text-muted-foreground">Press breakdowns and maintenance in one place.</p>
+      <p className="mt-1 text-muted-foreground">Work center breakdowns and maintenance in one place.</p>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <ModuleStat
@@ -48,7 +48,7 @@ function MachineOverview() {
           hint="Customer would wait"
         />
         <ModuleStat
-          label="Presses down"
+          label="Work centers down"
           value={down.length}
           tone={down.length > 0 ? 'critical' : 'neutral'}
           to="/machine-followup/breakdowns"
@@ -64,7 +64,7 @@ function MachineOverview() {
 
       {critical.length > 0 && (
         <div className="mt-6 rounded-lg border border-destructive bg-destructive/10 p-4">
-          <h2 className="text-sm font-semibold text-destructive">Presses holding up the plan</h2>
+          <h2 className="text-sm font-semibold text-destructive">Work centers holding up the plan</h2>
           <ul className="mt-2 space-y-1 text-sm">
             {critical.map((m) => (
               <li key={`${m.press}-${m.kind}-${m.from}`}>

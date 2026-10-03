@@ -341,8 +341,8 @@ export function PeriodTable({
               <td className="whitespace-nowrap px-2 py-1 font-medium text-foreground">
                 {wc}
                 {unknown?.has(wc) && (
-                  <span className="ml-1 text-[10px] font-normal text-amber-700" title="Not defined on Press Definitions">
-                    (not in Press Definitions)
+                  <span className="ml-1 text-[10px] font-normal text-amber-700" title="Not defined on Work Center Definitions">
+                    (not in Work Center Definitions)
                   </span>
                 )}
               </td>

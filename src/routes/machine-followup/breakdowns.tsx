@@ -147,14 +147,14 @@ function BreakdownsPage() {
       <h1 className="text-2xl font-bold text-foreground">Machine Breakdowns</h1>
       <p className="mt-2 text-muted-foreground">
         Report a breakdown and record how it was solved — it closes only with a
-        description of what was done. If the press is <strong>stopped</strong>,
+        description of what was done. If the work center is <strong>stopped</strong>,
         the plan does not use it until the expected time it is back, or until
         the breakdown is solved when no time is given; parts that then cannot
         be delivered show on the PlanningExpert{' '}
         <Link to="/alarms" className="underline hover:no-underline">
           Alarms
         </Link>{' '}
-        page. Which presses fail and why is on the{' '}
+        page. Which work centers fail and why is on the{' '}
         <Link to="/machine-followup/reports" className="underline hover:no-underline">
           Reports
         </Link>{' '}
@@ -178,7 +178,7 @@ function BreakdownsPage() {
         <h2 className="text-sm font-semibold text-foreground">Report a breakdown</h2>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
           <label className="text-sm">
-            <span className="block text-xs text-muted-foreground">Press</span>
+            <span className="block text-xs text-muted-foreground">Work center</span>
             <select className={`mt-1 w-full ${inputClass}`} value={press} onChange={(e) => setPress(e.target.value)}>
               <option value="">Select…</option>
               {presses.map((p) => (
@@ -223,7 +223,7 @@ function BreakdownsPage() {
           </label>
           <label className="flex items-center gap-2 text-sm font-medium text-foreground sm:col-span-4">
             <input type="checkbox" checked={stopsPress} onChange={(e) => setStopsPress(e.target.checked)} />
-            The press is stopped — do not plan it until it is back
+            The work center is stopped — do not plan it until it is back
           </label>
           {stopsPress && (
             <>
@@ -248,8 +248,8 @@ function BreakdownsPage() {
               </label>
               <p className="self-end pb-2 text-xs text-muted-foreground sm:col-span-2">
                 {upDate
-                  ? 'The plan uses the press again from this moment.'
-                  : 'No date: the press stays out of the plan until the breakdown is solved.'}
+                  ? 'The plan uses the work center again from this moment.'
+                  : 'No date: the work center stays out of the plan until the breakdown is solved.'}
               </p>
             </>
           )}
@@ -314,9 +314,9 @@ function BreakdownsPage() {
           <input type="date" className={`mt-1 ${inputClass}`} value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
         <label className="text-sm">
-          <span className="block text-xs text-muted-foreground">Press</span>
+          <span className="block text-xs text-muted-foreground">Work center</span>
           <select className={`mt-1 ${inputClass}`} value={filterPress} onChange={(e) => setFilterPress(e.target.value)}>
-            <option value="">All presses</option>
+            <option value="">All work centers</option>
             {presses.map((p) => (
               <option key={p.name} value={p.name}>
                 {p.name}
@@ -357,7 +357,7 @@ function BreakdownsPage() {
                 <div className="flex flex-wrap gap-1">
                   {b.status === 'open' && b.stopsPress && (
                     <span className="rounded bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
-                      Press down —{' '}
+                      Work center down —{' '}
                       {b.expectedUpDate
                         ? `back ${b.expectedUpDate} ${hhmm(b.expectedUpMinute)}`
                         : 'until solved'}
