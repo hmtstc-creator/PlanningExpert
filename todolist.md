@@ -231,10 +231,14 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
     kurulumu. Açık işler yalnızca bu dosyada.
   - [ ] **[G]** Kararları tek "karar günlüğü"ne (tarih + karar + gerekçe)
     taşımak; eski "Açık sorular" bölümlerini kapatmak.
-- [ ] **P1 — Dev dosyalar.** `planlama.tsx` 2000, `scheduler.ts` 2146,
-  `planValidator.ts` 2005, `takvim.tsx` 1371, `platform.tsx` ~1200 satır.
-  İncelemek ve değiştirmek zor.
-  → Sayfaları bileşenlere, motoru kural modüllerine böl.
+- [ ] **P1 — Dev dosyalar.** İncelemek ve değiştirmek zor.
+  - [x] ✅ `planlama.tsx` 2000 → 955 satır (2026-10-03): geç işler, plan
+    başlangıcı, veri kapsamı, bağımsız denetim / optimizasyon ve özet
+    panelleri `src/components/plan/` altına taşındı (davranış aynı).
+  - [ ] **[G]** `takvim.tsx` 1371, `platform.tsx` ~1350 satır: aynı yöntemle.
+  - [ ] **[G]** Motor: `scheduler.ts` 2146, `planValidator.ts` 2005 —
+    kural modüllerine bölünecek (validator bağımsızlığı korunarak; yoğun
+    testli olduğu için ayrı ve dikkatli bir iş).
 - [x] ✅ **P1 — Sunucuda tip yoktu** (2026-10-03). Bütün sarmalayıcılar
   (`guardedQuery/Mutation`, `userQuery/Mutation`, `plantInternal*`) tipli
   bağlam verir; fabrikaya kilitli veritabanının kendi tipi var
