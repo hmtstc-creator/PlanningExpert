@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 
 import { internalMutation, internalQuery, query } from './_generated/server'
 import { SESSION_TTL_MS, afterFailedLogin } from '../src/lib/authRules'
+import { audit } from './audit'
 
 /**
  * Girişin veritabanı tarafı.
@@ -66,6 +67,7 @@ export const createUserWithPassword = internalMutation({
       category: 'system',
       createdAt: Date.now(),
     })
+    await audit(ctx.db, { actor: 'system (first setup)', action: 'user.add', target: args.name, detail: `role: ${args.role}` })
     return id
   },
 })
@@ -112,6 +114,14 @@ export const storePassword = internalMutation({
       author: args.actor,
       createdAt: Date.now(),
     })
+    await audit(ctx.db, {
+      actor: args.actor,
+      action: args.actor === user.name ? 'password.change' : 'password.set',
+      target: user.name,
+      detail: args.mustChangePassword ? 'temporary password; must change at next sign-in' : undefined,
+      companyId: user.companyId,
+      holdingId: user.holdingId,
+    })
     return null
   },
 })
@@ -132,6 +142,7 @@ export const recordLoginFailure = internalMutation({
         category: 'system',
         createdAt: Date.now(),
       })
+      await audit(ctx.db, { action: 'signin.locked', target: user.name, detail: 'too many wrong passwords; 15 minutes', companyId: user.companyId, holdingId: user.holdingId })
     }
     return { locked: next.locked }
   },

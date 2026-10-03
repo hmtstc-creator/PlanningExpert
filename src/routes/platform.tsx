@@ -168,6 +168,12 @@ function PlatformPage() {
         </main>
       </div>
 
+      {isPlatform && (
+        <section className="mt-10">
+          <CollapsibleHistory />
+        </section>
+      )}
+
       {ctx?.platformRole === 'owner' && (
         <section className="mt-10">
           <h2 className="text-sm font-semibold text-foreground">Generals</h2>
@@ -485,7 +491,7 @@ function HoldingPanel({ holding: h, companies, isPlatform, onSelect }: { holding
 
 // ---- Company ----------------------------------------------------------------------
 
-type CompanyTab = 'plants' | 'users' | 'groups'
+type CompanyTab = 'plants' | 'users' | 'groups' | 'history'
 
 function CompanyPanel({ company: c, holdings, isPlatform, onSelect }: { company: CompanyRow; holdings: OrgHolding[]; isPlatform: boolean; onSelect: (n: OrgNode) => void }) {
   const { run: updateCompany, error, clearError } = useSafeMutation(api.platform.updateCompany)
@@ -581,6 +587,7 @@ function CompanyPanel({ company: c, holdings, isPlatform, onSelect }: { company:
             ['plants', 'Plants'],
             ['users', 'Users & access'],
             ['groups', 'Groups'],
+            ['history', 'History'],
           ] as [CompanyTab, string][]
         ).map(([k, label]) => (
           <button
@@ -601,6 +608,11 @@ function CompanyPanel({ company: c, holdings, isPlatform, onSelect }: { company:
           <AccessMatrix company={c} users={people.orgUsers} groups={people.orgGroups} onSelect={onSelect} />
           <h3 className="mt-5 text-sm font-semibold text-foreground">Accounts</h3>
           <CompanyUsers companyId={c._id} groups={people.groups} />
+        </div>
+      )}
+      {tab === 'history' && (
+        <div className="mt-3">
+          <AuditList companyId={c._id} />
         </div>
       )}
       {tab === 'groups' && (
@@ -1187,5 +1199,59 @@ function CompanyDataActions({ company: c, isPlatform }: { company: CompanyRow; i
         </button>
       )}
     </div>
+  )
+}
+
+interface AuditRow {
+  _id: string
+  at: number
+  actor?: string
+  action: string
+  target: string
+  detail?: string
+}
+
+const fmtAt = (ms: number) => new Date(ms).toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+/** Denetim kaydı tablosu: şirketin (companyId) ya da bütün platformun. */
+function AuditList({ companyId }: { companyId?: string }) {
+  const rows = (useQuery(api.platform.auditLog, companyId ? { companyId } : {}) ?? []) as AuditRow[]
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">
+        Who changed what and when — users, passwords, groups, plants, departments, cost centers{companyId ? '' : ', companies and holdings'}. Kept
+        permanently, newest first (last 200).
+      </p>
+      <div className="mt-2">
+        <Table head={['When', 'Who', 'Action', 'On', 'Change']} empty={!rows.length && 'Nothing recorded yet.'}>
+          {rows.map((r) => (
+            <tr key={r._id} className="border-t border-border align-top">
+              <td className={`${td} text-xs whitespace-nowrap text-muted-foreground tabular-nums`}>{fmtAt(r.at)}</td>
+              <td className={`${td} text-xs whitespace-nowrap`}>{r.actor ?? '—'}</td>
+              <td className={`${td} font-mono text-[11px] whitespace-nowrap`}>{r.action}</td>
+              <td className={`${td} text-xs font-medium`}>{r.target}</td>
+              <td className={`${td} text-xs break-words text-muted-foreground`}>{r.detail ?? ''}</td>
+            </tr>
+          ))}
+        </Table>
+      </div>
+    </div>
+  )
+}
+
+/** General: bütün platformun denetim kaydı (açılınca yüklenir). */
+function CollapsibleHistory() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button className="flex items-center gap-2 text-sm font-semibold text-foreground" onClick={() => setOpen(!open)}>
+        Platform history <span className="text-xs font-normal text-muted-foreground underline">{open ? 'hide' : 'show'}</span>
+      </button>
+      {open && (
+        <div className="mt-2">
+          <AuditList />
+        </div>
+      )}
+    </>
   )
 }

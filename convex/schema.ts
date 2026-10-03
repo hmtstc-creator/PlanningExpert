@@ -71,6 +71,22 @@ export default defineSchema({
     createdAt: v.number(),
   }).index('by_company', ['companyId']),
 
+  /**
+   * Platform denetim kaydı (convex/audit.ts): kim, ne zaman, neyi; eski → yeni.
+   * Şirkete ya da holding'e bağlı; fabrika değişiklik kaydından ayrı.
+   */
+  auditLog: defineTable({
+    at: v.number(),
+    actor: v.optional(v.string()),
+    action: v.string(),
+    target: v.string(),
+    detail: v.optional(v.string()),
+    companyId: v.optional(v.id('companies')),
+    holdingId: v.optional(v.id('holdings')),
+  })
+    .index('by_at', ['at'])
+    .index('by_company', ['companyId', 'at']),
+
   /** Tek seferlik platform durumu (ör. fabrika anahtarı geçişi). */
   platformState: defineTable({
     key: v.string(),

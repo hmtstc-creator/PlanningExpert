@@ -82,9 +82,8 @@ Holding → Company → Plant → Department → Cost center → Work center
   kural. *(docs/decisions.md, src/lib/rawMrp.ts)*
 
 ### Platform
-- [ ] **[G]** Platform değişiklik kaydı: kullanıcı açma, parola, yetki,
-  askıya alma bugün hiçbir kayıtta görünmüyor. *(docs/plant-genisletme.md
-  → Kalan)*
+- [x] ✅ Platform değişiklik kaydı → denetim kaydı (bkz. 4.3).
+  *(docs/plant-genisletme.md → Kalan)*
 
 ---
 
@@ -185,10 +184,14 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 - [ ] **P1 — Kurumsal kimlik yok.** Müşteriler Azure AD / Google ile
   girmek isteyecek; parolayı creator elle veriyor, "parolamı unuttum" yok.
   → SSO (OIDC) ve e-postayla davet / parola sıfırlama.
-- [ ] **P1 — Denetim kaydı eksik.** Platform düzeyindeki işlemler (kullanıcı,
-  parola, yetki, askı, holding) kaydedilmiyor (bkz. 2 → Platform).
-  → Kim, ne zaman, neyi, eski → yeni değer; silinemez ve dışa
-  aktarılabilir bir kayıt.
+- [x] ✅ **P1 — Denetim kaydı eksikti** (2026-10-03): `auditLog` tablosu
+  (convex/audit.ts). Kayda düşenler: holding, şirket (ad, modül, askı,
+  holding, silme), plant (ad, ülke, saat dilimi, kapalı modül, bölüm, masraf
+  yeri), kullanıcı (açma, değişiklik, silme), grup, parola verme /
+  değiştirme, giriş kilidi. Her kayıtta kim, ne zaman ve eski → yeni değer
+  var. Ekran: şirket panelinde **History**, General için **Platform
+  history**. Ekrandan silinmez.
+  - [ ] **[G]** Dışa aktarma (CSV) ve saklama süresi kararı.
 - [ ] **P2 — Yetki yalnızca plant × modül.** Bölüm ya da masraf yeri
   bazında yetki yok; onay akışı da yok (ör. master data ya da plan onayında
   dört göz).

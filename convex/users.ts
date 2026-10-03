@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
 import { internalQuery } from './_generated/server'
+import { audit, diff } from './audit'
 import { userMutation, userQuery } from './guarded'
 import { LEVELS, MODULES, canManageCompany, isPlatform } from '../src/lib/tenancy'
 
@@ -134,7 +135,9 @@ export const add = userMutation({
       const name = args.name.trim()
       if (!name) throw new ConvexError('A name is required')
       await nameFree(ctx.db, name)
-      return ctx.db.insert('users', { name, email: args.email?.trim() || undefined, active: true, createdAt: Date.now(), holdingId: args.holdingId, role: 'holding board' })
+      const hid = await ctx.db.insert('users', { name, email: args.email?.trim() || undefined, active: true, createdAt: Date.now(), holdingId: args.holdingId, role: 'holding board' })
+      await audit(ctx.db, { actor: me.name, action: 'user.add', target: name, detail: 'holding board member', holdingId: args.holdingId })
+      return hid
     }
     requireManager(me, args.companyId)
     const name = args.name.trim()
@@ -152,6 +155,13 @@ export const add = userMutation({
       createdAt: Date.now(),
       ...doc,
       role: roleLabel(doc),
+    })
+    await audit(ctx.db, {
+      actor: me.name,
+      action: 'user.add',
+      target: name,
+      detail: args.companyId ? `${roleLabel(doc)}; groups: ${(await groupNames(ctx.db, groupIds)) || '—'}` : 'general',
+      companyId: args.companyId ?? undefined,
     })
     return id
   },
@@ -188,6 +198,11 @@ export const update = userMutation({
       patch.role = roleLabel({ isCreator: patch.isCreator })
     }
     await ctx.db.patch(args.id, patch)
+    const detail = diff(
+      { name: user.name, email: user.email, active: user.active, creator: user.isCreator === true, groups: await groupNames(ctx.db, user.groupIds ?? []) },
+      { name, email: patch.email, active: args.active, ...(patch.groupIds ? { creator: patch.isCreator, groups: await groupNames(ctx.db, patch.groupIds) } : {}) },
+    )
+    if (detail) await audit(ctx.db, { actor: me.name, action: 'user.update', target: name, detail, companyId: user.companyId, holdingId: user.holdingId })
     // Pasife alınan kullanıcının oturumu hemen bitmeli.
     if (!args.active) await signOut(ctx.db, args.id)
     return null
@@ -217,9 +232,16 @@ export const remove = userMutation({
     // Açık oturumlar da kapanır; eski kayıtlarda adı kalır.
     await signOut(ctx.db, id)
     await ctx.db.delete(id)
+    await audit(ctx.db, { actor: me.name, action: 'user.remove', target: user.name, companyId: user.companyId, holdingId: user.holdingId })
     return null
   },
 })
+
+async function groupNames(db: Any, ids: string[]): Promise<string> {
+  const names: string[] = []
+  for (const id of ids) names.push((await db.get(id))?.name ?? '?')
+  return names.sort().join(', ')
+}
 
 /** auth.setPasswordAsAdmin: oturum sahibi bu kullanıcının parolasını verebilir mi? */
 export const canSetPassword = internalQuery({
@@ -281,13 +303,20 @@ export const saveGroup = userMutation({
       if (!plant || plant.companyId !== args.companyId) throw new ConvexError('A plant does not belong to this company')
     }
     const doc = { companyId: args.companyId, name, allPlants: args.allPlants, plantIds: args.allPlants ? [] : args.plantIds, permissions: args.permissions, board: args.board === true }
+    const plantNames = async (g: Any) => (g.allPlants ? 'all' : (await Promise.all(g.plantIds.map(async (p: string) => (await ctx.db.get(p))?.name ?? '?'))).sort().join(', '))
+    const summary = async (g: Any) => ({ name: g.name, plants: await plantNames(g), board: g.board === true, ...Object.fromEntries(MODULES.map((m) => [m, g.permissions?.[m] ?? 'none'])) })
+    const actor = ctx.sessionUser.name
     if (args.id) {
       const old = await ctx.db.get(args.id)
       if (!old || old.companyId !== args.companyId) throw new ConvexError('Group not found')
       await ctx.db.patch(args.id, doc)
+      const detail = diff(await summary(old), await summary(doc))
+      if (detail) await audit(ctx.db, { actor, action: 'group.update', target: name, detail, companyId: args.companyId })
       return args.id
     }
-    return ctx.db.insert('userGroups', { ...doc, createdAt: Date.now() })
+    const gid = await ctx.db.insert('userGroups', { ...doc, createdAt: Date.now() })
+    await audit(ctx.db, { actor, action: 'group.add', target: name, detail: diff({}, await summary(doc)), companyId: args.companyId })
+    return gid
   },
 })
 
@@ -306,6 +335,7 @@ export const removeGroup = userMutation({
       if ((u.groupIds ?? []).includes(id)) await ctx.db.patch(u._id, { groupIds: u.groupIds.filter((x: string) => x !== id) })
     }
     await ctx.db.delete(id)
+    await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'group.remove', target: g.name, companyId: g.companyId })
     return null
   },
 })

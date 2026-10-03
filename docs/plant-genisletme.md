@@ -469,5 +469,6 @@ Platform — General grubu (site sahibi + onun eklediği generaller)
 
 ### Kalan (sıradaki aşamalar)
 - Karşılaştırma ekranının içeriği (aşama 7 ilk sürümü yalnızca OEE).
-- Platform değişiklik kaydı (kullanıcı açma / parola) bugün fabrika
-  kaydında görünmüyor.
+- ~~Platform değişiklik kaydı (kullanıcı açma / parola) bugün fabrika
+  kaydında görünmüyor.~~ → 2026-10-03: platform denetim kaydı (`auditLog`,
+  Companies and plants → History / Platform history).

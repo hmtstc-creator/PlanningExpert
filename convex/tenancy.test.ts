@@ -459,4 +459,36 @@ describe('fabrika ayrımı', () => {
       t.mutation(api.platform.updatePlant, { token: boss, id, name: 'Plant 1', costCenters: [{ code: 'PG', name: 'Progressive', department: 'Stamping' }] }),
     ).rejects.toThrow(/TR still has work centers \(PRS-106\)/)
   })
+  it('denetim kaydı: platform işlemleri eski → yeni yazılır; creator yalnızca kendi şirketini görür', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const ctx0 = await t.query(api.tenancy.context, { token: boss })
+    const c1 = ctx0.plants[0].companyId
+    const h = await holding(t, boss, 'Group')
+    await t.mutation(api.platform.setCompanyHolding, { token: boss, companyId: c1, holdingId: h })
+    await t.mutation(api.platform.updatePlant, { token: boss, id: ctx0.active.plantId, name: 'Plant 1', departments: ['Stamping'], costCenters: [{ code: 'TR', name: 'Transfer', department: 'Stamping' }] })
+    const g = await t.mutation(api.users.saveGroup, { token: boss, companyId: c1, name: 'Planners', allPlants: true, plantIds: [], permissions: { planning: 'edit' } })
+    const z = await t.mutation(api.users.add, { token: boss, companyId: c1, name: 'zeynep', groupIds: [g] })
+    await t.mutation(api.users.update, { token: boss, id: z, name: 'zeynep', active: false, isCreator: false, groupIds: [] })
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning'], holdingId: h })
+
+    const all = await t.query(api.platform.auditLog, { token: boss })
+    const lines = all.map((r: Any) => `${r.action} ${r.target}`)
+    expect(lines).toEqual(expect.arrayContaining(['holding.add Group', 'company.holding Company 1', 'plant.update Plant 1', 'group.add Planners', 'user.add zeynep', 'user.update zeynep', 'company.add Other']))
+    const upd = all.find((r: Any) => r.action === 'user.update')
+    expect(upd.actor).toBe('boss')
+    expect(upd.detail).toBe('active: true → false; groups: Planners → —')
+    expect(all.find((r: Any) => r.action === 'plant.update').detail).toContain('costCenters: — → TR Transfer (Stamping)')
+
+    // Creator kendi şirketinin kaydını görür; başka şirketi ve platformun tamamını göremez.
+    const a2 = await session(t, u.admin2, 'a2')
+    const mine = await t.query(api.platform.auditLog, { token: a2, companyId: c1 })
+    expect(mine.every((r: Any) => r.target !== 'Other')).toBe(true)
+    expect(mine.length).toBeGreaterThan(0)
+    await expect(t.query(api.platform.auditLog, { token: a2, companyId: c2 })).rejects.toThrow(/creator of this company/)
+    await expect(t.query(api.platform.auditLog, { token: a2 })).rejects.toThrow(/General/)
+  })
 })

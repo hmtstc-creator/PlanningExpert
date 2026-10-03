@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 
 import { internal } from './_generated/api'
 import { internalMutation } from './_generated/server'
+import { audit, diff } from './audit'
 import { TABLES, userMutation, userQuery } from './guarded'
 import { isPlantTable } from './plantDb'
 import { MODULES, canManageCompany, isPlatform } from '../src/lib/tenancy'
@@ -103,6 +104,18 @@ async function workCentersOf(db: Any, plantId: string): Promise<{ name: string; 
   return rows.map((r) => ({ name: r.name, ...(r.costCenter ? { costCenter: r.costCenter } : {}) }))
 }
 
+/** Denetim kaydı için plant'in okunur özeti (eski → yeni karşılaştırılır). */
+function plantSummary(p: Any) {
+  return {
+    name: p.name,
+    country: p.country,
+    timeZone: p.timeZone,
+    modulesOff: [...(p.disabledModules ?? [])].sort(),
+    departments: p.departments ?? [],
+    costCenters: (p.costCenters ?? []).map((c: CostCenter) => `${c.code} ${c.name}${c.department ? ` (${c.department})` : ''}`),
+  }
+}
+
 function requirePlatform(me: Any) {
   if (!isPlatform(me)) throw new ConvexError('Only a General can do this')
 }
@@ -153,7 +166,9 @@ export const createCompany = userMutation({
     if (!(await ctx.db.get(holdingId))) throw new ConvexError('Holding not found — add the holding first')
     if (!name.trim()) throw new ConvexError('A company name is required')
     await companyNameFree(ctx.db, name.trim())
-    return ctx.db.insert('companies', { name: name.trim(), status: 'active', modules, holdingId, createdAt: Date.now() })
+    const id = await ctx.db.insert('companies', { name: name.trim(), status: 'active', modules, holdingId, createdAt: Date.now() })
+    await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'company.add', target: name.trim(), detail: `modules: ${modules.join(', ') || '—'}`, companyId: id, holdingId })
+    return id
   },
 })
 
@@ -178,6 +193,8 @@ export const updateCompany = userMutation({
           ? { suspendedAt: now, deleteAfter: now + DELETE_AFTER_DAYS * 86_400_000 }
           : { suspendedAt: undefined, deleteAfter: undefined }
     await ctx.db.patch(args.id, { name: args.name.trim(), modules: args.modules, status: args.status, ...status })
+    const detail = diff({ name: c.name, modules: [...c.modules].sort(), status: c.status }, { name: args.name.trim(), modules: [...args.modules].sort(), status: args.status })
+    if (detail) await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'company.update', target: args.name.trim(), detail, companyId: args.id, holdingId: c.holdingId })
     return null
   },
 })
@@ -203,7 +220,7 @@ export const createPlant = userMutation({
     await plantNameFree(ctx.db, args.companyId, args.name.trim())
     const locale = checkLocale(args.country, args.timeZone)
     const departments = checkDepartments(args.departments ?? [])
-    return ctx.db.insert('plants', {
+    const doc = {
       companyId: args.companyId,
       name: args.name.trim(),
       code: args.code?.trim() || undefined,
@@ -211,7 +228,10 @@ export const createPlant = userMutation({
       departments,
       costCenters: checkCostCenters(args.costCenters ?? [], departments, []),
       createdAt: Date.now(),
-    })
+    }
+    const id = await ctx.db.insert('plants', doc)
+    await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'plant.add', target: doc.name, detail: diff({}, plantSummary(doc)), companyId: args.companyId })
+    return id
   },
 })
 
@@ -271,6 +291,8 @@ export const updatePlant = userMutation({
       }
     }
     await ctx.db.patch(args.id, patch)
+    const detail = diff(plantSummary(plant), plantSummary({ ...plant, ...patch }))
+    if (detail) await audit(ctx.db, { actor: me.name, action: 'plant.update', target: patch.name, detail, companyId: plant.companyId })
     return null
   },
 })
@@ -360,6 +382,7 @@ export const deleteCompany = userMutation({
     for (const g of groups) await ctx.db.delete(g._id)
     for (const p of plants) await ctx.db.delete(p._id)
     await ctx.db.delete(id)
+    await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'company.delete', target: c.name, detail: `plants: ${plants.map((p) => p.name).join(', ')}; data purged in the background`, companyId: id, holdingId: c.holdingId })
     await ctx.db.insert('platformState', {
       key: `purge:${id}`,
       value: { companyName: c.name, plantIds: plants.map((p) => p._id), tableIndex: 0, deleted: 0, done: false },
@@ -400,6 +423,7 @@ export const deletePlant = userMutation({
       if (s.plantId === id) await ctx.db.patch(s._id, { plantId: undefined })
     }
     await ctx.db.delete(id)
+    await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'plant.delete', target: plant.name, detail: 'data purged in the background', companyId: plant.companyId })
     await ctx.db.insert('platformState', {
       key: `purge:plant:${id}`,
       value: { plantName: plant.name, plantIds: [id], tableIndex: 0, deleted: 0, done: false },
@@ -486,10 +510,14 @@ export const saveHolding = userMutation({
     if (!n) throw new ConvexError('A holding name is required')
     await holdingNameFree(ctx.db, n, id)
     if (id) {
+      const old = await ctx.db.get(id)
       await ctx.db.patch(id, { name: n })
+      if (old?.name !== n) await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'holding.rename', target: n, detail: diff({ name: old?.name }, { name: n }), holdingId: id })
       return id
     }
-    return ctx.db.insert('holdings', { name: n, createdAt: Date.now() })
+    const hid = await ctx.db.insert('holdings', { name: n, createdAt: Date.now() })
+    await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'holding.add', target: n, holdingId: hid })
+    return hid
   },
 })
 
@@ -512,7 +540,9 @@ export const removeHolding = userMutation({
       for (const s of await ctx.db.query('sessions').withIndex('by_user', (q: Any) => q.eq('userId', u._id)).collect()) await ctx.db.delete(s._id)
       await ctx.db.delete(u._id)
     }
+    const h = await ctx.db.get(id)
     await ctx.db.delete(id)
+    await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'holding.delete', target: h?.name ?? '?', holdingId: id })
     return null
   },
 })
@@ -523,8 +553,40 @@ export const setCompanyHolding = userMutation({
   returns: v.null(),
   handler: async (ctx: Any, { companyId, holdingId }: Any) => {
     requirePlatform(ctx.sessionUser)
-    if (!(await ctx.db.get(holdingId))) throw new ConvexError('Holding not found')
+    const h = await ctx.db.get(holdingId)
+    if (!h) throw new ConvexError('Holding not found')
+    const c = await ctx.db.get(companyId)
+    if (!c) throw new ConvexError('Company not found')
     await ctx.db.patch(companyId, { holdingId })
+    if (c.holdingId !== holdingId) {
+      const old = c.holdingId ? await ctx.db.get(c.holdingId) : null
+      await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'company.holding', target: c.name, detail: diff({ holding: old?.name }, { holding: h.name }), companyId, holdingId })
+    }
     return null
+  },
+})
+
+// ---- Denetim kaydı ---------------------------------------------------------------
+
+/**
+ * Platform denetim kaydı, en yeniden eskiye. General: hepsi ya da bir
+ * şirketin; creator: yalnızca kendi şirketinin.
+ */
+export const auditLog = userQuery({
+  args: { companyId: v.optional(v.id('companies')), limit: v.optional(v.number()) },
+  returns: v.any(),
+  handler: async (ctx: Any, { companyId, limit }: Any) => {
+    const me = ctx.sessionUser
+    const n = Math.min(Math.max(limit ?? 200, 1), 500)
+    if (!companyId) {
+      requirePlatform(me)
+      return ctx.db.query('auditLog').withIndex('by_at').order('desc').take(n)
+    }
+    if (!canManageCompany(me, companyId)) throw new ConvexError('Only a creator of this company can see its history')
+    return ctx.db
+      .query('auditLog')
+      .withIndex('by_company', (q: Any) => q.eq('companyId', companyId))
+      .order('desc')
+      .take(n)
   },
 })
