@@ -11,7 +11,43 @@ parçadır; ikisi ayrı düşünülür:
 Kodda Vercel'e bağlı bir şey yok; Nitro VPS'te varsayılan Node sunucusu
 üretir.
 
-## Karar: Convex nerede? **[K]** (todolist.md)
+## Veri güvenliği — geliştirme sürerken canlı veri korunur
+
+Kullanıcılar siteyi kullanırken geliştirme devam eder. Kural: **canlı
+veritabanı hiçbir zaman silinmez, sıfırlanmaz, şeması daraltılmaz.**
+
+| Risk | Önlem | Nerede |
+|---|---|---|
+| Şemadan alan / tablo kaldırmak, alanı zorunlu yapmak, tipi daraltmak | **Şema kapısı**: canlı şemanın kaydı `scripts/schema.snapshot.json`; yeni şema yalnızca genişleyebilir, aksi CI'da kırmızı (deploy'a gitmez). Yeni alan eklenince `npm run schema:snapshot` | `convex/schemaGuard.test.ts`, `src/lib/schemaCompat.ts` |
+| Yayın sırasında bir şey ters gitmesi | **Yayın betiği** önce doğrular, sonra production'ın tam yedeğini alır (dosyalar dahil), yedek yoksa durur; sonra Convex, en son arayüz | `scripts/release.sh` |
+| Günlük veri kaybı | **Günlük yedek** (cron), son 30 tutulur; sunucu dışına da kopyalanır | `scripts/backup.sh` |
+| Geliştirirken production'a yazmak | Geliştirme **ayrı dev deployment**'ta (`npx convex dev` kendi dev veritabanına yazar). `.env.local`'daki `CONVEX_DEPLOYMENT` production olmamalı; production'a yalnızca `scripts/release.sh` yazar (prod anahtarı olmadan çalışmaz) | — |
+| Veriyi dönüştüren geçiş | Geçiş bir kerelik bayrakla, tekrar çalışırsa zararsız, eski alanı silmeden (docs/architecture.md kural 12) | `planRuns.migrateSettings`, `tenancy.backfill` |
+| Elle silme | Tek kayıt, onaylı; şirket / plant silme ad yazılarak, şirket için askıdan 90 gün sonra; kullanımdaki work center / parça / cost center silinmez | `convex/platform.ts`, `workCenterRefs.ts`, `materialRefs.ts` |
+
+**Alan kaldırmak gerekirse (iki yayın):** (1) kod alanı okumayı / yazmayı
+bırakır, bir geçiş alanı boşaltır, yayınlanır; (2) bir sonraki yayında alan
+şemadan ve `scripts/schema.snapshot.json`'dan elle çıkarılır (gerekçe commit
+mesajında).
+
+**Geri dönüş:** `npx convex import --replace backups/<dosya>.zip` (önce boş
+bir deployment'ta denenir; production'a yalnızca gerçek bir kayıpta).
+
+## VPS'e taşıma kontrol listesi — seçenek A (2026-10-03 kararı: haftaya)
+
+Seçenek A'da veritabanı Convex'te kalır; taşınan yalnızca arayüzdür, veri
+yerinden oynamaz.
+
+1. Taşımadan önce `scripts/backup.sh` ile yedek al, dosyayı sunucu dışına kopyala.
+2. VPS'te arayüzü **aynı production Convex adresiyle** kur (`VITE_CONVEX_URL`);
+   eski site çalışmaya devam eder (iki adres aynı veriye bakar).
+3. VPS adresinde giriş yap; **System → Connection diagnostics**'te deployment
+   adı eski siteyle aynı mı, kayıt sayıları aynı mı bak.
+4. Birkaç kullanıcıyla VPS adresini dene; sorun yoksa alan adını (DNS) VPS'e
+   çevir. Eski siteyi bir hafta açık tut (geri dönüş yolu).
+5. VPS'te `scripts/backup.sh` için cron ve `scripts/release.sh` ile yayın.
+
+## Karar: Convex nerede? (2026-10-03: **A**, taşıma haftaya)
 
 | | A) Arayüz VPS, Convex Cloud | B) Hepsi VPS (self-hosted Convex) |
 |---|---|---|

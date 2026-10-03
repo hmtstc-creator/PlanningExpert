@@ -1,0 +1,3696 @@
+{
+  "actualProduction": {
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "movementType": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "orderNumber": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plant": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "postingDate": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "quantity": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "storageLocation": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "uploadedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "auditLog": {
+    "action": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "actor": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "at": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "companyId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "companies"
+      },
+      "optional": true
+    },
+    "detail": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "holdingId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "holdings"
+      },
+      "optional": true
+    },
+    "target": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "changeLog": {
+    "author": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "category": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "detail": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "title": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "companies": {
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "deleteAfter": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "holdingId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "holdings"
+      },
+      "optional": true
+    },
+    "modules": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": false
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "suspendedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    }
+  },
+  "craneGroups": {
+    "groupName": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "machines": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    }
+  },
+  "demandDaily": {
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "overdue": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "periods": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "label": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "qty": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "stockInStorage": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "uploadedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "demandWeekly": {
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "overdue": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "periods": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "label": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "qty": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "stockInStorage": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "uploadedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "errorLog": {
+    "count": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "detail": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "firstAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "key": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "lastAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "message": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plant": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "source": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "url": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "user": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
+  "globalShiftSettings": {
+    "acceptedPerformanceRate": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "breakMinutesPerShift": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "capacityFactor": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "coilSetupGapMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "concurrentSetupsPerHall": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "country": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "deliveryCutoffMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "frozenDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "key": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "maxScenarios": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "maxSetupsPlantWide": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "maxSetupsPlantWideNormal": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "migratedCalendarV2": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "migratedSetupGap10": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "overtimeShiftMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "planningHorizonWeeks": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "pullForwardDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "rawCoverageDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "rawOrderExtraKg": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "rawOrderMailCc": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": true
+    },
+    "rawOrderMailTo": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": true
+    },
+    "rawUrgentDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "safetyStockDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "setupGapMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "setupsCrossShifts": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "shiftMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "shiftStartMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "timeZone": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "utilisationTarget": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    }
+  },
+  "holdings": {
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "kpiEntries": {
+    "actual": {
+      "fieldType": {
+        "type": "any"
+      },
+      "optional": false
+    },
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "line": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "num": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "operatorType": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "period": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plan": {
+      "fieldType": {
+        "type": "any"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "updatedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "updatedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "year": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "lookups": {
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "kind": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "sortOrder": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "value": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "machinePriorities": {
+    "machineName": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "priority": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "productCode": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "machineProblems": {
+    "description": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "downtimeMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "expectedUpDate": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "expectedUpMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "occurredAt": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "occurredMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "photos": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "id",
+          "tableName": "_storage"
+        }
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "problemType": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "reportedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "reportedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "solution": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "solvedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "solvedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "stopsPress": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": false
+    }
+  },
+  "machines": {
+    "hall": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "hasCrane": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": false
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "tonnage": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "moldAlarms": {
+    "closedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "closedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "closeReason": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "limitAtAlarm": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "openedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "shotsAtAlarm": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "moldMaintenance": {
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "createdBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "dateTo": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "kind": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "note": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    }
+  },
+  "moldProblems": {
+    "description": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "downtimeMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "occurredAt": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "operation": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "photos": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "id",
+          "tableName": "_storage"
+        }
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "problemType": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "reportedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "reportedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "solution": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "solvedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "solvedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "moldReadiness": {
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "ready": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": false
+    },
+    "readyDate": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "readyMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "reason": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "updatedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "updatedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
+  "oeeDays": {
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "good": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "loadingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "operatingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "plantKey": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "productionMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "reject": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "responsible": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "scheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "scrap": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "source": {
+      "fieldType": {
+        "type": "union",
+        "value": [
+          {
+            "type": "literal",
+            "value": "shiftly"
+          },
+          {
+            "type": "literal",
+            "value": "daily"
+          }
+        ]
+      },
+      "optional": false
+    },
+    "unscheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "oeeDowntimeDays": {
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "events": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "array",
+          "value": {
+            "type": "union",
+            "value": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "optional": false
+    },
+    "plant": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "plantKey": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "oeeImports": {
+    "fileName": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "ranges": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "array",
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "optional": false
+    },
+    "sheets": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "array",
+          "value": {
+            "type": "union",
+            "value": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "optional": false
+    },
+    "uploadedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "uploadedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
+  "oeeLossDays": {
+    "codes": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "array",
+          "value": {
+            "type": "union",
+            "value": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "optional": true
+    },
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "groups": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "array",
+          "value": {
+            "type": "union",
+            "value": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "reasonList": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "array",
+          "value": {
+            "type": "union",
+            "value": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "optional": true
+    },
+    "reasons": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "array",
+          "value": {
+            "type": "union",
+            "value": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "optional": true
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "oeeMonthly": {
+    "availability": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "good": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "loadingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "month": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "monthKey": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "oee": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "operatingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "performance": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "plantKey": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "productionMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "quality": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "reject": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "responsible": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "scheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "scheduledSec": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "scrap": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "unscheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "year": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    }
+  },
+  "oeeOrders": {
+    "availability": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "equipment": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "good": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "loadingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "oee": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "operatingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "order": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "performance": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "plant": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "plantName": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "productionMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "quality": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "reject": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "scheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "scrap": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "shift": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "unscheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "oeeSettings": {
+    "areas": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "name": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "pick": {
+              "fieldType": {
+                "type": "union",
+                "value": [
+                  {
+                    "type": "literal",
+                    "value": "costCenter"
+                  },
+                  {
+                    "type": "literal",
+                    "value": "machine"
+                  }
+                ]
+              },
+              "optional": false
+            },
+            "startupRunMin": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": true
+            }
+          }
+        }
+      },
+      "optional": false
+    },
+    "breakReasonCodes": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": false
+    },
+    "costCenters": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "code": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "name": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "area": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": false
+    },
+    "key": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "lossGroups": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "code": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "label": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "chart": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "breakdown": {
+              "fieldType": {
+                "type": "boolean"
+              },
+              "optional": false
+            },
+            "hidden": {
+              "fieldType": {
+                "type": "boolean"
+              },
+              "optional": true
+            }
+          }
+        }
+      },
+      "optional": false
+    },
+    "lossReasonCodes": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "setupTexts": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "text": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "kind": {
+              "fieldType": {
+                "type": "union",
+                "value": [
+                  {
+                    "type": "literal",
+                    "value": "planned"
+                  },
+                  {
+                    "type": "literal",
+                    "value": "unplanned"
+                  }
+                ]
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": false
+    },
+    "shifts": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "code": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "number": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": false
+    },
+    "startupRunMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "topN": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "trendWeeks": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "updatedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "updatedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
+  "oeeShifts": {
+    "availability": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "good": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "loadingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "oee": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "operatingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "performance": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "plantKey": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "productionMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "quality": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "reject": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "responsible": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "scheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "scrap": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "shiftDefinition": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "shiftGroup": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "unscheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "oeeWeekly": {
+    "availability": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "good": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "loadingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "oee": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "operatingMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "performance": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "plantKey": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "productionMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "quality": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "reject": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "responsible": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "scheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "scheduledSec": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "scrap": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "sheet": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "source": {
+      "fieldType": {
+        "type": "union",
+        "value": [
+          {
+            "type": "literal",
+            "value": "archive"
+          },
+          {
+            "type": "literal",
+            "value": "weekly"
+          }
+        ]
+      },
+      "optional": true
+    },
+    "unscheduledMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "week": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "year": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "officialHolidays": {
+    "country": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "year": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "overtimeDefinitions": {
+    "description": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "durationMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "startMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "planOverrides": {
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "kind": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "note": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
+  "planRunChunks": {
+    "index": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "items": {
+      "fieldType": {
+        "type": "any"
+      },
+      "optional": false
+    },
+    "kind": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "runId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "planRuns"
+      },
+      "optional": false
+    }
+  },
+  "planRuns": {
+    "chunkCount": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "computedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "durationMs": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "startedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "summary": {
+      "fieldType": {
+        "type": "any"
+      },
+      "optional": false
+    },
+    "trigger": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
+  "planSnapshots": {
+    "approvedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "horizonStart": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "jobCount": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "jobs": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "material": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "press": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "hall": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "date": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "phase": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "quantity": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "shots": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "coilsNeeded": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "setupStartMinute": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "endMinute": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "endDate": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": true
+            },
+            "segments": {
+              "fieldType": {
+                "type": "array",
+                "value": {
+                  "type": "object",
+                  "value": {
+                    "kind": {
+                      "fieldType": {
+                        "type": "string"
+                      },
+                      "optional": false
+                    },
+                    "date": {
+                      "fieldType": {
+                        "type": "string"
+                      },
+                      "optional": false
+                    },
+                    "start": {
+                      "fieldType": {
+                        "type": "number"
+                      },
+                      "optional": false
+                    },
+                    "end": {
+                      "fieldType": {
+                        "type": "number"
+                      },
+                      "optional": false
+                    }
+                  }
+                }
+              },
+              "optional": true
+            },
+            "reason": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "truncated": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "unplannedCount": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "planStatus": {
+    "key": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "lastDurationMs": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "lastError": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "lastErrorAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "lastRunAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "requestedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "runningSince": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "scheduledFor": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    }
+  },
+  "plannedStops": {
+    "durationMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "kind": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "shiftIndex": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "startMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "plants": {
+    "code": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "companyId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "companies"
+      },
+      "optional": false
+    },
+    "costCenters": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "code": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "name": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "department": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": true
+            }
+          }
+        }
+      },
+      "optional": true
+    },
+    "country": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "departments": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": true
+    },
+    "disabledModules": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": true
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "timeZone": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
+  "platformState": {
+    "key": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "updatedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "value": {
+      "fieldType": {
+        "type": "any"
+      },
+      "optional": false
+    }
+  },
+  "pressMaintenance": {
+    "actualDate": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "actualEndMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "actualStartMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "completedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "completedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "createdBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "endMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "note": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "reason": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "startMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "pressOvertime": {
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "definitionId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "overtimeDefinitions"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "pressPlanStarts": {
+    "delayMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "fromDate": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "fromMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "reason": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "updatedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "updatedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
+  "pressTemplates": {
+    "overtimeShifts": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "recurringOvertime": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "dayKey": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "definitionId": {
+              "fieldType": {
+                "type": "id",
+                "tableName": "overtimeDefinitions"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": true
+    },
+    "shiftsPerDay": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "workingDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "pressWeekOverrides": {
+    "overtimeShifts": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "shiftsPerDay": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "weekStart": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "workingDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "presses": {
+    "category": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "feedsCoil": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "frozenDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "hall": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "tonnage": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    }
+  },
+  "products": {
+    "altMachine1": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "altMachine2": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "altMachine3": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "altMachine4": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "code": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "coilSetupMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "coilWeight": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "coProduct": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "cycleTimeSeconds": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "flexiblePress": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "grossWeight": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "mainMachine": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "maxShots": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "minLotQty": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "moldCavities": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "performanceFactor": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "qualityApprovalMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "rawMaterialCode": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "setupMinutes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "spm": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    }
+  },
+  "rawInTransit": {
+    "eta": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "poNumber": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "quantityKg": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "supplier": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "uploadedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "sapUploads": {
+    "coversFrom": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "coversTo": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "fileName": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "key": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "legacy": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "rowsImported": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "rowsInFile": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "skippedUnknownLocation": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "skippedUnknownMaterial": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "uploadedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "uploadedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
+  "sessions": {
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "expiresAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "token": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "userId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "users"
+      },
+      "optional": false
+    }
+  },
+  "stock": {
+    "blocked": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plant": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "qualityInspection": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "restricted": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "returns": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "storageLocation": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "transit": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "unrestricted": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "uploadedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
+  "storageLocations": {
+    "category": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "code": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "countFinished": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "countProduction": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "countRaw": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "description": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    }
+  },
+  "userGroups": {
+    "allPlants": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": false
+    },
+    "board": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "companyId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "companies"
+      },
+      "optional": false
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "permissions": {
+      "fieldType": {
+        "type": "object",
+        "value": {
+          "planning": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": true
+          },
+          "oee": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": true
+          },
+          "die": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": true
+          },
+          "machine": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": true
+          },
+          "kpi": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": true
+          }
+        }
+      },
+      "optional": false
+    },
+    "plantIds": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "id",
+          "tableName": "plants"
+        }
+      },
+      "optional": false
+    }
+  },
+  "users": {
+    "active": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": false
+    },
+    "companyId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "companies"
+      },
+      "optional": true
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "email": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "failedLogins": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "groupIds": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "id",
+          "tableName": "userGroups"
+        }
+      },
+      "optional": true
+    },
+    "holdingId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "holdings"
+      },
+      "optional": true
+    },
+    "isCreator": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "lockedUntil": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "mustChangePassword": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "name": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "passwordHash": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "passwordSalt": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "platformRole": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "role": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
+  "workCalendar": {
+    "holidays": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": false
+    },
+    "key": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "shiftMinutesPerDay": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "workingDays": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": false
+    }
+  }
+}

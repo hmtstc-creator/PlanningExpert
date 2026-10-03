@@ -7,3 +7,4 @@ dist
 .tanstack
 tsconfig.tsbuildinfo
 convex/_generated
+backups/

@@ -14,12 +14,12 @@ Ayrıntı ve gerekçe ilgili maddede; karar verilince madde güncellenir.
 
 | # | Karar | Madde |
 |---|---|---|
-| K1 | VPS: Convex bulutta mı (A), VPS'te mi (B)? | 4.1 |
+| ~~K1~~ | ✅ **A** (arayüz VPS, Convex bulutta) — taşıma haftaya | 4.1 |
 | K2 | Yedek hedefi: kabul edilen veri kaybı (RPO) ve geri dönüş süresi (RTO) | 4.1 |
-| K3 | Bölüm ile OEE Area birleşsin mi? | 2, 4.2 |
-| K4 | Organizasyon tarihli olsun mu (geçmiş raporlar eski yapıyla kalsın)? | 4.2 |
+| ~~K3~~ | ✅ Evet: bölümün OEE'si olur, ayrı OEE alanı yok | 2, 4.2 |
+| ~~K4~~ | ✅ Hayır, gerek yok | 4.2 |
 | K5 | Work center kodu değişince OEE geçmişi de taşınsın mı? | 4.2 |
-| K6 | Eski kısa parolalar bir sonraki girişte değiştirilmeye zorlansın mı? | 4.3 |
+| ~~K6~~ | ✅ Hayır | 4.3 |
 | K7 | Board / KPI kırılımına bölüm seviyesi; bölüm sorumlusu; holding hedefi; Board PDF | 2 |
 | K8 | KPI ağırlıkları (Absenteeism, Productivity birimi, saati boş satır) | 2 |
 | K9 | OEE: Avg setup'a ara süreler; kayıp grubu adları | 2 |
@@ -67,7 +67,7 @@ Holding → Company → Plant → Department → Cost center → Work center
 ### Organizasyon ve Board
 - [ ] **[K]** Board Dashboard ve KPI kırılımına bölüm seviyesi (plant →
   bölüm → masraf yeri) eklensin mi? *(docs/board.md)*
-- [ ] **[K]** Bölüm ile OEE **Area** birleşsin mi? Şu an iki ayrı gruplama
+- [x] ✅ Bölüm ile OEE **Area** birleşir (K3, 2026-10-03). Önceden iki ayrı gruplama
   var (bkz. 4.2). *(docs/board.md)*
 - [ ] **[K]** Bölüme sorumlu kullanıcı atansın mı? *(docs/board.md)*
 - [ ] **[K]** Holding'e kendi hedefi (ör. grup OEE hedefi) girilsin mi,
@@ -132,9 +132,12 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   - [ ] **[S]** VPS'te yayın yalnızca CI yeşilken: yayın betiği önce
     `npm run verify` çalıştırır (docs/deployment.md); GitHub'da `main` için
     "Require status checks".
-- [ ] **[K] P0 — VPS'e taşıma: Convex nerede çalışacak?** A) arayüz VPS +
-  Convex Cloud, B) hepsi VPS (self-hosted Convex + Postgres). Karşılaştırma
-  ve adımlar: docs/deployment.md. B seçilirse yedek ve izleme tamamen bizde.
+- [ ] **P0 — VPS'e taşıma (karar: A — arayüz VPS, Convex bulutta; haftaya).**
+  Kontrol listesi: docs/deployment.md → "VPS'e taşıma kontrol listesi".
+- [x] ✅ **P0 — Geliştirirken canlı veri korunur** (2026-10-03): şema kapısı
+  (alan / tablo kaldırma, zorunlu yapma, daraltma CI'da durur), yayın öncesi
+  zorunlu yedek (`scripts/release.sh`), günlük yedek (`scripts/backup.sh`),
+  kurallar: docs/deployment.md → "Veri güvenliği".
 - [ ] **P0 — Staging yok.** Değişikliği gerçek veriye benzer bir yerde
   denemenin yolu yok. → VPS'te ayrı bir staging Convex deployment'ı +
   arayüz kopyası, anonimleştirilmiş veriyle.
@@ -205,7 +208,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   değişiyor.
   - [x] ✅ Ağaç değişikliklerinin kaydı tutuluyor (denetim kaydı: bölüm,
     masraf yeri eski → yeni).
-  - [ ] **[K]** "Geçerlilik başlangıcı" olan organizasyon kayıtları (K4).
+  - [x] Geçerlilik tarihli organizasyon gerekmiyor (K4 kararı, 2026-10-03).
 - [ ] **P1 — Bölümler ad listesi.** Bugün plant kaydında metin dizisi olarak
   duruyor; hedef, sorumlu ya da yetki eklenecekse ayrı bir tablo (ID) olmalı.
 - [ ] **P1 — Eski alanlar.** Şemada 8 `@deprecated` alan, kullanıcıda eski
@@ -227,8 +230,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   yazılır; creator yeni parola verince kilit kalkar. Giriş ekranı artık
   `admin/admin` ipucunu yalnızca boş kurulumda gösterir (önceden her zaman
   gösteriyordu). Eski kısa parolalar çalışmaya devam eder.
-  - [ ] **[K]** Eski kısa parolaları bir sonraki girişte değiştirmeye
-    zorlayalım mı?
+  - [x] Eski kısa parolalar zorla değiştirilmez (K6 kararı, 2026-10-03).
 - [ ] **P1 — Kurumsal kimlik yok.** Müşteriler Azure AD / Google ile
   girmek isteyecek; parolayı creator elle veriyor, "parolamı unuttum" yok.
   → SSO (OIDC) ve e-postayla davet / parola sıfırlama.
