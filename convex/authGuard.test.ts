@@ -98,6 +98,8 @@ describe('sunucu tarafı yetki denetimi', () => {
       'compare.ts': /./,
       // dashboard / plants: yalnızca visiblePlants'taki KPI izinli fabrikalar.
       'kpi.ts': /./,
+      // overview: yalnızca visiblePlants, her plant kendi plantId'siyle; KPI / OEE izni ayrı.
+      'board.ts': /./,
       'authInternal.ts': /internal(Query|Mutation)\(/,
     }
     for (const { name, source } of convexFiles()) {

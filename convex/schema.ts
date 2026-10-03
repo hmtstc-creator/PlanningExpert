@@ -20,6 +20,14 @@ export default defineSchema({
     suspendedAt: v.optional(v.number()),
     /** Askıya alınınca +90 gün: bu tarihten sonra kalıcı silinebilir. */
     deleteAfter: v.optional(v.number()),
+    /** Bağlı olduğu holding (General bağlar). */
+    holdingId: v.optional(v.id('holdings')),
+    createdAt: v.number(),
+  }).index('by_holding', ['holdingId']),
+
+  /** Holding (grup): şirketleri bir araya getirir; board üyeleri özet görür (yalnızca okuma). */
+  holdings: defineTable({
+    name: v.string(),
     createdAt: v.number(),
   }),
 
@@ -52,6 +60,8 @@ export default defineSchema({
       machine: v.optional(v.string()),
       kpi: v.optional(v.string()),
     }),
+    /** Board grubu: üyeleri özet görünümde (Board Dashboard). */
+    board: v.optional(v.boolean()),
     createdAt: v.number(),
   }).index('by_company', ['companyId']),
 
@@ -561,9 +571,12 @@ export default defineSchema({
     /** Şirket creator'ı: şirketin bütün fabrikaları, bütün modüller. */
     isCreator: v.optional(v.boolean()),
     groupIds: v.optional(v.array(v.id('userGroups'))),
+    /** Holding board üyesi (şirketsiz): holding'in şirketlerini özet görür. */
+    holdingId: v.optional(v.id('holdings')),
   })
     .index('by_name', ['name'])
-    .index('by_company', ['companyId']),
+    .index('by_company', ['companyId'])
+    .index('by_holding', ['holdingId']),
 
   // Açık oturumlar. Jeton tarayıcıda saklanır; süresi dolunca yeniden
   // giriş istenir.

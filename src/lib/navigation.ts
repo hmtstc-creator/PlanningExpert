@@ -87,7 +87,20 @@ export interface ModuleNav {
   links: NavItem[]
 }
 
+/** Board görünümünün menüsü (board kullanıcısında her sayfada bu). */
+export const BOARD_NAV: ModuleNav = {
+  prefix: '/board',
+  title: 'Board',
+  links: [
+    { to: '/board', label: 'Board Dashboard', hint: 'Group, company, plant — results and trends' },
+    { to: '/kpi/monthly/dashboard', label: 'KPI monthly', hint: 'A3 page, 12 months' },
+    { to: '/kpi/weekly/dashboard', label: 'KPI weekly', hint: 'A3 page, 13 weeks' },
+    { to: '/oee', label: 'OEE', hint: 'Monthly, weeks and shifts' },
+  ],
+}
+
 export const MODULE_NAVS: ModuleNav[] = [
+  BOARD_NAV,
   {
     prefix: '/die-followup',
     title: 'Die Follow-up',

@@ -53,7 +53,8 @@ const TABLE_ROWS = 10
 const ccKey = (plantId: string, code: string) => `${plantId}|${code}`
 
 export function KpiDashboardPage({ period }: { period: KpiPeriod }) {
-  const { ctx } = usePlant()
+  const { ctx, can } = usePlant()
+  const canEditKpi = can('kpi', 'edit') && !ctx?.isBoard
   const [slot, setSlot] = useState(() => defaultSlot(period))
   const options = (useQuery(api.kpi.plants) ?? []) as PlantOption[]
   const [plantIds, setPlantIds] = useState<string[] | null>(null)
@@ -120,7 +121,7 @@ export function KpiDashboardPage({ period }: { period: KpiPeriod }) {
         title={period === 'month' ? 'Monthly KPI — dashboard' : 'Weekly KPI — dashboard'}
         summary="One A3 page: every KPI, plan against actual, the trend and each cost center."
         links={[
-          { to: period === 'month' ? '/kpi/monthly/entry' : '/kpi/weekly/entry', label: 'Data entry' },
+          ...(canEditKpi ? [{ to: period === 'month' ? '/kpi/monthly/entry' : '/kpi/weekly/entry', label: 'Data entry' }] : []),
           { to: period === 'month' ? '/kpi/weekly/dashboard' : '/kpi/monthly/dashboard', label: period === 'month' ? 'Weekly dashboard' : 'Monthly dashboard' },
         ]}
         info={
@@ -304,7 +305,7 @@ function KpiCard({ row, slots, results, current }: { row: (typeof KPI_ROWS)[numb
 }
 
 /** Sabit dilimli küçük trend: gerçekleşen çubuk, plan kısa çizgi; seçili dilim koyu ve değerli. */
-function MiniTrend({ slots, actual, plan, current, unit, label }: { slots: KpiSlot[]; actual: (number | null)[]; plan: (number | null)[]; current: number; unit: 'n' | 'h' | 'pcs' | '%'; label: string }) {
+export function MiniTrend({ slots, actual, plan, current, unit, label }: { slots: KpiSlot[]; actual: (number | null)[]; plan: (number | null)[]; current: number; unit: 'n' | 'h' | 'pcs' | '%'; label: string }) {
   const W = 290
   const H = 150
   const padB = 16

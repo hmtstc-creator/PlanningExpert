@@ -20,6 +20,7 @@ type Any = any
 
 export const PLATFORM_TABLES = new Set([
   'companies',
+  'holdings',
   'plants',
   'userGroups',
   'platformState',

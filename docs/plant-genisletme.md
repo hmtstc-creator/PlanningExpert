@@ -461,6 +461,12 @@ Platform — General grubu (site sahibi + onun eklediği generaller)
   "Not this plant (skipped)" diye sayılır. Fabrikanın masraf yeri yoksa
   yükleme yapılmaz. Sunucu da başka masraf yerinin satırını reddeder.
 
+### Holding ve Board görünümü (2026-10-03)
+- Platform → **Holding** → Şirket → Plant. General holding açar, şirketleri
+  bağlar, holding board üyelerini açar. Holding board üyesi holding'in
+  şirketlerinde yalnızca KPI ve OEE'yi görür (salt okunur). Ayrıntı:
+  docs/board.md.
+
 ### Kalan (sıradaki aşamalar)
 - Karşılaştırma ekranının içeriği (aşama 7 ilk sürümü yalnızca OEE).
 - Platform değişiklik kaydı (kullanıcı açma / parola) bugün fabrika

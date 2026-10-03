@@ -47,6 +47,8 @@ export function atLeast(have: Level, need: Level): boolean {
 export interface UserLike {
   _id: string
   companyId?: string
+  /** Holding board üyesi: holding'e bağlı şirketlerin plantlerini özet olarak görür. */
+  holdingId?: string
   platformRole?: PlatformRole
   isCreator?: boolean
   groupIds?: string[]
@@ -61,6 +63,8 @@ export interface PlantLike {
 
 export interface CompanyLike {
   _id: string
+  /** Şirketin bağlı olduğu holding (grup); General bağlar. */
+  holdingId?: string
   status: CompanyStatus
   /** Şirket için açık modüller (kiralama paketi). */
   modules: string[]
@@ -72,6 +76,22 @@ export interface GroupLike {
   allPlants: boolean
   plantIds: string[]
   permissions: Partial<Record<Module, Level>>
+  /** Board grubu: üyeleri programı özet (board) görünümünde kullanır. */
+  board?: boolean
+}
+
+/** Board görünümünde açık modüller: yalnızca sonuçlar (KPI ve OEE), salt okunur. */
+export const BOARD_MODULES: readonly Module[] = ['kpi', 'oee']
+
+/**
+ * Board görünümü: holding board üyesi ya da yalnızca board gruplarına üye
+ * şirket kullanıcısı. Menüde Board Dashboard ve KPI / OEE dashboard'ları.
+ */
+export function isBoardUser(u: UserLike, groups: GroupLike[]): boolean {
+  if (isPlatform(u) || u.isCreator) return false
+  if (u.holdingId && !u.companyId) return true
+  const mine = groups.filter((g) => (u.groupIds ?? []).includes(g._id))
+  return mine.length > 0 && mine.every((g) => g.board === true)
 }
 
 export const isPlatform = (u: UserLike) => u.platformRole === 'owner' || u.platformRole === 'general'
@@ -92,6 +112,15 @@ export function canSeePlant(u: UserLike, plant: PlantLike, company: CompanyLike,
  */
 export function accessFor(u: UserLike, plant: PlantLike, company: CompanyLike, groups: GroupLike[]): Access {
   if (isPlatform(u)) return { ...FULL_ACCESS }
+  // Holding board üyesi: holding'in şirketlerinde yalnızca KPI ve OEE, salt okunur.
+  if (u.holdingId && !u.companyId) {
+    const out: Access = { ...NO_ACCESS }
+    if (!company.holdingId || company.holdingId !== u.holdingId || company._id !== plant.companyId) return out
+    for (const m of BOARD_MODULES) {
+      if (company.modules.includes(m) && !(plant.disabledModules ?? []).includes(m)) out[m] = 'view'
+    }
+    return out
+  }
   if (!u.companyId || u.companyId !== plant.companyId || company._id !== plant.companyId) return { ...NO_ACCESS }
   const out: Access = { ...NO_ACCESS }
   if (u.isCreator) Object.assign(out, FULL_ACCESS)

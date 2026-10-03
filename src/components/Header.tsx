@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import { useCurrentUser } from '../lib/currentUser'
 import { PlantSwitch } from './TenancyGate'
-import { ALL_GROUPS, NAV_GROUPS, PRIMARY_LINKS, moduleNavFor } from '../lib/navigation'
+import { ALL_GROUPS, BOARD_NAV, NAV_GROUPS, PRIMARY_LINKS, moduleNavFor } from '../lib/navigation'
+import { usePlant } from '../lib/plantContext'
 import { isPortalPath } from '../lib/portal'
 
 /**
@@ -21,6 +22,8 @@ export function Header() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const navRef = useRef<HTMLDivElement>(null)
   const { name: currentUser, setToken } = useCurrentUser()
+  // Board kullanıcısı her sayfada yalnızca özet menüsünü görür.
+  const isBoard = usePlant().ctx?.isBoard === true
 
   // Navigating away should always leave the menus closed, however it happened.
   useEffect(() => {
@@ -102,7 +105,7 @@ export function Header() {
   )
 
   // Takip modülleri (kalıp, makine): kendi kısa menüleri, portala dönüş.
-  const moduleNav = moduleNavFor(pathname)
+  const moduleNav = isBoard ? BOARD_NAV : moduleNavFor(pathname)
   if (moduleNav) {
     return (
       <header className={HEADER_CLASS}>

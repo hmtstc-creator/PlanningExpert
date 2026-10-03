@@ -36,6 +36,8 @@ export interface GroupRow {
   allPlants: boolean
   plantIds: string[]
   permissions: Partial<Record<Module, Level>>
+  /** Board görünümü: üyeleri yalnızca Board Dashboard ve KPI / OEE dashboard'larını görür. */
+  board?: boolean
 }
 
 interface UserDraft {
@@ -52,8 +54,12 @@ const sameUser = (a: UserDraft, b: UserDraft) => JSON.stringify(a) === JSON.stri
 const input = 'rounded-md border border-input bg-background px-2 py-1.5 text-sm'
 const btn = 'rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40'
 
-export function CompanyUsers({ companyId, groups }: { companyId: string | null; groups: GroupRow[] }) {
-  const users = (useQuery(api.users.list, { companyId }) ?? []) as UserRow[]
+/**
+ * `holdingId` verilirse holding board üyeleri (şirketsiz, yalnızca General
+ * yönetir): holding'in bütün şirketlerinin özetini görürler.
+ */
+export function CompanyUsers({ companyId, groups, holdingId }: { companyId: string | null; groups: GroupRow[]; holdingId?: string }) {
+  const users = (useQuery(api.users.list, holdingId ? { holdingId } : { companyId }) ?? []) as UserRow[]
   const { token, name: me, setToken } = useCurrentUser()
   const setPassword = useAction(api.auth.setPasswordAsAdmin)
   const { run: add, error: addError, clearError } = useSafeMutation(api.users.add)
@@ -70,7 +76,7 @@ export function CompanyUsers({ companyId, groups }: { companyId: string | null; 
 
   const submit = async () => {
     if (!name.trim()) return
-    const ok = await add({ companyId, name: name.trim(), email: email.trim() || undefined, ...(company ? { isCreator: creator, groupIds } : {}) })
+    const ok = await add({ companyId, name: name.trim(), email: email.trim() || undefined, ...(holdingId ? { holdingId } : {}), ...(company ? { isCreator: creator, groupIds } : {}) })
     if (ok) {
       setName('')
       setEmail('')
@@ -110,7 +116,7 @@ export function CompanyUsers({ companyId, groups }: { companyId: string | null; 
           </>
         )}
         <button className={btn} disabled={!name.trim()} onClick={() => void submit()}>
-          {company ? 'Add user' : 'Add General'}
+          {company ? 'Add user' : holdingId ? 'Add board member' : 'Add General'}
         </button>
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
@@ -147,8 +153,8 @@ export function CompanyUsers({ companyId, groups }: { companyId: string | null; 
                   <input className={`w-48 ${input}`} value={d.email} onChange={(e) => edit({ email: e.target.value })} />
                 </td>
                 <td className="px-3 py-2 text-xs">
-                  {u.platformRole ? (
-                    u.platformRole
+                  {u.platformRole || !company ? (
+                    u.platformRole ?? u.role
                   ) : (
                     <label className="flex items-center gap-1">
                       <input type="checkbox" checked={d.isCreator} onChange={(e) => edit({ isCreator: e.target.checked })} /> creator
@@ -269,6 +275,7 @@ export function CompanyGroups({ companyId, groups, plants }: { companyId: string
       allPlants: draft.allPlants,
       plantIds: draft.plantIds,
       permissions: { ...EMPTY_PERMS, ...draft.permissions },
+      board: draft.board === true,
     })
     if (ok) setDraft(null)
   }
@@ -294,7 +301,10 @@ export function CompanyGroups({ companyId, groups, plants }: { companyId: string
             {groups.map((g) => (
               <tr key={g._id} className="border-t border-border">
                 <td className="px-3 py-2 font-medium">{g.name}</td>
-                <td className="px-3 py-2 text-xs">{g.allPlants ? 'All plants' : plants.filter((p) => g.plantIds.includes(p._id)).map((p) => p.name).join(', ') || '—'}</td>
+                <td className="px-3 py-2 text-xs">
+                  {g.allPlants ? 'All plants' : plants.filter((p) => g.plantIds.includes(p._id)).map((p) => p.name).join(', ') || '—'}
+                  {g.board && <span className="ml-1 rounded bg-muted px-1">board view</span>}
+                </td>
                 {MODULES.map((m) => (
                   <td key={m} className="px-3 py-2 text-xs">
                     {g.permissions[m] ?? 'none'}
@@ -325,9 +335,9 @@ export function CompanyGroups({ companyId, groups, plants }: { companyId: string
           <button
             className="underline"
             title="Sees every plant of the company (also plants added later), changes nothing"
-            onClick={() => setDraft({ ...blank, name: 'Board members', allPlants: true, permissions: { planning: 'view', oee: 'view', die: 'view', machine: 'view', kpi: 'view' } })}
+            onClick={() => setDraft({ ...blank, name: 'Board members', allPlants: true, board: true, permissions: { planning: 'none', oee: 'view', die: 'none', machine: 'none', kpi: 'view' } })}
           >
-            + Board members (all plants, view)
+            + Board members (all plants, KPI and OEE summary)
           </button>
           {plants.map((p) => (
             <button
@@ -350,6 +360,9 @@ export function CompanyGroups({ companyId, groups, plants }: { companyId: string
           <div className="flex flex-wrap items-center gap-3 text-xs">
             <label className="flex items-center gap-1">
               <input type="checkbox" checked={draft.allPlants} onChange={(e) => setDraft({ ...draft, allPlants: e.target.checked })} /> All plants of the company (also plants added later)
+            </label>
+            <label className="flex items-center gap-1" title="Members see only the Board Dashboard and the KPI / OEE dashboards (read only) — no entry pages, plan or follow-up details">
+              <input type="checkbox" checked={draft.board === true} onChange={(e) => setDraft({ ...draft, board: e.target.checked })} /> Board view (summary only)
             </label>
             {!draft.allPlants &&
               plants.map((p) => (

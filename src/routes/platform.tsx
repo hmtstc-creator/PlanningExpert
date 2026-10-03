@@ -37,6 +37,7 @@ interface CompanyRow {
   status: 'active' | 'suspended'
   modules: Module[]
   deleteAfter?: number
+  holdingId?: string
   plants: PlantRow[]
   userCount: number
   creators: string[]
@@ -131,6 +132,8 @@ function PlatformPage() {
         ))}
       </div>
 
+      {isPlatform && <HoldingsSection companies={companies} />}
+
       {ctx?.platformRole === 'owner' && (
         <section className="mt-8">
           <h2 className="text-sm font-semibold text-foreground">Generals</h2>
@@ -192,6 +195,7 @@ function CompanyCard({ company: c, isPlatform, open, onToggle }: { company: Comp
         <p className="mt-1 text-xs text-amber-900">Suspended — data can be deleted after {new Date(c.deleteAfter).toISOString().slice(0, 10)}.</p>
       )}
       <CompanyDataActions company={c} isPlatform={isPlatform} />
+      {isPlatform && <CompanyHoldingPick company={c} />}
 
       {isPlatform && (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
@@ -469,5 +473,99 @@ function CompanyDataActions({ company: c, isPlatform }: { company: CompanyRow; i
         </button>
       )}
     </div>
+  )
+}
+
+interface HoldingRow {
+  _id: string
+  name: string
+  companies: { _id: string; name: string }[]
+}
+
+/** Şirketin holding'i (General): seçince bağlanır, "—" ayırır. */
+function CompanyHoldingPick({ company: c }: { company: CompanyRow }) {
+  const holdings = (useQuery(api.platform.holdings) ?? []) as HoldingRow[]
+  const { run: setHolding, error, clearError } = useSafeMutation(api.platform.setCompanyHolding)
+  return (
+    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+      <ErrorBanner message={error} onDismiss={clearError} />
+      <label className="flex items-center gap-2">
+        Holding
+        <select
+          className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
+          value={c.holdingId ?? ''}
+          onChange={(e) => void setHolding({ companyId: c._id, holdingId: e.target.value || null })}
+        >
+          <option value="">— none —</option>
+          {holdings.map((h) => (
+            <option key={h._id} value={h._id}>
+              {h.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  )
+}
+
+/**
+ * Holdingler (General): şirketleri bir araya getirir. Holding board üyeleri
+ * holding'in bütün şirketlerinin ve plantlerinin özetini (Board Dashboard,
+ * KPI / OEE dashboard'ları) salt okunur görür; şirket verisine yazamaz.
+ */
+function HoldingsSection({ companies }: { companies: CompanyRow[] }) {
+  const holdings = (useQuery(api.platform.holdings) ?? []) as HoldingRow[]
+  const { run: saveHolding, error, clearError } = useSafeMutation(api.platform.saveHolding)
+  const { run: removeHolding } = useSafeMutation(api.platform.removeHolding)
+  const [name, setName] = useState('')
+  const [open, setOpen] = useState<string | null>(null)
+  return (
+    <section className="mt-8">
+      <h2 className="text-sm font-semibold text-foreground">Holdings</h2>
+      <p className="mt-1 text-xs text-muted-foreground">
+        A holding groups companies. Its board members see every company and plant of the holding on the Board Dashboard and
+        the KPI / OEE dashboards — read only. Link a company to a holding on the company card above.
+      </p>
+      <ErrorBanner message={error} onDismiss={clearError} />
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <input className={`w-60 ${input}`} placeholder="New holding name" value={name} onChange={(e) => setName(e.target.value)} />
+        <button
+          className={btn}
+          disabled={!name.trim()}
+          onClick={async () => {
+            if (await saveHolding({ name: name.trim() })) setName('')
+          }}
+        >
+          Add holding
+        </button>
+      </div>
+      <div className="mt-3 space-y-3">
+        {holdings.map((h) => (
+          <div key={h._id} className="rounded-lg border border-border p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-semibold text-foreground">{h.name}</span>
+              <span className="text-xs text-muted-foreground">
+                Companies: {h.companies.map((c) => c.name).join(', ') || '— none yet —'}
+              </span>
+              <button className="ml-auto text-xs underline" onClick={() => setOpen(open === h._id ? null : h._id)}>
+                {open === h._id ? 'Hide board members' : 'Board members'}
+              </button>
+              <button
+                className="text-xs text-destructive hover:underline"
+                onClick={() => window.confirm(`Delete the holding ${h.name}? Its companies stay; its board members' accounts are removed.`) && void removeHolding({ id: h._id })}
+              >
+                Delete
+              </button>
+            </div>
+            {open === h._id && (
+              <div className="mt-2">
+                <CompanyUsers companyId={null} groups={[]} holdingId={h._id} />
+              </div>
+            )}
+          </div>
+        ))}
+        {!holdings.length && <p className="text-xs text-muted-foreground">No holding yet.{companies.length > 1 ? ' Add one to see several companies together.' : ''}</p>}
+      </div>
+    </section>
   )
 }

@@ -4,7 +4,7 @@ import { internal } from './_generated/api'
 import { internalMutation } from './_generated/server'
 import { TABLES, activePlant, userMutation, userQuery, visiblePlants } from './guarded'
 import { isPlantTable } from './plantDb'
-import { LEGACY_ROLE_GROUPS, MODULES, isPlatform, uniformPermissions } from '../src/lib/tenancy'
+import { LEGACY_ROLE_GROUPS, MODULES, isBoardUser, isPlatform, uniformPermissions } from '../src/lib/tenancy'
 
 /**
  * Şirket / fabrika bağlamı ve tek seferlik geçiş (docs/plant-genisletme.md).
@@ -184,10 +184,21 @@ export const context = userQuery({
   handler: async (ctx: Any) => {
     const user = ctx.sessionUser
     const state = await stateDoc(ctx.db)
+    const groups: Any[] = user.companyId
+      ? await ctx.db
+          .query('userGroups')
+          .withIndex('by_company', (q: Any) => q.eq('companyId', user.companyId))
+          .collect()
+      : []
+    const holding = user.holdingId ? await ctx.db.get(user.holdingId) : null
     const base = {
       platformRole: user.platformRole ?? null,
       isCreator: user.isCreator === true,
       companyId: user.companyId ?? null,
+      holdingId: user.holdingId ?? null,
+      holdingName: holding?.name ?? null,
+      // Board görünümü: yalnızca Board Dashboard ve KPI / OEE dashboard'ları.
+      isBoard: isBoardUser(user, groups),
     }
     if (!state?.value?.done) return { ...base, migration: { started: !!state, done: false }, plants: [], active: null }
     const plants = await visiblePlants(ctx.db, user)

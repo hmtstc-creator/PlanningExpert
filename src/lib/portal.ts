@@ -45,6 +45,13 @@ export const PORTAL_MODULES: PortalModule[] = [
     ready: true,
   },
   {
+    to: '/board',
+    module: 'kpi',
+    title: 'Board Dashboard',
+    description: 'Results and trends for the group, its companies and plants — KPI and OEE at a glance.',
+    ready: true,
+  },
+  {
     to: '/kpi',
     module: 'kpi',
     title: 'KPI',

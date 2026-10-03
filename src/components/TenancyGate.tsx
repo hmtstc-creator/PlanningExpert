@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '../../convex/_generated/api'
 import { useMutation, useQuery } from '../lib/convexTransport'
 import { friendlyError } from '../lib/mutationErrors'
-import { moduleOfPath, usePlant } from '../lib/plantContext'
+import { boardAllows, moduleOfPath, usePlant } from '../lib/plantContext'
 import { MODULE_LABELS } from '../lib/tenancy'
 
 /**
@@ -68,6 +68,18 @@ export function TenancyGate({ children }: { children: ReactNode }) {
             'Ask a creator of your company to add you to a group.'
           )}
         </p>
+      </div>
+    )
+  }
+
+  // Board görünümü: yalnızca özet ve dashboard'lar.
+  if (ctx.isBoard && !boardAllows(pathname)) {
+    return (
+      <div className="mx-auto w-full max-w-md px-4 py-16 text-center text-sm text-muted-foreground">
+        <p className="text-foreground">This page is not part of the board view.</p>
+        <Link to="/board" className="mt-2 inline-block underline">
+          Open the Board Dashboard
+        </Link>
       </div>
     )
   }

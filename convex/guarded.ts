@@ -80,9 +80,23 @@ async function groupsOf(db: Any, companyId: string): Promise<Any[]> {
 
 /** Kullanıcının görebildiği fabrikalar, izinleriyle. Ham (kilitsiz) veritabanı. */
 export async function visiblePlants(db: Any, user: Any): Promise<PlantContext[]> {
+  const holdingCompanies: Any[] =
+    !isPlatform(user) && user.holdingId && !user.companyId
+      ? await db
+          .query('companies')
+          .withIndex('by_holding', (q: Any) => q.eq('holdingId', user.holdingId))
+          .collect()
+      : []
+  const byCompany = async (companyId: string) =>
+    db
+      .query('plants')
+      .withIndex('by_company', (q: Any) => q.eq('companyId', companyId))
+      .collect()
   const plants: Any[] = isPlatform(user)
     ? await db.query('plants').collect()
-    : user.companyId
+    : holdingCompanies.length
+      ? (await Promise.all(holdingCompanies.map((c) => byCompany(c._id)))).flat()
+      : user.companyId
       ? await db
           .query('plants')
           .withIndex('by_company', (q: Any) => q.eq('companyId', user.companyId))

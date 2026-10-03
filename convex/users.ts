@@ -24,9 +24,10 @@ const levelValidator = v.union(...LEVELS.map((l) => v.literal(l)))
 const permissionsValidator = v.object(Object.fromEntries(MODULES.map((m) => [m, v.optional(levelValidator)])) as Any)
 
 /** Ekranda gösterilen rol adı (kayıttaki `role` alanı yalnızca bilgi). */
-function roleLabel(u: { platformRole?: string; isCreator?: boolean }) {
+function roleLabel(u: { platformRole?: string; isCreator?: boolean; holdingId?: string; companyId?: string }) {
   if (u.platformRole === 'owner') return 'owner'
   if (u.platformRole === 'general') return 'general'
+  if (u.holdingId && !u.companyId) return 'holding board'
   return u.isCreator ? 'creator' : 'member'
 }
 
@@ -43,8 +44,16 @@ function row(u: Any) {
     platformRole: u.platformRole ?? null,
     isCreator: u.isCreator === true,
     groupIds: u.groupIds ?? [],
+    holdingId: u.holdingId ?? null,
     role: roleLabel(u),
   }
+}
+
+/** Holding board üyesi (şirketsiz): yalnızca General yönetir. */
+const isHoldingUser = (u: Any) => !!u.holdingId && !u.companyId && !u.platformRole
+
+function requirePlatformUser(me: Any) {
+  if (!isPlatform(me)) throw new ConvexError('Only a General can manage holding board members')
 }
 
 function requireManager(me: Any, companyId: string | null | undefined) {
@@ -75,10 +84,18 @@ async function checkGroups(db: Any, companyId: string, groupIds: string[]) {
  * generaller — yalnızca platform görür).
  */
 export const list = userQuery({
-  args: { companyId: v.optional(v.union(v.id('companies'), v.null())) },
+  args: { companyId: v.optional(v.union(v.id('companies'), v.null())), holdingId: v.optional(v.id('holdings')) },
   returns: v.any(),
-  handler: async (ctx: Any, { companyId }: Any) => {
+  handler: async (ctx: Any, { companyId, holdingId }: Any) => {
     const me = ctx.sessionUser
+    if (holdingId) {
+      requirePlatformUser(me)
+      const users: Any[] = await ctx.db
+        .query('users')
+        .withIndex('by_holding', (q: Any) => q.eq('holdingId', holdingId))
+        .collect()
+      return users.filter(isHoldingUser).map(row)
+    }
     const target = companyId === undefined ? me.companyId : companyId
     if (!target) {
       if (!isPlatform(me)) throw new ConvexError('Only the platform can see platform users')
@@ -104,10 +121,21 @@ export const add = userMutation({
     email: v.optional(v.string()),
     isCreator: v.optional(v.boolean()),
     groupIds: v.optional(v.array(v.id('userGroups'))),
+    /** Holding board üyesi açılır (companyId null). */
+    holdingId: v.optional(v.id('holdings')),
   },
   returns: v.id('users'),
   handler: async (ctx: Any, args: Any) => {
     const me = ctx.sessionUser
+    if (args.holdingId) {
+      requirePlatformUser(me)
+      if (args.companyId) throw new ConvexError('A holding board member belongs to the holding, not to a company')
+      if (!(await ctx.db.get(args.holdingId))) throw new ConvexError('Holding not found')
+      const name = args.name.trim()
+      if (!name) throw new ConvexError('A name is required')
+      await nameFree(ctx.db, name)
+      return ctx.db.insert('users', { name, email: args.email?.trim() || undefined, active: true, createdAt: Date.now(), holdingId: args.holdingId, role: 'holding board' })
+    }
     requireManager(me, args.companyId)
     const name = args.name.trim()
     if (!name) throw new ConvexError('A name is required')
@@ -144,7 +172,8 @@ export const update = userMutation({
     const user = await ctx.db.get(args.id)
     if (!user) throw new ConvexError('User not found')
     if (user.platformRole === 'owner' && me._id !== user._id) throw new ConvexError('The site owner can only be changed by themselves')
-    requireManager(me, user.platformRole ? null : user.companyId)
+    if (isHoldingUser(user)) requirePlatformUser(me)
+    else requireManager(me, user.platformRole ? null : user.companyId)
     const name = args.name.trim()
     if (!name) throw new ConvexError('A name is required')
     await nameFree(ctx.db, name, args.id)
@@ -183,7 +212,8 @@ export const remove = userMutation({
     if (!user) return null
     if (user.platformRole === 'owner') throw new ConvexError('The site owner cannot be removed')
     if (id === me._id) throw new ConvexError('You cannot remove yourself')
-    requireManager(me, user.platformRole ? null : user.companyId)
+    if (isHoldingUser(user)) requirePlatformUser(me)
+    else requireManager(me, user.platformRole ? null : user.companyId)
     // Açık oturumlar da kapanır; eski kayıtlarda adı kalır.
     await signOut(ctx.db, id)
     await ctx.db.delete(id)
@@ -205,7 +235,11 @@ export const canSetPassword = internalQuery({
     const user = await ctx.db.get(userId)
     if (!me?.active || !user) return { ok: false, actor: '' }
     if (user.platformRole === 'owner') return { ok: me._id === user._id, actor: me.name }
-    const ok = user.platformRole ? me.platformRole === 'owner' : !!user.companyId && canManageCompany(me, user.companyId)
+    const ok = isHoldingUser(user)
+      ? isPlatform(me)
+      : user.platformRole
+        ? me.platformRole === 'owner'
+        : !!user.companyId && canManageCompany(me, user.companyId)
     return { ok, actor: me.name }
   },
 })
@@ -234,6 +268,8 @@ export const saveGroup = userMutation({
     allPlants: v.boolean(),
     plantIds: v.array(v.id('plants')),
     permissions: permissionsValidator,
+    /** Board grubu: üyeleri özet görünümde (Board Dashboard, KPI / OEE dashboard'ları). */
+    board: v.optional(v.boolean()),
   },
   returns: v.id('userGroups'),
   handler: async (ctx: Any, args: Any) => {
@@ -244,7 +280,7 @@ export const saveGroup = userMutation({
       const plant = await ctx.db.get(p)
       if (!plant || plant.companyId !== args.companyId) throw new ConvexError('A plant does not belong to this company')
     }
-    const doc = { companyId: args.companyId, name, allPlants: args.allPlants, plantIds: args.allPlants ? [] : args.plantIds, permissions: args.permissions }
+    const doc = { companyId: args.companyId, name, allPlants: args.allPlants, plantIds: args.allPlants ? [] : args.plantIds, permissions: args.permissions, board: args.board === true }
     if (args.id) {
       const old = await ctx.db.get(args.id)
       if (!old || old.companyId !== args.companyId) throw new ConvexError('Group not found')

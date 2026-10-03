@@ -31,7 +31,7 @@ function checkSlot(period: string, year: number, num: number) {
   if (!Number.isInteger(num) || num < 1 || num > max) throw new ConvexError(period === 'month' ? 'Choose a month' : 'Choose a week')
 }
 
-const entryOut = (e: Any) => ({
+export const entryOut = (e: Any) => ({
   period: e.period,
   year: e.year,
   num: e.num,
@@ -45,7 +45,7 @@ const entryOut = (e: Any) => ({
 })
 
 /** Bir dönemin OEE kök verisi, masraf yeri bazında (kilitli db: kendi fabrikası). */
-async function oeeSums(db: Any, slot: KpiSlot, plantId?: string) {
+export async function oeeSums(db: Any, slot: KpiSlot, plantId?: string) {
   const q = plantId
     ? db.query('oeeDays').withIndex('by_date', (r: Any) => r.eq('plantId', plantId).gte('date', slot.from).lte('date', slot.to))
     : db.query('oeeDays').withIndex('by_date', (r: Any) => r.gte('date', slot.from).lte('date', slot.to))

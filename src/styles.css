@@ -170,7 +170,8 @@
 }
 
 /* ---- KPI dashboard: tek A3 yatay sayfa (420 × 297 mm), ölçü sabit ---- */
-.kpi-sheet {
+.kpi-sheet,
+.kpi-paper {
   /* Kağıt: ekranda da yazdırmada da açık zemin; renkler açık temanın doğrulanmış dizisi. */
   --kpi-ink: #1d1d1b;
   --kpi-muted: #5f5e5a;
@@ -179,6 +180,8 @@
   --kpi-plan: #eb6834;
   --kpi-good: #13795b;
   --kpi-bad: #c0362c;
+}
+.kpi-sheet {
   width: 420mm;
   height: 297mm;
   box-sizing: border-box;
@@ -230,3 +233,13 @@
 .kpi-table .kpi-td-name { text-align: left; }
 .kpi-total td { font-weight: 700; border-top: 2px solid var(--kpi-ink); }
 .kpi-foot { font-size: 9.5px; color: var(--kpi-muted); border-top: 1px solid var(--kpi-line); padding-top: 1.5mm; }
+
+/* ---- Board Dashboard: KPI kağıdıyla aynı renkler, ekranda akışkan ---- */
+.kpi-paper { background: #ffffff; color: var(--kpi-ink); border: 1px solid var(--kpi-line); }
+.kpi-paper .kpi-card { min-height: 0; }
+/* Kartlar ekran genişliğine göre dizilir; grafik yüksekliği sabit (geniş ekranda büyümez). */
+.board-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.board-trend { height: 120px; margin-top: 4px; }
+.board-trend .kpi-trend { width: 100%; height: 100%; margin: 0; }
+.kpi-heat-good { background: #e3f2ec; color: var(--kpi-good) !important; }
+.kpi-heat-bad { background: #fbe5e3; color: var(--kpi-bad) !important; }

@@ -388,3 +388,77 @@ export const purge = internalMutation({
     return null
   },
 })
+
+// ---- Holding (grup): General açar, şirketleri bağlar ---------------------------------
+
+export const holdings = userQuery({
+  args: {},
+  returns: v.any(),
+  handler: async (ctx: Any) => {
+    requirePlatform(ctx.sessionUser)
+    const out: Any[] = []
+    for (const h of await ctx.db.query('holdings').collect()) {
+      const companies: Any[] = await ctx.db
+        .query('companies')
+        .withIndex('by_holding', (q: Any) => q.eq('holdingId', h._id))
+        .collect()
+      out.push({ ...h, companies: companies.map((c) => ({ _id: c._id, name: c.name })) })
+    }
+    return out
+  },
+})
+
+async function holdingNameFree(db: Any, name: string, except?: string) {
+  const all: Any[] = await db.query('holdings').collect()
+  if (all.some((h) => h._id !== except && h.name.trim().toLowerCase() === name.toLowerCase())) throw new ConvexError(`A holding named ${name} already exists`)
+}
+
+export const saveHolding = userMutation({
+  args: { id: v.optional(v.id('holdings')), name: v.string() },
+  returns: v.id('holdings'),
+  handler: async (ctx: Any, { id, name }: Any) => {
+    requirePlatform(ctx.sessionUser)
+    const n = name.trim()
+    if (!n) throw new ConvexError('A holding name is required')
+    await holdingNameFree(ctx.db, n, id)
+    if (id) {
+      await ctx.db.patch(id, { name: n })
+      return id
+    }
+    return ctx.db.insert('holdings', { name: n, createdAt: Date.now() })
+  },
+})
+
+/** Holding'i siler: şirketler holding'siz kalır, board üyelerinin hesabı kapanır. */
+export const removeHolding = userMutation({
+  args: { id: v.id('holdings') },
+  returns: v.null(),
+  handler: async (ctx: Any, { id }: Any) => {
+    requirePlatform(ctx.sessionUser)
+    for (const c of await ctx.db.query('companies').withIndex('by_holding', (q: Any) => q.eq('holdingId', id)).collect()) {
+      await ctx.db.patch(c._id, { holdingId: undefined })
+    }
+    for (const u of await ctx.db.query('users').withIndex('by_holding', (q: Any) => q.eq('holdingId', id)).collect()) {
+      if (u.companyId || u.platformRole) {
+        await ctx.db.patch(u._id, { holdingId: undefined })
+        continue
+      }
+      for (const s of await ctx.db.query('sessions').withIndex('by_user', (q: Any) => q.eq('userId', u._id)).collect()) await ctx.db.delete(s._id)
+      await ctx.db.delete(u._id)
+    }
+    await ctx.db.delete(id)
+    return null
+  },
+})
+
+/** Şirketi bir holding'e bağlar ya da ayırır (null). */
+export const setCompanyHolding = userMutation({
+  args: { companyId: v.id('companies'), holdingId: v.union(v.id('holdings'), v.null()) },
+  returns: v.null(),
+  handler: async (ctx: Any, { companyId, holdingId }: Any) => {
+    requirePlatform(ctx.sessionUser)
+    if (holdingId && !(await ctx.db.get(holdingId))) throw new ConvexError('Holding not found')
+    await ctx.db.patch(companyId, { holdingId: holdingId ?? undefined })
+    return null
+  },
+})

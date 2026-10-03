@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlarmsRouteImport } from './routes/alarms'
+import { Route as BoardRouteImport } from './routes/board'
 import { Route as CapacityRouteImport } from './routes/capacity'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as DepolarRouteImport } from './routes/depolar'
@@ -60,6 +61,11 @@ const IndexRoute = IndexRouteImport.update({
 const AlarmsRoute = AlarmsRouteImport.update({
   id: '/alarms',
   path: '/alarms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoardRoute = BoardRouteImport.update({
+  id: '/board',
+  path: '/board',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CapacityRoute = CapacityRouteImport.update({
@@ -268,6 +274,7 @@ const KpiWeeklyEntryRoute = KpiWeeklyEntryRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alarms': typeof AlarmsRoute
+  '/board': typeof BoardRoute
   '/capacity': typeof CapacityRoute
   '/compare': typeof CompareRoute
   '/depolar': typeof DepolarRoute
@@ -312,6 +319,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alarms': typeof AlarmsRoute
+  '/board': typeof BoardRoute
   '/capacity': typeof CapacityRoute
   '/compare': typeof CompareRoute
   '/depolar': typeof DepolarRoute
@@ -357,6 +365,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alarms': typeof AlarmsRoute
+  '/board': typeof BoardRoute
   '/capacity': typeof CapacityRoute
   '/compare': typeof CompareRoute
   '/depolar': typeof DepolarRoute
@@ -403,6 +412,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/alarms'
+    | '/board'
     | '/capacity'
     | '/compare'
     | '/depolar'
@@ -447,6 +457,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/alarms'
+    | '/board'
     | '/capacity'
     | '/compare'
     | '/depolar'
@@ -491,6 +502,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/alarms'
+    | '/board'
     | '/capacity'
     | '/compare'
     | '/depolar'
@@ -536,6 +548,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlarmsRoute: typeof AlarmsRoute
+  BoardRoute: typeof BoardRoute
   CapacityRoute: typeof CapacityRoute
   CompareRoute: typeof CompareRoute
   DepolarRoute: typeof DepolarRoute
@@ -592,6 +605,13 @@ declare module '@tanstack/react-router' {
       path: '/alarms'
       fullPath: '/alarms'
       preLoaderRoute: typeof AlarmsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/board': {
+      id: '/board'
+      path: '/board'
+      fullPath: '/board'
+      preLoaderRoute: typeof BoardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/capacity': {
@@ -880,6 +900,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlarmsRoute: AlarmsRoute,
+  BoardRoute: BoardRoute,
   CapacityRoute: CapacityRoute,
   CompareRoute: CompareRoute,
   DepolarRoute: DepolarRoute,

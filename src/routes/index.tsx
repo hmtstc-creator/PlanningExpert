@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, Navigate } from '@tanstack/react-router'
 
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
@@ -17,8 +17,10 @@ export const Route = createFileRoute('/')({
  */
 function PortalHome() {
   const { ctx, can, canManage, isPlatform } = usePlant()
+  // Board görünümü doğrudan Board Dashboard'la açılır.
+  if (ctx?.isBoard) return <Navigate to="/board" />
   // Yalnızca bu fabrikada izni olan modüller.
-  const modules = PORTAL_MODULES.filter((m) => !m.module || can(m.module))
+  const modules = PORTAL_MODULES.filter((m) => (m.to === '/board' ? can('kpi') || can('oee') : !m.module || can(m.module)))
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
       <h1 className="text-2xl font-bold text-foreground">Production Portal</h1>
