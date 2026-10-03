@@ -215,7 +215,7 @@ export const updateField = guardedMutation({
     ]
 
     if (field === 'flexiblePress') {
-      const on = value === true || value === 1 || ['yes', 'true', '1', 'x'].includes(String(value).toLowerCase())
+      const on = value === 1 || ['yes', 'true', '1', 'x'].includes(String(value).toLowerCase())
       await ctx.db.patch(id, { flexiblePress: on ? true : undefined })
       return null
     }

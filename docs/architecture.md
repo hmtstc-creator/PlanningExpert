@@ -147,6 +147,10 @@ Bunlar kodu değiştiren herkes (ve Claude) için bağlayıcıdır.
    kodunu import etmez, kuralı kendisi yeniden yazar.
 
 ### Sunucu
+9a. Yeni handler bağlamı `Any` ile işaretlemez: `guardedQuery` /
+    `guardedMutation` tipli bağlam verir (`GuardedQueryCtx`, kilitli
+    veritabanı tipi `convex/lockedDbTypes.ts`). Tablo, alan ve indeks adı
+    derlemede denetlenir.
 9. Her fonksiyon `guardedQuery` / `guardedMutation`; korumasız `query(` yok
    (istisnalar yalnızca `auth.ts`, `authInternal.ts`).
 10. Kullanıcıya gidecek hata `throw new ConvexError('…')`; düz `Error`

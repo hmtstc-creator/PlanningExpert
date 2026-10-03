@@ -3,6 +3,8 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { PLATFORM_TABLES } from './plantDb'
+
 /**
  * Yetki denetiminin kaynak düzeyinde korunması.
  *
@@ -109,6 +111,13 @@ describe('sunucu tarafı yetki denetimi', () => {
       if (!hit) continue
       expect(allowed[name], `${name}: ${hit[1]} fabrika kilidini atlar`).toBeDefined()
     }
+  })
+
+  it('kilitli veritabanı tipi platform tablolarını çalışma zamanıyla aynı bilir', () => {
+    // lockedDbTypes.ts'teki PlatformTable birliği plantDb.ts'teki PLATFORM_TABLES ile aynı olmalı:
+    // biri eksik kalırsa indeks aralığı tipte yanlış alandan başlar.
+    const typed = [...readFileSync(join('convex', 'lockedDbTypes.ts'), 'utf-8').matchAll(/\| '(\w+)'/g)].map((m) => m[1]).sort()
+    expect(typed).toEqual([...PLATFORM_TABLES].sort())
   })
 
   it('her koruma sarmalayıcısı içe aktarılmış', () => {

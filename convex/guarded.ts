@@ -1,6 +1,10 @@
 import { ConvexError, v } from 'convex/values'
 
+import type { Scheduler, StorageReader, StorageWriter } from 'convex/server'
+import type { ObjectType, PropertyValidators } from 'convex/values'
+
 import { internalMutation, internalQuery, mutation, query } from './_generated/server'
+import type { Doc, LockedDb } from './lockedDbTypes'
 import { requireSession } from './authGuard'
 import { plantDb } from './plantDb'
 import { requestRecompute } from './planQueue'
@@ -172,8 +176,34 @@ function scopedCtx(ctx: Any, c: { user: Any; plant: Any; company: Any; access: A
   }
 }
 
+/**
+ * Korumalı işlevin bağlamı: fabrikaya kilitli tipli veritabanı, seçili
+ * fabrika, şirket, izinler ve oturumdaki kullanıcı.
+ */
+export interface GuardedQueryCtx {
+  db: LockedDb
+  plantId: Doc<'plants'>['_id']
+  plant: Doc<'plants'>
+  company: Doc<'companies'>
+  access: Access
+  sessionUser: Doc<'users'>
+  storage: StorageReader
+}
+
+export interface GuardedMutationCtx extends Omit<GuardedQueryCtx, 'storage'> {
+  storage: StorageWriter
+  scheduler: Scheduler
+}
+
+interface GuardedSpec<A extends PropertyValidators, C> {
+  modules?: readonly Module[]
+  args: A
+  returns?: Any
+  handler: (ctx: C, args: ObjectType<A>) => Any
+}
+
 /** Fabrika verisini okuyan sorgu: modüllerden birinde en az "görür". */
-export function guardedQuery(spec: Any): Any {
+export function guardedQuery<A extends PropertyValidators>(spec: GuardedSpec<A, GuardedQueryCtx>): Any {
   const { modules: _m, ...definition } = spec
   const modules = needModules(spec)
   return query({
@@ -191,7 +221,10 @@ export function guardedQuery(spec: Any): Any {
  * Yazma işlemi: modüllerden birinde "düzenler". Askıdaki şirkette kimse
  * düzenleyemez (izinler "görür"e iner).
  */
-export function guardedMutation(spec: Any, opts: { companyAdmin?: boolean } = {}): Any {
+export function guardedMutation<A extends PropertyValidators>(
+  spec: GuardedSpec<A, GuardedMutationCtx> & { affectsPlan?: boolean },
+  opts: { companyAdmin?: boolean } = {},
+): Any {
   // `affectsPlan: false` — planın okumadığı veriyi yazan işlevler (kullanıcılar,
   // kalıp problemleri, sözlükler…) planı yeniden hesaplatmaz.
   const { affectsPlan = true, modules: _m, ...definition } = spec

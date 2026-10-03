@@ -235,10 +235,16 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   `planValidator.ts` 2005, `takvim.tsx` 1371, `platform.tsx` ~1200 satır.
   İncelemek ve değiştirmek zor.
   → Sayfaları bileşenlere, motoru kural modüllerine böl.
-- [ ] **P1 — Sunucuda tip yok.** 11 Convex dosyasında `type Any = any`;
-  alan adı yazım hatası derlemede yakalanmıyor.
-  → Convex'in ürettiği tipleri (`DataModel`) kullan, `Any`'yi kademeli
-  kaldır, ESLint ekle (projede lint yok).
+- [ ] **P1 — Sunucuda tip yok.** (Kısmen düzeltildi, 2026-10-03.)
+  - [x] ✅ Korumalı işlevler (`guardedQuery` / `guardedMutation`) tipli
+    bağlam alır: fabrikaya kilitli veritabanı tipi (convex/lockedDbTypes.ts)
+    tablo, alan ve indeks adını denetler; `plantId` indekste atlanır
+    (kilit doldurur). Açık parametreli 100 handler artık derlemede
+    denetleniyor (bulunan tek sorun ölü bir koşuldu, temizlendi).
+  - [ ] **[G]** Bağlamı elle `Any` işaretli 80 handler (platform, oee,
+    planRuns, users, overtime, tenancy, sapUploads, kpi …) dosya dosya
+    tipliye çevrilecek; `userQuery` / `userMutation` da tiplenecek.
+  - [ ] **[G]** ESLint (projede lint yok).
 - [ ] **P2 — Ad karmaşası.** (Menüde kalan "Presses" → "Work Centers"
   düzeltildi, 2026-10-03.) Ekran "work center" diyor; tablo `presses`,
   alan `press`. Rotalar Türkçe (`/makineler`, `/takvim`, `/referanslar`),

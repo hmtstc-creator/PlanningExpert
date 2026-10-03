@@ -5,8 +5,7 @@
 
 import { v } from 'convex/values'
 
-import type { QueryCtx } from './_generated/server'
-import { ALL_MODULES, guardedQuery } from './guarded'
+import { ALL_MODULES, guardedQuery, type GuardedQueryCtx } from './guarded'
 
 /** Sayım üst sınırı — büyük tablolarda bant genişliğini korur. */
 const COUNT_LIMIT = 5000
@@ -40,7 +39,7 @@ const TABLES = [
 
 type TableName = (typeof TABLES)[number]
 
-async function tableStats(ctx: QueryCtx, table: TableName) {
+async function tableStats(ctx: GuardedQueryCtx, table: TableName) {
   const rows = await ctx.db.query(table).take(COUNT_LIMIT + 1)
   const capped = rows.length > COUNT_LIMIT
   const lastWrite = rows.reduce<number | null>(
