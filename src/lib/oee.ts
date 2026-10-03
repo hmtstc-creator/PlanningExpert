@@ -208,7 +208,7 @@ export const EMPTY_CONFIG: OeeConfig = {
 }
 
 /**
- * Fabrikanın masraf yerleri (Companies and plants → Plant → Cost centers;
+ * Fabrikanın masraf yerleri (Companies and plants → Plant → Department → Cost centers;
  * creator tanımlar) tek kaynaktır: hangi masraf yerleri var ve adları oradan
  * gelir; OEE ayarı yalnızca alanı (area) tutar. Fabrikada olmayan kod OEE'de
  * yoktur. Alanı seçilmemiş masraf yeri "Unassigned" alanında yine hesaba girer.
@@ -222,7 +222,7 @@ export function withPlantCostCenters(c: OeeConfig, plant: { code: string; name: 
 export function configProblems(c: OeeConfig): string[] {
   const out: string[] = []
   if (!c.areas.length) out.push('No area is defined.')
-  if (!c.costCenters.length) out.push('The plant has no cost center — a creator adds them on Companies and plants (Company → Plant → Cost centers).')
+  if (!c.costCenters.length) out.push('The plant has no cost center — a creator adds them on Companies and plants (Plant → Department → Cost centers).')
   const areas = new Set(c.areas.map((a) => a.name))
   const noArea = c.costCenters.filter((x) => !areas.has(x.area)).map((x) => x.code)
   if (noArea.length) out.push(`Cost center ${noArea.join(', ')} has no area.`)
@@ -1594,7 +1594,7 @@ export function lossCoverage(days: DayRow[], lossDays: LossDay[], scope: Scope, 
 
 /**
  * Yüklenen dosyadan yalnızca seçili fabrikanın masraf yerlerinin satırları
- * (Company → Plant → Cost center; masraf yerlerini creator tanımlar). Aynı
+ * (Plant → Department → Cost center; masraf yerlerini creator tanımlar). Aynı
  * dosyada başka fabrikaların satırları olabilir: atlanır ve sayılır.
  * Sipariş satırlarında masraf yeri yok: iş merkezi, dosyada bu fabrikanın
  * masraf yerlerinde görülen iş merkezlerindense alınır.

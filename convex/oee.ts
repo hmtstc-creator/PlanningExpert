@@ -66,7 +66,7 @@ const dayDoc = (d: Ctx) => ({
 
 /** Vardiyalar: ekle ya da güncelle; etkilenen günlerin toplamı yeniden hesaplanır. */
 /**
- * Yalnızca seçili fabrikanın masraf yerleri (Company → Plant → Cost center).
+ * Yalnızca seçili fabrikanın masraf yerleri (Plant → Department → Cost center).
  * Ekran zaten süzer; bu sunucu tarafı güvencesi: başka fabrikanın satırı
  * bu fabrikaya yazılamaz.
  */

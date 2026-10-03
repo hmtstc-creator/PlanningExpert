@@ -18,7 +18,7 @@ seçilebilsin; masraf yerleri fabrikanınkiler, kök veri aynı.
 ## Veri
 
 - Kayıt: fabrika × dönem (ay ya da ISO hafta) × masraf yeri (`kpiEntries`).
-  Masraf yerleri fabrikanınkiler (Company → Plant → Cost center, creator
+  Masraf yerleri fabrikanınkiler (Plant → Department → Cost center, creator
   tanımlar); başka kod kaydedilmez.
 - Bir masraf yerinin **birden çok satırı** olabilir: "+ line" ile eklenir,
   her satırda operatör tipi **Direct / Indirect** seçilir (ör. Transfer

@@ -182,9 +182,9 @@ function OeeSettingsPage() {
         </button>
       </Card>
 
-      <Card title="Cost centers" info="The cost centers of this plant and the area each belongs to. Which cost centers a plant has, and their names, a creator defines on Companies and plants (Company → Plant → Cost centers); every one of them counts in the OEE pages — one without an area under Unassigned. Machines are read from the data.">
+      <Card title="Cost centers" info="The cost centers of this plant and the area each belongs to. Which cost centers a plant has, and their names, a creator defines on Companies and plants (Plant → Department → Cost centers); every one of them counts in the OEE pages — one without an area under Unassigned. Machines are read from the data.">
         <Rows
-          empty="This plant has no cost center yet — a creator adds them on Companies and plants (Company → Plant → Cost centers)."
+          empty="This plant has no cost center yet — a creator adds them on Companies and plants (Plant → Department → Cost centers)."
           head={['Code', 'Machines in the data', 'Name', 'Area']}
           rows={c.costCenters.map((cc, i) => [
             cc.code,

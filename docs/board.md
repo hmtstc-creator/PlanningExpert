@@ -46,7 +46,56 @@ yükleme / veri girişi düğmeleri görünmez. Sunucu da yazmaya izin vermez.
 - Hesap KPI ile aynı: saat ve adet toplanır, oran toplamdan; girilen
   yüzdeler / değerler saatle ağırlıklı (docs/kpi.md → Açık notlar).
 
+## Organizasyon ağacı (2026-10-03)
+
+Planlamacı: "ilişki yapısını güçlendir; tepeden aşağı kurulsun, her şey için
+önce holding tanımı gerekir; kullanıcıları her seviyenin altında görelim."
+
+```
+Holding → Company → Plant → Department → Cost center
+```
+
+Kararlar:
+
+1. **Şirket kalır** (kiralama birimi: kullanıcılar, gruplar, creator'lar,
+   modüller, askıya alma). Ağaçta holding'in altında görünür.
+2. **Holding zorunlu:** şirket yalnızca bir holding'in içinde açılır
+   (`createCompany` holding ister); şirket holding'siz bırakılamaz, yalnızca
+   başka holding'e taşınır. Şirketi olan holding silinmez. Eski holding'siz
+   şirketler ağaçta "No holding" altında uyarıyla durur.
+3. **Bölüm (Department)** plant'in altında yeni seviye
+   (`plants.departments`, sıralı ad listesi). **Her masraf yeri bir bölüme
+   aittir** (`costCenters[].department`): yeni masraf yeri bölümsüz
+   kaydedilmez; masraf yeri olan bölüm silinmez; bölümün adı değişince
+   masraf yerleri yeni adla gelir. Bölümden önceki masraf yerleri
+   "Without a department" altında, bir bölüme taşınana kadar kalır (verileri
+   kodla bağlı, kod değişmez).
+4. Bölüm ile OEE **Area** ayrı kalır (OEE Settings değişmedi); birleştirmek
+   sonra konuşulacak.
+5. Yetki seviyesi değişmedi: erişim plant × modül (gruplar). Bölüm ve masraf
+   yeri seviyesinde ayrı yetki yok.
+
+Ekran (Companies and plants): solda ağaç (diyagram; renkli harf: H, C, P, D,
+CC), sağda (telefonda altta) seçili düğümün paneli:
+
+| Düğüm | Panel |
+|---|---|
+| Holding | ad, şirketler tablosu, şirket ekle, holding board üyeleri |
+| Company | ad, holding, askıya alma, modüller, dışa aktarım; sekmeler: Plants · Users & access (kullanıcı × plant izin matrisi + hesaplar) · Groups |
+| Plant | ad / ülke / saat dilimi, kapatılan modüller, bölüm kartları, bölüm ekle, bu plant'i gören kullanıcılar ve modül izinleri |
+| Department | ad, masraf yerleri tablosu (ad, bölüm değiştirme, kaldırma), masraf yeri ekle |
+
+Üstte "things to finish" listesi: holding'siz şirket, şirketsiz holding,
+aynı adlı iki plant, bölümsüz plant, masraf yeri olmayan bölüm, bölümsüz
+masraf yeri. Kural kodu: `src/lib/orgTree.ts` (+ test), sunucu:
+`convex/platform.ts`.
+
 ## Sonra konuşulacak
+
+- Board Dashboard ve KPI kırılımında bölüm seviyesi (plant → bölüm → masraf
+  yeri).
+- Bölüm = OEE Area birleştirmesi.
+- Bölüm sorumlusu (kullanıcıyı bölüme atama) gerekir mi?
 
 - Board Dashboard'un A3 / PDF çıktısı (KPI dashboard'undaki gibi).
 - Holding'e plan / hedef (ör. grup OEE hedefi) girilsin mi, yoksa yalnızca

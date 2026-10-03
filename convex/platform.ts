@@ -7,7 +7,8 @@ import { isPlantTable } from './plantDb'
 import { MODULES, canManageCompany, isPlatform } from '../src/lib/tenancy'
 
 /**
- * Platform ve şirket yapısı (docs/plant-genisletme.md, v3):
+ * Platform ve şirket yapısı (docs/plant-genisletme.md, v3; ağaç: docs/board.md):
+ * Holding → Company → Plant → Department → Cost center, tepeden aşağı kurulur.
  * - General: şirket açar, askıya alır, modül (kiralama paketi) açar/kapar,
  *   bütün şirketleri görür.
  * - Creator: kendi şirketine fabrika ekler ve fabrikayı düzenler.
@@ -21,16 +22,39 @@ type Any = any
 export const DELETE_AFTER_DAYS = 90
 
 const moduleList = v.array(v.union(...MODULES.map((m) => v.literal(m))))
-const costCenterList = v.array(v.object({ code: v.string(), name: v.string() }))
+const costCenterList = v.array(v.object({ code: v.string(), name: v.string(), department: v.optional(v.string()) }))
 
-/** Masraf yerleri: kod zorunlu ve fabrikada tek; ad boşsa kod. */
-function checkCostCenters(list: { code: string; name: string }[]) {
-  const out: { code: string; name: string }[] = []
+type CostCenter = { code: string; name: string; department?: string }
+
+/** Bölümler: ad zorunlu ve fabrikada tek (büyük/küçük harf fark etmez). */
+function checkDepartments(list: string[]) {
+  const out: string[] = []
+  for (const raw of list) {
+    const name = raw.trim()
+    if (!name) throw new ConvexError('A department needs a name')
+    if (out.some((x) => x.toLowerCase() === name.toLowerCase())) throw new ConvexError(`Department ${name} is listed twice`)
+    out.push(name)
+  }
+  return out
+}
+
+/**
+ * Masraf yerleri: kod zorunlu ve fabrikada tek; ad boşsa kod. Bölüm verilirse
+ * fabrikanın bölümlerinden biri olmalı; yeni eklenen masraf yeri (önceki
+ * listede olmayan kod) bölümsüz kaydedilmez — her masraf yeri bir bölüme
+ * aittir. Eski bölümsüz kayıtlar bir bölüme taşınana kadar kalabilir.
+ */
+function checkCostCenters(list: CostCenter[], departments: string[], before: CostCenter[]) {
+  const known = new Set(before.map((c) => c.code))
+  const out: CostCenter[] = []
   for (const cc of list) {
     const code = cc.code.trim()
     if (!code) throw new ConvexError('A cost center needs a code')
     if (out.some((x) => x.code === code)) throw new ConvexError(`Cost center ${code} is listed twice`)
-    out.push({ code, name: cc.name.trim() || code })
+    const department = cc.department?.trim() || undefined
+    if (department && !departments.includes(department)) throw new ConvexError(`Cost center ${code}: department ${department} is not a department of this plant`)
+    if (!department && !known.has(code)) throw new ConvexError(`Cost center ${code}: choose its department`)
+    out.push({ code, name: cc.name.trim() || code, ...(department ? { department } : {}) })
   }
   return out
 }
@@ -95,8 +119,10 @@ export const companies = userQuery({
         .query('users')
         .withIndex('by_company', (q: Any) => q.eq('companyId', c._id))
         .collect()
+      const holding = c.holdingId ? await ctx.db.get(c.holdingId) : null
       out.push({
         ...c,
+        holdingName: holding?.name ?? null,
         plants,
         userCount: users.length,
         creators: users.filter((u: Any) => u.isCreator).map((u: Any) => u.name),
@@ -106,14 +132,16 @@ export const companies = userQuery({
   },
 })
 
+/** Şirket bir holding'in altında açılır: önce holding tanımlanır. */
 export const createCompany = userMutation({
-  args: { name: v.string(), modules: moduleList },
+  args: { name: v.string(), modules: moduleList, holdingId: v.id('holdings') },
   returns: v.id('companies'),
-  handler: async (ctx: Any, { name, modules }: Any) => {
+  handler: async (ctx: Any, { name, modules, holdingId }: Any) => {
     requirePlatform(ctx.sessionUser)
+    if (!(await ctx.db.get(holdingId))) throw new ConvexError('Holding not found — add the holding first')
     if (!name.trim()) throw new ConvexError('A company name is required')
     await companyNameFree(ctx.db, name.trim())
-    return ctx.db.insert('companies', { name: name.trim(), status: 'active', modules, createdAt: Date.now() })
+    return ctx.db.insert('companies', { name: name.trim(), status: 'active', modules, holdingId, createdAt: Date.now() })
   },
 })
 
@@ -150,6 +178,7 @@ export const createPlant = userMutation({
     code: v.optional(v.string()),
     country: v.string(),
     timeZone: v.string(),
+    departments: v.optional(v.array(v.string())),
     costCenters: v.optional(costCenterList),
   },
   returns: v.id('plants'),
@@ -161,12 +190,14 @@ export const createPlant = userMutation({
     if (!args.name.trim()) throw new ConvexError('A plant name is required')
     await plantNameFree(ctx.db, args.companyId, args.name.trim())
     const locale = checkLocale(args.country, args.timeZone)
+    const departments = checkDepartments(args.departments ?? [])
     return ctx.db.insert('plants', {
       companyId: args.companyId,
       name: args.name.trim(),
       code: args.code?.trim() || undefined,
       ...locale,
-      costCenters: checkCostCenters(args.costCenters ?? []),
+      departments,
+      costCenters: checkCostCenters(args.costCenters ?? [], departments, []),
       createdAt: Date.now(),
     })
   },
@@ -181,6 +212,7 @@ export const updatePlant = userMutation({
     timeZone: v.optional(v.string()),
     /** Yalnızca General değiştirebilir. */
     disabledModules: v.optional(moduleList),
+    departments: v.optional(v.array(v.string())),
     costCenters: v.optional(costCenterList),
   },
   returns: v.null(),
@@ -193,12 +225,25 @@ export const updatePlant = userMutation({
     await plantNameFree(ctx.db, plant.companyId, args.name.trim(), args.id)
     const patch: Any = {
       name: args.name.trim(),
-      code: args.code?.trim() || undefined,
+      // Kod gönderilmezse dokunulmaz (ekran kodu göndermiyor).
+      ...(args.code !== undefined ? { code: args.code.trim() || undefined } : {}),
       ...(args.country?.trim() || args.timeZone?.trim()
         ? checkLocale(args.country ?? plant.country ?? '', args.timeZone ?? plant.timeZone ?? '')
         : {}),
     }
-    if (args.costCenters !== undefined) patch.costCenters = checkCostCenters(args.costCenters)
+    const departments = args.departments !== undefined ? checkDepartments(args.departments) : (plant.departments ?? [])
+    if (args.departments !== undefined) patch.departments = departments
+    // Bölüm listesi değişince masraf yerleri de yeniden denetlenir (silinen bölümde masraf yeri kalmasın).
+    const costCenters = args.costCenters ?? (args.departments !== undefined ? plant.costCenters : undefined)
+    if (costCenters !== undefined) {
+      const before: CostCenter[] = plant.costCenters ?? []
+      for (const cc of before) {
+        if (cc.department && !departments.includes(cc.department) && costCenters.some((x: CostCenter) => x.code === cc.code && x.department === cc.department)) {
+          throw new ConvexError(`Department ${cc.department} still has cost centers — move or remove them first`)
+        }
+      }
+      patch.costCenters = checkCostCenters(costCenters, departments, before)
+    }
     if (args.disabledModules !== undefined) {
       const same = JSON.stringify([...args.disabledModules].sort()) === JSON.stringify([...(plant.disabledModules ?? [])].sort())
       if (!same) {
@@ -429,15 +474,17 @@ export const saveHolding = userMutation({
   },
 })
 
-/** Holding'i siler: şirketler holding'siz kalır, board üyelerinin hesabı kapanır. */
+/**
+ * Holding'i siler: yalnızca şirketi kalmadıysa (şirketler holding'siz
+ * kalmaz); board üyelerinin hesabı kapanır.
+ */
 export const removeHolding = userMutation({
   args: { id: v.id('holdings') },
   returns: v.null(),
   handler: async (ctx: Any, { id }: Any) => {
     requirePlatform(ctx.sessionUser)
-    for (const c of await ctx.db.query('companies').withIndex('by_holding', (q: Any) => q.eq('holdingId', id)).collect()) {
-      await ctx.db.patch(c._id, { holdingId: undefined })
-    }
+    const companies: Any[] = await ctx.db.query('companies').withIndex('by_holding', (q: Any) => q.eq('holdingId', id)).collect()
+    if (companies.length) throw new ConvexError(`The holding still has ${companies.length} compan${companies.length === 1 ? 'y' : 'ies'} — move them to another holding first`)
     for (const u of await ctx.db.query('users').withIndex('by_holding', (q: Any) => q.eq('holdingId', id)).collect()) {
       if (u.companyId || u.platformRole) {
         await ctx.db.patch(u._id, { holdingId: undefined })
@@ -451,14 +498,14 @@ export const removeHolding = userMutation({
   },
 })
 
-/** Şirketi bir holding'e bağlar ya da ayırır (null). */
+/** Şirketi bir holding'e bağlar ya da başka holding'e taşır (holding'siz bırakılmaz). */
 export const setCompanyHolding = userMutation({
-  args: { companyId: v.id('companies'), holdingId: v.union(v.id('holdings'), v.null()) },
+  args: { companyId: v.id('companies'), holdingId: v.id('holdings') },
   returns: v.null(),
   handler: async (ctx: Any, { companyId, holdingId }: Any) => {
     requirePlatform(ctx.sessionUser)
-    if (holdingId && !(await ctx.db.get(holdingId))) throw new ConvexError('Holding not found')
-    await ctx.db.patch(companyId, { holdingId: holdingId ?? undefined })
+    if (!(await ctx.db.get(holdingId))) throw new ConvexError('Holding not found')
+    await ctx.db.patch(companyId, { holdingId })
     return null
   },
 })

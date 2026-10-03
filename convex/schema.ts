@@ -40,10 +40,16 @@ export default defineSchema({
     /** Bu fabrikada kapatılan modüller. */
     disabledModules: v.optional(v.array(v.string())),
     /**
-     * Fabrikanın masraf yerleri (SAP cost center kodu + adı). Tek kaynak:
-     * OEE ve diğer modüller adı buradan okur (Company → Plant → Cost center).
+     * Fabrikanın bölümleri (ör. Stamping, Welding), sıralı. Her masraf yeri
+     * bir bölüme aittir (Holding → Company → Plant → Department → Cost center).
      */
-    costCenters: v.optional(v.array(v.object({ code: v.string(), name: v.string() }))),
+    departments: v.optional(v.array(v.string())),
+    /**
+     * Fabrikanın masraf yerleri (SAP cost center kodu + adı + bölümü). Tek
+     * kaynak: OEE ve diğer modüller adı buradan okur. Bölümsüz olanlar eski
+     * kayıtlar (ekranda "Unassigned").
+     */
+    costCenters: v.optional(v.array(v.object({ code: v.string(), name: v.string(), department: v.optional(v.string()) }))),
     createdAt: v.number(),
   }).index('by_company', ['companyId']),
 

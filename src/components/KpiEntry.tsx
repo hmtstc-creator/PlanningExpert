@@ -148,7 +148,7 @@ export function KpiEntryPage({ period }: { period: KpiPeriod }) {
         info={
           <>
             <p>
-              The cost centers are those of the plant (Companies and plants → Plant → Cost centers). A cost center can have
+              The cost centers are those of the plant (Companies and plants → Plant → Department → Cost centers). A cost center can have
               several lines — e.g. one Direct and one Indirect line: press “+ line” and choose the type.
             </p>
             <p>

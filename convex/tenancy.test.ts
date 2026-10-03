@@ -21,6 +21,11 @@ async function session(t: Any, userId: string, token: string) {
   return token
 }
 
+/** Şirket bir holding'in altında açılır. */
+async function holding(t: Any, token: string, name = 'Group') {
+  return t.mutation(anyApi.platform.saveHolding, { token, name })
+}
+
 async function settle(t: Any) {
   // Geçişin arka plan işlerini bitir (plan motoru bu testte yok: zamanlanmış hesap atlanır).
   for (let i = 0; i < 50; i++) {
@@ -95,7 +100,7 @@ describe('fabrika ayrımı', () => {
     await settle(t)
 
     // General (owner) ikinci şirketi ve fabrikasını açar, creator atar.
-    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning', 'oee', 'die', 'machine'] })
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning', 'oee', 'die', 'machine'], holdingId: await holding(t, boss, 'H Other') })
     const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
     const cr2 = await t.mutation(api.users.add, { token: boss, companyId: c2, name: 'cr2', isCreator: true })
     const other = await session(t, cr2, 'cr2')
@@ -167,7 +172,7 @@ describe('fabrika ayrımı', () => {
     const boss = await session(t, u.admin, 'boss')
     await t.mutation(api.tenancy.startMigration, { token: boss })
     await settle(t)
-    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning'] })
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning'], holdingId: await holding(t, boss, 'H Other') })
     const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
     const cr2 = await t.mutation(api.users.add, { token: boss, companyId: c2, name: 'cr2', isCreator: true })
     const other = await session(t, cr2, 'cr2')
@@ -212,7 +217,7 @@ describe('fabrika ayrımı', () => {
     const boss = await session(t, u.admin, 'boss')
     await t.mutation(api.tenancy.startMigration, { token: boss })
     await settle(t)
-    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning', 'oee'] })
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning', 'oee'], holdingId: await holding(t, boss, 'H Other') })
     const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
     const day = (plantId: string, op: number) => ({
       plantId, date: '2026-09-21', plantKey: '', responsible: '', costCenter: 'X', workCenter: 'W', source: 'shiftly',
@@ -240,7 +245,7 @@ describe('fabrika ayrımı', () => {
     const c = await t.query(api.tenancy.context, { token: boss })
     const companyId = c.plants[0].companyId
     const plant1 = c.plants[0]._id
-    const plant2 = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Plant 2', country: 'RO', timeZone: 'Europe/Bucharest', costCenters: [{ code: '51010171', name: 'Transfer' }] })
+    const plant2 = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Plant 2', country: 'RO', timeZone: 'Europe/Bucharest', departments: ['Stamping'], costCenters: [{ code: '51010171', name: 'Transfer', department: 'Stamping' }] })
     const board = await t.mutation(api.users.saveGroup, { token: boss, companyId, name: 'Board members', allPlants: true, plantIds: [], permissions: { planning: 'view', oee: 'view', die: 'view', machine: 'view' } })
     const pm = await t.mutation(api.users.saveGroup, { token: boss, companyId, name: 'Plant manager — Plant 2', allPlants: false, plantIds: [plant2], permissions: { planning: 'view', oee: 'edit', die: 'view', machine: 'view' } })
     const b = await session(t, await t.mutation(api.users.add, { token: boss, companyId, name: 'board', groupIds: [board] }), 'board')
@@ -250,12 +255,12 @@ describe('fabrika ayrımı', () => {
     await expect(t.mutation(api.presses.upsert, { token: b, name: 'X', hall: 'H' })).rejects.toThrow(/edit permission/)
     const pmCtx = await t.query(api.tenancy.context, { token: m })
     expect(pmCtx.plants.map((p: Any) => p.name)).toEqual(['Plant 2'])
-    expect(pmCtx.active.costCenters).toEqual([{ code: '51010171', name: 'Transfer' }])
+    expect(pmCtx.active.costCenters).toEqual([{ code: '51010171', name: 'Transfer', department: 'Stamping' }])
     await expect(t.mutation(api.tenancy.selectPlant, { token: m, plantId: plant1 })).rejects.toThrow(/no access/)
     // Fabrika müdürü kendi fabrikasının presini görür, Plant 1'inkileri göremez.
     expect(await t.query(api.presses.list, { token: m })).toEqual([])
     // Board member de başka şirketi görmez.
-    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning'] })
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning'], holdingId: await holding(t, boss, 'H Other') })
     await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
     expect((await t.query(api.tenancy.context, { token: b })).plants.map((p: Any) => p.companyName)).not.toContain('Other')
   })
@@ -271,7 +276,7 @@ describe('fabrika ayrımı', () => {
     // Geçiş masraf yeri doldurmaz.
     expect(c.active.costCenters).toEqual([])
     await expect(t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'plant 1', country: 'RO', timeZone: 'Europe/Bucharest' })).rejects.toThrow(/already exists/)
-    await expect(t.mutation(api.platform.createCompany, { token: boss, name: 'company 1', modules: [] })).rejects.toThrow(/already exists/)
+    await expect(t.mutation(api.platform.createCompany, { token: boss, name: 'company 1', modules: [], holdingId: await holding(t, boss, 'H company 1') })).rejects.toThrow(/already exists/)
     const extra = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Extra', country: 'RO', timeZone: 'Europe/Bucharest' })
     await t.mutation(api.tenancy.selectPlant, { token: boss, plantId: extra })
     await t.mutation(api.presses.upsert, { token: boss, name: 'P', hall: 'H' })
@@ -296,7 +301,7 @@ describe('fabrika ayrımı', () => {
       availability: 0, quality: 0, performance: 0, oee: 0,
     }
     await expect(t.mutation(api.oee.upsertShifts, { token: boss, rows: [row] })).rejects.toThrow(/not a cost center/)
-    await t.mutation(api.platform.updatePlant, { token: boss, id: after.active.plantId, name: 'Plant 1', costCenters: [{ code: '51010171', name: 'Transfer' }] })
+    await t.mutation(api.platform.updatePlant, { token: boss, id: after.active.plantId, name: 'Plant 1', departments: ['Stamping'], costCenters: [{ code: '51010171', name: 'Transfer', department: 'Stamping' }] })
     await t.mutation(api.oee.upsertShifts, { token: boss, rows: [row] })
   })
 
@@ -309,8 +314,8 @@ describe('fabrika ayrımı', () => {
     const c = await t.query(api.tenancy.context, { token: boss })
     const companyId = c.plants[0].companyId
     const p1 = c.active.plantId
-    await t.mutation(api.platform.updatePlant, { token: boss, id: p1, name: 'Plant 1', costCenters: [{ code: 'CC1', name: 'Press' }] })
-    const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Plant 2', country: 'RO', timeZone: 'Europe/Bucharest', costCenters: [{ code: 'CC1', name: 'Press' }] })
+    await t.mutation(api.platform.updatePlant, { token: boss, id: p1, name: 'Plant 1', departments: ['Stamping'], costCenters: [{ code: 'CC1', name: 'Press', department: 'Stamping' }] })
+    const p2 = await t.mutation(api.platform.createPlant, { token: boss, companyId, name: 'Plant 2', country: 'RO', timeZone: 'Europe/Bucharest', departments: ['Stamping'], costCenters: [{ code: 'CC1', name: 'Press', department: 'Stamping' }] })
 
     const row = { costCenter: 'CC1', operatorType: 'direct', plan: { presenceHours: 100, overtimeHours: 10, oee: 0.8 }, actual: { presenceHours: 90, overtimeHours: 20 } }
     await expect(t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 9, rows: [{ ...row, costCenter: 'X' }] })).rejects.toThrow(/not a cost center/)
@@ -347,9 +352,9 @@ describe('fabrika ayrımı', () => {
     await t.mutation(api.tenancy.startMigration, { token: boss })
     await settle(t)
     const c1 = (await t.query(api.tenancy.context, { token: boss })).plants[0].companyId
-    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning', 'oee', 'kpi'] })
+    const c2 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Other', modules: ['planning', 'oee', 'kpi'], holdingId: await holding(t, boss, 'H Other') })
     await t.mutation(api.platform.createPlant, { token: boss, companyId: c2, name: 'Bursa', country: 'TR', timeZone: 'Europe/Istanbul' })
-    const c3 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Outside', modules: ['kpi'] })
+    const c3 = await t.mutation(api.platform.createCompany, { token: boss, name: 'Outside', modules: ['kpi'], holdingId: await holding(t, boss, 'H Outside') })
     await t.mutation(api.platform.createPlant, { token: boss, companyId: c3, name: 'Far', country: 'DE', timeZone: 'Europe/Berlin' })
     const h = await t.mutation(api.platform.saveHolding, { token: boss, name: 'Group' })
     await t.mutation(api.platform.setCompanyHolding, { token: boss, companyId: c1, holdingId: h })
@@ -370,8 +375,53 @@ describe('fabrika ayrımı', () => {
     await expect(t.query(api.presses.list, { token: bm })).resolves.toBeDefined()
     await expect(t.mutation(api.presses.upsert, { token: bm, name: 'X', hall: 'H' })).rejects.toThrow(/edit permission/)
     await expect(t.query(api.planRuns.status, { token: bm })).rejects.toThrow(/view permission/)
-    // Şirketi holding'den ayırınca görünmez.
-    await t.mutation(api.platform.setCompanyHolding, { token: boss, companyId: c2, holdingId: null })
+    // Şirket holding'siz bırakılmaz; başka holding'e taşınınca görünmez.
+    await expect(t.mutation(api.platform.setCompanyHolding, { token: boss, companyId: c2, holdingId: null })).rejects.toThrow()
+    const h2 = await holding(t, boss, 'Second')
+    await t.mutation(api.platform.setCompanyHolding, { token: boss, companyId: c2, holdingId: h2 })
     expect((await t.query(api.tenancy.context, { token: bm })).plants.map((p: Any) => p.companyName)).toEqual(['Company 1'])
+    // Şirketi olan holding silinmez; boşalınca silinir.
+    await expect(t.mutation(api.platform.removeHolding, { token: boss, id: h2 })).rejects.toThrow(/move them/)
+    await t.mutation(api.platform.setCompanyHolding, { token: boss, companyId: c2, holdingId: h })
+    await t.mutation(api.platform.removeHolding, { token: boss, id: h2 })
+  })
+
+  it('ağaç: şirket holding ister; masraf yeri bir bölüme ait, bölüm boşalmadan silinmez', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    await expect(t.mutation(api.platform.createCompany, { token: boss, name: 'Loose', modules: [] })).rejects.toThrow()
+    const c = await t.query(api.tenancy.context, { token: boss })
+    const id = c.active.plantId
+    const plant = async (): Promise<Any> => t.run((ctx: Any) => ctx.db.get(id))
+    // Eski (bölümden önceki) bölümsüz masraf yeri kalabilir; yenisi bölüm ister.
+    await t.run((ctx: Any) => ctx.db.patch(id, { costCenters: [{ code: 'OLD', name: 'Old' }] }))
+    await t.mutation(api.platform.updatePlant, { token: boss, id, name: 'Plant 1', costCenters: [{ code: 'OLD', name: 'Old (renamed)' }] })
+    await expect(
+      t.mutation(api.platform.updatePlant, { token: boss, id, name: 'Plant 1', costCenters: [{ code: 'OLD', name: 'Old' }, { code: 'CC1', name: 'Press' }] }),
+    ).rejects.toThrow(/choose its department/)
+    await expect(t.mutation(api.platform.updatePlant, { token: boss, id, name: 'Plant 1', departments: ['Stamping', ' stamping '] })).rejects.toThrow(/twice/)
+    await expect(
+      t.mutation(api.platform.updatePlant, { token: boss, id, name: 'Plant 1', departments: ['Stamping'], costCenters: [{ code: 'CC1', name: 'Press', department: 'Welding' }] }),
+    ).rejects.toThrow(/not a department/)
+    await t.mutation(api.platform.updatePlant, {
+      token: boss, id, name: 'Plant 1', departments: ['Stamping', 'Welding'],
+      costCenters: [{ code: 'OLD', name: 'Old', department: 'Welding' }, { code: 'CC1', name: 'Press', department: 'Stamping' }],
+    })
+    expect((await plant()).costCenters).toEqual([{ code: 'OLD', name: 'Old', department: 'Welding' }, { code: 'CC1', name: 'Press', department: 'Stamping' }])
+    // Masraf yeri olan bölüm kaldırılamaz.
+    await expect(t.mutation(api.platform.updatePlant, { token: boss, id, name: 'Plant 1', departments: ['Stamping'] })).rejects.toThrow(/still has cost centers/)
+    // Ad değişince masraf yerleri yeni adla gelir; kod korunur.
+    await t.run((ctx: Any) => ctx.db.patch(id, { code: 'P1' }))
+    await t.mutation(api.platform.updatePlant, {
+      token: boss, id, name: 'Plant 1', departments: ['Stamping', 'Assembly'],
+      costCenters: [{ code: 'OLD', name: 'Old', department: 'Assembly' }, { code: 'CC1', name: 'Press', department: 'Stamping' }],
+    })
+    expect((await plant()).departments).toEqual(['Stamping', 'Assembly'])
+    expect((await plant()).code).toBe('P1')
+    // Bağlam masraf yerlerini bölümüyle verir (OEE / KPI kodla okur).
+    expect((await t.query(api.tenancy.context, { token: boss })).active.costCenters.map((x: Any) => x.code)).toEqual(['OLD', 'CC1'])
   })
 })
