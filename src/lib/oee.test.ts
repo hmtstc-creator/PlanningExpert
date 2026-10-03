@@ -179,7 +179,7 @@ describe('oee workbook', () => {
     // Adı verilmiş, alanı boş masraf yeri: ad kalır, alan önerilir.
     const named = suggestConfig({ days: [], shifts: parsed.shifts, downtimes: [] }, { ...EMPTY_CONFIG, costCenters: [{ code: '51010171', name: 'Transfer', area: '' }] }, OEE_SUGGESTED)
     expect(named.costCenters.find((c) => c.code === '51010171')).toEqual({ code: '51010171', name: 'Transfer', area: 'PRS' })
-    expect(configProblems({ ...plant, costCenters: [{ code: 'X', name: 'X', area: 'Nope' }] })).toContain('Cost center X has no area.')
+    expect(configProblems({ ...plant, costCenters: [{ code: 'X', name: 'X', area: 'Nope' }] })).toContain('Cost center X has no department (Company settings → Organization).')
   })
 
   it('a week is the sum of its days, or the uploaded week when that covers more loading', () => {
@@ -244,13 +244,31 @@ describe('oee workbook', () => {
     expect(mine.downtimes.every((d) => d.costCenter === '51010171')).toBe(true)
   })
 
-  it('cost center names come from the plant; OEE keeps the area', () => {
-    const merged = withPlantCostCenters(plant, [{ code: '51010171', name: 'Transfer line' }, { code: '999', name: 'New' }])
-    expect(merged.costCenters.find((x) => x.code === '51010171')).toEqual({ code: '51010171', name: 'Transfer line', area: 'PRS' })
+  it('OEE area = department of the plant (K3); names from the plant; old area settings are inherited', () => {
+    const old = { ...plant, areas: plant.areas.map((a) => (a.name === 'APR' ? { ...a, startupRunMin: 10 } : a)) }
+    const merged = withPlantCostCenters(
+      old,
+      [
+        { code: '51010171', name: 'Transfer line', department: 'Stamping' },
+        { code: '51010173', name: 'Progressive', department: 'Stamping' },
+        { code: '51010172', name: 'APR', department: 'Nut welding' },
+        { code: '999', name: 'New' },
+      ],
+      ['Stamping', 'Nut welding', 'Assembly'],
+    )
+    expect(merged.costCenters.find((x) => x.code === '51010171')).toEqual({ code: '51010171', name: 'Transfer line', area: 'Stamping' })
+    // Bölümü olmayan masraf yeri Unassigned'a düşer.
     expect(merged.costCenters.find((x) => x.code === '999')).toEqual({ code: '999', name: 'New', area: '' })
-    // Fabrikada olmayan kod OEE'de yok.
-    expect(merged.costCenters.some((x) => x.code === '51010172')).toBe(false)
-    expect(withPlantCostCenters(plant, []).costCenters).toEqual([])
+    // Alanlar = bölümler, sırasıyla; eski alanın ayarı (PRS: costCenter, APR: machine + 10 dk) devralınır.
+    expect(merged.areas).toEqual([
+      { name: 'Stamping', pick: 'costCenter' },
+      { name: 'Nut welding', pick: 'machine', startupRunMin: 10 },
+      { name: 'Assembly', pick: 'machine' },
+    ])
+    // Bölümün kendi kayıtlı ayarı devralınanın önüne geçer.
+    const own = withPlantCostCenters({ ...plant, areas: [...plant.areas, { name: 'Nut welding', pick: 'costCenter' }] }, [{ code: '51010172', name: 'APR', department: 'Nut welding' }], ['Nut welding'])
+    expect(own.areas).toEqual([{ name: 'Nut welding', pick: 'costCenter' }])
+    expect(withPlantCostCenters(plant, [], []).costCenters).toEqual([])
   })
 
   it('data notes: empty periods, missing machines and the KPI–Downtimes difference', () => {

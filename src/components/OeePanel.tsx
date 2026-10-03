@@ -40,7 +40,8 @@ export function useOeeConfig(): { config: OeeConfig; problems: string[]; loaded:
   const doc = useQuery(api.oee.settings) as { config: OeeConfig; updatedAt: number } | null | undefined
   // Masraf yeri adları fabrika tanımından (tek kaynak).
   const plantCcs = usePlant().ctx?.active?.costCenters
-  const config = useMemo(() => withPlantCostCenters(doc?.config ?? EMPTY_CONFIG, plantCcs ?? []), [doc, plantCcs])
+  const departments = usePlant().ctx?.active?.departments
+  const config = useMemo(() => withPlantCostCenters(doc?.config ?? EMPTY_CONFIG, plantCcs ?? [], departments ?? []), [doc, plantCcs, departments])
   return { config, problems: doc === undefined ? [] : configProblems(config), loaded: doc !== undefined, savedAt: doc?.updatedAt ?? null }
 }
 

@@ -40,6 +40,8 @@ export interface TenancyContext {
     timeZone: string
     /** Fabrikanın masraf yerleri (Company settings'ta tanımlanır). */
     costCenters: { code: string; name: string; department?: string }[]
+    /** Plant'in bölümleri, sırasıyla (OEE alanları bunlardır). */
+    departments: string[]
     access: Access
     deleteAfter: number | null
   } | null

@@ -70,8 +70,13 @@ Kararlar:
    masraf yerleri yeni adla gelir. Bölümden önceki masraf yerleri
    "Without a department" altında, bir bölüme taşınana kadar kalır (verileri
    kodla bağlı, kod değişmez).
-4. Bölüm ile OEE **Area** ayrı kalır (OEE Settings değişmedi); birleştirmek
-   sonra konuşulacak.
+4. ~~Bölüm ile OEE Area ayrı kalır~~ → **K3 (2026-10-03): birleşti.** OEE
+   alanı = bölüm; bölümün OEE'si olur. OEE Settings'te bölüm başına yalnızca
+   seçim türü (masraf yeri / makine) ve setup sonrası süre kalır; bölümler ve
+   masraf yeri ataması Company settings → Organization'dan gelir. Eski OEE
+   alanlarının ayarı, masraf yerlerinin çoğunun eski alanından devralınır
+   (`withPlantCostCenters`, src/lib/oee.ts). Canlı testte değişiklik
+   gerekirse planlamacı söyler.
 5. Yetki seviyesi değişmedi: erişim plant × modül (gruplar). Bölüm ve masraf
    yeri seviyesinde ayrı yetki yok.
 6. **Her work center bir masraf yerine bağlıdır** (2026-10-03, planlamacı;

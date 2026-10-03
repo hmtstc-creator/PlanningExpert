@@ -208,24 +208,52 @@ export const EMPTY_CONFIG: OeeConfig = {
 }
 
 /**
- * Fabrikanın masraf yerleri (Company settings → Organization;
- * creator tanımlar) tek kaynaktır: hangi masraf yerleri var ve adları oradan
- * gelir; OEE ayarı yalnızca alanı (area) tutar. Fabrikada olmayan kod OEE'de
- * yoktur. Alanı seçilmemiş masraf yeri "Unassigned" alanında yine hesaba girer.
+ * OEE alanı = plant'in **bölümü** (K3, 2026-10-03): bölümün OEE'si olur,
+ * ayrı OEE alanı yoktur. Bölümler, masraf yerleri, adları ve hangi masraf
+ * yerinin hangi bölümde olduğu Company settings → Organization'dan gelir
+ * (tek kaynak). OEE ayarı bölüm başına yalnızca seçim türünü (masraf yeri /
+ * makine) ve setup sonrası süreyi tutar. Bölümü olmayan masraf yeri
+ * "Unassigned" altında yine hesaba girer.
+ *
+ * Eski kayıtla süreklilik: bölümün kendi ayarı yoksa, masraf yerlerinin eski
+ * OEE alanının ayarı devralınır (ör. APR'nin 10 dk'sı).
  */
-export function withPlantCostCenters(c: OeeConfig, plant: { code: string; name: string }[]): OeeConfig {
-  const own = new Map(c.costCenters.map((x) => [x.code, x]))
-  return { ...c, costCenters: plant.map((p) => ({ code: p.code, name: p.name, area: own.get(p.code)?.area ?? '' })) }
+export function withPlantCostCenters(
+  c: OeeConfig,
+  plant: { code: string; name: string; department?: string }[],
+  departments: string[] = [],
+): OeeConfig {
+  const known = new Set(departments)
+  const costCenters = plant.map((p) => ({ code: p.code, name: p.name, area: p.department && known.has(p.department) ? p.department : '' }))
+  const oldAreaOf = new Map(c.costCenters.map((x) => [x.code, x.area]))
+  const areas = departments.map((name) => {
+    const own = c.areas.find((a) => a.name === name)
+    const members = costCenters.filter((x) => x.area === name)
+    // Eski alan: üyelerinin çoğunun eskiden bağlı olduğu OEE alanı.
+    const votes = new Map<string, number>()
+    for (const m of members) {
+      const old = oldAreaOf.get(m.code)
+      if (old) votes.set(old, (votes.get(old) ?? 0) + 1)
+    }
+    const oldName = [...votes].sort((a, b) => b[1] - a[1])[0]?.[0]
+    const inherited = own ?? c.areas.find((a) => a.name === oldName)
+    return {
+      name,
+      pick: inherited?.pick ?? ((members.length > 1 ? 'costCenter' : 'machine') as Pick),
+      ...(inherited?.startupRunMin ? { startupRunMin: inherited.startupRunMin } : {}),
+    }
+  })
+  return { ...c, areas, costCenters }
 }
 
 /** Ayarda eksik olan ve kullanıcıya söylenmesi gereken konular. */
 export function configProblems(c: OeeConfig): string[] {
   const out: string[] = []
-  if (!c.areas.length) out.push('No area is defined.')
+  if (!c.areas.length) out.push('The plant has no department — a creator adds them on Company settings → Organization.')
   if (!c.costCenters.length) out.push('The plant has no cost center — a creator adds them on Company settings → Organization.')
   const areas = new Set(c.areas.map((a) => a.name))
   const noArea = c.costCenters.filter((x) => !areas.has(x.area)).map((x) => x.code)
-  if (noArea.length) out.push(`Cost center ${noArea.join(', ')} has no area.`)
+  if (noArea.length) out.push(`Cost center ${noArea.join(', ')} has no department (Company settings → Organization).`)
   if (!c.shifts.length) out.push('Shift codes are not numbered.')
   if (!c.lossReasonCodes.length) out.push('No Reason Code 1 is marked as a loss.')
   if (!c.lossGroups.length) out.push('Loss groups are not named.')

@@ -103,9 +103,9 @@ function OeeGuidePage() {
         </p>
         <ul>
           <li>
-            cost centers — every cost center of your files gets a name and an <b>area</b>; an area is a
-            group of cost centers such as work centers or assembly and becomes a button on top of every page
-            (do not type a cost center code as an area),
+            departments — each department of the plant is a button on top of every page and its OEE is the
+            OEE of its cost centers; departments, cost centers and their names are set on Company settings →
+            Organization (in Settings you only choose how to pick inside a department),
           </li>
           <li>shift numbers of the Shift Group codes,</li>
           <li>which Reason Code 1 is a loss and which is a planned break,</li>

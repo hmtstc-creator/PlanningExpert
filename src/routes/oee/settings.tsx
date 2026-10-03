@@ -26,6 +26,7 @@ function OeeSettingsPage() {
   const { config: saved, loaded, savedAt } = useOeeConfig()
   // Fabrikada tanımlı masraf yerleri: adı orada değişir, burada yalnızca alan.
   const plantList = usePlant().ctx?.active?.costCenters ?? []
+  const departments = usePlant().ctx?.active?.departments ?? []
   const plantCcs = new Set(plantList.map((x) => x.code))
   const save = useMutation(api.oee.saveSettings)
   const coverage = useQuery(api.oee.coverage) as
@@ -58,7 +59,7 @@ function OeeSettingsPage() {
   const [textFilter, setTextFilter] = useState('')
 
   // Öneri yalnızca alanları ve kodları doldurur; masraf yerleri fabrikanınkiler kalır.
-  const suggest = () => set(withPlantCostCenters(suggestConfig({ days, shifts, downtimes }, c, OEE_SUGGESTED), plantList))
+  const suggest = () => set(withPlantCostCenters(suggestConfig({ days, shifts, downtimes }, c, OEE_SUGGESTED), plantList, departments))
 
   // Verideki masraf yerleri ve makineleri (günler, vardiyalar, duruşlar).
   const found = useMemo(() => dataCostCenters({ days, shifts, downtimes }), [days, shifts, downtimes])
@@ -138,26 +139,22 @@ function OeeSettingsPage() {
       </ol>
 
       <Card
-        title="Areas"
-        info="A group of cost centers, e.g. work centers (PRS) or assembly (APR); each area is a button above every OEE page. 'Cost center' lets you pick a cost center of the area; 'Machine' lets you pick a single machine (when the area is one cost center). 'Production after a setup' is the minutes of production that make a setup OK in this area; empty = the value under Numbers."
+        title="Departments"
+        info="Every OEE page has a button per department of the plant (Company settings → Organization): the OEE of a department is the OEE of its cost centers. 'Cost center' lets you pick a cost center of the department; 'Machine' lets you pick a single machine (for a department of one cost center). 'Production after a setup' is the minutes of production that make a setup OK in this department; empty = the value under Numbers. Departments and which cost center belongs where are set on Company settings."
       >
         <Rows
-          empty="No area yet — work center Suggest from data, or add one below."
-          head={['Area name', 'Pick by', 'Production after a setup (min)', '']}
+          empty="This plant has no department yet — a creator adds them on Company settings → Organization."
+          head={['Department', 'Cost centers', 'Pick by', 'Production after a setup (min)']}
           rows={c.areas.map((a, i) => [
-            <input
-              key="n"
-              className={input}
-              value={a.name}
-              onChange={(e) => {
-                const old = a.name
-                const name = e.target.value
-                set({
-                  areas: c.areas.map((x, j) => (j === i ? { ...x, name } : x)),
-                  costCenters: c.costCenters.map((cc) => (cc.area === old ? { ...cc, area: name } : cc)),
-                })
-              }}
-            />,
+            <span key="n" className="font-medium">
+              {a.name}
+            </span>,
+            <span key="c" className="text-muted-foreground">
+              {c.costCenters
+                .filter((cc) => cc.area === a.name)
+                .map((cc) => cc.code)
+                .join(', ') || '—'}
+            </span>,
             <select key="p" className={input} value={a.pick} onChange={(e) => set({ areas: c.areas.map((x, j) => (j === i ? { ...x, pick: e.target.value as Pick } : x)) })}>
               <option value="costCenter">Cost center</option>
               <option value="machine">Machine</option>
@@ -174,37 +171,30 @@ function OeeSettingsPage() {
                 set({ areas: c.areas.map((x, j) => (j === i ? { ...x, startupRunMin: v > 0 ? v : undefined } : x)) })
               }}
             />,
-            <RemoveButton key="r" onClick={() => set({ areas: c.areas.filter((_, j) => j !== i) })} />,
           ])}
         />
-        <button type="button" onClick={() => set({ areas: [...c.areas, { name: `Area ${c.areas.length + 1}`, pick: 'costCenter' }] })} className="mt-2 text-xs underline">
-          + Add area
-        </button>
+        <Link to="/settings" className="mt-2 inline-block text-xs underline">
+          Departments and cost centers → Company settings
+        </Link>
       </Card>
 
-      <Card title="Cost centers" info="The cost centers of this plant and the area each belongs to. Which cost centers a plant has, and their names, a creator defines on Company settings → Organization; every one of them counts in the OEE pages — one without an area under Unassigned. Machines are read from the data.">
+      <Card title="Cost centers" info="The cost centers of this plant and their department, as defined on Company settings → Organization; every one of them counts in the OEE pages — one without a department under Unassigned. Machines are read from the data.">
         <Rows
           empty="This plant has no cost center yet — a creator adds them on Company settings → Organization."
-          head={['Code', 'Machines in the data', 'Name', 'Area']}
-          rows={c.costCenters.map((cc, i) => [
+          head={['Code', 'Machines in the data', 'Name', 'Department']}
+          rows={c.costCenters.map((cc) => [
             cc.code,
             <span key="m" className="text-muted-foreground">
               {found.get(cc.code)?.workCenters.join(', ') || '—'}
             </span>,
             <span key="n" title="Named on Company settings">{cc.name}</span>,
-            <select
-              key="a"
-              className={`${input} ${c.areas.some((a) => a.name === cc.area) ? '' : 'border-amber-500'}`}
-              value={c.areas.some((a) => a.name === cc.area) ? cc.area : ''}
-              onChange={(e) => set({ costCenters: c.costCenters.map((x, j) => (j === i ? { ...x, area: e.target.value } : x)) })}
-            >
-              <option value="">— choose an area —</option>
-              {c.areas.map((a) => (
-                <option key={a.name} value={a.name}>
-                  {a.name}
-                </option>
-              ))}
-            </select>,
+            cc.area ? (
+              <span key="a">{cc.area}</span>
+            ) : (
+              <span key="a" className="text-amber-800">
+                none — Unassigned
+              </span>
+            ),
           ])}
         />
         {notOfPlant.length > 0 && (

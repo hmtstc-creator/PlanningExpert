@@ -198,11 +198,11 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
     Work Center Definitions'ta uyarıyla çıkar).
   - [x] ✅ CI'daki `convex/_generated` taslağı artık veri modelini şemadan
     türetir (Doc, Id, tipli query/mutation) — gerçek kod üretimine yakın.
-- [ ] **P1 — Dört ayrı gruplama ekseni.** Work center için hol (vinç),
-  kategori (hat), bölüm (organizasyon) ve OEE Area var. Kullanıcı hangisinin
-  neye yaradığını bilmek zorunda.
-  → Area'yı bölümle birleştir ya da Area'yı bölümden türet. Hol ve
-  kategoriyi "teknik özellik" olarak ayrı bir başlık altında topla.
+- [ ] **P1 — Gruplama eksenleri.** Work center için hol (vinç), kategori
+  (hat), bölüm (organizasyon) vardı, bir de OEE Area.
+  - [x] ✅ OEE Area bölümle birleşti (K3, 2026-10-03): OEE alanı = bölüm.
+  - [ ] **[G]** Hol ve kategori "teknik özellik" olarak Work Center
+    Definitions'ta ayrı başlık altında toplanacak.
 - [ ] **P1 — Tarihsiz organizasyon.** Bir masraf yeri başka bölüme
   taşınınca geçmiş raporlar da yeni yapıya göre toplanıyor; geçmiş
   değişiyor.

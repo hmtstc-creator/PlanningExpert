@@ -305,9 +305,7 @@ export const saveSettings = guardedMutation({
     if (!(config.startupRunMin > 0) || !(config.trendWeeks > 0) || !(config.topN > 0)) {
       throw new ConvexError('Production after setup, trend weeks and list size must be above 0')
     }
-    const names = new Set(config.areas.map((a: Ctx) => a.name))
-    const missing = config.costCenters.filter((c: Ctx) => !names.has(c.area)).map((c: Ctx) => c.code)
-    if (missing.length) throw new ConvexError(`Choose an area for cost center ${missing.join(', ')}`)
+    // Alan = bölüm (K3): bölümler ve masraf yeri ataması Organization'dan gelir; burada denetlenmez.
     const doc = { key: 'default', ...config, updatedAt: Date.now(), updatedBy: ctx.sessionUser?.name }
     const hit = await ctx.db
       .query('oeeSettings')

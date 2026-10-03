@@ -224,6 +224,7 @@ export const context = userQuery({
             companyStatus: active.company.status,
             country: active.plant.country ?? '',
             costCenters: active.plant.costCenters ?? [],
+            departments: active.plant.departments ?? [],
             timeZone: active.plant.timeZone ?? '',
             access: active.access,
             // Askıdaki şirket: salt okunur; silinme tarihi.

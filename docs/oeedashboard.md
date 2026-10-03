@@ -507,3 +507,10 @@ bir sonraki plan hesabında yeni metinle yazılır.
 - ~~APR setup süresi~~ → alan bazlı süre (APR 10 dk). Parça bazlı setup
   süresi Master Data'da — ileride.
 - ~~Downtimes / Shiftly plansız duruş farkı~~ → yalnızca ekranda bildirim.
+
+## Alan = bölüm (2026-10-03, K3)
+
+OEE'nin üstteki alan düğmeleri artık plant'in **bölümleridir** (Company
+settings → Organization); ayrı OEE alanı tanımlanmaz. Bölümün OEE'si
+masraf yerlerinin toplam ÷ toplam OEE'sidir. OEE Settings → Departments:
+yalnızca seçim türü ve setup sonrası süre. Eski alan ayarları devralınır.
