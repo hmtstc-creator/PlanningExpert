@@ -16,6 +16,7 @@ import {
   withTimeout,
 } from '../lib/serverReachability'
 import { friendlyError } from '../lib/mutationErrors'
+import { ConvexError } from 'convex/values'
 
 /** Giriş isteği bu kadar sürede cevap almazsa ağ sorunu sayılır. */
 const LOGIN_TIMEOUT_MS = 25_000
@@ -38,6 +39,8 @@ export function LoginGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [seedError, setSeedError] = useState<string | null>(null)
+  // admin/admin ipucu yalnızca ilk hesabın az önce açıldığı boş kurulumda görünür.
+  const [freshInstall, setFreshInstall] = useState(false)
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -60,7 +63,10 @@ export function LoginGate({ children }: { children: ReactNode }) {
     // kullanıcı sebebini göremez.
     if (screen === 'login') {
       void seedAdmin({})
-        .then(() => setSeedError(null))
+        .then((r: { created?: boolean } | null) => {
+          setSeedError(null)
+          if (r?.created) setFreshInstall(true)
+        })
         .catch((e: unknown) =>
           setSeedError(friendlyError(e).message || 'Could not create the first account'),
         )
@@ -100,7 +106,8 @@ export function LoginGate({ children }: { children: ReactNode }) {
               setToken(result.token)
               setPassword('')
             } catch (e) {
-              setError(friendlyNetworkError(e))
+              // Kilit gibi sunucu açıklamaları (ConvexError) olduğu gibi gösterilir.
+              setError(e instanceof ConvexError && typeof e.data === 'string' ? e.data : friendlyNetworkError(e))
             } finally {
               setBusy(false)
             }
@@ -147,19 +154,21 @@ export function LoginGate({ children }: { children: ReactNode }) {
 
         <ConnectionCheck />
 
-        <p className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-          First time here? The account is{' '}
-          <strong>{DEFAULT_ADMIN_USERNAME}</strong> with the password{' '}
-          <strong>{DEFAULT_ADMIN_PASSWORD}</strong>. You will be asked to
-          replace it straight away — anyone who finds this address could use it
-          otherwise.
-        </p>
+        {freshInstall && (
+          <p className="mt-6 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            First time here? The account is{' '}
+            <strong>{DEFAULT_ADMIN_USERNAME}</strong> with the password{' '}
+            <strong>{DEFAULT_ADMIN_PASSWORD}</strong>. You will be asked to
+            replace it straight away — anyone who finds this address could use it
+            otherwise.
+          </p>
+        )}
       </div>
     )
   }
 
   if (screen === 'mustChangePassword') {
-    const problem = newPassword ? validatePassword(newPassword) : null
+    const problem = newPassword ? validatePassword(newPassword, user?.name) : null
     const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword
     return (
       <div className="mx-auto w-full max-w-sm px-4 py-16">

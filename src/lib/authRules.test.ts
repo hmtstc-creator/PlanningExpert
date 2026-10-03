@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  afterFailedLogin,
   isDefaultPassword,
+  LOCKOUT_MS,
+  lockRemainingMs,
+  MAX_FAILED_LOGINS,
   isSessionValid,
   screenFor,
   sessionExpiry,
@@ -15,19 +19,48 @@ describe('parola kuralı', () => {
     expect(validatePassword('   ')).toBe('A password cannot be only spaces')
   })
 
-  it('çok kısa parolayı reddeder', () => {
-    expect(validatePassword('ab')).toContain('4 characters')
+  it('8 karakterden kısa parolayı reddeder', () => {
+    expect(validatePassword('ab12')).toContain('8 characters')
+    expect(validatePassword('abcd123')).toContain('8 characters')
   })
 
-  it('kabul edilebilir parolaya karışmaz', () => {
-    expect(validatePassword('admin')).toBeNull()
-    expect(validatePassword('pres-2026!')).toBeNull()
+  it('harf ve rakam ister', () => {
+    expect(validatePassword('abcdefgh')).toBe('Use at least one letter and one digit')
+    expect(validatePassword('12345678')).toBe('Use at least one letter and one digit')
+    expect(validatePassword('şifre2026')).toBeNull()
+  })
+
+  it('kullanıcı adı parola olamaz', () => {
+    expect(validatePassword('ahmet2026', 'Ahmet2026')).toBe('The password cannot be the user name')
+    expect(validatePassword('pres-2026!', 'ahmet')).toBeNull()
   })
 
   it('varsayılan parolayı tanır', () => {
     expect(isDefaultPassword('admin')).toBe(true)
     expect(isDefaultPassword('Admin')).toBe(false)
     expect(isDefaultPassword('baska')).toBe(false)
+  })
+})
+
+describe('hatalı giriş kilidi', () => {
+  const now = 1_700_000_000_000
+
+  it(`${MAX_FAILED_LOGINS}. hatalı parolada ${LOCKOUT_MS / 60_000} dakika kilitlenir`, () => {
+    let state: { failedLogins?: number; lockedUntil?: number } = {}
+    for (let i = 1; i < MAX_FAILED_LOGINS; i++) {
+      const r = afterFailedLogin(state, now)
+      expect(r).toEqual({ failedLogins: i, locked: false })
+      state = r
+    }
+    const last = afterFailedLogin(state, now)
+    expect(last).toEqual({ failedLogins: 0, lockedUntil: now + LOCKOUT_MS, locked: true })
+    expect(lockRemainingMs(last, now + 60_000)).toBe(LOCKOUT_MS - 60_000)
+  })
+
+  it('kilit bitince yeniden sayılır', () => {
+    const after = { failedLogins: 0, lockedUntil: now - 1 }
+    expect(lockRemainingMs(after, now)).toBe(0)
+    expect(afterFailedLogin(after, now)).toEqual({ failedLogins: 1, locked: false })
   })
 })
 

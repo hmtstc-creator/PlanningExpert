@@ -174,10 +174,14 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 
 ### 4.3 Güvenlik ve erişim
 
-- [ ] **P0 — Zayıf parola kuralı.** En kısa parola 4 karakter; ilk
-  kurulum `admin/admin`; girişte deneme sınırı ya da kilitleme yok.
-  → En az 10 karakter, art arda hatalı girişte bekletme / kilit, şüpheli
-  giriş kaydı.
+- [x] ✅ **P0 — Zayıf parola kuralı** (2026-10-03): yeni parola en az 8
+  karakter, harf + rakam, kullanıcı adı / `admin` olamaz (sunucu ve ekran
+  aynı kural). Art arda 5 hatalı parolada 15 dk kilit, değişiklik kaydına
+  yazılır; creator yeni parola verince kilit kalkar. Giriş ekranı artık
+  `admin/admin` ipucunu yalnızca boş kurulumda gösterir (önceden her zaman
+  gösteriyordu). Eski kısa parolalar çalışmaya devam eder.
+  - [ ] **[K]** Eski kısa parolaları bir sonraki girişte değiştirmeye
+    zorlayalım mı?
 - [ ] **P1 — Kurumsal kimlik yok.** Müşteriler Azure AD / Google ile
   girmek isteyecek; parolayı creator elle veriyor, "parolamı unuttum" yok.
   → SSO (OIDC) ve e-postayla davet / parola sıfırlama.

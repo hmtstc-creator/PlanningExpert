@@ -22,7 +22,7 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 | 14 | Varış tarihi olmayan yoldaki rulo | bu hafta gelmiş sayılır | `rawMrp.ts`, `planning.ts` | P | |
 | 15 | Yoldakiler Excel'inde birim "TO" | tona çevrilir (×1000) | `sapParsers.ts` | P | |
 | 16 | Oturum süresi | 12 saat | `authRules.ts`, `convex/authInternal.ts` | K | |
-| 17 | En kısa şifre | 4 karakter | `authRules.ts`, `convex/auth.ts` | K | |
+| 17 | Yeni parola kuralı | en az 8 karakter, en az bir harf ve bir rakam; kullanıcı adı ve `admin` olamaz (eski parolalar çalışır) | `src/lib/authRules.ts` (sunucu ve ekran aynı kural) | P | P — 2026-10-03 (eski: 4 karakter) |
 | 18 | İlk kurulum yöneticisi | kullanıcı adı ve şifre `admin` | `authRules.ts`, `convex/auth.ts` | K (ilk girişte değiştirme zorunlu) | |
 | 19 | Plan yeniden hesaplama gecikmesi | kayıttan 4 sn sonra | `convex/planQueue.ts` | P | |
 | 20 | Saklanan eski plan sayısı | 3 | `convex/planRuns.ts` | P | |
@@ -37,6 +37,8 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 
 | 36 | ~~Ülke RO, saat dilimi Europe/Bucharest~~ | fabrika kaydında (`plants`), fabrika açılırken zorunlu; bilinmiyorsa UTC | `convex/plantLocale.ts` | K | Kaldırıldı (2026-10-02). Plant 1'e geçişte yazılır |
 | 37 | İlk kurulum kullanıcısı admin / admin | yalnızca platformun ilk kurulumu (hiç kullanıcı yokken); fabrikada kullanıcıyı creator geçici şifreyle açar | `convex/auth.ts` | P | Kalır |
+| 38 | Hatalı girişte kilit | art arda 5 hatalı parola | `src/lib/authRules.ts` (MAX_FAILED_LOGINS) | P | P — 2026-10-03 |
+| 39 | Kilit süresi | 15 dakika; yeni parola verilince hemen kalkar | `src/lib/authRules.ts` (LOCKOUT_MS) | P | P — 2026-10-03 |
 
 Not: Eski "14 gün stok = acil" kuralının kodu kaldırıldı; acil tanımı stok
 projeksiyonundan gelir.

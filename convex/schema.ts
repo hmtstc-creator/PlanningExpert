@@ -585,6 +585,9 @@ export default defineSchema({
     groupIds: v.optional(v.array(v.id('userGroups'))),
     /** Holding board üyesi (şirketsiz): holding'in şirketlerini özet görür. */
     holdingId: v.optional(v.id('holdings')),
+    /** Art arda hatalı parola sayısı ve geçici kilit (src/lib/authRules.ts). */
+    failedLogins: v.optional(v.number()),
+    lockedUntil: v.optional(v.number()),
   })
     .index('by_name', ['name'])
     .index('by_company', ['companyId'])

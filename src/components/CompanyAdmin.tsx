@@ -180,7 +180,7 @@ export function CompanyUsers({ companyId, groups, holdingId }: { companyId: stri
                       <button
                         className={btn}
                         onClick={async () => {
-                          const problem = validatePassword(pw)
+                          const problem = validatePassword(pw, u.name)
                           if (problem) return setPwError(problem)
                           try {
                             await setPassword({ token: token ?? '', userId: u._id, newPassword: pw })

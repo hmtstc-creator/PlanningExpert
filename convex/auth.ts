@@ -5,6 +5,7 @@ import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto'
 
 import { api, internal } from './_generated/api'
 import { action, internalAction } from './_generated/server'
+import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, lockRemainingMs, validatePassword } from '../src/lib/authRules'
 
 /**
  * Giriş.
@@ -35,15 +36,14 @@ function hashesMatch(a: string, b: string): boolean {
   return timingSafeEqual(left, right)
 }
 
-const DEFAULT_ADMIN_USERNAME = 'admin'
-const DEFAULT_ADMIN_PASSWORD = 'admin'
-const MIN_PASSWORD_LENGTH = 4
+/** Yeni parola kuralı tek yerde: src/lib/authRules.ts (ekran da aynısını kullanır). */
+function assertPassword(password: string, userName?: string): void {
+  const problem = validatePassword(password, userName)
+  if (problem) throw new ConvexError(problem)
+}
 
-function assertPassword(password: string): void {
-  if (password.trim().length === 0) throw new ConvexError('A password cannot be empty')
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new ConvexError(`The password must be at least ${MIN_PASSWORD_LENGTH} characters`)
-  }
+function lockedMessage(ms: number): string {
+  return `Too many wrong passwords — the account is locked for ${Math.ceil(ms / 60_000)} more minute(s). A creator can also set a new password.`
 }
 
 /**
@@ -89,7 +89,12 @@ export const login = action({
     // sayar.
     const failed = new Error('Wrong user name or password')
     if (!user || !user.active || !user.passwordHash || !user.passwordSalt) throw failed
+    // Kilitliyken parola denenmez (kaba kuvvet denemesi kilit süresince durur).
+    const wait = lockRemainingMs(user, Date.now())
+    if (wait > 0) throw new ConvexError(lockedMessage(wait))
     if (!hashesMatch(hashPassword(args.password, user.passwordSalt), user.passwordHash)) {
+      const r: { locked: boolean } = await ctx.runMutation(internal.authInternal.recordLoginFailure, { id: user._id })
+      if (r.locked) throw new ConvexError(lockedMessage(15 * 60_000))
       throw failed
     }
 
@@ -113,10 +118,10 @@ export const changePassword = action({
   args: { token: v.string(), currentPassword: v.string(), newPassword: v.string() },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    assertPassword(args.newPassword)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const me: any = await ctx.runQuery(api.authInternal.me, { token: args.token })
     if (!me) throw new ConvexError('Your session has expired — sign in again')
+    assertPassword(args.newPassword, me.name)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const user: any = await ctx.runQuery(internal.authInternal.findUser, { name: me.name })
     if (!user?.passwordHash || !user.passwordSalt) throw new ConvexError('User not found')
@@ -155,12 +160,12 @@ export const resetPassword = internalAction({
   args: { name: v.string(), newPassword: v.string() },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    assertPassword(args.newPassword)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const user: any = await ctx.runQuery(internal.authInternal.findUser, {
       name: args.name.trim(),
     })
     if (!user) throw new ConvexError(`No user named ${args.name}`)
+    assertPassword(args.newPassword, user.name)
     const salt = randomBytes(16).toString('hex')
     await ctx.runMutation(internal.authInternal.storePassword, {
       id: user._id,
@@ -183,7 +188,9 @@ export const setPasswordAsAdmin = action({
   args: { token: v.string(), userId: v.id('users'), newPassword: v.string() },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    assertPassword(args.newPassword)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const target: any = await ctx.runQuery(internal.authInternal.getUser, { id: args.userId })
+    assertPassword(args.newPassword, target?.name)
     // Şirket creator'ı kendi şirketinin, owner generallerin parolasını verir (users.ts).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const check: any = await ctx.runQuery(internal.users.canSetPassword, { token: args.token, userId: args.userId })
