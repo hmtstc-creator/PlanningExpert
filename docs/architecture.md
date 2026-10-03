@@ -180,15 +180,12 @@ Bunlar kodu değiştiren herkes (ve Claude) için bağlayıcıdır.
 
 ### Doğrulama (commit öncesi)
 ```
-# convex/_generated yoksa geçici taslak (commit'e girmez)
-mkdir -p convex/_generated
-printf "import { anyApi } from 'convex/server'\nexport const api: any = anyApi\nexport const internal: any = anyApi\n" > convex/_generated/api.ts
-printf "export { queryGeneric as query, mutationGeneric as mutation, actionGeneric as action, internalQueryGeneric as internalQuery, internalMutationGeneric as internalMutation, internalActionGeneric as internalAction, httpActionGeneric as httpAction } from 'convex/server'\n" > convex/_generated/server.ts
-npx tsc --noEmit -p .
-npx vitest run
-npx vite build
-rm -rf convex/_generated .output
+npm run verify     # tip kontrolü + bütün testler + build
 ```
+`npm run typecheck`, `convex/_generated` yoksa geçici taslak yazar
+(`scripts/stub-convex.mjs`; commit'e girmez, `.gitignore`'da). Aynı adımlar
+her push'ta GitHub Actions'ta da koşar (`.github/workflows/ci.yml`);
+kırmızı CI = main bozuk, önce o düzeltilir.
 
 ---
 

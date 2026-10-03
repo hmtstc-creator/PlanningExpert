@@ -6,3 +6,4 @@ dist
 *.local
 .tanstack
 tsconfig.tsbuildinfo
+convex/_generated

@@ -107,11 +107,13 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 
 ### 4.1 Güvence ve operasyon
 
-- [ ] **P0 — CI yok.** 600'den fazla test var, ama yalnızca biri elle
-  çalıştırırsa koşuyor. `main`'e giden her push doğrudan bütün
-  müşterilerin production'ına çıkıyor ve arada hiçbir kapı yok.
-  → GitHub Actions: her push'ta `tsc`, `vitest`, `vite build`. Kırmızıysa
-  deploy etme.
+- [x] ✅ **P0 — CI yok** (2026-10-03): GitHub Actions her push ve PR'da
+  tip kontrolü, testler ve build çalıştırır (`.github/workflows/ci.yml`);
+  yerelde aynısı `npm run verify`. Tip kontrolündeki iki sahte hata
+  (`QueryCtx`) giderildi.
+  - [ ] **[S]** Vercel'in yalnızca CI yeşilken deploy etmesi: GitHub'da
+    `main` için branch protection + "Require status checks" (CI), ya da
+    Vercel'de "Ignored Build Step". İkisi de senin hesabından açılır.
 - [ ] **P0 — Staging yok, preview kırık.** Vercel Preview'da Convex anahtarı
   yok; PR açınca build düşüyor. Değişikliği gerçek veriye benzer bir yerde
   denemenin yolu yok.
