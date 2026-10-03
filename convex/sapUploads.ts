@@ -62,7 +62,7 @@ export const beginUpload = guardedMutation({
   args: { key: keyValidator },
   returns: v.object({ uploadedAt: v.number(), batchSize: v.number() }),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { key }: Ctx) => {
+  handler: async (ctx, { key }) => {
     // Eski (kayıtsız) veri varsa önce onun yerini tutan bir kayıt açılır;
     // yoksa yazılan ilk parçalar "tablodaki en eski satır" sanılabilirdi.
     if (!(await uploadRecord(ctx, key))) {
@@ -90,7 +90,7 @@ export const appendRows = guardedMutation({
     unknownLocations: v.array(v.string()),
   }),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { key, uploadedAt, rows }: Ctx) => {
+  handler: async (ctx, { key, uploadedAt, rows }) => {
     if (rows.length > APPEND_BATCH) throw new ConvexError(`At most ${APPEND_BATCH} rows per batch`)
     if (uploadedAt <= (await liveUploadAt(ctx, key))) {
       throw new ConvexError('This upload is older than the current file — start again')
@@ -115,7 +115,8 @@ export const appendRows = guardedMutation({
       locationExempt: key === 'stock' ? await rawMaterialCodes(ctx) : undefined,
     })
     const table = TABLE_OF[key as SapUploadKey]
-    for (const row of kept) await ctx.db.insert(table, { ...row, uploadedAt })
+    // Satırın biçimi yükleme anahtarına göre değişir (ayrıştırıcı denetler); tablo-genel ekleme.
+    for (const row of kept) await (ctx.db as Ctx).insert(table, { ...row, uploadedAt })
     return { count: kept.length, ...report }
   },
 })
@@ -134,7 +135,7 @@ export const finishUpload = guardedMutation({
     coversTo: v.optional(v.string()),
   },
   returns: v.null(),
-  handler: async (ctx: Ctx, args: Ctx) => {
+  handler: async (ctx, args) => {
     const { key, uploadedAt } = args
     const current = await uploadRecord(ctx, key)
     if (current && current.uploadedAt >= uploadedAt) {
@@ -159,7 +160,7 @@ export const pruneOld = guardedMutation({
   args: { key: keyValidator },
   returns: v.object({ done: v.boolean() }),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { key }: Ctx) => {
+  handler: async (ctx, { key }) => {
     const live = await liveUploadAt(ctx, key)
     const table = TABLE_OF[key as SapUploadKey]
     const older = await ctx.db
@@ -191,7 +192,7 @@ export const filterCodes = guardedQuery({
     locations: v.array(v.string()),
     rawMaterials: v.array(v.string()),
   }),
-  handler: async (ctx: Ctx) => ({
+  handler: async (ctx) => ({
     materials: [...(await knownMaterialCodes(ctx))],
     locations: [...(await knownLocationCodes(ctx))],
     rawMaterials: [...(await rawMaterialCodes(ctx))],
@@ -226,7 +227,7 @@ export async function currentUploads(ctx: Ctx): Promise<SapUpload[]> {
 export const status = guardedQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     const run = await ctx.db
       .query('planRuns')
       .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))

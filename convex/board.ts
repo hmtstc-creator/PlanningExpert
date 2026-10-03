@@ -17,12 +17,12 @@ type Any = any
 export const overview = userQuery({
   args: { period: v.union(v.literal('month'), v.literal('week')), year: v.number(), num: v.number() },
   returns: v.any(),
-  handler: async (ctx: Any, { period, year, num }: Any) => {
+  handler: async (ctx, { period, year, num }) => {
     const max = period === 'month' ? 12 : 53
     if (!Number.isInteger(year) || !Number.isInteger(num) || num < 1 || num > max) throw new ConvexError('Choose a period')
     const slots = trendSlots(period, year, num)
     const visible = (await visiblePlants(ctx.db, ctx.sessionUser)).filter((p) => p.access.kpi !== 'none' || p.access.oee !== 'none')
-    const holdingIds = [...new Set(visible.map((p) => p.company.holdingId).filter(Boolean))]
+    const holdingIds = [...new Set(visible.map((p) => p.company.holdingId).filter((h): h is NonNullable<typeof h> => !!h))]
     const holdings = new Map<string, string>()
     for (const id of holdingIds) holdings.set(id, (await ctx.db.get(id))?.name ?? '')
     const plants: Any[] = []

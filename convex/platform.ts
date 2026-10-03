@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
 import { internal } from './_generated/api'
+import type { Id } from './_generated/dataModel'
 import { internalMutation } from './_generated/server'
 import { audit, diff } from './audit'
 import { TABLES, userMutation, userQuery } from './guarded'
@@ -124,7 +125,7 @@ function requirePlatform(me: Any) {
 export const companies = userQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Any) => {
+  handler: async (ctx) => {
     const me = ctx.sessionUser
     const all: Any[] = isPlatform(me)
       ? await ctx.db.query('companies').collect()
@@ -144,7 +145,7 @@ export const companies = userQuery({
         .query('users')
         .withIndex('by_company', (q: Any) => q.eq('companyId', c._id))
         .collect()
-      const holding = c.holdingId ? await ctx.db.get(c.holdingId) : null
+      const holding = c.holdingId ? await ctx.db.get(c.holdingId as Id<'holdings'>) : null
       out.push({
         ...c,
         holdingName: holding?.name ?? null,
@@ -161,7 +162,7 @@ export const companies = userQuery({
 export const createCompany = userMutation({
   args: { name: v.string(), modules: moduleList, holdingId: v.id('holdings') },
   returns: v.id('companies'),
-  handler: async (ctx: Any, { name, modules, holdingId }: Any) => {
+  handler: async (ctx, { name, modules, holdingId }) => {
     requirePlatform(ctx.sessionUser)
     if (!(await ctx.db.get(holdingId))) throw new ConvexError('Holding not found — add the holding first')
     if (!name.trim()) throw new ConvexError('A company name is required')
@@ -179,7 +180,7 @@ export const createCompany = userMutation({
 export const updateCompany = userMutation({
   args: { id: v.id('companies'), name: v.string(), modules: moduleList, status: v.union(v.literal('active'), v.literal('suspended')) },
   returns: v.null(),
-  handler: async (ctx: Any, args: Any) => {
+  handler: async (ctx, args) => {
     requirePlatform(ctx.sessionUser)
     const c = await ctx.db.get(args.id)
     if (!c) throw new ConvexError('Company not found')
@@ -211,7 +212,7 @@ export const createPlant = userMutation({
     costCenters: v.optional(costCenterList),
   },
   returns: v.id('plants'),
-  handler: async (ctx: Any, args: Any) => {
+  handler: async (ctx, args) => {
     if (!canManageCompany(ctx.sessionUser, args.companyId)) throw new ConvexError('Only a creator of this company can add a plant')
     const company = await ctx.db.get(args.companyId)
     if (!company) throw new ConvexError('Company not found')
@@ -248,7 +249,7 @@ export const updatePlant = userMutation({
     costCenters: v.optional(costCenterList),
   },
   returns: v.null(),
-  handler: async (ctx: Any, args: Any) => {
+  handler: async (ctx, args) => {
     const me = ctx.sessionUser
     const plant = await ctx.db.get(args.id)
     if (!plant) throw new ConvexError('Plant not found')
@@ -323,7 +324,7 @@ async function requireCompanyExport(ctx: Any, companyId: string) {
 export const exportTables = userQuery({
   args: { companyId: v.id('companies') },
   returns: v.array(v.string()),
-  handler: async (ctx: Any, { companyId }: Any) => {
+  handler: async (ctx, { companyId }) => {
     await requireCompanyExport(ctx, companyId)
     return TABLES.filter((t) => isPlantTable(t) && !DERIVED_TABLES.has(t))
   },
@@ -336,12 +337,13 @@ export const exportTables = userQuery({
 export const exportPage = userQuery({
   args: { companyId: v.id('companies'), plantId: v.id('plants'), table: v.string(), cursor: v.union(v.string(), v.null()) },
   returns: v.any(),
-  handler: async (ctx: Any, { companyId, plantId, table, cursor }: Any) => {
+  handler: async (ctx, { companyId, plantId, table, cursor }) => {
     await requireCompanyExport(ctx, companyId)
     const plant = await ctx.db.get(plantId)
     if (!plant || plant.companyId !== companyId) throw new ConvexError('Plant not found')
     if (!isPlantTable(table) || DERIVED_TABLES.has(table) || !TABLES.includes(table)) throw new ConvexError(`Unknown table ${table}`)
-    const r = await ctx.db
+    // Tablo adı parametre (dışa aktarım): tablo-genel okuma, bilerek gevşek.
+    const r = await (ctx.db as Any)
       .query(table)
       .withIndex('by_plant', (q: Any) => q.eq('plantId', plantId))
       .paginate({ cursor, numItems: table === 'oeeDowntimeDays' ? 20 : 200 })
@@ -358,7 +360,7 @@ export const exportPage = userQuery({
 export const deleteCompany = userMutation({
   args: { id: v.id('companies'), confirmName: v.string() },
   returns: v.null(),
-  handler: async (ctx: Any, { id, confirmName }: Any) => {
+  handler: async (ctx, { id, confirmName }) => {
     requirePlatform(ctx.sessionUser)
     const c = await ctx.db.get(id)
     if (!c) throw new ConvexError('Company not found')
@@ -412,7 +414,7 @@ export const deleteCompany = userMutation({
 export const deletePlant = userMutation({
   args: { id: v.id('plants'), confirmName: v.string() },
   returns: v.null(),
-  handler: async (ctx: Any, { id, confirmName }: Any) => {
+  handler: async (ctx, { id, confirmName }) => {
     const plant = await ctx.db.get(id)
     if (!plant) throw new ConvexError('Plant not found')
     if (!canManageCompany(ctx.sessionUser, plant.companyId)) throw new ConvexError('Only a creator of this company can delete a plant')
@@ -448,7 +450,7 @@ export const deletePlant = userMutation({
 export const purge = internalMutation({
   args: { key: v.string() },
   returns: v.null(),
-  handler: async (ctx: Any, { key }: Any) => {
+  handler: async (ctx, { key }) => {
     const state = await ctx.db
       .query('platformState')
       .withIndex('by_key', (q: Any) => q.eq('key', key))
@@ -463,7 +465,8 @@ export const purge = internalMutation({
       let checked = 0
       for (const plantId of state.value.plantIds) {
         checked++
-        const docs: Any[] = await ctx.db
+        // Tablo-genel silme: bilerek gevşek tip.
+        const docs: Any[] = await (ctx.db as Any)
           .query(table)
           .withIndex('by_plant', (q: Any) => q.eq('plantId', plantId))
           .take(Math.min(budget, table === 'planRunChunks' || table === 'oeeDowntimeDays' ? 5 : 100))
@@ -492,7 +495,7 @@ export const purge = internalMutation({
 export const holdings = userQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Any) => {
+  handler: async (ctx) => {
     requirePlatform(ctx.sessionUser)
     const out: Any[] = []
     for (const h of await ctx.db.query('holdings').collect()) {
@@ -514,7 +517,7 @@ async function holdingNameFree(db: Any, name: string, except?: string) {
 export const saveHolding = userMutation({
   args: { id: v.optional(v.id('holdings')), name: v.string() },
   returns: v.id('holdings'),
-  handler: async (ctx: Any, { id, name }: Any) => {
+  handler: async (ctx, { id, name }) => {
     requirePlatform(ctx.sessionUser)
     const n = name.trim()
     if (!n) throw new ConvexError('A holding name is required')
@@ -538,7 +541,7 @@ export const saveHolding = userMutation({
 export const removeHolding = userMutation({
   args: { id: v.id('holdings') },
   returns: v.null(),
-  handler: async (ctx: Any, { id }: Any) => {
+  handler: async (ctx, { id }) => {
     requirePlatform(ctx.sessionUser)
     const companies: Any[] = await ctx.db.query('companies').withIndex('by_holding', (q: Any) => q.eq('holdingId', id)).collect()
     if (companies.length) throw new ConvexError(`The holding still has ${companies.length} compan${companies.length === 1 ? 'y' : 'ies'} — move them to another holding first`)
@@ -561,7 +564,7 @@ export const removeHolding = userMutation({
 export const setCompanyHolding = userMutation({
   args: { companyId: v.id('companies'), holdingId: v.id('holdings') },
   returns: v.null(),
-  handler: async (ctx: Any, { companyId, holdingId }: Any) => {
+  handler: async (ctx, { companyId, holdingId }) => {
     requirePlatform(ctx.sessionUser)
     const h = await ctx.db.get(holdingId)
     if (!h) throw new ConvexError('Holding not found')
@@ -585,7 +588,7 @@ export const setCompanyHolding = userMutation({
 export const auditLog = userQuery({
   args: { companyId: v.optional(v.id('companies')), limit: v.optional(v.number()) },
   returns: v.any(),
-  handler: async (ctx: Any, { companyId, limit }: Any) => {
+  handler: async (ctx, { companyId, limit }) => {
     const me = ctx.sessionUser
     const n = Math.min(Math.max(limit ?? 200, 1), 500)
     if (!companyId) {

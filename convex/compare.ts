@@ -17,7 +17,7 @@ type Any = any
 export const oeeWeeks = userQuery({
   args: { endDate: v.string(), weeks: v.number() },
   returns: v.any(),
-  handler: async (ctx: Any, { endDate, weeks }: Any) => {
+  handler: async (ctx, { endDate, weeks }) => {
     const n = Math.max(1, Math.min(26, Math.floor(weeks)))
     const lastMonday = mondayOfIso(endDate)
     const from = addDaysIso(lastMonday, -7 * (n - 1))

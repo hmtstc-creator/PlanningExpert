@@ -1,9 +1,10 @@
 import { ConvexError, v } from 'convex/values'
 
-import type { Scheduler, StorageReader, StorageWriter } from 'convex/server'
+import type { GenericDatabaseReader, GenericDatabaseWriter, Scheduler, StorageReader, StorageWriter } from 'convex/server'
 import type { ObjectType, PropertyValidators } from 'convex/values'
 
 import { internalMutation, internalQuery, mutation, query } from './_generated/server'
+import type { DataModel } from './_generated/dataModel'
 import type { Doc, LockedDb } from './lockedDbTypes'
 import { requireSession } from './authGuard'
 import { plantDb } from './plantDb'
@@ -69,8 +70,8 @@ function withoutToken(args: Any): Any {
 }
 
 export interface PlantContext {
-  plant: Any
-  company: Any
+  plant: Doc<'plants'>
+  company: Doc<'companies'>
   access: Access
 }
 
@@ -260,7 +261,39 @@ export function adminMutation(spec: Any): Any {
  * denetlenir, veritabanı kilitsizdir. Yetkiyi handler kendisi denetler
  * (`ctx.sessionUser`, src/lib/tenancy.ts). Yalnızca convex/tenancy.ts.
  */
-export function userQuery(spec: Any): Any {
+/** Platform işlevinin bağlamı: kilitsiz (ham) veritabanı ve oturumdaki kullanıcı. */
+export interface UserQueryCtx {
+  db: GenericDatabaseReader<DataModel>
+  sessionUser: Doc<'users'>
+  session: Doc<'sessions'>
+  storage: StorageReader
+}
+
+export interface UserMutationCtx extends Omit<UserQueryCtx, 'db' | 'storage'> {
+  db: GenericDatabaseWriter<DataModel>
+  storage: StorageWriter
+  scheduler: Scheduler
+}
+
+/** Sunucu içi fabrika işlevinin bağlamı (plan motoru, zamanlayıcı). */
+export interface PlantInternalQueryCtx {
+  db: LockedDb
+  plantId: Doc<'plants'>['_id']
+  storage: StorageReader
+}
+
+export interface PlantInternalMutationCtx extends Omit<PlantInternalQueryCtx, 'storage'> {
+  storage: StorageWriter
+  scheduler: Scheduler
+}
+
+interface PlainSpec<A extends PropertyValidators, C> {
+  args: A
+  returns?: Any
+  handler: (ctx: C, args: ObjectType<A>) => Any
+}
+
+export function userQuery<A extends PropertyValidators>(spec: PlainSpec<A, UserQueryCtx>): Any {
   return query({
     ...spec,
     args: withSessionArg(spec.args),
@@ -271,7 +304,7 @@ export function userQuery(spec: Any): Any {
   })
 }
 
-export function userMutation(spec: Any): Any {
+export function userMutation<A extends PropertyValidators>(spec: PlainSpec<A, UserMutationCtx>): Any {
   return mutation({
     ...spec,
     args: withSessionArg(spec.args),
@@ -286,7 +319,7 @@ export function userMutation(spec: Any): Any {
  * Sunucu içi (plan motoru, zamanlayıcı) fabrika işlevleri: `plantId`
  * argümanı zorunlu, veritabanı o fabrikaya kilitli.
  */
-export function plantInternalQuery(spec: Any): Any {
+export function plantInternalQuery<A extends PropertyValidators>(spec: PlainSpec<A, PlantInternalQueryCtx>): Any {
   return internalQuery({
     ...spec,
     args: { ...(spec.args ?? {}), plantId: v.id('plants') },
@@ -295,7 +328,7 @@ export function plantInternalQuery(spec: Any): Any {
   })
 }
 
-export function plantInternalMutation(spec: Any): Any {
+export function plantInternalMutation<A extends PropertyValidators>(spec: PlainSpec<A, PlantInternalMutationCtx>): Any {
   return internalMutation({
     ...spec,
     args: { ...(spec.args ?? {}), plantId: v.id('plants') },

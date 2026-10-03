@@ -67,7 +67,7 @@ export const entries = guardedQuery({
   modules: KPI,
   args: { period: periodV, year: v.number(), num: v.number() },
   returns: v.any(),
-  handler: async (ctx: Any, { period, year, num }: Any) => {
+  handler: async (ctx, { period, year, num }) => {
     checkSlot(period, year, num)
     const rows: Any[] = await ctx.db
       .query('kpiEntries')
@@ -99,7 +99,7 @@ export const save = guardedMutation({
     ),
   },
   returns: v.null(),
-  handler: async (ctx: Any, { period, year, num, rows }: Any) => {
+  handler: async (ctx, { period, year, num, rows }) => {
     checkSlot(period, year, num)
     const codes = new Set((ctx.plant?.costCenters ?? []).map((c: Any) => c.code))
     const existing: Any[] = await ctx.db
@@ -146,7 +146,7 @@ export const save = guardedMutation({
 export const dashboard = userQuery({
   args: { period: periodV, year: v.number(), num: v.number(), plantIds: v.array(v.id('plants')) },
   returns: v.any(),
-  handler: async (ctx: Any, { period, year, num, plantIds }: Any) => {
+  handler: async (ctx, { period, year, num, plantIds }) => {
     checkSlot(period, year, num)
     const slots = trendSlots(period, year, num)
     const visible = (await visiblePlants(ctx.db, ctx.sessionUser)).filter((p) => p.access.kpi !== 'none')
@@ -181,7 +181,7 @@ export const dashboard = userQuery({
 export const plants = userQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Any) =>
+  handler: async (ctx) =>
     (await visiblePlants(ctx.db, ctx.sessionUser))
       .filter((p) => p.access.kpi !== 'none')
       .map((p) => ({ plantId: p.plant._id, plantName: p.plant.name, companyName: p.company.name, costCenters: p.plant.costCenters ?? [] })),

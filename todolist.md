@@ -235,15 +235,15 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   `planValidator.ts` 2005, `takvim.tsx` 1371, `platform.tsx` ~1200 satır.
   İncelemek ve değiştirmek zor.
   → Sayfaları bileşenlere, motoru kural modüllerine böl.
-- [ ] **P1 — Sunucuda tip yok.** (Kısmen düzeltildi, 2026-10-03.)
-  - [x] ✅ Korumalı işlevler (`guardedQuery` / `guardedMutation`) tipli
-    bağlam alır: fabrikaya kilitli veritabanı tipi (convex/lockedDbTypes.ts)
-    tablo, alan ve indeks adını denetler; `plantId` indekste atlanır
-    (kilit doldurur). Açık parametreli 100 handler artık derlemede
-    denetleniyor (bulunan tek sorun ölü bir koşuldu, temizlendi).
-  - [ ] **[G]** Bağlamı elle `Any` işaretli 80 handler (platform, oee,
-    planRuns, users, overtime, tenancy, sapUploads, kpi …) dosya dosya
-    tipliye çevrilecek; `userQuery` / `userMutation` da tiplenecek.
+- [x] ✅ **P1 — Sunucuda tip yoktu** (2026-10-03). Bütün sarmalayıcılar
+  (`guardedQuery/Mutation`, `userQuery/Mutation`, `plantInternal*`) tipli
+  bağlam verir; fabrikaya kilitli veritabanının kendi tipi var
+  (convex/lockedDbTypes.ts: fabrika tablosunda indeks `plantId`'siz başlar).
+  180 handler'ın 179'u derlemede denetleniyor (kalan: plan motoru action'ı).
+  Tablo adını parametre alan genel kodlar (dışa aktarım, silme, geçiş, SAP
+  yüklemesi, OEE tarih tabloları) bilerek gevşek ve yorumla işaretli.
+  Denetimin bulduğu küçükler düzeltildi (boşluk kontrolleri, ölü koşul).
+  - [ ] **[G]** Handler içindeki yerel `Any` değişkenleri kademeli kaldırma.
   - [ ] **[G]** ESLint (projede lint yok).
 - [ ] **P2 — Ad karmaşası.** (Menüde kalan "Presses" → "Work Centers"
   düzeltildi, 2026-10-03.) Ekran "work center" diyor; tablo `presses`,

@@ -49,7 +49,8 @@ export interface UserLike {
   companyId?: string
   /** Holding board üyesi: holding'e bağlı şirketlerin plantlerini özet olarak görür. */
   holdingId?: string
-  platformRole?: PlatformRole
+  /** 'owner' | 'general' (kayıtta metin). */
+  platformRole?: PlatformRole | string
   isCreator?: boolean
   groupIds?: string[]
 }

@@ -17,7 +17,7 @@ export const checklist = guardedQuery({
   modules: ALL_MODULES,
   args: {},
   returns: v.array(v.object({ key: v.string(), label: v.string(), done: v.boolean(), to: v.string(), module: v.string(), hint: v.string() })),
-  handler: async (ctx: Any) => {
+  handler: async (ctx) => {
     const db = ctx.db
     const presses: Any[] = await db.query('presses').collect()
     const settings = await db

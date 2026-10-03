@@ -59,7 +59,7 @@ export async function recordError(db: Any, e: ErrorEntry): Promise<void> {
 export const report = userMutation({
   args: { message: v.string(), stack: v.optional(v.string()), url: v.optional(v.string()), plant: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx: Any, args: Any) => {
+  handler: async (ctx, args) => {
     await recordError(ctx.db, { source: 'client', message: args.message, detail: args.stack, url: args.url, plant: args.plant, user: ctx.sessionUser.name })
     return null
   },
@@ -69,7 +69,7 @@ export const report = userMutation({
 export const list = userQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Any) => {
+  handler: async (ctx) => {
     if (!isPlatform(ctx.sessionUser)) throw new ConvexError('Only a General can see system errors')
     return ctx.db.query('errorLog').withIndex('by_last').order('desc').take(100)
   },

@@ -1,5 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
+import type { Id } from './_generated/dataModel'
 import { internalQuery } from './_generated/server'
 import { audit, diff } from './audit'
 import { userMutation, userQuery } from './guarded'
@@ -87,7 +88,7 @@ async function checkGroups(db: Any, companyId: string, groupIds: string[]) {
 export const list = userQuery({
   args: { companyId: v.optional(v.union(v.id('companies'), v.null())), holdingId: v.optional(v.id('holdings')) },
   returns: v.any(),
-  handler: async (ctx: Any, { companyId, holdingId }: Any) => {
+  handler: async (ctx, { companyId, holdingId }) => {
     const me = ctx.sessionUser
     if (holdingId) {
       requirePlatformUser(me)
@@ -126,7 +127,7 @@ export const add = userMutation({
     holdingId: v.optional(v.id('holdings')),
   },
   returns: v.id('users'),
-  handler: async (ctx: Any, args: Any) => {
+  handler: async (ctx, args) => {
     const me = ctx.sessionUser
     if (args.holdingId) {
       requirePlatformUser(me)
@@ -177,7 +178,7 @@ export const update = userMutation({
     groupIds: v.optional(v.array(v.id('userGroups'))),
   },
   returns: v.null(),
-  handler: async (ctx: Any, args: Any) => {
+  handler: async (ctx, args) => {
     const me = ctx.sessionUser
     const user = await ctx.db.get(args.id)
     if (!user) throw new ConvexError('User not found')
@@ -221,7 +222,7 @@ async function signOut(db: Any, userId: string) {
 export const remove = userMutation({
   args: { id: v.id('users') },
   returns: v.null(),
-  handler: async (ctx: Any, { id }: Any) => {
+  handler: async (ctx, { id }) => {
     const me = ctx.sessionUser
     const user = await ctx.db.get(id)
     if (!user) return null
@@ -247,7 +248,7 @@ async function groupNames(db: Any, ids: string[]): Promise<string> {
 export const canSetPassword = internalQuery({
   args: { token: v.string(), userId: v.id('users') },
   returns: v.object({ ok: v.boolean(), actor: v.string() }),
-  handler: async (ctx: Any, { token, userId }: Any) => {
+  handler: async (ctx, { token, userId }) => {
     const session = await ctx.db
       .query('sessions')
       .withIndex('by_token', (q: Any) => q.eq('token', token))
@@ -271,7 +272,7 @@ export const canSetPassword = internalQuery({
 export const listGroups = userQuery({
   args: { companyId: v.optional(v.id('companies')) },
   returns: v.any(),
-  handler: async (ctx: Any, { companyId }: Any) => {
+  handler: async (ctx, { companyId }) => {
     const me = ctx.sessionUser
     const target = companyId ?? me.companyId
     if (!target || !canManageCompany(me, target)) throw new ConvexError('Only a creator of this company can see its groups')
@@ -294,7 +295,7 @@ export const saveGroup = userMutation({
     board: v.optional(v.boolean()),
   },
   returns: v.id('userGroups'),
-  handler: async (ctx: Any, args: Any) => {
+  handler: async (ctx, args) => {
     requireManager(ctx.sessionUser, args.companyId)
     const name = args.name.trim()
     if (!name) throw new ConvexError('A group name is required')
@@ -303,7 +304,7 @@ export const saveGroup = userMutation({
       if (!plant || plant.companyId !== args.companyId) throw new ConvexError('A plant does not belong to this company')
     }
     const doc = { companyId: args.companyId, name, allPlants: args.allPlants, plantIds: args.allPlants ? [] : args.plantIds, permissions: args.permissions, board: args.board === true }
-    const plantNames = async (g: Any) => (g.allPlants ? 'all' : (await Promise.all(g.plantIds.map(async (p: string) => (await ctx.db.get(p))?.name ?? '?'))).sort().join(', '))
+    const plantNames = async (g: Any) => (g.allPlants ? 'all' : (await Promise.all(g.plantIds.map(async (p: Id<'plants'>) => (await ctx.db.get(p))?.name ?? '?'))).sort().join(', '))
     const summary = async (g: Any) => ({ name: g.name, plants: await plantNames(g), board: g.board === true, ...Object.fromEntries(MODULES.map((m) => [m, g.permissions?.[m] ?? 'none'])) })
     const actor = ctx.sessionUser.name
     if (args.id) {
@@ -323,7 +324,7 @@ export const saveGroup = userMutation({
 export const removeGroup = userMutation({
   args: { id: v.id('userGroups') },
   returns: v.null(),
-  handler: async (ctx: Any, { id }: Any) => {
+  handler: async (ctx, { id }) => {
     const g = await ctx.db.get(id)
     if (!g) return null
     requireManager(ctx.sessionUser, g.companyId)
@@ -332,7 +333,7 @@ export const removeGroup = userMutation({
       .withIndex('by_company', (q: Any) => q.eq('companyId', g.companyId))
       .collect()
     for (const u of members) {
-      if ((u.groupIds ?? []).includes(id)) await ctx.db.patch(u._id, { groupIds: u.groupIds.filter((x: string) => x !== id) })
+      if ((u.groupIds ?? []).includes(id)) await ctx.db.patch(u._id, { groupIds: (u.groupIds ?? []).filter((x) => x !== id) })
     }
     await ctx.db.delete(id)
     await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'group.remove', target: g.name, companyId: g.companyId })

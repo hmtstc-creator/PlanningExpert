@@ -10,7 +10,8 @@ import type { SapUploadKey } from '../src/lib/sapUploads'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Ctx = any
 
-export const TABLE_OF: Record<SapUploadKey, string> = {
+/** SAP yükleme anahtarı → tablo (hepsinde by_uploadedAt indeksi var). */
+export const TABLE_OF: Record<SapUploadKey, 'demandWeekly' | 'demandDaily' | 'stock' | 'actualProduction' | 'rawInTransit'> = {
   weeklyDemand: 'demandWeekly',
   dailyDemand: 'demandDaily',
   stock: 'stock',

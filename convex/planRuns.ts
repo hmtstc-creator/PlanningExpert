@@ -36,7 +36,7 @@ const RUN_TIMEOUT_MS = 10 * 60_000
 export const smallInputs = plantInternalQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     // Ülke ve saat dilimi fabrika kaydından (plantLocale.ts).
     const settings = await withLocale(
       ctx,
@@ -116,7 +116,7 @@ export const inputPage = plantInternalQuery({
     numItems: v.number(),
   },
   returns: v.any(),
-  handler: async (ctx: Ctx, { table, cursor, numItems }: Ctx) => {
+  handler: async (ctx, { table, cursor, numItems }) => {
     // SAP tablolarında yalnızca geçerli yüklemenin satırları: yarım kalmış ya
     // da süren bir yükleme planı bozmasın.
     const source = table === 'products' ? ctx.db.query(table) : await liveRows(ctx, KEY_OF[table])
@@ -183,7 +183,7 @@ async function migrateSettings(ctx: Ctx) {
 export const beginRun = plantInternalMutation({
   args: { trigger: v.optional(v.string()) },
   returns: v.object({ proceed: v.boolean() }),
-  handler: async (ctx: Ctx, { trigger }: Ctx) => {
+  handler: async (ctx, { trigger }) => {
     const now = Date.now()
     await migrateSettings(ctx)
     const status = await planStatusDoc(ctx)
@@ -206,7 +206,7 @@ export const beginRun = plantInternalMutation({
 export const finishRun = plantInternalMutation({
   args: { startedAt: v.number(), error: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx: Ctx, { startedAt, error }: Ctx) => {
+  handler: async (ctx, { startedAt, error }) => {
     const now = Date.now()
     const status = await planStatusDoc(ctx)
     if (!status) return null
@@ -232,14 +232,14 @@ export const createRun = plantInternalMutation({
     summary: v.any(),
   },
   returns: v.id('planRuns'),
-  handler: async (ctx: Ctx, args: Ctx) =>
+  handler: async (ctx, args) =>
     ctx.db.insert('planRuns', { ...args, status: 'writing' }),
 })
 
 export const addChunk = plantInternalMutation({
   args: { runId: v.id('planRuns'), index: v.number(), kind: v.string(), items: v.any() },
   returns: v.null(),
-  handler: async (ctx: Ctx, args: Ctx) => {
+  handler: async (ctx, args) => {
     await ctx.db.insert('planRunChunks', args)
     return null
   },
@@ -258,7 +258,7 @@ async function deleteRun(ctx: Ctx, runId: Ctx) {
 export const completeRun = plantInternalMutation({
   args: { runId: v.id('planRuns'), chunkCount: v.number(), durationMs: v.number() },
   returns: v.null(),
-  handler: async (ctx: Ctx, { runId, chunkCount, durationMs }: Ctx) => {
+  handler: async (ctx, { runId, chunkCount, durationMs }) => {
     await ctx.db.patch(runId, { status: 'ready', chunkCount, durationMs })
 
     const ready = await ctx.db
@@ -288,7 +288,7 @@ export const completeRun = plantInternalMutation({
 export const latest = guardedQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     const run = await ctx.db
       .query('planRuns')
       .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))
@@ -330,7 +330,7 @@ export const latestAlarms = guardedQuery({
   modules: ALL_MODULES,
   args: {},
   returns: v.any(),
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     const run = await ctx.db
       .query('planRuns')
       .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))
@@ -352,7 +352,7 @@ export const latestAlarms = guardedQuery({
 export const latestCapacity = guardedQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     const run = await ctx.db
       .query('planRuns')
       .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))
@@ -371,7 +371,7 @@ export const latestCapacity = guardedQuery({
 export const latestRawCoverage = guardedQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     const run = await ctx.db
       .query('planRuns')
       .withIndex('by_status_computed', (q: Ctx) => q.eq('status', 'ready'))
@@ -390,7 +390,7 @@ export const latestRawCoverage = guardedQuery({
 export const status = guardedQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     const doc = await planStatusDoc(ctx)
     if (!doc) return null
     const { _id, _creationTime, key, ...rest } = doc
@@ -403,7 +403,7 @@ export const requestNow = guardedMutation({
   args: {},
   returns: v.null(),
   affectsPlan: false,
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     await requestRecompute(ctx, 0, 'manual')
     return null
   },

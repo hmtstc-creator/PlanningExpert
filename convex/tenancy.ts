@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
 import { internal } from './_generated/api'
+import type { Id } from './_generated/dataModel'
 import { internalMutation } from './_generated/server'
 import { TABLES, activePlant, userMutation, userQuery, visiblePlants } from './guarded'
 import { isPlantTable } from './plantDb'
@@ -78,7 +79,7 @@ const plantTables = () => TABLES.filter(isPlantTable)
 export const migrationStatus = userQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Any) => {
+  handler: async (ctx) => {
     const state = await stateDoc(ctx.db)
     const tables = plantTables()
     if (!state) return { started: false, done: false, progress: 0 }
@@ -95,7 +96,7 @@ export const migrationStatus = userQuery({
 export const startMigration = userMutation({
   args: {},
   returns: v.null(),
-  handler: async (ctx: Any) => {
+  handler: async (ctx) => {
     const db = ctx.db
     if (await stateDoc(db)) return null
     const now = Date.now()
@@ -114,7 +115,7 @@ export const startMigration = userMutation({
       createdAt: now,
     })
     await writeLegacyLocationTicks(db)
-    const groupIds = new Map<string, string>()
+    const groupIds = new Map<string, Id<'userGroups'>>()
     for (const g of LEGACY_ROLE_GROUPS) {
       groupIds.set(
         g.role,
@@ -145,7 +146,7 @@ export const startMigration = userMutation({
 export const backfill = internalMutation({
   args: {},
   returns: v.null(),
-  handler: async (ctx: Any) => {
+  handler: async (ctx) => {
     const state = await stateDoc(ctx.db)
     if (!state || state.value.done) return null
     const tables = plantTables()
@@ -155,7 +156,8 @@ export const backfill = internalMutation({
     while (tableIndex < tables.length && budget > 0) {
       const table = tables[tableIndex]
       const n = Math.min(BATCH[table] ?? DEFAULT_BATCH, budget)
-      const docs = await ctx.db
+      // Tablo-genel geçiş: bilerek gevşek tip.
+      const docs: Any[] = await (ctx.db as Any)
         .query(table)
         .withIndex('by_plant', (q: Any) => q.eq('plantId', undefined))
         .take(n)
@@ -181,7 +183,7 @@ export const backfill = internalMutation({
 export const context = userQuery({
   args: {},
   returns: v.any(),
-  handler: async (ctx: Any) => {
+  handler: async (ctx) => {
     const user = ctx.sessionUser
     const state = await stateDoc(ctx.db)
     const groups: Any[] = user.companyId
@@ -236,7 +238,7 @@ export const context = userQuery({
 export const selectPlant = userMutation({
   args: { plantId: v.id('plants') },
   returns: v.null(),
-  handler: async (ctx: Any, { plantId }: Any) => {
+  handler: async (ctx, { plantId }) => {
     const plants = await visiblePlants(ctx.db, ctx.sessionUser)
     if (!plants.some((p) => p.plant._id === plantId)) throw new ConvexError('You have no access to this plant')
     await ctx.db.patch(ctx.session._id, { plantId })
@@ -252,10 +254,10 @@ export const selectPlant = userMutation({
 export const recomputeAll = internalMutation({
   args: { trigger: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx: Any, { trigger }: Any) => {
+  handler: async (ctx, { trigger }) => {
     const state = await stateDoc(ctx.db)
     if (!state?.value?.done) return null
-    const plants: Any[] = await ctx.db.query('plants').collect()
+    const plants = await ctx.db.query('plants').collect()
     let i = 0
     for (const plant of plants) {
       const company = await ctx.db.get(plant.companyId)

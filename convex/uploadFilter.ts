@@ -1,7 +1,10 @@
 // Server side of the SAP upload filter: which codes are known. The filter
 // itself is shared with the browser — see src/lib/uploadFilter.ts.
 
-import type { QueryCtx } from './_generated/server'
+import type { LockedDb } from './lockedDbTypes'
+
+/** Fabrikaya kilitli okuma bağlamı (korumalı işlevin ctx'i). */
+type ReadCtx = { db: Pick<LockedDb, 'query'> }
 
 export { filterRows, type FilterReport } from '../src/lib/uploadFilter'
 
@@ -11,7 +14,7 @@ export { filterRows, type FilterReport } from '../src/lib/uploadFilter'
  * hammadde (rulo) kodları da eklenir — MB52'deki rulo stoğu için.
  */
 export async function knownMaterialCodes(
-  ctx: QueryCtx,
+  ctx: ReadCtx,
   options: { raw?: boolean } = {},
 ): Promise<Set<string>> {
   const products = await ctx.db.query('products').collect()
@@ -25,12 +28,12 @@ export async function knownMaterialCodes(
   return codes
 }
 
-export async function rawMaterialCodes(ctx: QueryCtx): Promise<Set<string>> {
+export async function rawMaterialCodes(ctx: ReadCtx): Promise<Set<string>> {
   const products = await ctx.db.query('products').collect()
   return new Set(products.map((p) => p.rawMaterialCode?.trim() ?? '').filter((c) => c !== ''))
 }
 
-export async function knownLocationCodes(ctx: QueryCtx): Promise<Set<string>> {
+export async function knownLocationCodes(ctx: ReadCtx): Promise<Set<string>> {
   const locations = await ctx.db.query('storageLocations').collect()
   return new Set(locations.map((l) => l.code.trim()).filter((c) => c !== ''))
 }

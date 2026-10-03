@@ -81,7 +81,7 @@ export const upsertShifts = guardedMutation({
   args: { rows: v.array(v.object(shiftFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { rows }: Ctx) => {
+  handler: async (ctx, { rows }) => {
     plantCostCentersOnly(ctx, rows)
     const touched = new Map<string, { date: string; workCenter: string }>()
     for (const r of rows) {
@@ -114,7 +114,7 @@ export const upsertDaily = guardedMutation({
   args: { rows: v.array(v.object(dailyFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { rows }: Ctx) => {
+  handler: async (ctx, { rows }) => {
     plantCostCentersOnly(ctx, rows)
     let n = 0
     for (const r of rows) {
@@ -135,7 +135,7 @@ export const upsertOrders = guardedMutation({
   args: { rows: v.array(v.object(orderFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { rows }: Ctx) => {
+  handler: async (ctx, { rows }) => {
     for (const r of rows) {
       const hit = await ctx.db
         .query('oeeOrders')
@@ -154,7 +154,7 @@ export const upsertWeekly = guardedMutation({
   args: { rows: v.array(v.object(weeklyFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { rows }: Ctx) => {
+  handler: async (ctx, { rows }) => {
     plantCostCentersOnly(ctx, rows)
     for (const r of rows) {
       const hit = await ctx.db
@@ -173,7 +173,7 @@ export const upsertMonthly = guardedMutation({
   args: { rows: v.array(v.object({ ...monthlyFields, year: v.number() })) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { rows }: Ctx) => {
+  handler: async (ctx, { rows }) => {
     plantCostCentersOnly(ctx, rows)
     for (const r of rows) {
       const same = await ctx.db
@@ -199,7 +199,7 @@ export const upsertDowntimeDays = guardedMutation({
   args: { days: v.array(v.object(downtimeDayFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { days }: Ctx) => {
+  handler: async (ctx, { days }) => {
     plantCostCentersOnly(ctx, days)
     for (const incoming of days) {
       const hit = await ctx.db
@@ -232,7 +232,7 @@ export const rebuildStored = guardedMutation({
   args: { step: v.union(v.literal('days'), v.literal('losses')), cursor: v.union(v.string(), v.null()) },
   returns: v.object({ cursor: v.string(), isDone: v.boolean(), count: v.number() }),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { step, cursor }: Ctx) => {
+  handler: async (ctx, { step, cursor }) => {
     if (step === 'days') {
       const page = await ctx.db.query('oeeShifts').withIndex('by_date').paginate({ cursor, numItems: 400 })
       const keys = new Map<string, { date: string; workCenter: string }>()
@@ -274,7 +274,7 @@ export const finishImport = guardedMutation({
   },
   returns: v.null(),
   affectsPlan: false,
-  handler: async (ctx: Ctx, args: Ctx) => {
+  handler: async (ctx, args) => {
     await ctx.db.insert('oeeImports', { ...args, uploadedAt: Date.now(), uploadedBy: ctx.sessionUser?.name })
     return null
   },
@@ -285,7 +285,7 @@ export const finishImport = guardedMutation({
 export const settings = guardedQuery({
   modules: OEE,
   args: {},
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     const doc = await ctx.db
       .query('oeeSettings')
       .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
@@ -301,7 +301,7 @@ export const saveSettings = guardedMutation({
   args: { config: v.object(configFields) },
   returns: v.null(),
   affectsPlan: false,
-  handler: async (ctx: Ctx, { config }: Ctx) => {
+  handler: async (ctx, { config }) => {
     if (!(config.startupRunMin > 0) || !(config.trendWeeks > 0) || !(config.topN > 0)) {
       throw new ConvexError('Production after setup, trend weeks and list size must be above 0')
     }
@@ -325,19 +325,22 @@ const strip = ({ _id, _creationTime, ...rest }: Ctx) => rest
 export const lastImport = guardedQuery({
   modules: OEE,
   args: {},
-  handler: async (ctx: Ctx) => {
+  handler: async (ctx) => {
     const doc = await ctx.db.query('oeeImports').withIndex('by_uploadedAt').order('desc').first()
     return doc ? strip(doc) : null
   },
 })
 
-const byDate = (table: string) =>
+/** Tarih indeksli OEE tabloları (tablo adı parametre: tip burada bilerek gevşek). */
+type DatedTable = 'oeeDays' | 'oeeShifts' | 'oeeOrders' | 'oeeLossDays' | 'oeeDowntimeDays'
+
+const byDate = (table: DatedTable) =>
   guardedQuery({
     modules: OEE,
     args: { from: v.string(), to: v.string() },
-    handler: async (ctx: Ctx, { from, to }: Ctx) => {
+    handler: async (ctx, { from, to }) => {
       checkRange(from, to)
-      const rows = await ctx.db
+      const rows = await (ctx.db as Ctx)
         .query(table)
         .withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to))
         .collect()
@@ -356,7 +359,7 @@ export const lossDays = byDate('oeeLossDays')
 export const periods = guardedQuery({
   modules: OEE,
   args: {},
-  handler: async (ctx: Ctx) => ({
+  handler: async (ctx) => ({
     weekly: (await ctx.db.query('oeeWeekly').collect()).map(strip),
     monthly: (await ctx.db.query('oeeMonthly').collect()).filter((m: Ctx) => m.year !== undefined).map(strip),
   }),
@@ -366,7 +369,7 @@ export const periods = guardedQuery({
 export const downtimeDays = guardedQuery({
   modules: OEE,
   args: { from: v.string(), to: v.string() },
-  handler: async (ctx: Ctx, { from, to }: Ctx) => {
+  handler: async (ctx, { from, to }) => {
     checkRange(from, to)
     const n = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000 + 1
     if (n > MAX_EVENT_DAYS) throw new ConvexError(`Downtime rows can be read for at most ${MAX_EVENT_DAYS} days at a time`)
@@ -382,11 +385,12 @@ export const downtimeDays = guardedQuery({
 export const coverage = guardedQuery({
   modules: OEE,
   args: {},
-  handler: async (ctx: Ctx) => {
-    const span = async (table: string) => {
-      const first = await ctx.db.query(table).withIndex('by_date').order('asc').first()
-      const last = await ctx.db.query(table).withIndex('by_date').order('desc').first()
-      return first ? { from: first.date, to: last.date } : null
+  handler: async (ctx) => {
+    const span = async (table: DatedTable) => {
+      const db = ctx.db as Ctx
+      const first = await db.query(table).withIndex('by_date').order('asc').first()
+      const last = await db.query(table).withIndex('by_date').order('desc').first()
+      return first ? { from: first.date as string, to: (last ?? first).date as string } : null
     }
     const weekFirst = await ctx.db.query('oeeWeekly').withIndex('by_week').order('asc').first()
     const weekLast = await ctx.db.query('oeeWeekly').withIndex('by_week').order('desc').first()
@@ -406,7 +410,7 @@ export const coverage = guardedQuery({
       shifts,
       orders: await span('oeeOrders'),
       downtimes: await span('oeeDowntimeDays'),
-      weekly: weekFirst ? { from: `${weekFirst.year}-W${weekFirst.week}`, to: `${weekLast.year}-W${weekLast.week}` } : null,
+      weekly: weekFirst ? { from: `${weekFirst.year}-W${weekFirst.week}`, to: `${(weekLast ?? weekFirst).year}-W${(weekLast ?? weekFirst).week}` } : null,
     }
   },
 })

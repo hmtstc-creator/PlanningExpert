@@ -44,7 +44,7 @@ const pressOvertimeValidator = v.object({
 export const listDefinitions = guardedQuery({
   args: {},
   returns: v.array(definitionValidator),
-  handler: async (ctx: Ctx) => ctx.db.query('overtimeDefinitions').collect(),
+  handler: async (ctx) => ctx.db.query('overtimeDefinitions').collect(),
 })
 
 export const saveDefinition = guardedMutation({
@@ -56,7 +56,7 @@ export const saveDefinition = guardedMutation({
     durationMinutes: v.number(),
   },
   returns: v.null(),
-  handler: async (ctx: Ctx, args: Ctx) => {
+  handler: async (ctx, args) => {
     const name = args.name.trim()
     if (!name) throw new ConvexError('Give the overtime a name (e.g. Full overtime)')
     if (!Number.isInteger(args.startMinute) || args.startMinute < 0 || args.startMinute >= DAY_MINUTES) {
@@ -86,7 +86,7 @@ export const saveDefinition = guardedMutation({
 export const removeDefinition = guardedMutation({
   args: { id: v.id('overtimeDefinitions') },
   returns: v.null(),
-  handler: async (ctx: Ctx, { id }: Ctx) => {
+  handler: async (ctx, { id }) => {
     const dated = await ctx.db
       .query('pressOvertime')
       .withIndex('by_definition', (q: Ctx) => q.eq('definitionId', id))
@@ -96,7 +96,7 @@ export const removeDefinition = guardedMutation({
     )
     if (dated || recurring) {
       throw new ConvexError(
-        `Still in use (${dated ? `${dated.press} ${dated.date}` : `every ${recurring.press} template`}) — remove that overtime first.`,
+        `Still in use (${dated ? `${dated.press} ${dated.date}` : `every ${recurring?.press} template`}) — remove that overtime first.`,
       )
     }
     await ctx.db.delete(id)
@@ -107,14 +107,14 @@ export const removeDefinition = guardedMutation({
 export const listPressOvertime = guardedQuery({
   args: {},
   returns: v.array(pressOvertimeValidator),
-  handler: async (ctx: Ctx) => ctx.db.query('pressOvertime').collect(),
+  handler: async (ctx) => ctx.db.query('pressOvertime').collect(),
 })
 
 /** Bir presin bir gününe mesai aç. Plana alınamayacaksa kaydedilmez. */
 export const addPressOvertime = guardedMutation({
   args: { press: v.string(), date: v.string(), definitionId: v.id('overtimeDefinitions') },
   returns: v.null(),
-  handler: async (ctx: Ctx, args: Ctx) => {
+  handler: async (ctx, args) => {
     const press = args.press.trim()
     if (!press) throw new ConvexError('Work center is required')
     if (!ISO.test(args.date)) throw new ConvexError('Date must be YYYY-MM-DD')
@@ -144,7 +144,7 @@ export const addPressOvertime = guardedMutation({
 export const removePressOvertime = guardedMutation({
   args: { id: v.id('pressOvertime') },
   returns: v.null(),
-  handler: async (ctx: Ctx, { id }: Ctx) => {
+  handler: async (ctx, { id }) => {
     await ctx.db.delete(id)
     return null
   },
@@ -157,7 +157,7 @@ export const setRecurringOvertime = guardedMutation({
     items: v.array(v.object({ dayKey: v.string(), definitionId: v.id('overtimeDefinitions') })),
   },
   returns: v.null(),
-  handler: async (ctx: Ctx, { press, items }: Ctx) => {
+  handler: async (ctx, { press, items }) => {
     await requireDefinedPress(ctx, press)
     const template = await ctx.db
       .query('pressTemplates')
