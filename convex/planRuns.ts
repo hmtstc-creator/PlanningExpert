@@ -7,6 +7,7 @@ import { planStatusDoc, requestRecompute } from './planQueue'
 import { withDefaults } from './products'
 import { liveRows } from './sapLive'
 import { withLocale } from './plantLocale'
+import { withCraneHall } from '../src/lib/hall'
 import { SETTINGS_DEFAULTS } from '../src/lib/settingsDefaults'
 import { countsFinished, countsProduction, countsRaw } from '../src/lib/stockLocations'
 import { currentUploads } from './sapUploads'
@@ -48,7 +49,8 @@ export const smallInputs = plantInternalQuery({
     const country = settings.country
     return {
       settings,
-      presses: await ctx.db.query('presses').collect(),
+      // Holsüz work center kendi başına bir hol sayılır (src/lib/hall.ts).
+      presses: (await ctx.db.query('presses').collect()).map(withCraneHall),
       templates: await ctx.db.query('pressTemplates').collect(),
       // Work Calendar istisna haftaları: o haftaya açılan fazla mesai dahil.
       weekOverrides: await ctx.db.query('pressWeekOverrides').collect(),

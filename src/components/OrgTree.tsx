@@ -90,7 +90,7 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink, comp
     })
 
   const company = (c: OrgCompany) => (
-    <Row
+    <TreeRow
       key={c._id}
       level="company"
       label={c.name}
@@ -105,7 +105,7 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink, comp
         const loose = unassignedOf(p)
         const depts = departmentsOf(p)
         return (
-          <Row
+          <TreeRow
             key={p._id}
             level="plant"
             label={p.name}
@@ -119,7 +119,7 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink, comp
             {depts.map((d) => {
               const key = `${p._id}|${d.name}`
               return (
-                <Row
+                <TreeRow
                   key={key}
                   level="department"
                   label={d.name}
@@ -133,11 +133,11 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink, comp
                   {d.costCenters.map((cc) => (
                     <Leaf key={cc.code} code={cc.code} name={cc.name} workCenters={workCentersOf(p, cc.code).map((w) => w.name)} onSelect={() => onSelect({ kind: 'department', plantId: p._id, department: d.name })} />
                   ))}
-                </Row>
+                </TreeRow>
               )
             })}
             {loose.length > 0 && (
-              <Row
+              <TreeRow
                 level="department"
                 label="Without a department"
                 meta={`${loose.length} CC`}
@@ -151,12 +151,12 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink, comp
                 {loose.map((cc) => (
                   <Leaf key={cc.code} code={cc.code} name={cc.name} workCenters={workCentersOf(p, cc.code).map((w) => w.name)} onSelect={() => onSelect({ kind: 'department', plantId: p._id, department: null })} />
                 ))}
-              </Row>
+              </TreeRow>
             )}
-          </Row>
+          </TreeRow>
         )
       })}
-    </Row>
+    </TreeRow>
   )
 
   if (companyRoot) return <div className="text-sm">{companies.map(company)}</div>
@@ -166,7 +166,7 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink, comp
       {holdings.map((h) => {
         const list = companiesOf(h._id, companies)
         return (
-          <Row
+          <TreeRow
             key={h._id}
             level="holding"
             label={h.name}
@@ -178,7 +178,7 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink, comp
             onToggle={list.length ? () => toggle(h._id) : undefined}
           >
             {list.map(company)}
-          </Row>
+          </TreeRow>
         )
       })}
       {orphans.length > 0 && (
@@ -191,8 +191,10 @@ export function OrgTree({ holdings, companies, selected, onSelect, canLink, comp
   )
 }
 
-function Row({
+/** Ağaç satırı (başka ağaçlar da kullanır: Work Center Definitions). */
+export function TreeRow({
   level,
+  chip,
   label,
   meta,
   warn,
@@ -205,6 +207,8 @@ function Row({
   children,
 }: {
   level: Level
+  /** Seviye rozeti yerine başka rozet (ör. kategori, hol). */
+  chip?: ReactNode
   label: string
   meta?: string
   warn?: boolean
@@ -231,7 +235,7 @@ function Row({
           <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden />
         </button>
         <button type="button" className="flex min-w-0 flex-1 items-center gap-1.5 text-left" onClick={onSelect}>
-          <LevelChip level={level} className={dashed ? 'opacity-60' : ''} />
+          {chip ?? <LevelChip level={level} className={dashed ? 'opacity-60' : ''} />}
           <span className={`truncate ${level === 'holding' || level === 'company' ? 'font-semibold' : ''} ${dashed ? 'italic text-amber-900' : 'text-foreground'}`}>{label}</span>
           {warn && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" title="Something is missing here" />}
           {meta && <span className="ml-auto shrink-0 pl-2 text-[11px] text-muted-foreground">{meta}</span>}

@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { ALL_MODULES, guardedMutation, guardedQuery } from './guarded'
+import { ALL_MODULES, guardedMutation, guardedQuery, type GuardedMutationCtx, type GuardedQueryCtx } from './guarded'
 import { renameEverywhere, usageText, whereUsed } from './workCenterRefs'
 
 const pressValidator = v.object({
@@ -44,9 +44,10 @@ export const upsert = guardedMutation({
   handler: async (ctx, args) => {
     const name = args.name.trim()
     if (!name) throw new ConvexError('Work center name is required')
-    // Hol vinç kısıtıdır; kodda varsayılan hol adı yok.
+    // Hol isteğe bağlı: boşsa work center kimseyle vinç paylaşmaz
+    // (src/lib/hall.ts). Kodda varsayılan hol adı yok.
     const hall = args.hall.trim()
-    if (!hall) throw new ConvexError(`Enter the hall of ${name} — work centers in one hall share the crane for setups`)
+    const category = args.category?.trim() || undefined
     const existing = await ctx.db
       .query('presses')
       .withIndex('by_name', (q) => q.eq('name', name))
@@ -62,10 +63,12 @@ export const upsert = guardedMutation({
     if (!costCenter && (!existing || existing.costCenter)) {
       throw new ConvexError(`Choose the cost center of ${name} — every work center belongs to one`)
     }
+    // Kategori listesi veriden gelir: yeni yazılan kategori listeye girer.
+    if (category) await ensureCategory(ctx.db, category)
     if (existing) {
       await ctx.db.patch(existing._id, {
         hall,
-        category: args.category,
+        category,
         feedsCoil: args.feedsCoil,
         // Tonaj kaldırıldı: eski değer kayıtta kalmasın.
         tonnage: undefined,
@@ -73,7 +76,7 @@ export const upsert = guardedMutation({
         costCenter,
       })
     } else {
-      await ctx.db.insert('presses', { ...args, name, hall, costCenter })
+      await ctx.db.insert('presses', { ...args, name, hall, category, costCenter })
     }
     return null
   },
@@ -155,5 +158,107 @@ export const costCentersSeen = guardedQuery({
     // En yeni kayıt kazanır.
     for (const r of rows) if (r.workCenter && r.costCenter && !seen.has(r.workCenter)) seen.set(r.workCenter, r.costCenter)
     return [...seen].map(([workCenter, costCenter]) => ({ workCenter, costCenter }))
+  },
+})
+
+// ---- Kategoriler (hatlar) ----------------------------------------------------
+//
+// Kategori work center'ları hatta toplar: Gantt onunla gruplar, Capacity
+// Dashboard aynı kategorideki work center'ları toplar. Liste koda gömülü
+// değildir: plant'in seçim listesinde ('workCenterCategory') tutulur ve Work
+// Center Definitions sayfasında yönetilir; kullanılan ama listede olmayan eski
+// değerler de listede görünür.
+
+const CATEGORY_KIND = 'workCenterCategory'
+
+type Db = GuardedMutationCtx['db']
+
+async function categoryRows(db: GuardedQueryCtx['db']) {
+  return db
+    .query('lookups')
+    .withIndex('by_kind', (q) => q.eq('kind', CATEGORY_KIND))
+    .collect()
+}
+
+async function ensureCategory(db: Db, name: string) {
+  const rows = await categoryRows(db)
+  if (rows.some((r) => r.value.toLowerCase() === name.toLowerCase())) return
+  await db.insert('lookups', { kind: CATEGORY_KIND, value: name, sortOrder: rows.length, createdAt: Date.now() })
+}
+
+const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** Plant'in kategorileri: listedekiler (sırasıyla) + kullanılıp listede olmayanlar. */
+export const categories = guardedQuery({
+  modules: ALL_MODULES,
+  args: {},
+  returns: v.array(v.object({ name: v.string(), listed: v.boolean() })),
+  handler: async (ctx) => {
+    const rows = (await categoryRows(ctx.db)).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.value.localeCompare(b.value))
+    const out = rows.map((r) => ({ name: r.value, listed: true }))
+    for (const p of await ctx.db.query('presses').collect()) {
+      const c = p.category?.trim()
+      if (c && !out.some((o) => o.name === c)) out.push({ name: c, listed: false })
+    }
+    return out
+  },
+})
+
+export const addCategory = guardedMutation({
+  affectsPlan: false,
+  args: { name: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const name = args.name.trim()
+    if (!name) throw new ConvexError('Enter the category name')
+    const rows = await categoryRows(ctx.db)
+    const same = rows.find((r) => sameText(r.value, name))
+    if (same) throw new ConvexError(`${same.value} already exists`)
+    await ensureCategory(ctx.db, name)
+    return null
+  },
+})
+
+/**
+ * Kategorinin adını değiştirir: listedeki kayıt ve o kategorideki bütün work
+ * center'lar birlikte. Yeni ad zaten varsa iki kategori birleşir.
+ */
+export const renameCategory = guardedMutation({
+  args: { from: v.string(), to: v.string() },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const from = args.from.trim()
+    const to = args.to.trim()
+    if (!to) throw new ConvexError('Enter the new name')
+    if (from === to) return 0
+    let changed = 0
+    for (const p of await ctx.db.query('presses').collect()) {
+      if (p.category?.trim() === from) {
+        await ctx.db.patch(p._id, { category: to })
+        changed++
+      }
+    }
+    const rows = await categoryRows(ctx.db)
+    const old = rows.find((r) => r.value === from)
+    const target = rows.find((r) => r.value !== from && sameText(r.value, to))
+    if (old && target) await ctx.db.delete(old._id)
+    else if (old) await ctx.db.patch(old._id, { value: to })
+    else await ensureCategory(ctx.db, to)
+    return changed
+  },
+})
+
+/** Kategoriyi listeden siler — yalnızca hiçbir work center'da kullanılmıyorsa. */
+export const removeCategory = guardedMutation({
+  affectsPlan: false,
+  args: { name: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { name }) => {
+    const users = (await ctx.db.query('presses').collect()).filter((p) => p.category?.trim() === name)
+    if (users.length) {
+      throw new ConvexError(`${name} is the category of ${users.map((p) => p.name).join(', ')} — move them to another category first`)
+    }
+    for (const r of await categoryRows(ctx.db)) if (r.value === name) await ctx.db.delete(r._id)
+    return null
   },
 })

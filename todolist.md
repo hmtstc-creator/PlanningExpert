@@ -302,6 +302,19 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   Overview ve "Menu ▾"; menüde dört grup (Analysis, SAP data, Master data,
   Help), her grubun sayfaları sağ bölmede. OEE ve KPI de aynı düzende.
   Telefonda gruplar katlanır. Test: `src/lib/navigation.test.ts`.
+- [x] ✅ **Work Center Definitions yeniden kuruldu** (2026-10-04): holding
+  sayfası düzeninde — solda ağaç (Cost centers / Categories / Halls
+  görünümleri), sağda seçilen düğümün paneli (sayılar, düzenlenebilir
+  tablo, o düğüme hazır "Add a work center").
+  - Kategori önerileri koddan silindi; kategoriler plant'in listesinde
+    (`lookups`, kind `workCenterCategory`) ve bu sayfada oluşturulur,
+    yeniden adlandırılır (work center'larıyla birlikte), boşsa silinir.
+  - Hol isteğe bağlı: boş hol = kimseyle vinç paylaşmaz (`src/lib/hall.ts`,
+    plan girdisinde uygulanır); başlıkta i ile nasıl çalıştığı anlatılır.
+- [ ] **P2 — Koddaki başlangıç listeleri.** Selection lists'teki "başlangıç
+  değerlerini yaz" düğmesi (`lookups.seedDefaults`: OP10…, problem tipleri,
+  bakım nedenleri) hâlâ koddan gelir. İlke "her şey veriden": düğme kaldırılsın
+  mı, yoksa boş listeyle başlansın mı? (Karar: kullanıcı.)
 - [x] ✅ **Yönetim sayfaları ayrıldı** (2026-10-03): `/admin`
   Administration (yalnızca General: holding, şirket, General, platform
   geçmişi, sistem hataları), `/settings` Company settings (creator:

@@ -48,10 +48,10 @@ export const checklist = guardedQuery({
       {
         key: 'presses',
         module: 'planning',
-        label: 'Work Center Definitions — cost center and hall of every work center',
+        label: 'Work Center Definitions — cost center of every work center',
         to: '/makineler',
-        done: presses.length > 0 && presses.every((p) => !!p.hall?.trim() && (ctx.plant.costCenters ?? []).some((c: Any) => c.code === p.costCenter)),
-        hint: 'Every work center belongs to a cost center and needs a hall (crane constraint).',
+        done: presses.length > 0 && presses.every((p) => (ctx.plant.costCenters ?? []).some((c: Any) => c.code === p.costCenter)),
+        hint: 'Every work center belongs to a cost center. Halls (shared setup crane) are optional.',
       },
       { key: 'calendar', module: 'planning', label: 'Work Calendar — shift length, days and shifts per work center', to: '/takvim', done: !!settings && (await any(db.query('pressTemplates'))), hint: 'Without a pattern a work center has no capacity.' },
       { key: 'locations', module: 'planning', label: 'Storage Locations — which stock counts', to: '/depolar', done: locations.some((l) => l.countFinished === true), hint: 'No location is counted until it is ticked.' },

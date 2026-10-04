@@ -97,7 +97,7 @@ sihirbazında girilen değerlere dönüşür:
 |---|---|
 | Ülke `RO`, saat dilimi `Europe/Bucharest` | Fabrika ekleme formu |
 | Sayılan depolar `2009`, `1009`; üretim girişi `2009` | Storage Locations (tanımsızsa hiçbir depo sayılmaz, uyarı çıkar) |
-| Boş hol adı `Hall 1` | Hol zorunlu alan |
+| Boş hol adı `Hall 1` | Hol isteğe bağlı; boş hol = work center kimseyle vinç paylaşmaz (`src/lib/hall.ts`) |
 | İlk kullanıcı `admin/admin` | Yalnızca platform ilk kurulumu; fabrikada creator davetle gelir |
 | docs/fixeddefinitions.md'deki diğer sabitler | Tek tek gözden geçirilir: "program kuralı" olanlar kalır, "fabrika değeri" olanlar ayara taşınır |
 
