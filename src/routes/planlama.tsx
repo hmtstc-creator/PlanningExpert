@@ -667,6 +667,7 @@ function PlanlamaPage() {
                   name: p.name,
                   hall: p.hall,
                   category: p.category,
+                  frequencyStop: p.frequencyStop,
                   days: allDates.map((d) => ({
                     date: d,
                     shifts: shiftsByPressDate.get(`${p.name}|${d}`) ?? 0,

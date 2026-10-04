@@ -200,10 +200,10 @@ function PlanLogicPage() {
             ['Coils in transit', 'In-transit Excel list: each quantity arrives in its ETA week (no ETA = this week)', '/sapdata'],
             [
               'Master data',
-              'Cavities, strokes per minute (SPM), setup and coil change times, quality approval time, coil and gross weight, mould shot limit, main and alternative work centers, Flexible work center tick, co-product, Accepted OEE',
+              'Cavities, strokes per minute (SPM), setup and frequency stop (coil change) times, quality approval time, coil and gross weight, mould shot limit, main and alternative work centers, Flexible work center tick, co-product, Accepted OEE',
               '/referanslar',
             ],
-            ['Work Centers', 'The single work center list: cost center, hall (crane and setup team), category (Gantt and Capacity Dashboard groups), coil fed, frozen days', '/makineler'],
+            ['Work Centers', 'The single work center list: cost center, hall (crane and setup team), category (Gantt and Capacity Dashboard groups), frequency stop (coil setup, fixture setup … or none), frozen days', '/makineler'],
             ['Work calendar', 'Per work center: weekly pattern (days from Monday × shifts), exception weeks, overtime (dated or recurring, from an overtime type); planned stops; public and manual holidays; planning settings', '/takvim'],
             ['Dies', 'Readiness (date and time), maintenance days, shot-limit alarms — from Die Follow-up', '/die-followup/maintenance'],
             ['Machines', 'Planned work center maintenance hours and open breakdowns that stop a work center — from Machine Follow-up', '/machine-followup/breakdowns'],
@@ -432,7 +432,7 @@ function PlanLogicPage() {
           <span aria-hidden>→</span>
           <Block tone="bg-emerald-100 text-emerald-900">Production (coil 1)</Block>
           <span aria-hidden>→</span>
-          <Block tone="bg-sky-100 text-sky-900">Coil change</Block>
+          <Block tone="bg-sky-100 text-sky-900">Frequency stop (e.g. coil change)</Block>
           <span aria-hidden>→</span>
           <Block tone="bg-emerald-100 text-emerald-900">Production (coil 2)</Block>
           <span aria-hidden>→ …</span>
@@ -442,7 +442,8 @@ function PlanLogicPage() {
         </Formula>
         <p className="text-xs text-muted-foreground">
           Example: 10 h of pure stroke time at a 60 % Accepted OEE is a 16.7 h job.
-          Setup, coil changes and quality approval sit inside that time.
+          Setup, frequency stops (coil changes …) and quality approval sit inside that time. A work center
+          whose frequency stop is — none — never stops for it.
         </p>
         <p>It has to respect every rule at once:</p>
         <ul>

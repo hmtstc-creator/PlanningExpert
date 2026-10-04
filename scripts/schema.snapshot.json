@@ -3034,6 +3034,12 @@
       },
       "optional": true
     },
+    "frequencyStop": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
     "frozenDays": {
       "fieldType": {
         "type": "number"

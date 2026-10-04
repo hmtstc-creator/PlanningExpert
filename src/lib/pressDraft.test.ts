@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { draftOf, pressPayload, sameDraft, type PressRecord } from './pressDraft'
+import { UNNAMED_STOP, draftOf, pressPayload, sameDraft, stopPatch, stopValue, type PressRecord } from './pressDraft'
 
 const press: PressRecord = {
   name: 'PRS-107',
@@ -51,4 +51,18 @@ describe('pres taslağı', () => {
     expect(sameDraft(base, { ...base, feedsCoil: true })).toBe(false)
     expect(sameDraft(base, { ...base, costCenter: '51010173' })).toBe(false)
   })
+
+  it('frekansiyel duruş: ad seçilince açık, "none" kapalı, eski adsız kayıt ayrı', () => {
+    const named = { ...draftOf(press), ...stopPatch('Coil setup') }
+    expect(pressPayload(press.name, named)).toMatchObject({ feedsCoil: true, frequencyStop: 'Coil setup' })
+    expect(stopValue(named)).toBe('Coil setup')
+    const none = { ...draftOf(press), ...stopPatch('') }
+    expect(pressPayload(press.name, none)).toMatchObject({ feedsCoil: false, frequencyStop: undefined })
+    // feedsCoil yazılmamış eski kayıt: açık, adı yok.
+    const legacy = draftOf({ name: 'PRS-1', hall: '' })
+    expect(stopValue(legacy)).toBe(UNNAMED_STOP)
+    expect(pressPayload('PRS-1', legacy)).toMatchObject({ feedsCoil: true, frequencyStop: undefined })
+    expect(sameDraft(draftOf(press), named)).toBe(false)
+  })
 })
+

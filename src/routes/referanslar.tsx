@@ -190,7 +190,11 @@ function ReferanslarPage() {
       ),
       setupMinutes: n(row['Setup Time'] ?? row['Setup Süresi'] ?? row['setupMinutes']),
       coilSetupMinutes: n(
-        row['Coil Setup Time'] ?? row['Rulo Setup Süresi'] ?? row['coilSetupMinutes'],
+        row['Frequency Stop Time (min)'] ??
+          row['Frequency Stop Time'] ??
+          row['Coil Setup Time'] ??
+          row['Rulo Setup Süresi'] ??
+          row['coilSetupMinutes'],
       ),
       mainMachine: s(row['Main Machine'] ?? row['Ana Makine'] ?? row['mainMachine']),
       altMachine1: s(row['Alternative 1'] ?? row['Alternatif Makine 1'] ?? row['altMachine1']),
@@ -284,7 +288,7 @@ function ReferanslarPage() {
             'Gross Weight (Kg/piece)',
             'Min Lot (pcs) (optional)',
             'Setup Time',
-            'Coil Setup Time',
+            'Frequency Stop Time (min) (or Coil Setup Time)',
             'Main Machine',
             'Alternative 1-4',
             'Max Shot',
@@ -313,7 +317,7 @@ function ReferanslarPage() {
           <Field label="Gross Weight (Kg/piece)" value={form.grossWeight} onChange={(v) => update('grossWeight', v)} type="number" placeholder="1.465" />
           <Field label="Min. lot (pcs) — replaces the coil" value={form.minLotQty} onChange={(v) => update('minLotQty', v)} type="number" placeholder="2000" />
           <Field label="Setup Time (min)" value={form.setupMinutes} onChange={(v) => update('setupMinutes', v)} type="number" placeholder="30" />
-          <Field label="Coil Setup Time (min)" value={form.coilSetupMinutes} onChange={(v) => update('coilSetupMinutes', v)} type="number" placeholder="15" />
+          <Field label="Frequency stop time (min) — e.g. coil setup" value={form.coilSetupMinutes} onChange={(v) => update('coilSetupMinutes', v)} type="number" placeholder="15" />
           <Field label="Main Machine" value={form.mainMachine} onChange={(v) => update('mainMachine', v)} placeholder="PRS-107" />
           <Field label="Alternative 1" value={form.altMachine1} onChange={(v) => update('altMachine1', v)} placeholder="" />
           <Field label="Alternative 2" value={form.altMachine2} onChange={(v) => update('altMachine2', v)} placeholder="" />
@@ -383,7 +387,12 @@ function ReferanslarPage() {
                 Pcs/coil
               </th>
               <th className="px-3 py-2 font-medium">Setup</th>
-              <th className="px-3 py-2 font-medium">Coil Setup</th>
+              <th
+                className="px-3 py-2 font-medium"
+                title="Frequency stop time (min): the length of each repeating stop of the work center (coil setup, fixture setup …). Only work centers with a frequency stop use it."
+              >
+                Freq. stop
+              </th>
               <th className="px-3 py-2 font-medium">Main Machine</th>
               <th className="px-3 py-2 font-medium">Alternatives</th>
               <th

@@ -8,6 +8,7 @@ export interface WcPress {
   hall: string
   category?: string
   feedsCoil?: boolean
+  frequencyStop?: string
   frozenDays?: number
   costCenter?: string
 }

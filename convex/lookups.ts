@@ -5,10 +5,13 @@ import { ALL_MODULES, adminMutation, guardedQuery } from './guarded'
 /**
  * Kullanıcı tanımlı seçim listeleri.
  *
- * Operasyon adları (OP10, OP20 …) ve problem tipleri (çapak, yırtık, zımba
- * kırılması …) atölyeden atölyeye değişir; koda gömülmemeleri gerekir.
+ * Operasyon adları (OP10, OP20 …), problem tipleri, bakım nedenleri ve
+ * frekansiyel duruşlar (rulo setup'ı, fikstür setup'ı …) atölyeden atölyeye
+ * değişir: koda gömülmez, başlangıç değeri de yoktur — listeleri kullanıcı
+ * tanımlar. (Work center kategorileri de bu tabloda, kind
+ * 'workCenterCategory'; Work Center Definitions sayfasında yönetilir.)
  */
-const KINDS = ['operation', 'problemType', 'maintenanceReason', 'machineProblemType']
+const KINDS = ['operation', 'problemType', 'maintenanceReason', 'machineProblemType', 'frequencyStop']
 
 const rowValidator = v.object({
   _id: v.id('lookups'),
@@ -59,65 +62,16 @@ export const remove = adminMutation({
   args: { id: v.id('lookups') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
-    await ctx.db.delete(id)
-    return null
-  },
-})
-
-/**
- * Listeler boşsa atölyede yaygın olan başlangıç değerlerini yazar.
- *
- * Bu bir "varsayılan", kalıcı bir kural değil: admin silebilir, ekleyebilir.
- * Boş bir seçim listesiyle problem bildirilemeyeceği için bir kere çalışır.
- */
-export const seedDefaults = adminMutation({
-  modules: ALL_MODULES,
-  affectsPlan: false,
-  args: {},
-  returns: v.number(),
-  handler: async (ctx) => {
-    const defaults: Record<string, string[]> = {
-      operation: ['OP10', 'OP20', 'OP30', 'OP40', 'OP50'],
-      problemType: [
-        'Burr',
-        'Tear',
-        'Punch breakage',
-        'Die wear',
-        'Spring failure',
-        'Misfeed',
-        'Scratch',
-        'Dimensional deviation',
-      ],
-      machineProblemType: [
-        'Hydraulic',
-        'Electrical',
-        'Mechanical',
-        'Feeder / coil line',
-        'Die clamping',
-        'Safety device',
-        'Lubrication',
-        'Control / PLC',
-      ],
-      maintenanceReason: [
-        'Periodic maintenance',
-        'Breakdown',
-        'Hydraulic service',
-        'Electrical fault',
-        'Overhaul',
-      ],
-    }
-    let added = 0
-    for (const [kind, values] of Object.entries(defaults)) {
-      const existing = await ctx.db
-        .query('lookups')
-        .withIndex('by_kind', (q) => q.eq('kind', kind))
-        .collect()
-      if (existing.length > 0) continue
-      for (const [index, value] of values.entries()) {
-        await ctx.db.insert('lookups', { kind, value, sortOrder: index, createdAt: Date.now() })
-        added++
+    const row = await ctx.db.get(id)
+    if (!row) return null
+    // Work center'da kullanılan frekansiyel duruş silinmez (tanım sahipsiz kalır).
+    if (row.kind === 'frequencyStop') {
+      const users = (await ctx.db.query('presses').collect()).filter((p) => p.frequencyStop === row.value)
+      if (users.length) {
+        throw new ConvexError(`${row.value} is the frequency stop of ${users.map((p) => p.name).join(', ')} — change those on Work Center Definitions first`)
       }
     }
-    return added
+    await ctx.db.delete(id)
+    return null
   },
 })

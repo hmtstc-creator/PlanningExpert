@@ -1756,7 +1756,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   }
 
   // R8 lot fiziği
-  const r8 = rule('lot-rules', 'Whole coils (or ≥ Min. lot), mould shot limit, run not faster than SPM, no coil changes on transfer work centers')
+  const r8 = rule('lot-rules', 'Whole coils (or ≥ Min. lot), mould shot limit, run not faster than SPM, no frequency stops on work centers without one')
   const lotSums = new Map<string, { qty: number; jobs: AJob[] }>()
   for (const j of planJobs) {
     const key = `${j.material}|${j.job?.bucketLabel ?? ''}|${j.job?.dueDate ?? ''}`
@@ -1782,7 +1782,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const spm = p.spm && p.spm > 0 ? p.spm : 0
     const runMin = j.runSegs.reduce((x, b) => x + (b.end - b.start), 0)
     if (spm > 0 && runMin < j.shots / spm - 0.5) r8.fail(`${j.id}: runs ${Math.round(runMin)} min, faster than ${spm} SPM allows (${Math.round(j.shots / spm)} min).`)
-    if (pressByName.get(j.press)?.feedsCoil === false && j.coilSegs.length > 0) r8.fail(`${j.id}: coil change on transfer work center ${j.press}.`)
+    if (pressByName.get(j.press)?.feedsCoil === false && j.coilSegs.length > 0) r8.fail(`${j.id}: frequency stop on ${j.press}, which has none.`)
   }
   for (const [key, e] of lotSums) {
     const p = productBy.get(key.split('|')[0])

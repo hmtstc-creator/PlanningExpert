@@ -311,10 +311,20 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
     yeniden adlandırılır (work center'larıyla birlikte), boşsa silinir.
   - Hol isteğe bağlı: boş hol = kimseyle vinç paylaşmaz (`src/lib/hall.ts`,
     plan girdisinde uygulanır); başlıkta i ile nasıl çalıştığı anlatılır.
-- [ ] **P2 — Koddaki başlangıç listeleri.** Selection lists'teki "başlangıç
-  değerlerini yaz" düğmesi (`lookups.seedDefaults`: OP10…, problem tipleri,
-  bakım nedenleri) hâlâ koddan gelir. İlke "her şey veriden": düğme kaldırılsın
-  mı, yoksa boş listeyle başlansın mı? (Karar: kullanıcı.)
+- [x] ✅ **Koddaki başlangıç listeleri kaldırıldı** (2026-10-04):
+  `lookups.seedDefaults` ve "Fill with common defaults" düğmesi yok; bütün
+  seçim listelerini kullanıcı tanımlar.
+- [x] ✅ **Coil fed → Frequency stop** (2026-10-04): work center'ın
+  frekansiyel duruşu plant'in listesinden seçilir (Coil setup, Fixture setup
+  … ya da — none —; robot hattı, kataforez). Alan `presses.frequencyStop`;
+  plan motoru yine `feedsCoil`'e bakar (ad seçilince açık). Master Data
+  "Frequency stop time", Gantt, plan kontrolleri ve Planning Logic metinleri
+  güncellendi; Excel'de eski "Coil Setup Time" başlığı da okunur.
+  - [ ] **[G] Frekansiyel duruşun sıklığı.** Bugün aralık her zaman ruludan
+    gelir (rulo ağırlığı ÷ brüt ağırlık). Fikstür setup'ı gibi rulosuz
+    duruşlar için parça başına "kaç adette bir" alanı gerekir (Master Data'da
+    yeni sütun, motor `piecesPerCoil` yerine onu okur). Kullanıcı bu
+    hatları planlayacağı zaman yapılmalı.
 - [x] ✅ **Yönetim sayfaları ayrıldı** (2026-10-03): `/admin`
   Administration (yalnızca General: holding, şirket, General, platform
   geçmişi, sistem hataları), `/settings` Company settings (creator:

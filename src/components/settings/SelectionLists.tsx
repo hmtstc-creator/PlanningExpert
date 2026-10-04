@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { ErrorBanner } from '../ErrorBanner'
-import { useMutation, useQuery } from '../../lib/convexTransport'
+import { useQuery } from '../../lib/convexTransport'
 import { useSafeMutation } from '../../lib/useSafeMutation'
 
 /** Seçim listeleri (plant'e ait): kalıp ve makine formlarında seçilen değerler. */
@@ -11,13 +11,13 @@ const LISTS = [
   { kind: 'problemType', label: 'Problem types', hint: 'Burr, tear, punch breakage …' },
   { kind: 'maintenanceReason', label: 'Maintenance reasons', hint: 'Suggested on work center maintenance' },
   { kind: 'machineProblemType', label: 'Machine problem types', hint: 'Hydraulic, electrical … used on machine breakdown reports' },
+  { kind: 'frequencyStop', label: 'Frequency stops', hint: 'Coil setup, fixture setup … chosen per work center on Work Center Definitions' },
 ]
 
 export function SelectionLists() {
   const lookups = (useQuery(api.lookups.list) ?? []) as { _id: string; kind: string; value: string }[]
   const { run: addLookup, error: lookupError, clearError } = useSafeMutation(api.lookups.add)
   const { run: removeLookup } = useSafeMutation(api.lookups.remove)
-  const seedDefaults = useMutation(api.lookups.seedDefaults)
   const [newValue, setNewValue] = useState<Record<string, string>>({})
   const byKind = useMemo(() => {
     const map = new Map<string, typeof lookups>()
@@ -34,14 +34,7 @@ export function SelectionLists() {
       <ErrorBanner message={lookupError} onDismiss={clearError} />
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-sm font-semibold text-foreground">Selection lists</h2>
-        {lookups.length === 0 && (
-          <button
-            onClick={() => void seedDefaults()}
-            className="rounded-md border border-border px-3 py-1.5 text-xs text-foreground hover:bg-muted"
-          >
-            Fill with common defaults
-          </button>
-        )}
+        <p className="text-xs text-muted-foreground">Every list is this plant's own — nothing is filled in by the program.</p>
       </div>
       <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-3">
         {LISTS.map((list) => (
@@ -98,7 +91,7 @@ export function SelectionLists() {
                 </span>
               ))}
               {(byKind.get(list.kind) ?? []).length === 0 && (
-                <span className="text-xs text-muted-foreground">Empty.</span>
+                <span className="text-xs text-muted-foreground">Empty — add the first value.</span>
               )}
             </div>
           </div>

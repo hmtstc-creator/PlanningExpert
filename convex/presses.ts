@@ -10,6 +10,7 @@ const pressValidator = v.object({
   hall: v.string(),
   category: v.optional(v.string()),
   feedsCoil: v.optional(v.boolean()),
+  frequencyStop: v.optional(v.string()),
   /** @deprecated Kaldırıldı; eski kayıtlarda kalmış olabilir, okunmaz. */
   tonnage: v.optional(v.number()),
   frozenDays: v.optional(v.number()),
@@ -37,6 +38,7 @@ export const upsert = guardedMutation({
     hall: v.string(),
     category: v.optional(v.string()),
     feedsCoil: v.optional(v.boolean()),
+    frequencyStop: v.optional(v.string()),
     frozenDays: v.optional(v.number()),
     costCenter: v.optional(v.string()),
   },
@@ -48,6 +50,9 @@ export const upsert = guardedMutation({
     // (src/lib/hall.ts). Kodda varsayılan hol adı yok.
     const hall = args.hall.trim()
     const category = args.category?.trim() || undefined
+    // Adı seçilmiş frekansiyel duruş her zaman açıktır.
+    const frequencyStop = args.frequencyStop?.trim() || undefined
+    const feedsCoil = frequencyStop ? true : args.feedsCoil
     const existing = await ctx.db
       .query('presses')
       .withIndex('by_name', (q) => q.eq('name', name))
@@ -64,19 +69,21 @@ export const upsert = guardedMutation({
       throw new ConvexError(`Choose the cost center of ${name} — every work center belongs to one`)
     }
     // Kategori listesi veriden gelir: yeni yazılan kategori listeye girer.
-    if (category) await ensureCategory(ctx.db, category)
+    if (category) await ensureListValue(ctx.db, CATEGORY_KIND, category)
+    if (frequencyStop) await ensureListValue(ctx.db, STOP_KIND, frequencyStop)
     if (existing) {
       await ctx.db.patch(existing._id, {
         hall,
         category,
-        feedsCoil: args.feedsCoil,
+        feedsCoil,
+        frequencyStop,
         // Tonaj kaldırıldı: eski değer kayıtta kalmasın.
         tonnage: undefined,
         frozenDays: args.frozenDays,
         costCenter,
       })
     } else {
-      await ctx.db.insert('presses', { ...args, name, hall, category, costCenter })
+      await ctx.db.insert('presses', { ...args, name, hall, category, feedsCoil, frequencyStop, costCenter })
     }
     return null
   },
@@ -170,20 +177,25 @@ export const costCentersSeen = guardedQuery({
 // değerler de listede görünür.
 
 const CATEGORY_KIND = 'workCenterCategory'
+/** Frekansiyel duruş adları (Company settings → Selection lists'te de yönetilir). */
+const STOP_KIND = 'frequencyStop'
 
 type Db = GuardedMutationCtx['db']
 
-async function categoryRows(db: GuardedQueryCtx['db']) {
+async function listRows(db: GuardedQueryCtx['db'], kind: string) {
   return db
     .query('lookups')
-    .withIndex('by_kind', (q) => q.eq('kind', CATEGORY_KIND))
+    .withIndex('by_kind', (q) => q.eq('kind', kind))
     .collect()
 }
 
-async function ensureCategory(db: Db, name: string) {
-  const rows = await categoryRows(db)
+const categoryRows = (db: GuardedQueryCtx['db']) => listRows(db, CATEGORY_KIND)
+
+/** Değer listede yoksa ekler (büyük/küçük harf farkı aynı değer sayılır). */
+async function ensureListValue(db: Db, kind: string, name: string) {
+  const rows = await listRows(db, kind)
   if (rows.some((r) => r.value.toLowerCase() === name.toLowerCase())) return
-  await db.insert('lookups', { kind: CATEGORY_KIND, value: name, sortOrder: rows.length, createdAt: Date.now() })
+  await db.insert('lookups', { kind, value: name, sortOrder: rows.length, createdAt: Date.now() })
 }
 
 const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
@@ -214,7 +226,7 @@ export const addCategory = guardedMutation({
     const rows = await categoryRows(ctx.db)
     const same = rows.find((r) => sameText(r.value, name))
     if (same) throw new ConvexError(`${same.value} already exists`)
-    await ensureCategory(ctx.db, name)
+    await ensureListValue(ctx.db, CATEGORY_KIND, name)
     return null
   },
 })
@@ -243,7 +255,7 @@ export const renameCategory = guardedMutation({
     const target = rows.find((r) => r.value !== from && sameText(r.value, to))
     if (old && target) await ctx.db.delete(old._id)
     else if (old) await ctx.db.patch(old._id, { value: to })
-    else await ensureCategory(ctx.db, to)
+    else await ensureListValue(ctx.db, CATEGORY_KIND, to)
     return changed
   },
 })
@@ -259,6 +271,40 @@ export const removeCategory = guardedMutation({
       throw new ConvexError(`${name} is the category of ${users.map((p) => p.name).join(', ')} — move them to another category first`)
     }
     for (const r of await categoryRows(ctx.db)) if (r.value === name) await ctx.db.delete(r._id)
+    return null
+  },
+})
+
+// ---- Frekansiyel duruşlar ---------------------------------------------------
+//
+// İşin ortasında belli aralıkla tekrar eden duruş: rulo setup'ı (pres hattı),
+// fikstür setup'ı … Adları plant'in listesindedir; work center bir tanesini
+// seçer ya da hiç seçmez (robot hattı, kataforez …).
+
+/** Plant'in frekansiyel duruş adları: listedekiler + kullanılıp listede olmayanlar. */
+export const frequencyStops = guardedQuery({
+  modules: ALL_MODULES,
+  args: {},
+  returns: v.array(v.string()),
+  handler: async (ctx) => {
+    const rows = (await listRows(ctx.db, STOP_KIND)).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.value.localeCompare(b.value))
+    const out = rows.map((r) => r.value)
+    for (const p of await ctx.db.query('presses').collect()) {
+      const f = p.frequencyStop?.trim()
+      if (f && !out.includes(f)) out.push(f)
+    }
+    return out
+  },
+})
+
+export const addFrequencyStop = guardedMutation({
+  affectsPlan: false,
+  args: { name: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const name = args.name.trim()
+    if (!name) throw new ConvexError('Enter the name of the stop')
+    await ensureListValue(ctx.db, STOP_KIND, name)
     return null
   },
 })

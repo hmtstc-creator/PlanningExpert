@@ -11,6 +11,8 @@ export interface PressRecord {
   hall: string
   category?: string
   feedsCoil?: boolean
+  /** Frekansiyel duruşun adı (plant'in listesinden); doluysa feedsCoil açık. */
+  frequencyStop?: string
   frozenDays?: number
   /** Bağlı masraf yeri (fabrikanın cost center kodu). */
   costCenter?: string
@@ -24,6 +26,7 @@ export interface PressDraft {
   hall: string
   category: string
   feedsCoil: boolean
+  frequencyStop: string
   frozenDays: string
   costCenter: string
 }
@@ -34,6 +37,7 @@ export function draftOf(press: PressRecord): PressDraft {
     category: press.category ?? '',
     // Alan hiç yazılmamışsa rulo beslemeli kabul edilir.
     feedsCoil: press.feedsCoil !== false,
+    frequencyStop: press.frequencyStop ?? '',
     frozenDays: press.frozenDays === undefined ? '' : String(press.frozenDays),
     costCenter: press.costCenter ?? '',
   }
@@ -44,6 +48,7 @@ export function sameDraft(a: PressDraft, b: PressDraft): boolean {
     a.hall === b.hall &&
     a.category === b.category &&
     a.feedsCoil === b.feedsCoil &&
+    a.frequencyStop === b.frequencyStop &&
     a.frozenDays === b.frozenDays &&
     a.costCenter === b.costCenter
   )
@@ -63,6 +68,7 @@ export interface PressPayload {
   hall: string
   category: string | undefined
   feedsCoil: boolean
+  frequencyStop: string | undefined
   frozenDays: number | undefined
   costCenter: string | undefined
 }
@@ -74,9 +80,26 @@ export function pressPayload(name: string, draft: PressDraft): PressPayload {
     // Hol isteğe bağlı: boşsa work center kimseyle vinç paylaşmaz (hall.ts).
     hall: draft.hall.trim(),
     category: draft.category.trim() || undefined,
-    feedsCoil: draft.feedsCoil,
+    // Adı seçilmiş duruş her zaman açıktır.
+    feedsCoil: draft.feedsCoil || !!draft.frequencyStop.trim(),
+    frequencyStop: draft.frequencyStop.trim() || undefined,
     frozenDays: optionalNumber(draft.frozenDays, 0),
     // Zorunlu (yeni kayıtta); boşsa sunucu reddeder.
     costCenter: draft.costCenter.trim() || undefined,
   }
+}
+
+/** Frekansiyel duruşu açık ama adı seçilmemiş eski kayıt (seçicide ayrı satır). */
+export const UNNAMED_STOP = '\u0001'
+
+/** Seçicinin değeri: '' yok, ad, ya da adsız açık. */
+export function stopValue(draft: Pick<PressDraft, 'feedsCoil' | 'frequencyStop'>): string {
+  if (draft.frequencyStop) return draft.frequencyStop
+  return draft.feedsCoil ? UNNAMED_STOP : ''
+}
+
+/** Seçicideki değeri taslağa çevirir. */
+export function stopPatch(value: string): Pick<PressDraft, 'feedsCoil' | 'frequencyStop'> {
+  if (value === UNNAMED_STOP) return { feedsCoil: true, frequencyStop: '' }
+  return { feedsCoil: value !== '', frequencyStop: value }
 }

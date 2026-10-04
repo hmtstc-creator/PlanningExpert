@@ -84,7 +84,7 @@ describe('sunucu tarafı yetki denetimi', () => {
       expect(users.slice(start, start + 1500), fn).toContain('requireManager(')
     }
     const lookups = readFileSync('convex/lookups.ts', 'utf-8')
-    for (const fn of ['add', 'remove', 'seedDefaults']) {
+    for (const fn of ['add', 'remove']) {
       expect(lookups).toContain(`export const ${fn} = adminMutation({`)
     }
   })

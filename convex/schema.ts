@@ -199,6 +199,10 @@ export default defineSchema({
     // Rulodan mı beslenir? Progresif hatlar rulo, transfer presler blank
     // kullanır — transferde rulo değişimi yoktur, setup tektir.
     feedsCoil: v.optional(v.boolean()),
+    // Frekansiyel duruşun adı (rulo setup'ı, fikstür setup'ı …): plant'in
+    // seçim listesinden ('frequencyStop'). Doluysa feedsCoil true'dur — plan
+    // motoru duruşu feedsCoil'e göre açar; ad yalnızca tanım ve ekran içindir.
+    frequencyStop: v.optional(v.string()),
     // @deprecated Pres tonajı kaldırıldı (hiçbir hesapta yoktu).
     tonnage: v.optional(v.number()),
     // Bu presin planı kaç gün ileriye kadar dondurulmuş sayılsın.

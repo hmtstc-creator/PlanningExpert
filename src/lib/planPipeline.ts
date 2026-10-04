@@ -77,6 +77,8 @@ export interface PlanPress {
   hall: string
   category?: string
   feedsCoil?: boolean
+  /** Frekansiyel duruşun adı (ekran için; motor feedsCoil'e bakar). */
+  frequencyStop?: string
   frozenDays?: number
 }
 
@@ -310,7 +312,7 @@ export interface PlanRun {
   dailyUntil: string | null
   /** Son stok yüklemesinden beri üretilmiş sayılan onaylı iş. */
   producedSinceStock: { quantity: number; jobs: number; stockDay: string }
-  presses: { name: string; hall: string; category?: string }[]
+  presses: { name: string; hall: string; category?: string; frequencyStop?: string }[]
   plannedStops: PlannedStop[]
   days: PlanDay[]
   /** Ekranda gösterilen işler: dondurulmuşlar + motorun yeni planı. */
@@ -1612,7 +1614,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     dailyUntil: daily.until,
     lateRepair,
     alarms,
-    presses: presses.map((p) => ({ name: p.name, hall: p.hall, category: p.category })),
+    presses: presses.map((p) => ({ name: p.name, hall: p.hall, category: p.category, frequencyStop: p.frequencyStop })),
     plannedStops: plannedStops.map((p) => ({
       shiftIndex: p.shiftIndex,
       name: p.name,

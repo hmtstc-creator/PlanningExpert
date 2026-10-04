@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { ErrorBanner } from '../components/ErrorBanner'
 import { LevelChip, LevelLegend, TreeRow, type Level } from '../components/OrgTree'
@@ -9,7 +9,7 @@ import { SaveStatus } from '../components/SaveStatus'
 import { UnsavedBar } from '../components/UnsavedBar'
 import { relatedPages } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
-import { draftOf, pressPayload, sameDraft } from '../lib/pressDraft'
+import { UNNAMED_STOP, draftOf, pressPayload, sameDraft, stopPatch, stopValue } from '../lib/pressDraft'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import {
@@ -66,9 +66,9 @@ function HallInfo() {
           to the plant-wide limit.
         </li>
         <li>
-          Consecutive setups keep the <i>Min. gap between setups</i>, coil changes keep the <i>Min. gap between coil changes</i>.
+          Consecutive setups keep the <i>Min. gap between setups</i>, frequency stops (e.g. coil changes) keep the <i>Min. gap between coil changes</i>.
         </li>
-        <li>A die setup and a coil change never happen at the same time.</li>
+        <li>A die setup and a frequency stop never happen at the same time.</li>
         <li>When the crane is busy, the next setup waits — the job starts later or moves to another slot.</li>
       </ul>
       <p>
@@ -80,6 +80,70 @@ function HallInfo() {
         plant-wide limit on setups at once (setup crew) still applies to every work center.
       </p>
     </>
+  )
+}
+
+/** Frekansiyel duruşun ne olduğu ve planlayıcıda nasıl çalıştığı. */
+function StopInfo() {
+  return (
+    <>
+      <p>
+        <b>Frequency stop</b> = a stop that repeats during a job at a fixed interval — for example a <i>coil setup</i> on a
+        press line or a <i>fixture setup</i>. Choose the stop this work center has; leave it <i>— none —</i> where there is
+        no such stop (robot lines, cataphoresis, transfer presses running blanks).
+      </p>
+      <p>The names are this plant's own list: add one with “+ New frequency stop…” or on Company settings → Selection lists.</p>
+      <p>How the planner uses it:</p>
+      <ul className="ml-4 list-disc space-y-0.5">
+        <li>
+          The interval comes from the part in Master Data: every coil (coil weight ÷ gross weight). The first one is part of the
+          setup; each one after it stops the work center.
+        </li>
+        <li>Its length is the part's <i>Frequency stop time</i> in Master Data.</li>
+        <li>
+          In one hall, frequency stops keep the <i>Min. gap between coil changes</i> and never run together with a die setup.
+        </li>
+      </ul>
+      <p>With — none — the work center never stops for it, whatever the part data says.</p>
+    </>
+  )
+}
+
+/** Frekansiyel duruş adları ve "yeni" — sayfanın her yerindeki seçiciler için. */
+const StopsContext = createContext<{ stops: string[]; onNew: () => Promise<string | null> }>({ stops: [], onNew: async () => null })
+
+/** Frekansiyel duruş seçici: — none —, plant'in listesi, en altta "+ New frequency stop…". */
+function StopSelect({
+  value,
+  onChange,
+  className = '',
+}: {
+  value: { feedsCoil: boolean; frequencyStop: string }
+  onChange: (patch: { feedsCoil: boolean; frequencyStop: string }) => void
+  className?: string
+}) {
+  const { stops, onNew } = useContext(StopsContext)
+  const current = stopValue(value)
+  const options = value.frequencyStop && !stops.includes(value.frequencyStop) ? [...stops, value.frequencyStop] : stops
+  return (
+    <select
+      className={`${input} ${current === UNNAMED_STOP ? 'border-amber-500' : ''} ${className}`}
+      value={current}
+      title={current === UNNAMED_STOP ? 'This work center has a frequency stop without a name — choose which one it is' : undefined}
+      onChange={(e) => {
+        if (e.target.value === NEW) void onNew().then((n) => n && onChange(stopPatch(n)))
+        else onChange(stopPatch(e.target.value))
+      }}
+    >
+      <option value="">— none —</option>
+      {current === UNNAMED_STOP && <option value={UNNAMED_STOP}>Yes — choose its name</option>}
+      {options.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
+      <option value={NEW}>+ New frequency stop…</option>
+    </select>
   )
 }
 
@@ -105,6 +169,8 @@ function MakinelerPage() {
   const { run: remove, error: removeError } = useSafeMutation(api.presses.remove)
   const { run: rename, error: renameError } = useSafeMutation(api.presses.rename)
   const { run: addCategory, error: addCatError } = useSafeMutation(api.presses.addCategory)
+  const { run: addStop, error: addStopError } = useSafeMutation(api.presses.addFrequencyStop)
+  const stops = (useQuery(api.presses.frequencyStops) ?? []) as string[]
   const { run: renameCategory, error: renameCatError } = useSafeMutation(api.presses.renameCategory)
   const { run: removeCategory, error: removeCatError } = useSafeMutation(api.presses.removeCategory)
 
@@ -151,8 +217,19 @@ function MakinelerPage() {
   const known = new Set(costCenters.map((c) => c.code))
   const unlinked = presses.filter((p) => !p.costCenter || !known.has(p.costCenter))
   const differs = presses.filter((p) => p.costCenter && seenBy.has(p.name) && seenBy.get(p.name) !== p.costCenter)
+  // Frekansiyel duruşu açık ama adı seçilmemiş (eski "Coil fed" kayıtları).
+  const unnamedStops = presses.filter((p) => p.feedsCoil !== false && !p.frequencyStop)
 
   // Yeni kategori: sayfada oluşturulur, seçim listesine girer.
+  // Yeni frekansiyel duruş: sayfada oluşturulur, seçim listesine girer.
+  const newStop = async (): Promise<string | null> => {
+    const name = window.prompt('New frequency stop (e.g. Coil setup, Fixture setup)')?.trim()
+    if (!name) return null
+    const existing = stops.find((c) => c.toLowerCase() === name.toLowerCase())
+    if (existing) return existing
+    return (await addStop({ name })) ? name : null
+  }
+
   const newCategory = async (): Promise<string | null> => {
     const name = window.prompt('New category (line) name')?.trim()
     if (!name) return null
@@ -162,10 +239,11 @@ function MakinelerPage() {
   }
 
   return (
+    <StopsContext.Provider value={{ stops, onNew: newStop }}>
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <PageHeader
         title="Work Center Definitions"
-        summary="Cost center, category, hall and coil feed of every work center — the single work center list of the program."
+        summary="Cost center, category, hall and frequency stop of every work center — the single work center list of the program."
         links={relatedPages('/makineler')}
         info={
           <>
@@ -183,8 +261,9 @@ function MakinelerPage() {
               <b>Hall</b> (optional) is the setup crane: work centers in one hall never set up at the same time. See the i next to Hall.
             </p>
             <p>
-              <b>Coil fed</b> marks a progressive line: the first coil goes on during setup and every coil after it costs a coil change. A
-              transfer work center runs blanks — untick it there.
+              <b>Frequency stop</b> is a stop that repeats during a job — a coil setup on a press line, a fixture setup … Choose it per
+              work center from the plant's own list; — none — for lines without one (robot lines, cataphoresis). See the i next to
+              Frequency stop.
             </p>
             <p>
               <b>Frozen days</b> locks that work center's plan for the given number of days; empty uses the global setting.
@@ -202,7 +281,7 @@ function MakinelerPage() {
       </div>
 
       <ErrorBanner
-        message={upsertError ?? removeError ?? renameError ?? addCatError ?? renameCatError ?? removeCatError}
+        message={upsertError ?? removeError ?? renameError ?? addCatError ?? addStopError ?? renameCatError ?? removeCatError}
         onDismiss={clearError}
       />
 
@@ -215,10 +294,10 @@ function MakinelerPage() {
           first.
         </div>
       ) : (
-        (unlinked.length > 0 || differs.length > 0 || undefinedPresses.length > 0) && (
+        (unlinked.length > 0 || differs.length > 0 || unnamedStops.length > 0 || undefinedPresses.length > 0) && (
           <div className="mt-4 space-y-1.5 rounded-lg border border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-950">
             <p className="font-medium">
-              {[unlinked.length > 0, differs.length > 0, undefinedPresses.length > 0].filter(Boolean).length} thing(s) to finish
+              {[unlinked.length > 0, differs.length > 0, unnamedStops.length > 0, undefinedPresses.length > 0].filter(Boolean).length} thing(s) to finish
             </p>
             {unlinked.length > 0 && (
               <p>
@@ -232,6 +311,13 @@ function MakinelerPage() {
                   {unlinked.length} work center
                   {unlinked.length === 1 ? '' : 's'} without a cost center: {unlinked.map((p) => p.name).join(', ')}
                 </button>
+              </p>
+            )}
+            {unnamedStops.length > 0 && (
+              <p>
+                {unnamedStops.length} work center{unnamedStops.length === 1 ? ' has' : 's have'} a frequency stop without a name
+                (formerly “Coil fed”): {unnamedStops.map((p) => p.name).join(', ')} — choose Coil setup, Fixture setup … or — none — in
+                the Frequency stop column.
               </p>
             )}
             {differs.length > 0 && (
@@ -368,6 +454,7 @@ function MakinelerPage() {
         onDiscard={rows.discardAll}
       />
     </div>
+    </StopsContext.Provider>
   )
 }
 
@@ -680,7 +767,14 @@ function Detail({
   savePress: (id: string) => (draft: ReturnType<typeof draftOf>) => Promise<boolean>
   onSelect: (n: WcNode) => void
   onNewCategory: () => Promise<string | null>
-  upsert: (args: { name: string; hall: string; category?: string; feedsCoil?: boolean; costCenter?: string }) => Promise<boolean>
+  upsert: (args: {
+    name: string
+    hall: string
+    category?: string
+    feedsCoil?: boolean
+    frequencyStop?: string
+    costCenter?: string
+  }) => Promise<boolean>
   prefillName: string | null
   onPrefillUsed: () => void
   onRenameCode: (p: WcPress) => void
@@ -714,7 +808,7 @@ function Detail({
       chip: <Chip kind="hall" />,
     },
     {
-      label: 'Coil fed',
+      label: 'Frequency stop',
       value: list.filter((p) => p.feedsCoil !== false).length,
     },
   ]
@@ -993,11 +1087,13 @@ function WcTable({
                 </InfoTip>
               </span>
             </th>
-            <th
-              className="px-3 py-2 font-medium"
-              title="Progressive lines are coil fed; transfer work centers run blanks and have a single setup"
-            >
-              Coil fed
+            <th className="px-3 py-2 font-medium">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                Frequency stop
+                <InfoTip label="What a frequency stop is">
+                  <StopInfo />
+                </InfoTip>
+              </span>
             </th>
             <th className="px-3 py-2 font-medium" title="Days of this work center's plan that stay locked; empty uses the global setting">
               Frozen days
@@ -1063,12 +1159,7 @@ function WcTable({
                   <HallInput className="w-28" value={draft.hall} halls={halls} onChange={(v) => rows.edit(p._id, { hall: v })} />
                 </td>
                 <td className="px-3 py-2">
-                  <input
-                    type="checkbox"
-                    className="mt-2 h-4 w-4"
-                    checked={draft.feedsCoil}
-                    onChange={(e) => rows.edit(p._id, { feedsCoil: e.target.checked })}
-                  />
+                  <StopSelect className="w-40" value={draft} onChange={(patch) => rows.edit(p._id, patch)} />
                 </td>
                 <td className="px-3 py-2">
                   <input
@@ -1128,7 +1219,14 @@ function AddWorkCenter({
   costCenters: WcCostCenter[]
   categories: string[]
   halls: string[]
-  upsert: (args: { name: string; hall: string; category?: string; feedsCoil?: boolean; costCenter?: string }) => Promise<boolean>
+  upsert: (args: {
+    name: string
+    hall: string
+    category?: string
+    feedsCoil?: boolean
+    frequencyStop?: string
+    costCenter?: string
+  }) => Promise<boolean>
   onNewCategory: () => Promise<string | null>
   prefillName: string | null
   onPrefillUsed: () => void
@@ -1138,7 +1236,7 @@ function AddWorkCenter({
   const [costCenter, setCostCenter] = useState(node.kind === 'costCenter' ? node.code : '')
   const [category, setCategory] = useState(node.kind === 'category' ? node.name : '')
   const [hall, setHall] = useState(node.kind === 'hall' ? node.name : '')
-  const [feedsCoil, setFeedsCoil] = useState(true)
+  const [stop, setStop] = useState({ feedsCoil: false, frequencyStop: '' })
   const [saving, setSaving] = useState(false)
   const add = async () => {
     const n = name.trim()
@@ -1149,7 +1247,8 @@ function AddWorkCenter({
         name: n,
         hall: hall.trim(),
         category: category || undefined,
-        feedsCoil,
+        feedsCoil: stop.feedsCoil,
+        frequencyStop: stop.frequencyStop || undefined,
         costCenter,
       })
       if (ok) {
@@ -1200,12 +1299,14 @@ function AddWorkCenter({
           </span>
           <HallInput className="mt-1 block w-32" value={hall} halls={halls} onChange={setHall} />
         </label>
-        <label className="flex items-center gap-2 pb-2 text-xs text-muted-foreground">
-          <input type="checkbox" className="h-4 w-4" checked={feedsCoil} onChange={(e) => setFeedsCoil(e.target.checked)} />
-          <span>
-            Coil fed
-            <span className="block text-[10px]">untick for transfer</span>
+        <label className="text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            Frequency stop
+            <InfoTip label="What a frequency stop is">
+              <StopInfo />
+            </InfoTip>
           </span>
+          <StopSelect className="mt-1 block w-44" value={stop} onChange={setStop} />
         </label>
         <button onClick={() => void add()} disabled={!name.trim() || !costCenter || saving} className={`${btn} py-2`}>
           {saving ? 'Adding…' : 'Add work center'}

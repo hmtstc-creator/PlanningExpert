@@ -17,14 +17,14 @@ import {
  * identifiable when scrolled far to the right.
  */
 /**
- * Grey is deliberately outside the categorical palette: a coil change is the
+ * Grey is deliberately outside the categorical palette: a frequency stop (coil change …) is the
  * absence of production rather than another kind of it, and it must not
  * compete with the mould setup for attention. The five chromatic kinds were
  * validated together as a set.
  */
 const COLORS = {
   setup: { fill: '#3b6fd4', label: 'Mould setup' },
-  coil: { fill: '#94a3b8', label: 'Coil change' },
+  coil: { fill: '#94a3b8', label: 'Frequency stop' },
   quality: { fill: '#a259a8', label: 'Quality approval' },
   run: { fill: '#5aa97b', label: 'Production' },
   meeting: { fill: '#d1ad33', label: 'Meeting / handover' },
@@ -134,6 +134,8 @@ export interface WeekGanttPress {
   name: string
   hall: string
   category?: string
+  /** Work center'ın frekansiyel duruşunun adı (ör. Coil setup). */
+  frequencyStop?: string
   days: WeekGanttDay[]
 }
 
@@ -337,7 +339,7 @@ export function WeekGantt({
                         carriedOver ? ' ↻' : ''
                       }`,
               title:
-                `${job.material} · ${COLORS[kind].label} · ` +
+                `${job.material} · ${kind === 'coil' && press.frequencyStop ? press.frequencyStop : COLORS[kind].label} · ` +
                 `${clockLabel(seg.start)}–${clockLabel(seg.end)}` +
                 (kind === 'maintenance'
                   ? ''
@@ -449,7 +451,7 @@ export function WeekGantt({
                 `${job.material} · ${job.quantity.toLocaleString('en-GB')} pcs`,
                 `${toClock(start)}–${toClock(end)}`,
                 setupMin > 0 ? `setup ${Math.round(setupMin)} min` : 'no setup (die already mounted)',
-                coilCount > 0 ? `${coilCount} coil change${coilCount > 1 ? 's' : ''}` : '',
+                coilCount > 0 ? `${coilCount} × ${(press.frequencyStop ?? 'frequency stop').toLowerCase()}` : '',
                 carriedOver ? `continued from ${job.date}` : '',
                 job.urgentSetup ? 'urgent: setup may overlap another' : '',
                 job.frozen ? 'FROZEN (approved plan)' : '',
@@ -555,7 +557,7 @@ export function WeekGantt({
               <span className="absolute inset-y-0 left-1/2 w-px bg-white/80" />
             </span>
           }
-          label="Coil change"
+          label="Frequency stop"
         />
         <LegendItem
           swatch={
