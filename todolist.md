@@ -297,6 +297,11 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   kullanıcı ▾); PlanningExpert'te "System" ve tek sayfalık "Analysis"
   grupları kalktı (Performance ve Decision Log → Planning); telefonda
   çekmece. Tanım tek yerde: `src/lib/navigation.ts`.
+- [x] ✅ **Menüde hâlâ çok alt menü vardı** (2026-10-04): menü ağaç oldu
+  (çubuk → menü → alt menü). PlanningExpert çubuğunda yalnızca Plan,
+  Overview ve "Menu ▾"; menüde dört grup (Analysis, SAP data, Master data,
+  Help), her grubun sayfaları sağ bölmede. OEE ve KPI de aynı düzende.
+  Telefonda gruplar katlanır. Test: `src/lib/navigation.test.ts`.
 - [x] ✅ **Yönetim sayfaları ayrıldı** (2026-10-03): `/admin`
   Administration (yalnızca General: holding, şirket, General, platform
   geçmişi, sistem hataları), `/settings` Company settings (creator:

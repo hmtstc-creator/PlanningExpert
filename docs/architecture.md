@@ -175,6 +175,11 @@ Bunlar kodu değiştiren herkes (ve Claude) için bağlayıcıdır.
     (alanlar: portal, PlanningExpert, OEE, Die, Machine, KPI, Board, Company
     settings, Administration). Üst çubuk her alanda aynı: logo (portal) ·
     alan ▾ (izinli modüller) · alanın menüsü · Şirket › Plant ▾ · kullanıcı ▾.
+    Menü bir ağaçtır (`NavNode`), en çok üç kademe: çubukta sık sayfalar,
+    "Menu ▾" açılınca solda gruplar (Analysis, SAP data, Master data, Help),
+    sağda seçili grubun sayfaları. Bulunulan sayfa çubukta "Menu · Stock"
+    olarak görünür. Telefonda gruplar katlanır bölümdür. Kural testi:
+    `src/lib/navigation.test.ts` (derinlik, tekrar, sayfası olmayan bağlantı).
     Yönetim modül menülerinde yoktur; kullanıcı menüsünden açılır:
     - `/account` — herkes: kimlik, izinler, parola değiştirme.
     - `/settings` — Company settings (creator; General seçili şirkette):

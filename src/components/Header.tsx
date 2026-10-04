@@ -1,11 +1,11 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import { ChevronDown, LayoutGrid, LogOut, Menu, Settings, Shield, UserRound, Wifi, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, LayoutGrid, LogOut, Menu, Settings, Shield, UserRound, Wifi, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { useMutation } from '../lib/convexTransport'
 import { useCurrentUser } from '../lib/currentUser'
-import { BOARD_AREA, MODULE_AREAS, areaFor, type Area, type NavItem } from '../lib/navigation'
+import { BOARD_AREA, MODULE_AREAS, areaFor, nodeHas, type Area, type NavItem, type NavNode } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
 
 /**
@@ -171,7 +171,7 @@ function AreaSwitcher({ area, modules }: { area: Area; modules: Area[] }) {
   )
 }
 
-/** Masaüstü menüsü: alanın doğrudan bağlantıları + açılır gruplar. */
+/** Masaüstü menüsü: çubukta doğrudan bağlantılar; grup düğümü açılır menü. */
 function DesktopNav({ area, pathname }: { area: Area; pathname: string }) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
@@ -187,44 +187,120 @@ function DesktopNav({ area, pathname }: { area: Area; pathname: string }) {
       document.removeEventListener('keydown', key)
     }
   }, [openGroup])
-  if (!area.primary.length && !area.groups.length) return null
+  if (!area.nav.length) return null
   return (
     <div ref={ref} className="ml-3 hidden min-w-0 items-center gap-0.5 lg:flex">
-      {area.primary.map((item) => (
-        <Link
-          key={item.to}
-          to={item.to}
-          className={`shrink-0 ${BAR_LINK}`}
-          activeProps={{ className: BAR_ACTIVE }}
-          activeOptions={{ exact: item.to === area.home }}
-        >
-          {item.label}
-        </Link>
-      ))}
-      {area.groups.map((g) => {
-        const isOpen = openGroup === g.label
-        const active = g.items.some((i) => i.to === pathname)
+      {area.nav.map((node) => {
+        if (node.to) {
+          return (
+            <Link
+              key={node.to}
+              to={node.to}
+              className={`shrink-0 ${BAR_LINK}`}
+              activeProps={{ className: BAR_ACTIVE }}
+              activeOptions={{ exact: node.to === area.home }}
+            >
+              {node.label}
+            </Link>
+          )
+        }
+        const isOpen = openGroup === node.label
+        const active = nodeHas(node, pathname)
+        const current = active ? findTrail(node, pathname) : []
         return (
-          <div key={g.label} className="relative">
+          <div key={node.label} className="relative">
             <button
-              onClick={() => setOpenGroup(isOpen ? null : g.label)}
+              onClick={() => setOpenGroup(isOpen ? null : node.label)}
               aria-expanded={isOpen}
               className={`flex items-center gap-1 ${BAR_LINK} ${active || isOpen ? BAR_ACTIVE : ''}`}
             >
-              {g.label}
-              <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+              {node.label}
+              {/* Menüdeki sayfadaysa: çubukta hangi sayfa olduğu görünür. */}
+              {current.length > 0 && <span className="max-w-[11rem] truncate text-white/70">· {current[current.length - 1]}</span>}
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden />
             </button>
-            {isOpen && (
-              <Panel>
-                {g.items.map((item) => (
-                  <MenuLink key={item.to} item={item} onClick={() => setOpenGroup(null)} />
-                ))}
-              </Panel>
-            )}
+            {isOpen && <GroupPanel node={node} pathname={pathname} onPick={() => setOpenGroup(null)} />}
           </div>
         )
       })}
     </div>
+  )
+}
+
+/** Sayfaya giden etiketler (grup › sayfa). */
+function findTrail(node: NavNode, pathname: string): string[] {
+  for (const c of node.children ?? []) {
+    if (c.to === pathname) return [c.label]
+    if (nodeHas(c, pathname)) return [c.label, ...findTrail(c, pathname)]
+  }
+  return []
+}
+
+/**
+ * Açılan menü. Alt grupları varsa iki bölmeli: solda gruplar (üzerine
+ * gelince ya da tıklayınca seçilir), sağda seçili grubun sayfaları — menü →
+ * alt menü → sayfa. Alt grup yoksa düz liste.
+ */
+function GroupPanel({ node, pathname, onPick }: { node: NavNode; pathname: string; onPick: () => void }) {
+  const children = node.children ?? []
+  const groups = children.filter((c) => c.children?.length)
+  const leaves = children.filter((c) => c.to)
+  const [sel, setSel] = useState(() => (groups.find((g) => nodeHas(g, pathname)) ?? groups[0])?.label)
+  if (!groups.length) {
+    return (
+      <Panel>
+        <div className="py-1">
+          {leaves.map((c) => (
+            <MenuLink key={c.to} item={{ to: c.to!, label: c.label, hint: c.hint }} onClick={onPick} />
+          ))}
+        </div>
+      </Panel>
+    )
+  }
+  const open = groups.find((g) => g.label === sel) ?? groups[0]
+  return (
+    <Panel width="w-[42rem]">
+      <div className="flex">
+        <div className="w-64 shrink-0 border-r border-border bg-muted/40 py-2">
+          {groups.map((g) => {
+            const isSel = g.label === open.label
+            const has = nodeHas(g, pathname)
+            return (
+              <button
+                key={g.label}
+                onMouseEnter={() => setSel(g.label)}
+                onFocus={() => setSel(g.label)}
+                onClick={() => setSel(g.label)}
+                aria-expanded={isSel}
+                className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors ${isSel ? 'bg-background text-foreground shadow-[inset_3px_0_0] shadow-indigo-500' : 'text-muted-foreground hover:bg-background/60 hover:text-foreground'}`}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className={`block ${has ? 'font-semibold' : 'font-medium'}`}>
+                    {g.label}
+                    {has && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-indigo-500 align-middle" aria-label="current page is here" />}
+                  </span>
+                  {g.hint && <span className="block truncate text-xs text-muted-foreground/80">{g.hint}</span>}
+                </span>
+                <ChevronRight className={`h-4 w-4 shrink-0 ${isSel ? 'text-indigo-500' : 'text-muted-foreground/50'}`} aria-hidden />
+              </button>
+            )
+          })}
+          {leaves.length > 0 && (
+            <div className="mt-2 border-t border-border pt-2">
+              {leaves.map((c) => (
+                <MenuLink key={c.to} item={{ to: c.to!, label: c.label, hint: c.hint }} onClick={onPick} />
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 py-2">
+          <p className="px-4 pt-1 pb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{open.label}</p>
+          {(open.children ?? []).map((c) =>
+            c.to ? <MenuLink key={c.to} item={{ to: c.to, label: c.label, hint: c.hint }} onClick={onPick} /> : null,
+          )}
+        </div>
+      </div>
+    </Panel>
   )
 }
 
@@ -416,10 +492,7 @@ function Drawer({ area, modules, onClose }: { area: Area; modules: Area[]; onClo
           </button>
         </div>
         <div className="flex-1 px-2 py-3">
-          {section(area.title, area.primary)}
-          {area.groups.map((g) => (
-            <div key={g.label}>{section(g.label, g.items)}</div>
-          ))}
+          <DrawerNav area={area} onClose={onClose} />
           {section('Modules', [{ to: '/', label: 'Portal home' }, ...modules.filter((m) => m.key !== area.key).map((m) => ({ to: m.home, label: m.title }))])}
           {section('Account', account)}
           <button
@@ -434,3 +507,66 @@ function Drawer({ area, modules, onClose }: { area: Area; modules: Area[]; onClo
   )
 }
 
+/**
+ * Çekmecedeki alan menüsü: doğrudan bağlantılar üstte; çubuktaki "Menu"
+ * gibi grupların içi açılır, alt gruplar katlanır bölüm olur (bulunulan
+ * sayfanın bölümü açık gelir).
+ */
+function DrawerNav({ area, onClose }: { area: Area; onClose: () => void }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  if (!area.nav.length) return null
+  // Çubuktaki grup başlığı ("Menu") çekmecede tekrar etmez: içi düzleşir.
+  const nodes = area.nav.flatMap((n) => (n.to ? [n] : (n.children ?? [])))
+  const leaves = nodes.filter((n) => n.to)
+  const groups = nodes.filter((n) => !n.to && n.children?.length)
+  return (
+    <div className="mb-3">
+      <p className="px-2 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{area.title}</p>
+      {leaves.map((n) => (
+        <DrawerLink key={n.to} node={n} exact={n.to === area.home} onClose={onClose} />
+      ))}
+      {groups.map((g) => (
+        <DrawerGroup key={g.label} node={g} initiallyOpen={nodeHas(g, pathname)} onClose={onClose} />
+      ))}
+    </div>
+  )
+}
+
+function DrawerGroup({ node, initiallyOpen, onClose }: { node: NavNode; initiallyOpen: boolean; onClose: () => void }) {
+  const [open, setOpen] = useState(initiallyOpen)
+  return (
+    <div className="mt-1">
+      <button
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-foreground hover:bg-muted"
+      >
+        <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block">{node.label}</span>
+          {!open && node.hint && <span className="block truncate text-xs font-normal text-muted-foreground/80">{node.hint}</span>}
+        </span>
+      </button>
+      {open && (
+        <div className="ml-4 border-l border-border pl-2">
+          {(node.children ?? []).map((c) => (c.to ? <DrawerLink key={c.to} node={c} onClose={onClose} /> : null))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DrawerLink({ node, exact, onClose }: { node: NavNode; exact?: boolean; onClose: () => void }) {
+  return (
+    <Link
+      to={node.to!}
+      onClick={onClose}
+      className="block rounded-md px-2 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+      activeProps={{ className: 'bg-muted text-foreground font-medium' }}
+      activeOptions={{ exact }}
+    >
+      <span className="block">{node.label}</span>
+      {node.hint && <span className="block text-xs text-muted-foreground/80">{node.hint}</span>}
+    </Link>
+  )
+}
