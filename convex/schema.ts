@@ -66,6 +66,11 @@ export default defineSchema({
       machine: v.optional(v.string()),
       kpi: v.optional(v.string()),
     }),
+    /**
+     * Alan bazında seviye (src/lib/tenancy.ts → AREAS), ör.
+     * { 'planning.calendar': 'edit' }. Yazılmayan alan modülün seviyesini alır.
+     */
+    areas: v.optional(v.record(v.string(), v.string())),
     /** Board grubu: üyeleri özet görünümde (Board Dashboard). */
     board: v.optional(v.boolean()),
     createdAt: v.number(),

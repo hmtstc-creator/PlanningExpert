@@ -154,6 +154,7 @@ export async function runSync(ctx: Ctx): Promise<{ opened: number; cleared: numb
 }
 
 export const sync = guardedMutation({
+  areas: ['die.maintenance', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   args: {},
   returns: v.object({ opened: v.number(), cleared: v.number() }),
@@ -167,6 +168,7 @@ export const sync = guardedMutation({
  * bir sonraki eşleme onu yeniden açmaz. Ancak sayaç sıfırlanınca düşer.
  */
 export const close = guardedMutation({
+  areas: ['die.maintenance', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   args: {
     id: v.id('moldAlarms'),
@@ -199,6 +201,7 @@ export const close = guardedMutation({
 
 /** Kapatılan alarmı yeniden açar — karar geri alınabilir olmalı. */
 export const reopen = guardedMutation({
+  areas: ['die.maintenance', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   args: { id: v.id('moldAlarms'), reopenedBy: v.optional(v.string()) },
   returns: v.null(),

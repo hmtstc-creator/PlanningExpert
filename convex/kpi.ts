@@ -83,6 +83,7 @@ export const entries = guardedQuery({
  * ekrandan kaldırılan satır silinir.
  */
 export const save = guardedMutation({
+  areas: ['kpi.entry'],
   modules: KPI,
   affectsPlan: false,
   args: {

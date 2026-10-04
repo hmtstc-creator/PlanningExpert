@@ -24,6 +24,7 @@ export const list = guardedQuery({
  * varsa değiştirilir — bir malzemenin aynı anda tek kuralı olur.
  */
 export const set = guardedMutation({
+  areas: ['planning.plan'],
   args: {
     material: v.string(),
     kind: v.string(),
@@ -73,6 +74,7 @@ export const set = guardedMutation({
 })
 
 export const clear = guardedMutation({
+  areas: ['planning.plan'],
   args: { material: v.string() },
   returns: v.null(),
   handler: async (ctx, { material }) => {

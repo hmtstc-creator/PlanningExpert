@@ -27,6 +27,7 @@ export const listByCountry = guardedQuery({
  * motoruna da ulaşır ve o günün kapasitesi sıfırlanır.
  */
 export const replaceYear = guardedMutation({
+  areas: ['planning.calendar'],
   args: {
     country: v.string(),
     year: v.number(),

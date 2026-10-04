@@ -71,8 +71,8 @@ const COMPUTED = [
 ] as const
 
 export function KpiEntryPage({ period }: { period: KpiPeriod }) {
-  const { ctx, can } = usePlant()
-  const editable = can('kpi', 'edit')
+  const { ctx, canArea } = usePlant()
+  const editable = canArea('kpi.entry', 'edit')
   const costCenters = useMemo(() => ctx?.active?.costCenters ?? [], [ctx?.active?.costCenters])
   const [slot, setSlot] = useState(() => defaultSlot(period))
   const data = useQuery(api.kpi.entries, { period, year: slot.year, num: slot.num }) as { entries: Entry[]; oee: OeeSum[] } | undefined

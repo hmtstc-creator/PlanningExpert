@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { accessFor, allows, canManageCompany, type CompanyLike, type GroupLike, type PlantLike } from './tenancy'
+import { accessFor, allows, allowsAreas, areaAccessFor, canManageCompany, type CompanyLike, type GroupLike, type PlantLike } from './tenancy'
 import { boardAllows, moduleOfPath } from './plantContext'
 
 const company: CompanyLike = { _id: 'c1', status: 'active', modules: ['planning', 'oee', 'die', 'machine'] }
@@ -10,6 +10,31 @@ const board: GroupLike = { _id: 'g1', companyId: 'c1', allPlants: true, plantIds
 const eng: GroupLike = { _id: 'g2', companyId: 'c1', allPlants: false, plantIds: ['p1'], permissions: { planning: 'edit' } }
 
 describe('yetki kuralları', () => {
+  it('alan izni: modül varsayılanı, alan daraltır ya da genişletir', () => {
+    // PlanningExpert'i görür, yalnızca takvimi düzenler; OEE verisini yükleyemez ama görür.
+    const cal: GroupLike = {
+      _id: 'g3',
+      companyId: 'c1',
+      allPlants: true,
+      plantIds: [],
+      permissions: { planning: 'view', oee: 'edit' },
+      areas: { 'planning.calendar': 'edit', 'oee.data': 'view' },
+    }
+    const u = { _id: 'u', companyId: 'c1', groupIds: ['g3'] }
+    const areas = areaAccessFor(u, p1, company, [cal])
+    expect(areas['planning.calendar']).toBe('edit')
+    expect(areas['planning.masterData']).toBe('view')
+    expect(areas['oee.data']).toBe('view')
+    expect(areas['oee.settings']).toBe('edit')
+    expect(allowsAreas(areas, ['planning.masterData'], 'edit')).toBe(false)
+    // Modül özeti: alanlarının en genişi (sayfa açılır, düzenleme alanda).
+    expect(accessFor(u, p1, company, [cal])).toMatchObject({ planning: 'edit', oee: 'edit' })
+    // Alan yazılmamış eski grup: davranış aynen.
+    const old = areaAccessFor({ _id: 'u', companyId: 'c1', groupIds: ['g2'] }, p1, company, [eng])
+    expect(old['planning.sapData']).toBe('edit')
+    expect(old['oee.data']).toBe('none')
+  })
+
   it('gruplar birleşir, en geniş izin geçerli; fabrika kapsamı', () => {
     const u = { _id: 'u', companyId: 'c1', groupIds: ['g1', 'g2'] }
     expect(accessFor(u, p1, company, [board, eng])).toEqual({ planning: 'edit', oee: 'view', die: 'none', machine: 'none', kpi: 'none' })

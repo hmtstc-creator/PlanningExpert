@@ -36,6 +36,7 @@ export const list = guardedQuery({
 })
 
 export const set = guardedMutation({
+  areas: ['planning.plan'],
   args: {
     press: v.string(),
     fromDate: v.optional(v.string()),
@@ -79,6 +80,7 @@ export const set = guardedMutation({
 })
 
 export const clearAll = guardedMutation({
+  areas: ['planning.plan'],
   args: {},
   returns: v.null(),
   handler: async (ctx) => {

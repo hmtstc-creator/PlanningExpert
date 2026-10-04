@@ -36,6 +36,7 @@ import { Route as SiparislerRouteImport } from './routes/siparisler'
 import { Route as StoklarRouteImport } from './routes/stoklar'
 import { Route as TakvimRouteImport } from './routes/takvim'
 import { Route as TaniRouteImport } from './routes/tani'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as YonetimRouteImport } from './routes/yonetim'
 import { Route as DieFollowupIndexRouteImport } from './routes/die-followup/index'
 import { Route as DieFollowupMaintenanceRouteImport } from './routes/die-followup/maintenance'
@@ -191,6 +192,11 @@ const TaniRoute = TaniRouteImport.update({
   path: '/tani',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const YonetimRoute = YonetimRouteImport.update({
   id: '/yonetim',
   path: '/yonetim',
@@ -317,6 +323,7 @@ export interface FileRoutesByFullPath {
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
   '/tani': typeof TaniRoute
+  '/users': typeof UsersRoute
   '/yonetim': typeof YonetimRoute
   '/die-followup/maintenance': typeof DieFollowupMaintenanceRoute
   '/die-followup/problems': typeof DieFollowupProblemsRoute
@@ -365,6 +372,7 @@ export interface FileRoutesByTo {
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
   '/tani': typeof TaniRoute
+  '/users': typeof UsersRoute
   '/yonetim': typeof YonetimRoute
   '/die-followup/maintenance': typeof DieFollowupMaintenanceRoute
   '/die-followup/problems': typeof DieFollowupProblemsRoute
@@ -414,6 +422,7 @@ export interface FileRoutesById {
   '/stoklar': typeof StoklarRoute
   '/takvim': typeof TakvimRoute
   '/tani': typeof TaniRoute
+  '/users': typeof UsersRoute
   '/yonetim': typeof YonetimRoute
   '/die-followup/maintenance': typeof DieFollowupMaintenanceRoute
   '/die-followup/problems': typeof DieFollowupProblemsRoute
@@ -464,6 +473,7 @@ export interface FileRouteTypes {
     | '/stoklar'
     | '/takvim'
     | '/tani'
+    | '/users'
     | '/yonetim'
     | '/die-followup/maintenance'
     | '/die-followup/problems'
@@ -512,6 +522,7 @@ export interface FileRouteTypes {
     | '/stoklar'
     | '/takvim'
     | '/tani'
+    | '/users'
     | '/yonetim'
     | '/die-followup/maintenance'
     | '/die-followup/problems'
@@ -560,6 +571,7 @@ export interface FileRouteTypes {
     | '/stoklar'
     | '/takvim'
     | '/tani'
+    | '/users'
     | '/yonetim'
     | '/die-followup/maintenance'
     | '/die-followup/problems'
@@ -609,6 +621,7 @@ export interface RootRouteChildren {
   StoklarRoute: typeof StoklarRoute
   TakvimRoute: typeof TakvimRoute
   TaniRoute: typeof TaniRoute
+  UsersRoute: typeof UsersRoute
   YonetimRoute: typeof YonetimRoute
   DieFollowupMaintenanceRoute: typeof DieFollowupMaintenanceRoute
   DieFollowupProblemsRoute: typeof DieFollowupProblemsRoute
@@ -821,6 +834,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TaniRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/yonetim': {
       id: '/yonetim'
       path: '/yonetim'
@@ -985,6 +1005,7 @@ const rootRouteChildren: RootRouteChildren = {
   StoklarRoute: StoklarRoute,
   TakvimRoute: TakvimRoute,
   TaniRoute: TaniRoute,
+  UsersRoute: UsersRoute,
   YonetimRoute: YonetimRoute,
   DieFollowupMaintenanceRoute: DieFollowupMaintenanceRoute,
   DieFollowupProblemsRoute: DieFollowupProblemsRoute,

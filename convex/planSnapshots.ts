@@ -60,6 +60,7 @@ export const latest = guardedQuery({
 })
 
 export const approve = guardedMutation({
+  areas: ['planning.plan'],
   args: {
     horizonStart: v.string(),
     unplannedCount: v.number(),

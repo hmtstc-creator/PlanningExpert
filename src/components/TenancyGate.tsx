@@ -76,7 +76,7 @@ export function TenancyGate({ children }: { children: ReactNode }) {
 
   // Administration yalnızca General; Company settings şirketi yöneten (creator ya da General).
   if (under('/admin') && !isPlatform) return <NoAccess text="Administration is for Generals only." />
-  if (under('/settings') && !canManage) return <NoAccess text="Company settings are managed by a creator of your company." />
+  if ((under('/settings') || under('/users')) && !canManage) return <NoAccess text="Company settings are managed by a creator of your company." />
 
   // Board görünümü: yalnızca özet ve dashboard'lar.
   if (ctx.isBoard && !boardAllows(pathname)) {

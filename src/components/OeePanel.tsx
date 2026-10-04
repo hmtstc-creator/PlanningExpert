@@ -153,7 +153,7 @@ export function OeeControls({
   const options = useMemo(() => scopeOptions(scope.area, rows, config), [scope.area, rows, config])
   const coverage = useQuery(api.oee.coverage) as { days: { from: string; to: string } | null } | undefined
   const problems = configProblems(config)
-  const canEditOee = usePlant().can('oee', 'edit')
+  const canEditOee = usePlant().canArea('oee.data', 'edit')
   return (
     <>
       <OeeRebuildNotice />

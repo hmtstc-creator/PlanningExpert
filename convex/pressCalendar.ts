@@ -68,6 +68,7 @@ export const getGlobalSettings = guardedQuery({
 })
 
 export const saveGlobalSettings = guardedMutation({
+  areas: ['planning.calendar'],
   args: {
     shiftMinutes: v.number(),
     overtimeShiftMinutes: v.number(),
@@ -164,6 +165,7 @@ export const listTemplates = guardedQuery({
 })
 
 export const saveTemplate = guardedMutation({
+  areas: ['planning.calendar'],
   args: {
     press: v.string(),
     workingDays: v.number(),
@@ -218,6 +220,7 @@ export const listOverrides = guardedQuery({
 })
 
 export const saveOverride = guardedMutation({
+  areas: ['planning.calendar'],
   args: {
     press: v.string(),
     weekStart: v.string(),
@@ -255,6 +258,7 @@ export const saveOverride = guardedMutation({
 })
 
 export const clearOverride = guardedMutation({
+  areas: ['planning.calendar'],
   args: { press: v.string(), weekStart: v.string() },
   returns: v.null(),
   handler: async (ctx, { press, weekStart }) => {
@@ -278,6 +282,7 @@ export const clearOverride = guardedMutation({
  * değiştirmez (plan parça performansını master data'dan okur).
  */
 export const saveAcceptedPerformanceRate = guardedMutation({
+  areas: ['planning.calendar'],
   args: { rate: v.number() },
   returns: v.null(),
   affectsPlan: false,
@@ -296,6 +301,7 @@ export const saveAcceptedPerformanceRate = guardedMutation({
 })
 
 export const setCapacityFactor = guardedMutation({
+  areas: ['planning.calendar'],
   args: { capacityFactor: v.number() },
   returns: v.null(),
   handler: async (ctx, { capacityFactor }) => {
@@ -342,6 +348,7 @@ export const listAllOverrides = guardedQuery({
 
 /** Raw Material Coverage sayfasının ayarları: yalnızca bu iki alan yazılır. */
 export const saveRawCoverageSettings = guardedMutation({
+  areas: ['planning.calendar'],
   args: { rawCoverageDays: v.number(), rawOrderExtraKg: v.number() },
   returns: v.null(),
   affectsPlan: false,
@@ -367,6 +374,7 @@ const EMAIL = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/
 
 /** Hammadde sipariş mailinin alıcıları (To) ve bilgi grubu (CC) — bir kez tanımlanır. */
 export const saveRawOrderRecipients = guardedMutation({
+  areas: ['planning.calendar'],
   args: { to: v.array(v.string()), cc: v.array(v.string()) },
   returns: v.null(),
   affectsPlan: false,

@@ -227,6 +227,8 @@ export const context = userQuery({
             departments: active.plant.departments ?? [],
             timeZone: active.plant.timeZone ?? '',
             access: active.access,
+            // Alan izinleri: düzenleme düğmeleri bunlara bakar.
+            areas: active.areas,
             // Askıdaki şirket: salt okunur; silinme tarihi.
             deleteAfter: active.company.deleteAfter ?? null,
           }

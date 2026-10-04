@@ -48,6 +48,7 @@ export const listDefinitions = guardedQuery({
 })
 
 export const saveDefinition = guardedMutation({
+  areas: ['planning.calendar'],
   args: {
     id: v.optional(v.id('overtimeDefinitions')),
     name: v.string(),
@@ -84,6 +85,7 @@ export const saveDefinition = guardedMutation({
 })
 
 export const removeDefinition = guardedMutation({
+  areas: ['planning.calendar'],
   args: { id: v.id('overtimeDefinitions') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -112,6 +114,7 @@ export const listPressOvertime = guardedQuery({
 
 /** Bir presin bir gününe mesai aç. Plana alınamayacaksa kaydedilmez. */
 export const addPressOvertime = guardedMutation({
+  areas: ['planning.calendar'],
   args: { press: v.string(), date: v.string(), definitionId: v.id('overtimeDefinitions') },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -142,6 +145,7 @@ export const addPressOvertime = guardedMutation({
 })
 
 export const removePressOvertime = guardedMutation({
+  areas: ['planning.calendar'],
   args: { id: v.id('pressOvertime') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -152,6 +156,7 @@ export const removePressOvertime = guardedMutation({
 
 /** Şablondaki tekrarlayan mesai (her hafta, iptal edilene kadar). */
 export const setRecurringOvertime = guardedMutation({
+  areas: ['planning.calendar'],
   args: {
     press: v.string(),
     items: v.array(v.object({ dayKey: v.string(), definitionId: v.id('overtimeDefinitions') })),

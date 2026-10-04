@@ -1,5 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import { ChevronDown, ChevronRight, LayoutGrid, LogOut, Menu, Settings, Shield, UserRound, Wifi, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, LayoutGrid, LogOut, Menu, Settings, Shield, UserRound, Users, Wifi, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -409,7 +409,10 @@ function UserMenu() {
           <div className="py-1">
             <UserLink to="/account" icon={<UserRound className="h-4 w-4" />} label="My account" hint="Password, who you are" onClick={close} />
             {canManage && !ctx?.isBoard && (
-              <UserLink to="/settings" icon={<Settings className="h-4 w-4" />} label="Company settings" hint="Plants, departments, users, lists" onClick={close} />
+              <UserLink to="/settings" icon={<Settings className="h-4 w-4" />} label="Company settings" hint="Plants, departments, cost centers, lists" onClick={close} />
+            )}
+            {canManage && !ctx?.isBoard && (
+              <UserLink to="/users" icon={<Users className="h-4 w-4" />} label="Users & permissions" hint="Groups, users, permission matrix" onClick={close} />
             )}
             {isPlatform && (
               <UserLink to="/admin" icon={<Shield className="h-4 w-4" />} label="Administration" hint="Holdings, companies, Generals, system" onClick={close} />
@@ -472,7 +475,12 @@ function Drawer({ area, modules, onClose }: { area: Area; modules: Area[]; onClo
     )
   const account: NavItem[] = [
     { to: '/account', label: 'My account', hint: 'Password, who you are' },
-    ...(canManage && !ctx?.isBoard ? [{ to: '/settings', label: 'Company settings', hint: 'Plants, departments, users, lists' }] : []),
+    ...(canManage && !ctx?.isBoard
+      ? [
+          { to: '/settings', label: 'Company settings', hint: 'Plants, departments, cost centers, lists' },
+          { to: '/users', label: 'Users & permissions', hint: 'Groups, users, permission matrix' },
+        ]
+      : []),
     ...(isPlatform ? [{ to: '/admin', label: 'Administration', hint: 'Holdings, companies, Generals, system' }] : []),
     { to: '/tani', label: 'Connection diagnostics', hint: 'Is this device connected?' },
   ]

@@ -21,6 +21,7 @@ export const list = guardedQuery({
 })
 
 export const add = guardedMutation({
+  areas: ['planning.calendar'],
   args: {
     shiftIndex: v.number(),
     name: v.string(),
@@ -47,6 +48,7 @@ export const add = guardedMutation({
 })
 
 export const update = guardedMutation({
+  areas: ['planning.calendar'],
   args: {
     id: v.id('plannedStops'),
     name: v.optional(v.string()),
@@ -68,6 +70,7 @@ export const update = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  areas: ['planning.calendar'],
   args: { id: v.id('plannedStops') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

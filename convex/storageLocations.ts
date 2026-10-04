@@ -36,6 +36,7 @@ export const listAll = guardedQuery({
 })
 
 export const upsert = guardedMutation({
+  areas: ['planning.masterData'],
   args: {
     code: v.string(),
     description: v.optional(v.string()),
@@ -67,6 +68,7 @@ export const upsert = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  areas: ['planning.masterData'],
   args: { id: v.id('storageLocations') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

@@ -1248,30 +1248,3 @@ export function SystemErrors() {
     </div>
   )
 }
-
-/**
- * Şirketin kullanıcıları ve grupları (Company settings → Users & groups):
- * kim hangi plant'te ne görür matrisi, hesaplar, gruplar.
- */
-export function CompanyPeople({ companyId }: { companyId: string }) {
-  const company = ((useQuery(api.platform.companies) ?? []) as CompanyRow[]).find((c) => c._id === companyId)
-  const people = useCompanyPeople(companyId)
-  if (!company) return null
-  return (
-    <div className="space-y-8">
-      <AccessMatrix company={company} users={people.orgUsers} groups={people.orgGroups} onSelect={() => {}} />
-      <section>
-        <h3 className="text-sm font-semibold text-foreground">Accounts</h3>
-        <CompanyUsers companyId={companyId} groups={people.groups} />
-      </section>
-      <section>
-        <h3 className="text-sm font-semibold text-foreground">Groups</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          A group gives its members plants and a permission per module (no access · views · edits). A person in several groups gets the
-          widest permission. A creator needs no group.
-        </p>
-        <CompanyGroups companyId={companyId} groups={people.groups} plants={company.plants} />
-      </section>
-    </div>
-  )
-}

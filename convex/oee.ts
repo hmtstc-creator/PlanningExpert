@@ -77,6 +77,7 @@ function plantCostCentersOnly(ctx: Ctx, rows: { costCenter: string }[]) {
 }
 
 export const upsertShifts = guardedMutation({
+  areas: ['oee.data'],
   modules: OEE,
   args: { rows: v.array(v.object(shiftFields)) },
   returns: v.number(),
@@ -110,6 +111,7 @@ export const upsertShifts = guardedMutation({
 
 /** Daily KPI (geçmiş): o günün vardiya verisi varsa vardiya toplamı geçerlidir. */
 export const upsertDaily = guardedMutation({
+  areas: ['oee.data'],
   modules: OEE,
   args: { rows: v.array(v.object(dailyFields)) },
   returns: v.number(),
@@ -131,6 +133,7 @@ export const upsertDaily = guardedMutation({
 })
 
 export const upsertOrders = guardedMutation({
+  areas: ['oee.data'],
   modules: OEE,
   args: { rows: v.array(v.object(orderFields)) },
   returns: v.number(),
@@ -150,6 +153,7 @@ export const upsertOrders = guardedMutation({
 })
 
 export const upsertWeekly = guardedMutation({
+  areas: ['oee.data'],
   modules: OEE,
   args: { rows: v.array(v.object(weeklyFields)) },
   returns: v.number(),
@@ -169,6 +173,7 @@ export const upsertWeekly = guardedMutation({
 })
 
 export const upsertMonthly = guardedMutation({
+  areas: ['oee.data'],
   modules: OEE,
   args: { rows: v.array(v.object({ ...monthlyFields, year: v.number() })) },
   returns: v.number(),
@@ -195,6 +200,7 @@ export const upsertMonthly = guardedMutation({
  * Kayıp özeti yeniden hesaplanır.
  */
 export const upsertDowntimeDays = guardedMutation({
+  areas: ['oee.data'],
   modules: OEE,
   args: { days: v.array(v.object(downtimeDayFields)) },
   returns: v.number(),
@@ -228,6 +234,7 @@ export const upsertDowntimeDays = guardedMutation({
  * imleçle çağırır.
  */
 export const rebuildStored = guardedMutation({
+  areas: ['oee.data'],
   modules: OEE,
   args: { step: v.union(v.literal('days'), v.literal('losses')), cursor: v.union(v.string(), v.null()) },
   returns: v.object({ cursor: v.string(), isDone: v.boolean(), count: v.number() }),
@@ -266,6 +273,7 @@ export const rebuildStored = guardedMutation({
 })
 
 export const finishImport = guardedMutation({
+  areas: ['oee.data'],
   modules: OEE,
   args: {
     fileName: v.string(),
@@ -297,6 +305,7 @@ export const settings = guardedQuery({
 })
 
 export const saveSettings = guardedMutation({
+  areas: ['oee.settings'],
   modules: OEE,
   args: { config: v.object(configFields) },
   returns: v.null(),

@@ -3,7 +3,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 import { api } from '../../convex/_generated/api'
 import { useQuery } from './convexTransport'
 import { setDisplayTimeZone } from './sapUploads'
-import { NO_ACCESS, atLeast, type Access, type Level, type Module } from './tenancy'
+import { NO_ACCESS, NO_AREAS, atLeast, type Access, type AreaAccess, type AreaKey, type Level, type Module } from './tenancy'
 
 /**
  * Oturumun şirket / fabrika bağlamı (convex/tenancy.ts → context): seçili
@@ -43,6 +43,8 @@ export interface TenancyContext {
     /** Plant'in bölümleri, sırasıyla (OEE alanları bunlardır). */
     departments: string[]
     access: Access
+    /** Alan izinleri (AREAS); eski sunucu yanıtında yok. */
+    areas?: AreaAccess
     deleteAfter: number | null
   } | null
 }
@@ -51,6 +53,8 @@ interface Value {
   ctx: TenancyContext | undefined
   access: Access
   can: (module: Module, level?: Level) => boolean
+  /** Alan izni (ör. canArea('planning.calendar', 'edit')). */
+  canArea: (area: AreaKey, level?: Level) => boolean
   isPlatform: boolean
   /** Seçili fabrikanın şirketini yönetebilir mi (creator ya da platform). */
   canManage: boolean
@@ -60,6 +64,7 @@ const PlantContext = createContext<Value>({
   ctx: undefined,
   access: NO_ACCESS,
   can: () => false,
+  canArea: () => false,
   isPlatform: false,
   canManage: false,
 })
@@ -74,6 +79,7 @@ export function PlantProvider({ children }: { children: ReactNode }) {
     ctx,
     access,
     can: (m, level = 'view') => atLeast(access[m], level),
+    canArea: (a, level = 'view') => atLeast((ctx?.active?.areas ?? NO_AREAS)[a] ?? 'none', level),
     isPlatform,
     canManage: isPlatform || (!!ctx?.isCreator && !!ctx.active && ctx.active.companyId === ctx.companyId),
   }
@@ -102,7 +108,7 @@ export function usePlantTimeZone(): string {
 export function moduleOfPath(pathname: string): Module | null {
   // Karşılaştırma birden çok fabrikayı okur; sunucu her fabrikanın OEE iznine bakar.
   // Modülsüz: portal, Board, yönetim (Administration, Company settings), hesap, teşhis, karşılaştırma.
-  const free = ['/board', '/admin', '/settings', '/account', '/tani', '/platform', '/yonetim', '/compare']
+  const free = ['/board', '/admin', '/settings', '/users', '/account', '/tani', '/platform', '/yonetim', '/compare']
   if (pathname === '/' || free.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null
   if (pathname.startsWith('/oee')) return 'oee'
   if (pathname.startsWith('/die-followup')) return 'die'

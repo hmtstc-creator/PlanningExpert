@@ -21,6 +21,7 @@ export const list = guardedQuery({
 })
 
 export const create = guardedMutation({
+  areas: ['planning.masterData'],
   args: { groupName: v.string(), machines: v.array(v.string()) },
   returns: v.id('craneGroups'),
   handler: async (ctx, args) => {
@@ -33,6 +34,7 @@ export const create = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  areas: ['planning.masterData'],
   args: { id: v.id('craneGroups') },
   returns: v.null(),
   handler: async (ctx, { id }) => {

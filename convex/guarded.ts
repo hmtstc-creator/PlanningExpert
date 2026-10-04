@@ -12,12 +12,18 @@ import { requestRecompute } from './planQueue'
 import schema from './schema'
 import {
   NO_ACCESS,
-  accessFor,
   allows,
+  allowsAreas,
+  areaAccessFor,
+  areaInfo,
   canManageCompany,
   canSeePlant,
   isPlatform,
+  moduleAccessOf,
+  MODULE_LABELS,
   type Access,
+  type AreaAccess,
+  type AreaKey,
   type Module,
 } from '../src/lib/tenancy'
 
@@ -73,6 +79,14 @@ export interface PlantContext {
   plant: Doc<'plants'>
   company: Doc<'companies'>
   access: Access
+  /** Alan izinleri (AREAS); `access` bunların modül özeti. */
+  areas: AreaAccess
+}
+
+/** Fabrikadaki izinler: alanlar ve modül özeti. */
+function permissionsIn(user: Any, plant: Any, company: Any, g: Any[]): { access: Access; areas: AreaAccess } {
+  const areas = areaAccessFor(user, plant, company, g)
+  return { areas, access: moduleAccessOf(areas) }
 }
 
 /** Şirketin grupları (kullanıcı grubu izinleri için). */
@@ -117,7 +131,7 @@ export async function visiblePlants(db: Any, user: Any): Promise<PlantContext[]>
     if (!groups.has(plant.companyId)) groups.set(plant.companyId, await groupsOf(db, plant.companyId))
     const g = groups.get(plant.companyId)!
     if (!canSeePlant(user, plant, company, g)) continue
-    out.push({ plant, company, access: accessFor(user, plant, company, g) })
+    out.push({ plant, company, ...permissionsIn(user, plant, company, g) })
   }
   return out
 }
@@ -130,7 +144,7 @@ export async function activePlant(db: Any, user: Any, session: Any): Promise<Pla
       const company = await db.get(plant.companyId)
       if (company) {
         const g = await groupsOf(db, plant.companyId)
-        if (canSeePlant(user, plant, company, g)) return { plant, company, access: accessFor(user, plant, company, g) }
+        if (canSeePlant(user, plant, company, g)) return { plant, company, ...permissionsIn(user, plant, company, g) }
       }
     }
   }
@@ -165,7 +179,13 @@ function denied(modules: readonly Module[], need: string, access: Access): never
   throw new ConvexError(`This needs ${need} permission on ${names} — you have ${have}`)
 }
 
-function scopedCtx(ctx: Any, c: { user: Any; plant: Any; company: Any; access: Access }): Any {
+function deniedArea(keys: readonly AreaKey[], areas: AreaAccess): never {
+  const names = keys.map((k) => `${areaInfo(k)!.label} (${MODULE_LABELS[areaInfo(k)!.module]})`).join(' or ')
+  const have = keys.map((k) => `${areaInfo(k)!.label}: ${areas[k] ?? 'none'}`).join(', ')
+  throw new ConvexError(`This needs edit permission on ${names} — you have ${have}`)
+}
+
+function scopedCtx(ctx: Any, c: { user: Any; plant: Any; company: Any; access: Access; areas: AreaAccess }): Any {
   return {
     ...ctx,
     db: plantDb(ctx.db, c.plant._id, TABLES),
@@ -173,6 +193,7 @@ function scopedCtx(ctx: Any, c: { user: Any; plant: Any; company: Any; access: A
     plant: c.plant,
     company: c.company,
     access: c.access,
+    areas: c.areas,
     sessionUser: c.user,
   }
 }
@@ -187,6 +208,8 @@ export interface GuardedQueryCtx {
   plant: Doc<'plants'>
   company: Doc<'companies'>
   access: Access
+  /** Alan izinleri (src/lib/tenancy.ts → AREAS). */
+  areas: AreaAccess
   sessionUser: Doc<'users'>
   storage: StorageReader
 }
@@ -198,6 +221,11 @@ export interface GuardedMutationCtx extends Omit<GuardedQueryCtx, 'storage'> {
 
 interface GuardedSpec<A extends PropertyValidators, C> {
   modules?: readonly Module[]
+  /**
+   * Yazma işlevinin yetki alanları (biri yeterli). Verilirse izin alandan
+   * denetlenir; verilmezse modülden (herhangi bir alanı düzenleyen yazar).
+   */
+  areas?: readonly AreaKey[]
   args: A
   returns?: Any
   handler: (ctx: C, args: ObjectType<A>) => Any
@@ -205,7 +233,7 @@ interface GuardedSpec<A extends PropertyValidators, C> {
 
 /** Fabrika verisini okuyan sorgu: modüllerden birinde en az "görür". */
 export function guardedQuery<A extends PropertyValidators>(spec: GuardedSpec<A, GuardedQueryCtx>): Any {
-  const { modules: _m, ...definition } = spec
+  const { modules: _m, areas: _a, ...definition } = spec
   const modules = needModules(spec)
   return query({
     ...definition,
@@ -228,14 +256,16 @@ export function guardedMutation<A extends PropertyValidators>(
 ): Any {
   // `affectsPlan: false` — planın okumadığı veriyi yazan işlevler (kullanıcılar,
   // kalıp problemleri, sözlükler…) planı yeniden hesaplatmaz.
-  const { affectsPlan = true, modules: _m, ...definition } = spec
+  const { affectsPlan = true, modules: _m, areas, ...definition } = spec
   const modules = needModules(spec)
   return mutation({
     ...definition,
     args: withSessionArg(definition.args),
     handler: async (ctx: Any, args: Any) => {
       const c = await plantContext(ctx, args.token)
-      if (!allows(c.access, modules, 'edit')) denied(modules, 'edit', c.access)
+      if (areas?.length) {
+        if (!allowsAreas(c.areas, areas, 'edit')) deniedArea(areas, c.areas)
+      } else if (!allows(c.access, modules, 'edit')) denied(modules, 'edit', c.access)
       if (opts.companyAdmin && !canManageCompany(c.user, c.plant.companyId)) {
         throw new ConvexError('Only a company creator can do this')
       }

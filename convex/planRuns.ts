@@ -402,6 +402,7 @@ export const status = guardedQuery({
 
 /** "Şimdi yeniden hesapla" düğmesi. */
 export const requestNow = guardedMutation({
+  areas: ['planning.plan'],
   args: {},
   returns: v.null(),
   affectsPlan: false,

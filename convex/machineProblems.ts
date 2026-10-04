@@ -63,6 +63,7 @@ export const list = guardedQuery({
 })
 
 export const generateUploadUrl = guardedMutation({
+  areas: ['machine.breakdowns', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   affectsPlan: false,
   args: {},
@@ -71,6 +72,7 @@ export const generateUploadUrl = guardedMutation({
 })
 
 export const report = guardedMutation({
+  areas: ['machine.breakdowns', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   args: {
     press: v.string(),
@@ -138,6 +140,7 @@ export const report = guardedMutation({
 
 /** Beklenen devreye giriş zamanını günceller — plan buna göre yeniden kurulur. */
 export const setExpectedUp = guardedMutation({
+  areas: ['machine.breakdowns', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   args: {
     id: v.id('machineProblems'),
@@ -161,6 +164,7 @@ export const setExpectedUp = guardedMutation({
 })
 
 export const solve = guardedMutation({
+  areas: ['machine.breakdowns', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   args: {
     id: v.id('machineProblems'),
@@ -196,6 +200,7 @@ export const solve = guardedMutation({
 })
 
 export const reopen = guardedMutation({
+  areas: ['machine.breakdowns', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   args: { id: v.id('machineProblems') },
   returns: v.null(),
@@ -206,6 +211,7 @@ export const reopen = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  areas: ['machine.breakdowns', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   args: { id: v.id('machineProblems') },
   returns: v.null(),

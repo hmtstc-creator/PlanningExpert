@@ -183,8 +183,15 @@ Bunlar kodu değiştiren herkes (ve Claude) için bağlayıcıdır.
     Yönetim modül menülerinde yoktur; kullanıcı menüsünden açılır:
     - `/account` — herkes: kimlik, izinler, parola değiştirme.
     - `/settings` — Company settings (creator; General seçili şirkette):
-      Organization (plant → bölüm → cost center), Users & groups, Selection
-      lists, Change history. Holding / şirket yönetimi burada **yok**.
+      Organization (plant → bölüm → cost center), Selection lists, Change
+      history. Holding / şirket yönetimi burada **yok**.
+    - `/users` — Users & permissions (creator; General seçili şirkette):
+      şirket → grup → kullanıcı ağacı, izin matrisi (grup × alan), kullanıcının
+      plant × alan etkin izni. Yetki **alan** bazındadır (`AREAS`,
+      src/lib/tenancy.ts): grup modüle seviye verir, alanı ayrıca
+      daraltır/genişletir (`userGroups.areas`). Her fabrika yazma işlevi
+      alanını söyler (`areas: [...]`, convex/guarded.ts denetler; test:
+      convex/authGuard.test.ts).
     - `/admin` — Administration (yalnızca General): holding'ler, şirketler,
       kiralanan modüller, General'ler, platform geçmişi, sistem hataları.
     Eski adresler `/platform`, `/yonetim` yönlendirir. Kapı: TenancyGate.

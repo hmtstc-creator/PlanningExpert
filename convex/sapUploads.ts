@@ -59,6 +59,7 @@ const PRUNE_BATCH = 4000
 const ABANDONED_MS = 60 * 60_000
 
 export const beginUpload = guardedMutation({
+  areas: ['planning.sapData'],
   args: { key: keyValidator },
   returns: v.object({ uploadedAt: v.number(), batchSize: v.number() }),
   affectsPlan: false,
@@ -81,6 +82,7 @@ export const beginUpload = guardedMutation({
 })
 
 export const appendRows = guardedMutation({
+  areas: ['planning.sapData'],
   args: { key: keyValidator, uploadedAt: v.number(), rows: v.array(v.any()) },
   returns: v.object({
     count: v.number(),
@@ -123,6 +125,7 @@ export const appendRows = guardedMutation({
 
 /** Yeni dosyayı geçerli yap. Plan bu andan sonra yeni dosyayla hesaplanır. */
 export const finishUpload = guardedMutation({
+  areas: ['planning.sapData'],
   args: {
     key: keyValidator,
     uploadedAt: v.number(),
@@ -157,6 +160,7 @@ export const finishUpload = guardedMutation({
 
 /** Geçerli olmayan satırları sil; bitene kadar tekrar çağrılır. */
 export const pruneOld = guardedMutation({
+  areas: ['planning.sapData'],
   args: { key: keyValidator },
   returns: v.object({ done: v.boolean() }),
   affectsPlan: false,

@@ -33,6 +33,7 @@ export const list = guardedQuery({
  * göndermelidir; kısmi gönderim diğer alanları sessizce uçurur.
  */
 export const upsert = guardedMutation({
+  areas: ['planning.masterData'],
   args: {
     name: v.string(),
     hall: v.string(),
@@ -95,6 +96,7 @@ export const upsert = guardedMutation({
  * söyler; kayıtlar sahipsiz kalmaz.
  */
 export const remove = guardedMutation({
+  areas: ['planning.masterData'],
   args: { id: v.id('presses') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -123,6 +125,7 @@ export const usage = guardedQuery({
  * eski koduyla kalır (geçmiş değişmez).
  */
 export const rename = guardedMutation({
+  areas: ['planning.masterData'],
   args: { id: v.id('presses'), to: v.string() },
   returns: v.number(),
   handler: async (ctx, { id, to }) => {
@@ -217,6 +220,7 @@ export const categories = guardedQuery({
 })
 
 export const addCategory = guardedMutation({
+  areas: ['planning.masterData'],
   affectsPlan: false,
   args: { name: v.string() },
   returns: v.null(),
@@ -236,6 +240,7 @@ export const addCategory = guardedMutation({
  * center'lar birlikte. Yeni ad zaten varsa iki kategori birleşir.
  */
 export const renameCategory = guardedMutation({
+  areas: ['planning.masterData'],
   args: { from: v.string(), to: v.string() },
   returns: v.number(),
   handler: async (ctx, args) => {
@@ -262,6 +267,7 @@ export const renameCategory = guardedMutation({
 
 /** Kategoriyi listeden siler — yalnızca hiçbir work center'da kullanılmıyorsa. */
 export const removeCategory = guardedMutation({
+  areas: ['planning.masterData'],
   affectsPlan: false,
   args: { name: v.string() },
   returns: v.null(),
@@ -298,6 +304,7 @@ export const frequencyStops = guardedQuery({
 })
 
 export const addFrequencyStop = guardedMutation({
+  areas: ['planning.masterData'],
   affectsPlan: false,
   args: { name: v.string() },
   returns: v.null(),

@@ -174,7 +174,7 @@ const under = (pathname: string, prefix: string) => pathname === prefix || pathn
 export function areaFor(pathname: string): Area {
   if (pathname === '/' || under(pathname, '/account') || under(pathname, '/tani') || under(pathname, '/compare')) return PORTAL_AREA
   if (under(pathname, '/admin')) return ADMIN_AREA
-  if (under(pathname, '/settings')) return SETTINGS_AREA
+  if (under(pathname, '/settings') || under(pathname, '/users')) return SETTINGS_AREA
   if (under(pathname, '/board')) return BOARD_AREA
   for (const a of MODULE_AREAS) if (a.key !== 'planning' && a.key !== 'board' && under(pathname, a.home)) return a
   return PLANNING

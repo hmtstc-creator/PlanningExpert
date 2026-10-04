@@ -132,4 +132,20 @@ describe('sunucu tarafı yetki denetimi', () => {
       }
     }
   })
+
+  it('her fabrika yazma işlevi yetki alanını söyler (AREAS)', () => {
+    // Alan yazılmazsa modülün herhangi bir alanını düzenleyen yazar: bir
+    // grubun "yalnızca takvimi düzenler" ayarı sessizce delinirdi.
+    // İstisna: karar kaydı (herkese açık not) — bilinçli.
+    const exempt: Record<string, true> = { 'changeLog.ts': true, 'guarded.ts': true }
+    const files = readdirSync('convex').filter((f) => f.endsWith('.ts') && !f.includes('.test.') && !exempt[f])
+    const missing: string[] = []
+    for (const f of files) {
+      const src = readFileSync(join('convex', f), 'utf-8')
+      for (const m of src.matchAll(/export const (\w+) = guardedMutation\(\{([\s\S]{0,300})/g)) {
+        if (!/\n\s*areas: \[/.test(m[2])) missing.push(`${f}: ${m[1]}`)
+      }
+    }
+    expect(missing).toEqual([])
+  })
 })

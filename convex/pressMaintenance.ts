@@ -45,6 +45,7 @@ function requireDate(date: string, field: string): string {
 }
 
 export const add = guardedMutation({
+  areas: ['machine.maintenance', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   args: {
     press: v.string(),
@@ -89,6 +90,7 @@ export const add = guardedMutation({
 })
 
 export const update = guardedMutation({
+  areas: ['machine.maintenance', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   args: {
     id: v.id('pressMaintenance'),
@@ -129,6 +131,7 @@ export const update = guardedMutation({
  * geçmişe dönük saklandığı için silinmez, üzerine yazılır.
  */
 export const complete = guardedMutation({
+  areas: ['machine.maintenance', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   args: {
     id: v.id('pressMaintenance'),
@@ -173,6 +176,7 @@ export const complete = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  areas: ['machine.maintenance', 'planning.plan'],
   modules: MACHINE_OR_PLANNING,
   args: { id: v.id('pressMaintenance') },
   returns: v.null(),

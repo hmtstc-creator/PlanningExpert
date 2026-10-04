@@ -23,6 +23,7 @@ export const list = guardedQuery({
 })
 
 export const add = guardedMutation({
+  areas: ['die.maintenance', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   args: {
     material: v.string(),
@@ -78,6 +79,7 @@ export const add = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  areas: ['die.maintenance', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   args: { id: v.id('moldMaintenance') },
   returns: v.null(),

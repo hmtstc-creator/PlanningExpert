@@ -335,6 +335,15 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 - [x] ✅ **Kurulum listesi organizasyonu kapsamıyordu** (2026-10-03
   düzeltildi): yeni adım "Departments and cost centers"; work center adımı
   ancak her work center bir masraf yerine bağlıysa tamamlanır.
+- [x] ✅ **Yetki matrisi genişletildi, ayrı sayfa** (2026-10-04): `/users`
+  Users & permissions — şirket → grup → kullanıcı ağacı; modül içinde alan
+  bazında yetki (PlanningExpert: Plan & rules / Master data / Work calendar /
+  SAP data; OEE: data / settings; Die: problems / maintenance; Machine:
+  breakdowns / maintenance; KPI: entry). Sunucu her yazmada alanı denetler.
+  Eski gruplar aynen çalışır (alan yazılmamışsa modülün seviyesi).
+  - [ ] **[G]** Sayfalardaki düzenleme düğmelerini alan iznine göre gizleme
+    (bugün sunucu reddeder ve nedenini söyler; OEE yükleme ve KPI girişi
+    alana bakıyor).
 - [ ] **P2 — SAP entegrasyonu elle.** ZPP / MB52 / MB51 Excel'le yükleniyor.
   → Zamanlanmış içe alma (SAP export klasörü ya da API) ve "veri ne kadar
   eski" göstergesi.

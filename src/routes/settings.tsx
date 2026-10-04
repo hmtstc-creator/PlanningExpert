@@ -1,9 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { PageHeader } from '../components/PageHeader'
 import { Tabs } from '../components/Tabs'
-import { AuditList, CompanyPeople, OrgAdmin } from '../components/org/OrgAdmin'
+import { AuditList, OrgAdmin } from '../components/org/OrgAdmin'
 import { PlantChangeLog } from '../components/settings/PlantChangeLog'
 import { SelectionLists } from '../components/settings/SelectionLists'
 import { usePlant } from '../lib/plantContext'
@@ -12,7 +12,7 @@ export const Route = createFileRoute('/settings')({
   component: SettingsPage,
 })
 
-type Tab = 'organization' | 'people' | 'lists' | 'history'
+type Tab = 'organization' | 'lists' | 'history'
 
 /**
  * Company settings — şirketin creator'ları (ve seçili şirkette General):
@@ -36,8 +36,7 @@ function SettingsPage() {
               every work center (Work Center Definitions) to a cost center.
             </p>
             <p>
-              <b>Users &amp; groups</b>: a creator manages the whole company; other users get plants × module permissions through
-              their groups. New users sign in with a temporary password and replace it at the first sign-in.
+              Users, groups and permissions have their own page: <b>Users &amp; permissions</b>.
             </p>
             <p>
               <b>Selection lists</b> and the <b>plant change log</b> belong to the selected plant (header).
@@ -45,11 +44,16 @@ function SettingsPage() {
           </>
         }
       />
+      <p className="mt-3 text-sm">
+        Users, groups and the permission matrix:{' '}
+        <Link to="/users" className="font-medium text-primary underline">
+          Users &amp; permissions →
+        </Link>
+      </p>
       <div className="mt-4">
         <Tabs
           tabs={[
             { key: 'organization', label: 'Organization' },
-            { key: 'people', label: 'Users & groups' },
             { key: 'lists', label: 'Selection lists' },
             { key: 'history', label: 'Change history' },
           ]}
@@ -59,7 +63,6 @@ function SettingsPage() {
       </div>
       <div className="mt-4">
         {tab === 'organization' && <OrgAdmin scope="company" />}
-        {tab === 'people' && companyId && <CompanyPeople companyId={companyId} />}
         {tab === 'lists' && <SelectionLists />}
         {tab === 'history' && companyId && (
           <div className="space-y-8">

@@ -119,6 +119,7 @@ export const listAll = guardedQuery({
 })
 
 export const create = guardedMutation({
+  areas: ['planning.masterData'],
   args: productArgs,
   returns: v.id('products'),
   handler: async (ctx, args) => {
@@ -130,6 +131,7 @@ export const create = guardedMutation({
 })
 
 export const bulkUpsert = guardedMutation({
+  areas: ['planning.masterData'],
   args: { rows: v.array(v.object(productArgs)) },
   returns: v.object({ inserted: v.number(), updated: v.number() }),
   handler: async (ctx, { rows }) => {
@@ -163,6 +165,7 @@ export const bulkUpsert = guardedMutation({
 
 /** Parçayı siler — kalıp kayıtları, plan müdahalesi ya da eş ürün bağı yoksa. */
 export const remove = guardedMutation({
+  areas: ['planning.masterData'],
   args: { id: v.id('products') },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -184,6 +187,7 @@ export const remove = guardedMutation({
  * untouched.
  */
 export const updateField = guardedMutation({
+  areas: ['planning.masterData'],
   args: {
     id: v.id('products'),
     field: v.string(),

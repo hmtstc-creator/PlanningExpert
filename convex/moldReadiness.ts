@@ -29,6 +29,7 @@ export const list = guardedQuery({
  * eski tarih kayıtta kalır ve ileride yanıltır.
  */
 export const set = guardedMutation({
+  areas: ['die.maintenance', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   args: {
     material: v.string(),

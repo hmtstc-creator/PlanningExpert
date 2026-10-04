@@ -23,6 +23,7 @@ export const get = guardedQuery({
 })
 
 export const save = guardedMutation({
+  areas: ['planning.calendar'],
   args: {
     workingDays: v.array(v.string()),
     holidays: v.array(v.string()),

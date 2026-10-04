@@ -4,7 +4,7 @@ import type { Id } from './_generated/dataModel'
 import { internalQuery } from './_generated/server'
 import { audit, diff } from './audit'
 import { userMutation, userQuery } from './guarded'
-import { LEVELS, MODULES, canManageCompany, isPlatform } from '../src/lib/tenancy'
+import { LEVELS, MODULES, areaInfo, canManageCompany, isPlatform } from '../src/lib/tenancy'
 
 /**
  * Kullanıcılar ve kullanıcı grupları — şirket seviyesinde
@@ -291,6 +291,8 @@ export const saveGroup = userMutation({
     allPlants: v.boolean(),
     plantIds: v.array(v.id('plants')),
     permissions: permissionsValidator,
+    /** Alan bazında seviye (AREAS); yazılmayan alan modülün seviyesini alır. */
+    areas: v.optional(v.record(v.string(), levelValidator)),
     /** Board grubu: üyeleri özet görünümde (Board Dashboard, KPI / OEE dashboard'ları). */
     board: v.optional(v.boolean()),
   },
@@ -303,9 +305,33 @@ export const saveGroup = userMutation({
       const plant = await ctx.db.get(p)
       if (!plant || plant.companyId !== args.companyId) throw new ConvexError('A plant does not belong to this company')
     }
-    const doc = { companyId: args.companyId, name, allPlants: args.allPlants, plantIds: args.allPlants ? [] : args.plantIds, permissions: args.permissions, board: args.board === true }
+    // Yalnızca bilinen alanlar; modülün seviyesiyle aynı olan alan yazılmaz
+    // (fazlalık: modül değişince alan da onunla değişsin).
+    // Alanları göndermeyen eski ekran (Administration) grubun alanlarını silmez.
+    const kept = args.areas === undefined && args.id ? ((await ctx.db.get(args.id))?.areas ?? {}) : (args.areas ?? {})
+    const areas: Record<string, string> = {}
+    for (const [key, level] of Object.entries(kept)) {
+      const info = areaInfo(key)
+      if (!info) throw new ConvexError(`Unknown permission area: ${key}`)
+      if (level !== (args.permissions[info.module] ?? 'none')) areas[key] = level
+    }
+    const doc = {
+      companyId: args.companyId,
+      name,
+      allPlants: args.allPlants,
+      plantIds: args.allPlants ? [] : args.plantIds,
+      permissions: args.permissions,
+      areas,
+      board: args.board === true,
+    }
     const plantNames = async (g: Any) => (g.allPlants ? 'all' : (await Promise.all(g.plantIds.map(async (p: Id<'plants'>) => (await ctx.db.get(p))?.name ?? '?'))).sort().join(', '))
-    const summary = async (g: Any) => ({ name: g.name, plants: await plantNames(g), board: g.board === true, ...Object.fromEntries(MODULES.map((m) => [m, g.permissions?.[m] ?? 'none'])) })
+    const summary = async (g: Any) => ({
+      name: g.name,
+      plants: await plantNames(g),
+      board: g.board === true,
+      ...Object.fromEntries(MODULES.map((m) => [m, g.permissions?.[m] ?? 'none'])),
+      ...Object.fromEntries(Object.entries(g.areas ?? {}).map(([k, l]) => [areaInfo(k)?.label ?? k, l])),
+    })
     const actor = ctx.sessionUser.name
     if (args.id) {
       const old = await ctx.db.get(args.id)

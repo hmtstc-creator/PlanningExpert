@@ -31,6 +31,37 @@ export type Access = Record<Module, Level>
 export type PlatformRole = 'owner' | 'general'
 export type CompanyStatus = 'active' | 'suspended'
 
+/**
+ * Yetki alanları: modülün içindeki iş alanları. Grup her modüle bir
+ * varsayılan seviye verir; bir alanı ayrıca daraltabilir ya da genişletebilir
+ * (ör. PlanningExpert'i görür, yalnızca Work calendar'ı düzenler). Alanlar
+ * program kuralıdır — her biri sunucudaki belli yazma işlevlerini kapsar
+ * (convex/*.ts, `areas:`); ekranda yalnızca adları görünür.
+ */
+export const AREAS = [
+  { key: 'planning.plan', module: 'planning', label: 'Plan & rules', hint: 'Pin, exclude or move jobs; approve the plan; work center start times; recalculate' },
+  { key: 'planning.masterData', module: 'planning', label: 'Master data', hint: 'Parts, work centers, categories, storage locations, crane groups' },
+  { key: 'planning.calendar', module: 'planning', label: 'Work calendar', hint: 'Shift patterns, exception weeks, overtime, planned stops, holidays, plan settings' },
+  { key: 'planning.sapData', module: 'planning', label: 'SAP data', hint: 'Upload ZPP, ZPP_DAILY, MB52, MB51 and in-transit lists' },
+  { key: 'oee.data', module: 'oee', label: 'OEE data', hint: 'Upload the OEE sheets' },
+  { key: 'oee.settings', module: 'oee', label: 'OEE settings', hint: 'Departments, shifts, loss groups, setups' },
+  { key: 'die.problems', module: 'die', label: 'Die problems', hint: 'Report, solve and reopen die problems' },
+  { key: 'die.maintenance', module: 'die', label: 'Die maintenance', hint: 'Maintenance days, ready flag, shot-limit alarms' },
+  { key: 'machine.breakdowns', module: 'machine', label: 'Breakdowns', hint: 'Report, solve and reopen machine breakdowns' },
+  { key: 'machine.maintenance', module: 'machine', label: 'Machine maintenance', hint: 'Planned work center maintenance' },
+  { key: 'kpi.entry', module: 'kpi', label: 'KPI entry', hint: 'Monthly and weekly plan and actual values' },
+] as const satisfies readonly { key: string; module: Module; label: string; hint: string }[]
+
+export type AreaKey = (typeof AREAS)[number]['key']
+export type AreaAccess = Record<AreaKey, Level>
+export const AREA_KEYS: readonly AreaKey[] = AREAS.map((a) => a.key)
+
+export const areasOf = (m: Module) => AREAS.filter((a) => a.module === m)
+export const areaInfo = (key: string) => AREAS.find((a) => a.key === key)
+
+const allAreas = (level: Level): AreaAccess => Object.fromEntries(AREA_KEYS.map((k) => [k, level])) as AreaAccess
+export const NO_AREAS: AreaAccess = allAreas('none')
+
 export const NO_ACCESS: Access = { planning: 'none', oee: 'none', die: 'none', machine: 'none', kpi: 'none' }
 export const FULL_ACCESS: Access = { planning: 'edit', oee: 'edit', die: 'edit', machine: 'edit', kpi: 'edit' }
 
@@ -77,8 +108,21 @@ export interface GroupLike {
   allPlants: boolean
   plantIds: string[]
   permissions: Partial<Record<Module, Level>>
+  /**
+   * Alan bazında seviye (AREAS); yazılmayan alan modülün seviyesini alır.
+   * Ör. { 'planning.calendar': 'edit' } — PlanningExpert'i görür, takvimi düzenler.
+   */
+  areas?: Partial<Record<string, Level | string>>
   /** Board grubu: üyeleri programı özet (board) görünümünde kullanır. */
   board?: boolean
+}
+
+const asLevel = (v: unknown): Level | undefined => (v === 'none' || v === 'view' || v === 'edit' ? v : undefined)
+
+/** Grubun bir alandaki seviyesi: alana yazılan, yoksa modülünkü. */
+export function groupAreaLevel(g: Pick<GroupLike, 'permissions' | 'areas'>, key: AreaKey): Level {
+  const area = areaInfo(key)!
+  return asLevel(g.areas?.[key]) ?? asLevel(g.permissions[area.module]) ?? 'none'
 }
 
 /** Board görünümünde açık modüller: yalnızca sonuçlar (KPI ve OEE), salt okunur. */
@@ -103,41 +147,58 @@ export function canSeePlant(u: UserLike, plant: PlantLike, company: CompanyLike,
 }
 
 /**
- * Kullanıcının bir fabrikadaki modül izinleri.
- * - Platform: her modül düzenler.
+ * Kullanıcının bir fabrikadaki alan izinleri.
+ * - Platform: her alan düzenler.
  * - Başka şirketin fabrikası: hiçbir şey.
  * - Creator: şirketin bütün fabrikalarında düzenler.
- * - Diğerleri: üyesi olduğu grupların bu fabrikayı kapsayanlarının en genişi.
+ * - Diğerleri: üyesi olduğu grupların bu fabrikayı kapsayanlarının en genişi
+ *   (grubun alan seviyesi, yoksa modül seviyesi).
  * - Kapalı modül (şirket ya da fabrika): yok.
  * - Askıdaki şirket: en çok "görür" (salt okunur).
  */
-export function accessFor(u: UserLike, plant: PlantLike, company: CompanyLike, groups: GroupLike[]): Access {
-  if (isPlatform(u)) return { ...FULL_ACCESS }
+export function areaAccessFor(u: UserLike, plant: PlantLike, company: CompanyLike, groups: GroupLike[]): AreaAccess {
+  if (isPlatform(u)) return allAreas('edit')
+  const out: AreaAccess = { ...NO_AREAS }
   // Holding board üyesi: holding'in şirketlerinde yalnızca KPI ve OEE, salt okunur.
   if (u.holdingId && !u.companyId) {
-    const out: Access = { ...NO_ACCESS }
     if (!company.holdingId || company.holdingId !== u.holdingId || company._id !== plant.companyId) return out
-    for (const m of BOARD_MODULES) {
-      if (company.modules.includes(m) && !(plant.disabledModules ?? []).includes(m)) out[m] = 'view'
+    for (const a of AREAS) {
+      if (BOARD_MODULES.includes(a.module) && company.modules.includes(a.module) && !(plant.disabledModules ?? []).includes(a.module)) out[a.key] = 'view'
     }
     return out
   }
-  if (!u.companyId || u.companyId !== plant.companyId || company._id !== plant.companyId) return { ...NO_ACCESS }
-  const out: Access = { ...NO_ACCESS }
-  if (u.isCreator) Object.assign(out, FULL_ACCESS)
+  if (!u.companyId || u.companyId !== plant.companyId || company._id !== plant.companyId) return out
+  if (u.isCreator) Object.assign(out, allAreas('edit'))
   else {
     const mine = new Set(u.groupIds ?? [])
     for (const g of groups) {
       if (!mine.has(g._id) || g.companyId !== plant.companyId) continue
       if (!g.allPlants && !g.plantIds.includes(plant._id)) continue
-      for (const m of MODULES) out[m] = maxLevel(out[m], g.permissions[m] ?? 'none')
+      for (const k of AREA_KEYS) out[k] = maxLevel(out[k], groupAreaLevel(g, k))
     }
   }
-  for (const m of MODULES) {
-    if (!company.modules.includes(m) || (plant.disabledModules ?? []).includes(m)) out[m] = 'none'
-    else if (company.status !== 'active' && out[m] === 'edit') out[m] = 'view'
+  for (const a of AREAS) {
+    if (!company.modules.includes(a.module) || (plant.disabledModules ?? []).includes(a.module)) out[a.key] = 'none'
+    else if (company.status !== 'active' && out[a.key] === 'edit') out[a.key] = 'view'
   }
   return out
+}
+
+/** Alan izinlerinden modül izni: modülün alanlarının en genişi (sayfaları açar). */
+export function moduleAccessOf(areas: AreaAccess): Access {
+  const out: Access = { ...NO_ACCESS }
+  for (const a of AREAS) out[a.module] = maxLevel(out[a.module], areas[a.key])
+  return out
+}
+
+/** Kullanıcının bir fabrikadaki modül izinleri (alan izinlerinin özeti). */
+export function accessFor(u: UserLike, plant: PlantLike, company: CompanyLike, groups: GroupLike[]): Access {
+  return moduleAccessOf(areaAccessFor(u, plant, company, groups))
+}
+
+/** İşlevin alanlarından biri yeterli. */
+export function allowsAreas(areas: AreaAccess, keys: readonly AreaKey[], need: Level): boolean {
+  return keys.some((k) => atLeast(areas[k] ?? 'none', need))
 }
 
 /** İşlevin modüllerinden biri yeterli: okumada "görür", yazmada "düzenler". */

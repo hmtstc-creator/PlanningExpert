@@ -45,6 +45,7 @@ export const list = guardedQuery({
 
 /** Fotoğrafın doğrudan tarayıcıdan yükleneceği tek kullanımlık adres. */
 export const generateUploadUrl = guardedMutation({
+  areas: ['die.problems', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: {},
@@ -53,6 +54,7 @@ export const generateUploadUrl = guardedMutation({
 })
 
 export const report = guardedMutation({
+  areas: ['die.problems', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: {
@@ -104,6 +106,7 @@ export const report = guardedMutation({
 })
 
 export const solve = guardedMutation({
+  areas: ['die.problems', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: {
@@ -136,6 +139,7 @@ export const solve = guardedMutation({
 })
 
 export const reopen = guardedMutation({
+  areas: ['die.problems', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: { id: v.id('moldProblems') },
@@ -151,6 +155,7 @@ export const reopen = guardedMutation({
 })
 
 export const remove = guardedMutation({
+  areas: ['die.problems', 'planning.plan'],
   modules: DIE_OR_PLANNING,
   affectsPlan: false,
   args: { id: v.id('moldProblems') },
