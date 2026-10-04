@@ -9,6 +9,7 @@ const press: PressRecord = {
   feedsCoil: false,
   frozenDays: 3,
   costCenter: '51010171',
+  rateModel: 'stroke',
 }
 
 describe('pres taslağı', () => {

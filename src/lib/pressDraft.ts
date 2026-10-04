@@ -13,6 +13,8 @@ export interface PressRecord {
   feedsCoil?: boolean
   /** Frekansiyel duruşun adı (plant'in listesinden); doluysa feedsCoil açık. */
   frequencyStop?: string
+  /** Üretim modeli: 'stroke' (pres; varsayılan) ya da 'cycle' (src/lib/rateModel.ts). */
+  rateModel?: string
   frozenDays?: number
   /** Bağlı masraf yeri (fabrikanın cost center kodu). */
   costCenter?: string
@@ -27,6 +29,7 @@ export interface PressDraft {
   category: string
   feedsCoil: boolean
   frequencyStop: string
+  rateModel: 'stroke' | 'cycle'
   frozenDays: string
   costCenter: string
 }
@@ -38,6 +41,7 @@ export function draftOf(press: PressRecord): PressDraft {
     // Alan hiç yazılmamışsa rulo beslemeli kabul edilir.
     feedsCoil: press.feedsCoil !== false,
     frequencyStop: press.frequencyStop ?? '',
+    rateModel: press.rateModel === 'cycle' ? 'cycle' : 'stroke',
     frozenDays: press.frozenDays === undefined ? '' : String(press.frozenDays),
     costCenter: press.costCenter ?? '',
   }
@@ -49,6 +53,7 @@ export function sameDraft(a: PressDraft, b: PressDraft): boolean {
     a.category === b.category &&
     a.feedsCoil === b.feedsCoil &&
     a.frequencyStop === b.frequencyStop &&
+    a.rateModel === b.rateModel &&
     a.frozenDays === b.frozenDays &&
     a.costCenter === b.costCenter
   )
@@ -69,6 +74,7 @@ export interface PressPayload {
   category: string | undefined
   feedsCoil: boolean
   frequencyStop: string | undefined
+  rateModel: 'stroke' | 'cycle'
   frozenDays: number | undefined
   costCenter: string | undefined
 }
@@ -83,6 +89,7 @@ export function pressPayload(name: string, draft: PressDraft): PressPayload {
     // Adı seçilmiş duruş her zaman açıktır.
     feedsCoil: draft.feedsCoil || !!draft.frequencyStop.trim(),
     frequencyStop: draft.frequencyStop.trim() || undefined,
+    rateModel: draft.rateModel,
     frozenDays: optionalNumber(draft.frozenDays, 0),
     // Zorunlu (yeni kayıtta); boşsa sunucu reddeder.
     costCenter: draft.costCenter.trim() || undefined,

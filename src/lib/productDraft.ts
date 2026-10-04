@@ -31,6 +31,10 @@ export interface ProductDraft {
   maxShots: string
   qualityApprovalMinutes: string
   performanceFactor: string
+  /** Çevrim hattı (src/lib/rateModel.ts): çevrim süresi (sn). */
+  cycleTimeSeconds: string
+  /** Çevrim hattı: frekansiyel duruşlar arası adet. */
+  stopEveryPcs: string
 }
 
 export const PRODUCT_FIELDS: ProductField[] = [
@@ -53,6 +57,8 @@ export const PRODUCT_FIELDS: ProductField[] = [
   { name: 'maxShots', numeric: true },
   { name: 'qualityApprovalMinutes', numeric: true },
   { name: 'performanceFactor', numeric: true },
+  { name: 'cycleTimeSeconds', numeric: true },
+  { name: 'stopEveryPcs', numeric: true },
 ]
 
 function text(value: unknown): string {

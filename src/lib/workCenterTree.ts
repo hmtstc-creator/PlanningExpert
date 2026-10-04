@@ -9,6 +9,7 @@ export interface WcPress {
   category?: string
   feedsCoil?: boolean
   frequencyStop?: string
+  rateModel?: string
   frozenDays?: number
   costCenter?: string
 }

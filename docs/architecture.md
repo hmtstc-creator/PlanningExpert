@@ -195,6 +195,13 @@ Bunlar kodu değiştiren herkes (ve Claude) için bağlayıcıdır.
     - `/admin` — Administration (yalnızca General): holding'ler, şirketler,
       kiralanan modüller, General'ler, platform geçmişi, sistem hataları.
     Eski adresler `/platform`, `/yonetim` yönlendirir. Kapı: TenancyGate.
+18b. **Üretim modeli** (2026-10-04, src/lib/rateModel.ts): work center'ın
+    tanımı — `stroke` (pres: SPM × göz, tam rulo ya da Min. lot, sac kg) ya da
+    `cycle` (robot, montaj, kataforez: çevrim süresi × çevrim başına adet, lot
+    Min. lot ya da tam ihtiyaç, rulo/kg yok, frekansiyel duruş "her N adette").
+    Parça ana makinesinin modelini alır. Motor tek dili konuşur: parça plana
+    girerken `planSpec` ile çevrilir (convex/planEngine.ts → loadInputs);
+    vinç, setup, vardiya, geç iş kuralları iki modelde aynıdır.
 19. Her sayfa `PageHeader` ile başlar (`src/components/PageHeader.tsx`):
     başlık, tek satır özet, uzun açıklama mavi **i** (`InfoTip`) içinde —
     üzerine gelince (dokunmatikte tıklayınca) açılır. Sayfa içindeki uzun

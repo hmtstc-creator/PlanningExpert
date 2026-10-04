@@ -180,7 +180,11 @@ export default defineSchema({
     performanceFactor: v.optional(v.number()),
     name: v.optional(v.string()),
     material: v.optional(v.string()),
+    // Çevrim hattı parçası (ana makinesi 'cycle'): çevrim süresi (sn); göz
+    // sayısı "çevrim başına adet" olarak okunur.
     cycleTimeSeconds: v.optional(v.number()),
+    // Çevrim hattı: frekansiyel duruşlar arası adet (fikstür setup'ı …).
+    stopEveryPcs: v.optional(v.number()),
   }).index('by_code', ['plantId', 'code'])
     .index('by_plant', ['plantId']),
 
@@ -208,6 +212,9 @@ export default defineSchema({
     // seçim listesinden ('frequencyStop'). Doluysa feedsCoil true'dur — plan
     // motoru duruşu feedsCoil'e göre açar; ad yalnızca tanım ve ekran içindir.
     frequencyStop: v.optional(v.string()),
+    // Üretim modeli (src/lib/rateModel.ts): 'stroke' (pres; varsayılan) ya da
+    // 'cycle' (robot, montaj, kataforez — çevrim süresi, rulo/kg yok).
+    rateModel: v.optional(v.string()),
     // @deprecated Pres tonajı kaldırıldı (hiçbir hesapta yoktu).
     tonnage: v.optional(v.number()),
     // Bu presin planı kaç gün ileriye kadar dondurulmuş sayılsın.

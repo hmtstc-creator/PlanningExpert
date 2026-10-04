@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
+import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport'
 import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -17,6 +17,7 @@ import {
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { lotRuleOf, piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
+import { RATE_MODELS, modelOfPart, piecesPerHour, planSpec, type RateModel } from '../lib/rateModel'
 import { ExcelUpload } from '../components/ExcelUpload'
 import { friendlyError } from '../lib/mutationErrors'
 import { InfoTip, PageHeader } from '../components/PageHeader'
@@ -46,6 +47,8 @@ const emptyForm = {
   maxShots: '',
   qualityApprovalMinutes: '',
   performanceFactor: '',
+  cycleTimeSeconds: '',
+  stopEveryPcs: '',
 }
 
 function ReferanslarPage() {
@@ -64,6 +67,11 @@ function ReferanslarPage() {
     {},
     { initialNumItems: 200 },
   )
+
+  // Parçanın üretim modeli ana makinesinden (Work Center Definitions).
+  const presses = (useQuery(api.presses.list) ?? []) as { name: string; rateModel?: string }[]
+  const pressByName = useMemo(() => new Map(presses.map((p) => [p.name, p])), [presses])
+  const hasCycle = presses.some((p) => p.rateModel === 'cycle')
 
   // Excel uploads bring hundreds of rows; without a filter, correcting one
   // material means scrolling through all of them.
@@ -140,6 +148,8 @@ function ReferanslarPage() {
         maxShots: num(form.maxShots),
         qualityApprovalMinutes: num(form.qualityApprovalMinutes),
         performanceFactor: num(form.performanceFactor),
+        cycleTimeSeconds: num(form.cycleTimeSeconds),
+        stopEveryPcs: num(form.stopEveryPcs),
       })
       setForm(emptyForm)
     } catch (err) {
@@ -222,6 +232,9 @@ function ReferanslarPage() {
           row['Performans Çarpanı'] ??
           row['performanceFactor'],
       ),
+      // Çevrim hattı parçaları (robot, montaj, hat); sütun yoksa korunur.
+      cycleTimeSeconds: n(row['Cycle Time (s)'] ?? row['Cycle Time'] ?? row['Çevrim Süresi'] ?? row['cycleTimeSeconds']),
+      stopEveryPcs: n(row['Stop Every (pcs)'] ?? row['Stop Every'] ?? row['stopEveryPcs']),
     }))
     const validRows = parsed.filter((r) => r.code)
     const result = await bulkUpsert({ rows: validRows })
@@ -289,6 +302,8 @@ function ReferanslarPage() {
             'Min Lot (pcs) (optional)',
             'Setup Time',
             'Frequency Stop Time (min) (or Coil Setup Time)',
+            'Cycle Time (s) (cycle lines)',
+            'Stop Every (pcs) (cycle lines)',
             'Main Machine',
             'Alternative 1-4',
             'Max Shot',
@@ -310,8 +325,10 @@ function ReferanslarPage() {
         >
           <Field label="Material (code)" value={form.code} onChange={(v) => update('code', v)} placeholder="M250SP001RO" />
           <Field label="Co-Product" value={form.coProduct} onChange={(v) => update('coProduct', v)} placeholder="M250SP002RO" />
-          <Field label="Cavity" value={form.moldCavities} onChange={(v) => update('moldCavities', v)} type="number" placeholder="1" />
-          <Field label="SPM" value={form.spm} onChange={(v) => update('spm', v)} type="number" placeholder="16" />
+          <Field label="Cavity / pieces per cycle" value={form.moldCavities} onChange={(v) => update('moldCavities', v)} type="number" placeholder="1" />
+          <Field label="SPM — press lines" value={form.spm} onChange={(v) => update('spm', v)} type="number" placeholder="16" />
+          <Field label="Cycle time (s) — cycle lines" value={form.cycleTimeSeconds} onChange={(v) => update('cycleTimeSeconds', v)} type="number" placeholder="45" />
+          <Field label="Stop every (pcs) — cycle lines" value={form.stopEveryPcs} onChange={(v) => update('stopEveryPcs', v)} type="number" placeholder="500" />
           <Field label="Raw Material Code" value={form.rawMaterialCode} onChange={(v) => update('rawMaterialCode', v)} placeholder="SD51-100-0976" />
           <Field label="Coil Weight (Kg)" value={form.coilWeight} onChange={(v) => update('coilWeight', v)} type="number" placeholder="8000" />
           <Field label="Gross Weight (Kg/piece)" value={form.grossWeight} onChange={(v) => update('grossWeight', v)} type="number" placeholder="1.465" />
@@ -366,11 +383,32 @@ function ReferanslarPage() {
           <thead className="bg-muted text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">Material</th>
+              <th className="px-3 py-2 font-medium">
+                <span className="inline-flex items-center gap-1">
+                  Model
+                  <InfoTip label="Production model">
+                    <p>The model comes from the main machine (Work Center Definitions):</p>
+                    <p>
+                      <b>Press</b> — {RATE_MODELS.stroke.hint}. Columns: Cavity, SPM, Raw material, Coil weight, Gross weight.
+                    </p>
+                    <p>
+                      <b>Cycle</b> — {RATE_MODELS.cycle.hint}. Columns: pieces per cycle (Cavity column), cycle time in seconds (SPM column)
+                      and “stop every N pieces” for the frequency stop (Coil column). No raw material in kg.
+                    </p>
+                  </InfoTip>
+                </span>
+              </th>
               <th className="px-3 py-2 font-medium">Co-Product</th>
-              <th className="px-3 py-2 font-medium">Cavity</th>
-              <th className="px-3 py-2 font-medium">SPM</th>
+              <th className="px-3 py-2 font-medium" title="Press: cavities. Cycle line: pieces per cycle">
+                {hasCycle ? 'Cavity · pcs/cycle' : 'Cavity'}
+              </th>
+              <th className="px-3 py-2 font-medium" title="Press: strokes per minute. Cycle line: cycle time in seconds">
+                {hasCycle ? 'SPM · cycle s' : 'SPM'}
+              </th>
               <th className="px-3 py-2 font-medium">Raw Material</th>
-              <th className="px-3 py-2 font-medium">Coil Wt</th>
+              <th className="px-3 py-2 font-medium" title="Press: coil weight (kg). Cycle line: pieces between frequency stops">
+                {hasCycle ? 'Coil Wt · stop every' : 'Coil Wt'}
+              </th>
               <th className="px-3 py-2 font-medium" title="Gross weight is per piece">
                 Gross Wt/pc
               </th>
@@ -412,14 +450,14 @@ function ReferanslarPage() {
           <tbody>
             {status === 'LoadingFirstPage' && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={18}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={19}>
                   Loading…
                 </td>
               </tr>
             )}
             {status !== 'LoadingFirstPage' && visibleProducts.length === 0 && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={18}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={19}>
                   No materials added yet.
                 </td>
               </tr>
@@ -446,24 +484,29 @@ function ReferanslarPage() {
               )
               const field = (name: ProductField['name']) =>
                 PRODUCT_FIELDS.find((f) => f.name === name)!
+              const model: RateModel = modelOfPart(p, pressByName)
               return (
                 <tr
                   key={p._id}
                   className={`border-t border-border ${dirty ? 'bg-amber-50' : ''}`}
                 >
                   <td className="px-1 py-1">{cell(field('code'), 'w-28')}</td>
+                  <td className="px-2 py-1">
+                    <ModelBadge model={model} pph={piecesPerHour(p as unknown as ProductSpec, model)} />
+                  </td>
                   <td className="px-1 py-1">{cell(field('coProduct'), 'w-28')}</td>
                   <td className="px-1 py-1">{cell(field('moldCavities'), 'w-20')}</td>
-                  <td className="px-1 py-1">{cell(field('spm'), 'w-20')}</td>
-                  <td className="px-1 py-1">{cell(field('rawMaterialCode'), 'w-28')}</td>
-                  <td className="px-1 py-1">{cell(field('coilWeight'), 'w-20')}</td>
-                  <td className="px-1 py-1">{cell(field('grossWeight'), 'w-20')}</td>
+                  <td className="px-1 py-1">{model === 'cycle' ? cell(field('cycleTimeSeconds'), 'w-20') : cell(field('spm'), 'w-20')}</td>
+                  <td className="px-1 py-1">{model === 'cycle' ? <NotUsed /> : cell(field('rawMaterialCode'), 'w-28')}</td>
+                  <td className="px-1 py-1">{model === 'cycle' ? cell(field('stopEveryPcs'), 'w-20') : cell(field('coilWeight'), 'w-20')}</td>
+                  <td className="px-1 py-1">{model === 'cycle' ? <NotUsed /> : cell(field('grossWeight'), 'w-20')}</td>
                   <td className="px-1 py-1">{cell(field('minLotQty'), 'w-20')}</td>
                   <td className="px-3 py-2 text-muted-foreground" title="Coil weight ÷ gross weight per piece">
                     {(() => {
-                      const spec = { ...p } as unknown as ProductSpec
+                      const spec = planSpec({ ...p } as unknown as ProductSpec, model)
                       const rule = lotRuleOf(spec)
                       if (rule === 'minLot') return <span className="text-xs">min. lot</span>
+                      if (rule === 'need') return <span className="text-xs" title="Cycle line: no coil — the lot is the exact need">exact need</span>
                       if (rule === 'missing') {
                         return (
                           <span
@@ -732,3 +775,27 @@ function ApplyToAll() {
     </details>
   )
 }
+
+/** Parçanın üretim modeli (ana makinesinden) ve saatlik adedi. */
+function ModelBadge({ model, pph }: { model: RateModel; pph: number }) {
+  return (
+    <span className="whitespace-nowrap" title={`${RATE_MODELS[model].label} — ${RATE_MODELS[model].hint}`}>
+      <span
+        className={`rounded px-1.5 py-px text-[10px] font-semibold ${model === 'cycle' ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-800'}`}
+      >
+        {RATE_MODELS[model].short}
+      </span>
+      {pph > 0 && <span className="block text-[10px] text-muted-foreground">{Math.round(pph).toLocaleString('en-GB')} pcs/h</span>}
+    </span>
+  )
+}
+
+/** Çevrim hattında kullanılmayan alan (rulo, kg). */
+function NotUsed() {
+  return (
+    <span className="block px-2 text-xs text-muted-foreground/60" title="Not used on a cycle line (no coil, no kg)">
+      —
+    </span>
+  )
+}
+

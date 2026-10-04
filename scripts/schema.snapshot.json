@@ -3065,6 +3065,12 @@
       },
       "optional": true
     },
+    "rateModel": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
     "tonnage": {
       "fieldType": {
         "type": "number"
@@ -3207,6 +3213,12 @@
       "optional": true
     },
     "spm": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "stopEveryPcs": {
       "fieldType": {
         "type": "number"
       },

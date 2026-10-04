@@ -32,7 +32,8 @@ const productValidator = v.object({
   performanceFactor: v.optional(v.number()),
   name: v.string(),
   material: v.string(),
-  cycleTimeSeconds: v.number(),
+  cycleTimeSeconds: v.optional(v.number()),
+  stopEveryPcs: v.optional(v.number()),
 })
 
 const productArgs = {
@@ -58,6 +59,7 @@ const productArgs = {
   name: v.optional(v.string()),
   material: v.optional(v.string()),
   cycleTimeSeconds: v.optional(v.number()),
+  stopEveryPcs: v.optional(v.number()),
 }
 
 /**
@@ -78,7 +80,6 @@ export function withDefaults<T extends Record<string, unknown>>(doc: T) {
     mainMachine: (doc.mainMachine as string | undefined) ?? '',
     name: (doc.name as string | undefined) ?? '',
     material: (doc.material as string | undefined) ?? '',
-    cycleTimeSeconds: (doc.cycleTimeSeconds as number | undefined) ?? 0,
   }
 }
 
@@ -125,7 +126,7 @@ export const create = guardedMutation({
   handler: async (ctx, args) => {
     const code = args.code.trim()
     if (!code) throw new ConvexError('Material code is required')
-    const { name: _n, material: _m, cycleTimeSeconds: _c, ...rest } = args
+    const { name: _n, material: _m, ...rest } = args
     return ctx.db.insert('products', { ...rest, code })
   },
 })
@@ -140,8 +141,11 @@ export const bulkUpsert = guardedMutation({
     for (const row of rows) {
       const code = row.code.trim()
       if (!code) continue
-      const { name: _n, material: _m, cycleTimeSeconds: _c, ...rest } = row
+      const { name: _n, material: _m, ...rest } = row
       const data: Record<string, unknown> = { ...rest, code }
+      // Çevrim alanları dosyada yoksa elle girilen değer korunur.
+      if (data.cycleTimeSeconds === undefined) delete data.cycleTimeSeconds
+      if (data.stopEveryPcs === undefined) delete data.stopEveryPcs
       // "Flexible press" SAP'den gelmez, burada işaretlenir. Dosyada sütun
       // yoksa mevcut işaret korunur — yeniden yükleme onu silmemeli.
       if (data.flexiblePress === undefined) delete data.flexiblePress
@@ -216,6 +220,8 @@ export const updateField = guardedMutation({
       'maxShots',
       'qualityApprovalMinutes',
       'performanceFactor',
+      'cycleTimeSeconds',
+      'stopEveryPcs',
     ]
 
     if (field === 'flexiblePress') {

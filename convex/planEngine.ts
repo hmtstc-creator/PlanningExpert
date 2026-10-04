@@ -5,6 +5,7 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction } from './_generated/server'
 import { computePlan, type PlanInputs, type PlanRun } from '../src/lib/planPipeline'
+import { modelOfPart, planSpec } from '../src/lib/rateModel'
 import { compactSegments } from '../src/lib/segmentCompact'
 
 /**
@@ -62,9 +63,12 @@ async function loadInputs(ctx: Ctx, plantId: string): Promise<PlanInputs> {
     readTable(ctx, plantId, 'demandDaily'),
     readTable(ctx, plantId, 'stock'),
   ])
+  // Parça, ana makinesinin üretim modeliyle motorun diline çevrilir
+  // (pres: olduğu gibi; çevrim hattı: çevrim süresi → SPM, rulo/kg yok).
+  const pressByName = new Map((small.presses as Ctx[]).map((p) => [p.name, p]))
   return {
     ...small,
-    products: products.rows,
+    products: products.rows.map((p: Ctx) => planSpec(p, modelOfPart(p, pressByName))),
     weeklyDemand: demand.rows,
     dailyDemand: daily.rows,
     stock: stock.rows,

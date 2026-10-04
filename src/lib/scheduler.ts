@@ -173,6 +173,8 @@ export interface PressSpec {
    * setup vardır. Belirtilmezse rulo beslemeli kabul edilir.
    */
   feedsCoil?: boolean
+  /** Frekansiyel duruşun adı (iş açıklaması için). */
+  frequencyStop?: string
 }
 
 /**
@@ -2060,7 +2062,9 @@ function placeRun(
     run.coilsNeeded === 0
       ? (product.minLotQty ?? 0) > 0
         ? `min. lot ${Math.round(product.minLotQty ?? 0).toLocaleString('en-GB')} pcs`
-        : '⚠ no Min. lot and no coil weight in master data — exact quantity'
+        : product.lotByNeed
+          ? 'cycle line — exact quantity needed'
+          : '⚠ no Min. lot and no coil weight in master data — exact quantity'
       : run.coilsNeeded === 1
         ? '1 full coil'
         : `${run.coilsNeeded} full coils`,
@@ -2068,7 +2072,11 @@ function placeRun(
       ? [`co-product ${product.coProduct} ${Math.round(entry.coProductQty).toLocaleString('en-GB')} pcs from the same strokes`]
       : []),
     ...(press.feedsCoil !== false && run.coilChanges > 0
-      ? [`${run.coilChanges} coil change${run.coilChanges > 1 ? 's' : ''}`]
+      ? [
+          press.frequencyStop
+            ? `${run.coilChanges} × ${press.frequencyStop.toLowerCase()}`
+            : `${run.coilChanges} coil change${run.coilChanges > 1 ? 's' : ''}`,
+        ]
       : []),
     sameMaterial ? 'setup not repeated' : `setup ${run.setupMinutes} min`,
   ]

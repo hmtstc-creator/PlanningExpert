@@ -11,6 +11,7 @@ const pressValidator = v.object({
   category: v.optional(v.string()),
   feedsCoil: v.optional(v.boolean()),
   frequencyStop: v.optional(v.string()),
+  rateModel: v.optional(v.string()),
   /** @deprecated Kaldırıldı; eski kayıtlarda kalmış olabilir, okunmaz. */
   tonnage: v.optional(v.number()),
   frozenDays: v.optional(v.number()),
@@ -40,6 +41,8 @@ export const upsert = guardedMutation({
     category: v.optional(v.string()),
     feedsCoil: v.optional(v.boolean()),
     frequencyStop: v.optional(v.string()),
+    /** 'stroke' (pres) ya da 'cycle' (robot, montaj, hat). */
+    rateModel: v.optional(v.union(v.literal('stroke'), v.literal('cycle'))),
     frozenDays: v.optional(v.number()),
     costCenter: v.optional(v.string()),
   },
@@ -78,13 +81,24 @@ export const upsert = guardedMutation({
         category,
         feedsCoil,
         frequencyStop,
+        // Pres varsayılandır: yalnızca 'cycle' yazılır.
+        rateModel: args.rateModel === 'cycle' ? 'cycle' : undefined,
         // Tonaj kaldırıldı: eski değer kayıtta kalmasın.
         tonnage: undefined,
         frozenDays: args.frozenDays,
         costCenter,
       })
     } else {
-      await ctx.db.insert('presses', { ...args, name, hall, category, feedsCoil, frequencyStop, costCenter })
+      await ctx.db.insert('presses', {
+        ...args,
+        name,
+        hall,
+        category,
+        feedsCoil,
+        frequencyStop,
+        rateModel: args.rateModel === 'cycle' ? 'cycle' : undefined,
+        costCenter,
+      })
     }
     return null
   },

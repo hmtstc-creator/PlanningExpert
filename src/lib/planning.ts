@@ -724,10 +724,12 @@ export const PLACEHOLDER_COIL_KG = 1
  * Lot kuralı: minimum lot tanımlıysa o, değilse tam rulo. İkisi de yoksa
  * ana veri eksiktir; lot tam ihtiyaç kadar kurulur ve plan uyarır.
  */
-export function lotRuleOf(product: ProductSpec | undefined): 'minLot' | 'coil' | 'missing' {
+export function lotRuleOf(product: ProductSpec | undefined): 'minLot' | 'coil' | 'need' | 'missing' {
   if (!product) return 'missing'
   if ((product.minLotQty ?? 0) > 0) return 'minLot'
-  return piecesPerCoil(product) > 0 ? 'coil' : 'missing'
+  if (piecesPerCoil(product) > 0) return 'coil'
+  // Çevrim hattı: rulo yok, lot tam ihtiyaç kadar — eksik veri değil.
+  return product.lotByNeed ? 'need' : 'missing'
 }
 
 function cavitiesOf(product: ProductSpec | undefined): number {
@@ -805,6 +807,26 @@ export interface ProductSpec {
    * gereği yalnızca ana preste çalışır.
    */
   flexiblePress?: boolean
+  /**
+   * Çevrim hattı (src/lib/rateModel.ts): frekansiyel duruşlar arası adet —
+   * rulo yokken duruş aralığı budur (fikstür setup'ı her N adette bir …).
+   */
+  stopEveryPcs?: number
+  /**
+   * Çevrim hattı: lot rulodan değil, Min. lot ya da tam ihtiyaçtan kurulur
+   * (Min. lot yoksa "eksik veri" sayılmaz).
+   */
+  lotByNeed?: boolean
+}
+
+/**
+ * Frekansiyel duruşlar arası adet: pres hattında rulodaki adet, çevrim
+ * hattında `stopEveryPcs`. 0 = işin ortasında duruş yok.
+ */
+export function stopIntervalPieces(product: ProductSpec): number {
+  const coil = piecesPerCoil(product)
+  if (coil > 0) return coil
+  return product.stopEveryPcs && product.stopEveryPcs > 0 ? Math.floor(product.stopEveryPcs) : 0
 }
 
 /**
@@ -883,8 +905,11 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   const setupMinutes = product.setupMinutes ?? 0
   // İlk rulo ana setup'ın içinde bağlanır; kayıp yalnızca sonraki rulolarda
   // yaşanır. Rulo beslemeyen presler (transfer) bunu hiç ödemez — orada
-  // setup tektir.
-  const coilChanges = Math.max(0, coilsNeeded - 1)
+  // setup tektir. Çevrim hattında aralık rulodan değil `stopEveryPcs`'ten
+  // gelir (frekansiyel duruş: fikstür setup'ı …).
+  const interval = stopIntervalPieces(product)
+  const segmentsNeeded = interval > 0 ? Math.ceil(quantity / interval) : 0
+  const coilChanges = Math.max(0, segmentsNeeded - 1)
   const coilChangeMinutes = product.coilSetupMinutes ?? 0
   const coilSetupMinutes = coilChangeMinutes * coilChanges
   const qualityApprovalMinutes = product.qualityApprovalMinutes ?? 0
@@ -909,10 +934,10 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   // Üretimi rulo başına parçalara böl: her rulo kendi süresi kadar çalışır,
   // aralarına rulo değişimi girer.
   const coilRunMinutes: number[] = []
-  if (piecesInCoil > 0 && quantity > 0) {
+  if (interval > 0 && quantity > 0) {
     let left = quantity
     while (left > 0) {
-      const chunk = Math.min(left, piecesInCoil)
+      const chunk = Math.min(left, interval)
       coilRunMinutes.push((runMinutes * chunk) / quantity)
       left -= chunk
     }

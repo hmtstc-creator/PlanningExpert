@@ -10,6 +10,7 @@ import { UnsavedBar } from '../components/UnsavedBar'
 import { relatedPages } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
 import { UNNAMED_STOP, draftOf, pressPayload, sameDraft, stopPatch, stopValue } from '../lib/pressDraft'
+import { RATE_MODELS, type RateModel } from '../lib/rateModel'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import {
@@ -83,6 +84,39 @@ function HallInfo() {
   )
 }
 
+/** Üretim modeli: work center parçayı neyle ölçer (src/lib/rateModel.ts). */
+function ModelInfo() {
+  return (
+    <>
+      <p>
+        <b>Production model</b> — how the work center measures a part. Every part takes the model of its main machine.
+      </p>
+      <ul className="ml-4 list-disc space-y-0.5">
+        <li>
+          <b>{RATE_MODELS.stroke.label}</b>: {RATE_MODELS.stroke.hint}. The raw material page orders steel in kg for these parts.
+        </li>
+        <li>
+          <b>{RATE_MODELS.cycle.label}</b>: {RATE_MODELS.cycle.hint}. In Master Data the part gets a cycle time (s), pieces per
+          cycle and “stop every N pieces” for its frequency stop (fixture setup …).
+        </li>
+      </ul>
+      <p>The planner's rules — hall crane, setups, shifts, overtime, late jobs — work the same for both.</p>
+    </>
+  )
+}
+
+function ModelSelect({ value, onChange, className = '' }: { value: RateModel; onChange: (v: RateModel) => void; className?: string }) {
+  return (
+    <select className={`${input} ${className}`} value={value} onChange={(e) => onChange(e.target.value as RateModel)}>
+      {(Object.keys(RATE_MODELS) as RateModel[]).map((m) => (
+        <option key={m} value={m}>
+          {RATE_MODELS[m].label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 /** Frekansiyel duruşun ne olduğu ve planlayıcıda nasıl çalıştığı. */
 function StopInfo() {
   return (
@@ -96,8 +130,8 @@ function StopInfo() {
       <p>How the planner uses it:</p>
       <ul className="ml-4 list-disc space-y-0.5">
         <li>
-          The interval comes from the part in Master Data: every coil (coil weight ÷ gross weight). The first one is part of the
-          setup; each one after it stops the work center.
+          The interval comes from the part in Master Data: on a press line every coil (coil weight ÷ gross weight), on a cycle
+          line every “Stop every N pieces”. The first one is part of the setup; each one after it stops the work center.
         </li>
         <li>Its length is the part's <i>Frequency stop time</i> in Master Data.</li>
         <li>
@@ -773,6 +807,7 @@ function Detail({
     category?: string
     feedsCoil?: boolean
     frequencyStop?: string
+    rateModel?: RateModel
     costCenter?: string
   }) => Promise<boolean>
   prefillName: string | null
@@ -808,8 +843,8 @@ function Detail({
       chip: <Chip kind="hall" />,
     },
     {
-      label: 'Frequency stop',
-      value: list.filter((p) => p.feedsCoil !== false).length,
+      label: 'Cycle lines',
+      value: list.filter((p) => p.rateModel === 'cycle').length,
     },
   ]
 
@@ -1089,6 +1124,14 @@ function WcTable({
             </th>
             <th className="px-3 py-2 font-medium">
               <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                Model
+                <InfoTip label="Production model">
+                  <ModelInfo />
+                </InfoTip>
+              </span>
+            </th>
+            <th className="px-3 py-2 font-medium">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
                 Frequency stop
                 <InfoTip label="What a frequency stop is">
                   <StopInfo />
@@ -1159,6 +1202,9 @@ function WcTable({
                   <HallInput className="w-28" value={draft.hall} halls={halls} onChange={(v) => rows.edit(p._id, { hall: v })} />
                 </td>
                 <td className="px-3 py-2">
+                  <ModelSelect className="w-44" value={draft.rateModel} onChange={(v) => rows.edit(p._id, { rateModel: v })} />
+                </td>
+                <td className="px-3 py-2">
                   <StopSelect className="w-40" value={draft} onChange={(patch) => rows.edit(p._id, patch)} />
                 </td>
                 <td className="px-3 py-2">
@@ -1225,6 +1271,7 @@ function AddWorkCenter({
     category?: string
     feedsCoil?: boolean
     frequencyStop?: string
+    rateModel?: RateModel
     costCenter?: string
   }) => Promise<boolean>
   onNewCategory: () => Promise<string | null>
@@ -1237,6 +1284,7 @@ function AddWorkCenter({
   const [category, setCategory] = useState(node.kind === 'category' ? node.name : '')
   const [hall, setHall] = useState(node.kind === 'hall' ? node.name : '')
   const [stop, setStop] = useState({ feedsCoil: false, frequencyStop: '' })
+  const [rateModel, setRateModel] = useState<RateModel>('stroke')
   const [saving, setSaving] = useState(false)
   const add = async () => {
     const n = name.trim()
@@ -1249,6 +1297,7 @@ function AddWorkCenter({
         category: category || undefined,
         feedsCoil: stop.feedsCoil,
         frequencyStop: stop.frequencyStop || undefined,
+        rateModel,
         costCenter,
       })
       if (ok) {
@@ -1298,6 +1347,15 @@ function AddWorkCenter({
             </InfoTip>
           </span>
           <HallInput className="mt-1 block w-32" value={hall} halls={halls} onChange={setHall} />
+        </label>
+        <label className="text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            Model
+            <InfoTip label="Production model">
+              <ModelInfo />
+            </InfoTip>
+          </span>
+          <ModelSelect className="mt-1 block w-52" value={rateModel} onChange={setRateModel} />
         </label>
         <label className="text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">

@@ -344,6 +344,28 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   - [ ] **[G]** Sayfalardaki düzenleme düğmelerini alan iznine göre gizleme
     (bugün sunucu reddeder ve nedenini söyler; OEE yükleme ve KPI girişi
     alana bakıyor).
+- [x] ✅ **Pres dışı hatlar: üretim modeli** (2026-10-04): work center'da
+  Model = Stroke (pres) / Cycle (robot, montaj, kataforez). Cycle parçada
+  çevrim süresi (sn) + çevrim başına adet, "her N adette" frekansiyel duruş;
+  rulo/kg yok, lot Min. lot ya da tam ihtiyaç; hammadde (kg) hesabına girmez.
+  Master Data satırı modele göre alan gösterir (pcs/h da yazılı).
+  Sonraki adımlar (derin tasarım — karar ve sıra kullanıcıyla):
+  - [ ] **[G] Ürün ağacı (BOM) ve bağımlı talep.** Montaj / kaynak parçası
+    pres parçalarından oluşur: montajın planı, pres parçasının talebini
+    doğurmalı (bugün her parçanın talebi yalnızca SAP'den). Gerekli: parça →
+    bileşen × adet tablosu, talebin seviye seviye patlatılması, bileşenin
+    montajdan önce hazır olma kuralı (öncelik kısıtı), stok düşümü.
+  - [ ] **[G] Ambalaj / kasa katı.** Montaj hattında lot çoğu zaman kasa
+    adedinin katıdır (Min. lot yetmez): "lot multiple" alanı.
+  - [ ] **[G] Rota (çok operasyon).** Bir parça art arda birkaç hattan
+    geçebilir (pres → kaynak → kataforez). Bugün parça tek makinede tek
+    işlem; rota tablosu ve operasyonlar arası bekleme süresi gerekir.
+  - [ ] **[G] Parti (batch) prosesler.** Kataforez / fırın: kapasite askı ya
+    da sepet başına adet ve hat hızıyla; farklı parçalar aynı partide
+    birlikte işlenebilir (pres mantığında her iş ayrı). İlk yaklaşım Cycle
+    (askı başına adet ÷ askı çevrimi) ile çalışır; birlikte işleme ayrıca.
+  - [ ] **[G] Bileşen malzemesi.** Cycle hatlarında hammadde kg değil adet
+    (vida, somun, tel) — BOM ile birlikte hammadde sayfası adet bazlı.
 - [ ] **P2 — SAP entegrasyonu elle.** ZPP / MB52 / MB51 Excel'le yükleniyor.
   → Zamanlanmış içe alma (SAP export klasörü ya da API) ve "veri ne kadar
   eski" göstergesi.
