@@ -171,14 +171,33 @@ Bunlar kodu değiştiren herkes (ve Claude) için bağlayıcıdır.
 17. Kayıt `useSafeMutation` / `friendlyError` ile; hata "Not saved" + neden
     olarak gösterilir, "[CONVEX …]" metni kullanıcıya çıkmaz.
 18. Silme işlemleri `window.confirm` ister (uiGuards testi denetler).
-18a. **Menü ve yönetim yapısı** (2026-10-03): tek tanım `src/lib/navigation.ts`
-    (alanlar: portal, PlanningExpert, OEE, Die, Machine, KPI, Board, Company
-    settings, Administration). Üst çubuk her alanda aynı: logo (portal) ·
-    alan ▾ (izinli modüller) · alanın menüsü · Şirket › Plant ▾ · kullanıcı ▾.
-    Menü bir ağaçtır (`NavNode`), en çok üç kademe: çubukta sık sayfalar,
-    "Menu ▾" açılınca solda gruplar (Analysis, SAP data, Master data, Help),
-    sağda seçili grubun sayfaları. Bulunulan sayfa çubukta "Menu · Stock"
-    olarak görünür. Telefonda gruplar katlanır bölümdür. Kural testi:
+18a. **Menü ve yönetim yapısı** (2026-10-03; yeni görünüm 2026-10-05): tek
+    tanım `src/lib/navigation.ts` (alanlar: portal, PlanningExpert, OEE, Die,
+    Machine, KPI, Board, Company settings, Administration). Her alanın ve
+    sayfanın ikonu (`IconKey` → src/components/nav/NavIcon.tsx) ve her
+    modülün rengi (`AccentKey`: Planning indigo, OEE yeşil, Die turuncu,
+    Machine kırmızı, KPI mor, Board mavi) vardır. Üst çubuk iki kat:
+    - 1. kat (koyu): logo (portal) · **modül şeridi** (izinli modüller, tek
+      tıkla geçiş; seçili modül beyaz kart) · arama (Ctrl K) · Şirket ›
+      Plant ▾ · kişi ▾. Altında modülün renginde ince şerit.
+    - 2. kat (açık): modül kimliği · sayfalar sekme gibi · "Menu ▾". Alt
+      grupları olan menü **mega menü** açar: bütün gruplar yan yana sütun
+      (Analysis, SAP data, Master data, Help), sağda kişinin sabitlediği ve
+      son açtığı sayfalar. Alt grubu olmayan menü düğmenin altında kart.
+      Bulunulan sayfa çubukta "Menu › Master data › Work Centers".
+    - **Komut paleti** (Ctrl+K / ⌘K, her ekranda): izinli bütün sayfalar,
+      plant değiştirme, çıkış. Türkçe ve SAP kelimeleriyle de bulur ("arıza",
+      "kalıp", "MB52"; `src/lib/navSearch.ts`, test edilir).
+    - **Kısayollar**: ☆ ile sabitlenen ve son açılan sayfalar mega menüde,
+      paletde ve ana sayfada; kişi başına bu cihazda (localStorage,
+      `src/lib/shortcuts.ts`) — sunucuya gitmez.
+    - Telefonda: 1. katta menü, logo + alan adı, arama, plant, kişi; 2. kat
+      yana kayan sekmeler; çekmecede arama, modül ızgarası, alanın sayfaları
+      (gruplar katlanır), hesap.
+    - Portal ana sayfası: karşılama (gün, ISO hafta, plant, büyük arama,
+      kısayollar), kurulum listesi, Today, modül kartları (her kartta en çok
+      4 sayfaya doğrudan bağlantı), yönetim kısayolları.
+    Menü bir ağaçtır (`NavNode`), en çok üç kademe. Kural testi:
     `src/lib/navigation.test.ts` (derinlik, tekrar, sayfası olmayan bağlantı).
     Yönetim modül menülerinde yoktur; kullanıcı menüsünden açılır:
     - `/account` — herkes: kimlik, izinler, parola değiştirme.

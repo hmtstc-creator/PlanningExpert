@@ -9,11 +9,28 @@
 
 import type { Module } from './tenancy'
 
+/**
+ * Menü ikonları (anahtar → src/components/nav/NavIcon.tsx). Liste burada:
+ * menü verisi React'tan bağımsız kalsın, ikon haritası da eksiksiz olsun
+ * (tip denetimi).
+ */
+export const ICON_KEYS = [
+  'home', 'gantt', 'dashboard', 'grid', 'chart', 'gauge', 'layers', 'siren', 'trending', 'database', 'upload', 'clipboard',
+  'boxes', 'check', 'package', 'factory', 'calendar', 'calendarRange', 'warehouse', 'book', 'scroll', 'activity', 'chartDown',
+  'sheet', 'settings', 'anvil', 'alert', 'wrench', 'pareto', 'cog', 'zap', 'target', 'pencil', 'presentation', 'building',
+  'users', 'shield', 'user', 'wifi', 'compare',
+] as const
+export type IconKey = (typeof ICON_KEYS)[number]
+
+/** Modül rengi (src/components/nav/NavIcon.tsx → ACCENTS). */
+export type AccentKey = 'indigo' | 'emerald' | 'amber' | 'rose' | 'violet' | 'sky' | 'slate'
+
 export interface NavItem {
   to: string
   label: string
   /** Açılan menüde ve telefon çekmecesinde bir satırlık açıklama. */
   hint?: string
+  icon?: IconKey
 }
 
 /**
@@ -25,6 +42,7 @@ export interface NavNode {
   label: string
   to?: string
   hint?: string
+  icon?: IconKey
   children?: NavNode[]
 }
 
@@ -33,65 +51,77 @@ export type AreaKey = 'portal' | 'planning' | 'oee' | 'die' | 'machine' | 'kpi' 
 export interface Area {
   key: AreaKey
   title: string
+  /** Modül şeridinde kısa ad. */
+  short: string
   /** Logonun altında küçük satır. */
   subtitle: string
   home: string
+  icon: IconKey
+  accent: AccentKey
   /** İzin modülü (src/lib/tenancy.ts); yoksa modül değil (portal, ayarlar). */
   module?: Module
   /** Çubuğun menüsü (ağaç). */
   nav: NavNode[]
 }
 
-const link = (to: string, label: string, hint?: string): NavNode => ({ to, label, hint })
+const link = (to: string, label: string, hint?: string, icon?: IconKey): NavNode => ({ to, label, hint, icon })
 
 const PLANNING: Area = {
   key: 'planning',
   title: 'PlanningExpert',
+  short: 'Planning',
   subtitle: 'Production planning',
   home: '/planningexpert',
+  icon: 'gantt',
+  accent: 'indigo',
   module: 'planning',
   nav: [
-    link('/planlama', 'Plan', 'The weekly production plan'),
-    link('/planningexpert', 'Overview', 'Daily status and warnings'),
+    link('/planlama', 'Plan', 'The weekly production plan', 'gantt'),
+    link('/planningexpert', 'Overview', 'Daily status and warnings', 'dashboard'),
     {
       label: 'Menu',
+      icon: 'grid',
       children: [
         {
           label: 'Analysis',
           hint: 'Capacity, raw material, alarms, performance',
+          icon: 'chart',
           children: [
-            link('/capacity', 'Capacity Dashboard', 'Weekly capacity vs demand by work center group'),
-            link('/hammadde', 'Raw Material Coverage', 'Steel requirement and orders per week'),
-            link('/alarms', 'Alarms', 'Dies and machines that hold up the plan'),
-            link('/performans', 'Performance', 'Plan versus actual'),
+            link('/capacity', 'Capacity Dashboard', 'Weekly capacity vs demand by work center group', 'gauge'),
+            link('/hammadde', 'Raw Material Coverage', 'Steel requirement and orders per week', 'layers'),
+            link('/alarms', 'Alarms', 'Dies and machines that hold up the plan', 'siren'),
+            link('/performans', 'Performance', 'Plan versus actual', 'trending'),
           ],
         },
         {
           label: 'SAP data',
           hint: 'Uploads and what they contain',
+          icon: 'database',
           children: [
-            link('/sapdata', 'SAP Data', 'Upload ZPP, ZPP_DAILY, MB52 and MB51'),
-            link('/siparisler', 'Demand', 'Weekly and daily net requirements'),
-            link('/stoklar', 'Stock', 'Stock by material and location'),
-            link('/gerceklesen', 'Actuals', 'Posted production movements'),
+            link('/sapdata', 'SAP Data', 'Upload ZPP, ZPP_DAILY, MB52 and MB51', 'upload'),
+            link('/siparisler', 'Demand', 'Weekly and daily net requirements', 'clipboard'),
+            link('/stoklar', 'Stock', 'Stock by material and location', 'boxes'),
+            link('/gerceklesen', 'Actuals', 'Posted production movements', 'check'),
           ],
         },
         {
           label: 'Master data',
           hint: 'Parts, work centers, calendar, locations',
+          icon: 'package',
           children: [
-            link('/referanslar', 'Master Data', 'Cavities, SPM, weights, machines'),
-            link('/makineler', 'Work Centers', 'Cost center, hall, category, coil feed'),
-            link('/takvim', 'Work Calendar', 'Shifts, stops, capacity'),
-            link('/depolar', 'Storage Locations', 'Which stock counts'),
+            link('/referanslar', 'Master Data', 'Cavities, SPM, weights, machines', 'package'),
+            link('/makineler', 'Work Centers', 'Cost center, hall, category, coil feed', 'factory'),
+            link('/takvim', 'Work Calendar', 'Shifts, stops, capacity', 'calendar'),
+            link('/depolar', 'Storage Locations', 'Which stock counts', 'warehouse'),
           ],
         },
         {
           label: 'Help',
           hint: 'How the plan works, decisions of the plant',
+          icon: 'book',
           children: [
-            link('/planlogic', 'Planning Logic', 'How the plan is calculated'),
-            link('/kayitlar', 'Decision Log', 'Decisions, rules and open issues of the plant'),
+            link('/planlogic', 'Planning Logic', 'How the plan is calculated', 'book'),
+            link('/kayitlar', 'Decision Log', 'Decisions, rules and open issues of the plant', 'scroll'),
           ],
         },
       ],
@@ -99,64 +129,77 @@ const PLANNING: Area = {
   ],
 }
 
-const area = (key: AreaKey, title: string, home: string, module: Module | undefined, nav: NavNode[]): Area => ({
+const area = (key: AreaKey, title: string, short: string, home: string, icon: IconKey, accent: AccentKey, module: Module | undefined, nav: NavNode[]): Area => ({
   key,
   title,
+  short,
   subtitle: 'Production Portal',
   home,
+  icon,
+  accent,
   module,
   nav,
 })
 
 /** Board görünümünün menüsü (board kullanıcısında her sayfada bu). */
-export const BOARD_AREA: Area = area('board', 'Board', '/board', 'kpi', [
-  link('/board', 'Board Dashboard', 'Group, company, plant — results and trends'),
-  link('/kpi/monthly/dashboard', 'KPI monthly', 'A3 page, 12 months'),
-  link('/kpi/weekly/dashboard', 'KPI weekly', 'A3 page, 13 weeks'),
-  link('/oee', 'OEE', 'Monthly, weeks and shifts'),
+export const BOARD_AREA: Area = area('board', 'Board', 'Board', '/board', 'presentation', 'sky', 'kpi', [
+  link('/board', 'Board Dashboard', 'Group, company, plant — results and trends', 'presentation'),
+  link('/kpi/monthly/dashboard', 'KPI monthly', 'A3 page, 12 months', 'chart'),
+  link('/kpi/weekly/dashboard', 'KPI weekly', 'A3 page, 13 weeks', 'chart'),
+  link('/oee', 'OEE', 'Monthly, weeks and shifts', 'activity'),
 ])
 
 /** Modül değiştiricideki sıra: portalın modülleri. */
 export const MODULE_AREAS: Area[] = [
   PLANNING,
-  area('oee', 'OEE', '/oee', 'oee', [
-    link('/oee', 'Dashboard', 'Monthly, 10 weeks and the selected week'),
-    link('/oee/losses', 'Losses Trend', 'Losses, dies, breakdowns and setups'),
+  area('oee', 'OEE', 'OEE', '/oee', 'activity', 'emerald', 'oee', [
+    link('/oee', 'Dashboard', 'Monthly, 10 weeks and the selected week', 'dashboard'),
+    link('/oee/losses', 'Losses Trend', 'Losses, dies, breakdowns and setups', 'chartDown'),
     {
       label: 'Menu',
+      icon: 'grid',
       children: [
-        link('/oee/data', 'Data', 'The uploaded sheets, as in the file'),
-        link('/oee/settings', 'Settings', 'Departments, shifts, loss groups, setups'),
-        link('/oee/guide', 'How to use', 'First setup and routine uploads'),
+        link('/oee/data', 'Data', 'The uploaded sheets, as in the file', 'sheet'),
+        link('/oee/settings', 'Settings', 'Departments, shifts, loss groups, setups', 'settings'),
+        link('/oee/guide', 'How to use', 'First setup and routine uploads', 'book'),
       ],
     },
   ]),
-  area('die', 'Die Follow-up', '/die-followup', 'die', [
-    link('/die-followup', 'Overview'),
-    link('/die-followup/problems', 'Problems', 'Report, solve, history'),
-    link('/die-followup/maintenance', 'Maintenance', 'Ready flag, bookings, shot limits'),
-    link('/die-followup/reports', 'Reports', 'Pareto by die, problem, operation'),
+  area('die', 'Die Follow-up', 'Dies', '/die-followup', 'anvil', 'amber', 'die', [
+    link('/die-followup', 'Overview', 'Open problems, readiness, shot limits', 'dashboard'),
+    link('/die-followup/problems', 'Problems', 'Report, solve, history', 'alert'),
+    link('/die-followup/maintenance', 'Maintenance', 'Ready flag, bookings, shot limits', 'wrench'),
+    link('/die-followup/reports', 'Reports', 'Pareto by die, problem, operation', 'pareto'),
   ]),
-  area('machine', 'Machine Follow-up', '/machine-followup', 'machine', [
-    link('/machine-followup', 'Overview'),
-    link('/machine-followup/breakdowns', 'Breakdowns', 'Report, solve, history'),
-    link('/machine-followup/maintenance', 'Maintenance', 'Planned work center maintenance'),
-    link('/machine-followup/reports', 'Reports', 'Pareto by work center and problem'),
+  area('machine', 'Machine Follow-up', 'Machines', '/machine-followup', 'cog', 'rose', 'machine', [
+    link('/machine-followup', 'Overview', 'Stopped machines and open breakdowns', 'dashboard'),
+    link('/machine-followup/breakdowns', 'Breakdowns', 'Report, solve, history', 'zap'),
+    link('/machine-followup/maintenance', 'Maintenance', 'Planned work center maintenance', 'wrench'),
+    link('/machine-followup/reports', 'Reports', 'Pareto by work center and problem', 'pareto'),
   ]),
-  area('kpi', 'KPI', '/kpi', 'kpi', [
-    link('/kpi', 'Overview'),
+  area('kpi', 'KPI', 'KPI', '/kpi', 'target', 'violet', 'kpi', [
+    link('/kpi', 'Overview', 'Monthly and weekly KPIs at a glance', 'dashboard'),
     {
       label: 'Menu',
+      icon: 'grid',
       children: [
         {
           label: 'Monthly',
           hint: 'Plan and actual per cost center and month',
-          children: [link('/kpi/monthly/entry', 'Entry', 'Plan and actual per cost center'), link('/kpi/monthly/dashboard', 'Dashboard', 'A3 page, 12 months')],
+          icon: 'calendar',
+          children: [
+            link('/kpi/monthly/entry', 'Entry', 'Plan and actual per cost center', 'pencil'),
+            link('/kpi/monthly/dashboard', 'Dashboard', 'A3 page, 12 months', 'chart'),
+          ],
         },
         {
           label: 'Weekly',
           hint: 'Plan and actual per cost center and week',
-          children: [link('/kpi/weekly/entry', 'Entry', 'Plan and actual per cost center'), link('/kpi/weekly/dashboard', 'Dashboard', 'A3 page, 13 weeks')],
+          icon: 'calendarRange',
+          children: [
+            link('/kpi/weekly/entry', 'Entry', 'Plan and actual per cost center', 'pencil'),
+            link('/kpi/weekly/dashboard', 'Dashboard', 'A3 page, 13 weeks', 'chart'),
+          ],
         },
       ],
     },
@@ -164,9 +207,25 @@ export const MODULE_AREAS: Area[] = [
   { ...BOARD_AREA, nav: [BOARD_AREA.nav[0]] },
 ]
 
-export const PORTAL_AREA: Area = { ...area('portal', 'Production Portal', '/', undefined, []), subtitle: 'Planning · OEE · Dies · Machines · KPI' }
-export const SETTINGS_AREA: Area = area('settings', 'Company settings', '/settings', undefined, [])
-export const ADMIN_AREA: Area = area('admin', 'Administration', '/admin', undefined, [])
+export const PORTAL_AREA: Area = {
+  ...area('portal', 'Production Portal', 'Portal', '/', 'home', 'sky', undefined, []),
+  subtitle: 'Planning · OEE · Dies · Machines · KPI',
+}
+export const SETTINGS_AREA: Area = area('settings', 'Company settings', 'Settings', '/settings', 'building', 'slate', undefined, [
+  link('/settings', 'Company settings', 'Plants, departments, cost centers, lists', 'building'),
+  link('/users', 'Users & permissions', 'Groups, users, permission matrix', 'users'),
+])
+export const ADMIN_AREA: Area = area('admin', 'Administration', 'Admin', '/admin', 'shield', 'slate', undefined, [])
+
+/** Hesap ve yönetim bağlantıları (kullanıcı menüsü, çekmece, arama). */
+export const ACCOUNT_LINKS: (NavItem & { need?: 'manage' | 'platform' })[] = [
+  { to: '/account', label: 'My account', hint: 'Password, devices, who you are', icon: 'user' },
+  { to: '/settings', label: 'Company settings', hint: 'Plants, departments, cost centers, lists', icon: 'building', need: 'manage' },
+  { to: '/users', label: 'Users & permissions', hint: 'Groups, users, permission matrix', icon: 'users', need: 'manage' },
+  { to: '/admin', label: 'Administration', hint: 'Holdings, companies, Generals, security', icon: 'shield', need: 'platform' },
+  { to: '/compare', label: 'Compare plants', hint: 'Plants side by side', icon: 'compare' },
+  { to: '/tani', label: 'Connection diagnostics', hint: 'Is this device connected?', icon: 'wifi' },
+]
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`)
 
@@ -182,7 +241,7 @@ export function areaFor(pathname: string): Area {
 
 /** Bir düğümün altındaki bütün bağlantılar. */
 export function linksOf(nodes: NavNode[]): NavItem[] {
-  return nodes.flatMap((n) => [...(n.to ? [{ to: n.to, label: n.label, hint: n.hint }] : []), ...linksOf(n.children ?? [])])
+  return nodes.flatMap((n) => [...(n.to ? [{ to: n.to, label: n.label, hint: n.hint, icon: n.icon }] : []), ...linksOf(n.children ?? [])])
 }
 
 /** Bir alanın bütün bağlantıları. */

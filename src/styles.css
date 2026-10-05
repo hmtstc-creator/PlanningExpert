@@ -140,6 +140,13 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
   }
+  /* Menü sekmeleri: telefonda yana kayar, çubuk görünmez. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* OEE grafikleri: kategorik renkler (dataviz referans paleti, sırası sabit). */
