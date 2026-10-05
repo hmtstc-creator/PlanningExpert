@@ -775,6 +775,8 @@ export function schedule(
 ): ScheduleResult {
   const jobs: ScheduledJob[] = []
   const unplanned: UnplannedItem[] = []
+  // Eş ürünün göz sayısı: aynı vuruştan kaç eş ürün çıktığını o belirler.
+  const coCavities = (p: ProductSpec) => (p.coProduct ? products.get(p.coProduct.trim())?.moldCavities : undefined)
 
   const overrides = options.overrides ?? []
   const excluded = new Set(
@@ -1031,7 +1033,7 @@ export function schedule(
     }
 
     // Kalıp limitine göre partilere böl.
-    const runs = splitByMoldLimit(product, entry.qty)
+    const runs = splitByMoldLimit(product, entry.qty, coCavities(product))
 
     // Takılı kalıp kuralı (yalnızca acil, tek partili, kullanıcı müdahalesi
     // olmayan iş). Önce ucuz ön kontrol: adaylardan birinde başka bir
@@ -1055,7 +1057,7 @@ export function schedule(
       const mounted = normal ? mountedBefore.get(normal.press) : undefined
       const fill = normal && mounted ? fillFor(mounted, normal.press) : undefined
       const fillProduct = fill ? products.get(fill.material) : undefined
-      const fillRuns = fillProduct && fill ? splitByMoldLimit(fillProduct, fill.qty) : []
+      const fillRuns = fillProduct && fill ? splitByMoldLimit(fillProduct, fill.qty, coCavities(fillProduct)) : []
       let accepted: ScheduledJob[] | null = null
       if (normal && !normal.late && normal.setupMinutes > 0 && fill && fillProduct && fillRuns.length === 1) {
         const afterNormal = snapshot()
@@ -2062,9 +2064,7 @@ function placeRun(
     run.coilsNeeded === 0
       ? (product.minLotQty ?? 0) > 0
         ? `min. lot ${Math.round(product.minLotQty ?? 0).toLocaleString('en-GB')} pcs`
-        : product.lotByNeed
-          ? 'cycle line — exact quantity needed'
-          : '⚠ no Min. lot and no coil weight in master data — exact quantity'
+        : '⚠ no Min. lot and no coil weight in master data — exact quantity'
       : run.coilsNeeded === 1
         ? '1 full coil'
         : `${run.coilsNeeded} full coils`,

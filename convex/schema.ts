@@ -180,9 +180,11 @@ export default defineSchema({
     performanceFactor: v.optional(v.number()),
     name: v.optional(v.string()),
     material: v.optional(v.string()),
-    // Çevrim hattı parçası (ana makinesi 'cycle'): çevrim süresi (sn); göz
-    // sayısı "çevrim başına adet" olarak okunur.
+    // @deprecated Kullanılmıyor (yerine cycleMinutes); eski kayıtlarda kalabilir.
     cycleTimeSeconds: v.optional(v.number()),
+    // Çevrim hattı parçası (ana makinesi 'cycle': punta, robot, montaj):
+    // çevrim süresi, dakika / adet, virgülden sonra 3 hane. Pres planına girmez.
+    cycleMinutes: v.optional(v.number()),
     // Çevrim hattı: frekansiyel duruşlar arası adet (fikstür setup'ı …).
     stopEveryPcs: v.optional(v.number()),
   }).index('by_code', ['plantId', 'code'])

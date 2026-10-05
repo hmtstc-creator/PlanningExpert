@@ -488,12 +488,6 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const cw = p.coilWeight ?? 0
     return gw > 0 && cw > PLACEHOLDER_COIL_KG ? Math.floor(cw / gw) : 0
   }
-  /** Frekansiyel duruşlar arası adet: rulo, yoksa çevrim hattının "her N adette bir"i. */
-  const stopIntervalPieces = (p: ProductSpec) => {
-    const pcs = piecesPerCoil(p)
-    if (pcs > 0) return pcs
-    return p.stopEveryPcs && p.stopEveryPcs > 0 ? Math.floor(p.stopEveryPcs) : 0
-  }
   /** Rulo başına parça, göz sayısına tam bölünür hâliyle (bir rulonun verdiği adet). */
   const coilUnit = (p: ProductSpec | undefined) => {
     const pcs = piecesPerCoil(p)
@@ -1063,7 +1057,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const spm = p.spm && p.spm > 0 ? p.spm : 0
     const theor = spm > 0 ? strokes / spm : 0
     const f = p.performanceFactor && p.performanceFactor > 0 ? Math.min(1, p.performanceFactor) : 1
-    const pc = stopIntervalPieces(p)
+    const pc = piecesPerCoil(p)
     const feeds = pressByName.get(press)?.feedsCoil !== false
     const coilChanges = feeds && pc > 0 ? Math.max(0, Math.ceil(qPrimary / pc) - 1) : 0
     const setup = mountedAt0.get(press) === g ? 0 : pressSetupOf(p)
@@ -1408,7 +1402,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     if (primary) {
       if (!(primary.spm && primary.spm > 0)) flags.push(`${primary.code}: no SPM in master data.`)
       if (!primary.mainMachine?.trim()) flags.push(`${primary.code}: no main work center in master data.`)
-      if (!((primary.minLotQty ?? 0) > 0) && !primary.lotByNeed && piecesPerCoil(primary) <= 0) flags.push(`${primary.code}: no Min. lot and no real coil weight — lot size unknown.`)
+      if (!((primary.minLotQty ?? 0) > 0) && piecesPerCoil(primary) <= 0) flags.push(`${primary.code}: no Min. lot and no real coil weight — lot size unknown.`)
     }
     return flags
   }

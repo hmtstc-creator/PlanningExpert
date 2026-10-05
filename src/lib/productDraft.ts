@@ -31,8 +31,8 @@ export interface ProductDraft {
   maxShots: string
   qualityApprovalMinutes: string
   performanceFactor: string
-  /** Çevrim hattı (src/lib/rateModel.ts): çevrim süresi (sn). */
-  cycleTimeSeconds: string
+  /** Çevrim hattı (src/lib/rateModel.ts): çevrim süresi, dakika / adet (3 hane). */
+  cycleMinutes: string
   /** Çevrim hattı: frekansiyel duruşlar arası adet. */
   stopEveryPcs: string
 }
@@ -57,7 +57,7 @@ export const PRODUCT_FIELDS: ProductField[] = [
   { name: 'maxShots', numeric: true },
   { name: 'qualityApprovalMinutes', numeric: true },
   { name: 'performanceFactor', numeric: true },
-  { name: 'cycleTimeSeconds', numeric: true },
+  { name: 'cycleMinutes', numeric: true },
   { name: 'stopEveryPcs', numeric: true },
 ]
 
@@ -69,11 +69,26 @@ export function productDraftOf(product: Record<string, unknown>): ProductDraft {
   const draft = {} as ProductDraft
   for (const field of PRODUCT_FIELDS) draft[field.name] = text(product[field.name])
   draft.flexiblePress = product.flexiblePress ? 'yes' : ''
+  // Çevrim süresi her zaman 3 haneyle görünür (0.750).
+  const cycle = product.cycleMinutes
+  draft.cycleMinutes = typeof cycle === 'number' && cycle > 0 ? cycle.toFixed(3) : ''
   return draft
 }
 
+/**
+ * İki kutu değeri aynı mı? Çevrim süresi 3 haneyle saklanır: "0.75" ile
+ * "0.750" aynıdır (yazım farkı değişiklik sayılmaz).
+ */
+export function sameFieldValue(name: keyof ProductDraft, a: string, b: string): boolean {
+  if (a === b) return true
+  if (name !== 'cycleMinutes') return false
+  const x = Number(a.trim().replace(',', '.'))
+  const y = Number(b.trim().replace(',', '.'))
+  return a.trim() !== '' && b.trim() !== '' && Number.isFinite(x) && Number.isFinite(y) && Math.round(x * 1000) === Math.round(y * 1000)
+}
+
 export function sameProductDraft(a: ProductDraft, b: ProductDraft): boolean {
-  return PRODUCT_FIELDS.every((field) => a[field.name] === b[field.name])
+  return PRODUCT_FIELDS.every((field) => sameFieldValue(field.name, a[field.name], b[field.name]))
 }
 
 /** Sunucuya yazılması gereken alanlar. */
@@ -81,5 +96,5 @@ export function changedProductFields(
   draft: ProductDraft,
   server: ProductDraft,
 ): ProductField[] {
-  return PRODUCT_FIELDS.filter((field) => draft[field.name] !== server[field.name])
+  return PRODUCT_FIELDS.filter((field) => !sameFieldValue(field.name, draft[field.name], server[field.name]))
 }

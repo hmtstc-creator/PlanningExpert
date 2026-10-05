@@ -724,12 +724,10 @@ export const PLACEHOLDER_COIL_KG = 1
  * Lot kuralı: minimum lot tanımlıysa o, değilse tam rulo. İkisi de yoksa
  * ana veri eksiktir; lot tam ihtiyaç kadar kurulur ve plan uyarır.
  */
-export function lotRuleOf(product: ProductSpec | undefined): 'minLot' | 'coil' | 'need' | 'missing' {
+export function lotRuleOf(product: ProductSpec | undefined): 'minLot' | 'coil' | 'missing' {
   if (!product) return 'missing'
   if ((product.minLotQty ?? 0) > 0) return 'minLot'
-  if (piecesPerCoil(product) > 0) return 'coil'
-  // Çevrim hattı: rulo yok, lot tam ihtiyaç kadar — eksik veri değil.
-  return product.lotByNeed ? 'need' : 'missing'
+  return piecesPerCoil(product) > 0 ? 'coil' : 'missing'
 }
 
 function cavitiesOf(product: ProductSpec | undefined): number {
@@ -807,26 +805,6 @@ export interface ProductSpec {
    * gereği yalnızca ana preste çalışır.
    */
   flexiblePress?: boolean
-  /**
-   * Çevrim hattı (src/lib/rateModel.ts): frekansiyel duruşlar arası adet —
-   * rulo yokken duruş aralığı budur (fikstür setup'ı her N adette bir …).
-   */
-  stopEveryPcs?: number
-  /**
-   * Çevrim hattı: lot rulodan değil, Min. lot ya da tam ihtiyaçtan kurulur
-   * (Min. lot yoksa "eksik veri" sayılmaz).
-   */
-  lotByNeed?: boolean
-}
-
-/**
- * Frekansiyel duruşlar arası adet: pres hattında rulodaki adet, çevrim
- * hattında `stopEveryPcs`. 0 = işin ortasında duruş yok.
- */
-export function stopIntervalPieces(product: ProductSpec): number {
-  const coil = piecesPerCoil(product)
-  if (coil > 0) return coil
-  return product.stopEveryPcs && product.stopEveryPcs > 0 ? Math.floor(product.stopEveryPcs) : 0
 }
 
 /**
@@ -887,7 +865,7 @@ export interface RunPlan {
  * Eş ürün (coProduct) aynı vuruşta çıktığı için aynı adet kadar üretilmiş
  * sayılır ve onun talebinden de düşülmelidir.
  */
-export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan {
+export function computeRunPlan(product: ProductSpec, quantity: number, coProductCavities?: number): RunPlan {
   const cavities = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
   const shots = Math.ceil(quantity / cavities)
   const spm = product.spm && product.spm > 0 ? product.spm : 0
@@ -905,11 +883,8 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   const setupMinutes = product.setupMinutes ?? 0
   // İlk rulo ana setup'ın içinde bağlanır; kayıp yalnızca sonraki rulolarda
   // yaşanır. Rulo beslemeyen presler (transfer) bunu hiç ödemez — orada
-  // setup tektir. Çevrim hattında aralık rulodan değil `stopEveryPcs`'ten
-  // gelir (frekansiyel duruş: fikstür setup'ı …).
-  const interval = stopIntervalPieces(product)
-  const segmentsNeeded = interval > 0 ? Math.ceil(quantity / interval) : 0
-  const coilChanges = Math.max(0, segmentsNeeded - 1)
+  // setup tektir.
+  const coilChanges = Math.max(0, coilsNeeded - 1)
   const coilChangeMinutes = product.coilSetupMinutes ?? 0
   const coilSetupMinutes = coilChangeMinutes * coilChanges
   const qualityApprovalMinutes = product.qualityApprovalMinutes ?? 0
@@ -934,10 +909,10 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   // Üretimi rulo başına parçalara böl: her rulo kendi süresi kadar çalışır,
   // aralarına rulo değişimi girer.
   const coilRunMinutes: number[] = []
-  if (interval > 0 && quantity > 0) {
+  if (piecesInCoil > 0 && quantity > 0) {
     let left = quantity
     while (left > 0) {
-      const chunk = Math.min(left, interval)
+      const chunk = Math.min(left, piecesInCoil)
       coilRunMinutes.push((runMinutes * chunk) / quantity)
       left -= chunk
     }
@@ -948,7 +923,9 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
   return {
     quantity,
     shots,
-    coProductQuantity: product.coProduct ? shots * cavities : 0,
+    // Eş ürün aynı vuruştan kendi göz sayısı kadar çıkar (bağımsız kontrol de
+    // böyle sayar: vuruş × eşin gözü); eşin gözü bilinmiyorsa asılınki.
+    coProductQuantity: product.coProduct ? shots * (coProductCavities && coProductCavities > 0 ? coProductCavities : cavities) : 0,
     kgNeeded,
     shotsPerCoil,
     coilsNeeded,
@@ -970,13 +947,13 @@ export function computeRunPlan(product: ProductSpec, quantity: number): RunPlan 
  * Kalıp limiti aşılıyorsa üretimi limite sığan partilere böler.
  * Her parti kendi setup'ını taşır (kalıp bakımı arada yapılır).
  */
-export function splitByMoldLimit(product: ProductSpec, quantity: number): RunPlan[] {
+export function splitByMoldLimit(product: ProductSpec, quantity: number, coProductCavities?: number): RunPlan[] {
   const cavities = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
   const maxShots = product.maxShots ?? 0
-  if (maxShots <= 0) return [computeRunPlan(product, quantity)]
+  if (maxShots <= 0) return [computeRunPlan(product, quantity, coProductCavities)]
 
   const maxQtyPerRun = maxShots * cavities
-  if (quantity <= maxQtyPerRun) return [computeRunPlan(product, quantity)]
+  if (quantity <= maxQtyPerRun) return [computeRunPlan(product, quantity, coProductCavities)]
 
   // Partiler tam rulo sınırında bölünür: bağlanan rulo yarıda bırakılmaz.
   // Tek rulo limitten büyükse parti bir rulodur (limit aşımı işte uyarılır).
@@ -988,7 +965,7 @@ export function splitByMoldLimit(product: ProductSpec, quantity: number): RunPla
   let remaining = quantity
   while (remaining > 0) {
     const chunk = Math.min(remaining, chunkSize)
-    runs.push(computeRunPlan(product, chunk))
+    runs.push(computeRunPlan(product, chunk, coProductCavities))
     remaining -= chunk
   }
   return runs

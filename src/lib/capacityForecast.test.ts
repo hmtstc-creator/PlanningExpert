@@ -144,3 +144,23 @@ describe('performance basis', () => {
     expect(seriesForBasis(s, 'accepted', 0.75)).toEqual({ capacity: [100, 100], demand: [40, 16] })
   })
 })
+
+describe('eş ürün: her ürün kendi göz sayısıyla', () => {
+  it('gereken vuruş = iki ürünün adet ÷ kendi gözünün büyüğü', () => {
+    // A 2 gözlü, eşi B 1 gözlü. A'dan 2000, B'den 1500 → vuruş max(1000, 1500) = 1500.
+    const f = buildCapacityForecast(
+      input({
+        products: [
+          { code: 'A', coProduct: 'B', mainMachine: 'PRS-106', spm: 10, moldCavities: 2 },
+          { code: 'B', mainMachine: 'PRS-106', spm: 10, moldCavities: 1 },
+        ],
+        weeklyDemand: [
+          { material: 'A', periods: [{ label: 'W39', qty: 2000 }] },
+          { material: 'B', periods: [{ label: 'W39', qty: 1500 }] },
+        ],
+      }),
+    )
+    // 1500 vuruş ÷ 10 SPM = 150 dk = 2.5 sa (eskiden max(2000,1500)/2 = 1000 vuruş → 1.67 sa: eksik).
+    expect(f.presses.find((p) => p.press === 'PRS-106')!.demand[0]).toBe(2.5)
+  })
+})

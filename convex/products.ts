@@ -33,6 +33,7 @@ const productValidator = v.object({
   name: v.string(),
   material: v.string(),
   cycleTimeSeconds: v.optional(v.number()),
+  cycleMinutes: v.optional(v.number()),
   stopEveryPcs: v.optional(v.number()),
 })
 
@@ -58,9 +59,12 @@ const productArgs = {
   performanceFactor: v.optional(v.number()),
   name: v.optional(v.string()),
   material: v.optional(v.string()),
-  cycleTimeSeconds: v.optional(v.number()),
+  cycleMinutes: v.optional(v.number()),
   stopEveryPcs: v.optional(v.number()),
 }
+
+/** Çevrim süresi dakika / adet, 3 hane (src/lib/rateModel.ts). */
+const round3 = (n: number | undefined) => (n === undefined ? undefined : Math.round(n * 1000) / 1000)
 
 /**
  * Tek sorguda okunacak en fazla satır. Convex'in okuma sınırının altında
@@ -127,7 +131,7 @@ export const create = guardedMutation({
     const code = args.code.trim()
     if (!code) throw new ConvexError('Material code is required')
     const { name: _n, material: _m, ...rest } = args
-    return ctx.db.insert('products', { ...rest, code })
+    return ctx.db.insert('products', { ...rest, cycleMinutes: round3(rest.cycleMinutes), code })
   },
 })
 
@@ -142,9 +146,9 @@ export const bulkUpsert = guardedMutation({
       const code = row.code.trim()
       if (!code) continue
       const { name: _n, material: _m, ...rest } = row
-      const data: Record<string, unknown> = { ...rest, code }
+      const data: Record<string, unknown> = { ...rest, cycleMinutes: round3(rest.cycleMinutes), code }
       // Çevrim alanları dosyada yoksa elle girilen değer korunur.
-      if (data.cycleTimeSeconds === undefined) delete data.cycleTimeSeconds
+      if (data.cycleMinutes === undefined) delete data.cycleMinutes
       if (data.stopEveryPcs === undefined) delete data.stopEveryPcs
       // "Flexible press" SAP'den gelmez, burada işaretlenir. Dosyada sütun
       // yoksa mevcut işaret korunur — yeniden yükleme onu silmemeli.
@@ -220,7 +224,7 @@ export const updateField = guardedMutation({
       'maxShots',
       'qualityApprovalMinutes',
       'performanceFactor',
-      'cycleTimeSeconds',
+      'cycleMinutes',
       'stopEveryPcs',
     ]
 
@@ -249,7 +253,7 @@ export const updateField = guardedMutation({
         // cycle time; zero would make the job infinitely long.
         throw new ConvexError('Accepted OEE must be greater than 0 and at most 1')
       }
-      await ctx.db.patch(id, { [field]: parsed })
+      await ctx.db.patch(id, { [field]: field === 'cycleMinutes' ? round3(parsed) : parsed })
       return null
     }
 

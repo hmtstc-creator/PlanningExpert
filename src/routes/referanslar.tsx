@@ -9,6 +9,7 @@ import { UnsavedBar } from '../components/UnsavedBar'
 import {
   changedProductFields,
   productDraftOf,
+  sameFieldValue,
   sameProductDraft,
   PRODUCT_FIELDS,
   type ProductDraft,
@@ -17,7 +18,7 @@ import {
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { lotRuleOf, piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
-import { RATE_MODELS, modelOfPart, piecesPerHour, planSpec, type RateModel } from '../lib/rateModel'
+import { CYCLE_DECIMALS, RATE_MODELS, modelOfPart, piecesPerHour, type RateModel } from '../lib/rateModel'
 import { ExcelUpload } from '../components/ExcelUpload'
 import { friendlyError } from '../lib/mutationErrors'
 import { InfoTip, PageHeader } from '../components/PageHeader'
@@ -47,7 +48,7 @@ const emptyForm = {
   maxShots: '',
   qualityApprovalMinutes: '',
   performanceFactor: '',
-  cycleTimeSeconds: '',
+  cycleMinutes: '',
   stopEveryPcs: '',
 }
 
@@ -148,7 +149,7 @@ function ReferanslarPage() {
         maxShots: num(form.maxShots),
         qualityApprovalMinutes: num(form.qualityApprovalMinutes),
         performanceFactor: num(form.performanceFactor),
-        cycleTimeSeconds: num(form.cycleTimeSeconds),
+        cycleMinutes: num(form.cycleMinutes),
         stopEveryPcs: num(form.stopEveryPcs),
       })
       setForm(emptyForm)
@@ -233,7 +234,7 @@ function ReferanslarPage() {
           row['performanceFactor'],
       ),
       // Çevrim hattı parçaları (robot, montaj, hat); sütun yoksa korunur.
-      cycleTimeSeconds: n(row['Cycle Time (s)'] ?? row['Cycle Time'] ?? row['Çevrim Süresi'] ?? row['cycleTimeSeconds']),
+      cycleMinutes: n(row['Cycle Time (min)'] ?? row['Cycle Time'] ?? row['Çevrim Süresi (dk)'] ?? row['Çevrim Süresi'] ?? row['cycleMinutes']),
       stopEveryPcs: n(row['Stop Every (pcs)'] ?? row['Stop Every'] ?? row['stopEveryPcs']),
     }))
     const validRows = parsed.filter((r) => r.code)
@@ -302,7 +303,7 @@ function ReferanslarPage() {
             'Min Lot (pcs) (optional)',
             'Setup Time',
             'Frequency Stop Time (min) (or Coil Setup Time)',
-            'Cycle Time (s) (cycle lines)',
+            'Cycle Time (min) (cycle lines)',
             'Stop Every (pcs) (cycle lines)',
             'Main Machine',
             'Alternative 1-4',
@@ -325,9 +326,9 @@ function ReferanslarPage() {
         >
           <Field label="Material (code)" value={form.code} onChange={(v) => update('code', v)} placeholder="M250SP001RO" />
           <Field label="Co-Product" value={form.coProduct} onChange={(v) => update('coProduct', v)} placeholder="M250SP002RO" />
-          <Field label="Cavity / pieces per cycle" value={form.moldCavities} onChange={(v) => update('moldCavities', v)} type="number" placeholder="1" />
-          <Field label="SPM — press lines" value={form.spm} onChange={(v) => update('spm', v)} type="number" placeholder="16" />
-          <Field label="Cycle time (s) — cycle lines" value={form.cycleTimeSeconds} onChange={(v) => update('cycleTimeSeconds', v)} type="number" placeholder="45" />
+          <Field label="Cavity — presses" value={form.moldCavities} onChange={(v) => update('moldCavities', v)} type="number" placeholder="1" />
+          <Field label="SPM — presses" value={form.spm} onChange={(v) => update('spm', v)} type="number" placeholder="16" />
+          <Field label="Cycle time (min / piece, 3 decimals) — cycle lines" value={form.cycleMinutes} onChange={(v) => update('cycleMinutes', v)} type="number" placeholder="0.750" />
           <Field label="Stop every (pcs) — cycle lines" value={form.stopEveryPcs} onChange={(v) => update('stopEveryPcs', v)} type="number" placeholder="500" />
           <Field label="Raw Material Code" value={form.rawMaterialCode} onChange={(v) => update('rawMaterialCode', v)} placeholder="SD51-100-0976" />
           <Field label="Coil Weight (Kg)" value={form.coilWeight} onChange={(v) => update('coilWeight', v)} type="number" placeholder="8000" />
@@ -392,18 +393,19 @@ function ReferanslarPage() {
                       <b>Press</b> — {RATE_MODELS.stroke.hint}. Columns: Cavity, SPM, Raw material, Coil weight, Gross weight.
                     </p>
                     <p>
-                      <b>Cycle</b> — {RATE_MODELS.cycle.hint}. Columns: pieces per cycle (Cavity column), cycle time in seconds (SPM column)
-                      and “stop every N pieces” for the frequency stop (Coil column). No raw material in kg.
+                      <b>Cycle</b> — {RATE_MODELS.cycle.hint}. Columns: cycle time in minutes per piece, {CYCLE_DECIMALS} decimals (SPM
+                      column), and “stop every N pieces” for the frequency stop (Coil column). No cavity, coil or kg.
                     </p>
+                    <p>Pieces per hour: press = SPM × 60 × cavities; cycle line = 60 ÷ cycle time (min).</p>
                   </InfoTip>
                 </span>
               </th>
               <th className="px-3 py-2 font-medium">Co-Product</th>
-              <th className="px-3 py-2 font-medium" title="Press: cavities. Cycle line: pieces per cycle">
-                {hasCycle ? 'Cavity · pcs/cycle' : 'Cavity'}
+              <th className="px-3 py-2 font-medium" title="Press: cavities (pieces per stroke). Not used on a cycle line">
+                Cavity
               </th>
-              <th className="px-3 py-2 font-medium" title="Press: strokes per minute. Cycle line: cycle time in seconds">
-                {hasCycle ? 'SPM · cycle s' : 'SPM'}
+              <th className="px-3 py-2 font-medium" title="Press: strokes per minute. Cycle line: cycle time in minutes per piece (3 decimals)">
+                {hasCycle ? 'SPM · cycle min/pc' : 'SPM'}
               </th>
               <th className="px-3 py-2 font-medium">Raw Material</th>
               <th className="px-3 py-2 font-medium" title="Press: coil weight (kg). Cycle line: pieces between frequency stops">
@@ -470,8 +472,9 @@ function ReferanslarPage() {
               const saveThisRow = () => {
                 if (dirty && !busy) void rows.commit(rowId, saveRow(rowId))
               }
-              const cell = (field: ProductField, width: string) => (
+              const cell = (field: ProductField, width: string, format?: (v: string) => string) => (
                 <CellInput
+                  format={format}
                   key={field.name}
                   value={draft[field.name]}
                   title={field.name}
@@ -479,7 +482,7 @@ function ReferanslarPage() {
                   numeric={field.numeric}
                   onChange={(next) => rows.edit(rowId, { [field.name]: next } as Partial<ProductDraft>)}
                   onCommit={saveThisRow}
-                  changed={draft[field.name] !== productDraftOf(p)[field.name]}
+                  changed={!sameFieldValue(field.name, draft[field.name], productDraftOf(p)[field.name])}
                 />
               )
               const field = (name: ProductField['name']) =>
@@ -492,21 +495,21 @@ function ReferanslarPage() {
                 >
                   <td className="px-1 py-1">{cell(field('code'), 'w-28')}</td>
                   <td className="px-2 py-1">
-                    <ModelBadge model={model} pph={piecesPerHour(p as unknown as ProductSpec, model)} />
+                    <ModelBadge model={model} pph={piecesPerHour(p, model)} />
                   </td>
                   <td className="px-1 py-1">{cell(field('coProduct'), 'w-28')}</td>
-                  <td className="px-1 py-1">{cell(field('moldCavities'), 'w-20')}</td>
-                  <td className="px-1 py-1">{model === 'cycle' ? cell(field('cycleTimeSeconds'), 'w-20') : cell(field('spm'), 'w-20')}</td>
+                  <td className="px-1 py-1">{model === 'cycle' ? <NotUsed /> : cell(field('moldCavities'), 'w-20')}</td>
+                  <td className="px-1 py-1">{model === 'cycle' ? cell(field('cycleMinutes'), 'w-20', fixed3) : cell(field('spm'), 'w-20')}</td>
                   <td className="px-1 py-1">{model === 'cycle' ? <NotUsed /> : cell(field('rawMaterialCode'), 'w-28')}</td>
                   <td className="px-1 py-1">{model === 'cycle' ? cell(field('stopEveryPcs'), 'w-20') : cell(field('coilWeight'), 'w-20')}</td>
                   <td className="px-1 py-1">{model === 'cycle' ? <NotUsed /> : cell(field('grossWeight'), 'w-20')}</td>
                   <td className="px-1 py-1">{cell(field('minLotQty'), 'w-20')}</td>
                   <td className="px-3 py-2 text-muted-foreground" title="Coil weight ÷ gross weight per piece">
                     {(() => {
-                      const spec = planSpec({ ...p } as unknown as ProductSpec, model)
+                      if (model === 'cycle') return <NotUsed />
+                      const spec = { ...p } as unknown as ProductSpec
                       const rule = lotRuleOf(spec)
                       if (rule === 'minLot') return <span className="text-xs">min. lot</span>
-                      if (rule === 'need') return <span className="text-xs" title="Cycle line: no coil — the lot is the exact need">exact need</span>
                       if (rule === 'missing') {
                         return (
                           <span
@@ -666,8 +669,11 @@ function CellInput({
   changed,
   onChange,
   onCommit,
+  format,
 }: {
   value: string
+  /** Kutudan çıkınca değeri biçimler (ör. çevrim süresi 3 hane). */
+  format?: (v: string) => string
   title?: string
   className?: string
   numeric?: boolean
@@ -682,6 +688,9 @@ function CellInput({
       value={value}
       inputMode={numeric ? 'decimal' : undefined}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={() => {
+        if (format && format(value) !== value) onChange(format(value))
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') onCommit()
       }}
@@ -797,5 +806,11 @@ function NotUsed() {
       —
     </span>
   )
+}
+
+/** Çevrim süresi kutusu: sayıysa 3 haneyle (0.75 → 0.750). */
+function fixed3(v: string): string {
+  const n = Number(v.trim().replace(',', '.'))
+  return v.trim() !== '' && Number.isFinite(n) ? n.toFixed(CYCLE_DECIMALS) : v
 }
 

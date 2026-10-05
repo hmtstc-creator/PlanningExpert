@@ -172,10 +172,13 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
     // Eş ürün çifti: süreyi taşıyan, eşini tanımlayan ürün.
     let carrier = productByCode.get(material)
     let partnerNet: number[] | undefined
+    // Eşin kodu: adedi kendi göz sayısıyla vuruşa çevrilir.
+    let partnerCode: string | undefined
     const partnerOf = (p?: ProductSpec) => p?.coProduct?.trim() || undefined
     const partner = partnerOf(carrier)
     if (partner) {
       partnerNet = netByMaterial.get(partner)
+      partnerCode = partner
       done.add(partner)
     } else {
       // Bu malzeme başka bir ürünün eşi mi?
@@ -183,6 +186,7 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
       if (owner) {
         carrier = owner
         partnerNet = netByMaterial.get(owner.code.trim())
+        partnerCode = owner.code.trim()
         done.add(owner.code.trim())
       }
     }
@@ -206,7 +210,10 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
       unassigned.push({ material, reason: 'no SPM', quantity: total })
       continue
     }
-    const cavities = carrier.moldCavities && carrier.moldCavities > 0 ? carrier.moldCavities : 1
+    const cav = (p?: ProductSpec) => (p?.moldCavities && p.moldCavities > 0 ? p.moldCavities : 1)
+    // Bu malzemenin ve eşinin göz sayısı (eş ürün aynı vuruştan kendi gözü kadar çıkar).
+    const ownCavities = cav(productByCode.get(material) ?? carrier)
+    const partnerCavities = cav(partnerCode ? productByCode.get(partnerCode) : undefined)
     const factor =
       carrier.performanceFactor && carrier.performanceFactor > 0
         ? Math.min(1, carrier.performanceFactor)
@@ -214,10 +221,11 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
     const row = demandMinutes.get(press)!
     const ideal = idealMinutes.get(press)!
     for (let w = 0; w < weekCount; w++) {
-      const qty = Math.max(net[w], partnerNet?.[w] ?? 0)
-      if (qty <= 0) continue
-      row[w] += qty / cavities / spm / factor
-      ideal[w] += qty / cavities / spm
+      // Gereken vuruş: iki ürünün kendi adet ÷ kendi gözünün büyüğü.
+      const strokes = Math.max(net[w] / ownCavities, (partnerNet?.[w] ?? 0) / partnerCavities)
+      if (strokes <= 0) continue
+      row[w] += strokes / spm / factor
+      ideal[w] += strokes / spm
     }
   }
 

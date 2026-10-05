@@ -203,7 +203,7 @@ function PlanLogicPage() {
               'Cavities, strokes per minute (SPM), setup and frequency stop (coil change) times, quality approval time, coil and gross weight, mould shot limit, main and alternative work centers, Flexible work center tick, co-product, Accepted OEE',
               '/referanslar',
             ],
-            ['Work Centers', 'The single work center list: cost center, hall (crane and setup team), category (Gantt and Capacity Dashboard groups), production model (press: SPM × cavities, coils, kg — or cycle line: cycle time, pieces per cycle, no coil), frequency stop (coil setup, fixture setup … or none), frozen days', '/makineler'],
+            ['Work Centers', 'The single work center list: cost center, hall (crane and setup team), category (Gantt and Capacity Dashboard groups), production model (press — planned here; cycle line: spot welding, robot, assembly — cycle time in min/piece, not part of this plan), frequency stop (coil setup, fixture setup … or none), frozen days', '/makineler'],
             ['Work calendar', 'Per work center: weekly pattern (days from Monday × shifts), exception weeks, overtime (dated or recurring, from an overtime type); planned stops; public and manual holidays; planning settings', '/takvim'],
             ['Dies', 'Readiness (date and time), maintenance days, shot-limit alarms — from Die Follow-up', '/die-followup/maintenance'],
             ['Machines', 'Planned work center maintenance hours and open breakdowns that stop a work center — from Machine Follow-up', '/machine-followup/breakdowns'],
@@ -438,12 +438,15 @@ function PlanLogicPage() {
           <span aria-hidden>→ …</span>
         </div>
         <Formula>
-          strokes = quantity ÷ cavities · job time = strokes ÷ SPM ÷ Accepted OEE
+          strokes = ⌈quantity ÷ cavities⌉ · pure time = strokes ÷ SPM · job time = max(pure time ÷ Accepted OEE, pure time + setup +
+          frequency stops + approval)
         </Formula>
         <p className="text-xs text-muted-foreground">
           Example: 10 h of pure stroke time at a 60 % Accepted OEE is a 16.7 h job.
-          Setup, frequency stops (coil changes …) and quality approval sit inside that time. A work center
-          whose frequency stop is — none — never stops for it.
+          Setup, frequency stops (coil changes …) and quality approval sit inside that time; when they do not fit, the job is the pure
+          time plus those stops. Frequency stops = coils − 1 (coils = ⌈quantity ÷ pieces per coil⌉, pieces per coil = ⌊coil weight ÷
+          gross weight⌋); a work center whose frequency stop is — none — never stops for it. A co-product comes from the same strokes:
+          strokes × its own cavities.
         </p>
         <p>It has to respect every rule at once:</p>
         <ul>

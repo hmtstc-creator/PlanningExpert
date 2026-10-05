@@ -344,28 +344,22 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   - [ ] **[G]** Sayfalardaki düzenleme düğmelerini alan iznine göre gizleme
     (bugün sunucu reddeder ve nedenini söyler; OEE yükleme ve KPI girişi
     alana bakıyor).
-- [x] ✅ **Pres dışı hatlar: üretim modeli** (2026-10-04): work center'da
-  Model = Stroke (pres) / Cycle (robot, montaj, kataforez). Cycle parçada
-  çevrim süresi (sn) + çevrim başına adet, "her N adette" frekansiyel duruş;
-  rulo/kg yok, lot Min. lot ya da tam ihtiyaç; hammadde (kg) hesabına girmez.
-  Master Data satırı modele göre alan gösterir (pcs/h da yazılı).
-  Sonraki adımlar (derin tasarım — karar ve sıra kullanıcıyla):
-  - [ ] **[G] Ürün ağacı (BOM) ve bağımlı talep.** Montaj / kaynak parçası
-    pres parçalarından oluşur: montajın planı, pres parçasının talebini
-    doğurmalı (bugün her parçanın talebi yalnızca SAP'den). Gerekli: parça →
-    bileşen × adet tablosu, talebin seviye seviye patlatılması, bileşenin
-    montajdan önce hazır olma kuralı (öncelik kısıtı), stok düşümü.
-  - [ ] **[G] Ambalaj / kasa katı.** Montaj hattında lot çoğu zaman kasa
-    adedinin katıdır (Min. lot yetmez): "lot multiple" alanı.
-  - [ ] **[G] Rota (çok operasyon).** Bir parça art arda birkaç hattan
-    geçebilir (pres → kaynak → kataforez). Bugün parça tek makinede tek
-    işlem; rota tablosu ve operasyonlar arası bekleme süresi gerekir.
-  - [ ] **[G] Parti (batch) prosesler.** Kataforez / fırın: kapasite askı ya
-    da sepet başına adet ve hat hızıyla; farklı parçalar aynı partide
-    birlikte işlenebilir (pres mantığında her iş ayrı). İlk yaklaşım Cycle
-    (askı başına adet ÷ askı çevrimi) ile çalışır; birlikte işleme ayrıca.
-  - [ ] **[G] Bileşen malzemesi.** Cycle hatlarında hammadde kg değil adet
-    (vida, somun, tel) — BOM ile birlikte hammadde sayfası adet bazlı.
+- [x] ✅ **Pres dışı hatlar ayrıldı** (2026-10-05): work center'da Model =
+  Stroke (pres) / Cycle (punta, robot, montaj, kataforez). Her hattın plan
+  yapısı farklıdır, birleştirilmez: pres motoru yalnızca pres hatlarını ve
+  ana makinesi pres olan parçaları (talep, stok, takvim) planlar; çevrim
+  hatları ve parçaları pres planına girmez (planda tek satır uyarı).
+  Çevrim parçasının tanımı: çevrim süresi, dakika / adet, 3 hane
+  (`products.cycleMinutes`), "her N adette" frekansiyel duruş. Pres
+  parçası → punta hattı bağı bugün kurulmaz.
+  Hesap kontrolü: eş ürün adedi ve kapasite tahmininde eşin kendi göz sayısı
+  kullanılmıyordu (düzeltildi: vuruş × eşin gözü; kapasitede iki ürünün
+  vuruşunun büyüğü). Plan Logic formülleri motorla aynı yazıldı.
+  - [ ] **[K] Çevrim hatlarının planı.** Ayrı plan sayfası (talep × çevrim
+    süresi ↔ hat kapasitesi, iş listesi). Kullanıcı "şimdilik plan dışı"
+    dedi (2026-10-05).
+  - [ ] **[G] Pres → punta bağı (ileride).** Punta / montaj parçasının pres
+    bileşenleri (ürün ağacı) ve bağımlı talep; kullanıcı ileride ister.
 - [ ] **P2 — SAP entegrasyonu elle.** ZPP / MB52 / MB51 Excel'le yükleniyor.
   → Zamanlanmış içe alma (SAP export klasörü ya da API) ve "veri ne kadar
   eski" göstergesi.

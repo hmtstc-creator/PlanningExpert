@@ -1,20 +1,18 @@
-// Üretim modeli: work center parçayı neyle ölçer.
+// Üretim modeli: work center'ın plan yapısı.
 //
-// Pres hattı ile robot / montaj / kataforez hattı aynı şeyi üretmez:
+// Her hattın plan yapısı farklıdır; birleştirilmez:
 //
-//   Stroke (pres)   hız = SPM × göz; lot = tam rulo ya da Min. lot; malzeme
-//                   rulodan kg (brüt ağırlık); frekansiyel duruş her rulo.
-//   Cycle (hat)     hız = çevrim başına adet ÷ çevrim süresi (sn); lot = Min.
-//                   lot ya da tam ihtiyaç; rulo ve kg yok; frekansiyel duruş
-//                   "her N adette bir" (fikstür, elektrot, askı …).
+//   Stroke (pres)   PlanningExpert'in planı: SPM × göz, tam rulo ya da Min.
+//                   lot, sac kg, vinç, kalıp setup'ı. Pres motoru yalnızca
+//                   bu work center'ları ve ana makinesi bunlardan biri olan
+//                   parçaları planlar.
+//   Cycle (hat)     Punta, robot, montaj, kataforez: parçanın çevrim süresi
+//                   (dakika / adet). Pres planına GİRMEZ — ayrıca planlanır;
+//                   pres parçasıyla bağı (punta hattına giden pres parçası)
+//                   bugün kurulmaz.
 //
 // Model work center'ın tanımıdır (Work Center Definitions); parça ana
-// makinesinin modelini alır. Plan motoru tek bir dili konuşur (vuruş, göz,
-// parça aralığı): parça motora girmeden önce buradaki `planSpec` ile o dile
-// çevrilir. Böylece motorun kuralları (vinç, setup, vardiya, geç iş) iki
-// modelde de aynen çalışır.
-
-import type { ProductSpec } from './planning'
+// makinesinin modelini alır.
 
 export type RateModel = 'stroke' | 'cycle'
 
@@ -22,14 +20,17 @@ export const RATE_MODELS: Record<RateModel, { label: string; short: string; hint
   stroke: {
     label: 'Stroke — press',
     short: 'Press',
-    hint: 'Strokes per minute × cavities; whole coils or Min. lot; steel in kg from the coil',
+    hint: 'Strokes per minute × cavities, whole coils or Min. lot, steel in kg — planned by PlanningExpert',
   },
   cycle: {
-    label: 'Cycle — robot, assembly, line',
+    label: 'Cycle — spot welding, robot, assembly, line',
     short: 'Cycle',
-    hint: 'Pieces per cycle ÷ cycle time; Min. lot or the exact need; no coil, no kg',
+    hint: 'Cycle time in minutes per piece — not part of the press plan, planned separately',
   },
 }
+
+/** Çevrim süresinin gösterim hassasiyeti (dakika, virgülden sonra 3 hane). */
+export const CYCLE_DECIMALS = 3
 
 export function rateModelOf(press: { rateModel?: string | null } | undefined): RateModel {
   return press?.rateModel === 'cycle' ? 'cycle' : 'stroke'
@@ -40,42 +41,58 @@ export function modelOfPart(product: { mainMachine?: string | null }, presses: M
   return rateModelOf(presses.get(product.mainMachine?.trim() ?? ''))
 }
 
-/** Çevrim hattı parçasının ek alanları (products). */
-export interface CycleFields {
-  cycleTimeSeconds?: number | null
-  /** Frekansiyel duruşlar arası adet (fikstür setup'ı … her N adette bir). */
-  stopEveryPcs?: number | null
+/** Dakikayı 3 haneye yuvarlar (kayıt ve gösterim aynı değeri kullanır). */
+export function roundCycleMinutes(minutes: number): number {
+  const f = 10 ** CYCLE_DECIMALS
+  return Math.round(minutes * f) / f
+}
+
+export function formatCycleMinutes(minutes: number | null | undefined): string {
+  return minutes && minutes > 0 ? minutes.toFixed(CYCLE_DECIMALS) : ''
 }
 
 /**
- * Parçayı plan motorunun diline çevirir.
- * - Pres: olduğu gibi (çevrim alanları yok sayılır).
- * - Çevrim: SPM = 60 ÷ çevrim süresi, göz = çevrim başına adet; rulo yok
- *   (lot Min. lot ya da tam ihtiyaç); hammadde kg hesabına girmez;
- *   frekansiyel duruş aralığı `stopEveryPcs`.
+ * Parçanın saatlik adedi (ekran için).
+ * - Pres: SPM × 60 × göz (bir vuruşta göz kadar parça).
+ * - Çevrim: 60 ÷ çevrim süresi (dakika / adet).
  */
-export function planSpec<T extends ProductSpec & CycleFields & { rawMaterialCode?: string }>(product: T, model: RateModel): T & ProductSpec {
-  if (model === 'stroke') {
-    const { stopEveryPcs: _s, ...rest } = product
-    return { ...rest, stopEveryPcs: undefined } as T
+export function piecesPerHour(
+  product: { spm?: number | null; moldCavities?: number | null; cycleMinutes?: number | null },
+  model: RateModel,
+): number {
+  if (model === 'cycle') {
+    const c = product.cycleMinutes ?? 0
+    return c > 0 ? 60 / c : 0
   }
-  const cycle = product.cycleTimeSeconds ?? 0
-  return {
-    ...product,
-    spm: cycle > 0 ? 60 / cycle : 0,
-    coilWeight: 0,
-    rawMaterialCode: '',
-    stopEveryPcs: (product.stopEveryPcs ?? 0) > 0 ? product.stopEveryPcs ?? undefined : undefined,
-    lotByNeed: true,
-  }
+  const cavities = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
+  return (product.spm ?? 0) * 60 * cavities
 }
 
-/** Parçanın saatlik adedi (ekran için): model hangisiyse ondan. */
-export function piecesPerHour(product: ProductSpec & CycleFields, model: RateModel): number {
-  const perCycle = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
-  if (model === 'cycle') {
-    const c = product.cycleTimeSeconds ?? 0
-    return c > 0 ? (3600 / c) * perCycle : 0
+/** Bir adedin dakikası (iki model için de aynı dil: dakika / adet). */
+export function minutesPerPiece(
+  product: { spm?: number | null; moldCavities?: number | null; cycleMinutes?: number | null },
+  model: RateModel,
+): number {
+  const pph = piecesPerHour(product, model)
+  return pph > 0 ? 60 / pph : 0
+}
+
+/**
+ * Pres planının girdisi: çevrim hatlarını ve ana makinesi çevrim hattı olan
+ * parçaları (talepleri, stokları, takvimleri ile) dışarıda bırakır.
+ * `excluded` ekranda "pres planında değil" diye söylenir.
+ */
+export function pressPlanScope<P extends { name: string; rateModel?: string | null }, Q extends { code: string; mainMachine?: string | null }>(
+  presses: P[],
+  products: Q[],
+): { presses: P[]; products: Q[]; excludedParts: Set<string>; cycleLines: string[] } {
+  const byName = new Map(presses.map((p) => [p.name, p]))
+  const cycleLines = presses.filter((p) => rateModelOf(p) === 'cycle').map((p) => p.name)
+  const excludedParts = new Set(products.filter((p) => modelOfPart(p, byName) === 'cycle').map((p) => p.code))
+  return {
+    presses: presses.filter((p) => rateModelOf(p) === 'stroke'),
+    products: products.filter((p) => !excludedParts.has(p.code)),
+    excludedParts,
+    cycleLines,
   }
-  return (product.spm ?? 0) * 60 * perCycle
 }

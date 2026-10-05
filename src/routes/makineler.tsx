@@ -96,11 +96,14 @@ function ModelInfo() {
           <b>{RATE_MODELS.stroke.label}</b>: {RATE_MODELS.stroke.hint}. The raw material page orders steel in kg for these parts.
         </li>
         <li>
-          <b>{RATE_MODELS.cycle.label}</b>: {RATE_MODELS.cycle.hint}. In Master Data the part gets a cycle time (s), pieces per
-          cycle and “stop every N pieces” for its frequency stop (fixture setup …).
+          <b>{RATE_MODELS.cycle.label}</b>: {RATE_MODELS.cycle.hint}. In Master Data the part gets a cycle time in minutes per
+          piece (3 decimals) and “stop every N pieces” for its frequency stop (fixture setup …).
         </li>
       </ul>
-      <p>The planner's rules — hall crane, setups, shifts, overtime, late jobs — work the same for both.</p>
+      <p>
+        Every line has its own plan structure; they are not mixed. A press part that goes on to a spot welding line is planned on the
+        press; the welding line is planned separately (no link between them today).
+      </p>
     </>
   )
 }
@@ -130,8 +133,8 @@ function StopInfo() {
       <p>How the planner uses it:</p>
       <ul className="ml-4 list-disc space-y-0.5">
         <li>
-          The interval comes from the part in Master Data: on a press line every coil (coil weight ÷ gross weight), on a cycle
-          line every “Stop every N pieces”. The first one is part of the setup; each one after it stops the work center.
+          On a press the interval is every coil (coil weight ÷ gross weight, Master Data). The first one is part of the setup; each
+          one after it stops the press. A cycle line keeps “Stop every N pieces” per part for its own plan.
         </li>
         <li>Its length is the part's <i>Frequency stop time</i> in Master Data.</li>
         <li>
