@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery } from '../lib/convexTransport'
+import { Cockpit } from '../components/Cockpit'
 import { useMemo } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -174,6 +175,7 @@ function HomePage() {
         summary="Plant production planning — daily status overview."
         links={relatedPages('/planningexpert')}
       />
+      <Cockpit className="mt-4" />
 
       {truncatedInputs.length > 0 && (
         <p className="mt-4 rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm text-foreground">

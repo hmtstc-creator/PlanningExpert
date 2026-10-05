@@ -26,6 +26,9 @@ Ayrıntı ve gerekçe ilgili maddede; karar verilince madde güncellenir.
 | K10 | Koddaki sabit sayılar: programda mı, kullanıcıda mı (P/K) | 2 |
 | K11 | Fabrika karşılaştırma ekranının içeriği | 2 |
 | K12 | "Doğrudan main" yerine PR + inceleme düzeni | 4.1 |
+| K13 | Geç teslimatta karar sahibi ve tepki süresi (aksiyon kaydı) | 5 |
+| K14 | Günlük özet e-postası: kime, saat kaçta, hangi sinyaller | 5 |
+| K15 | Plan sabitlenmesi (frozen) ve plana uyum hedefi (%) | 5 |
 
 ## 1. Hemen — senin yapacakların (yeni yapıya geçiş)
 
@@ -365,3 +368,81 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   eski" göstergesi.
 - [ ] **P2 — Bildirim yok.** Alarm, geciken iş ya da kalıp ömrü için
   e-posta / mobil bildirim yok; kullanıcı sayfayı açınca görüyor.
+
+## 5. Yönetici gözüyle değerlendirme — CEO ve üretim direktörü (2026-10-05)
+
+Soru: "Bu programı açtığımda bugün neye karar vermem gerektiğini, neden ve
+ne kadar acil olduğunu görüyor muyum? Gördüğüm rakama güvenebilir miyim?"
+Cevap bu değerlendirmeden önce **hayır**dı.
+
+### 5.1 Ağır eleştiriler
+
+1. **Ana sayfa bir menüydü, yönetim ekranı değil.** Portal yalnızca modül
+   kartları (1, 2, 3 …) gösteriyordu. Bir CEO / direktör bir şey öğrenmek
+   için beş sayfa gezmek zorundaydı; gezmiyorsa program onun için yoktu.
+2. **Overview kayıt sayıyordu, risk değil.** "Materials 812, Demand records
+   640" bir yöneticiye hiçbir şey söylemez. Söylemesi gereken: hangi müşteri
+   teslimatı, kaç saat geç, neden, kim ne yapmalı. Üstelik sayfa binlerce
+   parça / talep / stok satırını tarayıcıya indiriyordu (yavaş, ölçeklenmez).
+3. **Gecikmenin "kaçınılmaz mı, sıralama mı" ayrımı gömülüydü.** Motor bunu
+   kanıtlıyor (kapasite alt sınırı) ama yalnızca plan kontrolünün içinde.
+   Fazla mesai ve alternatif makine kararı tam bu bilgiye dayanır.
+4. **Verinin tazeliği görünmüyordu.** Plan elle yüklenen SAP dosyalarıyla
+   kuruluyor; dosya 3 gün eskiyse plan 3 gün eski bir dünyayı planlıyor ve
+   ekran bunu söylemiyordu. Yanlış veriyle verilen doğru görünümlü karar en
+   pahalı hatadır.
+5. **Sessiz hata.** Plan hesabı hata verirse ya da takılırsa yalnızca plan
+   sayfasının içinde görünüyordu.
+6. **Aksiyon sahipliği yok.** Geç parça için öneri var ("fazla mesai",
+   "P3'e al") ama kim karar verdi, ne zaman, sonuç ne — kayıt yok. Aynı
+   gecikme her sabah yeniden "keşfediliyor".
+7. **Bildirim yok.** Kritik durumda program kimseyi aramıyor; sayfayı açanı
+   bekliyor.
+8. **Plana uyum (plan vs gerçekleşen) yönetim seviyesinde ölçülmüyor.**
+   Performance sayfası var ama hedefi, trendi ve Board'da yeri yok. Planı
+   olmayan değil, planına uymayan fabrika batar.
+9. **Fazla mesainin maliyeti görünmüyor.** Plan fazla mesaiyi kullanıyor;
+   haftalık mesai saati / maliyeti ve "mesaisiz kaç parça geç kalırdı"
+   karşılaştırması yok.
+10. **Çok fabrikada teslimat riski toplanmıyor.** Board KPI ve OEE
+    gösteriyor; "holding genelinde bu hafta kaç teslimat riskte" yok.
+11. **SAP elle, dil İngilizce, tek kişi bağımlılığı** (4.4, 4.5'te de):
+    yüklemeyi yapan kişi tatile çıkınca plan bayatlıyor.
+
+### 5.2 Alınan tedbirler (bu adımda)
+
+- [x] ✅ **Today paneli** (portal ana sayfası ve Overview üstü,
+  `src/lib/cockpit.ts`, `convex/cockpit.ts`): kayıt sayısı değil karar
+  sinyali, en kritik önce, her kart sorunun sayfasını açar:
+  - geç parçalar: adet, toplam gecikme saati, en kötü 3'ü ve motorun önerisi;
+  - "N tanesini hiçbir plan kurtaramaz" (kanıtlı kapasite alt sınırı) —
+    fazla mesai / başka makine kararı; geri kalanı sıralama;
+  - önümüzdeki 2 haftada kapasitesi aşılan makineler (ve takvimsiz talep);
+  - planı tutan kalıp ve makineler;
+  - eski / hiç yüklenmemiş ZPP ve MB52 (36 saat);
+  - son plan hesabı hata verdi ya da plan 3 saatten eski;
+  - bağımsız plan kontrolünün bulduğu kural ihlalleri;
+  - duran makineler, açık kalıp problemleri.
+  Yalnızca kullanıcının izinli modüllerinin sinyalleri; sunucu yalnızca
+  planın özetini okur (hızlı).
+- [x] ✅ Sayfalar arası kısayollar ve kayıt bağlantıları (parça → Master
+  Data, work center → Work Center Definitions) — yönetici bir sinyalden
+  kaynağına iki tıkla iner.
+
+### 5.3 Karşı tedbirler — sırada (karar ya da büyük iş)
+
+- [ ] **P1 — Aksiyon kaydı (K13).** Geç parça / darboğaz sinyaline "karar":
+  sahibi, karar (mesai, makine değişimi, müşteriye bilgi), hedef tarih,
+  sonuç. Today kartında "kararı verildi / bekliyor". Haftalık: kaç gecikme
+  zamanında yakalandı.
+- [ ] **P1 — Günlük özet (K14).** Her sabah Today sinyalleri e-posta ile
+  (Raw material sipariş alıcıları altyapısı var); kritik sinyal gün içinde.
+- [ ] **P1 — Plana uyum KPI'ı (K15).** Haftalık plan vs gerçekleşen (MB51),
+  hedefi, Board'da trendi; fabrika karşılaştırmasında.
+- [ ] **P2 — Fazla mesai görünürlüğü.** Haftalık planlanan mesai saati,
+  "mesaisiz geç kalacak parça" farkı (motor iki kez koşar), Today'de tek satır.
+- [ ] **P2 — Holding geneli teslimat riski.** Board'da plant başına Today
+  özeti (geç parça, darboğaz, veri yaşı).
+- [ ] **P2 — Eşikler ayara.** Today eşikleri (36 sa, 3 sa, 2 hafta) bugün
+  program kuralı; plant ayarına taşınabilir (K10 ile birlikte).
+
