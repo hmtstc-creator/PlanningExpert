@@ -3,6 +3,7 @@ import { useState } from 'react'
 
 import { CompanyUsers } from '../components/CompanyAdmin'
 import { PageHeader } from '../components/PageHeader'
+import { SecurityPanel } from '../components/security/SecurityPanel'
 import { Tabs } from '../components/Tabs'
 import { AuditList, OrgAdmin, SystemErrors } from '../components/org/OrgAdmin'
 import { usePlant } from '../lib/plantContext'
@@ -11,7 +12,7 @@ export const Route = createFileRoute('/admin')({
   component: AdminPage,
 })
 
-type Tab = 'organization' | 'generals' | 'history' | 'errors'
+type Tab = 'organization' | 'generals' | 'security' | 'history' | 'errors'
 
 /**
  * Administration — yalnızca General (site sahibi ve General'ler). Holding'ler,
@@ -26,6 +27,7 @@ function AdminPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'organization', label: 'Holdings & companies' },
     ...(owner ? [{ key: 'generals' as const, label: 'Generals' }] : []),
+    { key: 'security', label: 'Security' },
     { key: 'history', label: 'Platform history' },
     { key: 'errors', label: 'System errors' },
   ]
@@ -62,6 +64,7 @@ function AdminPage() {
             <CompanyUsers companyId={null} groups={[]} />
           </section>
         )}
+        {tab === 'security' && <SecurityPanel />}
         {tab === 'history' && <AuditList />}
         {tab === 'errors' && <SystemErrors />}
       </div>

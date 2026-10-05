@@ -33,4 +33,6 @@ export const SECURITY_HEADERS: Record<string, string> = {
   'Cross-Origin-Opener-Policy': 'same-origin',
   // Yalnızca HTTPS'te geçerli (tarayıcı HTTP'de yok sayar).
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  // Kapalı portal: giriş sayfası da arama sonuçlarında çıkmasın (robots.txt de kapalı).
+  'X-Robots-Tag': 'noindex, nofollow, noarchive',
 }

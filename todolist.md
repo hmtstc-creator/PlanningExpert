@@ -247,6 +247,14 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
     silinir.
   - Excel okuma: boyut sınırı, formül / HTML / makro okunmaz.
   - CI: kritik bağımlılık açığında durur (`npm audit`).
+- [x] ✅ **Siteye saldırıya karşı** (2026-10-05, docs/security.md):
+  - Parola püskürtme freni: çok hatalı giriş olunca her giriş birkaç saniye
+    bekler (hesap kilidinin yakalayamadığı, çok hesaba yayılan deneme).
+  - Sızmış parola reddi (Have I Been Pwned, yalnızca karmanın 5 hanesi gider).
+  - Sahipsiz yüklemeler her gece silinir (depo doldurma).
+  - Arama motorları kapalı (`robots.txt`, `X-Robots-Tag`).
+  - Güvenlik ekranı: Administration → Security; creator için Users &
+    permissions → Security check.
 - [ ] **P1 — xlsx (SheetJS) paketi.** npm'deki 0.18.5'in bilinen iki yüksek
   açığı var (prototype pollution, ReDoS); düzeltilmiş sürüm yalnızca
   SheetJS sunucusunda ve bu geliştirme ortamı oraya erişemiyor. Ağ erişimi

@@ -3385,6 +3385,26 @@
       "optional": false
     }
   },
+  "signinStats": {
+    "bucket": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "failures": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "unknownNames": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    }
+  },
   "stock": {
     "blocked": {
       "fieldType": {

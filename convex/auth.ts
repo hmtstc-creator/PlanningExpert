@@ -1,11 +1,13 @@
 'use node'
 
 import { ConvexError, v } from 'convex/values'
-import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createHash, pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto'
 
 import { api, internal } from './_generated/api'
 import { action, internalAction } from './_generated/server'
 import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, lockRemainingMs, validatePassword } from '../src/lib/authRules'
+import { PWNED_RANGE_URL, PWNED_TIMEOUT_MS, pwnedCount, pwnedMessage, splitSha1 } from '../src/lib/pwned'
+import { signinDelayMs } from '../src/lib/signinGuard'
 
 /**
  * Giriş.
@@ -48,6 +50,28 @@ function assertPassword(password: string, userName?: string): void {
   if (problem) throw new ConvexError(problem)
 }
 
+/**
+ * Yeni parola bilinen sızıntılarda geçiyor mu (src/lib/pwned.ts)? Servise
+ * yalnızca SHA-1 karmasının ilk 5 hanesi gider. Servis cevap vermezse
+ * parola reddedilmez. Kapatmak için Convex ortam değişkeni PWNED_CHECK=off.
+ */
+async function assertNotBreached(password: string): Promise<void> {
+  if (process.env.PWNED_CHECK === 'off') return
+  const { prefix, suffix } = splitSha1(createHash('sha1').update(password, 'utf8').digest('hex'))
+  let body: string
+  try {
+    const res = await fetch(PWNED_RANGE_URL + prefix, { headers: { 'Add-Padding': 'true' }, signal: AbortSignal.timeout(PWNED_TIMEOUT_MS) })
+    if (!res.ok) return
+    body = await res.text()
+  } catch {
+    return
+  }
+  const count = pwnedCount(body, suffix)
+  if (count > 0) throw new ConvexError(pwnedMessage(count))
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 function lockedMessage(ms: number): string {
   return `Too many wrong passwords — the account is locked for ${Math.ceil(ms / 60_000)} more minute(s). A creator can also set a new password.`
 }
@@ -88,6 +112,11 @@ export const login = action({
   returns: v.object({ token: v.string() }),
   handler: async (ctx, args): Promise<{ token: string }> => {
     const name = args.name.trim()
+    // Genel fren (src/lib/signinGuard.ts): son 30 dakikada çok hatalı giriş
+    // varsa her giriş birkaç saniye bekler — çok hesaba yayılan tahmin yavaşlar.
+    const pressure: number = await ctx.runQuery(internal.authInternal.signinPressure, {})
+    const delay = signinDelayMs(pressure)
+    if (delay > 0) await sleep(delay)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const user: any = await ctx.runQuery(internal.authInternal.findUser, { name })
 
@@ -97,11 +126,15 @@ export const login = action({
     const failed = new Error('Wrong user name or password')
     if (!user || !user.active || !user.passwordHash || !user.passwordSalt) {
       hashPassword(args.password, DUMMY_SALT)
+      await ctx.runMutation(internal.authInternal.recordSigninFailure, { unknown: !user })
       throw failed
     }
     // Kilitliyken parola denenmez (kaba kuvvet denemesi kilit süresince durur).
     const wait = lockRemainingMs(user, Date.now())
-    if (wait > 0) throw new ConvexError(lockedMessage(wait))
+    if (wait > 0) {
+      await ctx.runMutation(internal.authInternal.recordSigninFailure, { unknown: false })
+      throw new ConvexError(lockedMessage(wait))
+    }
     const iterations = user.passwordIterations ?? LEGACY_ITERATIONS
     if (!hashesMatch(hashPassword(args.password, user.passwordSalt, iterations), user.passwordHash)) {
       const r: { locked: boolean } = await ctx.runMutation(internal.authInternal.recordLoginFailure, { id: user._id })
@@ -153,6 +186,7 @@ export const changePassword = action({
     if (args.newPassword === args.currentPassword) {
       throw new ConvexError('The new password must be different from the current one')
     }
+    await assertNotBreached(args.newPassword)
 
     const salt = randomBytes(16).toString('hex')
     await ctx.runMutation(internal.authInternal.storePassword, {
@@ -188,6 +222,7 @@ export const resetPassword = internalAction({
     })
     if (!user) throw new ConvexError(`No user named ${args.name}`)
     assertPassword(args.newPassword, user.name)
+    await assertNotBreached(args.newPassword)
     const salt = randomBytes(16).toString('hex')
     await ctx.runMutation(internal.authInternal.storePassword, {
       id: user._id,
@@ -218,6 +253,7 @@ export const setPasswordAsAdmin = action({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const check: any = await ctx.runQuery(internal.users.canSetPassword, { token: args.token, userId: args.userId })
     if (!check.ok) throw new ConvexError('You cannot set this password')
+    await assertNotBreached(args.newPassword)
     const me = { name: check.actor }
 
     const salt = randomBytes(16).toString('hex')

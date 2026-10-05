@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { PageHeader } from '../components/PageHeader'
 import { PeopleAdmin } from '../components/people/PeopleAdmin'
+import { SecurityPanel } from '../components/security/SecurityPanel'
 import { relatedPages } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
 
@@ -15,7 +16,7 @@ export const Route = createFileRoute('/users')({
  * zaman seçili plant'in şirketini gösterir.
  */
 function UsersPage() {
-  const { ctx } = usePlant()
+  const { ctx, canManage } = usePlant()
   const companyId = ctx?.active?.companyId
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
@@ -35,6 +36,17 @@ function UsersPage() {
         }
       />
       {companyId && <PeopleAdmin companyId={companyId} />}
+      {companyId && canManage && (
+        <details className="mt-6 rounded-lg border border-border p-3">
+          <summary className="cursor-pointer text-sm font-semibold">Security check</summary>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Locked accounts, accounts nobody uses, temporary passwords and who has wide rights in this company.
+          </p>
+          <div className="mt-3">
+            <SecurityPanel companyId={companyId} />
+          </div>
+        </details>
+      )}
     </div>
   )
 }

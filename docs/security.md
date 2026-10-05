@@ -16,6 +16,8 @@ Ayrıntı kodda; her maddenin dosyası yanında.
 | Oturum ömrü | 12 saat; parola değişince diğer cihazlar kapanır; pasif kullanıcının jetonu çalışmaz; süresi dolanlar her gece silinir | src/lib/authRules.ts, convex/tenancy.ts |
 | Oturumu kapatma | Kullanıcı: My account → "Sign out the other devices". Yönetici: Users & permissions → "Sign out everywhere" (kayda düşer) | convex/users.ts |
 | Son giriş | Kullanıcı başına son başarılı giriş; uzun süre girmeyen hesap görünür | convex/authInternal.ts |
+| Parola püskürtme | Kullanıcıdan bağımsız sayaç: son 30 dakikada 30 / 100 / 300 hatalı giriş → **her** giriş 1 / 3 / 5 sn bekler; eşik aşılınca denetim kaydına `signin.pressure`. Var olmayan ad ve kilitli hesap denemesi de sayılır. Ad ya da parola yazılmaz, yalnızca sayılar (10 dk dilim, 30 gün saklanır) | src/lib/signinGuard.ts, convex/authInternal.ts |
+| Sızmış parola | Yeni parola (kendi değişikliği, yöneticinin verdiği, panelden sıfırlama) bilinen sızıntılarda geçiyorsa reddedilir. Have I Been Pwned'e yalnızca SHA-1 karmasının ilk 5 hanesi gider (k-anonimlik); servis 3 sn içinde cevap vermezse parola reddedilmez. Kapatmak: Convex ortam değişkeni `PWNED_CHECK=off` | src/lib/pwned.ts, convex/auth.ts |
 
 ## Yetki
 
@@ -26,12 +28,21 @@ Ayrıntı kodda; her maddenin dosyası yanında.
 
 ## Tarayıcı ve sunucu başlıkları
 
-Her cevapta (src/lib/securityHeaders.ts, Nitro): CSP (dış betik yok, veri yalnızca kendi sunucumuza ve Convex'e, `object` yok, başka sitede çerçeve yok), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, HSTS.
+Her cevapta (src/lib/securityHeaders.ts, Nitro): CSP (dış betik yok, veri yalnızca kendi sunucumuza ve Convex'e, `object` yok, başka sitede çerçeve yok), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, HSTS, `X-Robots-Tag: noindex`.
+
+Arama motorları: `robots.txt` her yolu kapatır ve başlık dizine almayı yasaklar — giriş sayfası Google'da çıkmaz, saldırgan siteyi aramayla bulamaz.
 
 ## Dosyalar
 
 - Fotoğraf: yalnızca JPEG / PNG / WebP / GIF / HEIC, en çok 15 MB ve 10 adet; uymayan depodan silinir (convex/uploads.ts).
+- Sahipsiz yükleme: yükleme adresi alınıp hiçbir arıza / kalıp problemine bağlanmayan dosya 24 saat sonra her gece silinir (depoyu doldurma denemesi ve vazgeçilen raporlar). Tablo taranamayacak kadar büyükse hiçbir şey silinmez; bir gecede en çok 200 dosya (convex/tenancy.ts `purgeOrphanUploads`).
 - Excel: yalnızca kullanıcının tarayıcısında okunur; 25 MB sınırı, formül / HTML / makro okunmaz (src/lib/safeExcel.ts).
+
+## Güvenlik ekranı
+
+- Administration → **Security** (General, bütün site): kilitli hesaplar, 90+ gün kullanılmayan yönetici ve diğer hesaplar, değiştirilmemiş geçici parolalar, geniş yetkili hesaplar, açık oturum sayısı, hatalı giriş sayıları (24 saat / 7 gün, var olmayan adla deneme), şu anki giriş beklemesi ve son güvenlik olayları.
+- Users & permissions → **Security check** (creator): aynısı, yalnızca kendi şirketi (site geneli giriş sayıları hariç).
+- Kural: src/lib/securityOverview.ts. Son giriş 2026-10-05'ten beri yazıldığı için "kullanılmıyor" uyarısı en erken 90 gün sonra çıkar.
 
 ## Kayıt
 

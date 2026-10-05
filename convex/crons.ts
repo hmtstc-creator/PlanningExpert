@@ -25,4 +25,7 @@ crons.interval('daily digest', { minutes: 15 }, internal.tenancy.digestTick, {})
 // Süresi dolmuş oturumlar her gece silinir (tenancy.purgeExpiredSessions).
 crons.daily('purge expired sessions', { hourUTC: 2, minuteUTC: 17 }, internal.tenancy.purgeExpiredSessions, {})
 
+// Hiçbir kayda bağlanmamış, 24 saatten eski yüklemeler (tenancy.purgeOrphanUploads).
+crons.daily('purge orphan uploads', { hourUTC: 2, minuteUTC: 47 }, internal.tenancy.purgeOrphanUploads, {})
+
 export default crons

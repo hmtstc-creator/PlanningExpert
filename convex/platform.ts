@@ -7,6 +7,8 @@ import { audit, diff } from './audit'
 import { TABLES, userMutation, userQuery } from './guarded'
 import { isPlantTable } from './plantDb'
 import { MODULES, canManageCompany, isPlatform } from '../src/lib/tenancy'
+import { securityOverview as buildSecurityOverview, type SecurityUser } from '../src/lib/securityOverview'
+import { SIGNIN_BUCKET_MS } from '../src/lib/signinGuard'
 
 /**
  * Platform ve şirket yapısı (docs/plant-genisletme.md, v3; ağaç: docs/board.md):
@@ -601,5 +603,67 @@ export const auditLog = userQuery({
       .withIndex('by_company', (q: Any) => q.eq('companyId', companyId))
       .order('desc')
       .take(n)
+  },
+})
+
+/** Güvenlik olayları: giriş kilidi / baskısı, parola ve oturum kapatma. */
+export const isSecurityAction = (action: string) => /^(signin\.|password\.|user\.signout)/.test(action)
+
+/**
+ * Administration → Security (General: bütün hesaplar ve giriş istatistiği)
+ * ve Users & permissions (creator: kendi şirketi). Kural:
+ * src/lib/securityOverview.ts. Karma, tuz ve jeton dönülmez.
+ */
+export const securityOverview = userQuery({
+  args: { companyId: v.optional(v.id('companies')) },
+  returns: v.any(),
+  handler: async (ctx, { companyId }) => {
+    const me = ctx.sessionUser
+    if (!companyId) requirePlatform(me)
+    else if (!canManageCompany(me, companyId)) throw new ConvexError('Only a creator of this company can see this')
+    const now = Date.now()
+    const rows: Any[] = companyId
+      ? await ctx.db
+          .query('users')
+          .withIndex('by_company', (q: Any) => q.eq('companyId', companyId))
+          .collect()
+      : await ctx.db.query('users').take(5000)
+    const names = new Map<string, string>()
+    if (!companyId) for (const c of await ctx.db.query('companies').collect()) names.set(c._id, c.name)
+    const users: SecurityUser[] = rows.map((u) => ({
+      _id: u._id,
+      name: u.name,
+      active: u.active,
+      hasPassword: !!u.passwordHash,
+      createdAt: u.createdAt ?? u._creationTime,
+      lastLoginAt: u.lastLoginAt,
+      lockedUntil: u.lockedUntil,
+      mustChangePassword: u.mustChangePassword,
+      isCreator: u.isCreator,
+      platformRole: u.platformRole,
+      company: u.companyId ? names.get(u.companyId) : u.platformRole ? 'Platform' : undefined,
+    }))
+    const ids = new Set(users.map((u) => u._id))
+    const sessions = await ctx.db.query('sessions').take(10000)
+    const activeSessions = sessions.filter((x: Any) => x.expiresAt > now && ids.has(x.userId)).length
+    // Giriş istatistiği bütün siteye ait: yalnızca General görür.
+    const buckets = companyId
+      ? []
+      : await ctx.db
+          .query('signinStats')
+          .withIndex('by_bucket', (q: Any) => q.gte('bucket', now - 7 * 24 * 60 * 60_000 - SIGNIN_BUCKET_MS))
+          .collect()
+    const recent = companyId
+      ? await ctx.db
+          .query('auditLog')
+          .withIndex('by_company', (q: Any) => q.eq('companyId', companyId))
+          .order('desc')
+          .take(1000)
+      : await ctx.db.query('auditLog').withIndex('by_at').order('desc').take(1000)
+    return {
+      ...buildSecurityOverview(users, buckets, activeSessions, now),
+      platform: !companyId,
+      events: recent.filter((r: Any) => isSecurityAction(r.action)).slice(0, 50),
+    }
   },
 })

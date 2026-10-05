@@ -34,6 +34,7 @@ export type PlatformTable =
   | 'auditLog'
   | 'errorLog'
   | 'officialHolidays'
+  | 'signinStats'
 
 type TI<T extends TableNames> = NamedTableInfo<DataModel, T>
 /** İndeksin ilk serbest alanı: fabrika tablosunda plantId kilitte dolu. */

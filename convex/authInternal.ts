@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 
 import { internalMutation, internalQuery, query } from './_generated/server'
 import { SESSION_TTL_MS, afterFailedLogin } from '../src/lib/authRules'
+import { SIGNIN_BUCKET_MS, SIGNIN_WINDOW_BUCKETS, bucketStart, crossedStep, windowFailures, windowStart } from '../src/lib/signinGuard'
 import { audit } from './audit'
 import { findSession, sessionMatches, tokenKey } from './sessionStore'
 
@@ -143,10 +144,67 @@ export const upgradeHash = internalMutation({
   },
 })
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function recentBuckets(db: any, now: number) {
+  return (
+    db
+      .query('signinStats')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .withIndex('by_bucket', (q: any) => q.gte('bucket', windowStart(now)))
+      .take(SIGNIN_WINDOW_BUCKETS + 1)
+  )
+}
+
+/**
+ * Bir hatalı giriş daha (kullanıcıdan bağımsız sayaç, src/lib/signinGuard.ts).
+ * Pencere yeni bir eşiği geçince denetim kaydına bir kez yazılır.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function countFailure(db: any, unknown: boolean) {
+  const now = Date.now()
+  const buckets = await recentBuckets(db, now)
+  const before = windowFailures(buckets, now)
+  const start = bucketStart(now)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const current = buckets.find((b: any) => b.bucket === start)
+  if (current)
+    await db.patch(current._id, { failures: current.failures + 1, unknownNames: (current.unknownNames ?? 0) + (unknown ? 1 : 0) })
+  else await db.insert('signinStats', { bucket: start, failures: 1, unknownNames: unknown ? 1 : 0 })
+  const step = crossedStep(before, before + 1)
+  if (step) {
+    await audit(db, {
+      action: 'signin.pressure',
+      target: 'all accounts',
+      detail: `${step.failures}+ wrong sign-ins in ${(SIGNIN_WINDOW_BUCKETS * SIGNIN_BUCKET_MS) / 60_000} minutes; every sign-in now waits ${step.delayMs / 1000} s`,
+    })
+  }
+}
+
+/** Son 30 dakikadaki hatalı giriş sayısı: giriş bundan bekleme süresini bulur. */
+export const signinPressure = internalQuery({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const now = Date.now()
+    return windowFailures(await recentBuckets(ctx.db, now), now)
+  },
+})
+
+/** Kullanıcısı olmayan ya da kilitli hesaba giriş denemesi. */
+export const recordSigninFailure = internalMutation({
+  args: { unknown: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, { unknown }) => {
+    await countFailure(ctx.db, unknown)
+    return null
+  },
+})
+
 export const recordLoginFailure = internalMutation({
   args: { id: v.id('users') },
   returns: v.object({ locked: v.boolean() }),
   handler: async (ctx, { id }) => {
+    await countFailure(ctx.db, false)
     const user = await ctx.db.get(id)
     if (!user) return { locked: false }
     const next = afterFailedLogin(user, Date.now())

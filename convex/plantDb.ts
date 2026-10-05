@@ -32,6 +32,8 @@ export const PLATFORM_TABLES = new Set([
   'errorLog',
   // Ülke resmi tatilleri: ortak referans.
   'officialHolidays',
+  // Hatalı giriş sayıları (kullanıcı ve fabrikadan bağımsız).
+  'signinStats',
 ])
 
 export const isPlantTable = (table: string) => !PLATFORM_TABLES.has(table)

@@ -7,6 +7,7 @@ import { TABLES, activePlant, userMutation, userQuery, visiblePlants } from './g
 import { isPlantTable } from './plantDb'
 import { LEGACY_ROLE_GROUPS, MODULES, isBoardUser, isPlatform, uniformPermissions } from '../src/lib/tenancy'
 import { digestDue, localNow } from '../src/lib/digest'
+import { SIGNIN_KEEP_MS } from '../src/lib/signinGuard'
 
 /**
  * Şirket / fabrika bağlamı ve tek seferlik geçiş (docs/plant-genisletme.md).
@@ -316,6 +317,49 @@ export const purgeExpiredSessions = internalMutation({
         await ctx.db.delete(s._id)
         n++
       }
+    }
+    // 30 günden eski hatalı giriş istatistiği (src/lib/signinGuard.ts).
+    const stale = await ctx.db
+      .query('signinStats')
+      .withIndex('by_bucket', (q) => q.lt('bucket', now - SIGNIN_KEEP_MS))
+      .take(2000)
+    for (const b of stale) await ctx.db.delete(b._id)
+    return n
+  },
+})
+
+/** Yüklenip bir kayda bağlanmayan dosya bu kadar beklenir (rapor yazılırken yüklenen fotoğraf). */
+export const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000
+/** Dosyaya bağlanan tablolar; burada olmayan bir tabloya fotoğraf eklenirse buraya da yazılmalı. */
+export const PHOTO_TABLES = ['moldProblems', 'machineProblems'] as const
+const PHOTO_SCAN_LIMIT = 6000
+const ORPHAN_DELETE_LIMIT = 200
+
+/**
+ * Sahipsiz yüklemeler: yükleme adresi alınıp gönderilen ama hiçbir arıza ya
+ * da kalıp problemine bağlanmayan dosyalar (vazgeçilen rapor ya da depoyu
+ * doldurmaya çalışan biri). 24 saatten eskiyse silinir. Emin olunamazsa
+ * (tablo taranamayacak kadar büyük) hiçbir şey silinmez.
+ */
+export const purgeOrphanUploads = internalMutation({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const cutoff = Date.now() - ORPHAN_GRACE_MS
+    const old = (await ctx.db.system.query('_storage').take(4000)).filter((f) => f._creationTime < cutoff)
+    if (!old.length) return 0
+    const used = new Set<string>()
+    for (const table of PHOTO_TABLES) {
+      const rows = await ctx.db.query(table).take(PHOTO_SCAN_LIMIT + 1)
+      if (rows.length > PHOTO_SCAN_LIMIT) return 0
+      for (const r of rows) for (const p of r.photos ?? []) used.add(p)
+    }
+    let n = 0
+    for (const f of old) {
+      if (n >= ORPHAN_DELETE_LIMIT) break
+      if (used.has(f._id)) continue
+      await ctx.storage.delete(f._id)
+      n++
     }
     return n
   },

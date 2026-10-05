@@ -92,6 +92,18 @@ export default defineSchema({
     .index('by_at', ['at'])
     .index('by_company', ['companyId', 'at']),
 
+  /**
+   * Hatalı giriş istatistiği, 10 dakikalık dilimler (convex/auth.ts; kural:
+   * src/lib/signinGuard.ts). Kullanıcıdan bağımsız: çok hesaba yayılan parola
+   * denemesini yakalar. Ad ya da parola yazılmaz; yalnızca sayılar. 30 günden
+   * eski dilimler gece silinir.
+   */
+  signinStats: defineTable({
+    bucket: v.number(),
+    failures: v.number(),
+    unknownNames: v.optional(v.number()),
+  }).index('by_bucket', ['bucket']),
+
   /** Uygulama içi hata kaydı (convex/errors.ts); aynı hata 24 saatte bir satır. */
   errorLog: defineTable({
     key: v.string(),
