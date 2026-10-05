@@ -23,6 +23,7 @@ import {
 } from '../lib/oee'
 import { usePlant } from '../lib/plantContext'
 import { importOee, type OeeApi } from '../lib/oeeStore'
+import { checkExcelFile, readWorkbook } from '../lib/safeExcel'
 
 /**
  * OEE sayfalarının ortak parçaları: ayar (kullanıcının OEE ayarları), alan /
@@ -241,15 +242,20 @@ export function OeeUploadButton() {
   }
 
   const onFile = async (file: File) => {
+    const problem = checkExcelFile(file)
+    if (problem) {
+      setState({ kind: 'error', text: problem })
+      return
+    }
     setState({ kind: 'busy', step: 'Reading the file…' })
     try {
       const buf = await file.arrayBuffer()
-      const names = XLSX.read(buf, { type: 'array', bookSheets: true }).SheetNames
+      const names = readWorkbook(buf, { bookSheets: true }).SheetNames
       const wanted = names.filter((n) => sheetKind(n))
       if (!wanted.length) {
         throw new Error('No OEE sheet in this file (Shiftly KPI, Shiftly Order Based KPI, Downtimes, Daily KPI, Weekly KPI, Monthly KPI).')
       }
-      const book = XLSX.read(buf, { type: 'array', sheets: wanted, dense: true })
+      const book = readWorkbook(buf, { sheets: wanted, dense: true })
       const sheets: Record<string, SheetRows> = {}
       for (const n of wanted) {
         sheets[n] = XLSX.utils.sheet_to_json<unknown[]>(book.Sheets[n], { header: 1, raw: true, defval: null, blankrows: false })

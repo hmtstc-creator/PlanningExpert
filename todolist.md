@@ -234,6 +234,30 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   `admin/admin` ipucunu yalnızca boş kurulumda gösterir (önceden her zaman
   gösteriyordu). Eski kısa parolalar çalışmaya devam eder.
   - [x] Eski kısa parolalar zorla değiştirilmez (K6 kararı, 2026-10-03).
+- [x] ✅ **Güvenlik yapıları geliştirildi** (2026-10-05, özet: docs/security.md):
+  - Oturum jetonu veritabanında yalnızca SHA-256 karması (yedek sızsa da
+    oturum açılamaz); eski oturumlar süreleri boyunca çalışır, kimse atılmadı.
+  - PBKDF2 210 000 tekrar; eski karmalar girişte fark ettirmeden yükselir.
+  - Var olmayan kullanıcıda da aynı süre (kullanıcı adı tahmini zorlaştı).
+  - "Kim yaptı" alanları sunucuda oturumdan (başkasının adıyla kayıt yok).
+  - Fotoğraf yükleme: tür, boyut, sayı sunucuda denetlenir.
+  - HTTP güvenlik başlıkları (CSP, clickjacking, nosniff, HSTS …).
+  - Son giriş zamanı, kilit durumu; "Sign out everywhere" (yönetici) ve
+    "Sign out the other devices" (kullanıcı); süresi dolan oturumlar her gece
+    silinir.
+  - Excel okuma: boyut sınırı, formül / HTML / makro okunmaz.
+  - CI: kritik bağımlılık açığında durur (`npm audit`).
+- [ ] **P1 — xlsx (SheetJS) paketi.** npm'deki 0.18.5'in bilinen iki yüksek
+  açığı var (prototype pollution, ReDoS); düzeltilmiş sürüm yalnızca
+  SheetJS sunucusunda ve bu geliştirme ortamı oraya erişemiyor. Ağ erişimi
+  olan bir makinede bir kez:
+  `npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` → commit.
+  O zamana kadar: okuma yalnızca kullanıcının kendi tarayıcısında, 25 MB
+  sınırı, formül / HTML okunmaz (src/lib/safeExcel.ts).
+- [ ] **P2 — İki adımlı doğrulama (2FA)** yönetici hesapları (owner,
+  General, creator) için TOTP. SSO ile birlikte değerlendirilmeli.
+- [ ] **P2 — Jeton tarayıcıda localStorage'da.** CSP dış betiği engelliyor;
+  daha ileri adım HttpOnly çerez (Convex HTTP katmanı gerekir).
 - [ ] **P1 — Kurumsal kimlik yok.** Müşteriler Azure AD / Google ile
   girmek isteyecek; parolayı creator elle veriyor, "parolamı unuttum" yok.
   → SSO (OIDC) ve e-postayla davet / parola sıfırlama.

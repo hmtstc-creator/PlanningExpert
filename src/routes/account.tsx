@@ -5,7 +5,9 @@ import { api } from '../../convex/_generated/api'
 import { roleLabel } from '../components/Header'
 import { PageHeader } from '../components/PageHeader'
 import { validatePassword } from '../lib/authRules'
-import { useAction } from '../lib/convexTransport'
+import { useAction, useQuery } from '../lib/convexTransport'
+import { formatPlantTime } from '../lib/sapUploads'
+import { useSafeMutation } from '../lib/useSafeMutation'
 import { useCurrentUser } from '../lib/currentUser'
 import { friendlyError } from '../lib/mutationErrors'
 import { MODULE_LABELS, MODULES } from '../lib/tenancy'
@@ -116,9 +118,40 @@ function AccountPage() {
         </form>
       </section>
 
+      <Devices />
+
       <button onClick={() => setToken(null)} className="mt-6 rounded-md border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
         Sign out
       </button>
     </div>
   )
 }
+
+/** Açık oturumlar: başka cihazdaki oturumları kapat (kayıp telefon, ortak bilgisayar). */
+function Devices() {
+  const info = useQuery(api.users.mySessions) as { open: number; lastLoginAt: number | null } | undefined
+  const { run, error, pending } = useSafeMutation(api.users.signOutOtherDevices)
+  const [done, setDone] = useState<string | null>(null)
+  if (!info) return null
+  const others = Math.max(0, info.open - 1)
+  return (
+    <section className="mt-6 rounded-lg border border-border p-4">
+      <h2 className="text-sm font-semibold text-foreground">Devices</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {others === 0 ? 'You are signed in on this device only.' : `You are also signed in on ${others} other device${others === 1 ? '' : 's'}.`}
+        {info.lastLoginAt ? ` Last sign-in ${formatPlantTime(info.lastLoginAt)}.` : ''}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">A session ends after 12 hours, when you sign out, or when your password changes.</p>
+      <button
+        disabled={others === 0 || pending}
+        onClick={() => void run({}).then((ok) => ok && setDone('The other devices are signed out.'))}
+        className="mt-3 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40"
+      >
+        Sign out the other devices
+      </button>
+      {done && <p className="mt-2 text-sm text-emerald-700">{done}</p>}
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+    </section>
+  )
+}
+

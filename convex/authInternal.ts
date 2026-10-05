@@ -3,6 +3,7 @@ import { ConvexError, v } from 'convex/values'
 import { internalMutation, internalQuery, query } from './_generated/server'
 import { SESSION_TTL_MS, afterFailedLogin } from '../src/lib/authRules'
 import { audit } from './audit'
+import { findSession, sessionMatches, tokenKey } from './sessionStore'
 
 /**
  * Girişin veritabanı tarafı.
@@ -48,6 +49,7 @@ export const createUserWithPassword = internalMutation({
     role: v.string(),
     passwordHash: v.string(),
     passwordSalt: v.string(),
+    passwordIterations: v.optional(v.number()),
     mustChangePassword: v.boolean(),
   },
   returns: v.id('users'),
@@ -58,6 +60,7 @@ export const createUserWithPassword = internalMutation({
       active: true,
       passwordHash: args.passwordHash,
       passwordSalt: args.passwordSalt,
+      passwordIterations: args.passwordIterations,
       mustChangePassword: args.mustChangePassword,
       createdAt: Date.now(),
     })
@@ -77,6 +80,7 @@ export const storePassword = internalMutation({
     id: v.id('users'),
     passwordHash: v.string(),
     passwordSalt: v.string(),
+    passwordIterations: v.optional(v.number()),
     mustChangePassword: v.boolean(),
     /** Parola değişince o kullanıcının diğer oturumları kapatılır. */
     keepToken: v.optional(v.string()),
@@ -90,6 +94,8 @@ export const storePassword = internalMutation({
     await ctx.db.patch(args.id, {
       passwordHash: args.passwordHash,
       passwordSalt: args.passwordSalt,
+      // Yeni karma eski tekrar sayısıyla okunmasın (yoksa 120 000 sayılır).
+      passwordIterations: args.passwordIterations,
       mustChangePassword: args.mustChangePassword,
       // Yeni parola kilidi ve sayacı kaldırır (creator kilitli hesabı böyle açar).
       failedLogins: undefined,
@@ -103,7 +109,7 @@ export const storePassword = internalMutation({
       .withIndex('by_user', (q) => q.eq('userId', args.id))
       .collect()
     for (const session of sessions) {
-      if (args.keepToken && session.token === args.keepToken) continue
+      if (args.keepToken && sessionMatches(session.token, args.keepToken)) continue
       await ctx.db.delete(session._id)
     }
 
@@ -127,6 +133,16 @@ export const storePassword = internalMutation({
 })
 
 /** Hatalı parola: sayaç artar, sınırda hesap kilitlenir ve kayda yazılır. */
+/** Girişte eski karmayı güncel ayarla değiştirir (oturumlara dokunmaz). */
+export const upgradeHash = internalMutation({
+  args: { id: v.id('users'), passwordHash: v.string(), passwordSalt: v.string(), passwordIterations: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { id, ...hash }) => {
+    await ctx.db.patch(id, hash)
+    return null
+  },
+})
+
 export const recordLoginFailure = internalMutation({
   args: { id: v.id('users') },
   returns: v.object({ locked: v.boolean() }),
@@ -155,9 +171,10 @@ export const createSession = internalMutation({
     const now = Date.now()
     // Başarılı giriş sayacı sıfırlar.
     const user = await ctx.db.get(args.userId)
-    if (user?.failedLogins || user?.lockedUntil) await ctx.db.patch(args.userId, { failedLogins: undefined, lockedUntil: undefined })
+    await ctx.db.patch(args.userId, { failedLogins: undefined, lockedUntil: undefined, lastLoginAt: now })
     await ctx.db.insert('sessions', {
-      token: args.token,
+      // Jeton açık yazılmaz: yalnızca karması (sessionStore.ts).
+      token: tokenKey(args.token),
       userId: args.userId,
       createdAt: now,
       expiresAt: now + SESSION_TTL_MS,
@@ -170,10 +187,7 @@ export const deleteSession = internalMutation({
   args: { token: v.string() },
   returns: v.null(),
   handler: async (ctx, { token }) => {
-    const session = await ctx.db
-      .query('sessions')
-      .withIndex('by_token', (q) => q.eq('token', token))
-      .first()
+    const session = await findSession(ctx.db, token)
     if (session) await ctx.db.delete(session._id)
     return null
   },
@@ -196,10 +210,7 @@ export const me = query({
   ),
   handler: async (ctx, { token }) => {
     if (!token) return null
-    const session = await ctx.db
-      .query('sessions')
-      .withIndex('by_token', (q) => q.eq('token', token))
-      .first()
+    const session = await findSession(ctx.db, token)
     if (!session || session.expiresAt <= Date.now()) return null
     const user = await ctx.db.get(session.userId)
     if (!user || !user.active) return null

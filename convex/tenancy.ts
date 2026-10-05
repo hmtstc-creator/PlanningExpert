@@ -300,4 +300,25 @@ export const digestTick = internalMutation({
   },
 })
 
+/**
+ * Süresi dolmuş oturumları siler (her gece, convex/crons.ts). Süresi dolan
+ * oturum zaten işe yaramaz; tablo şişmesin ve eski kayıt yedeklerde
+ * taşınmasın diye temizlenir.
+ */
+export const purgeExpiredSessions = internalMutation({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const now = Date.now()
+    let n = 0
+    for (const s of await ctx.db.query('sessions').take(5000)) {
+      if (s.expiresAt <= now) {
+        await ctx.db.delete(s._id)
+        n++
+      }
+    }
+    return n
+  },
+})
+
 export { isPlatform }

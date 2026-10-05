@@ -3,6 +3,7 @@ import { ConvexError, v } from 'convex/values'
 import type { Id } from './_generated/dataModel'
 import { internalQuery } from './_generated/server'
 import { audit, diff } from './audit'
+import { findSession } from './sessionStore'
 import { userMutation, userQuery } from './guarded'
 import { LEVELS, MODULES, areaInfo, canManageCompany, isPlatform } from '../src/lib/tenancy'
 
@@ -41,6 +42,9 @@ function row(u: Any) {
     active: u.active,
     hasPassword: !!u.passwordHash,
     mustChangePassword: u.mustChangePassword === true,
+    lastLoginAt: u.lastLoginAt ?? null,
+    // Hatalı parola kilidi hâlâ sürüyor mu (creator yeni parola verince kalkar).
+    locked: !!u.lockedUntil && u.lockedUntil > Date.now(),
     createdAt: u.createdAt,
     companyId: u.companyId ?? null,
     platformRole: u.platformRole ?? null,
@@ -50,6 +54,60 @@ function row(u: Any) {
     role: roleLabel(u),
   }
 }
+
+/**
+ * Kullanıcının bütün açık oturumlarını kapatır (kayıp telefon, şüpheli giriş,
+ * işten ayrılma): her cihazda yeniden giriş ister. Parola değişmez.
+ */
+export const signOutEverywhere = userMutation({
+  args: { id: v.id('users') },
+  returns: v.number(),
+  handler: async (ctx, { id }) => {
+    const me = ctx.sessionUser
+    const user = await ctx.db.get(id)
+    if (!user) throw new ConvexError('User not found')
+    if (id !== me._id) {
+      if (user.platformRole === 'owner') throw new ConvexError('Only the site owner can do this')
+      if (isHoldingUser(user)) requirePlatformUser(me)
+      else requireManager(me, user.platformRole ? null : user.companyId)
+    }
+    const n = await signOut(ctx.db, id)
+    await audit(ctx.db, { actor: me.name, action: 'user.signout', target: user.name, detail: `${n} open session(s) closed`, companyId: user.companyId, holdingId: user.holdingId })
+    return n
+  },
+})
+
+/** My account: bu cihaz dışındaki bütün oturumlarımı kapat. */
+export const signOutOtherDevices = userMutation({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    let n = 0
+    for (const s of await ctx.db
+      .query('sessions')
+      .withIndex('by_user', (q: Any) => q.eq('userId', ctx.sessionUser._id))
+      .collect()) {
+      if (s._id === ctx.session._id) continue
+      await ctx.db.delete(s._id)
+      n++
+    }
+    if (n) await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'user.signout', target: ctx.sessionUser.name, detail: `${n} other session(s) closed by the user`, companyId: ctx.sessionUser.companyId, holdingId: ctx.sessionUser.holdingId })
+    return n
+  },
+})
+
+/** My account: kaç cihazda açık oturumum var (bu dahil). */
+export const mySessions = userQuery({
+  args: {},
+  returns: v.object({ open: v.number(), lastLoginAt: v.union(v.number(), v.null()) }),
+  handler: async (ctx) => {
+    const all = await ctx.db
+      .query('sessions')
+      .withIndex('by_user', (q: Any) => q.eq('userId', ctx.sessionUser._id))
+      .collect()
+    return { open: all.filter((s: Any) => s.expiresAt > Date.now()).length, lastLoginAt: ctx.sessionUser.lastLoginAt ?? null }
+  },
+})
 
 /** Holding board üyesi (şirketsiz): yalnızca General yönetir. */
 const isHoldingUser = (u: Any) => !!u.holdingId && !u.companyId && !u.platformRole
@@ -249,10 +307,7 @@ export const canSetPassword = internalQuery({
   args: { token: v.string(), userId: v.id('users') },
   returns: v.object({ ok: v.boolean(), actor: v.string() }),
   handler: async (ctx, { token, userId }) => {
-    const session = await ctx.db
-      .query('sessions')
-      .withIndex('by_token', (q: Any) => q.eq('token', token))
-      .first()
+    const session = await findSession(ctx.db, token)
     if (!session || session.expiresAt <= Date.now()) return { ok: false, actor: '' }
     const me = await ctx.db.get(session.userId)
     const user = await ctx.db.get(userId)

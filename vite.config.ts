@@ -5,6 +5,8 @@ import { nitro } from 'nitro/vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+import { SECURITY_HEADERS } from './src/lib/securityHeaders'
+
 // NOT: Bu, orijinal Macaly projesinin sadeleştirilmiş halidir.
 // Macaly'ye özgü eklentiler (macalyTagger, visulima error overlay,
 // macaly.dev allowedHosts) kaldırıldı çünkü bu paketler Macaly dışında
@@ -22,7 +24,8 @@ const config = defineConfig({
         failOnError: true,
       },
     }),
-    nitro(),
+    // Güvenlik başlıkları her cevaba (src/lib/securityHeaders.ts).
+    nitro({ routeRules: { '/**': { headers: SECURITY_HEADERS } } }),
     viteReact(),
   ],
 })

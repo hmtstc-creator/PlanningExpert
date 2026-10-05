@@ -28,3 +28,8 @@ jobs:
         run: npx vitest run
       - name: Build
         run: npx vite build
+      # Üretimde çalışan paketlerde kritik bilinen açık varsa dur. (xlsx'in
+      # yüksek seviyeli bilinen açığı ayrı izleniyor: todolist.md 4.3.)
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=critical
+

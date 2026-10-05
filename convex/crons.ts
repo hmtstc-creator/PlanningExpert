@@ -22,4 +22,7 @@ crons.hourly('recompute plan', { minuteUTC: 5 }, internal.tenancy.recomputeAll, 
  */
 crons.interval('daily digest', { minutes: 15 }, internal.tenancy.digestTick, {})
 
+// Süresi dolmuş oturumlar her gece silinir (tenancy.purgeExpiredSessions).
+crons.daily('purge expired sessions', { hourUTC: 2, minuteUTC: 17 }, internal.tenancy.purgeExpiredSessions, {})
+
 export default crons

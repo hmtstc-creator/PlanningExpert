@@ -3775,6 +3775,12 @@
       },
       "optional": true
     },
+    "lastLoginAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
     "lockedUntil": {
       "fieldType": {
         "type": "number"
@@ -3796,6 +3802,12 @@
     "passwordHash": {
       "fieldType": {
         "type": "string"
+      },
+      "optional": true
+    },
+    "passwordIterations": {
+      "fieldType": {
+        "type": "number"
       },
       "optional": true
     },

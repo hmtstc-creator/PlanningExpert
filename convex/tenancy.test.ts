@@ -4,6 +4,7 @@ import { anyApi } from 'convex/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import schema from './schema'
+import { tokenKey } from './sessionStore'
 
 /**
  * Fabrika ayrımının uçtan uca testi (docs/plant-genisletme.md): iki şirket,
@@ -16,8 +17,9 @@ const api = anyApi
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
 
+/** Oturum, girişin yazdığı biçimde: jetonun karması (sessionStore.ts). */
 async function session(t: Any, userId: string, token: string) {
-  await t.run((ctx: Any) => ctx.db.insert('sessions', { token, userId, createdAt: Date.now(), expiresAt: Date.now() + 3_600_000 }))
+  await t.run((ctx: Any) => ctx.db.insert('sessions', { token: tokenKey(token), userId, createdAt: Date.now(), expiresAt: Date.now() + 3_600_000 }))
   return token
 }
 

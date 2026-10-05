@@ -7,6 +7,7 @@ import { internalMutation, internalQuery, mutation, query } from './_generated/s
 import type { DataModel } from './_generated/dataModel'
 import type { Doc, LockedDb } from './lockedDbTypes'
 import { requireSession } from './authGuard'
+import { stampAuthor } from '../src/lib/authorFields'
 import { plantDb } from './plantDb'
 import { requestRecompute } from './planQueue'
 import schema from './schema'
@@ -272,7 +273,8 @@ export function guardedMutation<A extends PropertyValidators>(
       const scoped = scopedCtx(ctx, c)
       // Yazanın kim olduğu handler'a `ctx.sessionUser` olarak gider (ör.
       // "bu dosyayı kim yükledi"); jetonun kendisi gitmez.
-      const result = await definition.handler(scoped, withoutToken(args))
+      // "Kim yaptı" alanları oturumdan (src/lib/authorFields.ts): tarayıcıdan gelen ad yok sayılır.
+      const result = await definition.handler(scoped, stampAuthor(definition.args, withoutToken(args), c.user.name))
       // Plan sunucuda hesaplanıyor: girdisi değişince kısa bir gecikmeyle
       // yeniden hesaplanır. Art arda gelen yazmalar tek hesapta birleşir.
       if (affectsPlan) await requestRecompute(scoped)

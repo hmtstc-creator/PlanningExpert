@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
 import { MACHINE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
+import { checkPhotos } from './uploads'
 
 /**
  * Makine (pres) arızaları.
@@ -89,6 +90,8 @@ export const report = guardedMutation({
   },
   returns: v.id('machineProblems'),
   handler: async (ctx, args) => {
+    // Fotoğraflar: yalnızca resim, en çok 10 adet, 15 MB (convex/uploads.ts).
+    await checkPhotos(ctx, args.photos)
     const press = args.press.trim()
     if (!press) throw new ConvexError('A work center is required')
     const problemType = args.problemType.trim()

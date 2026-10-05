@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
 import { DIE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
+import { checkPhotos } from './uploads'
 
 const rowValidator = v.object({
   _id: v.id('moldProblems'),
@@ -69,6 +70,8 @@ export const report = guardedMutation({
   },
   returns: v.id('moldProblems'),
   handler: async (ctx, args) => {
+    // Fotoğraflar: yalnızca resim, en çok 10 adet, 15 MB (convex/uploads.ts).
+    await checkPhotos(ctx, args.photos)
     const material = args.material.trim()
     if (!material) throw new ConvexError('Material code is required')
     const operation = args.operation.trim()

@@ -17,13 +17,19 @@ import { DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_USERNAME, lockRemainingMs, valida
  * Oturum jetonu her sorgu ve mutasyonda sunucuda denetlenir (guarded.ts);
  * yani deploy adresini bilen biri de jetonsuz veri okuyamaz ya da yazamaz.
  */
-const ITERATIONS = 120_000
+/** Yeni karmalar: OWASP 2023 önerisi (PBKDF2-HMAC-SHA512 ≥ 210 000). */
+const ITERATIONS = 210_000
+/** `passwordIterations` alanı olmayan eski karmalar; ilk girişte yükseltilir. */
+const LEGACY_ITERATIONS = 120_000
 const KEY_LENGTH = 64
 const DIGEST = 'sha512'
 
-function hashPassword(password: string, salt: string): string {
-  return pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, DIGEST).toString('hex')
+function hashPassword(password: string, salt: string, iterations = ITERATIONS): string {
+  return pbkdf2Sync(password, salt, iterations, KEY_LENGTH, DIGEST).toString('hex')
 }
+
+/** Var olmayan kullanıcıda da aynı iş yapılır: cevap süresi kullanıcı adını ele vermesin. */
+const DUMMY_SALT = randomBytes(16).toString('hex')
 
 /**
  * Sabit süreli karşılaştırma: `===` ilk farklı bayta kadar çalışır ve
@@ -68,6 +74,7 @@ export const seedAdmin = action({
       role: 'admin',
       passwordHash: hashPassword(DEFAULT_ADMIN_PASSWORD, salt),
       passwordSalt: salt,
+      passwordIterations: ITERATIONS,
       mustChangePassword: true,
     })
     return { created: true }
@@ -88,14 +95,28 @@ export const login = action({
     // Hangisinin doğru olduğunu söylemek, var olan kullanıcı adlarını
     // sayar.
     const failed = new Error('Wrong user name or password')
-    if (!user || !user.active || !user.passwordHash || !user.passwordSalt) throw failed
+    if (!user || !user.active || !user.passwordHash || !user.passwordSalt) {
+      hashPassword(args.password, DUMMY_SALT)
+      throw failed
+    }
     // Kilitliyken parola denenmez (kaba kuvvet denemesi kilit süresince durur).
     const wait = lockRemainingMs(user, Date.now())
     if (wait > 0) throw new ConvexError(lockedMessage(wait))
-    if (!hashesMatch(hashPassword(args.password, user.passwordSalt), user.passwordHash)) {
+    const iterations = user.passwordIterations ?? LEGACY_ITERATIONS
+    if (!hashesMatch(hashPassword(args.password, user.passwordSalt, iterations), user.passwordHash)) {
       const r: { locked: boolean } = await ctx.runMutation(internal.authInternal.recordLoginFailure, { id: user._id })
       if (r.locked) throw new ConvexError(lockedMessage(15 * 60_000))
       throw failed
+    }
+    // Eski (daha zayıf) karma: parola elimizdeyken güncel ayarla yeniden karılır.
+    if (iterations < ITERATIONS) {
+      const salt = randomBytes(16).toString('hex')
+      await ctx.runMutation(internal.authInternal.upgradeHash, {
+        id: user._id,
+        passwordHash: hashPassword(args.password, salt),
+        passwordSalt: salt,
+        passwordIterations: ITERATIONS,
+      })
     }
 
     const token = randomBytes(32).toString('hex')
@@ -126,7 +147,7 @@ export const changePassword = action({
     const user: any = await ctx.runQuery(internal.authInternal.findUser, { name: me.name })
     if (!user?.passwordHash || !user.passwordSalt) throw new ConvexError('User not found')
 
-    if (!hashesMatch(hashPassword(args.currentPassword, user.passwordSalt), user.passwordHash)) {
+    if (!hashesMatch(hashPassword(args.currentPassword, user.passwordSalt, user.passwordIterations ?? LEGACY_ITERATIONS), user.passwordHash)) {
       throw new ConvexError('The current password is wrong')
     }
     if (args.newPassword === args.currentPassword) {
@@ -138,6 +159,7 @@ export const changePassword = action({
       id: user._id,
       passwordHash: hashPassword(args.newPassword, salt),
       passwordSalt: salt,
+      passwordIterations: ITERATIONS,
       mustChangePassword: false,
       // Kendi oturumu açık kalsın; diğer cihazlar kapansın.
       keepToken: args.token,
@@ -171,6 +193,7 @@ export const resetPassword = internalAction({
       id: user._id,
       passwordHash: hashPassword(args.newPassword, salt),
       passwordSalt: salt,
+      passwordIterations: ITERATIONS,
       mustChangePassword: true,
       actor: 'Convex dashboard (password reset)',
     })
@@ -202,6 +225,7 @@ export const setPasswordAsAdmin = action({
       id: args.userId,
       passwordHash: hashPassword(args.newPassword, salt),
       passwordSalt: salt,
+      passwordIterations: ITERATIONS,
       mustChangePassword: true,
       actor: me.name,
     })

@@ -1,5 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
+import { findSession } from './sessionStore'
+
 /**
  * Sunucu tarafı yetki denetimi.
  *
@@ -30,11 +32,8 @@ export const sessionArg = { token: v.optional(v.string()) }
 export async function requireSession(ctx: any, token: string | undefined) {
   if (!token) throw new ConvexError('Not signed in')
 
-  const session = await ctx.db
-    .query('sessions')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .withIndex('by_token', (q: any) => q.eq('token', token))
-    .first()
+  // Jeton veritabanında karma olarak durur (sessionStore.ts).
+  const session = await findSession(ctx.db, token)
   if (!session) throw new ConvexError('Not signed in')
   if (session.expiresAt <= Date.now()) {
     throw new ConvexError('Your session has expired — sign in again')

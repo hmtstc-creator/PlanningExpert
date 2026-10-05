@@ -25,6 +25,10 @@ export interface PeopleUser {
   groupIds: string[]
   hasPassword?: boolean
   mustChangePassword?: boolean
+  /** Son başarılı giriş (ms); hiç girmediyse null. */
+  lastLoginAt?: number | null
+  /** Hatalı parola kilidi sürüyor. */
+  locked?: boolean
   platformRole?: string | null
 }
 

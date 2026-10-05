@@ -623,6 +623,10 @@ export default defineSchema({
      */
     passwordHash: v.optional(v.string()),
     passwordSalt: v.optional(v.string()),
+    /** PBKDF2 tekrar sayısı; yoksa eski kayıt (120 000) — girişte yükseltilir. */
+    passwordIterations: v.optional(v.number()),
+    /** Son başarılı giriş (Users & permissions'ta; uzun süre girmeyen hesap). */
+    lastLoginAt: v.optional(v.number()),
     /** Varsayılan parolayla oluşturuldu; değiştirmeden uygulamaya giremez. */
     mustChangePassword: v.optional(v.boolean()),
     createdAt: v.number(),

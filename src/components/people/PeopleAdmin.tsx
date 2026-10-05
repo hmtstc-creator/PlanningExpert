@@ -19,6 +19,7 @@ import {
   type PeopleUser,
 } from '../../lib/peopleTree'
 import { AREAS, MODULES, MODULE_LABELS, areasOf, moduleAccessOf, type AreaAccess, type CompanyStatus, type Level, type Module } from '../../lib/tenancy'
+import { formatPlantTime } from '../../lib/sapUploads'
 import { useSafeMutation } from '../../lib/useSafeMutation'
 import { ErrorBanner } from '../ErrorBanner'
 import { LevelChip, TreeRow } from '../OrgTree'
@@ -137,8 +138,8 @@ export function PeopleAdmin({ companyId }: { companyId: string }) {
       chip={<Chip kind={u.isCreator ? 'creator' : 'user'} />}
       label={u.name}
       muted={!u.active}
-      warn={!u.hasPassword}
-      meta={!u.active ? 'inactive' : !u.hasPassword ? 'no password' : undefined}
+      warn={!u.hasPassword || !!u.locked}
+      meta={!u.active ? 'inactive' : u.locked ? 'locked' : !u.hasPassword ? 'no password' : undefined}
       selected={node.kind === 'user' && node.id === u._id && node.via === via}
       onSelect={() => select({ kind: 'user', id: u._id, via })}
       open={false}
@@ -711,6 +712,8 @@ function UserPanel({
   const { token, name: me } = useCurrentUser()
   const { run: update, error: updateError, clearError } = useSafeMutation(api.users.update)
   const { run: remove, error: removeError } = useSafeMutation(api.users.remove)
+  const { run: signOutAll, error: signOutError } = useSafeMutation(api.users.signOutEverywhere)
+  const [signedOut, setSignedOut] = useState<number | null>(null)
   const setPassword = useAction(api.auth.setPasswordAsAdmin)
   const initial = { name: u.name, email: u.email ?? '', active: u.active, isCreator: u.isCreator, groupIds: [...u.groupIds].sort() }
   const [d, setD] = useState(initial)
@@ -723,7 +726,7 @@ function UserPanel({
 
   return (
     <div>
-      <ErrorBanner message={updateError ?? removeError ?? pwError} onDismiss={() => (clearError(), setPwError(null))} />
+      <ErrorBanner message={updateError ?? removeError ?? signOutError ?? pwError} onDismiss={() => (clearError(), setPwError(null))} />
       <div className="flex flex-wrap items-center gap-2">
         <Chip kind={d.isCreator ? 'creator' : 'user'} className="h-6 min-w-6 text-xs" />
         <input className={`w-48 font-semibold ${input}`} value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} aria-label="Name" />
@@ -763,6 +766,28 @@ function UserPanel({
           <input type="checkbox" checked={d.isCreator} onChange={(e) => setD({ ...d, isCreator: e.target.checked })} /> Creator
           <span className="text-xs text-muted-foreground">(every plant, every module, users and groups)</span>
         </label>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <span>
+          <span className="text-xs text-muted-foreground">Last sign-in: </span>
+          {u.lastLoginAt ? formatPlantTime(u.lastLoginAt) : <span className="text-muted-foreground">never (since sign-ins are recorded)</span>}
+        </span>
+        {u.locked && (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900" title="Too many wrong passwords — setting a new password unlocks it">
+            locked after wrong passwords
+          </span>
+        )}
+        <button
+          className="text-xs underline"
+          title="Close every open session of this user — they must sign in again on every device. The password does not change."
+          onClick={() => {
+            if (window.confirm(`Sign ${u.name} out on every device?`)) void signOutAll({ id: u._id }).then((ok) => ok && setSignedOut(1))
+          }}
+        >
+          Sign out everywhere
+        </button>
+        {signedOut !== null && <span className="text-xs text-emerald-700">signed out on every device</span>}
       </div>
 
       <div className="mt-3 text-sm">

@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { useState } from 'react'
 import { friendlyError } from '../lib/mutationErrors'
+import { checkExcelFile, readWorkbook } from '../lib/safeExcel'
 
 interface ExcelUploadProps {
   expectedColumns: string[]
@@ -62,10 +63,15 @@ export function ExcelUpload({
     event.target.value = ''
     if (!file) return
 
+    const problem = checkExcelFile(file)
+    if (problem) {
+      setStatus({ kind: 'error', message: problem })
+      return
+    }
     setStatus({ kind: 'reading' })
     try {
       const buffer = await file.arrayBuffer()
-      const workbook = XLSX.read(buffer, { type: 'array' })
+      const workbook = readWorkbook(buffer)
       const firstSheetName = workbook.SheetNames[0]
       if (!firstSheetName) throw new Error('No sheet found in the Excel file.')
       const sheet = workbook.Sheets[firstSheetName]
