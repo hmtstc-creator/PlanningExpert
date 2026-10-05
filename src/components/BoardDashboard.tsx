@@ -19,6 +19,7 @@ import {
 } from '../lib/board'
 import { formatKpi, periodTitle, type KpiMetrics, type KpiPeriod, type KpiResult, type KpiSlot } from '../lib/kpi'
 import { usePlant } from '../lib/plantContext'
+import { relatedPages } from '../lib/navigation'
 
 /**
  * Board Dashboard: holding → şirket → plant → masraf yeri; seçili kapsamın
@@ -84,11 +85,7 @@ export function BoardDashboardPage() {
       <PageHeader
         title="Board Dashboard"
         summary="Results and trends — group, company, plant and cost center at a glance."
-        links={[
-          { to: '/kpi/monthly/dashboard', label: 'KPI monthly' },
-          { to: '/kpi/weekly/dashboard', label: 'KPI weekly' },
-          { to: '/oee', label: 'OEE' },
-        ]}
+        links={relatedPages('/board')}
         info={
           <>
             <p>

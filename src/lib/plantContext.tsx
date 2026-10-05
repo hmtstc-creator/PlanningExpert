@@ -116,3 +116,22 @@ export function moduleOfPath(pathname: string): Module | null {
   if (pathname.startsWith('/kpi')) return 'kpi'
   return 'planning'
 }
+
+/**
+ * Bu kullanıcı sayfayı açabilir mi? (TenancyGate'in kuralı; kısayol ve
+ * bağlantılar açılmayacak sayfayı göstermesin diye.) Bağlam henüz yoksa
+ * hepsi açık sayılır — kapı yine sayfada denetler.
+ */
+export function useCanOpen(): (path: string) => boolean {
+  const { ctx, can, canManage, isPlatform } = usePlant()
+  return (path: string) => {
+    if (!ctx) return true
+    const p = path.replace(/\/$/, '') || '/'
+    if (ctx.isBoard && !boardAllows(p)) return false
+    if (p === '/settings' || p.startsWith('/settings/') || p === '/users') return canManage
+    if (p === '/admin' || p.startsWith('/admin/')) return isPlatform
+    const m = moduleOfPath(p)
+    return !m || can(m)
+  }
+}
+

@@ -26,6 +26,8 @@ import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/referanslar')({
   component: ReferanslarPage,
+  // ?q=KOD: başka sayfadaki parça bağlantısı (MaterialLink) aramayı doldurur.
+  validateSearch: (s: Record<string, unknown>): { q?: string } => (typeof s.q === 'string' && s.q ? { q: s.q } : {}),
 })
 
 const emptyForm = {
@@ -61,7 +63,12 @@ function ReferanslarPage() {
     error: updateError,
     clearError,
   } = useSafeMutation(api.products.updateField)
-  const [search, setSearch] = useState('')
+  const { q } = Route.useSearch()
+  const [search, setSearch] = useState(q ?? '')
+  // Başka sayfadan bir parçaya gelindi: aramayı o koda getir.
+  useEffect(() => {
+    if (q) setSearch(q)
+  }, [q])
 
   const { results: products, status } = usePaginatedQuery(
     api.products.list,

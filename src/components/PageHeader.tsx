@@ -1,4 +1,6 @@
 import { Link } from '@tanstack/react-router'
+
+import { useCanOpen } from '../lib/plantContext'
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -42,9 +44,13 @@ export function PageHeader({
 
 /** İlişkili sayfalara küçük kısayol düğmeleri. */
 export function PageLinks({ links, className = '' }: { links: PageLink[]; className?: string }) {
+  // Açamayacağı sayfanın kısayolu gösterilmez (ör. board üyesine veri girişi).
+  const canOpen = useCanOpen()
+  const shown = links.filter((l) => canOpen(l.to))
+  if (!shown.length) return null
   return (
     <nav aria-label="Related pages" className={`flex flex-wrap items-center gap-1.5 text-xs ${className}`}>
-      {links.map((l) => (
+      {shown.map((l) => (
         <Link
           key={l.to}
           to={l.to}

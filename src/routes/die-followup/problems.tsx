@@ -10,6 +10,9 @@ import { isoDate } from '../../lib/dates'
 import { downscaleImage } from '../../lib/imageResize'
 import { inRange } from '../../lib/problemReport'
 import { useSafeMutation } from '../../lib/useSafeMutation'
+import { PageLinks } from '../../components/PageHeader'
+import { relatedPages } from '../../lib/navigation'
+import { MaterialLink } from '../../components/EntityLinks'
 
 export const Route = createFileRoute('/die-followup/problems')({
   component: MoldProblemPage,
@@ -140,7 +143,10 @@ function MoldProblemPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Die Problems</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-foreground">Die Problems</h1>
+        <PageLinks links={relatedPages('/die-followup/problems')} />
+      </div>
       <p className="mt-2 text-muted-foreground">
         Report what went wrong on a die and record how it was solved — a
         problem is closed only with a description of what was done.
@@ -316,7 +322,7 @@ function MoldProblemPage() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    {p.material} · {p.operation} · {p.problemType}
+                    <MaterialLink code={p.material} /> · {p.operation} · {p.problemType}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {p.occurredAt}

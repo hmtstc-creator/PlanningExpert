@@ -3,6 +3,8 @@ import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
 import { useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { PageLinks } from '../components/PageHeader'
+import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/kayitlar')({
   component: KayitlarPage,
@@ -63,7 +65,10 @@ function KayitlarPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Change Log</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-foreground">Decision Log</h1>
+        <PageLinks links={relatedPages('/kayitlar')} />
+      </div>
       <p className="mt-2 text-muted-foreground">
         Decisions, business rules, improvements and open issues are recorded
         here, so the answer to "why did we do it this way?" is never lost.

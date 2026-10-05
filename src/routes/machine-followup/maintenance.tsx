@@ -11,6 +11,9 @@ import { isoDate } from '../../lib/dates'
 import { maintenancePerformance, type PressMaintenanceRow } from '../../lib/maintenance'
 import { useDraftRows } from '../../lib/useDraftRows'
 import { useSafeMutation } from '../../lib/useSafeMutation'
+import { PageLinks } from '../../components/PageHeader'
+import { relatedPages } from '../../lib/navigation'
+import { WorkCenterLink } from '../../components/EntityLinks'
 
 export const Route = createFileRoute('/machine-followup/maintenance')({
   component: PressMaintenancePage,
@@ -164,7 +167,10 @@ function PressMaintenancePage() {
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Work center Maintenance</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-foreground">Work Center Maintenance</h1>
+        <PageLinks links={relatedPages('/machine-followup/maintenance')} />
+      </div>
       <p className="mt-2 text-muted-foreground">
         The maintenance department books which work center is down, on which day and
         between which hours. The planner does not enter this and cannot plan
@@ -408,7 +414,7 @@ function MaintenanceTable(props: TableProps) {
                       if (e.key === 'Enter') save()
                     }}
                   >
-                    <td className="px-3 py-2 font-medium text-foreground">{row.press}</td>
+                    <td className="px-3 py-2 font-medium text-foreground"><WorkCenterLink name={row.press} /></td>
                     <td className="px-3 py-2">
                       <input
                         type="date"

@@ -196,10 +196,14 @@ export function nodeHas(node: NavNode, pathname: string): boolean {
 }
 
 /**
- * Sayfalar arası kısayollar (sayfa başlığındaki küçük düğmeler). Etiketler
- * menüdeki adlardan gelir; menüde adı değişen sayfa burada da değişir.
+ * Sayfalar arası kısayollar (sayfa başlığındaki küçük düğmeler): her sayfanın
+ * iş akışında yanındaki sayfalar — modül sınırı tanımaz (ör. Die Problems →
+ * OEE Losses). Kullanıcının açamayacağı sayfa düğmede görünmez
+ * (PageLinks). Yeni sayfa eklenince buraya da eklenir; test hedeflerin
+ * varlığını denetler (navigation.test.ts).
  */
 const RELATED_PAGES: Record<string, string[]> = {
+  // PlanningExpert
   '/planlama': ['/capacity', '/takvim', '/alarms', '/hammadde', '/planlogic'],
   '/planningexpert': ['/planlama', '/capacity', '/alarms', '/sapdata'],
   '/capacity': ['/takvim', '/planlama', '/makineler', '/referanslar'],
@@ -210,23 +214,76 @@ const RELATED_PAGES: Record<string, string[]> = {
   '/siparisler': ['/sapdata', '/planlama', '/capacity'],
   '/stoklar': ['/sapdata', '/depolar', '/hammadde'],
   '/gerceklesen': ['/sapdata', '/performans', '/depolar'],
-  '/referanslar': ['/makineler', '/planlama', '/capacity'],
-  '/makineler': ['/takvim', '/capacity', '/referanslar'],
-  '/takvim': ['/capacity', '/makineler', '/planlama'],
+  '/referanslar': ['/makineler', '/planlama', '/capacity', '/die-followup/maintenance'],
+  '/makineler': ['/takvim', '/capacity', '/referanslar', '/settings'],
+  '/takvim': ['/capacity', '/makineler', '/planlama', '/machine-followup/maintenance'],
   '/depolar': ['/stoklar', '/hammadde', '/sapdata'],
-  '/performans': ['/gerceklesen', '/planlama', '/takvim'],
+  '/performans': ['/gerceklesen', '/planlama', '/takvim', '/oee'],
+  '/kayitlar': ['/planlama', '/planlogic', '/settings'],
+  // OEE
+  '/oee': ['/oee/losses', '/oee/data', '/kpi/monthly/dashboard', '/machine-followup/breakdowns'],
+  '/oee/losses': ['/oee', '/machine-followup/breakdowns', '/die-followup/problems', '/oee/data'],
+  '/oee/data': ['/oee', '/oee/settings', '/oee/guide'],
+  '/oee/settings': ['/settings', '/oee/data', '/oee/guide', '/makineler'],
+  '/oee/guide': ['/oee/settings', '/oee/data', '/oee'],
+  // Die Follow-up
+  '/die-followup': ['/die-followup/problems', '/die-followup/maintenance', '/alarms', '/referanslar'],
+  '/die-followup/problems': ['/die-followup/reports', '/die-followup/maintenance', '/oee/losses'],
+  '/die-followup/maintenance': ['/alarms', '/planlama', '/referanslar', '/die-followup/problems'],
+  '/die-followup/reports': ['/die-followup/problems', '/oee/losses'],
+  // Machine Follow-up
+  '/machine-followup': ['/machine-followup/breakdowns', '/machine-followup/maintenance', '/alarms', '/makineler'],
+  '/machine-followup/breakdowns': ['/machine-followup/reports', '/machine-followup/maintenance', '/oee/losses', '/planlama'],
+  '/machine-followup/maintenance': ['/takvim', '/planlama', '/machine-followup/breakdowns', '/makineler'],
+  '/machine-followup/reports': ['/machine-followup/breakdowns', '/oee/losses'],
+  // KPI ve Board
+  '/kpi': ['/kpi/monthly/entry', '/kpi/weekly/entry', '/oee', '/settings'],
+  '/kpi/monthly/entry': ['/kpi/monthly/dashboard', '/oee', '/settings'],
+  '/kpi/weekly/entry': ['/kpi/weekly/dashboard', '/oee', '/settings'],
+  '/kpi/monthly/dashboard': ['/kpi/monthly/entry', '/kpi/weekly/dashboard', '/oee', '/board'],
+  '/kpi/weekly/dashboard': ['/kpi/weekly/entry', '/kpi/monthly/dashboard', '/oee', '/board'],
+  '/board': ['/kpi/monthly/dashboard', '/kpi/weekly/dashboard', '/oee'],
+  // Yönetim
+  '/settings': ['/users', '/makineler', '/oee/settings'],
+  '/users': ['/settings'],
 }
 
-const EXTRA_LABELS: Record<string, string> = {
+/**
+ * Modül dışından bakınca da anlaşılan adlar ("Dashboard" değil "OEE
+ * Dashboard"). Yoksa menüdeki ad.
+ */
+const LABELS: Record<string, string> = {
+  '/oee': 'OEE Dashboard',
+  '/oee/losses': 'OEE Losses',
+  '/oee/data': 'OEE Data',
+  '/oee/settings': 'OEE Settings',
+  '/oee/guide': 'OEE Guide',
+  '/die-followup': 'Die Follow-up',
+  '/die-followup/problems': 'Die Problems',
   '/die-followup/maintenance': 'Die Maintenance',
+  '/die-followup/reports': 'Die Reports',
+  '/machine-followup': 'Machine Follow-up',
   '/machine-followup/breakdowns': 'Machine Breakdowns',
+  '/machine-followup/maintenance': 'Machine Maintenance',
+  '/machine-followup/reports': 'Machine Reports',
+  '/kpi': 'KPI Overview',
+  '/kpi/monthly/entry': 'KPI Monthly Entry',
+  '/kpi/weekly/entry': 'KPI Weekly Entry',
+  '/kpi/monthly/dashboard': 'KPI Monthly',
+  '/kpi/weekly/dashboard': 'KPI Weekly',
+  '/board': 'Board Dashboard',
+  '/settings': 'Company settings',
+  '/users': 'Users & permissions',
 }
 
 export function pageLabel(to: string): string {
-  return areaLinks(PLANNING).find((i) => i.to === to)?.label ?? EXTRA_LABELS[to] ?? to
+  return LABELS[to] ?? areaLinks(PLANNING).find((i) => i.to === to)?.label ?? to
 }
 
 /** Bir sayfanın kısayolları: { to, label }. */
 export function relatedPages(path: string): { to: string; label: string }[] {
   return (RELATED_PAGES[path] ?? []).map((to) => ({ to, label: pageLabel(to) }))
 }
+
+/** Test için: kısayol haritası. */
+export const RELATED_PAGE_MAP: Readonly<Record<string, readonly string[]>> = RELATED_PAGES

@@ -6,6 +6,7 @@ import { Tabs } from '../components/Tabs'
 import { AuditList, OrgAdmin } from '../components/org/OrgAdmin'
 import { PlantChangeLog } from '../components/settings/PlantChangeLog'
 import { SelectionLists } from '../components/settings/SelectionLists'
+import { relatedPages } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
 
 export const Route = createFileRoute('/settings')({
@@ -27,6 +28,7 @@ function SettingsPage() {
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <PageHeader
+        links={relatedPages('/settings')}
         title="Company settings"
         summary={`${ctx?.active?.companyName ?? ''} — plants, departments, cost centers, users and lists.`}
         info={

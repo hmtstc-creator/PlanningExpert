@@ -22,6 +22,7 @@ import {
   type WeeklyRow,
 } from '../../lib/oee'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
+import { relatedPages } from '../../lib/navigation'
 
 export const Route = createFileRoute('/oee/data')({
   component: OeeDataPage,
@@ -153,11 +154,7 @@ function OeeDataPage() {
       <PageHeader
         title="OEE Data"
         summary="The uploaded sheets in the order of the file; the file formulas are calculated the same way."
-        links={[
-          { to: '/oee', label: 'OEE Dashboard' },
-          { to: '/oee/losses', label: 'Losses Trend' },
-          { to: '/oee/settings', label: 'Settings' },
-        ]}
+        links={relatedPages('/oee/data')}
       />
       <OeeControls selection={sel} rows={dayRows} config={config} />
       <div className="mt-4 flex flex-wrap items-center gap-2">

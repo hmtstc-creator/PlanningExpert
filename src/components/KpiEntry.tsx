@@ -20,6 +20,7 @@ import {
 import { usePlant } from '../lib/plantContext'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { KpiPeriodPicker, defaultSlot } from './KpiPeriodPicker'
+import { relatedPages } from '../lib/navigation'
 
 /**
  * KPI veri girişi (aylık ya da haftalık). Her satır bir masraf yeri ve
@@ -144,7 +145,7 @@ export function KpiEntryPage({ period }: { period: KpiPeriod }) {
       <PageHeader
         title={period === 'month' ? 'Monthly KPI — data entry' : 'Weekly KPI — data entry'}
         summary={`${ctx?.active?.plantName ?? ''} — plan and actual per cost center, ${period === 'month' ? 'one month' : 'one ISO week'} at a time.`}
-        links={[{ to: period === 'month' ? '/kpi/monthly/dashboard' : '/kpi/weekly/dashboard', label: 'Dashboard' }]}
+        links={relatedPages(period === 'month' ? '/kpi/monthly/entry' : '/kpi/weekly/entry')}
         info={
           <>
             <p>

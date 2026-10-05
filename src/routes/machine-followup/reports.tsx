@@ -7,6 +7,8 @@ import { ParetoChart } from '../../components/ParetoChart'
 import { ProblemMatrix } from '../../components/ProblemMatrix'
 import { useQuery } from '../../lib/convexTransport'
 import { groupBy, inRange } from '../../lib/problemReport'
+import { PageLinks } from '../../components/PageHeader'
+import { relatedPages } from '../../lib/navigation'
 
 export const Route = createFileRoute('/machine-followup/reports')({
   component: MachineReports,
@@ -52,7 +54,10 @@ function MachineReports() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Machine Reports</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-foreground">Machine Reports</h1>
+        <PageLinks links={relatedPages('/machine-followup/reports')} />
+      </div>
       <p className="mt-1 text-muted-foreground">
         Which work centers break down, how often and why. Blue bars are the few that
         make up 80% of the total — start there. Click a work center to see only its

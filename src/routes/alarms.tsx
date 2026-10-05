@@ -4,6 +4,7 @@ import type { DieAlarm, MachineAlarm } from '../lib/planAlarms'
 import { usePlanAlarms } from '../lib/usePlanAlarms'
 import { PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
+import { MaterialLink, WorkCenterLink } from '../components/EntityLinks'
 
 export const Route = createFileRoute('/alarms')({
   component: AlarmsPage,
@@ -162,7 +163,7 @@ function DieTable({
             <tbody>
               {rows.map((d) => (
                 <tr key={`${d.material}-${d.kind}-${d.label}`} className="border-t border-border align-top">
-                  <td className="px-4 py-2 font-medium text-foreground">{d.material}</td>
+                  <td className="px-4 py-2 font-medium text-foreground"><MaterialLink code={d.material} /></td>
                   <td className="px-4 py-2 text-foreground">{d.label}</td>
                   <td className="px-4 py-2 text-muted-foreground">{d.stockOut ?? '—'}</td>
                   <td className="px-4 py-2 tabular-nums text-muted-foreground">
@@ -208,14 +209,14 @@ function MachineTable({
             <tbody>
               {rows.map((m) => (
                 <tr key={`${m.press}-${m.kind}-${m.from}-${m.label}`} className="border-t border-border align-top">
-                  <td className="px-4 py-2 font-medium text-foreground">{m.press}</td>
+                  <td className="px-4 py-2 font-medium text-foreground"><WorkCenterLink name={m.press} /></td>
                   <td className="px-4 py-2 text-foreground">{m.label}</td>
                   <td className="px-4 py-2 text-xs text-muted-foreground">
                     {m.affected.length === 0
                       ? '—'
                       : m.affected.slice(0, 8).map((a) => (
                           <span key={a.material} className="mr-2 inline-block">
-                            <strong className="text-foreground">{a.material}</strong> stock out {a.stockOut} (
+                            <strong className="text-foreground"><MaterialLink code={a.material} /></strong> stock out {a.stockOut} (
                             {a.issue === 'late' ? 'late' : 'cannot be planned'})
                           </span>
                         ))}

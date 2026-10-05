@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
-import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { ErrorBanner } from '../components/ErrorBanner'
 import { LevelChip, LevelLegend, TreeRow, type Level } from '../components/OrgTree'
@@ -28,6 +28,8 @@ import { api } from '../../convex/_generated/api'
 
 export const Route = createFileRoute('/makineler')({
   component: MakinelerPage,
+  // ?wc=AD: başka sayfadaki work center bağlantısı (WorkCenterLink) onu seçer.
+  validateSearch: (s: Record<string, unknown>): { wc?: string } => (typeof s.wc === 'string' && s.wc ? { wc: s.wc } : {}),
 })
 
 const input = 'rounded-md border border-input bg-background px-2 py-1.5 text-sm'
@@ -212,7 +214,12 @@ function MakinelerPage() {
   const { run: removeCategory, error: removeCatError } = useSafeMutation(api.presses.removeCategory)
 
   const [view, setView] = useState<WcView>('org')
-  const [node, setNode] = useState<WcNode>({ kind: 'plant' })
+  const { wc } = Route.useSearch()
+  const [node, setNode] = useState<WcNode>(wc ? { kind: 'workCenter', name: wc } : { kind: 'plant' })
+  // Başka sayfadan bir work center'a gelindi: onu seç.
+  useEffect(() => {
+    if (wc) setNode({ kind: 'workCenter', name: wc })
+  }, [wc])
   const [prefillName, setPrefillName] = useState<string | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
 

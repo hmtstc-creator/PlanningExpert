@@ -20,6 +20,7 @@ import {
 } from '../lib/kpi'
 import { usePlant } from '../lib/plantContext'
 import { KpiPeriodPicker, defaultSlot } from './KpiPeriodPicker'
+import { relatedPages } from '../lib/navigation'
 
 /**
  * KPI dashboard'u — tek A3 (yatay) sayfa. Ölçü sabit: aylıkta her zaman 12
@@ -54,7 +55,6 @@ const ccKey = (plantId: string, code: string) => `${plantId}|${code}`
 
 export function KpiDashboardPage({ period }: { period: KpiPeriod }) {
   const { ctx, can } = usePlant()
-  const canEditKpi = can('kpi', 'edit') && !ctx?.isBoard
   const [slot, setSlot] = useState(() => defaultSlot(period))
   const options = (useQuery(api.kpi.plants) ?? []) as PlantOption[]
   const [plantIds, setPlantIds] = useState<string[] | null>(null)
@@ -120,10 +120,7 @@ export function KpiDashboardPage({ period }: { period: KpiPeriod }) {
       <PageHeader
         title={period === 'month' ? 'Monthly KPI — dashboard' : 'Weekly KPI — dashboard'}
         summary="One A3 page: every KPI, plan against actual, the trend and each cost center."
-        links={[
-          ...(canEditKpi ? [{ to: period === 'month' ? '/kpi/monthly/entry' : '/kpi/weekly/entry', label: 'Data entry' }] : []),
-          { to: period === 'month' ? '/kpi/weekly/dashboard' : '/kpi/monthly/dashboard', label: period === 'month' ? 'Weekly dashboard' : 'Monthly dashboard' },
-        ]}
+        links={relatedPages(period === 'month' ? '/kpi/monthly/dashboard' : '/kpi/weekly/dashboard')}
         info={
           <>
             <p>

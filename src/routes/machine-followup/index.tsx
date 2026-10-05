@@ -5,6 +5,9 @@ import { ModuleStat } from '../../components/ModuleStat'
 import { useQuery } from '../../lib/convexTransport'
 import { addDays, isoDate } from '../../lib/dates'
 import { usePlanAlarms } from '../../lib/usePlanAlarms'
+import { PageLinks } from '../../components/PageHeader'
+import { relatedPages } from '../../lib/navigation'
+import { WorkCenterLink } from '../../components/EntityLinks'
 
 export const Route = createFileRoute('/machine-followup/')({
   component: MachineOverview,
@@ -36,7 +39,10 @@ function MachineOverview() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Machine Follow-up</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-foreground">Machine Follow-up</h1>
+        <PageLinks links={relatedPages('/machine-followup')} />
+      </div>
       <p className="mt-1 text-muted-foreground">Work center breakdowns and maintenance in one place.</p>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -68,7 +74,7 @@ function MachineOverview() {
           <ul className="mt-2 space-y-1 text-sm">
             {critical.map((m) => (
               <li key={`${m.press}-${m.kind}-${m.from}`}>
-                <strong className="text-foreground">{m.press}</strong>{' '}
+                <strong className="text-foreground"><WorkCenterLink name={m.press} /></strong>{' '}
                 <span className="text-muted-foreground">
                   — {m.label}. {m.explanation}
                 </span>
@@ -97,7 +103,7 @@ function MachineOverview() {
               .map((b) => (
                 <li key={b._id} className="flex flex-wrap justify-between gap-2 py-1.5">
                   <span className="text-foreground">
-                    <strong>{b.press}</strong> · {b.problemType}
+                    <strong><WorkCenterLink name={b.press} /></strong> · {b.problemType}
                     {b.stopsPress ? (
                       <span className="ml-2 text-xs text-destructive">
                         down {b.expectedUpDate ? `until ${b.expectedUpDate}` : 'until solved'}

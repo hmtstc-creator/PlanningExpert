@@ -11,6 +11,9 @@ import { useCurrentUser } from '../../lib/currentUser'
 import { isoDate } from '../../lib/dates'
 import { maintenanceDates } from '../../lib/maintenance'
 import type { ProductSpec } from '../../lib/planning'
+import { PageLinks } from '../../components/PageHeader'
+import { relatedPages } from '../../lib/navigation'
+import { MaterialLink } from '../../components/EntityLinks'
 
 export const Route = createFileRoute('/die-followup/maintenance')({
   component: KaliplarPage,
@@ -234,7 +237,10 @@ function KaliplarPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Die Maintenance &amp; Readiness</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-foreground">Die Maintenance &amp; Readiness</h1>
+        <PageLinks links={relatedPages('/die-followup/maintenance')} />
+      </div>
       <p className="mt-2 text-muted-foreground">
         Everything the plan needs to know about a mold. Mark whether it is
         ready for production — a mold that is not ready is held out of the plan
@@ -276,7 +282,7 @@ function KaliplarPage() {
               <tbody>
                 {openAlarms.map((alarm) => (
                   <tr key={alarm._id} className="border-t border-border">
-                    <td className="px-3 py-2 font-medium text-foreground">{alarm.material}</td>
+                    <td className="px-3 py-2 font-medium text-foreground"><MaterialLink code={alarm.material} /></td>
                     <td className="px-3 py-2 text-foreground">
                       {alarm.shotsAtAlarm.toLocaleString('en-GB')}
                     </td>
@@ -432,7 +438,7 @@ function KaliplarPage() {
                   const held = readinessByMaterial.get(row.material)
                   return (
                     <tr key={row.material} className="border-t border-border">
-                      <td className="px-3 py-2 font-medium text-foreground">{row.material}</td>
+                      <td className="px-3 py-2 font-medium text-foreground"><MaterialLink code={row.material} /></td>
                       <td className="px-3 py-2 text-foreground">
                         {Math.round(row.cumulativeShots).toLocaleString('en-GB')}
                       </td>
@@ -562,7 +568,7 @@ function KaliplarPage() {
             <tbody>
               {heldMolds.map((r) => (
                 <tr key={r._id} className="border-t border-border">
-                  <td className="px-3 py-2 font-medium text-foreground">{r.material}</td>
+                  <td className="px-3 py-2 font-medium text-foreground"><MaterialLink code={r.material} /></td>
                   <td className="px-3 py-2 text-muted-foreground">
                     {r.readyDate ? (
                       `${r.readyDate}${
@@ -675,7 +681,7 @@ function KaliplarPage() {
             <tbody>
               {upcomingMaintenance.map((m) => (
                 <tr key={m._id} className="border-t border-border">
-                  <td className="px-3 py-2 font-medium text-foreground">{m.material}</td>
+                  <td className="px-3 py-2 font-medium text-foreground"><MaterialLink code={m.material} /></td>
                   <td className="px-3 py-2 text-muted-foreground">
                     {m.kind === 'repair' ? 'Repair' : 'Periodic'}
                   </td>
@@ -746,7 +752,7 @@ function KaliplarPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.material} className="border-t border-border">
-                  <td className="px-3 py-2 font-medium text-foreground">{r.material}</td>
+                  <td className="px-3 py-2 font-medium text-foreground"><MaterialLink code={r.material} /></td>
                   <td className="px-3 py-2">
                     <span className={STATUS_STYLE[r.status]}>{STATUS_LABEL[r.status]}</span>
                   </td>

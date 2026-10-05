@@ -1,7 +1,8 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { BOARD_AREA, MODULE_AREAS, areaFor, areaLinks, nodeHas, type NavNode } from './navigation'
+import { BOARD_AREA, MODULE_AREAS, RELATED_PAGE_MAP, areaFor, areaLinks, nodeHas, type NavNode } from './navigation'
 
 const depth = (n: NavNode): number => 1 + Math.max(0, ...(n.children ?? []).map(depth))
 const routeFile = (to: string) =>
@@ -36,4 +37,36 @@ describe('menü ağacı', () => {
     expect(nodeHas(menu, '/stoklar')).toBe(true)
     expect(nodeHas(menu, '/planlama')).toBe(false)
   })
+
+  it('kısayol haritasındaki her sayfa ve hedef var', () => {
+    for (const [from, targets] of Object.entries(RELATED_PAGE_MAP)) {
+      expect(routeFile(from), from).toBe(true)
+      for (const to of targets) {
+        expect(routeFile(to), `${from} → ${to}`).toBe(true)
+        expect(to, `${from} kendine bağlanmaz`).not.toBe(from)
+      }
+    }
+  })
+
+  it('kaynak koddaki her sabit bağlantı (to="/…") bir sayfaya gider', () => {
+    const files = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? files(join(dir, e.name)) : /\.tsx?$/.test(e.name) && !e.name.includes('.test.') && e.name !== 'routeTree.gen.ts' ? [join(dir, e.name)] : [],
+      )
+    const broken: string[] = []
+    for (const f of files('src')) {
+      const src = readFileSync(f, 'utf-8')
+      for (const m of src.matchAll(/\bto(?:=|: )["'](\/[A-Za-z0-9/_-]*)["']/g)) {
+        const to = m[1].replace(/\/$/, '') || '/'
+        if (to === '/' ) continue
+        if (!routeFile(to)) broken.push(`${f}: ${to}`)
+      }
+    }
+    expect(broken).toEqual([])
+  })
+
+  it('her modül sayfasının kısayolu var', () => {
+    for (const a of areas) for (const l of areaLinks(a)) expect(RELATED_PAGE_MAP[l.to]?.length ?? 0, l.to).toBeGreaterThan(0)
+  })
 })
+

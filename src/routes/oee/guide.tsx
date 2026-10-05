@@ -5,6 +5,7 @@ import { api } from '../../../convex/_generated/api'
 import { OeeRebuildNotice, OeeUploadButton } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
+import { relatedPages } from '../../lib/navigation'
 
 export const Route = createFileRoute('/oee/guide')({
   component: OeeGuidePage,
@@ -28,11 +29,7 @@ function OeeGuidePage() {
       <PageHeader
         title="How to use OEE"
         summary="Once: load the history and define your plant. Then: upload the last two weeks whenever you like."
-        links={[
-          { to: '/oee', label: 'OEE Dashboard' },
-          { to: '/oee/settings', label: 'Settings' },
-          { to: '/oee/data', label: 'Data' },
-        ]}
+        links={relatedPages('/oee/guide')}
       />
 
       <OeeRebuildNotice />

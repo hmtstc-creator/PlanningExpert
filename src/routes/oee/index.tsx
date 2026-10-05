@@ -22,6 +22,7 @@ import {
   type ShiftRow,
   type WeeklyRow,
 } from '../../lib/oee'
+import { relatedPages } from '../../lib/navigation'
 
 export const Route = createFileRoute('/oee/')({
   component: OeeDashboard,
@@ -61,12 +62,7 @@ function OeeDashboard() {
       <PageHeader
         title="OEE Dashboard"
         summary="Monthly, recent weeks and the selected week — OEE from summed times, never an average of percentages."
-        links={[
-          { to: '/oee/losses', label: 'Losses Trend' },
-          { to: '/oee/data', label: 'Data' },
-          { to: '/oee/settings', label: 'Settings' },
-          { to: '/oee/guide', label: 'How to use' },
-        ]}
+        links={relatedPages('/oee')}
         info={
           <>
             <p>

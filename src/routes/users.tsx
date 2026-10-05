@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { PageHeader } from '../components/PageHeader'
 import { PeopleAdmin } from '../components/people/PeopleAdmin'
+import { relatedPages } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
 
 export const Route = createFileRoute('/users')({
@@ -19,6 +20,7 @@ function UsersPage() {
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <PageHeader
+        links={relatedPages('/users')}
         title="Users & permissions"
         summary={`${ctx?.active?.companyName ?? ''} — who may see and change what, by group, module area and plant.`}
         info={

@@ -5,6 +5,9 @@ import { ModuleStat } from '../../components/ModuleStat'
 import { useQuery } from '../../lib/convexTransport'
 import { isoDate, addDays } from '../../lib/dates'
 import { usePlanAlarms } from '../../lib/usePlanAlarms'
+import { PageLinks } from '../../components/PageHeader'
+import { relatedPages } from '../../lib/navigation'
+import { MaterialLink } from '../../components/EntityLinks'
 
 export const Route = createFileRoute('/die-followup/')({
   component: DieOverview,
@@ -38,7 +41,10 @@ function DieOverview() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Die Follow-up</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-foreground">Die Follow-up</h1>
+        <PageLinks links={relatedPages('/die-followup')} />
+      </div>
       <p className="mt-1 text-muted-foreground">
         Die problems, readiness, maintenance and shot counters in one place.
       </p>
@@ -78,7 +84,7 @@ function DieOverview() {
           <ul className="mt-2 space-y-1 text-sm">
             {critical.map((d) => (
               <li key={`${d.material}-${d.kind}`}>
-                <strong className="text-foreground">{d.material}</strong>{' '}
+                <strong className="text-foreground"><MaterialLink code={d.material} /></strong>{' '}
                 <span className="text-muted-foreground">
                   — {d.label}. {d.explanation}
                 </span>
@@ -108,7 +114,7 @@ function DieOverview() {
               .map((p) => (
                 <li key={p._id} className="flex flex-wrap justify-between gap-2 py-1.5">
                   <span className="text-foreground">
-                    <strong>{p.material}</strong> · {p.operation} · {p.problemType}
+                    <strong><MaterialLink code={p.material} /></strong> · {p.operation} · {p.problemType}
                   </span>
                   <span className="text-xs text-muted-foreground">{p.occurredAt}</span>
                 </li>

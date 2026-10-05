@@ -10,6 +10,7 @@ import { addDaysIso, configProblems, dataCostCenters, suggestConfig, withPlantCo
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { usePlant } from '../../lib/plantContext'
 import { OEE_SUGGESTED } from '../../lib/settingsDefaults'
+import { relatedPages } from '../../lib/navigation'
 
 export const Route = createFileRoute('/oee/settings')({
   component: OeeSettingsPage,
@@ -85,10 +86,7 @@ function OeeSettingsPage() {
       <PageHeader
         title="OEE Settings"
         summary="Everything specific to your plant is defined here — nothing is written in the program."
-        links={[
-          { to: '/oee', label: 'OEE Dashboard' },
-          { to: '/oee/guide', label: 'How to use' },
-        ]}
+        links={relatedPages('/oee/settings')}
         info={
           <>
             <p>

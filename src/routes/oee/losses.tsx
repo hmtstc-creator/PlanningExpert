@@ -39,6 +39,7 @@ import {
   type WeeklyRow,
 } from '../../lib/oee'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
+import { relatedPages } from '../../lib/navigation'
 
 export const Route = createFileRoute('/oee/losses')({
   component: LossesPage,
@@ -139,11 +140,7 @@ function LossesPage() {
       <PageHeader
         title="Losses Trend"
         summary="Where the time goes: losses of the selected week against the week before, dies, breakdowns and setups."
-        links={[
-          { to: '/oee', label: 'OEE Dashboard' },
-          { to: '/oee/data', label: 'Data' },
-          { to: '/oee/settings', label: 'Settings' },
-        ]}
+        links={relatedPages('/oee/losses')}
         info={
           <>
             <p>

@@ -9,6 +9,9 @@ import { isoDate } from '../../lib/dates'
 import { downscaleImage } from '../../lib/imageResize'
 import { inRange } from '../../lib/problemReport'
 import { useSafeMutation } from '../../lib/useSafeMutation'
+import { PageLinks } from '../../components/PageHeader'
+import { relatedPages } from '../../lib/navigation'
+import { WorkCenterLink } from '../../components/EntityLinks'
 
 export const Route = createFileRoute('/machine-followup/breakdowns')({
   component: BreakdownsPage,
@@ -144,7 +147,10 @@ function BreakdownsPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
-      <h1 className="text-2xl font-bold text-foreground">Machine Breakdowns</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-foreground">Machine Breakdowns</h1>
+        <PageLinks links={relatedPages('/machine-followup/breakdowns')} />
+      </div>
       <p className="mt-2 text-muted-foreground">
         Report a breakdown and record how it was solved — it closes only with a
         description of what was done. If the work center is <strong>stopped</strong>,
@@ -346,7 +352,7 @@ function BreakdownsPage() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    {b.press} · {b.problemType}
+                    <WorkCenterLink name={b.press} /> · {b.problemType}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {b.occurredAt} {hhmm(b.occurredMinute)}
