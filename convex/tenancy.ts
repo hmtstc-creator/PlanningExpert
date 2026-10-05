@@ -6,6 +6,7 @@ import { internalMutation } from './_generated/server'
 import { TABLES, activePlant, userMutation, userQuery, visiblePlants } from './guarded'
 import { isPlantTable } from './plantDb'
 import { LEGACY_ROLE_GROUPS, MODULES, isBoardUser, isPlatform, uniformPermissions } from '../src/lib/tenancy'
+import { digestDue, localNow } from '../src/lib/digest'
 
 /**
  * Şirket / fabrika bağlamı ve tek seferlik geçiş (docs/plant-genisletme.md).
@@ -267,6 +268,33 @@ export const recomputeAll = internalMutation({
       if (!company || company.status !== 'active' || !company.modules.includes('planning')) continue
       if ((plant.disabledModules ?? []).includes('planning')) continue
       await ctx.scheduler.runAfter(i++ * 60_000, internal.planEngine.recompute, { trigger, plantId: plant._id })
+    }
+    return null
+  },
+})
+
+/**
+ * Günlük özet zamanlayıcısı (her 15 dakikada bir, convex/crons.ts): özeti açık
+ * ve bugünkü saati gelmiş her plant için gönderimi kurar. Gönderim ve içerik
+ * plant kilidi altında: convex/digest.ts → sendForPlant.
+ */
+export const digestTick = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const state = await stateDoc(ctx.db)
+    if (!state?.value?.done) return null
+    const now = Date.now()
+    for (const plant of await ctx.db.query('plants').collect()) {
+      const company = await ctx.db.get(plant.companyId)
+      if (!company || company.status !== 'active') continue
+      const s = await ctx.db
+        .query('todaySettings')
+        .withIndex('by_plant', (q) => q.eq('plantId', plant._id))
+        .first()
+      if (!s?.digest) continue
+      if (!digestDue(s.digest, localNow(now, plant.timeZone ?? 'UTC'), s.lastDigestDate)) continue
+      await ctx.scheduler.runAfter(0, internal.digest.sendForPlant, { plantId: plant._id })
     }
     return null
   },

@@ -92,3 +92,19 @@ node .output/server/index.mjs          # systemd / pm2 ile, önünde nginx/caddy
   hataları zaten System errors'ta.
 - Saat başı plan hesabı (`convex/crons.ts`) backend'le birlikte çalışır;
   ayrı cron gerekmez.
+
+## Günlük özet e-postası (Today & daily digest)
+
+E-posta Resend üzerinden gider. Anahtar programda ve veritabanında **tutulmaz**;
+Convex ortam değişkenidir (Convex dashboard → Settings → Environment Variables,
+ya da `npx convex env set`):
+
+| Değişken | Ne | Örnek |
+|---|---|---|
+| `RESEND_API_KEY` | Resend API anahtarı | `re_…` |
+| `DIGEST_FROM` | Gönderen (doğrulanmış alan adı) | `Production Portal <portal@firma.com>` |
+| `APP_URL` | İsteğe bağlı: e-postadaki bağlantılar | `https://portal.firma.com` |
+
+Alıcılar, gün, saat ve içerik Company settings → Today & daily digest'te.
+Ayarlanmamışsa özet gönderilmez ve sayfa nedenini söyler.
+

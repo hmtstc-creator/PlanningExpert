@@ -3,7 +3,8 @@ import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
 
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
-import { FRESHNESS, type Signal } from '../lib/cockpit'
+import type { Signal, TodayThresholds } from '../lib/cockpit'
+import { TODAY_DEFAULTS } from '../lib/settingsDefaults'
 import { useCanOpen } from '../lib/plantContext'
 import { InfoTip } from './PageHeader'
 
@@ -19,6 +20,7 @@ const TONE: Record<Signal['level'], { box: string; icon: typeof XCircle; iconCls
  */
 export function Cockpit({ className = '' }: { className?: string }) {
   const signals = useQuery(api.cockpit.today) as Signal[] | undefined
+  const t = ((useQuery(api.digest.settings) as { thresholds: TodayThresholds } | undefined)?.thresholds ?? TODAY_DEFAULTS) as TodayThresholds
   const canOpen = useCanOpen()
   if (!signals || signals.length === 0) return null
   return (
@@ -29,10 +31,11 @@ export function Cockpit({ className = '' }: { className?: string }) {
           <p>Risks and their reasons from the latest plan and the follow-up modules — not record counts. Each card opens its page.</p>
           <ul className="ml-4 list-disc space-y-0.5">
             <li>Late parts: the plan's late deliveries, worst first, with the engine's suggestion. “No plan can save” is proven from capacity — the decision there is overtime or another work center.</li>
-            <li>Over capacity: work centers whose demand exceeds capacity in the next {FRESHNESS.bottleneckWeeks} weeks.</li>
-            <li>Old data: demand (ZPP) or stock (MB52) older than {FRESHNESS.sapStaleHours} h — the plan is only as good as the upload.</li>
-            <li>Plan health: the last calculation failed, or the plan is older than {FRESHNESS.planStaleHours} h.</li>
+            <li>Over capacity: work centers whose demand exceeds {t.overloadPercent} % of capacity in the next {t.bottleneckWeeks} weeks.</li>
+            <li>Old data: demand (ZPP) or stock (MB52) older than {t.sapStaleHours} h — the plan is only as good as the upload.</li>
+            <li>Plan health: the last calculation failed, or the plan is older than {t.planStaleHours} h.</li>
           </ul>
+          <p>The limits are this plant's own: Company settings → Today &amp; daily digest.</p>
         </InfoTip>
       </h2>
       <div className="mt-2 grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-3">

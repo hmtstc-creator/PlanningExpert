@@ -26,17 +26,35 @@ export interface Signal {
   to: string
 }
 
-/** Program kuralları (sayfada da yazılır): ne zaman "bayat" sayılır. */
-export const FRESHNESS = {
+/**
+ * Today eşikleri — plant ayarı (Company settings → Today & daily digest);
+ * kaydedilmemişse TODAY_DEFAULTS (src/lib/settingsDefaults.ts).
+ */
+export interface TodayThresholds {
   /** Talep (ZPP) ve stok (MB52) bu kadar saatten eskiyse uyarı. */
-  sapStaleHours: 36,
+  sapStaleHours: number
   /** Plan saat başı yeniden hesaplanır; bundan eskiyse bir şey takılmış. */
-  planStaleHours: 3,
-  /** Darboğaz: kapasitenin bu oranını aşan hafta. */
-  overloadRatio: 1,
-  /** Darboğaza bakılan hafta sayısı (bu hafta + sonraki). */
-  bottleneckWeeks: 2,
-} as const
+  planStaleHours: number
+  /** Darboğaz: talebi kapasitenin bu yüzdesini aşan hafta. */
+  overloadPercent: number
+  /** Darboğaza bakılan hafta sayısı (bu hafta + sonrakiler). */
+  bottleneckWeeks: number
+}
+
+/** Today'in sinyal türleri (günlük özette hangilerinin gideceği seçilir). */
+export const SIGNAL_TYPES: { key: string; label: string }[] = [
+  { key: 'late', label: 'Late parts and on-time status' },
+  { key: 'blockers', label: 'Dies / machines holding up deliveries' },
+  { key: 'bottleneck', label: 'Work centers over capacity' },
+  { key: 'freshness', label: 'Old or missing SAP data' },
+  { key: 'plan', label: 'Plan health (failed, missing or old plan)' },
+  { key: 'rules', label: 'Rule breaches found by the plan check' },
+  { key: 'breakdowns', label: 'Machines stopped by a breakdown' },
+  { key: 'dieProblems', label: 'Open die problems' },
+]
+
+/** Sinyalin türü (planError / noPlan / planStale → plan). */
+export const signalType = (key: string) => (key === 'planError' || key === 'noPlan' || key === 'planStale' ? 'plan' : key)
 
 export interface CockpitInput {
   now: number
@@ -63,7 +81,7 @@ const ageText = (ms: number) => {
 }
 const fmt = (n: number) => Math.round(n).toLocaleString('en-GB')
 
-export function buildCockpit(input: CockpitInput): Signal[] {
+export function buildCockpit(input: CockpitInput, t: TodayThresholds): Signal[] {
   const out: Signal[] = []
   const { plan, now } = input
 
@@ -73,7 +91,7 @@ export function buildCockpit(input: CockpitInput): Signal[] {
   }
   if (!plan && input.uploads) {
     out.push({ key: 'noPlan', level: 'critical', title: 'No plan yet', detail: 'Upload demand and stock on SAP Data; the plan is calculated automatically.', to: '/sapdata' })
-  } else if (plan && hours(now - plan.computedAt) > FRESHNESS.planStaleHours) {
+  } else if (plan && hours(now - plan.computedAt) > t.planStaleHours) {
     out.push({ key: 'planStale', level: 'warning', title: `The plan is ${ageText(now - plan.computedAt)} old`, detail: 'It is recalculated every hour and after every change — open the plan and recalculate.', to: '/planlama' })
   }
 
@@ -85,7 +103,7 @@ export function buildCockpit(input: CockpitInput): Signal[] {
     ]
     const stale = sources
       .map(([key, label]) => ({ label, at: input.uploads?.[key] ?? 0 }))
-      .filter((s) => !s.at || hours(now - s.at) > FRESHNESS.sapStaleHours)
+      .filter((s) => !s.at || hours(now - s.at) > t.sapStaleHours)
     if (stale.length) {
       const never = stale.some((s) => !s.at)
       out.push({
@@ -124,10 +142,10 @@ export function buildCockpit(input: CockpitInput): Signal[] {
     if (cap) {
       const hits: { press: string; week: string; ratio: number }[] = []
       for (const p of cap.presses) {
-        for (let w = 0; w < Math.min(FRESHNESS.bottleneckWeeks, cap.weeks.length); w++) {
+        for (let w = 0; w < Math.min(t.bottleneckWeeks, cap.weeks.length); w++) {
           const c = p.capacity[w] ?? 0
           const d = p.demand[w] ?? 0
-          if (d > 0 && (c <= 0 || d / c > FRESHNESS.overloadRatio)) hits.push({ press: p.press, week: cap.weeks[w].label, ratio: c > 0 ? d / c : Infinity })
+          if (d > 0 && (c <= 0 || (d / c) * 100 > t.overloadPercent)) hits.push({ press: p.press, week: cap.weeks[w].label, ratio: c > 0 ? d / c : Infinity })
         }
       }
       hits.sort((a, b) => b.ratio - a.ratio)
@@ -135,7 +153,7 @@ export function buildCockpit(input: CockpitInput): Signal[] {
         out.push({
           key: 'bottleneck',
           level: 'warning',
-          title: `${new Set(hits.map((h) => h.press)).size} work center${hits.length === 1 ? '' : 's'} over capacity in the next ${FRESHNESS.bottleneckWeeks} weeks`,
+          title: `${new Set(hits.map((h) => h.press)).size} work center${hits.length === 1 ? '' : 's'} over capacity in the next ${t.bottleneckWeeks} weeks`,
           items: hits.slice(0, 4).map((h) => ({ text: `${h.press} — ${h.week}`, sub: Number.isFinite(h.ratio) ? `${Math.round(h.ratio * 100)} % of capacity` : 'demand but no capacity (no calendar)' })),
           to: '/capacity',
         })

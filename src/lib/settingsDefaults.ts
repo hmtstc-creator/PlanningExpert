@@ -66,3 +66,15 @@ export const OEE_SUGGESTED = {
   trendWeeks: 10,
   topN: 10,
 } as const
+
+/**
+ * Today panelinin eşikleri, kaydedilmemişse (plant kendi değerini Company
+ * settings → Today & daily digest'te yazar). Bkz. src/lib/cockpit.ts.
+ */
+export const TODAY_DEFAULTS = {
+  sapStaleHours: 36,
+  planStaleHours: 3,
+  overloadPercent: 100,
+  bottleneckWeeks: 2,
+} as const
+

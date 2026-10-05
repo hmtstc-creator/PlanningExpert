@@ -6,6 +6,7 @@ import { Tabs } from '../components/Tabs'
 import { AuditList, OrgAdmin } from '../components/org/OrgAdmin'
 import { PlantChangeLog } from '../components/settings/PlantChangeLog'
 import { SelectionLists } from '../components/settings/SelectionLists'
+import { DigestSettings } from '../components/settings/DigestSettings'
 import { relatedPages } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
 
@@ -13,7 +14,7 @@ export const Route = createFileRoute('/settings')({
   component: SettingsPage,
 })
 
-type Tab = 'organization' | 'lists' | 'history'
+type Tab = 'organization' | 'lists' | 'today' | 'history'
 
 /**
  * Company settings — şirketin creator'ları (ve seçili şirkette General):
@@ -41,7 +42,8 @@ function SettingsPage() {
               Users, groups and permissions have their own page: <b>Users &amp; permissions</b>.
             </p>
             <p>
-              <b>Selection lists</b> and the <b>plant change log</b> belong to the selected plant (header).
+              <b>Selection lists</b>, <b>Today &amp; daily digest</b> (limits of the Today panel, the daily e-mail) and the <b>plant
+              change log</b> belong to the selected plant (header).
             </p>
           </>
         }
@@ -57,6 +59,7 @@ function SettingsPage() {
           tabs={[
             { key: 'organization', label: 'Organization' },
             { key: 'lists', label: 'Selection lists' },
+            { key: 'today', label: 'Today & daily digest' },
             { key: 'history', label: 'Change history' },
           ]}
           value={tab}
@@ -66,6 +69,7 @@ function SettingsPage() {
       <div className="mt-4">
         {tab === 'organization' && <OrgAdmin scope="company" />}
         {tab === 'lists' && <SelectionLists />}
+        {tab === 'today' && <DigestSettings />}
         {tab === 'history' && companyId && (
           <div className="space-y-8">
             <section>

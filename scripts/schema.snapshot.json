@@ -3499,6 +3499,131 @@
       "optional": true
     }
   },
+  "todaySettings": {
+    "bottleneckWeeks": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "digest": {
+      "fieldType": {
+        "type": "object",
+        "value": {
+          "enabled": {
+            "fieldType": {
+              "type": "boolean"
+            },
+            "optional": false
+          },
+          "time": {
+            "fieldType": {
+              "type": "string"
+            },
+            "optional": false
+          },
+          "days": {
+            "fieldType": {
+              "type": "array",
+              "value": {
+                "type": "string"
+              }
+            },
+            "optional": false
+          },
+          "to": {
+            "fieldType": {
+              "type": "array",
+              "value": {
+                "type": "string"
+              }
+            },
+            "optional": false
+          },
+          "cc": {
+            "fieldType": {
+              "type": "array",
+              "value": {
+                "type": "string"
+              }
+            },
+            "optional": false
+          },
+          "signals": {
+            "fieldType": {
+              "type": "array",
+              "value": {
+                "type": "string"
+              }
+            },
+            "optional": false
+          },
+          "onlyWhenIssues": {
+            "fieldType": {
+              "type": "boolean"
+            },
+            "optional": false
+          }
+        }
+      },
+      "optional": true
+    },
+    "lastDigestAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "lastDigestDate": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "lastDigestResult": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "overloadPercent": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "planStaleHours": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "sapStaleHours": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "updatedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "updatedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
   "userGroups": {
     "allPlants": {
       "fieldType": {

@@ -859,6 +859,34 @@ export default defineSchema({
     .index('by_period', ['plantId', 'period', 'year', 'num'])
     .index('by_plant', ['plantId']),
 
+  // ---- Today paneli ve günlük özet e-postası (src/lib/cockpit.ts, digest.ts) ----
+  // Plant başına tek kayıt. Eşik yazılmamışsa TODAY_DEFAULTS. E-posta
+  // servisinin anahtarı burada DEĞİL: Convex ortam değişkeni (RESEND_API_KEY).
+  todaySettings: defineTable({
+    ...plantField,
+    sapStaleHours: v.optional(v.number()),
+    planStaleHours: v.optional(v.number()),
+    overloadPercent: v.optional(v.number()),
+    bottleneckWeeks: v.optional(v.number()),
+    digest: v.optional(
+      v.object({
+        enabled: v.boolean(),
+        time: v.string(),
+        days: v.array(v.string()),
+        to: v.array(v.string()),
+        cc: v.array(v.string()),
+        signals: v.array(v.string()),
+        onlyWhenIssues: v.boolean(),
+      }),
+    ),
+    // Son gönderim: plant gününe göre tarih (aynı gün ikinci kez gitmesin) ve sonuç.
+    lastDigestDate: v.optional(v.string()),
+    lastDigestAt: v.optional(v.number()),
+    lastDigestResult: v.optional(v.string()),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.string()),
+  }).index('by_plant', ['plantId']),
+
   changeLog: defineTable({
     ...plantField,
     title: v.string(),

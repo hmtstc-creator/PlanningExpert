@@ -16,4 +16,10 @@ crons.hourly('recompute plan', { minuteUTC: 5 }, internal.tenancy.recomputeAll, 
   trigger: 'clock',
 })
 
+/**
+ * Günlük özet e-postası: her 15 dakikada bir, saati gelen plant'ler
+ * (Company settings → Today & daily digest). Aynı gün ikinci kez gitmez.
+ */
+crons.interval('daily digest', { minutes: 15 }, internal.tenancy.digestTick, {})
+
 export default crons

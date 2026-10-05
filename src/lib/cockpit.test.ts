@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildCockpit, type CockpitInput } from './cockpit'
+import { buildCockpit as build, type CockpitInput, type TodayThresholds } from './cockpit'
+import { TODAY_DEFAULTS } from './settingsDefaults'
+
+const buildCockpit = (i: CockpitInput, t: TodayThresholds = TODAY_DEFAULTS) => build(i, t)
 
 const H = 3_600_000
 const now = Date.UTC(2026, 9, 5, 10)
@@ -76,4 +79,14 @@ describe('Today paneli', () => {
     const s = buildCockpit({ now, plan: null, uploads: null, openBreakdowns: { total: 3, stopping: 1 }, openDieProblems: 2 })
     expect(s.map((x) => x.key)).toEqual(['breakdowns', 'dieProblems'])
   })
+
+  it('eşikler plant ayarından', () => {
+    const plan = base({ capacity: { weeks: [{ label: 'W41' }], presses: [{ press: 'P1', capacity: [100], demand: [95] }] } })
+    expect(buildCockpit(plan).some((x) => x.key === 'bottleneck')).toBe(false)
+    expect(buildCockpit(plan, { ...TODAY_DEFAULTS, overloadPercent: 90 }).some((x) => x.key === 'bottleneck')).toBe(true)
+    const old = { ...base(), uploads: { weeklyDemand: now - 10 * H, stock: now - 10 * H } }
+    expect(buildCockpit(old).some((x) => x.key === 'freshness')).toBe(false)
+    expect(buildCockpit(old, { ...TODAY_DEFAULTS, sapStaleHours: 8 }).some((x) => x.key === 'freshness')).toBe(true)
+  })
 })
+

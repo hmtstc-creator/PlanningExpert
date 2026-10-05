@@ -27,7 +27,7 @@ Ayrıntı ve gerekçe ilgili maddede; karar verilince madde güncellenir.
 | K11 | Fabrika karşılaştırma ekranının içeriği | 2 |
 | K12 | "Doğrudan main" yerine PR + inceleme düzeni | 4.1 |
 | K13 | Geç teslimatta karar sahibi ve tepki süresi (aksiyon kaydı) | 5 |
-| K14 | Günlük özet e-postası: kime, saat kaçta, hangi sinyaller | 5 |
+| ~~K14~~ | ✅ Kullanıcı ayarlar: Company settings → Today & daily digest (e-posta servisi anahtarı bekleniyor) | 5 |
 | K15 | Plan sabitlenmesi (frozen) ve plana uyum hedefi (%) | 5 |
 
 ## 1. Hemen — senin yapacakların (yeni yapıya geçiş)
@@ -435,14 +435,22 @@ Cevap bu değerlendirmeden önce **hayır**dı.
   sahibi, karar (mesai, makine değişimi, müşteriye bilgi), hedef tarih,
   sonuç. Today kartında "kararı verildi / bekliyor". Haftalık: kaç gecikme
   zamanında yakalandı.
-- [ ] **P1 — Günlük özet (K14).** Her sabah Today sinyalleri e-posta ile
-  (Raw material sipariş alıcıları altyapısı var); kritik sinyal gün içinde.
+- [x] ✅ **Günlük özet (K14)** (2026-10-05): Company settings → Today & daily
+  digest — açık/kapalı, saat (plant saati), günler, To / Cc (kullanıcılardan
+  ya da adres), içerik (sinyal türleri), "yalnızca sorun varsa", önizleme,
+  deneme gönderimi, son gönderim sonucu. Her 15 dakikada bir bakılır, günde
+  bir kez gider (convex/digest.ts, tenancy.digestTick).
+  - [ ] **Senin yapacağın:** Resend hesabı + gönderen alan adı doğrulaması;
+    Convex ortam değişkenleri `RESEND_API_KEY`, `DIGEST_FROM`, (isteğe
+    bağlı) `APP_URL`. Anahtar programda / veritabanında tutulmaz.
+  - [ ] Kritik sinyalin gün içinde anında gitmesi (bugün yalnızca günlük).
 - [ ] **P1 — Plana uyum KPI'ı (K15).** Haftalık plan vs gerçekleşen (MB51),
   hedefi, Board'da trendi; fabrika karşılaştırmasında.
 - [ ] **P2 — Fazla mesai görünürlüğü.** Haftalık planlanan mesai saati,
   "mesaisiz geç kalacak parça" farkı (motor iki kez koşar), Today'de tek satır.
 - [ ] **P2 — Holding geneli teslimat riski.** Board'da plant başına Today
   özeti (geç parça, darboğaz, veri yaşı).
-- [ ] **P2 — Eşikler ayara.** Today eşikleri (36 sa, 3 sa, 2 hafta) bugün
-  program kuralı; plant ayarına taşınabilir (K10 ile birlikte).
+- [x] ✅ **Eşikler ayara** (2026-10-05): Today eşikleri (eski SAP verisi,
+  eski plan, kapasite aşımı %, kaç hafta) plant ayarı; boşsa başlangıç değeri
+  (`TODAY_DEFAULTS`).
 
