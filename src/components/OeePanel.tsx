@@ -267,7 +267,7 @@ export function OeeUploadButton() {
       const names = readWorkbook(buf, { bookSheets: true }).SheetNames
       const wanted = names.filter((n) => sheetKind(n))
       if (!wanted.length) {
-        throw new Error('No OEE sheet in this file (Shiftly KPI, Shiftly Order Based KPI, Downtimes, Daily KPI, Weekly KPI, Monthly KPI).')
+        throw new Error('No OEE sheet in this file — upload the Report (Shiftly KPI, Shiftly Order Based KPI) or the Downtimes file.')
       }
       const book = readWorkbook(buf, { sheets: wanted, dense: true })
       const sheets: Record<string, SheetRows> = {}
@@ -281,13 +281,21 @@ export function OeeUploadButton() {
         throw new Error(`${plant?.plantName ?? 'This plant'} has no cost center yet — a creator adds them on Company settings → Organization.`)
       }
       const { parsed, skipped } = forPlantCostCenters(all, codes)
-      const kept = parsed.shifts.length + parsed.daily.length + parsed.weekly.length + parsed.monthly.length + parsed.downtimes.length
+      const kept = parsed.shifts.length + parsed.orders.length + parsed.daily.length + parsed.weekly.length + parsed.monthly.length + parsed.downtimes.length
       if (!kept) throw new Error(`No row of this file belongs to the cost centers of ${plant?.plantName} (${codes.join(', ')}).`)
       await importOee(parsed, file.name, calls, (step) => setState({ kind: 'busy', step }))
       const other = skipped.length ? ` Not this plant (skipped): ${skipped.map((s) => `${s.costCenter} ${s.rows.toLocaleString('en-GB')}`).join(', ')}.` : ''
       setState({
         kind: 'done',
-        text: `✓ ${plant?.plantName}: added / updated ${parsed.shifts.length.toLocaleString('en-GB')} shifts, ${parsed.downtimes.reduce((a, d) => a + d.events.length, 0).toLocaleString('en-GB')} downtimes, ${parsed.orders.length.toLocaleString('en-GB')} order rows, ${parsed.weekly.length} weekly, ${parsed.monthly.length} monthly. Nothing was deleted.${other}`,
+        text: `✓ ${plant?.plantName}: added / updated ${[
+          parsed.shifts.length && `${parsed.shifts.length.toLocaleString('en-GB')} shifts`,
+          parsed.orders.length && `${parsed.orders.length.toLocaleString('en-GB')} order rows`,
+          parsed.downtimes.length && `${parsed.downtimes.reduce((a, d) => a + d.events.length, 0).toLocaleString('en-GB')} downtimes`,
+          parsed.weekly.length && `${parsed.weekly.length} weekly`,
+          parsed.monthly.length && `${parsed.monthly.length} monthly`,
+        ]
+          .filter(Boolean)
+          .join(', ')}. Nothing was deleted.${other}`,
       })
     } catch (e) {
       setState({ kind: 'error', text: friendlyError(e).message || 'Upload failed' })

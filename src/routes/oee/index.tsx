@@ -72,9 +72,8 @@ function OeeDashboard() {
             </p>
             <p>
               Every day, week, month and group adds up the times first and divides once. A day is the
-              sum of its shifts (Shiftly KPI), or the Daily KPI row where no shifts were uploaded. A week
-              or month is the sum of its days, or the uploaded Weekly / Monthly KPI row when that covers
-              more loading time (history before the daily data).
+              sum of its shifts (Report → Shiftly KPI); a week or month is the sum of its days (Weekly /
+              Monthly KPI rows uploaded earlier are kept where they cover more loading time).
             </p>
             <p>
               Areas, cost center names and shift numbers come from{' '}

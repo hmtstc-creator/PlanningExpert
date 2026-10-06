@@ -552,3 +552,31 @@ planlı duruşları zaten dışarıda bıraktığı için köprüde yeniden dü�
 (yalnızca "Outside OEE" bilgisi). OEE, A, P, Q Dashboard'la birebir aynı;
 OEE + kayıplar = %100. Takvim / TEEP adımları ve OEE Settings'teki TPM
 tabanı seçeneği kaldırıldı. Ayrıntı: docs/oee-bridge.md.
+
+## Yeni dosya biçimi: yalnızca Report + Downtimes (2026-10-06, planlamacı)
+
+Planlamacı artık yalnızca iki dosya yükler; Daily / Weekly / Monthly KPI
+dışa aktarılmaz (gün, hafta, ay vardiyalardan hesaplanır; daha önce
+yüklenen haftalık / aylık satırlar silinmez).
+
+| Dosya → sayfa | Sütunlar (başlıkla bulunur) |
+|---|---|
+| Report → Shiftly KPI | Date, Plant - Key, Cost Center - Key, Work Center, **Shift Defination** (vardiya kodu UB61 …), **Shift Definition Txt** (ad), GOODQUANTITY, SCRAPQUANTITY, REJECTQUANTITY, Scheduled / Unscheduled Downtime(Min), Net Operating / Net Production / Loading Time(Min), Availability, Quality, Performance, Oee |
+| Report → Shiftly Order Based KPI | Date, **Plant - Key**, **Plant** (ad), Work Center, Shift Defination, Order, **Material - Key**, **Var_Equipment** (kalıp; APR / MARK hatlarında boş), süreler, Availability / Quality / Performance / Oee **(Order)** |
+| Downtimes → Downtimes (1) | başlık **2. satırda**, A sütunu boş; Date, Plant, Plant - Key, Cost Center - Key, Work Center - Key (Not Compounded), Order Number, MATERIAL, Mold Number, Shift Group (UB), Shift Defination, Reason Code 1–5, Reason Code Defination EN / TR, Stoppage Duration, Stoppage Duration(Min), StartDate, StartTime, EndDate, EndTime |
+
+- Başlık satırı ilk 10 satırda "Date" içeren ilk satırdır.
+- Kaldırılan sütunlar (dosyada artık yok): Production Responsible, Shiftly'deki
+  Shift Group, Order Based WEEK / TOTAL1, Downtimes formül sütunları (Shift,
+  Week, material, min). OEE → Data yalnızca dosyadaki sütunları gösterir.
+- Eski biçimde vardiya kodu "Shift Group"taydı; ikisi de okunur, kayıt anahtarı
+  aynı (tarih + makine + vardiya kodu), yeni yükleme eskisini günceller.
+- **Sipariş anahtarı** tarih + makine + vardiya + sipariş (kalıp anahtardan
+  çıktı): eski dosyanın "Equipment" sütununda malzeme kodu vardı; yeni dosya
+  aynı siparişi ikinci kayıt eklemeden düzeltir (test).
+- Gerçek dosyalar (05.01–06.10.2026): 9.860 vardiya, 15.425 sipariş satırı,
+  87.153 duruş (1.505 gün × makine, en büyük kayıt 55 KB); eksik sütun yok.
+- Duruş dosyasında ayarlarda olmayabilecek Reason Code 2 kodları: DNM (proje /
+  deneme), CLR (TPM / otonom bakım), DEV (yeni operatör eğitimi), SDK (planlı
+  duruş). OEE Settings → "Suggest from data" bunları ekler; eklenmezse
+  "Unassigned" görünür.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import fixture from './oee.fixture.json'
+import fixtureV2 from './oee.fixture.v2.json'
 import {
   EMPTY_CONFIG,
   chartShare,
@@ -398,3 +399,44 @@ describe('oee store and upload — history is never deleted', () => {
     expect(calls.some((c) => c.startsWith('downtimes'))).toBe(true)
   })
 })
+
+describe('dosya biçimi 2026-10-06 (Report.xlsx + Downtimes.xlsx)', () => {
+  // Gerçek dosyalardan kesit: 21.09.2026, APR-627 (1st/2nd/3rd = UB61–63) ve PRS-110 (UB64–66).
+  const v2 = parseOeeWorkbook(fixtureV2 as unknown as Record<string, SheetRows>)
+
+  it('iki dosyanın sayfaları eksik sütun olmadan okunur', () => {
+    expect(v2.problems).toEqual([])
+    expect(v2.read.map((r) => r.kind).sort()).toEqual(['downtimes', 'orders', 'shiftly'])
+  })
+
+  it('Shiftly KPI: vardiya kodu "Shift Defination", adı "Shift Definition Txt"', () => {
+    const s = v2.shifts.find((x) => x.workCenter === 'APR-627' && x.shiftGroup === 'UB61')!
+    expect(s).toMatchObject({ date: '2026-09-21', costCenter: '51010172', shiftDefinition: '1st Shift', good: 1580 })
+    // Anahtar (tarih + makine + vardiya kodu) tekrarsız: vardiyalar birbirinin üstüne yazılmaz.
+    expect(new Set(v2.shifts.map((x) => `${x.date}|${x.workCenter}|${x.shiftGroup}`)).size).toBe(v2.shifts.length)
+    // Gün = vardiyaların toplamı.
+    const day = daysFromShifts(v2.shifts).find((d) => d.workCenter === 'APR-627')!
+    expect(day.loadingMin).toBeCloseTo(
+      v2.shifts.filter((x) => x.workCenter === 'APR-627').reduce((a, x) => a + x.loadingMin, 0),
+      9,
+    )
+  })
+
+  it('Order Based: Plant - Key anahtar, Plant ad, Var_Equipment kalıp (boşsa boş), Material - Key malzeme, (Order) oranları', () => {
+    const prs = v2.orders.find((o) => o.workCenter === 'PRS-110')!
+    expect(prs).toMatchObject({ plant: '5101', plantName: 'Romanya Martur', equipment: 'PROGRESSIVE-DIE-6' })
+    expect(prs.material).toMatch(/^M/)
+    expect(prs.oee).toBeGreaterThan(0)
+    const apr = v2.orders.find((o) => o.workCenter === 'APR-627')!
+    expect(apr.equipment).toBe('')
+    expect(apr.shift).toMatch(/^UB6[123]$/)
+  })
+
+  it('Downtimes: başlık 2. satırda, A sütunu boş', () => {
+    const d = v2.downtimes.find((x) => x.workCenter === 'PRS-110')!
+    expect(d).toMatchObject({ date: '2026-09-21', plantKey: '5101', costCenter: '51010173' })
+    expect(d.events[0]).toMatchObject({ shiftGroup: 'UB', shiftDefinition: 'UB66', rc1: 'UNSCD_DOWN', rc2: 'KSD', minutes: 1 })
+    expect(d.events.length).toBe(fixtureV2['Downtimes (1)'].length - 2)
+  })
+})
+

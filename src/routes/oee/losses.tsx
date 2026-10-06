@@ -248,7 +248,7 @@ function LossesPage() {
 
       <Section
         title={`Loss trend — last ${weeksN} weeks · ${label}`}
-        info="Weeks without uploaded downtimes (history from Weekly / Daily KPI) show only Speed (Production − Operation); the downtime groups start with the uploaded Downtimes."
+        info="Weeks without uploaded downtimes show only Speed (Production − Operation); the downtime groups start with the uploaded Downtimes file."
       >
         <Legend items={chartColumns.map((c, i) => ({ key: c, label: c, slot: i + 1 }))} />
         <LineTrendChart
@@ -340,14 +340,14 @@ function DieSection({ dies, week, top }: { dies: ReturnType<typeof dieTable>; we
           <p className="text-xs font-medium text-muted-foreground">Worst {top} dies by OEE</p>
           <SimpleTable
             head={['Die', 'Press', 'Orders', 'Good', 'Loading', 'OEE']}
-            rows={worst.map((d) => [d.equipment, d.workCenter, String(d.orders), d.good.toLocaleString('en-GB'), minutes(d.loadingMin), pct(d.weightedOee)])}
+            rows={worst.map((d) => [d.equipment || '(no die)', d.workCenter, String(d.orders), d.good.toLocaleString('en-GB'), minutes(d.loadingMin), pct(d.weightedOee)])}
           />
         </div>
         <div>
           <p className="text-xs font-medium text-muted-foreground">Most speed loss</p>
           <SimpleTable
             head={['Die', 'Press', 'Good', 'Speed loss', 'OEE']}
-            rows={speed.map((d) => [d.equipment, d.workCenter, d.good.toLocaleString('en-GB'), minutes(d.speedLossMin), pct(d.weightedOee)])}
+            rows={speed.map((d) => [d.equipment || '(no die)', d.workCenter, d.good.toLocaleString('en-GB'), minutes(d.speedLossMin), pct(d.weightedOee)])}
           />
         </div>
       </div>

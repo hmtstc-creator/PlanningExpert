@@ -314,6 +314,21 @@ describe('fabrika ayrımı', () => {
     await expect(t.mutation(api.oee.upsertShifts, { token: boss, rows: [row] })).rejects.toThrow(/not a cost center/)
     await t.mutation(api.platform.updatePlant, { token: boss, id: after.active.plantId, name: 'Plant 1', departments: ['Stamping'], costCenters: [{ code: '51010171', name: 'Transfer', department: 'Stamping' }] })
     await t.mutation(api.oee.upsertShifts, { token: boss, rows: [row] })
+
+    // Sipariş: aynı tarih + makine + vardiya + sipariş tek kayıttır. Eski dosyada "Equipment"
+    // malzeme koduydu; yeni dosya (Var_Equipment = kalıp) aynı satırı düzeltir, yanına eklemez.
+    const order = {
+      date: '2026-09-21', plant: '5101', plantName: 'Romanya Martur', workCenter: 'PRS-106', shift: 'UB64', order: '6597582',
+      equipment: 'M315SP024', material: 'PROGRESSIVE-DIE-6', good: 10, scrap: 0, reject: 0, scheduledMin: 0, unscheduledMin: 0,
+      operatingMin: 1, productionMin: 1, loadingMin: 1, availability: 0, quality: 0, performance: 0, oee: 0,
+    }
+    await t.mutation(api.oee.upsertOrders, { token: boss, rows: [order, { ...order, order: '6597583' }] })
+    await t.mutation(api.oee.upsertOrders, { token: boss, rows: [{ ...order, equipment: 'PROGRESSIVE-DIE-6', material: 'M315SP024', good: 12 }] })
+    const orders = (await t.query(api.oee.orders, { token: boss, from: '2026-09-21', to: '2026-09-21' })) as Any[]
+    expect(orders.map((o) => [o.order, o.equipment, o.material, o.good]).sort()).toEqual([
+      ['6597582', 'PROGRESSIVE-DIE-6', 'M315SP024', 12],
+      ['6597583', 'M315SP024', 'PROGRESSIVE-DIE-6', 10],
+    ])
   })
 
   it('KPI: yalnızca fabrikanın masraf yerleri; dashboard yalnızca KPI izinli fabrikalar; OEE kök verisi', async () => {

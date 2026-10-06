@@ -1133,6 +1133,16 @@ export function sheetKind(name: string): keyof typeof OEE_SHEET_NAMES | null {
 
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
 
+/**
+ * Başlık satırı: ilk 10 satırda "Date" sütunu olan ilk satır. Downtimes
+ * dışa aktarımında başlık 2. satırda ve A sütunu boş (2026-10-06 biçimi).
+ */
+export function splitHeader(rows: SheetRows): { header: unknown[]; body: unknown[][] } {
+  const i = rows.slice(0, 10).findIndex((r) => Array.isArray(r) && r.some((c) => norm(c) === 'date'))
+  const at = i < 0 ? 0 : i
+  return { header: rows[at] ?? [], body: rows.slice(at + 1) }
+}
+
 function headerIndex(header: unknown[], names: string[]): number {
   const h = header.map(norm)
   for (const n of names) {
@@ -1203,10 +1213,10 @@ const TIME_COLS: Col[] = [
   { key: 'operating', names: ['Net Operating Time(Min)', 'Net Operating Time (min)'] },
   { key: 'production', names: ['Net Production Time(Min)', 'Net Production Time (min)'] },
   { key: 'loading', names: ['Loading Time(Min)', 'Loading Time (min)'] },
-  { key: 'availability', names: ['Availability'] },
-  { key: 'quality', names: ['Quality'] },
-  { key: 'performance', names: ['Performance'] },
-  { key: 'oee', names: ['Oee', 'OEE'] },
+  { key: 'availability', names: ['Availability', 'Availability (Order)'] },
+  { key: 'quality', names: ['Quality', 'Quality (Order)'] },
+  { key: 'performance', names: ['Performance', 'Performance (Order)'] },
+  { key: 'oee', names: ['Oee', 'OEE', 'Oee (Order)'] },
 ]
 
 function timesFrom(get: (row: unknown[], key: string) => unknown, row: unknown[]) {
@@ -1273,27 +1283,29 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
     byKind.set(kind, [...(byKind.get(kind) ?? []), [name, rows]])
   }
 
-  for (const [name, rows] of byKind.get('shiftly') ?? []) {
-    const r = reader(rows[0] ?? [], [
+  // Biçim (2026-10-06, Report.xlsx): vardiya kodu "Shift Defination" (UB61 …),
+  // adı "Shift Definition Txt". Eski dosyada kod "Shift Group", ad "Shift Definition" idi.
+  for (const [name, sheet] of byKind.get('shiftly') ?? []) {
+    const { header, body } = splitHeader(sheet)
+    const r = reader(header, [
       { key: 'date', names: ['Date'] },
       { key: 'plant', names: ['Plant - Key', 'Plant'] },
-      { key: 'resp', names: ['Production Responsible'] },
-      { key: 'cc', names: ['Cost Center', 'Cost Center - Key'] },
+      { key: 'cc', names: ['Cost Center - Key', 'Cost Center'] },
       { key: 'wc', names: ['Work Center'] },
-      { key: 'sg', names: ['Shift Group'] },
-      { key: 'sd', names: ['Shift Definition'] },
+      { key: 'sg', names: ['Shift Defination', 'Shift Group'] },
+      { key: 'sd', names: ['Shift Definition Txt', 'Shift Definition'] },
       ...TIME_COLS,
     ])
     if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
     let n = 0
-    for (const row of rows.slice(1)) {
+    for (const row of body) {
       const date = toIsoDate(r.get(row, 'date'))
       const wc = str(r.get(row, 'wc'))
       if (!date || !wc) continue
       out.shifts.push({
         date,
         plantKey: str(r.get(row, 'plant')),
-        responsible: str(r.get(row, 'resp')),
+        responsible: '',
         costCenter: str(r.get(row, 'cc')),
         workCenter: wc,
         shiftGroup: str(r.get(row, 'sg')),
@@ -1306,11 +1318,13 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
     checkMonday(name, out.shifts.slice(out.shifts.length - n))
   }
 
-  for (const [name, rows] of byKind.get('daily') ?? []) {
-    const r = reader(rows[0] ?? [], [
+  // Daily / Weekly / Monthly KPI artık dışa aktarılmıyor (gün, hafta, ay vardiyalardan
+  // hesaplanır); eski dosyalar yüklenirse yine okunur.
+  for (const [name, sheet] of byKind.get('daily') ?? []) {
+    const { header, body: rows } = splitHeader(sheet)
+    const r = reader(header, [
       { key: 'date', names: ['Date'] },
       { key: 'plant', names: ['Plant - Key'] },
-      { key: 'resp', names: ['Production Responsible'] },
       { key: 'cc', names: ['Cost Center - Key', 'Cost Center'] },
       { key: 'wc', names: ['Work Center'] },
       { key: 'schedSec', names: ['Scheduled Downtime'] },
@@ -1318,14 +1332,14 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
     ])
     if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
     let n = 0
-    for (const row of rows.slice(1)) {
+    for (const row of rows) {
       const date = toIsoDate(r.get(row, 'date'))
       const wc = str(r.get(row, 'wc'))
       if (!date || !wc) continue
       out.daily.push({
         date,
         plantKey: str(r.get(row, 'plant')),
-        responsible: str(r.get(row, 'resp')),
+        responsible: '',
         costCenter: str(r.get(row, 'cc')),
         workCenter: wc,
         scheduledSec: num(r.get(row, 'schedSec')),
@@ -1342,21 +1356,25 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
   const lastDate = [...out.shifts, ...out.daily].reduce((m, s) => (s.date > m ? s.date : m), '') || today
   const ref = isoWeek(lastDate)
 
-  for (const [name, rows] of byKind.get('orders') ?? []) {
-    const r = reader(rows[0] ?? [], [
+  // Biçim (2026-10-06): "Plant - Key" anahtar, "Plant" ad; kalıp "Var_Equipment", malzeme
+  // "Material - Key"; oranlar "(Order)" ekli. Eski dosyada "Plant" anahtar, "Plant Name" ad idi.
+  for (const [name, sheet] of byKind.get('orders') ?? []) {
+    const { header, body: rows } = splitHeader(sheet)
+    const newFormat = headerIndex(header, ['Plant - Key']) >= 0
+    const r = reader(header, [
       { key: 'date', names: ['Date'] },
-      { key: 'plant', names: ['Plant'] },
-      { key: 'plantName', names: ['Plant Name'] },
-      { key: 'wc', names: ['workcenter', 'Work Center'] },
-      { key: 'shift', names: ['Shift'] },
+      { key: 'plant', names: ['Plant - Key', 'Plant'] },
+      { key: 'plantName', names: newFormat ? ['Plant'] : ['Plant Name'] },
+      { key: 'wc', names: ['Work Center', 'workcenter'] },
+      { key: 'shift', names: ['Shift Defination', 'Shift'] },
       { key: 'order', names: ['Order'] },
-      { key: 'eq', names: ['Equipment'] },
-      { key: 'mat', names: ['Material'] },
+      { key: 'eq', names: ['Var_Equipment', 'Equipment'] },
+      { key: 'mat', names: ['Material - Key', 'Material'] },
       ...TIME_COLS,
     ])
     if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
     let n = 0
-    for (const row of rows.slice(1)) {
+    for (const row of rows) {
       const date = toIsoDate(r.get(row, 'date'))
       const wc = str(r.get(row, 'wc'))
       if (!date || !wc) continue
@@ -1379,7 +1397,6 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
 
   const periodCols: Col[] = [
     { key: 'plant', names: ['Plant - Key'] },
-    { key: 'resp', names: ['Production Responsible'] },
     { key: 'cc', names: ['Cost Center - Key', 'Cost Center'] },
     { key: 'wc', names: ['Work Center'] },
     { key: 'schedSec', names: ['Scheduled Downtime'] },
@@ -1390,11 +1407,12 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
   // Loading kapsayan satır alınır — daha eksiksizdir.
   const weeklySheets = byKind.get('weekly') ?? []
   const weekly = new Map<string, WeeklyRow>()
-  for (const [name, rows] of weeklySheets) {
-    const r = reader(rows[0] ?? [], [{ key: 'week', names: ['Week'] }, ...periodCols])
+  for (const [name, sheet] of weeklySheets) {
+    const { header, body: rows } = splitHeader(sheet)
+    const r = reader(header, [{ key: 'week', names: ['Week'] }, ...periodCols])
     if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
     let n = 0
-    for (const row of rows.slice(1)) {
+    for (const row of rows) {
       const week = Math.round(num(r.get(row, 'week')))
       const wc = str(r.get(row, 'wc'))
       if (!(week >= 1 && week <= 53) || !wc) continue
@@ -1409,7 +1427,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         year,
         week,
         plantKey: str(r.get(row, 'plant')),
-        responsible: str(r.get(row, 'resp')),
+        responsible: '',
         costCenter: str(r.get(row, 'cc')),
         workCenter: wc,
         scheduledSec: num(r.get(row, 'schedSec')),
@@ -1422,13 +1440,14 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
   }
   out.weekly = [...weekly.values()]
 
-  for (const [name, rows] of byKind.get('monthly') ?? []) {
+  for (const [name, sheet] of byKind.get('monthly') ?? []) {
     // Yıl ilk sütunda (Year) gelir; tahmin edilmez (planlamacı, 2026-09-28).
-    const r = reader(rows[0] ?? [], [{ key: 'year', names: ['Year'] }, { key: 'month', names: ['Month'] }, { key: 'key', names: ['Month Key'] }, ...periodCols])
+    const { header, body: rows } = splitHeader(sheet)
+    const r = reader(header, [{ key: 'year', names: ['Year'] }, { key: 'month', names: ['Month'] }, { key: 'key', names: ['Month Key'] }, ...periodCols])
     if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
     let n = 0
     const badYear: number[] = []
-    for (const [i, row] of rows.slice(1).entries()) {
+    for (const [i, row] of rows.entries()) {
       const wc = str(r.get(row, 'wc'))
       const rawKey = str(r.get(row, 'key'))
       if (!wc || !rawKey) continue
@@ -1443,7 +1462,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         month: str(r.get(row, 'month')),
         monthKey,
         plantKey: str(r.get(row, 'plant')),
-        responsible: str(r.get(row, 'resp')),
+        responsible: '',
         costCenter: str(r.get(row, 'cc')),
         workCenter: wc,
         scheduledSec: num(r.get(row, 'schedSec')),
@@ -1457,8 +1476,9 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
 
   // Bir gün × makinenin bütün duruşları tek kayıtta (yüklemede o günün duruşları bununla yenilenir).
   const days = new Map<string, DowntimeDay>()
-  for (const [name, rows] of byKind.get('downtimes') ?? []) {
-    const r = reader(rows[0] ?? [], [
+  for (const [name, sheet] of byKind.get('downtimes') ?? []) {
+    const { header, body: rows } = splitHeader(sheet)
+    const r = reader(header, [
       { key: 'date', names: ['Date'] },
       { key: 'plant', names: ['Plant'] },
       { key: 'plantKey', names: ['Plant - Key'] },
@@ -1486,7 +1506,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
     if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
     const sheetDates: { date: string }[] = []
     let n = 0
-    for (const row of rows.slice(1)) {
+    for (const row of rows) {
       const date = toIsoDate(r.get(row, 'date'))
       const wc = str(r.get(row, 'wc'))
       if (!date || !wc) continue
@@ -1538,22 +1558,6 @@ export function dateRange(dates: string[]): { from: string; to: string } | null 
   }
   return { from, to }
 }
-
-// ---- veri görünümü: dosyadaki sütun sırası ve formüller ---------------------------
-
-/** Order Based'deki formül sütunları: WEEK = ISOWEEKNUM(Date), TOTAL1 = OEE × Good. */
-export const orderFormulas = (o: OrderRow) => ({ week: isoWeek(o.date).week, total1: o.oee * o.good })
-
-/**
- * Downtimes'daki formül sütunları: Shift = vardiya kodu → 1/2/3,
- * Week = ISOWEEKNUM(Date), material = Material, min = Stoppage Duration(Min).
- */
-export const downtimeFormulas = (date: string, e: DowntimeEvent, c: OeeConfig) => ({
-  shift: shiftNumber(e.shiftDefinition, c),
-  week: isoWeek(date).week,
-  material: e.material,
-  min: e.minutes,
-})
 
 // ---- veri bildirimleri -------------------------------------------------------------
 

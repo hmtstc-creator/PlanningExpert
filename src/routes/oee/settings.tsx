@@ -206,7 +206,7 @@ function OeeSettingsPage() {
         )}
       </Card>
 
-      <Card title="Shifts" info="Shift Group code of the files → shift number (1st, 2nd, 3rd …). Used for the week-by-shift chart, the downtime Shift column and the Loss Bridge shift filter.">
+      <Card title="Shifts" info="Shift code of the files (Shift Defination, e.g. UB61) → shift number (1st, 2nd, 3rd …). Used for the week-by-shift chart and the Loss Bridge shift filter.">
         {plantShifts?.length ? (
           <p className="text-sm text-muted-foreground">
             From <b>Company settings → Shifts</b> ({shiftSource === 'plant' ? "this plant's own shifts" : 'company standard'}):{' '}
@@ -223,7 +223,7 @@ function OeeSettingsPage() {
               Better: define the company's shifts and their codes once on <b>Company settings → Shifts</b> — every plant and page then uses them.
             </p>
             <Rows
-              head={['Shift Group code', 'Shift number', '']}
+              head={['Shift code', 'Shift number', '']}
               rows={c.shifts.map((s, i) => [
                 s.code,
                 <input

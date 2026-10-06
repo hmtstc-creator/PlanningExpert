@@ -20,7 +20,7 @@ import { fromStoredDay, mergeEvents, toStoredDay, toStoredLoss } from '../src/li
  * satırı kendi anahtarıyla EKLER ya da GÜNCELLER:
  *   vardiya   tarih + iş merkezi + vardiya grubu
  *   gün       tarih + iş merkezi (vardiyalardan; yoksa Daily KPI)
- *   sipariş   tarih + iş merkezi + vardiya + sipariş + ekipman
+ *   sipariş   tarih + iş merkezi + vardiya + sipariş (kalıp güncellenir)
  *   duruş     iş merkezi + başlangıç tarihi/saati + sipariş (gün kaydında birleşir)
  *   hafta     yıl + hafta + iş merkezi
  *   ay        yıl + ay + iş merkezi
@@ -140,13 +140,16 @@ export const upsertOrders = guardedMutation({
   affectsPlan: false,
   handler: async (ctx, { rows }) => {
     for (const r of rows) {
-      const hit = await ctx.db
+      // Bir vardiyada bir siparişin tek satırı vardır. Kalıp anahtara girmez: eski
+      // dosyada "Equipment" sütununda malzeme kodu vardı; yeni dosya (Var_Equipment =
+      // kalıp) aynı satırı yanına ikinci kayıt eklemeden düzeltir (2026-10-06).
+      const same = await ctx.db
         .query('oeeOrders')
-        .withIndex('by_key', (q: Ctx) =>
-          q.eq('date', r.date).eq('workCenter', r.workCenter).eq('shift', r.shift).eq('order', r.order).eq('equipment', r.equipment),
-        )
-        .first()
+        .withIndex('by_key', (q: Ctx) => q.eq('date', r.date).eq('workCenter', r.workCenter).eq('shift', r.shift).eq('order', r.order))
+        .collect()
+      const hit = same.find((o: Ctx) => o.equipment === r.equipment) ?? same[0] ?? null
       await upsert(ctx, hit, 'oeeOrders', r)
+      for (const o of same) if (o._id !== hit?._id) await ctx.db.delete(o._id)
     }
     return rows.length
   },
