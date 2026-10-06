@@ -1,31 +1,43 @@
 // OEE Loss Bridge (src/routes/oee/bridge.tsx; kavram: docs/oee-bridge.md).
 //
-// Seçilen makine / hat ve dönem için zamanın şelalesi:
+// Seçilen makine / hat ve dönem için kayıpların yüzdesel şelalesi:
 //
-//   A Takvim → (planlanmamış) → Vardiya süresi → (planlı duruşlar) → Loading
-//   → (availability kayıpları, açıklanmayan) → C Üretim → (performans) →
-//   D Çalışma → (kalite) → E Efektif süre.        TEEP = E/A, OEE = E/B.
+//   Loading time %100 → (plansız duruş grupları, fark) → Availability (C/B)
+//   → (performans) → A × P (D/B) → (kalite) → OEE (E/B).
 //
-// Kurallar (komite, 2026-10-06):
-// - OEE tabanı (B) şirketin seçimi: 'loading' (MES — varsayılan; planlı
-//   duruşlar OEE dışında) ya da 'shift' (TPM — planlı duruşlar da kayıp).
-//   Varsayılanda köprünün OEE'si OEE Dashboard'unkiyle birebir aynıdır.
-// - Adımlar süre FARKLARINDAN hesaplanır (Loading − Production …); duruş
-//   kayıtları bu farkı yalnızca gruplara ayırır. Kayıtların açıklamadığı
-//   kısım işaretli "Not explained" adımıdır — hiçbir zaman orantılı
-//   dağıtılmaz. Böylece köprü her zaman kapanır: A − Σkayıp = E.
+// Kurallar (planlamacı, 2026-10-06 — ikinci tur):
+// - Taban HER ZAMAN Loading time'dır: MES'in Loading'i planlı duruşları
+//   (mola, planlı toplantı …) zaten dışarıda bırakır; köprüde bir daha
+//   düşülmezler. Planlı duruşlar yalnızca bilgi ("Outside OEE").
+// - Köprünün OEE / A / P / Q değerleri OEE Dashboard'unkiyle birebir aynıdır
+//   (A = Production ÷ Loading, P = Operation ÷ Production). Kayıplar
+//   Loading'in yüzdesidir: OEE + Σ kayıp = %100. Örn. A %80, P %80 → OEE
+//   %64; availability kaybı %20, performans kaybı %80 × %20 = %16.
+// - Plansız duruş grupları kayıtlı süreleriyle gösterilir; Loading −
+//   Production ile kayıtların farkı ayrı küçük adımdır ("Not explained" ya
+//   da "Over-recorded downtime") — gruplara dağıtılmaz, köprü kapanır.
 // - Kayıp grubunun ailesi (availability / performance) ayardan; varsayılan
 //   MES gibi availability. Ailesi değişen grup OEE'yi değiştirmez, yalnızca
 //   A ve P payını.
 // - Hız kaybı işaretlidir: üretim standardın üstündeyse (P > %100) negatif
 //   adım ("Speed above standard") — 0'a kırpılmaz.
 // - Oranların ortalaması alınmaz: süreler ve adetler toplanır, sonra bölünür.
-// - Öncelik: OEE tabanındaki kayıplar arasında en çok dakika. Açıklanmayan,
-//   tanımsız, hız kazancı ve planlı duruşlar (her iki tabanda) öncelik olamaz.
+// - Öncelik: kayıplar arasında en çok dakika. Açıklanmayan, tanımsız, hız
+//   kazancı ve planlı duruşlar öncelik olamaz.
 
-import { UNASSIGNED, daysFromShifts, lossDayOf, shiftNumber, type DayRow, type DowntimeDay, type LossDay, type OeeConfig, type OrderRow, type ShiftRow } from './oee'
+import {
+  UNASSIGNED,
+  daysFromShifts,
+  lossDayOf,
+  shiftNumber,
+  type DayRow,
+  type DowntimeDay,
+  type LossDay,
+  type OeeConfig,
+  type OrderRow,
+  type ShiftRow,
+} from './oee'
 
-export type BridgeBase = 'loading' | 'shift'
 export type BridgeFamily = 'notScheduled' | 'planned' | 'availability' | 'performance' | 'quality'
 export type LossFamily = 'availability' | 'performance'
 
@@ -36,6 +48,8 @@ export const SPEED_LOSS = 'Speed loss'
 export const SPEED_GAIN = 'Speed above standard'
 export const OTHER_PLANNED = 'Other planned stops'
 export const OVER_PLANNED = 'Over-recorded planned stops'
+/** Köprünün toplam çubukları (Loading tabanının yüzdesi). */
+export const TOTAL_LABEL = { L: 'Loading time', C: 'Availability', D: 'A × P', E: 'OEE' } as const
 
 export interface BridgeStep {
   key: string
@@ -44,8 +58,6 @@ export interface BridgeStep {
   family?: BridgeFamily
   /** Toplam çubuğunda süre; kayıpta düşülen süre (negatifse kazanç). */
   minutes: number
-  /** Toplam çubuğunun kısa adı (A, B …) ve TPM karşılığı. */
-  letter?: string
   note?: string
 }
 
@@ -54,7 +66,7 @@ export interface LossItem {
   label: string
   family: BridgeFamily
   minutes: number
-  /** OEE tabanına oranı (0–1). */
+  /** Loading time'a oranı (0–1). */
   share: number
   count: number
   /** Bu kalemin Reason Code 2 kodları (Level 3 için). */
@@ -65,41 +77,27 @@ export interface LossItem {
 }
 
 export interface Bridge {
-  base: BridgeBase
   steps: BridgeStep[]
-  totals: { calendar: number | null; shift: number; loading: number; production: number; operating: number; effective: number }
-  /** OEE tabanı (dakika). */
+  /** shift = Loading + planlı süre (bilgi); production = C (köprüdeki). */
+  totals: { shift: number; loading: number; production: number; operating: number; effective: number }
+  /** Köprünün tabanı: Loading time (dakika) = %100. */
   baseMinutes: number
   oee: number | null
-  teep: number | null
-  /** Seçilen tabana göre A, P, Q (köprüdeki C/B, D/C, E/D). */
+  /** A, P, Q (köprüdeki C/B, D/C, E/D) — varsayılan ailelerle Dashboard'unkiyle aynı. */
   availability: number | null
   performance: number | null
   quality: number | null
-  /** MES OEE (Operating × Q ÷ Loading) — Dashboard'daki. */
-  mesOee: number | null
-  /** OEE tabanının payları: OEE + availability + performance + quality kaybı = 1. */
+  /** Loading'in payları: OEE + availability + performance + quality kaybı = 1. */
   level1: { oee: number; availability: number; performance: number; quality: number } | null
-  /** Level 2: kayıp kalemleri, aileye göre, çoktan aza. */
+  /** Level 2: kayıp kalemleri, çoktan aza. */
   items: LossItem[]
-  /** OEE dışı planlı duruşlar (Loading tabanında; bilgi). */
+  /** Planlı duruşlar: OEE dışında (Loading bunları zaten içermez); bilgi. */
   outside: LossItem[]
   notExplained: number
   speed: number
   warnings: string[]
   /** Köprüye giren gün × makine kayıtları ve duruş kaydı olmayanlar (veri notu). */
   coverage: { dayRows: number; withoutDowntimes: string[]; downtimesWithoutShift: string[] }
-}
-
-export interface CalendarInfo {
-  /** A: gün × 1440 × makine sayısı. */
-  minutes: number
-  machines: number
-  days: number
-  /** Hiç vardiyası olmayan resmi tatil günleri. */
-  holidayMin: number
-  /** Hiç vardiyası olmayan diğer günler (hafta sonu, talep yok). */
-  idleDayMin: number
 }
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
@@ -136,7 +134,6 @@ function columns(groups: Map<string, [number, number]>, c: OeeConfig, pick: (cod
     cur.groups.push(code)
     by.set(label, cur)
   }
-  // Ayardaki sıra korunur; sonra büyükten küçüğe (ekranda).
   return [...by].map(([label, v]) => ({ label, ...v }))
 }
 
@@ -194,16 +191,10 @@ const rankableColumn = (label: string, groups: string[], c: OeeConfig) =>
   label !== UNASSIGNED && groups.some((code) => code !== '#' && code !== '' && !hiddenGroup(code, c))
 
 /**
- * Köprü. `days` ve `lossDays` seçilen kapsam ve döneme süzülmüş olmalı;
- * `calendar` yoksa takvim / planlanmamış adımları çıkmaz (TEEP yok).
+ * Köprü. `days` ve `lossDays` seçilen kapsam ve döneme süzülmüş olmalı.
+ * Taban Loading time (= %100); planlı duruşlar köprüye girmez.
  */
-export function buildBridge(
-  days: DayRow[],
-  allLossDays: LossDay[],
-  c: OeeConfig,
-  base: BridgeBase,
-  calendar: CalendarInfo | null = null,
-): Bridge {
+export function buildBridge(days: DayRow[], allLossDays: LossDay[], c: OeeConfig): Bridge {
   // Zaman tabanı gün × makine kayıtlarıdır: duruşlar yalnızca vardiya verisi
   // olan gün × makinede sayılır (vardiyası olmayan günün duruşu — ör. hiç
   // çalışılmamış vardiyanın 480 dk "scheduled downtime" kaydı — tabanı olmadan
@@ -226,19 +217,14 @@ export function buildBridge(
   const pieces = good + scrap + reject
   const Q = pieces > 0 ? good / pieces : 1
   const E = Op * Q
-  const shift = L + S
-  const B = base === 'shift' ? shift : L
   const warnings: string[] = []
 
-  // Planlı duruşlar (Reason Code 1 = mola / planlı): vardiyaların planlı süresi, gruplara ayrılır
-  // (gün × makine başına planlı süreyle sınırlı; fazlası çalışılmamış vardiya).
+  // Planlı duruşlar (Reason Code 1 = mola / planlı): Loading'in dışında, yalnızca bilgi.
+  // Gün × makine başına vardiyaların planlı süresiyle sınırlı (fazlası çalışılmamış vardiya).
   const sched = scheduledBy(days)
   const planned = new Map<string, [number, number]>()
-  let unworked = 0
   for (const l of lossDays) {
-    const r = cappedPlanned(l, sched.get(key(l)) ?? 0, c)
-    unworked += r.excess
-    for (const x of r.reasons) {
+    for (const x of cappedPlanned(l, sched.get(key(l)) ?? 0, c).reasons) {
       const cur = planned.get(x.rc2) ?? [0, 0]
       planned.set(x.rc2, [cur[0] + x.minutes, cur[1] + x.count])
     }
@@ -249,8 +235,7 @@ export function buildBridge(
     () => true,
     (code) => c.lossGroups.find((g) => g.code === code)?.label || code,
   )
-  const plannedRec = sum(plannedCols.map((x) => x.minutes))
-  const otherPlanned = S - plannedRec
+  const otherPlanned = S - sum(plannedCols.map((x) => x.minutes))
 
   // Kayıp duruşlar (Reason Code 1 = kayıp): availability ya da performance ailesi.
   // Gizli gruplar (Settings → "In charts" işaretsiz, ör. "#") kendi kalemidir — öncelik olamaz.
@@ -267,79 +252,29 @@ export function buildBridge(
     (code) => familyOf(code, c) === 'performance',
     (code) => chartOf(code, c),
   )
+  // Köprüde büyükten küçüğe (Pareto gibi okunur).
+  availCols.sort((a, b) => b.minutes - a.minutes)
+  perfCols.sort((a, b) => b.minutes - a.minutes)
   const recAvail = sum(availCols.map((x) => x.minutes))
   const recPerf = sum(perfCols.map((x) => x.minutes))
-  // Kaydı olmayan (ya da fazla kaydedilen) süre: açıklanmayan.
+  // Kayıtların Loading − Production ile farkı (az kayıt: açıklanmayan; fazla kayıt: eksi).
   const notExplained = L - P - recAvail - recPerf
   const C = P + recPerf
   const speed = P - Op
   const qualityMin = Op - E
   const scrapMin = pieces > 0 ? (qualityMin * scrap) / Math.max(1, scrap + reject) : 0
   const rejectMin = qualityMin - scrapMin
+  const pct = (v: number, base: number) => (base > 0 ? `${((v / base) * 100).toFixed(1)}%` : '—')
 
-  const steps: BridgeStep[] = []
-  if (calendar) {
-    steps.push({
-      key: 'A',
-      label: 'Calendar time',
+  const steps: BridgeStep[] = [
+    {
+      key: 'L',
+      label: TOTAL_LABEL.L,
       kind: 'total',
-      minutes: calendar.minutes,
-      letter: 'A',
-      note: `${calendar.machines} machine(s) × ${calendar.days} day(s) × 24 h`,
-    })
-    const otherIdle = calendar.minutes - shift - calendar.holidayMin - calendar.idleDayMin - unworked
-    if (calendar.holidayMin)
-      steps.push({ key: 'ns:holiday', label: 'Official holidays', kind: 'loss', family: 'notScheduled', minutes: calendar.holidayMin })
-    if (calendar.idleDayMin)
-      steps.push({
-        key: 'ns:idle',
-        label: 'Days without shift',
-        kind: 'loss',
-        family: 'notScheduled',
-        minutes: calendar.idleDayMin,
-        note: 'weekends, no demand, machine not used',
-      })
-    if (unworked >= 0.5)
-      steps.push({
-        key: 'ns:unworked',
-        label: 'Unworked shifts (recorded)',
-        kind: 'loss',
-        family: 'notScheduled',
-        minutes: unworked,
-        note: 'shifts recorded as scheduled downtime without any shift row — not a planned stop',
-      })
-    steps.push({
-      key: 'ns:other',
-      label: 'Hours without shift',
-      kind: 'loss',
-      family: 'notScheduled',
-      minutes: otherIdle,
-      note: 'outside the shifts on working days',
-    })
-  }
-  steps.push({
-    key: 'S',
-    label: 'Shift time',
-    kind: 'total',
-    minutes: shift,
-    letter: base === 'shift' ? 'B' : undefined,
-    note: 'Loading + scheduled downtime',
-  })
-  for (const p of plannedCols) steps.push({ key: `pl:${p.label}`, label: p.label, kind: 'loss', family: 'planned', minutes: p.minutes })
-  const otherPlannedLabel = otherPlanned < 0 ? OVER_PLANNED : OTHER_PLANNED
-  if (Math.abs(otherPlanned) >= 0.5)
-    steps.push({
-      key: 'pl:other',
-      label: otherPlannedLabel,
-      kind: 'loss',
-      family: 'planned',
-      minutes: otherPlanned,
-      note:
-        otherPlanned < 0
-          ? 'planned downtime records exceed the scheduled downtime of the shifts'
-          : 'scheduled downtime without a matching downtime record',
-    })
-  steps.push({ key: 'L', label: 'Loading time', kind: 'total', minutes: L, letter: base === 'loading' ? 'B' : undefined })
+      minutes: L,
+      note: 'shift time − planned stops (breaks …): the planned stops are already outside, as in the MES and the OEE Dashboard',
+    },
+  ]
   const hiddenNote = (groups: string[]) =>
     groups.every((g) => hiddenGroup(g, c)) ? 'hidden in the other charts (OEE Settings → Loss groups)' : undefined
   for (const a of availCols)
@@ -361,11 +296,11 @@ export function buildBridge(
       minutes: notExplained,
       note:
         notExplained < 0
-          ? 'the downtime records add up to more than Loading − Production; the groups are shown as recorded'
+          ? 'the downtime records add up to a little more than Loading − Production (normal: the MES counts some stops differently)'
           : 'Loading − Production not covered by a downtime with a reason (incl. undefined “#”)',
     })
   }
-  steps.push({ key: 'C', label: 'Production time', kind: 'total', minutes: C, letter: 'C' })
+  steps.push({ key: 'C', label: TOTAL_LABEL.C, kind: 'total', minutes: C, note: `Production time ÷ Loading time = ${pct(C, L)}` })
   for (const p of perfCols)
     steps.push({
       key: `pf:${p.label}`,
@@ -381,9 +316,15 @@ export function buildBridge(
     kind: 'loss',
     family: 'performance',
     minutes: speed,
-    note: 'Production − Operation time',
+    note: `Production − Operation time: ${pct(speed, C)} of the production time = ${pct(speed, L)} of the loading time`,
   })
-  steps.push({ key: 'D', label: 'Operation time', kind: 'total', minutes: Op, letter: 'D' })
+  steps.push({
+    key: 'D',
+    label: TOTAL_LABEL.D,
+    kind: 'total',
+    minutes: Op,
+    note: `Operation time ÷ Loading time; Performance = ${pct(Op, C)}`,
+  })
   steps.push({
     key: 'q:scrap',
     label: 'Scrap',
@@ -400,10 +341,9 @@ export function buildBridge(
     minutes: rejectMin,
     note: `${reject.toLocaleString('en-GB')} pcs`,
   })
-  steps.push({ key: 'E', label: 'Effective time', kind: 'total', minutes: E, letter: 'E', note: 'Operation time × quality' })
+  steps.push({ key: 'E', label: TOTAL_LABEL.E, kind: 'total', minutes: E, note: `Effective time ÷ Loading time; Quality = ${pct(E, Op)}` })
 
-  // Level 2 kalemleri (OEE tabanındaki kayıplar).
-  const share = (m: number) => (B > 0 ? m / B : 0)
+  // Level 2 kalemleri (Loading'in kayıpları).
   const item = (
     key: string,
     label: string,
@@ -417,18 +357,19 @@ export function buildBridge(
     label,
     family,
     minutes,
-    share: share(minutes),
+    share: L > 0 ? minutes / L : 0,
     count,
     groups,
     rankable,
   })
+  // Planlı duruşlar (mola, planlı toplantı …) yönetimin planıdır ve OEE dışındadır: öncelik olmaz.
   const plannedItems = [
-    // Planlı duruşlar (mola, planlı toplantı …) yönetimin planıdır, kaizen hedefi değil: öncelik olmaz (TPM tabanında da).
     ...plannedCols.map((p) => item(`pl:${p.label}`, p.label, 'planned', p.minutes, p.count, p.groups, false)),
-    ...(Math.abs(otherPlanned) >= 0.5 ? [item('pl:other', otherPlannedLabel, 'planned', otherPlanned, 0, [], false)] : []),
+    ...(Math.abs(otherPlanned) >= 0.5
+      ? [item('pl:other', otherPlanned < 0 ? OVER_PLANNED : OTHER_PLANNED, 'planned', otherPlanned, 0, [], false)]
+      : []),
   ]
   const items: LossItem[] = [
-    ...(base === 'shift' ? plannedItems : []),
     ...availCols.map((a) =>
       item(`av:${a.label}`, a.label, 'availability', a.minutes, a.count, a.groups, rankableColumn(a.label, a.groups, c)),
     ),
@@ -443,8 +384,8 @@ export function buildBridge(
   const ranked = items.filter((i) => i.rankable && i.minutes > 0).sort((a, b) => b.minutes - a.minutes)
   if (ranked[0]) ranked[0].priority = true
 
-  // Level 1: tabanın payları (köprüdeki adımlar; toplamları 1).
-  const level1 = B > 0 ? { oee: E / B, availability: (B - C) / B, performance: (C - Op) / B, quality: (Op - E) / B } : null
+  // Level 1: Loading'in payları (köprüdeki adımlar; toplamları 1).
+  const level1 = L > 0 ? { oee: E / L, availability: (L - C) / L, performance: (C - Op) / L, quality: (Op - E) / L } : null
 
   // Reason Code 1'i ne kayıp ne mola olan duruşlar: açıklanmayana düşer; söylenir.
   let unclassified = 0
@@ -472,71 +413,27 @@ export function buildBridge(
       `${Math.round((notExplained / (L - P)) * 100)}% of the availability loss has no downtime reason (${Math.round(notExplained)} min) — record the reasons, or the priorities below are incomplete.`,
     )
   }
-  if (notExplained < -0.5) {
-    warnings.push(
-      `Downtime records add up to ${Math.round(-notExplained)} min more than Loading − Production (shown as “${OVER_RECORDED}”) — the MES counts these stops differently; the groups are shown as recorded, never scaled.`,
-    )
-  }
-  if (Math.abs(otherPlanned) >= 0.5) {
-    warnings.push(
-      `Scheduled downtime of the shifts and planned downtime records differ by ${Math.round(otherPlanned)} min (shown as “${otherPlannedLabel}”).`,
-    )
-  }
   if (speed < 0)
     warnings.push(
       `Operation time is ${Math.round(-speed)} min above production time (performance over 100%) — shown as a gain, as recorded.`,
     )
 
   return {
-    base,
     steps,
-    totals: { calendar: calendar?.minutes ?? null, shift, loading: L, production: C, operating: Op, effective: E },
-    baseMinutes: B,
-    oee: B > 0 ? E / B : null,
-    teep: calendar && calendar.minutes > 0 ? E / calendar.minutes : null,
-    availability: B > 0 ? C / B : null,
+    totals: { shift: L + S, loading: L, production: C, operating: Op, effective: E },
+    baseMinutes: L,
+    oee: L > 0 ? E / L : null,
+    availability: L > 0 ? C / L : null,
     performance: C > 0 ? Op / C : null,
     quality: Op > 0 ? E / Op : null,
-    mesOee: L > 0 ? E / L : null,
     level1,
     items: items.filter((i) => Math.abs(i.minutes) >= 0.5).sort((a, b) => b.minutes - a.minutes),
-    outside: base === 'loading' ? plannedItems.filter((i) => Math.abs(i.minutes) >= 0.5) : [],
+    outside: plannedItems.filter((i) => Math.abs(i.minutes) >= 0.5).sort((a, b) => b.minutes - a.minutes),
     notExplained,
     speed,
     warnings,
     coverage,
   }
-}
-
-/**
- * Takvim süresi (A). Makine sayısı: tanımlı iş merkezleri ile verideki iş
- * merkezlerinin birleşimi — verisi olmayan makine de takvime girer.
- * Makine × gün: o gün vardiyası olmayan makine, resmi tatilse "Official
- * holidays", değilse "Days without shift"; vardiyalı günlerde vardiya dışı
- * saatler köprüde "Hours without shift".
- */
-export function calendarInfo(days: DayRow[], machines: string[], from: string, to: string, holidays: string[]): CalendarInfo {
-  const all = new Set([...machines, ...days.map((d) => d.workCenter)])
-  const n = all.size
-  const dates: string[] = []
-  for (let d = from; d <= to; d = nextDay(d)) dates.push(d)
-  const working = new Set(days.filter((d) => d.loadingMin + d.scheduledMin > 0).map(key))
-  const hol = new Set(holidays)
-  let holidayDays = 0
-  let idleDays = 0
-  for (const m of all)
-    for (const d of dates) {
-      if (working.has(`${d}|${m}`)) continue
-      if (hol.has(d)) holidayDays++
-      else idleDays++
-    }
-  return { minutes: dates.length * 1440 * n, machines: n, days: dates.length, holidayMin: holidayDays * 1440, idleDayMin: idleDays * 1440 }
-}
-
-function nextDay(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + 1)
-  return d.toISOString().slice(0, 10)
 }
 
 // ---- Level 3 -------------------------------------------------------------------------
@@ -846,7 +743,8 @@ export function clipToData(
 export const MAX_EVENT_DAYS = 8
 
 /** Duruşun vardiyası: kod Shift Definition'da ya da Shift Group'ta (dosyaya göre). */
-export const eventShift = (e: { shiftDefinition: string; shiftGroup: string }, c: OeeConfig) => shiftNumber(e.shiftDefinition, c) ?? shiftNumber(e.shiftGroup, c)
+export const eventShift = (e: { shiftDefinition: string; shiftGroup: string }, c: OeeConfig) =>
+  shiftNumber(e.shiftDefinition, c) ?? shiftNumber(e.shiftGroup, c)
 
 /**
  * Tek vardiyanın verisi: vardiya satırlarından gün × makine, o vardiyanın
@@ -857,7 +755,9 @@ export function shiftSlice(
   c: OeeConfig,
   input: { shifts: ShiftRow[]; events: DowntimeDay[]; orders: OrderRow[] },
 ): { days: DayRow[]; lossDays: LossDay[]; events: DowntimeDay[]; orders: OrderRow[] } {
-  const events = input.events.map((d) => ({ ...d, events: shift ? d.events.filter((e) => eventShift(e, c) === shift) : d.events })).filter((d) => d.events.length)
+  const events = input.events
+    .map((d) => ({ ...d, events: shift ? d.events.filter((e) => eventShift(e, c) === shift) : d.events }))
+    .filter((d) => d.events.length)
   return {
     days: daysFromShifts(shift ? input.shifts.filter((r) => shiftNumber(r.shiftGroup, c) === shift) : input.shifts),
     lossDays: events.map(lossDayOf),

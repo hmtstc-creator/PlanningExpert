@@ -13,18 +13,7 @@ import {
   type OeeConfig,
   type SheetRows,
 } from './oee'
-import {
-  NOT_EXPLAINED,
-  OVER_RECORDED,
-  SPEED_GAIN,
-  buildBridge,
-  calendarInfo,
-  level3,
-  level3Views,
-  matchedLossDays,
-  topN,
-  type Bridge,
-} from './oeeBridge'
+import { NOT_EXPLAINED, OVER_RECORDED, SPEED_GAIN, buildBridge, level3, level3Views, matchedLossDays, topN, type Bridge } from './oeeBridge'
 
 // Gerçek kesit (ASAKAI dosyası): Progressive 21 Eylül vardiyaları ve duruşları, Transfer 39. hafta.
 const parsed = parseOeeWorkbook(fixture as unknown as Record<string, SheetRows>)
@@ -73,11 +62,22 @@ function expectCloses(b: Bridge) {
 }
 
 describe('OEE köprüsü', () => {
-  it('Loading tabanı: OEE Dashboard ile aynı, köprü kapanır, Level 1 = %100', () => {
-    const b = buildBridge(pDays, pLoss, plant, 'loading')
+  it('Loading tabanı: OEE, A, P, Q Dashboard ile aynı, köprü kapanır, OEE + kayıplar = %100', () => {
+    const b = buildBridge(pDays, pLoss, plant)
     expectCloses(b)
-    expect(b.oee).toBeCloseTo(ratios(sumTimes(pDays)).oee!, 9)
-    expect(b.mesOee).toBeCloseTo(b.oee!, 9)
+    const r = ratios(sumTimes(pDays))
+    expect(b.oee).toBeCloseTo(r.oee!, 9)
+    expect(b.availability).toBeCloseTo(r.availability!, 9)
+    expect(b.performance).toBeCloseTo(r.performance!, 9)
+    expect(b.quality).toBeCloseTo(r.quality!, 9)
+    // Köprü Loading = %100 ile başlar, OEE ile biter; arada planlı duruş yok (Loading onları zaten içermez).
+    expect(b.steps[0]).toMatchObject({ key: 'L', minutes: b.totals.loading })
+    expect(b.steps[b.steps.length - 1]).toMatchObject({ key: 'E', label: 'OEE' })
+    expect(b.steps.some((s) => s.family === 'planned' || s.family === 'notScheduled')).toBe(false)
+    expect(b.items.some((i) => i.family === 'planned')).toBe(false)
+    expect(b.outside.length).toBeGreaterThan(0)
+    const lossShare = b.steps.filter((s) => s.kind === 'loss').reduce((a, s) => a + s.minutes / b.baseMinutes, 0)
+    expect(b.oee! + lossShare).toBeCloseTo(1, 9)
     const l1 = b.level1!
     expect(l1.oee + l1.availability + l1.performance + l1.quality).toBeCloseTo(1, 9)
     // Denetçinin bulgusu: L − P = 1397,3; kayıtlı duruşlar daha fazla — işaretli adım, dağıtılmaz.
@@ -86,36 +86,46 @@ describe('OEE köprüsü', () => {
     expect(b.steps.find((s) => s.key === 'av:unexplained')?.label).toBe(OVER_RECORDED)
   })
 
-  it('vardiya tabanı (TPM): planlı duruşlar OEE içinde — OEE düşer, E aynı', () => {
-    const l = buildBridge(pDays, pLoss, plant, 'loading')
-    const s = buildBridge(pDays, pLoss, plant, 'shift')
-    expectCloses(s)
-    expect(s.totals.effective).toBeCloseTo(l.totals.effective, 9)
-    expect(s.oee!).toBeLessThan(l.oee!)
-    expect(s.baseMinutes).toBeCloseTo(l.totals.shift, 9)
-    expect(s.items.some((i) => i.family === 'planned')).toBe(true)
-    expect(l.items.some((i) => i.family === 'planned')).toBe(false)
-    expect(l.outside.length).toBeGreaterThan(0)
-    // Planlı duruş TPM tabanında da öncelik olmaz.
-    expect(s.items.find((i) => i.priority)?.family).not.toBe('planned')
-  })
-
-  it('takvim: TEEP = E / A, planlanmamış süre kapanır', () => {
-    const cal = calendarInfo(pDays, ['PRS-999'], day, day, [])
-    expect(cal.machines).toBe(new Set([...pDays.map((d) => d.workCenter), 'PRS-999']).size)
-    const b = buildBridge(pDays, pLoss, plant, 'loading', cal)
+  it('A %80 ve P %80 → OEE %64: availability kaybı %20, performans kaybı %16', () => {
+    const d: DayRow = {
+      date: day,
+      plantKey: '',
+      responsible: '',
+      costCenter: '51010173',
+      workCenter: 'X',
+      source: 'shiftly',
+      good: 100,
+      scrap: 0,
+      reject: 0,
+      scheduledMin: 60,
+      unscheduledMin: 100,
+      operatingMin: 320,
+      productionMin: 400,
+      loadingMin: 500,
+    }
+    const loss: LossDay = {
+      date: day,
+      costCenter: '51010173',
+      workCenter: 'X',
+      codes: { 'UNSCD_DOWN|ARZ': [100, 2], 'SCHED_DOWN|UTS': [60, 2] },
+      reasons: { 'SCHED_DOWN|UTS|BREAK': [60, 2] },
+    }
+    const b = buildBridge([d], [loss], plant)
     expectCloses(b)
-    expect(b.teep).toBeCloseTo(b.totals.effective / cal.minutes, 9)
-    // Tatil ve boş gün: hiç vardiyası olmayan günler.
-    const two = calendarInfo(pDays, [], '2026-09-20', day, ['2026-09-20'])
-    expect(two.holidayMin).toBe(1440 * two.machines)
-    expect(two.idleDayMin).toBe(0)
+    expect(b.oee).toBeCloseTo(0.64, 9)
+    expect(b.level1).toMatchObject({ availability: 0.2, performance: 0.16, quality: 0 })
+    expect(b.items.find((i) => i.label === 'Machine')?.share).toBeCloseTo(0.2, 9)
+    expect(b.items.find((i) => i.key === 'pf:speed')?.share).toBeCloseTo(0.16, 9)
+    // Mola (planlı) köprüde düşülmez, yalnızca bilgi.
+    expect(b.steps.find((s) => s.label === 'Breaks')).toBeUndefined()
+    expect(b.outside.map((o) => [o.label, o.minutes])).toEqual([['Breaks', 60]])
+    expect(b.notExplained).toBeCloseTo(0, 9)
   })
 
   it('kayıp grubu performans ailesine alınınca OEE değişmez, A ve P payı değişir', () => {
     const moved = { ...plant, lossGroups: plant.lossGroups.map((g) => (g.code === 'KSD' ? { ...g, family: 'performance' as const } : g)) }
-    const a = buildBridge(pDays, pLoss, plant, 'loading')
-    const b = buildBridge(pDays, pLoss, moved, 'loading')
+    const a = buildBridge(pDays, pLoss, plant)
+    const b = buildBridge(pDays, pLoss, moved)
     expectCloses(b)
     expect(b.oee).toBeCloseTo(a.oee!, 9)
     expect(b.level1!.performance).toBeGreaterThan(a.level1!.performance)
@@ -141,7 +151,7 @@ describe('OEE köprüsü', () => {
         loadingMin: 450,
       },
     ]
-    const b = buildBridge(fast, [], plant, 'loading')
+    const b = buildBridge(fast, [], plant)
     expectCloses(b)
     expect(b.speed).toBe(-20)
     expect(b.steps.find((s) => s.key === 'pf:speed')?.label).toBe(SPEED_GAIN)
@@ -170,7 +180,7 @@ describe('OEE köprüsü', () => {
         loadingMin: 400,
       },
     ]
-    const b = buildBridge(q, [], plant, 'loading')
+    const b = buildBridge(q, [], plant)
     expectCloses(b)
     expect(b.quality).toBeCloseTo(0.9, 9)
     expect(b.items.find((i) => i.key === 'q:scrap')?.minutes).toBeCloseTo(24, 9)
@@ -179,7 +189,7 @@ describe('OEE köprüsü', () => {
   })
 
   it('öncelik: en çok dakikalı sayılabilir kayıp; açıklanmayan, tanımsız ve gizli olamaz', () => {
-    const b = buildBridge(pDays, pLoss, plant, 'loading')
+    const b = buildBridge(pDays, pLoss, plant)
     const pr = b.items.filter((i) => i.priority)
     expect(pr).toHaveLength(1)
     const best = Math.max(...b.items.filter((i) => i.rankable).map((i) => i.minutes))
@@ -190,14 +200,14 @@ describe('OEE köprüsü', () => {
 
   it('vardiyası olmayan gün × makinenin duruşu köprüye girmez', () => {
     const extra: LossDay = { date: day, costCenter: '51010173', workCenter: 'NO-SHIFT', codes: { 'UNSCD_DOWN|ARZ': [100, 1] }, reasons: {} }
-    const b = buildBridge(pDays, [...pLoss, extra], plant, 'loading')
-    expect(b).toMatchObject({ notExplained: buildBridge(pDays, pLoss, plant, 'loading').notExplained })
+    const b = buildBridge(pDays, [...pLoss, extra], plant)
+    expect(b).toMatchObject({ notExplained: buildBridge(pDays, pLoss, plant).notExplained })
     expect(b.coverage.downtimesWithoutShift).toEqual([`${day}|NO-SHIFT`])
     expect(matchedLossDays(pDays, [...pLoss, extra])).toHaveLength(pLoss.length)
   })
 
   it('Level 3: nedene ve makineye göre; önceki dönem; ilk 5 + diğerleri', () => {
-    const b = buildBridge(pDays, pLoss, plant, 'loading')
+    const b = buildBridge(pDays, pLoss, plant)
     const setup = b.items.find((i) => i.label === 'Setup')!
     expect(level3Views(setup)).toEqual(['reason', 'machine'])
     const cur = { days: pDays, lossDays: pLoss, orders: [] }
@@ -255,21 +265,19 @@ describe('denetçi bulguları (2026-10-06)', () => {
   const sumRows = (rows: { minutes: number }[]) => rows.reduce((a, r) => a + r.minutes, 0)
   const none = { days: [], lossDays: [], orders: [] }
 
-  it('çalışılmamış vardiyanın "scheduled downtime" kaydı planlı duruş değil, planlanmamış süredir', () => {
-    const cal = calendarInfo(pDays, [], day, day, [])
-    const b = buildBridge(pDays, pLoss, plant, 'loading', cal)
+  it('çalışılmamış vardiyanın "scheduled downtime" kaydı planlı duruş sayılmaz (bilgide sınırlı)', () => {
+    const b = buildBridge(pDays, pLoss, plant)
     expectCloses(b)
-    expect(b.steps.find((s) => s.key === 'ns:unworked')?.minutes).toBeCloseTo(480, 0)
-    // Planlı gruplar vardiyaların planlı süresini geçmez: eksi "fazla kayıt" adımı kalmaz.
-    expect(b.steps.find((s) => s.key === 'pl:other')?.minutes ?? 0).toBeGreaterThanOrEqual(0)
+    // Planlı gruplar vardiyaların planlı süresini geçmez: eksi "fazla kayıt" kalmaz.
+    expect(b.outside.find((i) => i.key === 'pl:other')?.minutes ?? 0).toBeGreaterThanOrEqual(0)
     const plannedSum = b.outside.filter((i) => i.key !== 'pl:other').reduce((a, i) => a + i.minutes, 0)
     expect(plannedSum).toBeLessThanOrEqual(b.totals.shift - b.totals.loading + 1e-6)
   })
 
   it('her Level 3 kırılımı Level 2 kalemine eşit', () => {
-    const b = buildBridge(pDays, pLoss, plant, 'shift')
+    const b = buildBridge(pDays, pLoss, plant)
     const cur = { days: pDays, lossDays: matchedLossDays(pDays, pLoss), orders: [] }
-    for (const it of b.items) {
+    for (const it of [...b.items, ...b.outside]) {
       for (const v of level3Views(it)) {
         const rows = level3(it, v, plant, cur, none)
         expect(sumRows(rows), `${it.label} / ${v}`).toBeCloseTo(it.minutes, 4)
@@ -295,7 +303,7 @@ describe('denetçi bulguları (2026-10-06)', () => {
       loadingMin: 400,
     })
     const days = [d('X', 6, 4), d('Y', 2, 0)]
-    const b = buildBridge(days, [], plant, 'loading')
+    const b = buildBridge(days, [], plant)
     const scrap = b.items.find((i) => i.key === 'q:scrap')!
     const order = {
       date: day,
@@ -335,60 +343,48 @@ describe('denetçi bulguları (2026-10-06)', () => {
 
   it('gizlenmemiş "#" grubu da öncelik olamaz', () => {
     const open = { ...plant, lossGroups: plant.lossGroups.map((g) => (g.code === '#' ? { ...g, hidden: false } : g)) }
-    const b = buildBridge(pDays, pLoss, open, 'loading')
+    const b = buildBridge(pDays, pLoss, open)
     expect(b.items.find((i) => i.label === 'Undefined')?.rankable).toBe(false)
-  })
-
-  it('takvim makine × gün: biri çalışırken boş duran makine "vardiyasız gün"dür', () => {
-    const one: DayRow[] = [
-      {
-        date: day,
-        plantKey: '',
-        responsible: '',
-        costCenter: 'C',
-        workCenter: 'M1',
-        source: 'shiftly',
-        good: 0,
-        scrap: 0,
-        reject: 0,
-        scheduledMin: 60,
-        unscheduledMin: 0,
-        operatingMin: 400,
-        productionMin: 400,
-        loadingMin: 420,
-      },
-    ]
-    const cal = calendarInfo(one, ['M1', 'M2'], day, day, [])
-    expect(cal).toMatchObject({ machines: 2, days: 1, idleDayMin: 1440, holidayMin: 0 })
-    const hol = calendarInfo(one, ['M1', 'M2'], day, day, [day])
-    expect(hol).toMatchObject({ idleDayMin: 0, holidayMin: 1440 })
   })
 })
 
 describe('vardiya ve kalıp (ham duruşlarla)', () => {
-  const cfg: OeeConfig = { ...plant, shifts: [{ code: 'UB64', number: 1 }, { code: 'UB65', number: 2 }, { code: 'UB66', number: 3 }] }
+  const cfg: OeeConfig = {
+    ...plant,
+    shifts: [
+      { code: 'UB64', number: 1 },
+      { code: 'UB65', number: 2 },
+      { code: 'UB66', number: 3 },
+    ],
+  }
   const pShifts = parsed.shifts.filter((s) => s.date === day && inScope(s, progressive, cfg))
   const pEvents = parsed.downtimes.filter((d) => d.date === day && inScope(d, progressive, cfg))
 
   it('vardiyaların toplamı bütün günün köprüsüne eşit', async () => {
     const { shiftSlice } = await import('./oeeBridge')
-    const all = buildBridge(pDays, pLoss, cfg, 'loading')
+    const all = buildBridge(pDays, pLoss, cfg)
     const parts = [1, 2, 3].map((n) => shiftSlice(n, cfg, { shifts: pShifts, events: pEvents, orders: [] }))
-    const sumOf = (f: (b: Bridge) => number) => parts.reduce((a, p) => a + f(buildBridge(p.days, p.lossDays, cfg, 'loading')), 0)
+    const sumOf = (f: (b: Bridge) => number) => parts.reduce((a, p) => a + f(buildBridge(p.days, p.lossDays, cfg)), 0)
     expect(sumOf((b) => b.totals.loading)).toBeCloseTo(all.totals.loading, 6)
     expect(sumOf((b) => b.totals.effective)).toBeCloseTo(all.totals.effective, 6)
-    for (const p of parts) expectCloses(buildBridge(p.days, p.lossDays, cfg, 'loading'))
+    for (const p of parts) expectCloses(buildBridge(p.days, p.lossDays, cfg))
     // Hepsi (0) = vardiya satırlarından gün.
     const whole = shiftSlice(0, cfg, { shifts: pShifts, events: pEvents, orders: [] })
-    expect(buildBridge(whole.days, whole.lossDays, cfg, 'loading').oee).toBeCloseTo(all.oee!, 9)
+    expect(buildBridge(whole.days, whole.lossDays, cfg).oee).toBeCloseTo(all.oee!, 9)
   })
 
   it('duruş kaleminin kalıp kırılımı Level 2 ile aynı toplam', () => {
-    const b = buildBridge(pDays, pLoss, cfg, 'loading')
+    const b = buildBridge(pDays, pLoss, cfg)
     const setup = b.items.find((i) => i.label === 'Setup')!
     expect(level3Views(setup, true)).toContain('die')
     expect(level3Views(setup, false)).not.toContain('die')
-    const rows = level3(setup, 'die', cfg, { days: pDays, lossDays: pLoss, orders: [], events: pEvents }, { days: [], lossDays: [], orders: [] })
+    const rows = level3(
+      setup,
+      'die',
+      cfg,
+      { days: pDays, lossDays: pLoss, orders: [], events: pEvents },
+      { days: [], lossDays: [], orders: [] },
+    )
     expect(rows.reduce((a, r) => a + r.minutes, 0)).toBeCloseTo(setup.minutes, 6)
     expect(rows[0].sub).toBeTruthy()
   })

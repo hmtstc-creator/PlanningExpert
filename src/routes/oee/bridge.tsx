@@ -23,7 +23,6 @@ import {
   MAX_EVENT_DAYS,
   PERIOD_PRESETS,
   buildBridge,
-  calendarInfo,
   clipToData,
   daysBetween,
   level3,
@@ -87,9 +86,6 @@ function BridgePage() {
   const dayRows = (useQuery(api.oee.days, q) ?? []) as DayRow[]
   const lossRaw = (useQuery(api.oee.lossDays, q) ?? []) as StoredLossDay[]
   const orders = (useQuery(api.oee.orders, q) ?? []) as OrderRow[]
-  const presses = (useQuery(api.presses.list) ?? []) as { name: string; costCenter?: string }[]
-  const country = ctx?.active?.country ?? ''
-  const holidays = (useQuery(api.holidays.listByCountry, { country }) ?? []) as { date: string }[]
   const lossDays = useMemo(() => fromStoredLosses(lossRaw), [lossRaw])
 
   // Vardiya filtresi ve duruşların kalıp kırılımı ham duruşlarla: en çok 8 günlük dönem.
@@ -97,8 +93,10 @@ function BridgePage() {
   const shiftOn = shift > 0 && eventsOk
   const needEvents = eventsOk && (shiftOn || view === 'die')
   const shiftRows = (useQuery(api.oee.shifts, shiftOn ? q : 'skip') ?? []) as ShiftRow[]
-  const curEvRaw = useQuery(api.oee.downtimeDays, needEvents && cur ? { from: cur.from, to: cur.to } : 'skip') as StoredDowntimeDay[] | undefined
-  const prevEvRaw = useQuery(api.oee.downtimeDays, needEvents && prev ? { from: prev.from, to: prev.to } : 'skip') as StoredDowntimeDay[] | undefined
+  const curEvRaw = useQuery(api.oee.downtimeDays, needEvents && cur ? { from: cur.from, to: cur.to } : 'skip') as
+    StoredDowntimeDay[] | undefined
+  const prevEvRaw = useQuery(api.oee.downtimeDays, needEvents && prev ? { from: prev.from, to: prev.to } : 'skip') as
+    StoredDowntimeDay[] | undefined
   const curEvents = useMemo(() => (curEvRaw ?? []).map(fromStoredDay), [curEvRaw])
   const prevEvents = useMemo(() => (prevEvRaw ?? []).map(fromStoredDay), [prevEvRaw])
   const eventsLoading = needEvents && (curEvRaw === undefined || prevEvRaw === undefined)
@@ -121,33 +119,24 @@ function BridgePage() {
       return { number: n, label: d ? `${n} · ${d.name}` : `Shift ${n}` }
     })
   }, [config.shifts, ctx?.active?.shifts])
-  const base = config.bridgeBase ?? 'loading'
 
   const part = (r: { from: string; to: string } | null, events: DowntimeDay[]) => {
     if (!r) return null
     const inRange = (x: { date: string }) => x.date >= r.from && x.date <= r.to
     const ordsIn = orders.filter((o) => inRange(o) && inSel({ workCenter: o.workCenter, costCenter: wcCostCenter.get(o.workCenter) ?? '' }))
     // Tek vardiya: vardiya satırları, o vardiyanın duruşları ve siparişleri; yoksa gün özetleri.
-    const slice = shiftOn ? shiftSlice(shift, config, { shifts: shiftRows.filter(inRange), events: events.filter(inRange), orders: ordsIn }) : null
+    const slice = shiftOn
+      ? shiftSlice(shift, config, { shifts: shiftRows.filter(inRange), events: events.filter(inRange), orders: ordsIn })
+      : null
     const days = (slice ? slice.days : dayRows).filter((d) => inRange(d) && inSel(d))
     const scoped = (slice ? slice.lossDays : lossDays).filter((l) => inRange(l) && inSel(l))
     // Level 3 köprüyle aynı tabanı kullanır: yalnızca vardiyası olan gün × makine.
     const losses = matchedLossDays(days, scoped)
     const keys = new Set(losses.map((l) => `${l.date}|${l.workCenter}`))
     const evs = (slice ? slice.events : events).filter((d) => keys.has(`${d.date}|${d.workCenter}`))
-    // Takvim: tanımlı iş merkezleri (kapsamdaki) ∪ verideki.
-    const defined = presses.filter((p) => p.costCenter && inSel({ workCenter: p.name, costCenter: p.costCenter })).map((p) => p.name)
-    const cal = calendarInfo(
-      days,
-      defined,
-      r.from,
-      r.to,
-      holidays.map((h) => h.date),
-    )
-    // Tek vardiyada takvim (24 saat) anlamsız: TEEP ve planlanmamış adımlar çıkmaz.
-    return { days, lossDays: losses, orders: slice ? slice.orders : ordsIn, events: evs, bridge: buildBridge(days, scoped, config, base, slice ? null : cal) }
+    return { days, lossDays: losses, orders: slice ? slice.orders : ordsIn, events: evs, bridge: buildBridge(days, scoped, config) }
   }
-  const deps = [dayRows, lossDays, orders, presses, holidays, config, scope.area, scope.key, machine, base, shiftOn, shift, shiftRows]
+  const deps = [dayRows, lossDays, orders, config, scope.area, scope.key, machine, shiftOn, shift, shiftRows]
   const now = useMemo(() => part(cur, curEvents), [...deps, curEvents, cur?.from, cur?.to]) // eslint-disable-line react-hooks/exhaustive-deps
   const before = useMemo(() => part(prev, prevEvents), [...deps, prevEvents, prev?.from, prev?.to]) // eslint-disable-line react-hooks/exhaustive-deps
   const b = now?.bridge
@@ -175,15 +164,9 @@ function BridgePage() {
     ...(prev && !prevFull && b
       ? [`No comparison: the previous period (${rangeText(prev)}) starts before the first uploaded day (${firstDay ? dm(firstDay) : '—'}).`]
       : []),
-    ...(!country && b
-      ? ['The plant has no country (Company settings → Organization) — official holidays are counted as days without shift.']
-      : []),
     ...(shift > 0 && !eventsOk ? [`The shift filter works for periods of up to ${MAX_EVENT_DAYS} days — all shifts are shown.`] : []),
-    ...(shiftOn && b ? [`Shift ${shift}: times from the shift rows, losses from the downtimes of that shift; calendar time and TEEP are left out.`] : []),
+    ...(shiftOn && b ? [`Shift ${shift}: times from the shift rows, losses from the downtimes of that shift.`] : []),
     ...(b?.warnings ?? []),
-    ...(b && b.totals.calendar !== null
-      ? [`Calendar: ${b.steps[0]?.note ?? ''}. Days without any shift row count as not scheduled — a missing upload looks the same.`]
-      : []),
   ]
   const priority = items.find((i) => i.priority)
   const prevPriority = priority ? prevItems.get(priority.key) : undefined
@@ -231,7 +214,10 @@ function BridgePage() {
         </>
       )}
       {shiftOptions.length > 0 && (
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground" title={eventsOk ? undefined : `The shift filter works for periods of up to ${MAX_EVENT_DAYS} days`}>
+        <label
+          className="flex flex-col gap-1 text-xs text-muted-foreground"
+          title={eventsOk ? undefined : `The shift filter works for periods of up to ${MAX_EVENT_DAYS} days`}
+        >
           Shift
           <select
             value={eventsOk ? shift : 0}
@@ -282,27 +268,27 @@ function BridgePage() {
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <PageHeader
         title="OEE Loss Bridge"
-        summary="From calendar time to effective time, loss by loss — and which loss to attack first."
+        summary="Loading time is 100% — each loss as a share of it, down to the OEE. Which loss to attack first."
         links={relatedPages('/oee/bridge')}
         info={
           <>
             <p>
-              <b>A</b> Calendar time → not scheduled → <b>Shift time</b> → planned stops → <b>Loading time</b> → availability losses →{' '}
-              <b>C</b> Production time → performance losses → <b>D</b> Operation time → quality losses → <b>E</b> Effective time. OEE = E ÷
-              B, TEEP = E ÷ A, Availability = C ÷ B, Performance = D ÷ C, Quality = E ÷ D.
+              <b>Loading time = 100%</b> → unplanned downtimes (by chart column) → <b>Availability</b> → performance losses → <b>A × P</b> →
+              quality losses → <b>OEE</b>. Every loss is a percentage of the loading time, so OEE + all losses = 100%.
             </p>
             <p>
-              <b>B — the OEE base</b> is set in OEE Settings → Loss bridge: Loading time (as the MES and the OEE Dashboard: planned stops
-              are outside OEE — the OEE here is exactly the Dashboard's) or Shift time (TPM: planned stops are losses too).
+              The loading time already leaves out the planned stops (breaks, planned meetings …), as in the MES and the OEE Dashboard — they
+              are not taken off again; they are listed under the bridge for information. OEE, A, P and Q here are exactly the
+              Dashboard&apos;s (A = production ÷ loading, P = operation ÷ production). Example: A 80% and P 80% give OEE 64% — 20%
+              availability loss and 16% performance loss (20% of the 80% production time).
             </p>
             <p>
-              Each step is a difference of the recorded times; the downtime records only split it into groups (Settings → Loss groups, chart
-              column and bridge family). What the records do not explain is shown as its own step — never spread over the groups — so the
-              bars always add up.
+              The downtime groups are shown as recorded. If the records add up to a little more or less than Loading − Production, the
+              difference is its own small grey step — normal, never spread over the groups.
             </p>
             <p>
-              Priority: the biggest loss in minutes. Not explained, undefined, a speed gain and planned stops are never the priority. Level
-              3 shows the top 5 of the selected loss with count and MTTR (many short stops → small fixes; few long ones → maintenance).
+              Priority: the biggest loss. Not explained, undefined, a speed gain and planned stops are never the priority. Level 3 shows the
+              top 5 of the selected loss with count and MTTR (many short stops → small fixes; few long ones → maintenance).
             </p>
           </>
         }
@@ -337,26 +323,29 @@ function BridgePage() {
           {/* Kutular */}
           <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-5">
             <Tile
-              label={base === 'shift' ? 'OEE (shift-time base)' : 'OEE'}
+              label="OEE"
               value={pctOf(b!.oee)}
               delta={delta(b!.oee, pb?.oee)}
-              sub={
-                base === 'shift'
-                  ? `MES OEE ${pctOf(b!.mesOee)}`
-                  : `A ${pctOf(b!.availability, 0)} · P ${pctOf(b!.performance, 0)}${config.lossGroups.some((g) => g.family === 'performance') ? ' (bridge split)' : ''} · Q ${pctOf(b!.quality, 0)}`
-              }
+              sub={`${hours(b!.baseMinutes)} loading · ${b!.coverage.dayRows} machine-day(s)`}
               strong
             />
-            <Tile label="TEEP" value={pctOf(b!.teep)} delta={delta(b!.teep, pb?.teep)} sub="effective ÷ calendar time" />
             <Tile
-              label={base === 'shift' ? 'Shift time (B)' : 'Loading time (B)'}
-              value={hours(b!.baseMinutes)}
-              sub={`${b!.coverage.dayRows} machine-day(s)`}
+              label={`Availability${config.lossGroups.some((g) => g.family === 'performance') ? ' (bridge split)' : ''}`}
+              value={pctOf(b!.availability)}
+              delta={delta(b!.availability, pb?.availability)}
+              sub={`loss ${pctOf(b!.level1?.availability)} of loading`}
             />
             <Tile
-              label="Effective time (E)"
-              value={hours(b!.totals.effective)}
-              sub={prevOk ? `${hours(pb!.totals.effective)} in the previous period` : 'no comparison period'}
+              label="Performance"
+              value={pctOf(b!.performance)}
+              delta={delta(b!.performance, pb?.performance)}
+              sub={`loss ${pctOf(b!.level1?.performance)} of loading`}
+            />
+            <Tile
+              label="Quality"
+              value={pctOf(b!.quality)}
+              delta={delta(b!.quality, pb?.quality)}
+              sub={`loss ${pctOf(b!.level1?.quality)} of loading`}
             />
             {priority ? (
               <button
@@ -367,7 +356,8 @@ function BridgePage() {
                 <p className="text-[11px] font-bold tracking-wide text-destructive uppercase">Priority · {FAMILY_LABEL[priority.family]}</p>
                 <p className="mt-0.5 truncate text-lg font-bold text-foreground">{priority.label}</p>
                 <p className="text-xs text-muted-foreground tabular-nums">
-                  {hours(priority.minutes)} · {pctOf(priority.share)} of B{prevPriority && ` · before ${pctOf(prevPriority.share)}`}
+                  {pctOf(priority.share)} of loading · {hours(priority.minutes)}
+                  {prevPriority && ` · before ${pctOf(prevPriority.share)}`}
                 </p>
               </button>
             ) : (
@@ -378,12 +368,23 @@ function BridgePage() {
           {/* Köprü */}
           <section className="mt-4 rounded-xl border border-border p-3 sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">Bridge — hours</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                Bridge — % of loading time{' '}
+                <span className="font-normal text-muted-foreground">
+                  · {pctOf(1)} − losses = OEE {pctOf(b!.oee)}
+                </span>
+              </h3>
               <Legend />
             </div>
             <div className="mt-2">
               <BridgeChart bridge={b!} selected={selectedItem?.key ?? null} onSelect={(k) => setPicked(k)} selectable={selectable} />
             </div>
+            {b!.outside.length > 0 && (
+              <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+                <b className="font-semibold text-foreground">Outside OEE</b> — planned stops, already left out of the loading time (not
+                taken off again): {b!.outside.map((o) => `${o.label} ${hours(o.minutes)}`).join(' · ')}
+              </p>
+            )}
           </section>
 
           {/* Dağılım */}
@@ -399,7 +400,7 @@ function BridgePage() {
             </section>
             <section className="rounded-xl border border-border p-4">
               <StackColumn
-                title="Level 1 — loss families"
+                title="Level 1 — OEE + losses = 100%"
                 parts={[
                   { label: 'OEE', share: b!.level1?.oee ?? 0, color: 'var(--viz-3)', strong: true },
                   { label: 'Availability', share: b!.level1?.availability ?? 0, color: FAMILY_SWATCH.availability },
@@ -410,17 +411,12 @@ function BridgePage() {
             </section>
             <section className="min-w-0 rounded-xl border border-border p-4">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Level 2 — losses, % of B</p>
+                <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Level 2 — losses, % of loading</p>
                 <span className="text-[11px] text-muted-foreground">Δ points vs the previous period · click for Level 3</span>
               </div>
               <div className="mt-2">
                 <Level2Bars items={items} previous={prevItems} selected={selectedItem?.key ?? null} onSelect={setPicked} />
               </div>
-              {b!.outside.length > 0 && (
-                <p className="mt-3 border-t border-border pt-2 text-[11px] text-muted-foreground">
-                  Outside OEE (planned stops, Loading base): {b!.outside.map((o) => `${o.label} ${hours(o.minutes)}`).join(' · ')}
-                </p>
-              )}
             </section>
           </div>
 
@@ -431,7 +427,7 @@ function BridgePage() {
                 <p className="text-sm font-semibold text-foreground">
                   Level 3 — {selectedItem.label}{' '}
                   <span className="font-normal text-muted-foreground">
-                    · {hours(selectedItem.minutes)} · {pctOf(selectedItem.share)} of B · top 5
+                    · {pctOf(selectedItem.share)} of loading · {hours(selectedItem.minutes)} · top 5
                   </span>
                 </p>
                 {views.length > 1 && (
@@ -457,6 +453,7 @@ function BridgePage() {
                   <Level3Table
                     rows={l3}
                     total={selectedItem.minutes}
+                    base={b!.baseMinutes}
                     unit={selectedItem.family === 'quality' ? 'pcs' : 'min'}
                     showMttr={selectedItem.groups.length > 0}
                   />
@@ -480,10 +477,10 @@ function BridgePage() {
                 <thead className="text-muted-foreground">
                   <tr className="border-b border-border">
                     <th className="py-1.5 pr-2 text-left font-medium">Step</th>
-                    <th className="py-1.5 pr-2 text-right font-medium">Minutes</th>
-                    <th className="py-1.5 pr-2 text-right font-medium">Hours</th>
-                    <th className="py-1.5 pr-2 text-right font-medium">% of B</th>
+                    <th className="py-1.5 pr-2 text-right font-medium">% of loading</th>
                     <th className="py-1.5 pr-2 text-right font-medium">Previous</th>
+                    <th className="py-1.5 pr-2 text-right font-medium">Hours</th>
+                    <th className="py-1.5 pr-2 text-right font-medium">Minutes</th>
                     <th className="py-1.5 text-left font-medium">Note</th>
                   </tr>
                 </thead>
@@ -499,16 +496,17 @@ function BridgePage() {
                               style={{ background: FAMILY_SWATCH[s.family ?? 'availability'] }}
                             />
                           ) : null}
-                          {s.letter ? `${s.letter} · ` : ''}
                           {s.kind === 'loss' ? '− ' : ''}
                           {s.label}
                         </td>
-                        <td className="py-1 pr-2 text-right tabular-nums">{Math.round(s.minutes).toLocaleString('en-GB')}</td>
-                        <td className="py-1 pr-2 text-right tabular-nums">{hours(s.minutes)}</td>
                         <td className="py-1 pr-2 text-right tabular-nums">
                           {b!.baseMinutes > 0 ? pctOf(s.minutes / b!.baseMinutes) : '—'}
                         </td>
-                        <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">{p ? hours(p.minutes) : '—'}</td>
+                        <td className="py-1 pr-2 text-right tabular-nums text-muted-foreground">
+                          {p && prevOk && pb!.baseMinutes > 0 ? pctOf(p.minutes / pb!.baseMinutes) : '—'}
+                        </td>
+                        <td className="py-1 pr-2 text-right tabular-nums">{hours(s.minutes)}</td>
+                        <td className="py-1 pr-2 text-right tabular-nums">{Math.round(s.minutes).toLocaleString('en-GB')}</td>
                         <td className="py-1 text-muted-foreground">{s.note ?? ''}</td>
                       </tr>
                     )
@@ -556,25 +554,19 @@ function Tile({
 }
 
 function Legend() {
-  const items: { label: string; color: string; hatch?: boolean }[] = [
-    { label: 'Time', color: 'var(--viz-1)' },
-    { label: FAMILY_LABEL.notScheduled, color: FAMILY_SWATCH.notScheduled },
-    { label: FAMILY_LABEL.planned, color: 'var(--viz-2)', hatch: true },
+  const items: { label: string; color: string }[] = [
+    { label: 'Total', color: 'var(--viz-1)' },
     { label: FAMILY_LABEL.availability, color: FAMILY_SWATCH.availability },
+    { label: 'Records vs MES difference', color: FAMILY_SWATCH.notScheduled },
     { label: FAMILY_LABEL.performance, color: FAMILY_SWATCH.performance },
     { label: FAMILY_LABEL.quality, color: FAMILY_SWATCH.quality },
-    { label: 'Effective', color: 'var(--viz-3)' },
+    { label: 'OEE', color: 'var(--viz-3)' },
   ]
   return (
     <div className="oee-viz flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
       {items.map((i) => (
         <span key={i.label} className="flex items-center gap-1">
-          <span
-            className="h-2.5 w-2.5 rounded-sm"
-            style={{
-              background: i.hatch ? `repeating-linear-gradient(45deg, ${i.color} 0 3px, #fff 3px 5px)` : i.color,
-            }}
-          />
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: i.color }} />
           {i.label}
         </span>
       ))}

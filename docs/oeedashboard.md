@@ -543,3 +543,12 @@ sayfaları vardiyaları bu kodlarla numaralar ve OEE Settings'teki Shifts
 kartı salt okunur olur; tanım yoksa eski OEE ayarı geçerli. Loss Bridge'de
 vardiya filtresi ve kalıba göre Level 3 (en çok 8 gün, ham duruşlardan):
 docs/oee-bridge.md.
+
+## Loss Bridge ikinci tur (2026-10-06, planlamacı)
+
+Köprü artık **Loading time = %100**'den başlayan yüzdesel şelale: plansız
+duruş grupları → Availability → hız kaybı → A × P → kalite → OEE. Loading
+planlı duruşları zaten dışarıda bıraktığı için köprüde yeniden düşülmezler
+(yalnızca "Outside OEE" bilgisi). OEE, A, P, Q Dashboard'la birebir aynı;
+OEE + kayıplar = %100. Takvim / TEEP adımları ve OEE Settings'teki TPM
+tabanı seçeneği kaldırıldı. Ayrıntı: docs/oee-bridge.md.

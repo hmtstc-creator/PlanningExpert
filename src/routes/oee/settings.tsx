@@ -308,19 +308,6 @@ function OeeSettingsPage() {
         />
       </Card>
 
-      <Card
-        title="Loss bridge"
-        info="The OEE base of the Loss Bridge page. Loading time (as the MES and the OEE Dashboard): planned stops such as breaks are outside OEE. Shift time (TPM): planned stops are losses inside OEE as well, so OEE is lower — the page then also shows the MES OEE beside it. Effective time is the same in both."
-      >
-        <label className="flex flex-wrap items-center gap-2 text-sm">
-          OEE base
-          <select className={input} value={c.bridgeBase ?? 'loading'} onChange={(e) => set({ bridgeBase: e.target.value === 'shift' ? 'shift' : 'loading' })}>
-            <option value="loading">Loading time — planned stops outside OEE (MES, as the Dashboard)</option>
-            <option value="shift">Shift time — planned stops are losses too (TPM)</option>
-          </select>
-        </label>
-      </Card>
-
       <Card title="Setups" info="Downtime texts (Reason Code Definition EN) that are a setup, planned or unplanned. Other adjustments after a setup are reasons for not getting into production.">
         <input className={`${input} mb-2 w-72`} placeholder="Filter texts…" value={textFilter} onChange={(e) => setTextFilter(e.target.value)} />
         <Rows

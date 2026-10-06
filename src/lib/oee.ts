@@ -201,9 +201,9 @@ export interface OeeConfig {
   trendWeeks: number
   topN: number
   /**
-   * Loss Bridge'in OEE tabanı: 'loading' (MES — planlı duruşlar OEE dışında;
-   * varsayılan, OEE Dashboard ile aynı) ya da 'shift' (TPM — planlı duruşlar
-   * da kayıp).
+   * Kullanılmıyor (2026-10-06): Loss Bridge her zaman Loading tabanlıdır —
+   * Loading planlı duruşları zaten dışarıda bırakır. Kayıtlı ayarlar
+   * bozulmasın diye alan duruyor.
    */
   bridgeBase?: 'loading' | 'shift'
 }

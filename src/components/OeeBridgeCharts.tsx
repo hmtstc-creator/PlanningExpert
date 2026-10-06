@@ -3,11 +3,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Bridge, BridgeFamily, BridgeStep, Level3Row, LossItem } from '../lib/oeeBridge'
 
 /**
- * Loss Bridge grafikleri (docs/oee-bridge.md). Renkler .oee-viz paletinden,
- * aile başına sabit: süreler mavi, availability turuncu (planlı duruş aynı
- * ton taralı), performans mor, kalite pembe, efektif süre yeşil,
- * planlanmamış gri. Renk tek başına anlam taşımaz: her çubukta adı ve
- * değeri yazılı, aile başlıkları üstte.
+ * Loss Bridge grafikleri (docs/oee-bridge.md). Köprü Loading time'ın
+ * yüzdesidir (%100 → OEE). Renkler .oee-viz paletinden, aile başına sabit:
+ * toplamlar mavi, availability turuncu, performans mor, kalite pembe, OEE
+ * yeşil, kayıtlarla MES farkı gri. Renk tek başına anlam taşımaz: her
+ * çubukta adı ve değeri yazılı, aile başlıkları üstte.
  */
 
 export const FAMILY_FILL: Record<BridgeFamily | 'total' | 'effective', string> = {
@@ -41,7 +41,10 @@ export const hours = (min: number) => {
   return `${h < 0 ? '−' : ''}${a >= 100 ? Math.round(a).toLocaleString('en-GB') : a.toFixed(1)} h`
 }
 export const pctOf = (v: number | null | undefined, digits = 1) =>
-  v === null || v === undefined || !Number.isFinite(v) ? '—' : `${(v * 100).toFixed(digits)}%`
+  v === null || v === undefined || !Number.isFinite(v) ? '—' : `${v < 0 ? '−' : ''}${Math.abs(v * 100).toFixed(digits)}%`
+
+/** Kayıtlarla MES farkı (açıklanmayan / fazla kayıt): nötr gri. */
+const DIFF_FILL = '#a8a7a2'
 
 function useWidth() {
   const ref = useRef<HTMLDivElement>(null)
@@ -87,7 +90,8 @@ export function bridgeBars(b: Bridge): Bar[] {
       out.push({ step: s, lo: 0, hi: s.minutes, fill: s.key === 'E' ? FAMILY_FILL.effective : FAMILY_FILL.total })
     } else {
       const next = run - s.minutes
-      out.push({ step: s, lo: Math.min(run, next), hi: Math.max(run, next), fill: FAMILY_FILL[s.family ?? 'availability'] })
+      const fill = s.key === 'av:unexplained' ? DIFF_FILL : FAMILY_FILL[s.family ?? 'availability']
+      out.push({ step: s, lo: Math.min(run, next), hi: Math.max(run, next), fill })
       run = next
     }
   }
@@ -100,18 +104,25 @@ const PAD_T = 64
 const PAD_B = 104
 
 /** Tooltip içeriği (her iki yerleşimde aynı). */
-function StepTip({ step, base, calendar }: { step: BridgeStep; base: number; calendar: number | null }) {
+function StepTip({ step, base }: { step: BridgeStep; base: number }) {
   return (
     <>
       <p className="font-semibold text-foreground">{step.label}</p>
-      <p className="tabular-nums">
+      {base > 0 && <p className="font-semibold tabular-nums">{pctOf(step.minutes / base)} of the loading time</p>}
+      <p className="text-muted-foreground tabular-nums">
         {hours(step.minutes)} · {Math.round(step.minutes).toLocaleString('en-GB')} min
       </p>
-      {base > 0 && <p className="text-muted-foreground tabular-nums">{pctOf(step.minutes / base)} of the OEE base</p>}
-      {calendar ? <p className="text-muted-foreground tabular-nums">{pctOf(step.minutes / calendar)} of calendar time</p> : null}
       {step.note && <p className="mt-1 text-muted-foreground">{step.note}</p>}
     </>
   )
+}
+
+/** Toplam çubuğunun içindeki oran: Availability → A, A × P → P, OEE → Q. */
+function ratioOf(key: string, b: Bridge): string | null {
+  if (key === 'C') return `A ${pctOf(b.availability, 0)}`
+  if (key === 'D') return `P ${pctOf(b.performance, 0)}`
+  if (key === 'E') return `Q ${pctOf(b.quality, 0)}`
+  return null
 }
 
 /**
@@ -175,9 +186,9 @@ function BridgeColumns({ width, bars, bridge, selected, onSelect, selectable, pr
   const col = (width - PAD_L - PAD_R) / n
   const barW = Math.max(10, Math.min(46, col * 0.62))
   const x = (i: number) => PAD_L + col * i + col / 2
-  // Izgara: saat, "güzel" adımla.
-  const stepH = niceStep(max / 60)
-  const ticks = Array.from({ length: Math.floor(max / 60 / stepH) + 1 }, (_, i) => i * stepH)
+  // Izgara: Loading'in yüzdesi, %20 adımla.
+  const base = Math.max(1e-9, bridge.baseMinutes)
+  const ticks = Array.from({ length: Math.floor(((max / base) * 100) / 20) + 1 }, (_, i) => i * 20)
   // Aile başlıkları: art arda aynı ailedeki kayıplar tek başlık.
   const spans: { family: BridgeFamily; from: number; to: number }[] = []
   bars.forEach((b, i) => {
@@ -193,9 +204,16 @@ function BridgeColumns({ width, bars, bridge, selected, onSelect, selectable, pr
         <Defs />
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={PAD_L} x2={width - PAD_R} y1={y(t * 60)} y2={y(t * 60)} stroke="var(--viz-grid)" strokeWidth={1} />
-            <text x={PAD_L - 6} y={y(t * 60) + 3} textAnchor="end" fontSize={10} fill="var(--viz-axis)">
-              {t >= 1000 ? `${t / 1000}k` : t} h
+            <line
+              x1={PAD_L}
+              x2={width - PAD_R}
+              y1={y((t / 100) * base)}
+              y2={y((t / 100) * base)}
+              stroke="var(--viz-grid)"
+              strokeWidth={1}
+            />
+            <text x={PAD_L - 6} y={y((t / 100) * base) + 3} textAnchor="end" fontSize={10} fill="var(--viz-axis)">
+              {t}%
             </text>
           </g>
         ))}
@@ -257,11 +275,11 @@ function BridgeColumns({ width, bars, bridge, selected, onSelect, selectable, pr
                 strokeWidth={isSel || isPrio ? 2 : 0}
               />
               <text x={x(i)} y={top - 5} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="var(--viz-value)">
-                {hours(b.step.minutes).replace(' h', '')}
+                {pctOf(b.step.minutes / base)}
               </text>
-              {b.step.letter && (
-                <text x={x(i)} y={y(b.lo) - 6} textAnchor="middle" fontSize={12} fontWeight={800} fill="white">
-                  {b.step.letter}
+              {!isLoss && ratioOf(b.step.key, bridge) && y(b.lo) - top > 22 && (
+                <text x={x(i)} y={y(b.lo) - 7} textAnchor="middle" fontSize={10} fontWeight={700} fill="white">
+                  {ratioOf(b.step.key, bridge)}
                 </text>
               )}
               {isPrio && (
@@ -293,7 +311,7 @@ function BridgeColumns({ width, bars, bridge, selected, onSelect, selectable, pr
             transform: 'translateY(-100%)',
           }}
         >
-          <StepTip step={bars[hover].step} base={bridge.baseMinutes} calendar={bridge.totals.calendar} />
+          <StepTip step={bars[hover].step} base={bridge.baseMinutes} />
         </div>
       )}
     </div>
@@ -320,8 +338,10 @@ function BridgeRows({ bars, bridge, selected, onSelect, selectable, priority }: 
             className={`grid w-full grid-cols-[7.5rem_1fr_3.5rem] items-center gap-2 rounded-md px-1 py-0.5 text-left text-xs ${selected === b.step.key ? 'bg-muted ring-1 ring-foreground/30' : ''}`}
           >
             <span className={`truncate ${isLoss ? 'text-muted-foreground' : 'font-semibold text-foreground'}`}>
-              {b.step.letter ? `${b.step.letter} · ` : ''}
               {b.step.label}
+              {!isLoss && ratioOf(b.step.key, bridge) && (
+                <span className="ml-1 font-normal text-muted-foreground">({ratioOf(b.step.key, bridge)})</span>
+              )}
               {priority === b.step.key && <span className="ml-1 font-bold text-destructive">●</span>}
             </span>
             <span className="relative h-3.5 rounded-sm bg-muted/50">
@@ -330,25 +350,26 @@ function BridgeRows({ bars, bridge, selected, onSelect, selectable, priority }: 
                 style={{
                   left: `${pos(b.lo)}%`,
                   width: `${Math.max(0.8, pos(b.hi) - pos(b.lo))}%`,
-                  background: !isLoss ? (b.step.key === 'E' ? 'var(--viz-3)' : 'var(--viz-1)') : FAMILY_SWATCH[fam ?? 'availability'],
+                  background: !isLoss
+                    ? b.step.key === 'E'
+                      ? 'var(--viz-3)'
+                      : 'var(--viz-1)'
+                    : b.step.key === 'av:unexplained'
+                      ? DIFF_FILL
+                      : FAMILY_SWATCH[fam ?? 'availability'],
                   opacity: isLoss && b.step.minutes < 0 ? 0.45 : 1,
                 }}
               />
             </span>
-            <span className="text-right font-semibold tabular-nums">{hours(b.step.minutes)}</span>
+            <span className="text-right font-semibold tabular-nums">{pctOf(b.step.minutes / Math.max(1e-9, bridge.baseMinutes))}</span>
           </button>
         )
       })}
-      <p className="pt-1 text-[11px] text-muted-foreground">OEE base {hours(bridge.baseMinutes)} · tap a loss for its details</p>
+      <p className="pt-1 text-[11px] text-muted-foreground">
+        % of the loading time ({hours(bridge.baseMinutes)}) · tap a loss for its details
+      </p>
     </div>
   )
-}
-
-function niceStep(maxH: number) {
-  const raw = maxH / 5
-  const pow = 10 ** Math.floor(Math.log10(Math.max(raw, 1e-9)))
-  const m = raw / pow
-  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * pow
 }
 
 /** %100 sütun: parçalar aşağıdan yukarı, yanında adı ve payı. */
@@ -464,12 +485,15 @@ export function Level2Bars({
 export function Level3Table({
   rows,
   total,
+  base,
   unit,
   showMttr,
   action,
 }: {
   rows: Level3Row[]
   total: number
+  /** Loading time (dakika): satırın payı. */
+  base?: number
   unit: 'min' | 'pcs'
   showMttr: boolean
   action?: (r: Level3Row) => ReactNode
@@ -484,6 +508,7 @@ export function Level3Table({
             <th className="py-1.5 pr-2 text-left font-medium">#</th>
             <th className="py-1.5 pr-2 text-left font-medium">Item</th>
             <th className="w-[35%] py-1.5 pr-2 font-medium" />
+            {base ? <th className="py-1.5 pr-2 text-right font-medium">% of loading</th> : null}
             <th className="py-1.5 pr-2 text-right font-medium">Time</th>
             <th className="py-1.5 pr-2 text-right font-medium">Cum.</th>
             <th className="py-1.5 pr-2 text-right font-medium">{unit === 'pcs' ? 'Pieces' : 'Stops'}</th>
@@ -518,7 +543,8 @@ export function Level3Table({
                     style={{ width: `${(Math.abs(r.minutes) / max) * 100}%`, opacity: isOthers ? 0.35 : r.minutes < 0 ? 0.45 : 1 }}
                   />
                 </td>
-                <td className="py-1.5 pr-2 text-right font-semibold tabular-nums">{hours(r.minutes)}</td>
+                {base ? <td className="py-1.5 pr-2 text-right font-semibold tabular-nums">{pctOf(r.minutes / base)}</td> : null}
+                <td className={`py-1.5 pr-2 text-right tabular-nums ${base ? '' : 'font-semibold'}`}>{hours(r.minutes)}</td>
                 <td className="py-1.5 pr-2 text-right tabular-nums text-muted-foreground">{total > 0 ? pctOf(cum / total, 0) : '—'}</td>
                 <td className="py-1.5 pr-2 text-right tabular-nums">{r.count ? r.count.toLocaleString('en-GB') : '—'}</td>
                 {showMttr && <td className="py-1.5 pr-2 text-right tabular-nums">{r.mttr === null ? '—' : `${r.mttr.toFixed(1)} min`}</td>}

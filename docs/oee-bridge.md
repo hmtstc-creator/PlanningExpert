@@ -21,47 +21,48 @@ kavram, sonra program, test, açık konuların çözümü.
 
 | Konu | Görsel (TPM) | Bu şirketin verisi (MES) | Karar |
 |---|---|---|---|
-| OEE tabanı B | Planlı süre (molalar, setup, planlı bakım kayıp) | **Loading** = vardiya − planlı duruş; molalar OEE dışında | Şirket seçer (OEE Settings → Loss bridge): **Loading (MES, varsayılan)** ya da **Shift time (TPM)**. Varsayılanda köprünün OEE'si OEE Dashboard ile birebir aynı (test). TPM tabanında tile "OEE (shift-time base)" olur, MES OEE yanında yazar. |
+| OEE tabanı B | Planlı süre (molalar, setup, planlı bakım kayıp) | **Loading** = vardiya − planlı duruş; molalar OEE dışında | Şirket seçer (OEE Settings → Loss bridge): **Loading (MES, varsayılan)** ya da **Shift time (TPM)**. Varsayılanda köprünün OEE'si OEE Dashboard ile birebir aynı (test). TPM tabanında tile "OEE (shift-time base)" olur, MES OEE yanında yazar. **İkinci turda kaldırıldı: taban her zaman Loading.** |
 | Kısa duruşlar | Performans kaybı | KSD duruş olarak kayıtlı → Loading − Production içinde (availability) | Her kayıp grubunun **köprü ailesi** ayarda: availability (varsayılan, MES gibi) ya da performance. Aile değişince OEE değişmez, yalnızca A/P payı. |
 | Kalite | Proses hatası, verim kaybı (süre) | Adet: Good / Scrap / Reject; dosyada şimdiye kadar hep %100. KON ("quality") bir **duruş** grubudur | Kalite süresi = Operation × (Scrap+Reject) ÷ (Good+Scrap+Reject), Scrap ve Reject adede göre ayrılır. KON availability'de kalır (çift sayılmaz). |
-| Planlanmamış süre | Yasal, felaket, kapasite fazlası, deneme | Bu nedenler veride yok | Takvim − vardiya süresi: **resmi tatil günleri** (plant ülkesinin tatil listesi), **vardiyasız günler** (hafta sonu, talep yok, makine kullanılmadı), **vardiya dışı saatler**. Eksik yükleme de "vardiyasız" görünür → veri notu. |
+| Planlanmamış süre | Yasal, felaket, kapasite fazlası, deneme | Bu nedenler veride yok | Takvim − vardiya süresi: **resmi tatil günleri** (plant ülkesinin tatil listesi), **vardiyasız günler** (hafta sonu, talep yok, makine kullanılmadı), **vardiya dışı saatler**. Eksik yükleme de "vardiyasız" görünür → veri notu. **İkinci turda kaldırıldı** (köprü Loading'den başlar). |
 | Performans > %100 | — | 57 vardiyada (en çok %134,5); planlamacı "olduğu gibi" dedi | Hız kaybı işaretli: negatifse "Speed above standard" adımı, 0'a kırpılmaz. |
 
-## Hesap (her çubuk)
+## İkinci tur: yüzdesel köprü, taban her zaman Loading (2026-10-06)
 
-Seçilen kapsam (alan → hat / makine, isteğe bağlı makine) ve dönem için
-gün × makine kayıtları (`oeeDays`) **toplanır**, sonra bölünür. Duruş
-özetleri (`oeeLossDays`) yalnızca vardiya verisi olan gün × makinede sayılır.
+Planlamacı ilk sürümü "hatalı, bir şey anlatmıyor" diye geri çevirdi:
+yüzdesel görmek istiyor; MES'in **Loading time'ı planlı duruşları zaten
+dışarıda bırakıyor**, köprüde planlıları yeniden düşmek saçma. Beklenti:
+OEE %64, performans %80 ise availability ~%80'dir ve bu plansız duruşların
+etkisidir; OEE'nin üstüne kayıpların yüzde dağılımı konunca %100 bulunmalı,
+küçük farklar normaldir.
 
-| Adım | Formül |
+Bu yüzden ilk turun takvim (A, TEEP, tatil, vardiyasız gün) ve TPM tabanı
+(Shift time, OEE Settings → Loss bridge) kaldırıldı. Köprü:
+
+| Adım | Formül (Loading'in %'si) |
 |---|---|
-| A Calendar time | gün × 1440 × makine (tanımlı iş merkezleri ∪ verideki) |
-| − Official holidays / Days without shift / Unworked shifts (recorded) / Hours without shift | makine × gün: vardiyası olmayan tatil günleri / diğer günler; hiç çalışılmamış vardiyanın "scheduled downtime" kaydı; A − kalan |
-| Shift time | Loading + Scheduled downtime |
-| − Planned stops | Reason Code 1 = mola/planlı (Settings) duruşları, grup başına; gün × makine başına vardiyaların planlı süresiyle sınırlı (fazlası çalışılmamış vardiyadır → planlanmamış süre, en uzun kayıttan düşülür); fark "Other planned stops" |
-| Loading time | Loading — **B (MES tabanı)** |
-| − Availability kayıpları | Reason Code 1 = kayıp duruşları, grafik sütunu (Settings → Chart column) başına, ailesi availability olanlar. Grafiklerde gizli gruplar ("#") kendi kalemidir, öncelik olamaz |
-| − Not explained | (Loading − Production) − kayıtlı kayıp duruşları. Negatifse "Over-recorded downtime". **Hiçbir zaman gruplara dağıtılmaz.** |
-| Production time | Production + performans ailesine alınan grupların süresi — **C** |
-| − Performans | Performans ailesindeki gruplar; Speed loss = Production − Operation (işaretli) |
-| Operation time | Operation — **D** |
-| − Quality | Scrap, Reject (adetten süreye) |
-| Effective time | Operation × Quality — **E** |
+| Loading time | %100 (planlı duruşlar zaten dışında) |
+| − Plansız duruş grupları | grafik sütunu başına kayıtlı dakika ÷ Loading, büyükten küçüğe |
+| − Fark | (Loading − Production) − kayıtlı duruşlar: "Not explained" ya da "Over-recorded downtime"; gri, gruplara dağıtılmaz |
+| = Availability | Production ÷ Loading (Dashboard'daki A) |
+| − Speed loss (+ performans ailesindeki gruplar) | (Production − Operation) ÷ Loading = A × (1 − P) |
+| = A × P | Operation ÷ Loading |
+| − Scrap / Reject | Operation × (1 − Q) ÷ Loading, adede göre ayrılır |
+| = OEE | Effective ÷ Loading = A × P × Q (Dashboard'daki OEE) |
 
-OEE = E ÷ B, TEEP = E ÷ A, Availability = C ÷ B, Performance = D ÷ C,
-Quality = E ÷ D. Köprü her zaman kapanır: A − Σkayıp = E (test).
+Örnek (test): A %80, P %80 → OEE %64; availability kaybı %20, performans
+kaybı %80 × %20 = %16; OEE + kayıplar = %100. Kutular OEE, A, P, Q (önceki
+döneme fark) ve öncelik. Planlı duruşlar köprünün altında "Outside OEE"
+bilgisi olarak saatle yazılır, köprüye girmez.
 
-**Level 1** (OEE tabanının payları, toplamı %100): OEE = E/B, availability
-kaybı = (B − C)/B, performans kaybı = (C − D)/B, kalite kaybı = (D − E)/B.
-1 − A, 1 − P, 1 − Q gösterilmez (toplamı tutmaz).
+**Level 1** (Loading'in payları, toplamı %100): OEE, availability kaybı
+(1 − A), performans kaybı (A × (1 − P)), kalite kaybı (A × P × (1 − Q)).
 
-**Level 2**: OEE tabanındaki kalemler, dakikaya göre çoktan aza, % of B.
-Loading tabanında planlı duruşlar ayrı listede (OEE dışında, bilgi).
+**Level 2**: kayıp kalemleri, çoktan aza, % of loading.
 
 **Öncelik**: en çok dakikalı kalem. Öncelik **olamaz**: Not explained,
-tanımsız (Unassigned), gizli gruplar, hız kazancı ve planlı duruşlar (her iki
-tabanda: mola ve planlı toplantı yönetimin planıdır, kaizen hedefi değil —
-TPM tabanında Level 2'de görünürler). Sıklık önceliği belirlemez; karşı önlemi seçmek için Level 3'te
+tanımsız (Unassigned), gizli gruplar, hız kazancı ve planlı duruşlar (mola ve planlı toplantı
+yönetimin planıdır ve OEE dışındadır). Sıklık önceliği belirlemez; karşı önlemi seçmek için Level 3'te
 adet × MTTR gösterilir (çok kısa duruş → kaizen / otonom bakım; az uzun
 duruş → planlı bakım / kalıp tamiri; setup → adet × ortalama süre).
 
@@ -84,10 +85,12 @@ bugüne ↔ önceki ayın aynı günleri), diğerlerinde önceki eşit dönem;
    tek makine; dönem: Yesterday, This week, Last week, This month, Last
    month, Custom (en çok 31 gün). Dönem son yüklenen güne kırpılır;
    Pazartesi "This week" ve ayın 1'i "This month" önceki hafta / aya döner.
-3. Kutular: OEE (önceki döneme göre fark), TEEP, Loading saati, ÖNCELİK kalemi.
-4. Köprü (saat; her kayıpta % of B), aile renkleri: süreler mavi,
-   availability turuncu (planlı duruş taralı), performans mor, kalite pembe,
-   efektif yeşil, planlanmamış gri. Tıklanan kayıp Level 3'ü açar.
+3. Kutular: OEE, Availability, Performance, Quality (önceki döneme göre
+   fark, kaybın Loading'e payı), ÖNCELİK kalemi.
+4. Köprü (% of loading; ipucunda saat ve dakika), renkler: toplamlar mavi,
+   availability turuncu, kayıt–MES farkı gri, performans mor, kalite pembe,
+   OEE yeşil; toplam çubuklarında A / P / Q. Altında "Outside OEE" planlı
+   duruşlar (bilgi). Tıklanan kayıp Level 3'ü açar.
 5. OEE dağılımı · Level 1 · Level 2 (öncelik işaretli, tıklanır).
 6. Level 3: ilk 5 + diğerleri, önceki dönem, aksiyon bağlantısı (kalıp
    problemleri, makine arızaları, Losses Trend).
@@ -104,8 +107,6 @@ Telefonda köprü yatay çubuklara döner (12+ adım 360 px'e sığmaz).
   (`oeeShifts`) kurulur. Bu yüzden dönem 8 günü geçince vardiya seçimi
   kapanır. Vardiyada planlanmamış süre (takvim) gösterilmez; vardiyaların
   toplamı tüm güne eşittir (test).
-- Planlama takvimi (vardiya planı) kullanılmaz: yalnızca PRS'te var; bütün
-  plant'lerde aynı kural için resmi tatil + gerçekleşen vardiya.
 - MES'in plansız duruş toplamı (Unscheduled) ile duruş kayıtları neden
   tutmuyor — MES sahibine sorulmalı (açık konu, docs/oeedashboard.md karar 10).
   Köprüde fark görünür kalır; Losses Trend'de değişen bir şey yok.
