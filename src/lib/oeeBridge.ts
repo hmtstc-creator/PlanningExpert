@@ -148,6 +148,51 @@ export function matchedLossDays(days: DayRow[], lossDays: LossDay[]): LossDay[] 
   return lossDays.filter((l) => keys.has(key(l)))
 }
 
+export interface PlannedReason {
+  rc2: string
+  text: string
+  minutes: number
+  count: number
+}
+
+/**
+ * Bir gün × makinenin planlı duruşları (Reason Code 1 = mola / planlı),
+ * vardiyaların planlı süresiyle (`scheduledMin`) sınırlı. Fazlası, hiç
+ * çalışılmamış bir vardiyanın "scheduled downtime" kaydıdır (ör. 480 dk):
+ * planlı duruş değil, planlanmamış süredir — en uzun kayıttan başlayarak
+ * düşülür ve `excess` olarak döner.
+ */
+export function cappedPlanned(l: LossDay, scheduledMin: number, c: OeeConfig): { reasons: PlannedReason[]; excess: number } {
+  const reasons: PlannedReason[] = []
+  for (const [k, [m, n]] of Object.entries(l.reasons)) {
+    const [rc1, rc2, ...rest] = k.split('|')
+    if (!c.breakReasonCodes.includes(rc1)) continue
+    reasons.push({ rc2, text: rest.join('|') || rc2, minutes: m, count: n })
+  }
+  const total = sum(reasons.map((r) => r.minutes))
+  let excess = Math.max(0, total - Math.max(0, scheduledMin))
+  const out = excess
+  for (const r of [...reasons].sort((a, b) => b.minutes - a.minutes)) {
+    if (excess <= 0) break
+    const cut = Math.min(r.minutes, excess)
+    r.minutes -= cut
+    excess -= cut
+    if (r.minutes <= 0) r.count = 0
+  }
+  return { reasons: reasons.filter((r) => r.minutes > 0), excess: out }
+}
+
+/** Gün × makine → vardiyaların planlı süresi. */
+const scheduledBy = (days: DayRow[]) => {
+  const m = new Map<string, number>()
+  for (const d of days) m.set(key(d), (m.get(key(d)) ?? 0) + d.scheduledMin)
+  return m
+}
+
+/** Kalem öncelik olabilir mi: tanımsız sütun, yalnızca gizli ya da "#" / boş kodlu gruplar olamaz. */
+const rankableColumn = (label: string, groups: string[], c: OeeConfig) =>
+  label !== UNASSIGNED && groups.some((code) => code !== '#' && code !== '' && !hiddenGroup(code, c))
+
 /**
  * Köprü. `days` ve `lossDays` seçilen kapsam ve döneme süzülmüş olmalı;
  * `calendar` yoksa takvim / planlanmamış adımları çıkmaz (TEEP yok).
@@ -185,8 +230,19 @@ export function buildBridge(
   const B = base === 'shift' ? shift : L
   const warnings: string[] = []
 
-  // Planlı duruşlar (Reason Code 1 = mola / planlı): Shiftly'deki planlı süre, gruplara ayrılır.
-  const planned = groupMinutes(lossDays, c.breakReasonCodes)
+  // Planlı duruşlar (Reason Code 1 = mola / planlı): vardiyaların planlı süresi, gruplara ayrılır
+  // (gün × makine başına planlı süreyle sınırlı; fazlası çalışılmamış vardiya).
+  const sched = scheduledBy(days)
+  const planned = new Map<string, [number, number]>()
+  let unworked = 0
+  for (const l of lossDays) {
+    const r = cappedPlanned(l, sched.get(key(l)) ?? 0, c)
+    unworked += r.excess
+    for (const x of r.reasons) {
+      const cur = planned.get(x.rc2) ?? [0, 0]
+      planned.set(x.rc2, [cur[0] + x.minutes, cur[1] + x.count])
+    }
+  }
   const plannedCols = columns(
     planned,
     c,
@@ -197,23 +253,23 @@ export function buildBridge(
   const otherPlanned = S - plannedRec
 
   // Kayıp duruşlar (Reason Code 1 = kayıp): availability ya da performance ailesi.
+  // Gizli gruplar (Settings → "In charts" işaretsiz, ör. "#") kendi kalemidir — öncelik olamaz.
   const losses = groupMinutes(lossDays, c.lossReasonCodes)
-  const visible = (code: string) => !hiddenGroup(code, c)
   const availCols = columns(
     losses,
     c,
-    (code) => visible(code) && familyOf(code, c) === 'availability',
+    (code) => familyOf(code, c) === 'availability',
     (code) => chartOf(code, c),
   )
   const perfCols = columns(
     losses,
     c,
-    (code) => visible(code) && familyOf(code, c) === 'performance',
+    (code) => familyOf(code, c) === 'performance',
     (code) => chartOf(code, c),
   )
   const recAvail = sum(availCols.map((x) => x.minutes))
   const recPerf = sum(perfCols.map((x) => x.minutes))
-  // Gizli gruplar ("#", açıklanmayan) ve kaydı olmayan süre: açıklanmayan.
+  // Kaydı olmayan (ya da fazla kaydedilen) süre: açıklanmayan.
   const notExplained = L - P - recAvail - recPerf
   const C = P + recPerf
   const speed = P - Op
@@ -231,7 +287,7 @@ export function buildBridge(
       letter: 'A',
       note: `${calendar.machines} machine(s) × ${calendar.days} day(s) × 24 h`,
     })
-    const otherIdle = calendar.minutes - shift - calendar.holidayMin - calendar.idleDayMin
+    const otherIdle = calendar.minutes - shift - calendar.holidayMin - calendar.idleDayMin - unworked
     if (calendar.holidayMin)
       steps.push({ key: 'ns:holiday', label: 'Official holidays', kind: 'loss', family: 'notScheduled', minutes: calendar.holidayMin })
     if (calendar.idleDayMin)
@@ -242,6 +298,15 @@ export function buildBridge(
         family: 'notScheduled',
         minutes: calendar.idleDayMin,
         note: 'weekends, no demand, machine not used',
+      })
+    if (unworked >= 0.5)
+      steps.push({
+        key: 'ns:unworked',
+        label: 'Unworked shifts (recorded)',
+        kind: 'loss',
+        family: 'notScheduled',
+        minutes: unworked,
+        note: 'shifts recorded as scheduled downtime without any shift row — not a planned stop',
       })
     steps.push({
       key: 'ns:other',
@@ -275,7 +340,17 @@ export function buildBridge(
           : 'scheduled downtime without a matching downtime record',
     })
   steps.push({ key: 'L', label: 'Loading time', kind: 'total', minutes: L, letter: base === 'loading' ? 'B' : undefined })
-  for (const a of availCols) steps.push({ key: `av:${a.label}`, label: a.label, kind: 'loss', family: 'availability', minutes: a.minutes })
+  const hiddenNote = (groups: string[]) =>
+    groups.every((g) => hiddenGroup(g, c)) ? 'hidden in the other charts (OEE Settings → Loss groups)' : undefined
+  for (const a of availCols)
+    steps.push({
+      key: `av:${a.label}`,
+      label: a.label,
+      kind: 'loss',
+      family: 'availability',
+      minutes: a.minutes,
+      note: hiddenNote(a.groups),
+    })
   const unexplainedLabel = notExplained < 0 ? OVER_RECORDED : NOT_EXPLAINED
   if (Math.abs(notExplained) >= 0.5) {
     steps.push({
@@ -291,7 +366,15 @@ export function buildBridge(
     })
   }
   steps.push({ key: 'C', label: 'Production time', kind: 'total', minutes: C, letter: 'C' })
-  for (const p of perfCols) steps.push({ key: `pf:${p.label}`, label: p.label, kind: 'loss', family: 'performance', minutes: p.minutes })
+  for (const p of perfCols)
+    steps.push({
+      key: `pf:${p.label}`,
+      label: p.label,
+      kind: 'loss',
+      family: 'performance',
+      minutes: p.minutes,
+      note: hiddenNote(p.groups),
+    })
   steps.push({
     key: 'pf:speed',
     label: speed < 0 ? SPEED_GAIN : SPEED_LOSS,
@@ -346,9 +429,13 @@ export function buildBridge(
   ]
   const items: LossItem[] = [
     ...(base === 'shift' ? plannedItems : []),
-    ...availCols.map((a) => item(`av:${a.label}`, a.label, 'availability', a.minutes, a.count, a.groups, a.label !== UNASSIGNED)),
+    ...availCols.map((a) =>
+      item(`av:${a.label}`, a.label, 'availability', a.minutes, a.count, a.groups, rankableColumn(a.label, a.groups, c)),
+    ),
     ...(Math.abs(notExplained) >= 0.5 ? [item('av:unexplained', unexplainedLabel, 'availability', notExplained, 0, [], false)] : []),
-    ...perfCols.map((p) => item(`pf:${p.label}`, p.label, 'performance', p.minutes, p.count, p.groups, p.label !== UNASSIGNED)),
+    ...perfCols.map((p) =>
+      item(`pf:${p.label}`, p.label, 'performance', p.minutes, p.count, p.groups, rankableColumn(p.label, p.groups, c)),
+    ),
     item('pf:speed', speed < 0 ? SPEED_GAIN : SPEED_LOSS, 'performance', speed, 0, [], speed > 0),
     item('q:scrap', 'Scrap', 'quality', scrapMin, scrap, [], scrapMin > 0),
     item('q:reject', 'Reject', 'quality', rejectMin, reject, [], rejectMin > 0),
@@ -423,31 +510,27 @@ export function buildBridge(
 
 /**
  * Takvim süresi (A). Makine sayısı: tanımlı iş merkezleri ile verideki iş
- * merkezlerinin birleşimi — verisi olmayan makine de takvime girer. Hiç
- * vardiyası olmayan gün: resmi tatilse "Official holidays", değilse "Days
- * without shift".
+ * merkezlerinin birleşimi — verisi olmayan makine de takvime girer.
+ * Makine × gün: o gün vardiyası olmayan makine, resmi tatilse "Official
+ * holidays", değilse "Days without shift"; vardiyalı günlerde vardiya dışı
+ * saatler köprüde "Hours without shift".
  */
 export function calendarInfo(days: DayRow[], machines: string[], from: string, to: string, holidays: string[]): CalendarInfo {
   const all = new Set([...machines, ...days.map((d) => d.workCenter)])
   const n = all.size
   const dates: string[] = []
   for (let d = from; d <= to; d = nextDay(d)) dates.push(d)
-  const working = new Set(days.filter((d) => d.loadingMin + d.scheduledMin > 0).map((d) => d.date))
+  const working = new Set(days.filter((d) => d.loadingMin + d.scheduledMin > 0).map(key))
   const hol = new Set(holidays)
   let holidayDays = 0
   let idleDays = 0
-  for (const d of dates) {
-    if (working.has(d)) continue
-    if (hol.has(d)) holidayDays++
-    else idleDays++
-  }
-  return {
-    minutes: dates.length * 1440 * n,
-    machines: n,
-    days: dates.length,
-    holidayMin: holidayDays * 1440 * n,
-    idleDayMin: idleDays * 1440 * n,
-  }
+  for (const m of all)
+    for (const d of dates) {
+      if (working.has(`${d}|${m}`)) continue
+      if (hol.has(d)) holidayDays++
+      else idleDays++
+    }
+  return { minutes: dates.length * 1440 * n, machines: n, days: dates.length, holidayMin: holidayDays * 1440, idleDayMin: idleDays * 1440 }
 }
 
 function nextDay(iso: string): string {
@@ -496,88 +579,102 @@ const finish = (map: Map<string, Level3Row>, withMttr: boolean) =>
     .filter((r) => Math.abs(r.minutes) > 0.05 || Math.abs(r.previous) > 0.05)
     .sort((a, b) => b.minutes - a.minutes)
 
+export interface Level3Set {
+  days: DayRow[]
+  lossDays: LossDay[]
+  orders: OrderRow[]
+}
+
+/** Bir veri kümesinin kalite kaybı (dk): köprüdeki gibi toplamdan, hurda ya da ret payı. */
+function qualityMinutes(days: DayRow[], scrap: boolean): { minutes: number; count: number } {
+  const op = sum(days.map((d) => d.operatingMin))
+  const good = sum(days.map((d) => d.good))
+  const sc = sum(days.map((d) => d.scrap))
+  const rj = sum(days.map((d) => d.reject))
+  const pcs = good + sc + rj
+  const q = pcs > 0 ? op * ((sc + rj) / pcs) : 0
+  const bad = sc + rj
+  return { minutes: bad > 0 ? (q * (scrap ? sc : rj)) / bad : 0, count: scrap ? sc : rj }
+}
+
+export const NOT_IN_ORDERS = 'Not in order data'
+
 /**
- * Level 3 kırılımı. `cur` ve `prev`: bu ve önceki dönemin (kapsama süzülmüş)
- * verisi. Kayıtlı duruş kalemlerinde neden ya da makine; hız ve kalitede
- * kalıp (Order Based) ya da makine; açıklanmayanda makine başına fark.
+ * Level 3 kırılımı. `cur` ve `prev`: bu ve önceki dönemin (kapsama süzülmüş,
+ * vardiyası olan gün × makineyle eşleşmiş) verisi. Satırların toplamı her
+ * zaman Level 2 kalemine eşittir:
+ * - kayıtlı duruş kalemleri: nedene ya da makineye göre (planlıda vardiya
+ *   süresiyle sınırlı, köprüdeki gibi),
+ * - hız: kalıba (Order Based) ya da makineye göre; sipariş verisinin
+ *   kapsamadığı kısım "Not in order data",
+ * - hurda / ret: kalemin süresi adede göre dağıtılır (kalıp ya da makine),
+ * - açıklanmayan ve diğer planlı: makine başına fark.
  */
-export function level3(
-  item: LossItem,
-  by: Level3By,
-  c: OeeConfig,
-  cur: { days: DayRow[]; lossDays: LossDay[]; orders: OrderRow[] },
-  prev: { days: DayRow[]; lossDays: LossDay[]; orders: OrderRow[] },
-): Level3Row[] {
+export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Set, prev: Level3Set): Level3Row[] {
   const map = new Map<string, Level3Row>()
-  const rc1s = item.family === 'planned' ? c.breakReasonCodes : c.lossReasonCodes
+  const sets = [
+    [cur, false],
+    [prev, true],
+  ] as const
 
   if (item.key === 'pf:speed') {
-    if (by === 'die') {
-      for (const [set, isPrev] of [
-        [cur.orders, false],
-        [prev.orders, true],
-      ] as const)
-        for (const o of set) {
+    for (const [set, isPrev] of sets) {
+      if (by === 'die') {
+        let covered = 0
+        for (const o of set.orders) {
           const m = o.productionMin - o.operatingMin
-          addRow(map, `${o.workCenter}|${o.equipment}`, o.equipment || '(no die)', m, 1, isPrev, o.workCenter)
+          covered += m
+          addRow(map, `${o.workCenter}|${o.equipment}`, o.equipment || '(no die)', m, 0, isPrev, o.workCenter)
         }
-      // Kalıp başına sipariş sayısı "count": MTTR anlamsız.
-      return finish(map, false).map((r) => ({ ...r, count: 0 }))
+        const total = sum(set.days.map((d) => d.productionMin - d.operatingMin))
+        if (Math.abs(total - covered) >= 0.05) addRow(map, '__noorders', NOT_IN_ORDERS, total - covered, 0, isPrev)
+      } else for (const d of set.days) addRow(map, d.workCenter, d.workCenter, d.productionMin - d.operatingMin, 0, isPrev)
     }
-    for (const [set, isPrev] of [
-      [cur.days, false],
-      [prev.days, true],
-    ] as const)
-      for (const d of set) addRow(map, d.workCenter, d.workCenter, d.productionMin - d.operatingMin, 0, isPrev)
     return finish(map, false)
   }
 
   if (item.family === 'quality') {
     const scrap = item.key === 'q:scrap'
-    const minutesOf = (r: { operatingMin: number; good: number; scrap: number; reject: number }) => {
-      const pcs = r.good + r.scrap + r.reject
-      return pcs > 0 ? (r.operatingMin * (scrap ? r.scrap : r.reject)) / pcs : 0
+    for (const [set, isPrev] of sets) {
+      const { minutes, count } = qualityMinutes(set.days, scrap)
+      if (count <= 0) continue
+      const per = minutes / count
+      let covered = 0
+      const rows: { key: string; label: string; n: number; sub?: string }[] =
+        by === 'die'
+          ? set.orders.map((o) => ({
+              key: `${o.workCenter}|${o.equipment}`,
+              label: o.equipment || '(no die)',
+              n: scrap ? o.scrap : o.reject,
+              sub: o.workCenter,
+            }))
+          : set.days.map((d) => ({ key: d.workCenter, label: d.workCenter, n: scrap ? d.scrap : d.reject }))
+      for (const r of rows) {
+        if (!r.n) continue
+        covered += r.n
+        addRow(map, r.key, r.label, r.n * per, r.n, isPrev, r.sub)
+      }
+      if (count - covered > 0) addRow(map, '__noorders', NOT_IN_ORDERS, (count - covered) * per, count - covered, isPrev)
     }
-    if (by === 'die') {
-      for (const [set, isPrev] of [
-        [cur.orders, false],
-        [prev.orders, true],
-      ] as const)
-        for (const o of set)
-          addRow(
-            map,
-            `${o.workCenter}|${o.equipment}`,
-            o.equipment || '(no die)',
-            minutesOf(o),
-            scrap ? o.scrap : o.reject,
-            isPrev,
-            o.workCenter,
-          )
-      return finish(map, false)
-    }
-    for (const [set, isPrev] of [
-      [cur.days, false],
-      [prev.days, true],
-    ] as const)
-      for (const d of set) addRow(map, d.workCenter, d.workCenter, minutesOf(d), scrap ? d.scrap : d.reject, isPrev)
     return finish(map, false)
   }
 
   if (item.key === 'av:unexplained' || item.key === 'pl:other') {
-    // Makine başına: süre farkı − o makinenin kayıtlı (görünür) duruşları.
+    // Makine başına: süre farkı − o makinenin kayıtlı duruşları (köprüyle aynı kural).
     const planned = item.key === 'pl:other'
-    for (const [set, isPrev] of [
-      [cur, false],
-      [prev, true],
-    ] as const) {
+    for (const [set, isPrev] of sets) {
+      const sched = scheduledBy(set.days)
       const gap = new Map<string, number>()
       for (const d of set.days)
         gap.set(d.workCenter, (gap.get(d.workCenter) ?? 0) + (planned ? d.scheduledMin : d.loadingMin - d.productionMin))
       for (const l of set.lossDays) {
+        if (planned) {
+          const r = cappedPlanned(l, sched.get(key(l)) ?? 0, c)
+          gap.set(l.workCenter, (gap.get(l.workCenter) ?? 0) - sum(r.reasons.map((x) => x.minutes)))
+          continue
+        }
         for (const [k, [m]] of Object.entries(l.codes)) {
-          const [rc1, rc2] = k.split('|')
-          const counts = planned ? c.breakReasonCodes.includes(rc1) : c.lossReasonCodes.includes(rc1) && !hiddenGroup(rc2, c)
-          if (counts) gap.set(l.workCenter, (gap.get(l.workCenter) ?? 0) - m)
+          if (c.lossReasonCodes.includes(k.split('|')[0])) gap.set(l.workCenter, (gap.get(l.workCenter) ?? 0) - m)
         }
       }
       for (const [wc, m] of gap) addRow(map, wc, wc, m, 0, isPrev)
@@ -585,22 +682,33 @@ export function level3(
     return finish(map, false)
   }
 
-  // Kayıtlı duruş kalemi: grupları; nedene ya da makineye göre.
   const groups = new Set(item.groups)
-  for (const [set, isPrev] of [
-    [cur.lossDays, false],
-    [prev.lossDays, true],
-  ] as const) {
-    for (const l of set) {
+  if (item.family === 'planned') {
+    for (const [set, isPrev] of sets) {
+      const sched = scheduledBy(set.days)
+      for (const l of set.lossDays) {
+        for (const r of cappedPlanned(l, sched.get(key(l)) ?? 0, c).reasons) {
+          if (!groups.has(r.rc2)) continue
+          if (by === 'machine') addRow(map, l.workCenter, l.workCenter, r.minutes, r.count, isPrev)
+          else addRow(map, r.text, r.text, r.minutes, r.count, isPrev)
+        }
+      }
+    }
+    return finish(map, true)
+  }
+
+  // Kayıtlı kayıp duruş kalemi: grupları; nedene ya da makineye göre.
+  for (const [set, isPrev] of sets) {
+    for (const l of set.lossDays) {
       if (by === 'machine') {
         for (const [k, [m, n]] of Object.entries(l.codes)) {
           const [rc1, rc2] = k.split('|')
-          if (rc1s.includes(rc1) && groups.has(rc2)) addRow(map, l.workCenter, l.workCenter, m, n, isPrev)
+          if (c.lossReasonCodes.includes(rc1) && groups.has(rc2)) addRow(map, l.workCenter, l.workCenter, m, n, isPrev)
         }
       } else {
         for (const [k, [m, n]] of Object.entries(l.reasons)) {
           const [rc1, rc2, ...rest] = k.split('|')
-          if (!rc1s.includes(rc1) || !groups.has(rc2)) continue
+          if (!c.lossReasonCodes.includes(rc1) || !groups.has(rc2)) continue
           const text = rest.join('|') || rc2
           addRow(map, text, text, m, n, isPrev)
         }
@@ -662,7 +770,8 @@ export function periodRange(preset: PeriodPreset, today: string, custom?: { from
       return { from: y, to: y }
     case 'thisWeek': {
       const m = mondayOf(today)
-      return { from: m, to: m === today ? today : y }
+      // Pazartesi: bu haftanın verisi yok (veri dünle biter) — geçen hafta.
+      return m === today ? periodRange('lastWeek', today) : { from: m, to: y }
     }
     case 'lastWeek': {
       const m = shiftDay(mondayOf(today), -7)
@@ -670,7 +779,8 @@ export function periodRange(preset: PeriodPreset, today: string, custom?: { from
     }
     case 'thisMonth': {
       const first = `${today.slice(0, 8)}01`
-      return { from: first, to: first === today ? today : y }
+      // Ayın 1'i: bu ayın verisi yok — geçen ay.
+      return first === today ? periodRange('lastMonth', today) : { from: first, to: y }
     }
     case 'lastMonth': {
       const first = `${today.slice(0, 8)}01`
@@ -687,9 +797,21 @@ export function periodRange(preset: PeriodPreset, today: string, custom?: { from
   }
 }
 
-/** Hemen önceki eşit uzunlukta dönem (karşılaştırma). */
-export function previousRange(r: { from: string; to: string }): { from: string; to: string } {
+/**
+ * Karşılaştırma dönemi: ay dönemlerinde önceki takvim ayı (tam ay ↔ önceki
+ * ayın tamamı; ay başından bugüne ↔ önceki ayın aynı günleri); diğerlerinde
+ * hemen önceki eşit uzunlukta dönem.
+ */
+export function previousRange(r: { from: string; to: string }, monthly = false): { from: string; to: string } {
   const n = daysBetween(r.from, r.to)
+  if (monthly && r.from.endsWith('-01')) {
+    const lastOfPrev = shiftDay(r.from, -1)
+    const first = `${lastOfPrev.slice(0, 8)}01`
+    // Tam ay ↔ önceki ayın tamamı.
+    if (shiftDay(r.to, 1).endsWith('-01')) return { from: first, to: lastOfPrev }
+    const to = shiftDay(first, n - 1)
+    return { from: first, to: to > lastOfPrev ? lastOfPrev : to }
+  }
   return { from: shiftDay(r.from, -n), to: shiftDay(r.from, -1) }
 }
 

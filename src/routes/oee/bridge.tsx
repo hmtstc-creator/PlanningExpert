@@ -66,7 +66,7 @@ function BridgePage() {
   const today = localIso(new Date())
   const [preset, setPreset] = useState<PeriodPreset>('yesterday')
   const [custom, setCustom] = useState(() => periodRange('lastWeek', today))
-  const [machine, setMachine] = useState('')
+  const [machineRaw, setMachine] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
   const [view, setView] = useState<Level3By | null>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -74,7 +74,11 @@ function BridgePage() {
   const wanted = periodRange(preset, today, custom)
   const lastDay = coverage?.days?.to ?? null
   const cur = clipToData(wanted, lastDay)
-  const prev = cur ? previousRange(cur) : null
+  // Ay dönemleri önceki takvim ayıyla karşılaştırılır.
+  const prev = cur ? previousRange(cur, preset === 'thisMonth' || preset === 'lastMonth') : null
+  const firstDay = coverage?.days?.from ?? null
+  // Önceki dönem ilk yüklenen günden önce başlıyorsa karşılaştırma yapılmaz (yarım dönem).
+  const prevFull = !!prev && !!firstDay && prev.from >= firstDay
   // Sorgu aralığı: önceki dönemin başından bu dönemin sonuna (veri yoksa dünkü gün, boş döner).
   const q = cur && prev ? { from: prev.from, to: cur.to } : { from: wanted.from, to: wanted.to }
   const dayRows = (useQuery(api.oee.days, q) ?? []) as DayRow[]
@@ -86,11 +90,13 @@ function BridgePage() {
   const lossDays = useMemo(() => fromStoredLosses(lossRaw), [lossRaw])
 
   const scope = effectiveScope(sel.scope, areaNames(dayRows, config))
-  const inSel = (r: { workCenter: string; costCenter: string }) => inScope(r, scope, config) && (!machine || r.workCenter === machine)
   const machineOptions = useMemo(
     () => [...new Set(dayRows.filter((r) => inScope(r, scope, config)).map((r) => r.workCenter))].sort(),
     [dayRows, scope, config],
   )
+  // Hat ya da alan değişince seçimin dışında kalan makine yok sayılır.
+  const machine = machineOptions.includes(machineRaw) ? machineRaw : ''
+  const inSel = (r: { workCenter: string; costCenter: string }) => inScope(r, scope, config) && (!machine || r.workCenter === machine)
   const wcCostCenter = useMemo(() => costCentersOf(dayRows), [dayRows])
   const base = config.bridgeBase ?? 'loading'
 
@@ -124,6 +130,7 @@ function BridgePage() {
   const b = now?.bridge
   const pb = before?.bridge
   const hasData = !!b && b.totals.loading > 0
+  const prevOk = prevFull && !!pb && pb.totals.loading > 0
 
   // Level 3: seçilen kalem, yoksa öncelik, yoksa en büyük.
   const items = b?.items ?? []
@@ -132,15 +139,21 @@ function BridgePage() {
   const activeView = view && views.includes(view) ? view : views[0]
   const l3 = useMemo(() => {
     if (!selectedItem || !activeView || !now || !before) return []
-    return topN(level3(selectedItem, activeView, config, now, before), 5)
-  }, [selectedItem, activeView, now, before, config])
-  const prevItems = useMemo(() => new Map((pb?.items ?? []).map((i) => [i.key, i])), [pb])
+    return topN(level3(selectedItem, activeView, config, now, prevOk ? before : { days: [], lossDays: [], orders: [] }), 5)
+  }, [selectedItem, activeView, now, before, config, prevOk])
+  const prevItems = useMemo(() => new Map((prevOk ? (pb?.items ?? []) : []).map((i) => [i.key, i])), [pb, prevOk])
   const selectable = useMemo(() => new Set(items.map((i) => i.key)), [items])
 
   const notes = [
     ...(cur?.clipped ? [`The data ends on ${dm(cur.to)} — the period is shown up to that day.`] : []),
     ...(wanted && lastDay && wanted.from > lastDay
       ? [`No OEE data uploaded for ${rangeText(wanted)} yet (data ends on ${dm(lastDay)}).`]
+      : []),
+    ...(prev && !prevFull && b
+      ? [`No comparison: the previous period (${rangeText(prev)}) starts before the first uploaded day (${firstDay ? dm(firstDay) : '—'}).`]
+      : []),
+    ...(!country && b
+      ? ['The plant has no country (Company settings → Organization) — official holidays are counted as days without shift.']
       : []),
     ...(b?.warnings ?? []),
     ...(b && b.totals.calendar !== null
@@ -150,8 +163,7 @@ function BridgePage() {
   const priority = items.find((i) => i.priority)
   const prevPriority = priority ? prevItems.get(priority.key) : undefined
   const label = `${scopeLabel(scope, config)}${machine ? ` · ${machine}` : ''}`
-  // Önceki dönemde veri yoksa fark gösterilmez.
-  const prevOk = !!pb && pb.totals.loading > 0
+  // Önceki dönem tam yüklü değilse ya da verisi yoksa fark gösterilmez.
   const delta = (a: number | null | undefined, p: number | null | undefined) =>
     !prevOk || a === null || a === undefined || p === null || p === undefined ? null : (a - p) * 100
 
@@ -288,7 +300,7 @@ function BridgePage() {
               sub={
                 base === 'shift'
                   ? `MES OEE ${pctOf(b!.mesOee)}`
-                  : `A ${pctOf(b!.availability, 0)} · P ${pctOf(b!.performance, 0)} · Q ${pctOf(b!.quality, 0)}`
+                  : `A ${pctOf(b!.availability, 0)} · P ${pctOf(b!.performance, 0)}${config.lossGroups.some((g) => g.family === 'performance') ? ' (bridge split)' : ''} · Q ${pctOf(b!.quality, 0)}`
               }
               strong
             />
@@ -301,7 +313,7 @@ function BridgePage() {
             <Tile
               label="Effective time (E)"
               value={hours(b!.totals.effective)}
-              sub={prevOk ? `${hours(pb!.totals.effective)} in the previous period` : 'no data in the previous period'}
+              sub={prevOk ? `${hours(pb!.totals.effective)} in the previous period` : 'no comparison period'}
             />
             {priority ? (
               <button
@@ -399,7 +411,7 @@ function BridgePage() {
                 {l3.length ? (
                   <Level3Table
                     rows={l3}
-                    total={l3.reduce((a, r) => a + r.minutes, 0)}
+                    total={selectedItem.minutes}
                     unit={selectedItem.family === 'quality' ? 'pcs' : 'min'}
                     showMttr={activeView !== 'die' && selectedItem.groups.length > 0}
                   />

@@ -184,7 +184,8 @@ describe('OEE köprüsü', () => {
     expect(pr).toHaveLength(1)
     const best = Math.max(...b.items.filter((i) => i.rankable).map((i) => i.minutes))
     expect(pr[0].minutes).toBe(best)
-    expect(b.items.find((i) => i.label === 'Undefined')).toBeUndefined()
+    // Gizli grup ("#") kendi kalemi, öncelik olamaz; açıklanmayana karışmaz.
+    expect(b.items.find((i) => i.label === 'Undefined')).toMatchObject({ rankable: false })
   })
 
   it('vardiyası olmayan gün × makinenin duruşu köprüye girmez', () => {
@@ -228,11 +229,18 @@ describe('köprü dönemi', () => {
     expect(periodRange('lastMonth', t)).toEqual({ from: '2026-09-01', to: '2026-09-30' })
     expect(periodRange('custom', t, { from: '2026-08-01', to: '2026-09-30' })).toEqual({ from: '2026-08-01', to: '2026-08-31' })
     expect(periodRange('lastMonth', '2026-01-15')).toEqual({ from: '2025-12-01', to: '2025-12-31' })
+    // Pazartesi "this week" ve ayın 1'i "this month": veri dünle biter — önceki hafta / ay.
+    expect(periodRange('thisWeek', '2026-10-05')).toEqual({ from: '2026-09-28', to: '2026-10-04' })
+    expect(periodRange('thisMonth', '2026-10-01')).toEqual({ from: '2026-09-01', to: '2026-09-30' })
   })
 
   it('önceki eşit dönem ve veriye kırpma', async () => {
     const { previousRange, clipToData } = await import('./oeeBridge')
     expect(previousRange({ from: '2026-09-28', to: '2026-10-04' })).toEqual({ from: '2026-09-21', to: '2026-09-27' })
+    // Ay: önceki takvim ayı (Eylül ↔ Ağustos tamamı, Ekim 1–5 ↔ Eylül 1–5, Mart ↔ Şubat tamamı).
+    expect(previousRange({ from: '2026-09-01', to: '2026-09-30' }, true)).toEqual({ from: '2026-08-01', to: '2026-08-31' })
+    expect(previousRange({ from: '2026-10-01', to: '2026-10-05' }, true)).toEqual({ from: '2026-09-01', to: '2026-09-05' })
+    expect(previousRange({ from: '2026-03-01', to: '2026-03-31' }, true)).toEqual({ from: '2026-02-01', to: '2026-02-28' })
     expect(clipToData({ from: '2026-10-01', to: '2026-10-05' }, '2026-10-03')).toEqual({
       from: '2026-10-01',
       to: '2026-10-03',
@@ -240,5 +248,119 @@ describe('köprü dönemi', () => {
     })
     expect(clipToData({ from: '2026-10-04', to: '2026-10-05' }, '2026-10-03')).toBeNull()
     expect(clipToData({ from: '2026-10-01', to: '2026-10-02' }, null)).toBeNull()
+  })
+})
+
+describe('denetçi bulguları (2026-10-06)', () => {
+  const sumRows = (rows: { minutes: number }[]) => rows.reduce((a, r) => a + r.minutes, 0)
+  const none = { days: [], lossDays: [], orders: [] }
+
+  it('çalışılmamış vardiyanın "scheduled downtime" kaydı planlı duruş değil, planlanmamış süredir', () => {
+    const cal = calendarInfo(pDays, [], day, day, [])
+    const b = buildBridge(pDays, pLoss, plant, 'loading', cal)
+    expectCloses(b)
+    expect(b.steps.find((s) => s.key === 'ns:unworked')?.minutes).toBeCloseTo(480, 0)
+    // Planlı gruplar vardiyaların planlı süresini geçmez: eksi "fazla kayıt" adımı kalmaz.
+    expect(b.steps.find((s) => s.key === 'pl:other')?.minutes ?? 0).toBeGreaterThanOrEqual(0)
+    const plannedSum = b.outside.filter((i) => i.key !== 'pl:other').reduce((a, i) => a + i.minutes, 0)
+    expect(plannedSum).toBeLessThanOrEqual(b.totals.shift - b.totals.loading + 1e-6)
+  })
+
+  it('her Level 3 kırılımı Level 2 kalemine eşit', () => {
+    const b = buildBridge(pDays, pLoss, plant, 'shift')
+    const cur = { days: pDays, lossDays: matchedLossDays(pDays, pLoss), orders: [] }
+    for (const it of b.items) {
+      for (const v of level3Views(it)) {
+        const rows = level3(it, v, plant, cur, none)
+        expect(sumRows(rows), `${it.label} / ${v}`).toBeCloseTo(it.minutes, 4)
+      }
+    }
+  })
+
+  it('kalite: süre adede göre dağılır; sipariş verisi olmayan kısım ayrı satır', () => {
+    const d = (wc: string, scrap: number, reject: number): DayRow => ({
+      date: day,
+      plantKey: '',
+      responsible: '',
+      costCenter: '51010173',
+      workCenter: wc,
+      source: 'shiftly',
+      good: 90,
+      scrap,
+      reject,
+      scheduledMin: 0,
+      unscheduledMin: 0,
+      operatingMin: 400,
+      productionMin: 400,
+      loadingMin: 400,
+    })
+    const days = [d('X', 6, 4), d('Y', 2, 0)]
+    const b = buildBridge(days, [], plant, 'loading')
+    const scrap = b.items.find((i) => i.key === 'q:scrap')!
+    const order = {
+      date: day,
+      plant: '',
+      plantName: '',
+      workCenter: 'X',
+      shift: '',
+      order: '1',
+      equipment: 'D-1',
+      material: '',
+      good: 90,
+      scrap: 6,
+      reject: 4,
+      scheduledMin: 0,
+      unscheduledMin: 0,
+      operatingMin: 400,
+      productionMin: 400,
+      loadingMin: 400,
+      availability: 0,
+      quality: 0,
+      performance: 0,
+      oee: 0,
+    }
+    const rows = level3(scrap, 'die', plant, { days, lossDays: [], orders: [order] }, none)
+    expect(sumRows(rows)).toBeCloseTo(scrap.minutes, 9)
+    expect(rows.map((r) => r.label)).toEqual(['D-1', 'Not in order data'])
+    expect(rows[0].count).toBe(6)
+    const speedRows = level3(
+      b.items.find((i) => i.key === 'pf:speed') ?? { ...scrap, key: 'pf:speed', family: 'performance', minutes: 0 },
+      'die',
+      plant,
+      { days, lossDays: [], orders: [order] },
+      none,
+    )
+    expect(sumRows(speedRows)).toBeCloseTo(0, 9)
+  })
+
+  it('gizlenmemiş "#" grubu da öncelik olamaz', () => {
+    const open = { ...plant, lossGroups: plant.lossGroups.map((g) => (g.code === '#' ? { ...g, hidden: false } : g)) }
+    const b = buildBridge(pDays, pLoss, open, 'loading')
+    expect(b.items.find((i) => i.label === 'Undefined')?.rankable).toBe(false)
+  })
+
+  it('takvim makine × gün: biri çalışırken boş duran makine "vardiyasız gün"dür', () => {
+    const one: DayRow[] = [
+      {
+        date: day,
+        plantKey: '',
+        responsible: '',
+        costCenter: 'C',
+        workCenter: 'M1',
+        source: 'shiftly',
+        good: 0,
+        scrap: 0,
+        reject: 0,
+        scheduledMin: 60,
+        unscheduledMin: 0,
+        operatingMin: 400,
+        productionMin: 400,
+        loadingMin: 420,
+      },
+    ]
+    const cal = calendarInfo(one, ['M1', 'M2'], day, day, [])
+    expect(cal).toMatchObject({ machines: 2, days: 1, idleDayMin: 1440, holidayMin: 0 })
+    const hol = calendarInfo(one, ['M1', 'M2'], day, day, [day])
+    expect(hol).toMatchObject({ idleDayMin: 0, holidayMin: 1440 })
   })
 })

@@ -36,12 +36,12 @@ gün × makine kayıtları (`oeeDays`) **toplanır**, sonra bölünür. Duruş
 | Adım | Formül |
 |---|---|
 | A Calendar time | gün × 1440 × makine (tanımlı iş merkezleri ∪ verideki) |
-| − Official holidays / Days without shift / Hours without shift | vardiyası olmayan tatil günleri / diğer günler / A − kalan |
+| − Official holidays / Days without shift / Unworked shifts (recorded) / Hours without shift | makine × gün: vardiyası olmayan tatil günleri / diğer günler; hiç çalışılmamış vardiyanın "scheduled downtime" kaydı; A − kalan |
 | Shift time | Loading + Scheduled downtime |
-| − Planned stops | Reason Code 1 = mola/planlı (Settings) duruşları, grup başına; fark "Other planned stops" (işaretli) |
+| − Planned stops | Reason Code 1 = mola/planlı (Settings) duruşları, grup başına; gün × makine başına vardiyaların planlı süresiyle sınırlı (fazlası çalışılmamış vardiyadır → planlanmamış süre, en uzun kayıttan düşülür); fark "Other planned stops" |
 | Loading time | Loading — **B (MES tabanı)** |
-| − Availability kayıpları | Reason Code 1 = kayıp duruşları, grafik sütunu (Settings → Chart column) başına, ailesi availability olanlar |
-| − Not explained | (Loading − Production) − kayıtlı görünür duruşlar. Gizli "#" grubu ve kaydı olmayan süre burada. Negatifse "Recorded beyond Loading − Production". **Hiçbir zaman gruplara dağıtılmaz.** |
+| − Availability kayıpları | Reason Code 1 = kayıp duruşları, grafik sütunu (Settings → Chart column) başına, ailesi availability olanlar. Grafiklerde gizli gruplar ("#") kendi kalemidir, öncelik olamaz |
+| − Not explained | (Loading − Production) − kayıtlı kayıp duruşları. Negatifse "Over-recorded downtime". **Hiçbir zaman gruplara dağıtılmaz.** |
 | Production time | Production + performans ailesine alınan grupların süresi — **C** |
 | − Performans | Performans ailesindeki gruplar; Speed loss = Production − Operation (işaretli) |
 | Operation time | Operation — **D** |
@@ -67,17 +67,23 @@ duruş → planlı bakım / kalıp tamiri; setup → adet × ortalama süre).
 
 **Level 3**: seçilen kalemin ilk 5'i + "Others":
 - kayıtlı duruş kalemleri: nedene (duruş metni) ya da makineye göre, adet, MTTR,
-- Speed: kalıba (Order Based: Production − Operation) ya da makineye göre,
-- Scrap / Reject: kalıba ya da makineye göre,
-- Not explained: makine başına (hangi makine nedenini yazmıyor).
-Her satırda önceki eşit dönem.
+- Speed: kalıba (Order Based: Production − Operation) ya da makineye göre;
+  sipariş verisinin kapsamadığı kısım "Not in order data",
+- Scrap / Reject: kalemin süresi adede göre kalıba ya da makineye dağılır,
+- Not explained / Other planned stops: makine başına fark (hangi makine
+  nedenini yazmıyor).
+Satırların toplamı her zaman Level 2 kalemine eşit (test). Her satırda
+önceki dönem: ay dönemlerinde önceki takvim ayı (tam ay ↔ tam ay, ay başından
+bugüne ↔ önceki ayın aynı günleri), diğerlerinde önceki eşit dönem;
+önceki dönem ilk yüklenen günden önce başlıyorsa karşılaştırma yok.
 
 ## Ekran
 
 1. Başlık, bilgi (tanımlar, "Dashboard ile aynı OEE" kuralı), ilgili sayfalar, A3 yazdır.
 2. Seçim: alan → hat / makine (OEE sayfalarıyla ortak, hatırlanır) + hatta
    tek makine; dönem: Yesterday, This week, Last week, This month, Last
-   month, Custom (en çok 62 gün). Dönem son yüklenen güne kırpılır.
+   month, Custom (en çok 31 gün). Dönem son yüklenen güne kırpılır;
+   Pazartesi "This week" ve ayın 1'i "This month" önceki hafta / aya döner.
 3. Kutular: OEE (önceki döneme göre fark), TEEP, Loading saati, ÖNCELİK kalemi.
 4. Köprü (saat; her kayıpta % of B), aile renkleri: süreler mavi,
    availability turuncu (planlı duruş taralı), performans mor, kalite pembe,
@@ -101,3 +107,17 @@ Telefonda köprü yatay çubuklara döner (12+ adım 360 px'e sığmaz).
 - MES'in plansız duruş toplamı (Unscheduled) ile duruş kayıtları neden
   tutmuyor — MES sahibine sorulmalı (açık konu, docs/oeedashboard.md karar 10).
   Köprüde fark görünür kalır; Losses Trend'de değişen bir şey yok.
+
+## Uygulama denetimi (2026-10-06)
+
+Program bittikten sonra veri denetçisi uygulamayı kendi bulgularına göre
+denetledi: engelleyici hata yok (köprü her durumda kapanıyor, Loading
+tabanında OEE Dashboard ile aynı). Düzeltilenler: çalışılmamış vardiya
+kaydı planlı duruşu şişiriyordu → sınırlandı, planlanmamış süreye taşındı;
+kalite Level 3'ü Level 2 ile tutmayabilirdi → süre adede göre dağıtılıyor;
+kalıp kırılımında sipariş verisi olmayan kısım ayrı satır; gizlenmemiş "#"
+öncelik olabiliyordu → olamaz; gizli gruplar "Not explained" sayılıyordu →
+kendi kalemi; ay karşılaştırması takvim ayına hizalandı; Pazartesi / ayın
+1'i boş dönem; seçim değişince makine filtresi; yarım önceki dönem; ülkesi
+olmayan plant uyarısı; A/P "bridge split" etiketi. Hepsi testli
+(src/lib/oeeBridge.test.ts).
