@@ -31,6 +31,19 @@ function checkSlot(period: string, year: number, num: number) {
   if (!Number.isInteger(num) || num < 1 || num > max) throw new ConvexError(period === 'month' ? 'Choose a month' : 'Choose a week')
 }
 
+// Productivity sayısal değerdir; yalnızca bunlar yüzde (kesir).
+const PCT = new Set(['absenteeism', 'oee'])
+
+function checkValues(r: { plan: Any; actual: Any }) {
+  for (const side of [r.plan, r.actual]) {
+    for (const [k, val] of Object.entries(side)) {
+      if (typeof val !== 'number' || !Number.isFinite(val) || val < 0) throw new ConvexError(`${k} must be a number ≥ 0`)
+      if (PCT.has(k) && val > 2) throw new ConvexError(`${k} is a percentage (e.g. 85)`)
+    }
+  }
+  if (r.actual.oee !== undefined) throw new ConvexError('Actual OEE comes from the OEE data')
+}
+
 export const entryOut = (e: Any) => ({
   period: e.period,
   year: e.year,
@@ -107,19 +120,11 @@ export const save = guardedMutation({
       .query('kpiEntries')
       .withIndex('by_period', (q: Any) => q.eq('period', period).eq('year', year).eq('num', num))
       .collect()
-    // Productivity sayısal değerdir; yalnızca bunlar yüzde (kesir).
-    const PCT = new Set(['absenteeism', 'oee'])
     const lines = new Map<string, number>()
     const docs: Any[] = []
     for (const r of rows) {
       if (!codes.has(r.costCenter)) throw new ConvexError(`Cost center ${r.costCenter} is not a cost center of ${ctx.plant?.name ?? 'this plant'}`)
-      for (const side of [r.plan, r.actual]) {
-        for (const [k, val] of Object.entries(side)) {
-          if (typeof val !== 'number' || !Number.isFinite(val) || val < 0) throw new ConvexError(`${k} must be a number ≥ 0`)
-          if (PCT.has(k) && val > 2) throw new ConvexError(`${k} is a percentage (e.g. 85)`)
-        }
-      }
-      if (r.actual.oee !== undefined) throw new ConvexError('Actual OEE comes from the OEE data')
+      checkValues(r)
       const line = lines.get(r.costCenter) ?? 0
       lines.set(r.costCenter, line + 1)
       docs.push({ period, year, num, costCenter: r.costCenter, line, operatorType: r.operatorType, plan: r.plan, actual: r.actual, updatedAt: Date.now(), updatedBy: ctx.sessionUser?.name })
@@ -135,6 +140,97 @@ export const save = guardedMutation({
       } else await ctx.db.insert('kpiEntries', d)
     }
     for (const e of old.values()) await ctx.db.delete(e._id)
+    return null
+  },
+})
+
+/**
+ * Aylık giriş — yıl görünümü (sütunlarda aylar): seçili fabrikanın bir
+ * yıldaki bütün aylık kayıtları ve ay × masraf yeri OEE kök verisi.
+ */
+export const year = guardedQuery({
+  modules: KPI,
+  args: { year: v.number() },
+  returns: v.any(),
+  handler: async (ctx, { year }) => {
+    checkSlot('month', year, 1)
+    const rows: Any[] = await ctx.db
+      .query('kpiEntries')
+      .withIndex('by_period', (q: Any) => q.eq('period', 'month').eq('year', year))
+      .collect()
+    const days: Any[] = await ctx.db
+      .query('oeeDays')
+      .withIndex('by_date', (r: Any) => r.gte('date', `${year}-01-01`).lte('date', `${year}-12-31`))
+      .collect()
+    const by = new Map<string, Any>()
+    for (const d of days) {
+      const num = Number(String(d.date).slice(5, 7))
+      const key = `${num}|${d.costCenter}`
+      const cur = by.get(key) ?? { num, costCenter: d.costCenter, good: 0, operatingMin: 0, productionMin: 0, loadingMin: 0 }
+      cur.good += d.good
+      cur.operatingMin += d.operatingMin
+      cur.productionMin += d.productionMin
+      cur.loadingMin += d.loadingMin
+      by.set(key, cur)
+    }
+    return { entries: rows.map(entryOut), oee: [...by.values()] }
+  },
+})
+
+const sameValues = (a: Any, b: Any) => JSON.stringify(Object.entries(a ?? {}).sort()) === JSON.stringify(Object.entries(b ?? {}).sort())
+
+/**
+ * Bir masraf yerinin bir yılı (yıl görünümünden): her ay için o masraf
+ * yerinin satırları sırayla yazılır, boş ay silinir. Başka masraf yerine
+ * dokunulmaz; değişmeyen kayıt yeniden yazılmaz (kim / ne zaman korunur).
+ */
+export const saveYear = guardedMutation({
+  areas: ['kpi.entry'],
+  modules: KPI,
+  affectsPlan: false,
+  args: {
+    year: v.number(),
+    costCenter: v.string(),
+    months: v.array(
+      v.object({
+        num: v.number(),
+        rows: v.array(v.object({ operatorType: v.union(v.literal('direct'), v.literal('indirect')), plan: valuesV, actual: valuesV })),
+      }),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, { year, costCenter, months }) => {
+    checkSlot('month', year, 1)
+    if (!(ctx.plant?.costCenters ?? []).some((c: Any) => c.code === costCenter)) {
+      throw new ConvexError(`Cost center ${costCenter} is not a cost center of ${ctx.plant?.name ?? 'this plant'}`)
+    }
+    const seen = new Set<number>()
+    for (const m of months) {
+      checkSlot('month', year, m.num)
+      if (seen.has(m.num)) throw new ConvexError('A month is listed twice')
+      seen.add(m.num)
+      m.rows.forEach(checkValues)
+      const existing: Any[] = (
+        await ctx.db
+          .query('kpiEntries')
+          .withIndex('by_period', (q: Any) => q.eq('period', 'month').eq('year', year).eq('num', m.num))
+          .collect()
+      )
+        .filter((e: Any) => e.costCenter === costCenter)
+        .sort((a: Any, b: Any) => (a.line ?? 0) - (b.line ?? 0))
+      for (let line = 0; line < Math.max(existing.length, m.rows.length); line++) {
+        const prev = existing[line]
+        const r = m.rows[line]
+        if (!r) {
+          await ctx.db.delete(prev._id)
+          continue
+        }
+        if (prev && prev.line === line && prev.operatorType === r.operatorType && sameValues(prev.plan, r.plan) && sameValues(prev.actual, r.actual)) continue
+        const doc = { period: 'month', year, num: m.num, costCenter, line, operatorType: r.operatorType, plan: r.plan, actual: r.actual, updatedAt: Date.now(), updatedBy: ctx.sessionUser?.name }
+        if (prev) await ctx.db.replace(prev._id, doc)
+        else await ctx.db.insert('kpiEntries', doc)
+      }
+    }
     return null
   },
 })

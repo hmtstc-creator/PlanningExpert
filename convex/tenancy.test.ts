@@ -356,6 +356,63 @@ describe('fabrika ayrımı', () => {
     await expect(t.mutation(api.kpi.save, { token: k, period: 'month', year: 2026, num: 9, rows: [row] })).rejects.toThrow(/edit permission/)
   })
 
+  it('KPI yıl görünümü: yalnızca seçili masraf yeri yazılır, boş ay silinir, değişmeyen kayıt korunur', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const c = await t.query(api.tenancy.context, { token: boss })
+    const p1 = c.active.plantId
+    await t.mutation(api.platform.updatePlant, {
+      token: boss,
+      id: p1,
+      name: 'Plant 1',
+      departments: ['Stamping'],
+      costCenters: [
+        { code: 'CC1', name: 'Press', department: 'Stamping' },
+        { code: 'CC2', name: 'Weld', department: 'Stamping' },
+      ],
+    })
+    // Başka masraf yerinin aynı ayı (eski sayfadan) — dokunulmamalı.
+    await t.mutation(api.kpi.save, { token: boss, period: 'month', year: 2026, num: 1, rows: [{ costCenter: 'CC2', operatorType: 'direct', plan: { operators: 7 }, actual: {} }] })
+    const empty = Array.from({ length: 12 }, (_, i) => ({ num: i + 1, rows: [] as Any[] }))
+    const months = empty.map((m) =>
+      m.num === 1
+        ? { ...m, rows: [{ operatorType: 'direct', plan: { operators: 10 }, actual: {} }, { operatorType: 'indirect', plan: { operators: 2 }, actual: {} }] }
+        : m.num === 2
+          ? { ...m, rows: [{ operatorType: 'indirect', plan: { operators: 3 }, actual: {} }] }
+          : m,
+    )
+    await expect(t.mutation(api.kpi.saveYear, { token: boss, year: 2026, costCenter: 'X', months })).rejects.toThrow(/not a cost center/)
+    await t.mutation(api.kpi.saveYear, { token: boss, year: 2026, costCenter: 'CC1', months })
+    let y = await t.query(api.kpi.year, { token: boss, year: 2026 })
+    const cc1 = (num: number) => y.entries.filter((e: Any) => e.costCenter === 'CC1' && e.num === num).map((e: Any) => [e.line, e.operatorType, e.plan.operators])
+    expect(cc1(1)).toEqual([[0, 'direct', 10], [1, 'indirect', 2]])
+    expect(cc1(2)).toEqual([[0, 'indirect', 3]])
+    expect(y.entries.filter((e: Any) => e.costCenter === 'CC2')).toHaveLength(1)
+
+    // Ocak değişmeden kalır (kim / ne zaman korunur); Şubat boşalınca silinir.
+    const before: Any[] = await t.run((ctx: Any) => ctx.db.query('kpiEntries').collect())
+    const jan = before.find((e: Any) => e.costCenter === 'CC1' && e.num === 1 && e.line === 0)
+    await t.mutation(api.kpi.saveYear, { token: boss, year: 2026, costCenter: 'CC1', months: months.map((m) => (m.num === 2 ? { ...m, rows: [] } : m)) })
+    y = await t.query(api.kpi.year, { token: boss, year: 2026 })
+    expect(cc1(2)).toEqual([])
+    const after: Any = await t.run((ctx: Any) => ctx.db.get(jan._id))
+    expect(after.updatedAt).toBe(jan.updatedAt)
+    await expect(
+      t.mutation(api.kpi.saveYear, { token: boss, year: 2026, costCenter: 'CC1', months: [{ num: 3, rows: [{ operatorType: 'direct', plan: { absenteeism: 4 }, actual: {} }] }] }),
+    ).rejects.toThrow(/percentage/)
+    await expect(t.mutation(api.kpi.saveYear, { token: boss, year: 2026, costCenter: 'CC1', months: [{ num: 13, rows: [] }] })).rejects.toThrow(/month/)
+
+    // OEE kök verisi ay × masraf yeri.
+    await t.run((ctx: Any) =>
+      ctx.db.insert('oeeDays', { plantId: p1, date: '2026-03-05', plantKey: '', responsible: '', costCenter: 'CC1', workCenter: 'W', source: 'shiftly', good: 5, scrap: 0, reject: 0, scheduledMin: 0, unscheduledMin: 0, operatingMin: 60, productionMin: 90, loadingMin: 100 }),
+    )
+    y = await t.query(api.kpi.year, { token: boss, year: 2026 })
+    expect(y.oee).toEqual([{ num: 3, costCenter: 'CC1', good: 5, operatingMin: 60, productionMin: 90, loadingMin: 100 }])
+  })
+
   it('holding: board üyesi holding şirketlerinin plantlerinde yalnızca KPI ve OEE görür, yazamaz', async () => {
     const t = convexTest(schema, modules)
     const u = await legacyInstall(t)

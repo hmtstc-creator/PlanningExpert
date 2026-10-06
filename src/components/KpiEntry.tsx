@@ -23,13 +23,13 @@ import { KpiPeriodPicker, defaultSlot } from './KpiPeriodPicker'
 import { relatedPages } from '../lib/navigation'
 
 /**
- * KPI veri girişi (aylık ya da haftalık). Her satır bir masraf yeri ve
+ * KPI veri girişi — haftalık (aylık giriş yıl görünümünde: KpiYearEntry.tsx). Her satır bir masraf yeri ve
  * operatör tipi (Direct / Indirect); bir masraf yerinin birden çok satırı
  * olabilir. Her satırda Plan ve Actual alt satırı. Hesaplananlar (Overtime %,
  * Total presence, Efficiency, gerçekleşen OEE) salt okunur.
  */
 
-type Side = Partial<Record<keyof KpiValues, string>>
+export type Side = Partial<Record<keyof KpiValues, string>>
 interface Line {
   id: string
   costCenter: string
@@ -38,15 +38,15 @@ interface Line {
   actual: Side
 }
 
-const pctKeys = new Set(KPI_INPUTS.filter((i) => i.pct).map((i) => i.key))
+export const pctKeys = new Set(KPI_INPUTS.filter((i) => i.pct).map((i) => i.key))
 
-const toText = (v: KpiValues, key: keyof KpiValues) => {
+export const toText = (v: KpiValues, key: keyof KpiValues) => {
   const x = v[key]
   if (x === undefined || x === null) return ''
   return pctKeys.has(key) ? String(Math.round(x * 1000) / 10) : String(x)
 }
 
-function toValues(side: Side): KpiValues {
+export function toValues(side: Side): KpiValues {
   const out: KpiValues = {}
   for (const [k, text] of Object.entries(side)) {
     const t = (text ?? '').trim().replace(',', '.')
@@ -58,7 +58,7 @@ function toValues(side: Side): KpiValues {
   return out
 }
 
-const sideOf = (v: KpiValues) => Object.fromEntries(KPI_INPUTS.map((i) => [i.key, toText(v ?? {}, i.key)])) as Side
+export const sideOf = (v: KpiValues) => Object.fromEntries(KPI_INPUTS.map((i) => [i.key, toText(v ?? {}, i.key)])) as Side
 let seq = 0
 const newId = () => `l${Date.now()}-${seq++}`
 
