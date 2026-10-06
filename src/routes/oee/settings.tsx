@@ -8,7 +8,7 @@ import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
 import { addDaysIso, configProblems, dataCostCenters, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
-import { usePlant } from '../../lib/plantContext'
+import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { OEE_SUGGESTED } from '../../lib/settingsDefaults'
 import { relatedPages } from '../../lib/navigation'
 
@@ -25,6 +25,9 @@ const input = 'rounded-md border border-input bg-background px-2 py-1 text-sm'
 
 function OeeSettingsPage() {
   const { config: saved, loaded, savedAt } = useOeeConfig()
+  const plantShifts = usePlant().ctx?.active?.shifts
+  const shiftSource = usePlant().ctx?.active?.shiftSource
+  const canOpen = useCanOpen()
   // Fabrikada tanımlı masraf yerleri: adı orada değişir, burada yalnızca alan.
   const plantList = usePlant().ctx?.active?.costCenters ?? []
   const departments = usePlant().ctx?.active?.departments ?? []
@@ -203,22 +206,39 @@ function OeeSettingsPage() {
         )}
       </Card>
 
-      <Card title="Shifts" info="Shift Group code of the files → shift number (1st, 2nd, 3rd …). Used for the week-by-shift chart and the downtime Shift column.">
-        <Rows
-          head={['Shift Group code', 'Shift number', '']}
-          rows={c.shifts.map((s, i) => [
-            s.code,
-            <input
-              key="n"
-              type="number"
-              min={1}
-              className={`${input} w-20`}
-              value={s.number}
-              onChange={(e) => set({ shifts: c.shifts.map((x, j) => (j === i ? { ...x, number: Number(e.target.value) } : x)) })}
-            />,
-            <RemoveButton key="r" onClick={() => set({ shifts: c.shifts.filter((_, j) => j !== i) })} />,
-          ])}
-        />
+      <Card title="Shifts" info="Shift Group code of the files → shift number (1st, 2nd, 3rd …). Used for the week-by-shift chart, the downtime Shift column and the Loss Bridge shift filter.">
+        {plantShifts?.length ? (
+          <p className="text-sm text-muted-foreground">
+            From <b>Company settings → Shifts</b> ({shiftSource === 'plant' ? "this plant's own shifts" : 'company standard'}):{' '}
+            {plantShifts.map((s) => `${s.number} ${s.name} = ${s.codes.join(', ') || '—'}`).join(' · ')}.{' '}
+            {canOpen('/settings') && (
+              <Link to="/settings" className="font-medium text-foreground underline">
+                Change there →
+              </Link>
+            )}
+          </p>
+        ) : (
+          <>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Better: define the company's shifts and their codes once on <b>Company settings → Shifts</b> — every plant and page then uses them.
+            </p>
+            <Rows
+              head={['Shift Group code', 'Shift number', '']}
+              rows={c.shifts.map((s, i) => [
+                s.code,
+                <input
+                  key="n"
+                  type="number"
+                  min={1}
+                  className={`${input} w-20`}
+                  value={s.number}
+                  onChange={(e) => set({ shifts: c.shifts.map((x, j) => (j === i ? { ...x, number: Number(e.target.value) } : x)) })}
+                />,
+                <RemoveButton key="r" onClick={() => set({ shifts: c.shifts.filter((_, j) => j !== i) })} />,
+              ])}
+            />
+          </>
+        )}
       </Card>
 
       <Card title="Reason Code 1" info="Which downtimes count as a loss (their minutes ÷ loading time) and which are planned breaks (shown apart after a setup).">

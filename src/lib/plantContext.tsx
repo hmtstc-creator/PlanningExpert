@@ -42,6 +42,9 @@ export interface TenancyContext {
     costCenters: { code: string; name: string; department?: string }[]
     /** Plant'in bölümleri, sırasıyla (OEE alanları bunlardır). */
     departments: string[]
+    /** Geçerli vardiyalar (src/lib/shifts.ts): plant'in kendi ya da şirket standardı. */
+    shifts?: import('./shifts').ShiftDef[]
+    shiftSource?: import('./shifts').ShiftSource
     access: Access
     /** Alan izinleri (AREAS); eski sunucu yanıtında yok. */
     areas?: AreaAccess

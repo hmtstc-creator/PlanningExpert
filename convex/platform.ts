@@ -9,6 +9,7 @@ import { isPlantTable } from './plantDb'
 import { MODULES, canManageCompany, isPlatform } from '../src/lib/tenancy'
 import { securityOverview as buildSecurityOverview, type SecurityUser } from '../src/lib/securityOverview'
 import { SIGNIN_BUCKET_MS } from '../src/lib/signinGuard'
+import { effectiveShifts, normalizeShifts, shiftLabel, shiftProblems, type ShiftDef } from '../src/lib/shifts'
 
 /**
  * Platform ve şirket yapısı (docs/plant-genisletme.md, v3; ağaç: docs/board.md):
@@ -665,5 +666,81 @@ export const securityOverview = userQuery({
       platform: !companyId,
       events: recent.filter((r: Any) => isSecurityAction(r.action)).slice(0, 50),
     }
+  },
+})
+
+// ---- vardiyalar (Company settings → Shifts; src/lib/shifts.ts) -------------------
+
+const shiftsV = v.array(
+  v.object({ number: v.number(), name: v.string(), start: v.optional(v.string()), end: v.optional(v.string()), codes: v.array(v.string()) }),
+)
+
+function checkShifts(list: ShiftDef[]): ShiftDef[] {
+  const problems = shiftProblems(list)
+  if (problems.length) throw new ConvexError(problems.join('; '))
+  return normalizeShifts(list)
+}
+
+const shiftsText = (list: ShiftDef[] | undefined) => (list?.length ? list.map((s) => `${shiftLabel(s)} [${s.codes.join(', ')}]`).join('; ') : '—')
+
+/** Şirket standardı ve plant'lerin kendi tanımları (creator; General seçili şirkette). */
+export const shiftSettings = userQuery({
+  args: { companyId: v.id('companies') },
+  returns: v.any(),
+  handler: async (ctx, { companyId }) => {
+    if (!canManageCompany(ctx.sessionUser, companyId)) throw new ConvexError('Only a creator of this company can see this')
+    const company: Any = await ctx.db.get(companyId)
+    const plants: Any[] = await ctx.db
+      .query('plants')
+      .withIndex('by_company', (q: Any) => q.eq('companyId', companyId))
+      .collect()
+    return {
+      company: company?.shifts ?? [],
+      plants: plants
+        .map((p) => ({ _id: p._id, name: p.name, own: p.shifts ?? [], effective: effectiveShifts(p.shifts, company?.shifts) }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    }
+  },
+})
+
+export const saveCompanyShifts = userMutation({
+  args: { companyId: v.id('companies'), shifts: shiftsV },
+  returns: v.null(),
+  handler: async (ctx, { companyId, shifts }) => {
+    if (!canManageCompany(ctx.sessionUser, companyId)) throw new ConvexError('Only a creator of this company can change its shifts')
+    const company: Any = await ctx.db.get(companyId)
+    if (!company) throw new ConvexError('Company not found')
+    const clean = checkShifts(shifts)
+    await ctx.db.patch(companyId, { shifts: clean })
+    await audit(ctx.db, {
+      actor: ctx.sessionUser.name,
+      action: 'company.shifts',
+      target: company.name,
+      detail: `${shiftsText(company.shifts)} → ${shiftsText(clean)}`,
+      companyId,
+      holdingId: company.holdingId,
+    })
+    return null
+  },
+})
+
+/** Plant'in kendi vardiyaları; boş liste = şirket standardına dön. */
+export const savePlantShifts = userMutation({
+  args: { plantId: v.id('plants'), shifts: shiftsV },
+  returns: v.null(),
+  handler: async (ctx, { plantId, shifts }) => {
+    const plant: Any = await ctx.db.get(plantId)
+    if (!plant) throw new ConvexError('Plant not found')
+    if (!canManageCompany(ctx.sessionUser, plant.companyId)) throw new ConvexError('Only a creator of this company can change its shifts')
+    const clean = shifts.length ? checkShifts(shifts) : undefined
+    await ctx.db.patch(plantId, { shifts: clean })
+    await audit(ctx.db, {
+      actor: ctx.sessionUser.name,
+      action: 'plant.shifts',
+      target: plant.name,
+      detail: `${plant.shifts?.length ? shiftsText(plant.shifts) : 'company standard'} → ${clean ? shiftsText(clean) : 'company standard'}`,
+      companyId: plant.companyId,
+    })
+    return null
   },
 })

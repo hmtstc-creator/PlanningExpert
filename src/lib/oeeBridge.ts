@@ -23,7 +23,7 @@
 // - Öncelik: OEE tabanındaki kayıplar arasında en çok dakika. Açıklanmayan,
 //   tanımsız, hız kazancı ve planlı duruşlar (her iki tabanda) öncelik olamaz.
 
-import { UNASSIGNED, type DayRow, type LossDay, type OeeConfig, type OrderRow } from './oee'
+import { UNASSIGNED, daysFromShifts, lossDayOf, shiftNumber, type DayRow, type DowntimeDay, type LossDay, type OeeConfig, type OrderRow, type ShiftRow } from './oee'
 
 export type BridgeBase = 'loading' | 'shift'
 export type BridgeFamily = 'notScheduled' | 'planned' | 'availability' | 'performance' | 'quality'
@@ -555,12 +555,16 @@ export interface Level3Row {
 
 export type Level3By = 'reason' | 'machine' | 'die'
 
-/** Bir kalemin Level 3 kırılımında hangi görünümler var. */
-export function level3Views(item: LossItem): Level3By[] {
+/**
+ * Bir kalemin Level 3 kırılımında hangi görünümler var. Kayıtlı kayıp
+ * duruşlarında kalıp görünümü ham duruşlarla (en çok 8 gün) olur.
+ */
+export function level3Views(item: LossItem, withEvents = false): Level3By[] {
   if (item.key === 'pf:speed') return ['die', 'machine']
   if (item.family === 'quality') return ['die', 'machine']
   if (item.key === 'av:unexplained' || item.key === 'pl:other') return ['machine']
-  return ['reason', 'machine']
+  if (item.family === 'planned') return ['reason', 'machine']
+  return withEvents ? ['reason', 'machine', 'die'] : ['reason', 'machine']
 }
 
 function addRow(map: Map<string, Level3Row>, key: string, label: string, minutes: number, count: number, prev: boolean, sub?: string) {
@@ -583,6 +587,8 @@ export interface Level3Set {
   days: DayRow[]
   lossDays: LossDay[]
   orders: OrderRow[]
+  /** Ham duruşlar (kalıp kırılımı için; en çok 8 gün okunur). */
+  events?: DowntimeDay[]
 }
 
 /** Bir veri kümesinin kalite kaybı (dk): köprüdeki gibi toplamdan, hurda ya da ret payı. */
@@ -697,7 +703,16 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
     return finish(map, true)
   }
 
-  // Kayıtlı kayıp duruş kalemi: grupları; nedene ya da makineye göre.
+  // Kayıtlı kayıp duruş kalemi: grupları; nedene, makineye ya da kalıba göre.
+  if (by === 'die') {
+    for (const [set, isPrev] of sets)
+      for (const d of set.events ?? [])
+        for (const e of d.events) {
+          if (!c.lossReasonCodes.includes(e.rc1) || !groups.has(e.rc2)) continue
+          addRow(map, `${d.workCenter}|${e.mold}`, e.mold || '(no die)', e.minutes, 1, isPrev, d.workCenter)
+        }
+    return finish(map, true)
+  }
   for (const [set, isPrev] of sets) {
     for (const l of set.lossDays) {
       if (by === 'machine') {
@@ -823,4 +838,30 @@ export function clipToData(
   if (!lastDataDay) return null
   if (r.from > lastDataDay) return null
   return r.to > lastDataDay ? { from: r.from, to: lastDataDay, clipped: true } : { ...r, clipped: false }
+}
+
+// ---- vardiya ---------------------------------------------------------------------
+
+/** Ham duruşlar en çok bu kadar gün okunur (convex/oee.ts MAX_EVENT_DAYS). */
+export const MAX_EVENT_DAYS = 8
+
+/** Duruşun vardiyası: kod Shift Definition'da ya da Shift Group'ta (dosyaya göre). */
+export const eventShift = (e: { shiftDefinition: string; shiftGroup: string }, c: OeeConfig) => shiftNumber(e.shiftDefinition, c) ?? shiftNumber(e.shiftGroup, c)
+
+/**
+ * Tek vardiyanın verisi: vardiya satırlarından gün × makine, o vardiyanın
+ * duruşlarından kayıp özeti, o vardiyanın siparişleri. `shift` 0 = hepsi.
+ */
+export function shiftSlice(
+  shift: number,
+  c: OeeConfig,
+  input: { shifts: ShiftRow[]; events: DowntimeDay[]; orders: OrderRow[] },
+): { days: DayRow[]; lossDays: LossDay[]; events: DowntimeDay[]; orders: OrderRow[] } {
+  const events = input.events.map((d) => ({ ...d, events: shift ? d.events.filter((e) => eventShift(e, c) === shift) : d.events })).filter((d) => d.events.length)
+  return {
+    days: daysFromShifts(shift ? input.shifts.filter((r) => shiftNumber(r.shiftGroup, c) === shift) : input.shifts),
+    lossDays: events.map(lossDayOf),
+    events,
+    orders: shift ? input.orders.filter((o) => shiftNumber(o.shift, c) === shift) : input.orders,
+  }
 }

@@ -8,6 +8,7 @@ import { isPlantTable } from './plantDb'
 import { LEGACY_ROLE_GROUPS, MODULES, isBoardUser, isPlatform, uniformPermissions } from '../src/lib/tenancy'
 import { digestDue, localNow } from '../src/lib/digest'
 import { SIGNIN_KEEP_MS } from '../src/lib/signinGuard'
+import { effectiveShifts } from '../src/lib/shifts'
 
 /**
  * Şirket / fabrika bağlamı ve tek seferlik geçiş (docs/plant-genisletme.md).
@@ -227,6 +228,9 @@ export const context = userQuery({
             country: active.plant.country ?? '',
             costCenters: active.plant.costCenters ?? [],
             departments: active.plant.departments ?? [],
+            // Geçerli vardiyalar: plant'in kendi tanımı, yoksa şirket standardı (Company settings → Shifts).
+            shifts: effectiveShifts(active.plant.shifts, active.company.shifts).shifts,
+            shiftSource: effectiveShifts(active.plant.shifts, active.company.shifts).source,
             timeZone: active.plant.timeZone ?? '',
             access: active.access,
             // Alan izinleri: düzenleme düğmeleri bunlara bakar.

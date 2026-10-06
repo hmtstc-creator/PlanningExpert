@@ -364,3 +364,32 @@ describe('denetçi bulguları (2026-10-06)', () => {
     expect(hol).toMatchObject({ idleDayMin: 0, holidayMin: 1440 })
   })
 })
+
+describe('vardiya ve kalıp (ham duruşlarla)', () => {
+  const cfg: OeeConfig = { ...plant, shifts: [{ code: 'UB64', number: 1 }, { code: 'UB65', number: 2 }, { code: 'UB66', number: 3 }] }
+  const pShifts = parsed.shifts.filter((s) => s.date === day && inScope(s, progressive, cfg))
+  const pEvents = parsed.downtimes.filter((d) => d.date === day && inScope(d, progressive, cfg))
+
+  it('vardiyaların toplamı bütün günün köprüsüne eşit', async () => {
+    const { shiftSlice } = await import('./oeeBridge')
+    const all = buildBridge(pDays, pLoss, cfg, 'loading')
+    const parts = [1, 2, 3].map((n) => shiftSlice(n, cfg, { shifts: pShifts, events: pEvents, orders: [] }))
+    const sumOf = (f: (b: Bridge) => number) => parts.reduce((a, p) => a + f(buildBridge(p.days, p.lossDays, cfg, 'loading')), 0)
+    expect(sumOf((b) => b.totals.loading)).toBeCloseTo(all.totals.loading, 6)
+    expect(sumOf((b) => b.totals.effective)).toBeCloseTo(all.totals.effective, 6)
+    for (const p of parts) expectCloses(buildBridge(p.days, p.lossDays, cfg, 'loading'))
+    // Hepsi (0) = vardiya satırlarından gün.
+    const whole = shiftSlice(0, cfg, { shifts: pShifts, events: pEvents, orders: [] })
+    expect(buildBridge(whole.days, whole.lossDays, cfg, 'loading').oee).toBeCloseTo(all.oee!, 9)
+  })
+
+  it('duruş kaleminin kalıp kırılımı Level 2 ile aynı toplam', () => {
+    const b = buildBridge(pDays, pLoss, cfg, 'loading')
+    const setup = b.items.find((i) => i.label === 'Setup')!
+    expect(level3Views(setup, true)).toContain('die')
+    expect(level3Views(setup, false)).not.toContain('die')
+    const rows = level3(setup, 'die', cfg, { days: pDays, lossDays: pLoss, orders: [], events: pEvents }, { days: [], lossDays: [], orders: [] })
+    expect(rows.reduce((a, r) => a + r.minutes, 0)).toBeCloseTo(setup.minutes, 6)
+    expect(rows[0].sub).toBeTruthy()
+  })
+})

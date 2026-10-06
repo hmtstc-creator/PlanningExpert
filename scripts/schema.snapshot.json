@@ -176,6 +176,50 @@
       },
       "optional": false
     },
+    "shifts": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "number": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "name": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "start": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": true
+            },
+            "end": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": true
+            },
+            "codes": {
+              "fieldType": {
+                "type": "array",
+                "value": {
+                  "type": "string"
+                }
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": true
+    },
     "status": {
       "fieldType": {
         "type": "string"
@@ -2751,6 +2795,50 @@
         "type": "string"
       },
       "optional": false
+    },
+    "shifts": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "number": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "name": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "start": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": true
+            },
+            "end": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": true
+            },
+            "codes": {
+              "fieldType": {
+                "type": "array",
+                "value": {
+                  "type": "string"
+                }
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": true
     },
     "timeZone": {
       "fieldType": {

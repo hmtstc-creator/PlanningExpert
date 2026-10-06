@@ -97,11 +97,13 @@ Telefonda köprü yatay çubuklara döner (12+ adım 360 px'e sığmaz).
 
 ## Kapsam dışı / bilinen sınırlar
 
-- **Vardiya filtresi yok:** duruş özetleri vardiyayı tutmuyor (`oeeLossDays`
-  gün × makine); vardiya kırılımı ham duruşlardan en çok 8 günlük okunabilir.
-- **Setup kalıba göre değil:** özet kalıbı tutmuyor; setup Level 3'ü nedene
-  ve makineye göre. Kalıp kırılımı için özete kalıp alanı eklenmeli (yeniden
-  kurulum gerektirir).
+- **Vardiya filtresi ve kalıp kırılımı en çok 8 gün:** duruş özetleri
+  (`oeeLossDays`) vardiyayı ve kalıbı tutmuyor; vardiya seçilince ya da
+  "By die" görünümünde köprü ham duruşlardan (`oeeDowntimeDays`, vardiya
+  kodu Shift Definition / Shift Group, kalıp Mold) ve vardiya kayıtlarından
+  (`oeeShifts`) kurulur. Bu yüzden dönem 8 günü geçince vardiya seçimi
+  kapanır. Vardiyada planlanmamış süre (takvim) gösterilmez; vardiyaların
+  toplamı tüm güne eşittir (test).
 - Planlama takvimi (vardiya planı) kullanılmaz: yalnızca PRS'te var; bütün
   plant'lerde aynı kural için resmi tatil + gerçekleşen vardiya.
 - MES'in plansız duruş toplamı (Unscheduled) ile duruş kayıtları neden
@@ -121,3 +123,20 @@ kendi kalemi; ay karşılaştırması takvim ayına hizalandı; Pazartesi / ayı
 1'i boş dönem; seçim değişince makine filtresi; yarım önceki dönem; ülkesi
 olmayan plant uyarısı; A/P "bridge split" etiketi. Hepsi testli
 (src/lib/oeeBridge.test.ts).
+
+## Vardiya tanımı ve vardiya filtresi (2026-10-06)
+
+İstek: vardiya sistemi firma ve plant bazında kurulabilsin; ör. 1-2-3
+vardiyaları MES'te UB61-62-63 gibi kodlarla gelir, bu eşleme vardiya
+tanımında standartlansın.
+
+- **Company settings → Shifts:** şirket standardı (No., ad, başlangıç /
+  bitiş, MES kodları virgülle) ve her plant için "Company standard" ya da
+  "Own shifts". Bir kod tek vardiyaya ait olabilir, numara 1–9. Kayıt
+  denetim kaydına yazılır (`company.shifts`, `plant.shifts`); yalnızca şirket
+  yöneticisi değiştirir (src/lib/shifts.ts, convex/platform.ts).
+- **OEE:** plant'in geçerli tanımında kod varsa OEE sayfaları vardiyaları bu
+  kodlarla numaralar; OEE Settings'teki Shifts kartı salt okunur olur ve
+  Company settings'e yönlendirir. Tanım yoksa eski OEE ayarı geçerlidir.
+- **Loss Bridge:** vardiya seçimi (adlar tanımdan) ve Level 3'te duruş
+  kalemleri için kalıba göre kırılım (adet ve MTTR ile), en çok 8 günlük dönem.

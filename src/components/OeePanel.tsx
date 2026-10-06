@@ -22,6 +22,7 @@ import {
   forPlantCostCenters,
 } from '../lib/oee'
 import { usePlant } from '../lib/plantContext'
+import { oeeShiftCodes } from '../lib/shifts'
 import { importOee, type OeeApi } from '../lib/oeeStore'
 import { checkExcelFile, readWorkbook } from '../lib/safeExcel'
 
@@ -42,7 +43,13 @@ export function useOeeConfig(): { config: OeeConfig; problems: string[]; loaded:
   // Masraf yeri adları fabrika tanımından (tek kaynak).
   const plantCcs = usePlant().ctx?.active?.costCenters
   const departments = usePlant().ctx?.active?.departments
-  const config = useMemo(() => withPlantCostCenters(doc?.config ?? EMPTY_CONFIG, plantCcs ?? [], departments ?? []), [doc, plantCcs, departments])
+  // Vardiya kodları Company settings → Shifts'ten (şirket standardı ya da plant'in kendi); yoksa OEE ayarındaki eski liste.
+  const plantShifts = usePlant().ctx?.active?.shifts
+  const config = useMemo(() => {
+    const c = withPlantCostCenters(doc?.config ?? EMPTY_CONFIG, plantCcs ?? [], departments ?? [])
+    const codes = oeeShiftCodes(plantShifts ?? [])
+    return codes.length ? { ...c, shifts: codes } : c
+  }, [doc, plantCcs, departments, plantShifts])
   return { config, problems: doc === undefined ? [] : configProblems(config), loaded: doc !== undefined, savedAt: doc?.updatedAt ?? null }
 }
 

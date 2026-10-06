@@ -7,6 +7,7 @@ import { AuditList, OrgAdmin } from '../components/org/OrgAdmin'
 import { PlantChangeLog } from '../components/settings/PlantChangeLog'
 import { SelectionLists } from '../components/settings/SelectionLists'
 import { DigestSettings } from '../components/settings/DigestSettings'
+import { ShiftSettings } from '../components/settings/ShiftSettings'
 import { relatedPages } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
 
@@ -14,7 +15,7 @@ export const Route = createFileRoute('/settings')({
   component: SettingsPage,
 })
 
-type Tab = 'organization' | 'lists' | 'today' | 'history'
+type Tab = 'organization' | 'shifts' | 'lists' | 'today' | 'history'
 
 /**
  * Company settings — şirketin creator'ları (ve seçili şirkette General):
@@ -42,6 +43,9 @@ function SettingsPage() {
               Users, groups and permissions have their own page: <b>Users &amp; permissions</b>.
             </p>
             <p>
+              <b>Shifts</b>: the company's standard shifts and their MES codes (UB61 …); a plant can have its own.
+            </p>
+            <p>
               <b>Selection lists</b>, <b>Today &amp; daily digest</b> (limits of the Today panel, the daily e-mail) and the <b>plant
               change log</b> belong to the selected plant (header).
             </p>
@@ -58,6 +62,7 @@ function SettingsPage() {
         <Tabs
           tabs={[
             { key: 'organization', label: 'Organization' },
+            { key: 'shifts', label: 'Shifts' },
             { key: 'lists', label: 'Selection lists' },
             { key: 'today', label: 'Today & daily digest' },
             { key: 'history', label: 'Change history' },
@@ -68,6 +73,7 @@ function SettingsPage() {
       </div>
       <div className="mt-4">
         {tab === 'organization' && <OrgAdmin scope="company" />}
+        {tab === 'shifts' && companyId && <ShiftSettings companyId={companyId} />}
         {tab === 'lists' && <SelectionLists />}
         {tab === 'today' && <DigestSettings />}
         {tab === 'history' && companyId && (

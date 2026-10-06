@@ -431,6 +431,49 @@ describe('fabrika ayrımı', () => {
     expect(r.entries.every((e: Any) => e.period === 'week')).toBe(true)
   })
 
+  it('vardiyalar: şirket standardı, plant kendi tanımı, denetim ve yetki', async () => {
+    const t = convexTest(schema, modules)
+    const u = await legacyInstall(t)
+    const boss = await session(t, u.admin, 'boss')
+    await t.mutation(api.tenancy.startMigration, { token: boss })
+    await settle(t)
+    const c = await t.query(api.tenancy.context, { token: boss })
+    const companyId = c.plants[0].companyId
+    const plantId = c.active.plantId
+    expect(c.active.shiftSource).toBe('none')
+    const std = [
+      { number: 2, name: 'Late', start: '14:00', end: '22:00', codes: ['ub62', 'UB65'] },
+      { number: 1, name: 'Early', start: '06:00', end: '14:00', codes: ['UB61', 'UB64'] },
+    ]
+    await t.mutation(api.platform.saveCompanyShifts, { token: boss, companyId, shifts: std })
+    let ctx = await t.query(api.tenancy.context, { token: boss })
+    expect(ctx.active.shiftSource).toBe('company')
+    expect(ctx.active.shifts.map((x: Any) => [x.number, x.codes])).toEqual([
+      [1, ['UB61', 'UB64']],
+      [2, ['UB62', 'UB65']],
+    ])
+    await expect(
+      t.mutation(api.platform.saveCompanyShifts, { token: boss, companyId, shifts: [...std, { number: 3, name: 'Night', codes: ['UB61'] }] }),
+    ).rejects.toThrow(/UB61 is in shift 1 and shift 3/)
+
+    await t.mutation(api.platform.savePlantShifts, { token: boss, plantId, shifts: [{ number: 1, name: 'Day', codes: ['X1'] }] })
+    ctx = await t.query(api.tenancy.context, { token: boss })
+    expect(ctx.active).toMatchObject({ shiftSource: 'plant', shifts: [{ number: 1, name: 'Day', codes: ['X1'] }] })
+    const view = await t.query(api.platform.shiftSettings, { token: boss, companyId })
+    expect(view.plants[0].effective.source).toBe('plant')
+    // Boş liste: şirket standardına döner.
+    await t.mutation(api.platform.savePlantShifts, { token: boss, plantId, shifts: [] })
+    ctx = await t.query(api.tenancy.context, { token: boss })
+    expect(ctx.active.shiftSource).toBe('company')
+    const audit: Any[] = await t.run((x: Any) => x.db.query('auditLog').collect())
+    expect(audit.filter((a) => a.action === 'company.shifts' || a.action === 'plant.shifts')).toHaveLength(3)
+
+    // Creator olmayan değiştiremez.
+    const vw = await session(t, u.viewer, 'vw')
+    await expect(t.mutation(api.platform.saveCompanyShifts, { token: vw, companyId, shifts: std })).rejects.toThrow(/creator/)
+    await expect(t.query(api.platform.shiftSettings, { token: vw, companyId })).rejects.toThrow(/creator/)
+  })
+
   it('holding: board üyesi holding şirketlerinin plantlerinde yalnızca KPI ve OEE görür, yazamaz', async () => {
     const t = convexTest(schema, modules)
     const u = await legacyInstall(t)

@@ -9,6 +9,15 @@ import { configFields, dayFields, downtimeDayFields, lossDayFields, monthlyField
  */
 const plantField = { plantId: v.optional(v.id('plants')) }
 
+/** Vardiya tanımı (src/lib/shifts.ts): numara, ad, saatler, MES kodları. */
+const shiftDefV = v.object({
+  number: v.number(),
+  name: v.string(),
+  start: v.optional(v.string()),
+  end: v.optional(v.string()),
+  codes: v.array(v.string()),
+})
+
 export default defineSchema({
   // ---- Platform (fabrikadan bağımsız) ----
   companies: defineTable({
@@ -22,6 +31,8 @@ export default defineSchema({
     deleteAfter: v.optional(v.number()),
     /** Bağlı olduğu holding (General bağlar). */
     holdingId: v.optional(v.id('holdings')),
+    /** Şirketin vardiya standardı (Company settings → Shifts); plant kendi tanımını yapabilir. */
+    shifts: v.optional(v.array(shiftDefV)),
     createdAt: v.number(),
   }).index('by_holding', ['holdingId']),
 
@@ -50,6 +61,8 @@ export default defineSchema({
      * kayıtlar (ekranda "Unassigned").
      */
     costCenters: v.optional(v.array(v.object({ code: v.string(), name: v.string(), department: v.optional(v.string()) }))),
+    /** Plant'in kendi vardiyaları; yoksa şirket standardı geçerli. */
+    shifts: v.optional(v.array(shiftDefV)),
     createdAt: v.number(),
   }).index('by_company', ['companyId']),
 

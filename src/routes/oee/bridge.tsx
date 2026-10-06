@@ -17,9 +17,10 @@ import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelecti
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import { areaNames, costCentersOf, inScope, scopeLabel, type DayRow, type OrderRow } from '../../lib/oee'
+import { areaNames, costCentersOf, inScope, scopeLabel, type DayRow, type DowntimeDay, type OrderRow, type ShiftRow } from '../../lib/oee'
 import {
   MAX_CUSTOM_DAYS,
+  MAX_EVENT_DAYS,
   PERIOD_PRESETS,
   buildBridge,
   calendarInfo,
@@ -30,12 +31,13 @@ import {
   matchedLossDays,
   periodRange,
   previousRange,
+  shiftSlice,
   topN,
   type Level3By,
   type LossItem,
   type PeriodPreset,
 } from '../../lib/oeeBridge'
-import { fromStoredLosses, type StoredLossDay } from '../../lib/oeeStore'
+import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { printSheet } from '../../lib/printSheet'
 
@@ -69,6 +71,7 @@ function BridgePage() {
   const [machineRaw, setMachine] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
   const [view, setView] = useState<Level3By | null>(null)
+  const [shift, setShift] = useState(0)
   const sheetRef = useRef<HTMLDivElement>(null)
 
   const wanted = periodRange(preset, today, custom)
@@ -89,6 +92,17 @@ function BridgePage() {
   const holidays = (useQuery(api.holidays.listByCountry, { country }) ?? []) as { date: string }[]
   const lossDays = useMemo(() => fromStoredLosses(lossRaw), [lossRaw])
 
+  // Vardiya filtresi ve duruşların kalıp kırılımı ham duruşlarla: en çok 8 günlük dönem.
+  const eventsOk = !!cur && !!prev && daysBetween(cur.from, cur.to) <= MAX_EVENT_DAYS
+  const shiftOn = shift > 0 && eventsOk
+  const needEvents = eventsOk && (shiftOn || view === 'die')
+  const shiftRows = (useQuery(api.oee.shifts, shiftOn ? q : 'skip') ?? []) as ShiftRow[]
+  const curEvRaw = useQuery(api.oee.downtimeDays, needEvents && cur ? { from: cur.from, to: cur.to } : 'skip') as StoredDowntimeDay[] | undefined
+  const prevEvRaw = useQuery(api.oee.downtimeDays, needEvents && prev ? { from: prev.from, to: prev.to } : 'skip') as StoredDowntimeDay[] | undefined
+  const curEvents = useMemo(() => (curEvRaw ?? []).map(fromStoredDay), [curEvRaw])
+  const prevEvents = useMemo(() => (prevEvRaw ?? []).map(fromStoredDay), [prevEvRaw])
+  const eventsLoading = needEvents && (curEvRaw === undefined || prevEvRaw === undefined)
+
   const scope = effectiveScope(sel.scope, areaNames(dayRows, config))
   const machineOptions = useMemo(
     () => [...new Set(dayRows.filter((r) => inScope(r, scope, config)).map((r) => r.workCenter))].sort(),
@@ -98,16 +112,29 @@ function BridgePage() {
   const machine = machineOptions.includes(machineRaw) ? machineRaw : ''
   const inSel = (r: { workCenter: string; costCenter: string }) => inScope(r, scope, config) && (!machine || r.workCenter === machine)
   const wcCostCenter = useMemo(() => costCentersOf(dayRows), [dayRows])
+  // Vardiyalar: Company settings → Shifts (adlarıyla), yoksa OEE ayarındaki kodların numaraları.
+  const shiftOptions = useMemo(() => {
+    const named = ctx?.active?.shifts ?? []
+    const numbers = [...new Set(config.shifts.map((x) => x.number))].sort((a, b) => a - b)
+    return numbers.map((n) => {
+      const d = named.find((x) => x.number === n)
+      return { number: n, label: d ? `${n} · ${d.name}` : `Shift ${n}` }
+    })
+  }, [config.shifts, ctx?.active?.shifts])
   const base = config.bridgeBase ?? 'loading'
 
-  const part = (r: { from: string; to: string } | null) => {
+  const part = (r: { from: string; to: string } | null, events: DowntimeDay[]) => {
     if (!r) return null
     const inRange = (x: { date: string }) => x.date >= r.from && x.date <= r.to
-    const days = dayRows.filter((d) => inRange(d) && inSel(d))
-    const scoped = lossDays.filter((l) => inRange(l) && inSel(l))
+    const ordsIn = orders.filter((o) => inRange(o) && inSel({ workCenter: o.workCenter, costCenter: wcCostCenter.get(o.workCenter) ?? '' }))
+    // Tek vardiya: vardiya satırları, o vardiyanın duruşları ve siparişleri; yoksa gün özetleri.
+    const slice = shiftOn ? shiftSlice(shift, config, { shifts: shiftRows.filter(inRange), events: events.filter(inRange), orders: ordsIn }) : null
+    const days = (slice ? slice.days : dayRows).filter((d) => inRange(d) && inSel(d))
+    const scoped = (slice ? slice.lossDays : lossDays).filter((l) => inRange(l) && inSel(l))
     // Level 3 köprüyle aynı tabanı kullanır: yalnızca vardiyası olan gün × makine.
     const losses = matchedLossDays(days, scoped)
-    const ords = orders.filter((o) => inRange(o) && inSel({ workCenter: o.workCenter, costCenter: wcCostCenter.get(o.workCenter) ?? '' }))
+    const keys = new Set(losses.map((l) => `${l.date}|${l.workCenter}`))
+    const evs = (slice ? slice.events : events).filter((d) => keys.has(`${d.date}|${d.workCenter}`))
     // Takvim: tanımlı iş merkezleri (kapsamdaki) ∪ verideki.
     const defined = presses.filter((p) => p.costCenter && inSel({ workCenter: p.name, costCenter: p.costCenter })).map((p) => p.name)
     const cal = calendarInfo(
@@ -117,16 +144,12 @@ function BridgePage() {
       r.to,
       holidays.map((h) => h.date),
     )
-    return { days, lossDays: losses, orders: ords, bridge: buildBridge(days, scoped, config, base, cal) }
+    // Tek vardiyada takvim (24 saat) anlamsız: TEEP ve planlanmamış adımlar çıkmaz.
+    return { days, lossDays: losses, orders: slice ? slice.orders : ordsIn, events: evs, bridge: buildBridge(days, scoped, config, base, slice ? null : cal) }
   }
-  const now = useMemo(
-    () => part(cur),
-    [dayRows, lossDays, orders, presses, holidays, config, scope.area, scope.key, machine, cur?.from, cur?.to, base],
-  ) // eslint-disable-line react-hooks/exhaustive-deps
-  const before = useMemo(
-    () => part(prev),
-    [dayRows, lossDays, orders, presses, holidays, config, scope.area, scope.key, machine, prev?.from, prev?.to, base],
-  ) // eslint-disable-line react-hooks/exhaustive-deps
+  const deps = [dayRows, lossDays, orders, presses, holidays, config, scope.area, scope.key, machine, base, shiftOn, shift, shiftRows]
+  const now = useMemo(() => part(cur, curEvents), [...deps, curEvents, cur?.from, cur?.to]) // eslint-disable-line react-hooks/exhaustive-deps
+  const before = useMemo(() => part(prev, prevEvents), [...deps, prevEvents, prev?.from, prev?.to]) // eslint-disable-line react-hooks/exhaustive-deps
   const b = now?.bridge
   const pb = before?.bridge
   const hasData = !!b && b.totals.loading > 0
@@ -135,7 +158,7 @@ function BridgePage() {
   // Level 3: seçilen kalem, yoksa öncelik, yoksa en büyük.
   const items = b?.items ?? []
   const selectedItem: LossItem | undefined = items.find((i) => i.key === picked) ?? items.find((i) => i.priority) ?? items[0]
-  const views = selectedItem ? level3Views(selectedItem) : []
+  const views = selectedItem ? level3Views(selectedItem, eventsOk) : []
   const activeView = view && views.includes(view) ? view : views[0]
   const l3 = useMemo(() => {
     if (!selectedItem || !activeView || !now || !before) return []
@@ -155,6 +178,8 @@ function BridgePage() {
     ...(!country && b
       ? ['The plant has no country (Company settings → Organization) — official holidays are counted as days without shift.']
       : []),
+    ...(shift > 0 && !eventsOk ? [`The shift filter works for periods of up to ${MAX_EVENT_DAYS} days — all shifts are shown.`] : []),
+    ...(shiftOn && b ? [`Shift ${shift}: times from the shift rows, losses from the downtimes of that shift; calendar time and TEEP are left out.`] : []),
     ...(b?.warnings ?? []),
     ...(b && b.totals.calendar !== null
       ? [`Calendar: ${b.steps[0]?.note ?? ''}. Days without any shift row count as not scheduled — a missing upload looks the same.`]
@@ -162,7 +187,7 @@ function BridgePage() {
   ]
   const priority = items.find((i) => i.priority)
   const prevPriority = priority ? prevItems.get(priority.key) : undefined
-  const label = `${scopeLabel(scope, config)}${machine ? ` · ${machine}` : ''}`
+  const label = `${scopeLabel(scope, config)}${machine ? ` · ${machine}` : ''}${shiftOn ? ` · ${shiftOptions.find((o) => o.number === shift)?.label ?? `Shift ${shift}`}` : ''}`
   // Önceki dönem tam yüklü değilse ya da verisi yoksa fark gösterilmez.
   const delta = (a: number | null | undefined, p: number | null | undefined) =>
     !prevOk || a === null || a === undefined || p === null || p === undefined ? null : (a - p) * 100
@@ -204,6 +229,24 @@ function BridgePage() {
             />
           </label>
         </>
+      )}
+      {shiftOptions.length > 0 && (
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground" title={eventsOk ? undefined : `The shift filter works for periods of up to ${MAX_EVENT_DAYS} days`}>
+          Shift
+          <select
+            value={eventsOk ? shift : 0}
+            disabled={!eventsOk}
+            onChange={(e) => setShift(Number(e.target.value))}
+            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground disabled:opacity-50"
+          >
+            <option value={0}>All shifts</option>
+            {shiftOptions.map((o) => (
+              <option key={o.number} value={o.number}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
       {machineOptions.length > 1 && (
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -408,12 +451,14 @@ function BridgePage() {
                 )}
               </div>
               <div className="mt-2">
-                {l3.length ? (
+                {activeView === 'die' && eventsLoading ? (
+                  <p className="text-xs text-muted-foreground">Loading the downtimes…</p>
+                ) : l3.length ? (
                   <Level3Table
                     rows={l3}
                     total={selectedItem.minutes}
                     unit={selectedItem.family === 'quality' ? 'pcs' : 'min'}
-                    showMttr={activeView !== 'die' && selectedItem.groups.length > 0}
+                    showMttr={selectedItem.groups.length > 0}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground">

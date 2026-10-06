@@ -533,3 +533,13 @@ fabrika müdürü) değerlendirmesi, hesap ve kararlar: **docs/oee-bridge.md**.
 - Örnek veride (Progressive, 21.09) kayıtlı plansız duruşlar Loading −
   Production'dan 167 dk fazla; çalışılmamış vardiyaların "scheduled downtime"
   kayıtları da planlı süreden 480 dk fazla. Nedeni MES sahibine sorulmalı.
+
+## Vardiya tanımı (2026-10-06, planlamacı)
+
+Vardiyalar artık şirket ve plant bazında **Company settings → Shifts**'te
+tanımlanır: numara, ad, saatler ve MES kodları (ör. 1 = UB61, UB64). Plant
+kendi tanımını yapmazsa şirket standardını kullanır. Tanımda kod varsa OEE
+sayfaları vardiyaları bu kodlarla numaralar ve OEE Settings'teki Shifts
+kartı salt okunur olur; tanım yoksa eski OEE ayarı geçerli. Loss Bridge'de
+vardiya filtresi ve kalıba göre Level 3 (en çok 8 gün, ham duruşlardan):
+docs/oee-bridge.md.
