@@ -182,7 +182,15 @@ export interface OeeConfig {
    * Reason Code 2 grupları. `hidden`: grafiklerde gösterilmez, tablolarda
    * kalır (ör. açıklanmayan duruşlar — planlamacı, 2026-09-28).
    */
-  lossGroups: { code: string; label: string; chart: string; breakdown: boolean; hidden?: boolean }[]
+  lossGroups: {
+    code: string
+    label: string
+    chart: string
+    breakdown: boolean
+    hidden?: boolean
+    /** Loss Bridge'de ailesi (docs/oee-bridge.md); yoksa availability (MES gibi). */
+    family?: 'availability' | 'performance'
+  }[]
   /** Setup sayılan duruş metinleri (Reason Code Definition EN). */
   setupTexts: { text: string; kind: 'planned' | 'unplanned' }[]
   /**
@@ -192,6 +200,12 @@ export interface OeeConfig {
   startupRunMin: number
   trendWeeks: number
   topN: number
+  /**
+   * Loss Bridge'in OEE tabanı: 'loading' (MES — planlı duruşlar OEE dışında;
+   * varsayılan, OEE Dashboard ile aynı) ya da 'shift' (TPM — planlı duruşlar
+   * da kayıp).
+   */
+  bridgeBase?: 'loading' | 'shift'
 }
 
 export const EMPTY_CONFIG: OeeConfig = {

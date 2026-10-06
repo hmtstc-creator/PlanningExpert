@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   Siren,
   Target,
+  TrendingDown,
   TrendingUp,
   TriangleAlert,
   Upload,
@@ -86,6 +87,7 @@ export const ICONS: Record<IconKey, LucideIcon> = {
   user: UserRound,
   wifi: Wifi,
   compare: ArrowLeftRight,
+  trendDown: TrendingDown,
 }
 
 export function NavIcon({ icon, className = 'h-4 w-4' }: { icon: IconKey | undefined; className?: string }) {

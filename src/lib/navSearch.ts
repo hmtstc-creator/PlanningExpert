@@ -39,6 +39,7 @@ export const PAGE_KEYWORDS: Record<string, string> = {
   '/kayitlar': 'karar kayıt kural açık konu decision log',
   '/oee': 'oee verimlilik ekipman etkinliği dashboard',
   '/oee/losses': 'kayıp duruş loss trend kalıp arıza setup',
+  '/oee/bridge': 'kayıp köprüsü bridge şelale waterfall teep oee kayıp öncelik pareto level',
   '/oee/data': 'oee veri tablo yükleme',
   '/oee/settings': 'oee ayar bölüm vardiya kayıp grubu',
   '/oee/guide': 'oee kılavuz nasıl kullanılır rehber',

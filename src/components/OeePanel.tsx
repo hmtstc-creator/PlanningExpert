@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as XLSX from 'xlsx'
 
 import { api } from '../../convex/_generated/api'
@@ -142,11 +142,14 @@ export function OeeControls({
   selection,
   rows,
   config,
+  period,
 }: {
   selection: ReturnType<typeof useOeeSelection>
   /** Seçenekler için iş merkezi / masraf yeri listesi. */
   rows: { workCenter: string; costCenter: string }[]
   config: OeeConfig
+  /** Tarih yerine dönem seçimi (Loss Bridge); verilirse tarih kutusu çıkmaz. */
+  period?: ReactNode
 }) {
   const { setScope, date, setDate, week } = selection
   const areas = useMemo(() => areaNames(rows, config), [rows, config])
@@ -198,19 +201,23 @@ export function OeeControls({
             </select>
           </label>
         )}
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Date
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
-          />
-        </label>
-        <span className="pb-2 text-xs text-muted-foreground">
-          Week <strong className="text-foreground">W{week.week}</strong>
-          {coverage?.days && ` · data ${coverage.days.from} – ${coverage.days.to}`}
-        </span>
+        {period ?? (
+          <>
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              Date
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+              />
+            </label>
+            <span className="pb-2 text-xs text-muted-foreground">
+              Week <strong className="text-foreground">W{week.week}</strong>
+              {coverage?.days && ` · data ${coverage.days.from} – ${coverage.days.to}`}
+            </span>
+          </>
+        )}
         {/* Yükleme yalnızca OEE düzenleme izniyle (board görünümünde yok). */}
         {canEditOee && (
           <div className="ml-auto">

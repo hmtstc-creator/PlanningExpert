@@ -48,6 +48,7 @@ import { Route as MachineFollowupBreakdownsRouteImport } from './routes/machine-
 import { Route as MachineFollowupMaintenanceRouteImport } from './routes/machine-followup/maintenance'
 import { Route as MachineFollowupReportsRouteImport } from './routes/machine-followup/reports'
 import { Route as OeeIndexRouteImport } from './routes/oee/index'
+import { Route as OeeBridgeRouteImport } from './routes/oee/bridge'
 import { Route as OeeDataRouteImport } from './routes/oee/data'
 import { Route as OeeGuideRouteImport } from './routes/oee/guide'
 import { Route as OeeLossesRouteImport } from './routes/oee/losses'
@@ -254,6 +255,11 @@ const OeeIndexRoute = OeeIndexRouteImport.update({
   path: '/oee/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OeeBridgeRoute = OeeBridgeRouteImport.update({
+  id: '/oee/bridge',
+  path: '/oee/bridge',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OeeDataRoute = OeeDataRouteImport.update({
   id: '/oee/data',
   path: '/oee/data',
@@ -331,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/machine-followup/breakdowns': typeof MachineFollowupBreakdownsRoute
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
+  '/oee/bridge': typeof OeeBridgeRoute
   '/oee/data': typeof OeeDataRoute
   '/oee/guide': typeof OeeGuideRoute
   '/oee/losses': typeof OeeLossesRoute
@@ -380,6 +387,7 @@ export interface FileRoutesByTo {
   '/machine-followup/breakdowns': typeof MachineFollowupBreakdownsRoute
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
+  '/oee/bridge': typeof OeeBridgeRoute
   '/oee/data': typeof OeeDataRoute
   '/oee/guide': typeof OeeGuideRoute
   '/oee/losses': typeof OeeLossesRoute
@@ -430,6 +438,7 @@ export interface FileRoutesById {
   '/machine-followup/breakdowns': typeof MachineFollowupBreakdownsRoute
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
+  '/oee/bridge': typeof OeeBridgeRoute
   '/oee/data': typeof OeeDataRoute
   '/oee/guide': typeof OeeGuideRoute
   '/oee/losses': typeof OeeLossesRoute
@@ -481,6 +490,7 @@ export interface FileRouteTypes {
     | '/machine-followup/breakdowns'
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
+    | '/oee/bridge'
     | '/oee/data'
     | '/oee/guide'
     | '/oee/losses'
@@ -530,6 +540,7 @@ export interface FileRouteTypes {
     | '/machine-followup/breakdowns'
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
+    | '/oee/bridge'
     | '/oee/data'
     | '/oee/guide'
     | '/oee/losses'
@@ -579,6 +590,7 @@ export interface FileRouteTypes {
     | '/machine-followup/breakdowns'
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
+    | '/oee/bridge'
     | '/oee/data'
     | '/oee/guide'
     | '/oee/losses'
@@ -629,6 +641,7 @@ export interface RootRouteChildren {
   MachineFollowupBreakdownsRoute: typeof MachineFollowupBreakdownsRoute
   MachineFollowupMaintenanceRoute: typeof MachineFollowupMaintenanceRoute
   MachineFollowupReportsRoute: typeof MachineFollowupReportsRoute
+  OeeBridgeRoute: typeof OeeBridgeRoute
   OeeDataRoute: typeof OeeDataRoute
   OeeGuideRoute: typeof OeeGuideRoute
   OeeLossesRoute: typeof OeeLossesRoute
@@ -918,6 +931,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OeeIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oee/bridge': {
+      id: '/oee/bridge'
+      path: '/oee/bridge'
+      fullPath: '/oee/bridge'
+      preLoaderRoute: typeof OeeBridgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/oee/data': {
       id: '/oee/data'
       path: '/oee/data'
@@ -1013,6 +1033,7 @@ const rootRouteChildren: RootRouteChildren = {
   MachineFollowupBreakdownsRoute: MachineFollowupBreakdownsRoute,
   MachineFollowupMaintenanceRoute: MachineFollowupMaintenanceRoute,
   MachineFollowupReportsRoute: MachineFollowupReportsRoute,
+  OeeBridgeRoute: OeeBridgeRoute,
   OeeDataRoute: OeeDataRoute,
   OeeGuideRoute: OeeGuideRoute,
   OeeLossesRoute: OeeLossesRoute,

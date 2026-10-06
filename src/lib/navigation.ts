@@ -18,7 +18,7 @@ export const ICON_KEYS = [
   'home', 'gantt', 'dashboard', 'grid', 'chart', 'gauge', 'layers', 'siren', 'trending', 'database', 'upload', 'clipboard',
   'boxes', 'check', 'package', 'factory', 'calendar', 'calendarRange', 'warehouse', 'book', 'scroll', 'activity', 'chartDown',
   'sheet', 'settings', 'anvil', 'alert', 'wrench', 'pareto', 'cog', 'zap', 'target', 'pencil', 'presentation', 'building',
-  'users', 'shield', 'user', 'wifi', 'compare',
+  'users', 'shield', 'user', 'wifi', 'compare', 'trendDown',
 ] as const
 export type IconKey = (typeof ICON_KEYS)[number]
 
@@ -154,7 +154,8 @@ export const MODULE_AREAS: Area[] = [
   PLANNING,
   area('oee', 'OEE', 'OEE', '/oee', 'activity', 'emerald', 'oee', [
     link('/oee', 'Dashboard', 'Monthly, 10 weeks and the selected week', 'dashboard'),
-    link('/oee/losses', 'Losses Trend', 'Losses, dies, breakdowns and setups', 'chartDown'),
+    link('/oee/losses', 'Losses Trend', 'Losses, dies, breakdowns and setups', 'trendDown'),
+    link('/oee/bridge', 'Loss Bridge', 'From calendar time to OEE, loss by loss — priorities', 'chartDown'),
     {
       label: 'Menu',
       icon: 'grid',
@@ -280,8 +281,9 @@ const RELATED_PAGES: Record<string, string[]> = {
   '/performans': ['/gerceklesen', '/planlama', '/takvim', '/oee'],
   '/kayitlar': ['/planlama', '/planlogic', '/settings'],
   // OEE
-  '/oee': ['/oee/losses', '/oee/data', '/kpi/monthly/dashboard', '/machine-followup/breakdowns'],
-  '/oee/losses': ['/oee', '/machine-followup/breakdowns', '/die-followup/problems', '/oee/data'],
+  '/oee': ['/oee/losses', '/oee/bridge', '/oee/data', '/kpi/monthly/dashboard', '/machine-followup/breakdowns'],
+  '/oee/losses': ['/oee', '/oee/bridge', '/machine-followup/breakdowns', '/die-followup/problems', '/oee/data'],
+  '/oee/bridge': ['/oee', '/oee/losses', '/die-followup/problems', '/machine-followup/breakdowns', '/oee/settings'],
   '/oee/data': ['/oee', '/oee/settings', '/oee/guide'],
   '/oee/settings': ['/settings', '/oee/data', '/oee/guide', '/makineler'],
   '/oee/guide': ['/oee/settings', '/oee/data', '/oee'],
@@ -314,6 +316,7 @@ const RELATED_PAGES: Record<string, string[]> = {
 const LABELS: Record<string, string> = {
   '/oee': 'OEE Dashboard',
   '/oee/losses': 'OEE Losses',
+  '/oee/bridge': 'OEE Loss Bridge',
   '/oee/data': 'OEE Data',
   '/oee/settings': 'OEE Settings',
   '/oee/guide': 'OEE Guide',

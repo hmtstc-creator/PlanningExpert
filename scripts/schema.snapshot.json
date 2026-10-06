@@ -1746,6 +1746,22 @@
       },
       "optional": false
     },
+    "bridgeBase": {
+      "fieldType": {
+        "type": "union",
+        "value": [
+          {
+            "type": "literal",
+            "value": "loading"
+          },
+          {
+            "type": "literal",
+            "value": "shift"
+          }
+        ]
+      },
+      "optional": true
+    },
     "costCenters": {
       "fieldType": {
         "type": "array",
@@ -1814,6 +1830,22 @@
             "hidden": {
               "fieldType": {
                 "type": "boolean"
+              },
+              "optional": true
+            },
+            "family": {
+              "fieldType": {
+                "type": "union",
+                "value": [
+                  {
+                    "type": "literal",
+                    "value": "availability"
+                  },
+                  {
+                    "type": "literal",
+                    "value": "performance"
+                  }
+                ]
               },
               "optional": true
             }

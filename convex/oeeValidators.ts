@@ -147,9 +147,21 @@ export const configFields = {
   shifts: v.array(v.object({ code: v.string(), number: v.number() })),
   lossReasonCodes: v.array(v.string()),
   breakReasonCodes: v.array(v.string()),
-  lossGroups: v.array(v.object({ code: v.string(), label: v.string(), chart: v.string(), breakdown: v.boolean(), hidden: v.optional(v.boolean()) })),
+  lossGroups: v.array(
+    v.object({
+      code: v.string(),
+      label: v.string(),
+      chart: v.string(),
+      breakdown: v.boolean(),
+      hidden: v.optional(v.boolean()),
+      // Loss Bridge ailesi (docs/oee-bridge.md); yoksa availability.
+      family: v.optional(v.union(v.literal('availability'), v.literal('performance'))),
+    }),
+  ),
   setupTexts: v.array(v.object({ text: v.string(), kind: v.union(v.literal('planned'), v.literal('unplanned')) })),
   startupRunMin: v.number(),
   trendWeeks: v.number(),
   topN: v.number(),
+  // Loss Bridge'in OEE tabanı; yoksa 'loading' (MES).
+  bridgeBase: v.optional(v.union(v.literal('loading'), v.literal('shift'))),
 }

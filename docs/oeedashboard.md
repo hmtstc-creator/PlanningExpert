@@ -514,3 +514,22 @@ OEE'nin üstteki alan düğmeleri artık plant'in **bölümleridir** (Company
 settings → Organization); ayrı OEE alanı tanımlanmaz. Bölümün OEE'si
 masraf yerlerinin toplam ÷ toplam OEE'sidir. OEE Settings → Departments:
 yalnızca seçim türü ve setup sonrası süre. Eski alan ayarları devralınır.
+
+## Loss Bridge (2026-10-06, planlamacı)
+
+Yeni sayfa **OEE → Loss Bridge** (`/oee/bridge`): seçilen hat ya da makinenin
+zamanı takvimden efektif süreye köprü (şelale) olarak; altında OEE dağılımı,
+Level 1 / 2 / 3 kayıplar ve öncelik. Komite (metodoloji, veri denetimi,
+fabrika müdürü) değerlendirmesi, hesap ve kararlar: **docs/oee-bridge.md**.
+
+- OEE tabanı varsayılan Loading (MES) — köprünün OEE'si Dashboard ile
+  birebir aynı. Settings → Loss bridge'den TPM tabanı (Shift time) seçilebilir.
+- Settings → Loss groups'a "Bridge family" sütunu eklendi (availability /
+  performance; varsayılan availability = MES).
+- **Karar 10 ile ilişki:** Losses Trend'de Shiftly–Downtimes farkı hâlâ
+  gösterilmiyor. Köprüde ise adımların toplamı tutmak zorunda olduğu için fark
+  ayrı ve işaretli bir adımdır: "Not explained" (kayıtlar az) ya da
+  "Over-recorded downtime" (kayıtlar fazla). Gruplara dağıtılmaz.
+- Örnek veride (Progressive, 21.09) kayıtlı plansız duruşlar Loading −
+  Production'dan 167 dk fazla; çalışılmamış vardiyaların "scheduled downtime"
+  kayıtları da planlı süreden 480 dk fazla. Nedeni MES sahibine sorulmalı.

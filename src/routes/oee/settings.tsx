@@ -248,10 +248,10 @@ function OeeSettingsPage() {
 
       <Card
         title="Loss groups"
-        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table."
+        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. Bridge family: where the group sits in the Loss Bridge — Availability as the MES counts it (default), or Performance (e.g. short stops in the TPM way). It changes the availability / performance split there, never the OEE."
       >
         <Rows
-          head={['Reason Code 2', 'Name', 'Chart column', 'In charts', 'Breakdown', '']}
+          head={['Reason Code 2', 'Name', 'Chart column', 'In charts', 'Breakdown', 'Bridge family', '']}
           rows={c.lossGroups.map((g, i) => [
             g.code,
             <input key="l" className={input} value={g.label} onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />,
@@ -268,9 +268,37 @@ function OeeSettingsPage() {
               checked={g.breakdown}
               onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, breakdown: e.target.checked } : x)) })}
             />,
+            <select
+              key="f"
+              className={input}
+              value={g.family ?? 'availability'}
+              onChange={(e) =>
+                set({
+                  lossGroups: c.lossGroups.map((x, j) =>
+                    j === i ? { ...x, family: e.target.value === 'performance' ? ('performance' as const) : ('availability' as const) } : x,
+                  ),
+                })
+              }
+            >
+              <option value="availability">Availability</option>
+              <option value="performance">Performance</option>
+            </select>,
             <RemoveButton key="r" onClick={() => set({ lossGroups: c.lossGroups.filter((_, j) => j !== i) })} />,
           ])}
         />
+      </Card>
+
+      <Card
+        title="Loss bridge"
+        info="The OEE base of the Loss Bridge page. Loading time (as the MES and the OEE Dashboard): planned stops such as breaks are outside OEE. Shift time (TPM): planned stops are losses inside OEE as well, so OEE is lower — the page then also shows the MES OEE beside it. Effective time is the same in both."
+      >
+        <label className="flex flex-wrap items-center gap-2 text-sm">
+          OEE base
+          <select className={input} value={c.bridgeBase ?? 'loading'} onChange={(e) => set({ bridgeBase: e.target.value === 'shift' ? 'shift' : 'loading' })}>
+            <option value="loading">Loading time — planned stops outside OEE (MES, as the Dashboard)</option>
+            <option value="shift">Shift time — planned stops are losses too (TPM)</option>
+          </select>
+        </label>
       </Card>
 
       <Card title="Setups" info="Downtime texts (Reason Code Definition EN) that are a setup, planned or unplanned. Other adjustments after a setup are reasons for not getting into production.">
