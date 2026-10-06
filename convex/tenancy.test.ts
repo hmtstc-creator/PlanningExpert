@@ -411,6 +411,24 @@ describe('fabrika ayrımı', () => {
     )
     y = await t.query(api.kpi.year, { token: boss, year: 2026 })
     expect(y.oee).toEqual([{ num: 3, costCenter: 'CC1', good: 5, operatingMin: 60, productionMin: 90, loadingMin: 100 }])
+
+    // Haftalık: 13 hafta, yıl geçişi; OEE haftasına göre.
+    const w = (year: number, num: number, operators?: number) => ({ year, num, rows: operators ? [{ operatorType: 'direct', plan: { operators }, actual: {} }] : [] })
+    await t.mutation(api.kpi.saveRange, { token: boss, period: 'week', costCenter: 'CC1', slots: [w(2025, 52, 6), w(2026, 1, 7)] })
+    await expect(t.mutation(api.kpi.saveRange, { token: boss, period: 'week', costCenter: 'CC1', slots: [w(2025, 53, 1)] })).rejects.toThrow(/week/)
+    await expect(t.mutation(api.kpi.saveRange, { token: boss, period: 'week', costCenter: 'CC1', slots: [w(2026, 1, 1), w(2026, 1, 2)] })).rejects.toThrow(/twice/)
+    await t.run((ctx: Any) =>
+      ctx.db.insert('oeeDays', { plantId: p1, date: '2026-01-01', plantKey: '', responsible: '', costCenter: 'CC1', workCenter: 'W', source: 'shiftly', good: 2, scrap: 0, reject: 0, scheduledMin: 0, unscheduledMin: 0, operatingMin: 6, productionMin: 9, loadingMin: 10 }),
+    )
+    const r = await t.query(api.kpi.range, { token: boss, period: 'week', year: 2026, num: 3 })
+    expect(r.slots.map((s: Any) => `${s.year}-${s.num}`).slice(-4)).toEqual(['2025-52', '2026-1', '2026-2', '2026-3'])
+    expect(r.entries.map((e: Any) => [e.year, e.num, e.plan.operators])).toEqual([
+      [2025, 52, 6],
+      [2026, 1, 7],
+    ])
+    expect(r.oee).toEqual([{ year: 2026, num: 1, costCenter: 'CC1', good: 2, operatingMin: 6, productionMin: 9, loadingMin: 10 }])
+    // Aylık kayıtlar haftalık aralıkta görünmez.
+    expect(r.entries.every((e: Any) => e.period === 'week')).toBe(true)
   })
 
   it('holding: board üyesi holding şirketlerinin plantlerinde yalnızca KPI ve OEE görür, yazamaz', async () => {

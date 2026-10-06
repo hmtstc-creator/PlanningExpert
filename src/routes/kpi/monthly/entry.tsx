@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { KpiYearEntry } from '../../../components/KpiYearEntry'
+import { KpiSeriesEntry } from '../../../components/KpiSeriesEntry'
 
 export const Route = createFileRoute('/kpi/monthly/entry')({
-  component: KpiYearEntry,
+  component: () => <KpiSeriesEntry period="month" />,
 })
