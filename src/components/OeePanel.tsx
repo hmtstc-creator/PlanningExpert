@@ -21,6 +21,7 @@ import {
   withPlantCostCenters,
   forPlantCostCenters,
 } from '../lib/oee'
+import { InfoTip } from './PageHeader'
 import { usePlant } from '../lib/plantContext'
 import { oeeShiftCodes } from '../lib/shifts'
 import { importOee, type OeeApi } from '../lib/oeeStore'
@@ -151,6 +152,7 @@ export function OeeControls({
   config,
   period,
   upload = false,
+  notes,
 }: {
   selection: ReturnType<typeof useOeeSelection>
   /** Seçenekler için iş merkezi / masraf yeri listesi. */
@@ -160,6 +162,8 @@ export function OeeControls({
   period?: ReactNode
   /** Yükleme düğmesi yalnızca OEE Data sayfasında (tek nokta — planlamacı, 2026-10-07). */
   upload?: boolean
+  /** Verilirse veri notları sayfayı kaplamaz: tarihin yanında info düğmesinde (Trend Analysis). */
+  notes?: string[]
 }) {
   const { setScope, date, setDate, week } = selection
   const areas = useMemo(() => areaNames(rows, config), [rows, config])
@@ -226,6 +230,19 @@ export function OeeControls({
               Week <strong className="text-foreground">W{week.week}</strong>
               {coverage?.days && ` · data ${coverage.days.from} – ${coverage.days.to}`}
             </span>
+            {notes && notes.length > 0 && (
+              <span className="flex items-center gap-1 pb-2 text-xs text-muted-foreground">
+                <InfoTip label="Data notes">
+                  <p className="font-semibold text-foreground">Data notes (the numbers use what is uploaded)</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    {notes.map((t) => (
+                      <li key={t}>{t}</li>
+                    ))}
+                  </ul>
+                </InfoTip>
+                Data notes ({notes.length})
+              </span>
+            )}
           </>
         )}
         {/* Yükleme yalnızca OEE düzenleme izniyle (board görünümünde yok). */}

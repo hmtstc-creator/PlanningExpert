@@ -3,7 +3,7 @@ import { useMemo, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { OeeBarChart, PeriodTable } from '../../components/OeeCharts'
-import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
+import { OeeControls, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import {
@@ -83,8 +83,12 @@ function OeeDashboard() {
         }
       />
 
-      <OeeControls selection={sel} rows={scopeRows} config={config} />
-      <OeeDataNotice items={[...trendGaps(month).map((t) => `Monthly — ${t}`), ...trendGaps(weeks).map((t) => `Weekly — ${t}`)]} />
+      <OeeControls
+        selection={sel}
+        rows={scopeRows}
+        config={config}
+        notes={[...trendGaps(month).map((t) => `Monthly — ${t}`), ...trendGaps(weeks).map((t) => `Weekly — ${t}`)]}
+      />
 
       {days.length === 0 && monthly.length === 0 && weekly.length === 0 && (
         <p className="mt-6 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
