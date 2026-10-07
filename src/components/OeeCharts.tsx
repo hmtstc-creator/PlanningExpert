@@ -41,10 +41,10 @@ function niceMax(v: number, atLeast = 1): number {
   return Math.max(step, Math.ceil(top / step - 1e-9) * step)
 }
 
-function Grid({ width, height, max }: { width: number; height: number; max: number }) {
+function Grid({ width, height, max, top = PAD_T }: { width: number; height: number; max: number; top?: number }) {
   const step = tickStep(max)
   const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step)
-  const y = (v: number) => PAD_T + (height - PAD_T - PAD_B) * (1 - v / max)
+  const y = (v: number) => top + (height - top - PAD_B) * (1 - v / max)
   return (
     <g>
       {ticks.map((t) => (
@@ -71,25 +71,58 @@ function Tooltip({ x, y, width, children }: { x: number; y: number; width: numbe
   )
 }
 
-/** Tek seri OEE çubukları (aylık, haftalık, vardiya). */
-export function OeeBarChart({ points, height = 220, ariaLabel }: { points: SeriesPoint[]; height?: number; ariaLabel: string }) {
+/**
+ * OEE çubukları (aylık, haftalık, vardiya) ve üstünde Performans % çizgisi
+ * (koyu turuncu; planlamacı 2026-10-07: "OEE 64, P 80 → availability ~80"
+ * yorumu için). İkisi de yüzde: tek eksen. Etiket: çubuk değeri çubuğun,
+ * performans değeri noktanın üstünde (14 noktaya kadar; fazlası ipucunda).
+ */
+export function OeeBarChart({ points, height = 240, ariaLabel }: { points: SeriesPoint[]; height?: number; ariaLabel: string }) {
   const { ref, width } = useWidth()
   const [hover, setHover] = useState<number | null>(null)
-  const max = niceMax(Math.max(0, ...points.map((p) => p.oee ?? 0)))
+  const perf = points.map((p) => (p.oee === null ? null : ratios(p.times).performance))
+  const max = niceMax(Math.max(0, ...points.map((p) => p.oee ?? 0), ...perf.map((v) => v ?? 0)))
   const n = Math.max(1, points.length)
   const col = (width - PAD_L - PAD_R) / n
   const bar = Math.max(4, Math.min(28, col * 0.62))
-  const y = (v: number) => PAD_T + (height - PAD_T - PAD_B) * (1 - v / max)
+  const top0 = PAD_T + 12
+  const y = (v: number) => top0 + (height - top0 - PAD_B) * (1 - v / max)
   const base = height - PAD_B
-  const labelEvery = n > 14 ? Math.ceil(n / 14) : 1
+  // Eksen etiketi en az ~40 px yer bulsun (telefonda üst üste binmesin).
+  const labelEvery = Math.max(n > 14 ? Math.ceil(n / 14) : 1, Math.ceil(40 / col))
+  const perfLabels = n <= 14 && col >= 22
+  const cx = (i: number) => PAD_L + col * i + col / 2
+  // Çizgi veri olmayan noktada kesilir.
+  const segments: string[] = []
+  let cur = ''
+  perf.forEach((v, i) => {
+    if (v === null || v === undefined) {
+      if (cur) segments.push(cur)
+      cur = ''
+      return
+    }
+    cur += `${cur ? 'L' : 'M'}${cx(i)},${y(v)}`
+  })
+  if (cur) segments.push(cur)
   const h = hover !== null ? points[hover] : null
   const hr = h ? ratios(h.times) : null
   return (
     <div ref={ref} className="oee-viz relative w-full">
-      <svg width={width} height={height} role="img" aria-label={ariaLabel} onMouseLeave={() => setHover(null)}>
-        <Grid width={width} height={height} max={max} />
+      <div className="mb-1 flex justify-end gap-4 text-[11px] text-muted-foreground" aria-hidden>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'var(--viz-1)' }} /> OEE
+        </span>
+        <span className="flex items-center gap-1.5">
+          <svg width="18" height="10" aria-hidden>
+            <line x1="1" x2="17" y1="5" y2="5" stroke="var(--viz-perf)" strokeWidth="2" />
+            <circle cx="9" cy="5" r="3.5" fill="var(--viz-perf)" stroke="var(--background)" strokeWidth="1.5" />
+          </svg>
+          Performance
+        </span>
+      </div>
+      <svg width={width} height={height} role="img" aria-label={`${ariaLabel} — OEE bars, performance line`} onMouseLeave={() => setHover(null)}>
+        <Grid width={width} height={height} max={max} top={top0} />
         {points.map((p, i) => {
-          const cx = PAD_L + col * i + col / 2
           const v = p.oee ?? 0
           const top = y(v)
           const hgt = Math.max(0, base - top)
@@ -98,38 +131,72 @@ export function OeeBarChart({ points, height = 220, ariaLabel }: { points: Serie
               <rect x={PAD_L + col * i} y={PAD_T} width={col} height={base - PAD_T} fill="transparent" />
               {p.oee !== null && hgt > 0 && (
                 <path
-                  d={`M${cx - bar / 2},${base} V${top + 4} q0,-4 4,-4 H${cx + bar / 2 - 4} q4,0 4,4 V${base} Z`}
+                  d={`M${cx(i) - bar / 2},${base} V${top + 4} q0,-4 4,-4 H${cx(i) + bar / 2 - 4} q4,0 4,4 V${base} Z`}
                   fill="var(--viz-1)"
                   opacity={hover === null || hover === i ? 1 : 0.55}
                 />
               )}
-              {p.oee !== null && hgt > 0 && (
-                // Değer çubuğun üstünde: kalın, siyah, arka plansız, % işaretsiz (60).
-                <text x={cx} y={Math.max(10, top - 4)} textAnchor="middle" fontSize={bar < 14 ? 9 : 11} fontWeight={700} fill="var(--viz-value)" pointerEvents="none">
-                  {Math.round(v * 100)}
-                </text>
-              )}
               {i % labelEvery === 0 && (
-                <text x={cx} y={base + 16} textAnchor="middle" fontSize={10} fill="var(--viz-axis)">
+                <text x={cx(i)} y={base + 16} textAnchor="middle" fontSize={10} fill="var(--viz-axis)">
                   {p.label}
                 </text>
               )}
             </g>
           )
         })}
+        {segments.map((d) => (
+          <path key={d} d={d} fill="none" stroke="var(--viz-perf)" strokeWidth={2} strokeLinejoin="round" pointerEvents="none" />
+        ))}
+        {perf.map((v, i) => {
+          if (v === null || v === undefined) return null
+          const py = y(v)
+          // Çubuk etiketiyle çakışmasın: nokta çubuğa yakınsa etiket biraz yukarıda.
+          const barLabel = y(points[i].oee ?? 0) - 4
+          const ly = Math.abs(py - 8 - barLabel) < 12 ? barLabel - 12 : py - 8
+          return (
+            <g key={`p${points[i].key}`} pointerEvents="none">
+              <circle cx={cx(i)} cy={py} r={hover === i ? 5 : 4} fill="var(--viz-perf)" stroke="var(--background)" strokeWidth={2} />
+              {perfLabels && (
+                <text x={cx(i)} y={Math.max(9, ly)} textAnchor="middle" fontSize={10} fontWeight={600} fill="var(--viz-axis)">
+                  {Math.round(v * 100)}
+                </text>
+              )}
+            </g>
+          )
+        })}
+        {/* Çubuk değerleri en üstte (çizgi üstünden geçmesin): kalın, siyah, % işaretsiz (60), zemin renginde ince hale. */}
+        {points.map((p, i) =>
+          p.oee !== null && base - y(p.oee) > 0 ? (
+            <text
+              key={`v${p.key}`}
+              x={cx(i)}
+              y={Math.max(10, y(p.oee) - 4)}
+              textAnchor="middle"
+              fontSize={bar < 14 ? 9 : 11}
+              fontWeight={700}
+              fill="var(--viz-value)"
+              stroke="var(--background)"
+              strokeWidth={3}
+              paintOrder="stroke"
+              pointerEvents="none"
+            >
+              {Math.round(p.oee * 100)}
+            </text>
+          ) : null,
+        )}
       </svg>
       {h && hr && (
-        <Tooltip x={PAD_L + col * hover! + col / 2} y={y(h.oee ?? 0)} width={width}>
+        <Tooltip x={cx(hover!)} y={y(Math.max(h.oee ?? 0, perf[hover!] ?? 0))} width={width}>
           <p className="font-semibold text-foreground">{h.label}</p>
           <p className="text-foreground">OEE {pct(hr.oee)}</p>
+          <p className="text-foreground">Performance {pct(hr.performance)}</p>
           <p className="text-muted-foreground">
-            A {pct(hr.availability)} · P {pct(hr.performance)} · Q {pct(hr.quality)}
+            A {pct(hr.availability)} · Q {pct(hr.quality)}
           </p>
-          <p className="text-muted-foreground">Loading {(h.times.loadingMin / 60).toFixed(1)} h</p>
         </Tooltip>
       )}
       {h && !hr && (
-        <Tooltip x={PAD_L + col * hover! + col / 2} y={base} width={width}>
+        <Tooltip x={cx(hover!)} y={base} width={width}>
           <p className="font-semibold text-foreground">{h.label}</p>
           <p className="text-muted-foreground">No data</p>
         </Tooltip>
@@ -299,14 +366,14 @@ export function PeriodTable({
   total,
   rows,
   unknown,
-  shift,
+  shiftsWorked,
 }: {
   total: SeriesPoint[]
   rows: [string, SeriesPoint[]][]
   /** Press Definitions'ta olmayan iş merkezleri (işaretlenir). */
   unknown?: Set<string>
-  /** Verilirse altta toplam Loading (saat) ve çalışılan vardiya = Loading ÷ vardiya süresi. */
-  shift?: { minutes: number; defined: boolean }
+  /** Verilirse başlığın altında "Shifts worked" satırı: Loading ÷ net vardiya süresi. */
+  shiftsWorked?: { of: (p: SeriesPoint) => number | null; note: string }
 }) {
   if (!total.length) return null
   const cell = (p: SeriesPoint) => {
@@ -315,7 +382,7 @@ export function PeriodTable({
       <td
         key={p.key}
         className="px-2 py-1 text-right tabular-nums"
-        title={r.oee === null ? 'No data' : `A ${pct(r.availability)} · P ${pct(r.performance)} · Q ${pct(r.quality)} · Loading ${(p.times.loadingMin / 60).toFixed(1)} h`}
+        title={r.oee === null ? 'No data' : `A ${pct(r.availability)} · P ${pct(r.performance)} · Q ${pct(r.quality)}`}
       >
         {pct(r.oee)}
       </td>
@@ -324,7 +391,7 @@ export function PeriodTable({
   return (
     <div className="mt-2 overflow-x-auto rounded-md border border-border">
       <table className="w-full text-xs">
-        <thead className="bg-muted text-muted-foreground">
+        <thead className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           <tr>
             <th className="px-2 py-1.5 text-left font-medium">OEE</th>
             {total.map((p) => (
@@ -335,6 +402,19 @@ export function PeriodTable({
           </tr>
         </thead>
         <tbody>
+          {shiftsWorked && (
+            <tr className="border-t border-border bg-sky-100 font-semibold text-sky-950 dark:bg-sky-950 dark:text-sky-100">
+              <td className="whitespace-nowrap px-2 py-1">Shifts worked</td>
+              {total.map((p) => {
+                const v = shiftsWorked.of(p)
+                return (
+                  <td key={p.key} className="px-2 py-1 text-right tabular-nums">
+                    {v === null ? '—' : v.toFixed(1)}
+                  </td>
+                )
+              })}
+            </tr>
+          )}
           <tr className="border-t border-border bg-muted/40 font-semibold text-foreground">
             <td className="px-2 py-1">Total</td>
             {total.map(cell)}
@@ -352,36 +432,9 @@ export function PeriodTable({
               {pts.map(cell)}
             </tr>
           ))}
-          {shift && (
-            <>
-              <tr className="border-t-2 border-border text-muted-foreground">
-                <td className="whitespace-nowrap px-2 py-1">Loading time (h)</td>
-                {total.map((p) => (
-                  <td key={p.key} className="px-2 py-1 text-right tabular-nums">
-                    {p.times.loadingMin > 0 ? Math.round(p.times.loadingMin / 60).toLocaleString('en-GB') : '—'}
-                  </td>
-                ))}
-              </tr>
-              <tr
-                className="border-t border-border font-semibold text-foreground"
-                title={`Loading time ÷ ${(shift.minutes / 60).toFixed(1)} h per shift${shift.defined ? ' (Company settings → Shifts)' : ' (8 h assumed — set the shift times on Company settings → Shifts)'}`}
-              >
-                <td className="whitespace-nowrap px-2 py-1">
-                  Shifts worked{' '}
-                  <span className="font-normal text-muted-foreground">
-                    (÷ {(shift.minutes / 60).toFixed(1)} h{shift.defined ? '' : ' assumed'})
-                  </span>
-                </td>
-                {total.map((p) => (
-                  <td key={p.key} className="px-2 py-1 text-right tabular-nums">
-                    {p.times.loadingMin > 0 ? (p.times.loadingMin / shift.minutes).toFixed(1) : '—'}
-                  </td>
-                ))}
-              </tr>
-            </>
-          )}
         </tbody>
       </table>
+      {shiftsWorked && <p className="border-t border-border px-2 py-1.5 text-[11px] text-muted-foreground">{shiftsWorked.note}</p>}
     </div>
   )
 }

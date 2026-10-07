@@ -162,6 +162,8 @@
   --viz-axis: #52514e;
   /* Çubuk üstü değer: siyah, kalın. */
   --viz-value: #000000;
+  /* OEE çubuklarının üstündeki Performans çizgisi: koyu turuncu (mavi ile doğrulandı). */
+  --viz-perf: #c2410c;
 }
 .dark .oee-viz {
   --viz-1: #3987e5;
@@ -174,6 +176,7 @@
   --viz-grid: #34332f;
   --viz-axis: #c3c2b7;
   --viz-value: #f4f3ee;
+  --viz-perf: #e0642a;
 }
 
 /* ---- KPI dashboard: tek A3 yatay sayfa (420 × 297 mm), ölçü sabit ---- */

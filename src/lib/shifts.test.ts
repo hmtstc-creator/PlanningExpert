@@ -9,7 +9,7 @@ import {
   shiftMinutes,
   shiftOfCode,
   shiftProblems,
-  standardShiftMinutes,
+  netShiftMinutes,
   type ShiftDef,
 } from './shifts'
 
@@ -66,10 +66,18 @@ describe('vardiya tanımı', () => {
     expect(shiftLabel(normalizeShifts(std)[0])).toBe('1 · Early 06:00–14:00')
   })
 
-  it('vardiya süresi: saati tanımlı vardiyaların ortalaması, yoksa 8 saat (Dashboard: Loading ÷ süre = çalışılan vardiya)', () => {
-    expect(standardShiftMinutes(std)).toEqual({ minutes: 480, defined: true })
-    expect(standardShiftMinutes([{ start: '06:00', end: '18:00' }, { start: '18:00', end: '06:00' }])).toEqual({ minutes: 720, defined: true })
-    expect(standardShiftMinutes([{}])).toEqual({ minutes: DEFAULT_SHIFT_MIN, defined: false })
-    expect(standardShiftMinutes(undefined).defined).toBe(false)
+  it('net vardiya süresi = vardiya süresi − planlı duruşları (çay, yemek, toplantı); saat yoksa 8 saat', () => {
+    const stops = [
+      { shiftIndex: 1, durationMinutes: 20 },
+      { shiftIndex: 1, durationMinutes: 10 },
+      { shiftIndex: 2, durationMinutes: 30 },
+      { shiftIndex: 3, durationMinutes: 40 },
+    ]
+    expect(netShiftMinutes(std, stops)).toEqual({ byShift: { 1: 450, 2: 450, 3: 440 }, average: 1340 / 3, plannedAverage: 100 / 3, timesDefined: true })
+    // Tanım yok: 1–3, 8 saat.
+    const none = netShiftMinutes([], stops)
+    expect(none.byShift).toEqual({ 1: 450, 2: 450, 3: 440 })
+    expect(none.timesDefined).toBe(false)
+    expect(netShiftMinutes(undefined, []).average).toBe(DEFAULT_SHIFT_MIN)
   })
 })

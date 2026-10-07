@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { OeeRebuildNotice, OeeUploadButton } from '../../components/OeePanel'
+import { OeeRebuildNotice } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
@@ -56,9 +56,13 @@ function OeeGuidePage() {
             </tr>
           </tbody>
         </table>
-        <div className="mt-3">
-          <OeeUploadButton />
-        </div>
+        <p className="mt-3 text-sm">
+          Files are uploaded in one place:{' '}
+          <Link to="/oee/data" className="font-medium underline">
+            OEE Data → Upload data
+          </Link>
+          .
+        </p>
       </section>
 
       <Step n={1} title="Once — load the year so far">
@@ -76,7 +80,7 @@ function OeeGuidePage() {
           </li>
         </ul>
         <p>
-          Press <b>Upload data</b> once for each file. The program finds the sheets by their names and the columns by their titles
+          On <Link to="/oee/data">OEE Data</Link> press <b>Upload data</b> once for each file. The program finds the sheets by their names and the columns by their titles
           (the order of the columns and an empty first row or column do not matter). Days, weeks and months are calculated from the
           shifts — no Daily, Weekly or Monthly KPI is needed.
         </p>

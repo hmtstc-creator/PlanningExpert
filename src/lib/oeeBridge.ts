@@ -272,7 +272,7 @@ export function buildBridge(days: DayRow[], allLossDays: LossDay[], c: OeeConfig
       label: TOTAL_LABEL.L,
       kind: 'total',
       minutes: L,
-      note: 'shift time − planned stops (breaks …): the planned stops are already outside, as in the MES and the OEE Dashboard',
+      note: 'shift time − planned stops (breaks …): the planned stops are already outside, as in the MES and OEE Trend Analysis',
     },
   ]
   const hiddenNote = (groups: string[]) =>

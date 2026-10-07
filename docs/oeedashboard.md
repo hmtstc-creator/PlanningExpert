@@ -581,13 +581,23 @@ yüklenen haftalık / aylık satırlar silinmez).
   duruş). OEE Settings → "Suggest from data" bunları ekler; eklenmezse
   "Unassigned" görünür.
 
-## Çalışılan vardiya (2026-10-07, planlamacı)
+## OEE Trend Analysis (2026-10-07, planlamacı)
 
-Dashboard'un aylık ve haftalık tablolarının altında iki toplam satırı:
-**Loading time (h)** (kapsamdaki iş merkezlerinin toplamı) ve **Shifts
-worked** = Loading ÷ vardiya süresi. Vardiya süresi Company settings →
-Shifts'teki başlangıç / bitiş saatlerinin ortalaması; saat tanımlı değilse
-8 saat varsayılır ve satırda "assumed" yazar (src/lib/shifts.ts
-standardShiftMinutes). Loading planlı duruşları (molalar) içermediği için
-sonuç kayıtlı vardiya sayısından biraz düşüktür: "kaç tam vardiyalık
-yükleme" anlamındadır.
+Dashboard sayfasının adı **OEE Trend Analysis**. Değişiklikler:
+
+- **Çalışılan vardiya:** haftalık trend ve haftanın vardiya tablosunda başlığın
+  (açık gri) hemen altında açık mavi **Shifts worked** satırı, altında Total ve
+  presler. Shifts worked = Loading ÷ **net vardiya** = vardiya süresi (Company
+  settings → Shifts; saat yoksa 8 saat) − o vardiyanın planlı duruşları
+  (Planning → Calendar → Planned stops: çay, yemek, toplantı …). Loading planlı
+  duruşları içermediği için bölen de onlarsız olmalı. Haftalıkta vardiyaların
+  ortalama net süresi, vardiya tablosunda her sütunun kendi vardiyasınınki.
+  Loading saati gösterilmez; aylıkta satır yok. OEE izni olan ama Planning
+  izni olmayan kullanıcı planlı duruş sürelerini `oee.plannedStopMinutes` ile okur
+  (src/lib/shifts.ts netShiftMinutes, test).
+- **Performans çizgisi:** üç grafikte OEE çubuklarının üstünde koyu turuncu
+  Performans % çizgisi (aynı yüzde ekseni; renk mavi ile doğrulandı, açık
+  #c2410c / koyu #e0642a). Yorum için: OEE 64, P 80 → A × Q ≈ 80.
+- Seçilen gün / hafta / önceki hafta / kalite kutuları kaldırıldı.
+- **Yükleme tek noktadan:** "Upload data" yalnızca OEE Data sayfasında; Settings
+  ve kılavuz oraya bağlantı verir.

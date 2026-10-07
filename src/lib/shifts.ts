@@ -83,15 +83,44 @@ export function shiftMinutes(s: Pick<ShiftDef, 'start' | 'end'>): number | null 
 /** Saati tanımlı değilse varsayılan vardiya süresi (dk). */
 export const DEFAULT_SHIFT_MIN = 480
 
+export interface NetShifts {
+  /** Vardiya numarası → net süre (dk) = vardiya süresi − planlı duruşları. */
+  byShift: Record<number, number>
+  /** Vardiyaların net süresinin ortalaması (haftalık toplamda bölen). */
+  average: number
+  /** Vardiyaların planlı duruşlarının ortalaması (dk). */
+  plannedAverage: number
+  /** Vardiya saatleri Company settings → Shifts'te tanımlı mı (değilse 8 saat varsayılır). */
+  timesDefined: boolean
+}
+
 /**
- * Bir vardiyanın süresi (dk): saati tanımlı vardiyaların ortalaması; hiçbirinin
- * saati yoksa 8 saat varsayılır (`defined: false`). Dashboard'da "kaç vardiya
- * çalışıldı" = Loading ÷ bu süre.
+ * Bir vardiyanın net süresi (planlamacı, 2026-10-07): vardiya süresi
+ * (Company settings → Shifts, saat yoksa 8 saat) − o vardiyanın planlı
+ * duruşları (Planning → Calendar → Planned stops: çay, yemek, toplantı …).
+ * Loading planlı duruşları içermez; "kaç vardiya çalışıldı" = Loading ÷ net süre.
  */
-export function standardShiftMinutes(shifts: Pick<ShiftDef, 'start' | 'end'>[] | undefined | null): { minutes: number; defined: boolean } {
-  const known = (shifts ?? []).map(shiftMinutes).filter((m): m is number => m !== null && m > 0)
-  if (!known.length) return { minutes: DEFAULT_SHIFT_MIN, defined: false }
-  return { minutes: known.reduce((a, b) => a + b, 0) / known.length, defined: true }
+export function netShiftMinutes(
+  shifts: Pick<ShiftDef, 'number' | 'start' | 'end'>[] | undefined | null,
+  stops: { shiftIndex: number; durationMinutes: number }[] | undefined | null,
+): NetShifts {
+  const defs = (shifts ?? []).length ? (shifts ?? []) : [1, 2, 3].map((number) => ({ number }) as Pick<ShiftDef, 'number' | 'start' | 'end'>)
+  const gross = defs.map((d) => ({ number: d.number, minutes: shiftMinutes(d) }))
+  const timesDefined = gross.some((g) => g.minutes !== null)
+  const byShift: Record<number, number> = {}
+  let planned = 0
+  for (const g of gross) {
+    const stop = (stops ?? []).filter((x) => x.shiftIndex === g.number).reduce((a, x) => a + Math.max(0, x.durationMinutes), 0)
+    planned += stop
+    byShift[g.number] = Math.max(1, (g.minutes ?? DEFAULT_SHIFT_MIN) - stop)
+  }
+  const nets = Object.values(byShift)
+  return {
+    byShift,
+    average: nets.reduce((a, b) => a + b, 0) / nets.length,
+    plannedAverage: planned / gross.length,
+    timesDefined,
+  }
 }
 
 /** Ekranda: "1 · Early 06:00–14:00". */

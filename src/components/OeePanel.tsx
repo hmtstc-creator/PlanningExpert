@@ -150,6 +150,7 @@ export function OeeControls({
   rows,
   config,
   period,
+  upload = false,
 }: {
   selection: ReturnType<typeof useOeeSelection>
   /** Seçenekler için iş merkezi / masraf yeri listesi. */
@@ -157,6 +158,8 @@ export function OeeControls({
   config: OeeConfig
   /** Tarih yerine dönem seçimi (Loss Bridge); verilirse tarih kutusu çıkmaz. */
   period?: ReactNode
+  /** Yükleme düğmesi yalnızca OEE Data sayfasında (tek nokta — planlamacı, 2026-10-07). */
+  upload?: boolean
 }) {
   const { setScope, date, setDate, week } = selection
   const areas = useMemo(() => areaNames(rows, config), [rows, config])
@@ -226,7 +229,7 @@ export function OeeControls({
           </>
         )}
         {/* Yükleme yalnızca OEE düzenleme izniyle (board görünümünde yok). */}
-        {canEditOee && (
+        {upload && canEditOee && (
           <div className="ml-auto">
             <OeeUploadButton />
           </div>

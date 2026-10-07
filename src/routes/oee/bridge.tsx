@@ -312,7 +312,7 @@ function BridgePage() {
               quality losses → <b>OEE</b>. Every loss is a percentage of the loading time, so OEE + all losses = 100%.
             </p>
             <p>
-              The loading time already leaves out the planned stops (breaks, planned meetings …), as in the MES and the OEE Dashboard — they
+              The loading time already leaves out the planned stops (breaks, planned meetings …), as in the MES and OEE Trend Analysis — they
               are not taken off again; they are listed under the bridge for information. OEE, A, P and Q here are exactly the
               Dashboard&apos;s (A = production ÷ loading, P = operation ÷ production). Example: A 80% and P 80% give OEE 64% — 20%
               availability loss and 16% performance loss (20% of the 80% production time).

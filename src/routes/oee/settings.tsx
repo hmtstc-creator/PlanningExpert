@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { OeeRebuildNotice, OeeUploadButton, useOeeConfig } from '../../components/OeePanel'
+import { OeeRebuildNotice, useOeeConfig } from '../../components/OeePanel'
 import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
@@ -106,7 +106,13 @@ function OeeSettingsPage() {
 
       <ol className="mt-4 grid gap-2 text-sm sm:grid-cols-4">
         <StepBox n={1} done={hasData} title="Upload data">
-          {hasData ? 'Data is stored.' : <OeeUploadButton />}
+          {hasData ? (
+            'Data is stored.'
+          ) : (
+            <Link to="/oee/data" className="font-medium text-foreground underline">
+              Upload on OEE Data →
+            </Link>
+          )}
         </StepBox>
         <StepBox n={2} done={c.costCenters.length > 0 && c.shifts.length > 0} title="Suggest from data">
           <button type="button" onClick={suggest} disabled={!hasData} className="rounded-md border border-border px-3 py-1 text-xs font-medium hover:bg-muted disabled:opacity-40">

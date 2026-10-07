@@ -37,7 +37,7 @@ export const PAGE_KEYWORDS: Record<string, string> = {
   '/depolar': 'depo yer lokasyon storage location',
   '/planlogic': 'plan mantığı nasıl hesaplanır kural yardım help',
   '/kayitlar': 'karar kayıt kural açık konu decision log',
-  '/oee': 'oee verimlilik ekipman etkinliği dashboard',
+  '/oee': 'oee trend analysis analiz verimlilik ekipman etkinliği dashboard performans vardiya',
   '/oee/losses': 'kayıp duruş loss trend kalıp arıza setup',
   '/oee/bridge': 'kayıp köprüsü bridge şelale waterfall teep oee kayıp öncelik pareto level',
   '/oee/data': 'oee veri tablo yükleme',

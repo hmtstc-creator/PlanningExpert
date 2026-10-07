@@ -153,7 +153,7 @@ export const BOARD_AREA: Area = area('board', 'Board', 'Board', '/board', 'prese
 export const MODULE_AREAS: Area[] = [
   PLANNING,
   area('oee', 'OEE', 'OEE', '/oee', 'activity', 'emerald', 'oee', [
-    link('/oee', 'Dashboard', 'Monthly, 10 weeks and the selected week', 'dashboard'),
+    link('/oee', 'Trend Analysis', 'Monthly, 10 weeks and the selected week — OEE and performance', 'dashboard'),
     link('/oee/losses', 'Losses Trend', 'Losses, dies, breakdowns and setups', 'trendDown'),
     link('/oee/bridge', 'Loss Bridge', 'From calendar time to OEE, loss by loss — priorities', 'chartDown'),
     {
@@ -314,7 +314,7 @@ const RELATED_PAGES: Record<string, string[]> = {
  * Dashboard"). Yoksa menüdeki ad.
  */
 const LABELS: Record<string, string> = {
-  '/oee': 'OEE Dashboard',
+  '/oee': 'OEE Trend Analysis',
   '/oee/losses': 'OEE Losses',
   '/oee/bridge': 'OEE Loss Bridge',
   '/oee/data': 'OEE Data',

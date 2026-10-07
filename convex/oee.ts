@@ -365,6 +365,20 @@ export const shifts = byDate('oeeShifts')
 export const orders = byDate('oeeOrders')
 export const lossDays = byDate('oeeLossDays')
 
+/**
+ * Planlı duruşların vardiya başına süreleri (Planning → Calendar → Planned stops:
+ * çay, yemek, toplantı …). OEE'de "kaç vardiya çalışıldı" = Loading ÷ (vardiya −
+ * planlı duruşlar). Planning izni olmayan OEE kullanıcısı da okur; yalnızca süreler.
+ */
+export const plannedStopMinutes = guardedQuery({
+  modules: OEE,
+  args: {},
+  handler: async (ctx) => {
+    const rows = await ctx.db.query('plannedStops').collect()
+    return rows.map((r: Ctx) => ({ shiftIndex: r.shiftIndex, durationMinutes: r.durationMinutes }))
+  },
+})
+
 /** Yüklenen haftalık ve aylık satırlar (yılı olmayan eski aylık kayıtlar hariç). */
 export const periods = guardedQuery({
   modules: OEE,

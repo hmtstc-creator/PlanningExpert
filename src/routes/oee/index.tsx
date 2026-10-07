@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMemo, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { OeeBarChart, PeriodTable, pct } from '../../components/OeeCharts'
+import { OeeBarChart, PeriodTable } from '../../components/OeeCharts'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
@@ -11,9 +11,7 @@ import {
   areaNames,
   inScope,
   monthlyTrend,
-  ratios,
   scopeLabel,
-  totalsFor,
   trendGaps,
   weeklyTrend,
   weekShiftTrend,
@@ -24,7 +22,7 @@ import {
 } from '../../lib/oee'
 import { relatedPages } from '../../lib/navigation'
 import { usePlant } from '../../lib/plantContext'
-import { standardShiftMinutes } from '../../lib/shifts'
+import { netShiftMinutes } from '../../lib/shifts'
 
 export const Route = createFileRoute('/oee/')({
   component: OeeDashboard,
@@ -33,8 +31,10 @@ export const Route = createFileRoute('/oee/')({
 function OeeDashboard() {
   const sel = useOeeSelection()
   const { config } = useOeeConfig()
-  // Kaç vardiya çalışıldı = Loading ÷ vardiya süresi (Company settings → Shifts).
-  const shiftLen = standardShiftMinutes(usePlant().ctx?.active?.shifts)
+  // Kaç vardiya çalışıldı = Loading ÷ net vardiya süresi (vardiya − planlı duruşlar:
+  // çay, yemek, toplantı; Company settings → Shifts ve Planning → Planned stops).
+  const stops = useQuery(api.oee.plannedStopMinutes) as { shiftIndex: number; durationMinutes: number }[] | undefined
+  const net = netShiftMinutes(usePlant().ctx?.active?.shifts, stops)
   const weeksN = config.trendWeeks || 1
   const yearStart = `${sel.date.slice(0, 4)}-01-01`
   const trendFrom = addDaysIso(sel.monday, -7 * (weeksN - 1))
@@ -51,21 +51,20 @@ function OeeDashboard() {
   const month = useMemo(() => monthlyTrend(days, monthly, scope, config, sel.date), [days, monthly, scope, config, sel.date])
   const weeks = useMemo(() => weeklyTrend(days, weekly, scope, config, sel.monday, weeksN), [days, weekly, scope, config, sel.monday, weeksN])
   const week = useMemo(() => weekShiftTrend(shifts, scope, config, sel.monday), [shifts, scope, config, sel.monday])
-  const day = ratios(totalsFor(days, scope, config, sel.date, sel.date))
-  const thisWeek = ratios(totalsFor(days, scope, config, sel.monday, sel.sunday))
-  const lastWeek = weeks.total.length > 1 ? weeks.total[weeks.total.length - 2] : null
   // Press Definitions ile ad eşleşmesi: alanında en az bir iş merkezi tanımlı pres
   // ise (pres alanı), tanımsız olanlar işaretlenir.
   const known = new Set(presses.map((p) => p.name))
   const wcs = [...new Set(scopeRows.filter((r) => inScope(r, scope, config)).map((r) => r.workCenter))]
   const unknown = new Set(wcs.some((wc) => known.has(wc)) ? wcs.filter((wc) => !known.has(wc)) : [])
   const label = scopeLabel(scope, config)
+  const h = (m: number) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}`
+  const shiftNote = `Shifts worked = loading time ÷ net shift (${h(net.average)} h = shift ${net.timesDefined ? '' : '8:00 h assumed '}− planned stops ${h(net.plannedAverage)} h: breaks, meals, meetings). Shift times: Company settings → Shifts; planned stops: Planning → Calendar.`
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
-        title="OEE Dashboard"
-        summary="Monthly, recent weeks and the selected week — OEE from summed times, never an average of percentages."
+        title="OEE Trend Analysis"
+        summary="Monthly, recent weeks and the selected week — OEE bars with the performance line; OEE from summed times, never an average of percentages."
         links={relatedPages('/oee')}
         info={
           <>
@@ -90,21 +89,6 @@ function OeeDashboard() {
       <OeeControls selection={sel} rows={scopeRows} config={config} />
       <OeeDataNotice items={[...trendGaps(month).map((t) => `Monthly — ${t}`), ...trendGaps(weeks).map((t) => `Weekly — ${t}`)]} />
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Tile label={`${label} · ${sel.date}`} value={pct(day.oee)} hint={`A ${pct(day.availability)} · P ${pct(day.performance)}`} />
-        <Tile label={`${label} · W${sel.week.week}`} value={pct(thisWeek.oee)} hint={`A ${pct(thisWeek.availability)} · P ${pct(thisWeek.performance)}`} />
-        <Tile
-          label="Previous week"
-          value={pct(lastWeek?.oee)}
-          hint={
-            lastWeek?.oee !== null && lastWeek?.oee !== undefined && thisWeek.oee !== null
-              ? `${thisWeek.oee >= lastWeek.oee ? '▲' : '▼'} ${((thisWeek.oee - lastWeek.oee) * 100).toFixed(1)} pts this week`
-              : ''
-          }
-        />
-        <Tile label="Quality" value={pct(thisWeek.quality)} hint="Good ÷ (good + scrap + reject)" />
-      </div>
-
       {days.length === 0 && monthly.length === 0 && weekly.length === 0 && (
         <p className="mt-6 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
           No OEE data for this period yet. Upload the file with <b>Upload data</b> —{' '}
@@ -117,12 +101,17 @@ function OeeDashboard() {
 
       <Section title={`Monthly OEE — ${label}`} note={`${sel.date.slice(0, 4)}, up to ${sel.date.slice(0, 7)}`}>
         <OeeBarChart points={month.total} ariaLabel={`Monthly OEE ${label}`} />
-        <PeriodTable total={month.total} rows={[...month.byWorkCenter]} unknown={unknown} shift={shiftLen} />
+        <PeriodTable total={month.total} rows={[...month.byWorkCenter]} unknown={unknown} />
       </Section>
 
       <Section title={`Last ${weeksN} weeks — ${label}`} note={`up to W${sel.week.week}`}>
         <OeeBarChart points={weeks.total} ariaLabel={`Weekly OEE ${label}`} />
-        <PeriodTable total={weeks.total} rows={[...weeks.byWorkCenter]} unknown={unknown} shift={shiftLen} />
+        <PeriodTable
+          total={weeks.total}
+          rows={[...weeks.byWorkCenter]}
+          unknown={unknown}
+          shiftsWorked={{ of: (p) => (p.times.loadingMin > 0 ? p.times.loadingMin / net.average : null), note: shiftNote }}
+        />
       </Section>
 
       <Section
@@ -130,22 +119,20 @@ function OeeDashboard() {
         note={`${sel.monday} – ${sel.sunday}${week.unknown.length ? ` · shift codes not numbered in Settings: ${week.unknown.join(', ')}` : ''}`}
       >
         <OeeBarChart points={week.slots} ariaLabel={`Shift OEE week ${sel.week.week} ${label}`} />
-        <PeriodTable total={week.slots} rows={[...week.byWorkCenter]} unknown={unknown} />
+        <PeriodTable
+          total={week.slots}
+          rows={[...week.byWorkCenter]}
+          unknown={unknown}
+          shiftsWorked={{
+            of: (p) => (p.times.loadingMin > 0 ? p.times.loadingMin / (net.byShift[Number(p.key.split('|')[1])] ?? net.average) : null),
+            note: shiftNote,
+          }}
+        />
       </Section>
 
       <p className="mt-6 text-xs text-muted-foreground">
         Losses behind these numbers: <Link to="/oee/losses" className="underline">Losses Trend</Link>.
       </p>
-    </div>
-  )
-}
-
-function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-lg border border-border p-3">
-      <p className="truncate text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{value}</p>
-      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   )
 }

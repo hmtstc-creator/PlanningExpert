@@ -147,7 +147,7 @@ function OeeDataPage() {
         summary="The uploaded sheets in the order of the file (Report: Shiftly KPI, Shiftly Order Based KPI; Downtimes). Days, weeks and months are calculated from the shifts."
         links={relatedPages('/oee/data')}
       />
-      <OeeControls selection={sel} rows={dayRows} config={config} />
+      <OeeControls selection={sel} rows={dayRows} config={config} upload />
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {SHEETS.map((s) => (
           <button
