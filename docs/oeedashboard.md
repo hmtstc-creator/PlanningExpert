@@ -611,3 +611,11 @@ sunucuda, bütün OEE okumalarında aynı kuralla (convex/oee.ts oeeWorkCenters)
 Tanımsız iş merkezinin (ör. PRS-103) yüklenen satırları silinmez; tanımlanınca
 geçmişiyle görünür. Fabrikada hiç tanım yoksa süzülmez. Yükleme mesajı
 saklanıp gösterilmeyen iş merkezlerini yazar. Test: tenancy.test.ts.
+
+## Değişmeyen satır yeniden yazılmaz (2026-10-07, planlamacı)
+
+OEE yüklemesinde (vardiya, gün, sipariş, duruş, kayıp özeti, hafta, ay) saklı
+kayıt yeni satırla birebir aynıysa yazma atlanır (src/lib/oeeStore.ts
+`sameStored`, convex/oee.ts `upsert`). Aynı dosyayı / aynı günleri tekrar
+yüklemek yalnızca okuma harcar; değişen satır her zamanki gibi güncellenir.
+Convex Database I/O kotası için (plan hesabının elle yapılmasıyla birlikte).

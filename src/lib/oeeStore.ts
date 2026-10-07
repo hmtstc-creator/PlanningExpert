@@ -222,3 +222,32 @@ export async function importOee(
   })
   return { ranges }
 }
+
+/** Sistemin eklediği alanlar: karşılaştırmada sayılmaz. */
+const SYSTEM_FIELDS = new Set(['_id', '_creationTime', 'plantId'])
+
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+    return a.every((x, i) => sameValue(x, b[i]))
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const ka = Object.keys(a).filter((k) => (a as Record<string, unknown>)[k] !== undefined)
+    const kb = Object.keys(b).filter((k) => (b as Record<string, unknown>)[k] !== undefined)
+    if (ka.length !== kb.length) return false
+    return ka.every((k) => sameValue((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+  }
+  return false
+}
+
+/**
+ * Saklı kayıt yeni satırla aynı mı (sistem alanları hariç)? Aynıysa yeniden
+ * yazılmaz: aynı dosyayı tekrar yüklemek Convex'in yazma kotasını boşa
+ * harcamasın (planlamacı, 2026-10-07).
+ */
+export function sameStored(existing: Record<string, unknown>, doc: Record<string, unknown>): boolean {
+  const own = Object.fromEntries(Object.entries(existing).filter(([k]) => !SYSTEM_FIELDS.has(k)))
+  return sameValue(own, doc)
+}
+

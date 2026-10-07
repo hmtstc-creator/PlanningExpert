@@ -11,7 +11,7 @@ import {
   weeklyFields,
 } from './oeeValidators'
 import { daysFromShifts, lossDayOf } from '../src/lib/oee'
-import { fromStoredDay, mergeEvents, toStoredDay, toStoredLoss } from '../src/lib/oeeStore'
+import { fromStoredDay, mergeEvents, sameStored, toStoredDay, toStoredLoss } from '../src/lib/oeeStore'
 
 /**
  * OEE Trend and Losses — veri.
@@ -43,6 +43,8 @@ function checkRange(from?: string, to?: string) {
 }
 
 async function upsert(ctx: Ctx, existing: Ctx | null, table: string, doc: Ctx) {
+  // Değişmeyen satır yeniden yazılmaz (aynı dosyanın tekrar yüklenmesi).
+  if (existing && sameStored(existing, doc)) return
   if (existing) await ctx.db.replace(existing._id, doc)
   else await ctx.db.insert(table, doc)
 }
