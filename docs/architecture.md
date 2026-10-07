@@ -24,10 +24,10 @@ Convex (sunucu, veritabanı)
   convex/schema.ts          bütün tablolar
   convex/*.ts               guardedQuery / guardedMutation (oturum + fabrika + modül izni)
   convex/plantDb.ts         fabrikaya kilitli veritabanı (her sorgu plantId ile)
-  convex/tenancy.ts         fabrika bağlamı, fabrika seçimi, geçiş, saat başı hesap
+  convex/tenancy.ts         fabrika bağlamı, fabrika seçimi, geçiş
   convex/platform.ts        şirketler ve fabrikalar; users.ts: kullanıcılar ve gruplar
   convex/planQueue.ts       girdi değişince 4 sn sonra tek hesap kuyruğu
-  convex/crons.ts           saat başı (dk 5) yeniden hesap
+  convex/crons.ts           günlük özet, gece temizlikleri (plan elle hesaplanır: Planning → Calculate plan)
   convex/planEngine.ts      Node action: planı hesaplar, planRuns'a yazar
         │  aynı kod
         ▼
@@ -264,3 +264,15 @@ kırmızı CI = main bozuk, önce o düzeltilir.
 | OEE Data | `/oee/data` | yüklenen sayfalar, dosya sırasıyla | OEE Dashboard |
 | OEE Settings | `/oee/settings` | alan, masraf yeri, vardiya, kayıp grubu, setup, süreler | OEE sayfaları |
 | How to use (OEE) | `/oee/guide` | ilk kurulum, rutin yükleme, yüklü veri | OEE Settings |
+
+## Plan hesabı elle (2026-10-07, planlamacı)
+
+Plan artık kendiliğinden hesaplanmaz: saat başı zamanlayıcı ve "veri değişince
+birkaç saniye içinde hesap" kaldırıldı (Convex'in Database I/O kotasını
+dolduruyordu: her hesap girdilerin tamamını okur, planın tamamını yazar ve en
+eski planı okuyup siler). Planlamacı günde bir **Planning → Calculate plan**
+düğmesine basar. Plan girdisini değiştiren her yazma (`guardedMutation`,
+`affectsPlan`) yalnızca `planStatus.dataChangedAt` işaretini koyar
+(convex/planQueue.ts `markPlanChanged`); Planning, Capacity ve Today "plan
+güncel değil" uyarısı verir, güncel olmayan plan onaylanamaz. Today'in "eski
+plan" eşiği varsayılan 24 saat.

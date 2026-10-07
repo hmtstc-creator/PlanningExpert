@@ -43,7 +43,7 @@ export function DigestSettings() {
 
 const FIELDS: { key: keyof TodayThresholds; label: string; unit: string; hint: string }[] = [
   { key: 'sapStaleHours', label: 'Old SAP data', unit: 'h', hint: 'Demand (ZPP) or stock (MB52) older than this is flagged' },
-  { key: 'planStaleHours', label: 'Old plan', unit: 'h', hint: 'The plan is recalculated every hour; older than this means something is stuck' },
+  { key: 'planStaleHours', label: 'Old plan', unit: 'h', hint: 'The plan is calculated by hand (Planning → Calculate plan); warn when it is older than this' },
   { key: 'overloadPercent', label: 'Over capacity', unit: '%', hint: 'A week whose demand exceeds this share of capacity' },
   { key: 'bottleneckWeeks', label: 'Weeks ahead', unit: 'weeks', hint: 'How many weeks (this one included) the capacity check looks at' },
 ]

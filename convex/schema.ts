@@ -748,6 +748,8 @@ export default defineSchema({
     requestedAt: v.optional(v.number()),
     scheduledFor: v.optional(v.number()),
     runningSince: v.optional(v.number()),
+    /** Plan girdisinin son değiştiği an: bundan sonra hesap yoksa plan güncel değildir (elle hesap). */
+    dataChangedAt: v.optional(v.number()),
     lastRunAt: v.optional(v.number()),
     lastDurationMs: v.optional(v.number()),
     lastError: v.optional(v.string()),

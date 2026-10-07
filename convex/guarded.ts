@@ -9,7 +9,7 @@ import type { Doc, LockedDb } from './lockedDbTypes'
 import { requireSession } from './authGuard'
 import { stampAuthor } from '../src/lib/authorFields'
 import { plantDb } from './plantDb'
-import { requestRecompute } from './planQueue'
+import { markPlanChanged } from './planQueue'
 import schema from './schema'
 import {
   NO_ACCESS,
@@ -275,9 +275,9 @@ export function guardedMutation<A extends PropertyValidators>(
       // "bu dosyayı kim yükledi"); jetonun kendisi gitmez.
       // "Kim yaptı" alanları oturumdan (src/lib/authorFields.ts): tarayıcıdan gelen ad yok sayılır.
       const result = await definition.handler(scoped, stampAuthor(definition.args, withoutToken(args), c.user.name))
-      // Plan sunucuda hesaplanıyor: girdisi değişince kısa bir gecikmeyle
-      // yeniden hesaplanır. Art arda gelen yazmalar tek hesapta birleşir.
-      if (affectsPlan) await requestRecompute(scoped)
+      // Plan elle hesaplanır (Planning → Calculate plan): girdisi değişince
+      // yalnızca "güncel değil" işareti konur, hesap kurulmaz.
+      if (affectsPlan) await markPlanChanged(scoped)
       return result
     },
   })

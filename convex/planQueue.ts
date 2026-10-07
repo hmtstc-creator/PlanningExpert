@@ -1,11 +1,13 @@
 import { internal } from './_generated/api'
 
 /**
- * Planın yeniden hesaplanma kuyruğu.
+ * Planın hesaplanma kuyruğu.
  *
- * Plan girdisini değiştiren her yazma burayı çağırır. Hesap hemen değil kısa
- * bir gecikmeyle başlar: Excel yüklemesi gibi art arda gelen yazmalar tek
- * hesapta birleşsin. Zaten bekleyen bir hesap varsa yenisi kurulmaz.
+ * Plan yalnızca elle hesaplanır (Planning → "Calculate plan"; planlamacı,
+ * 2026-10-07: otomatik hesap Convex'in okuma / yazma kotasını dolduruyordu).
+ * Plan girdisini değiştiren yazma yalnızca `markPlanChanged` ile "plan güncel
+ * değil" işaretini koyar. Hesap isteği kısa gecikmeyle kurulur; zaten bekleyen
+ * bir hesap varsa yenisi kurulmaz.
  */
 export const RECOMPUTE_DELAY_MS = 4_000
 
@@ -18,6 +20,14 @@ export async function planStatusDoc(ctx: Ctx) {
     .query('planStatus')
     .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
     .first()
+}
+
+/** Plan girdisi değişti: plan elle yeniden hesaplanana kadar güncel değil. */
+export async function markPlanChanged(ctx: Ctx): Promise<void> {
+  const now = Date.now()
+  const status = await planStatusDoc(ctx)
+  if (status) await ctx.db.patch(status._id, { dataChangedAt: now })
+  else await ctx.db.insert('planStatus', { key: 'default', dataChangedAt: now })
 }
 
 /** `ctx`: fabrikaya kilitli bağlam (`ctx.plantId`, convex/guarded.ts). */

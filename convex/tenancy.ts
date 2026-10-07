@@ -256,29 +256,6 @@ export const selectPlant = userMutation({
 })
 
 /**
- * Saat başı hesap: her aktif şirketin PlanningExpert'i açık fabrikaları,
- * birer dakika arayla (hepsi aynı anda başlamasın). Birinin hatası diğerini
- * durdurmaz — her hesap ayrı iş.
- */
-export const recomputeAll = internalMutation({
-  args: { trigger: v.optional(v.string()) },
-  returns: v.null(),
-  handler: async (ctx, { trigger }) => {
-    const state = await stateDoc(ctx.db)
-    if (!state?.value?.done) return null
-    const plants = await ctx.db.query('plants').collect()
-    let i = 0
-    for (const plant of plants) {
-      const company = await ctx.db.get(plant.companyId)
-      if (!company || company.status !== 'active' || !company.modules.includes('planning')) continue
-      if ((plant.disabledModules ?? []).includes('planning')) continue
-      await ctx.scheduler.runAfter(i++ * 60_000, internal.planEngine.recompute, { trigger, plantId: plant._id })
-    }
-    return null
-  },
-})
-
-/**
  * Günlük özet zamanlayıcısı (her 15 dakikada bir, convex/crons.ts): özeti açık
  * ve bugünkü saati gelmiş her plant için gönderimi kurar. Gönderim ve içerik
  * plant kilidi altında: convex/digest.ts → sendForPlant.

@@ -33,7 +33,7 @@ export interface Signal {
 export interface TodayThresholds {
   /** Talep (ZPP) ve stok (MB52) bu kadar saatten eskiyse uyarı. */
   sapStaleHours: number
-  /** Plan saat başı yeniden hesaplanır; bundan eskiyse bir şey takılmış. */
+  /** Plan elle hesaplanır (günde bir); bundan eskiyse uyarı. */
   planStaleHours: number
   /** Darboğaz: talebi kapasitenin bu yüzdesini aşan hafta. */
   overloadPercent: number
@@ -68,6 +68,8 @@ export interface CockpitInput {
     alarms?: PlanAlarms
   } | null
   planError?: { message: string; at: number } | null
+  /** Plan girdisinin son değiştiği an (planStatus.dataChangedAt): plandan sonraysa plan güncel değil. */
+  planChangedAt?: number | null
   /** SAP yüklemeleri: anahtar → son yükleme anı (0 = hiç). */
   uploads?: Record<string, number> | null
   openBreakdowns?: { total: number; stopping: number } | null
@@ -90,9 +92,11 @@ export function buildCockpit(input: CockpitInput, t: TodayThresholds): Signal[] 
     out.push({ key: 'planError', level: 'critical', title: 'The last plan calculation failed', detail: input.planError.message, to: '/planlama' })
   }
   if (!plan && input.uploads) {
-    out.push({ key: 'noPlan', level: 'critical', title: 'No plan yet', detail: 'Upload demand and stock on SAP Data; the plan is calculated automatically.', to: '/sapdata' })
+    out.push({ key: 'noPlan', level: 'critical', title: 'No plan yet', detail: 'Upload demand and stock on SAP Data, then press Calculate plan on Planning.', to: '/planlama' })
+  } else if (plan && (input.planChangedAt ?? 0) > plan.computedAt) {
+    out.push({ key: 'planStale', level: 'warning', title: 'The plan is not up to date', detail: `The data changed ${ageText(now - (input.planChangedAt ?? now))} ago, after the last calculation — press Calculate plan.`, to: '/planlama' })
   } else if (plan && hours(now - plan.computedAt) > t.planStaleHours) {
-    out.push({ key: 'planStale', level: 'warning', title: `The plan is ${ageText(now - plan.computedAt)} old`, detail: 'It is recalculated every hour and after every change — open the plan and recalculate.', to: '/planlama' })
+    out.push({ key: 'planStale', level: 'warning', title: `The plan is ${ageText(now - plan.computedAt)} old`, detail: 'The plan is calculated by hand — open Planning and press Calculate plan.', to: '/planlama' })
   }
 
   // 5. Verinin tazeliği.

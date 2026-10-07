@@ -68,11 +68,19 @@ describe('Today paneli', () => {
   })
 
   it('plan hatası ve bayat plan en üstte', () => {
-    const s = buildCockpit({ ...base({ computedAt: now - 5 * H }), planError: { message: 'boom', at: now - H } })
+    const s = buildCockpit({ ...base({ computedAt: now - 30 * H }), planError: { message: 'boom', at: now - H } })
     expect(s[0].key).toBe('planError')
     expect(s.some((x) => x.key === 'planStale')).toBe(true)
     // Hatadan sonra başarılı hesap: hata gösterilmez.
     expect(buildCockpit({ ...base(), planError: { message: 'old', at: now - 2 * H } }).some((x) => x.key === 'planError')).toBe(false)
+  })
+
+  it('plan elle hesaplanır: son hesaptan sonra veri değiştiyse plan güncel değil', () => {
+    const fresh = base({ computedAt: now - 2 * H })
+    expect(buildCockpit(fresh).some((x) => x.key === 'planStale')).toBe(false)
+    const s = buildCockpit({ ...fresh, planChangedAt: now - H })
+    expect(s.find((x) => x.key === 'planStale')?.title).toBe('The plan is not up to date')
+    expect(buildCockpit({ ...fresh, planChangedAt: now - 3 * H }).some((x) => x.key === 'planStale')).toBe(false)
   })
 
   it('planlama izni yoksa plan sinyali yok; bakım sinyalleri yine görünür', () => {

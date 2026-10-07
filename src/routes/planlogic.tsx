@@ -663,8 +663,8 @@ function PlanLogicPage() {
           </li>
         </ul>
         <p className="mt-2 text-sm text-muted-foreground">
-          Work that is not approved needs no correction: the plan is rebuilt from the current
-          moment every hour and after every change.
+          Work that is not approved needs no correction: every Calculate plan rebuilds the plan from
+          the current moment.
         </p>
       </section>
 

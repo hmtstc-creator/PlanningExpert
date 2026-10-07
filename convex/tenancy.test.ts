@@ -339,6 +339,10 @@ describe('fabrika ayrımı', () => {
     expect(await wcs()).toEqual(['PRS-106', 'PRS-107'])
     await t.mutation(api.presses.upsert, { token: boss, name: 'PRS-107', hall: 'H', costCenter: '51010171' })
     expect(await wcs()).toEqual(['PRS-107'])
+    // Plan elle hesaplanır: plan girdisini değiştiren yazma hesap kurmaz, yalnızca "güncel değil" işareti koyar.
+    const st = (await t.query(api.planRuns.status, { token: boss })) as Any
+    expect(st.dataChangedAt).toBeGreaterThan(0)
+    expect(st.scheduledFor).toBeUndefined()
     expect(((await t.query(api.oee.shifts, { token: boss, from: '2026-09-21', to: '2026-09-21' })) as Any[]).map((d) => d.workCenter)).toEqual(['PRS-107'])
     // Masraf yerine bağlı değilse tanımlı sayılmaz.
     await t.mutation(api.presses.upsert, { token: boss, name: 'PRS-106', hall: 'H' })

@@ -48,7 +48,7 @@ function CapacityPage() {
     | null
     | undefined
   const planStatus = useQuery(api.planRuns.status) as
-    | { runningSince?: number; scheduledFor?: number }
+    | { runningSince?: number; scheduledFor?: number; dataChangedAt?: number }
     | null
     | undefined
   const templates = (useQuery(api.pressCalendar.listTemplates) ?? []) as ({ press: string } & Pattern)[]
@@ -129,6 +129,8 @@ function CapacityPage() {
     }
   }
   const recalculating = !!planStatus?.runningSince || (planStatus?.scheduledFor ?? 0) > Date.now() - 60_000
+  // Plan elle hesaplanır: son hesaptan sonra veri değiştiyse bu sayfa da eskidir.
+  const stale = !!data && !recalculating && (planStatus?.dataChangedAt ?? 0) > data.computedAt
 
   return (
     <div className="mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 xl:w-2/3 xl:px-0">
@@ -236,7 +238,12 @@ function CapacityPage() {
         )}
         {recalculating && (
           <span className="rounded bg-amber-100 px-2 py-0.5 font-medium text-amber-900">
-            Data changed — recalculating…
+            Calculating the plan…
+          </span>
+        )}
+        {stale && (
+          <span className="rounded bg-amber-100 px-2 py-0.5 font-medium text-amber-900">
+            Data changed — not up to date until the plan is calculated again (Planning → Calculate plan)
           </span>
         )}
       </div>

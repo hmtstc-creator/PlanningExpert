@@ -46,6 +46,7 @@ export async function cockpitSignals(ctx: { db: LockedDb }, access: Access, now 
         : null
     const status = await planStatusDoc(ctx)
     input.planError = status?.lastError && status.lastErrorAt ? { message: status.lastError, at: status.lastErrorAt } : null
+    input.planChangedAt = status?.dataChangedAt ?? null
     const uploads: Record<string, number> = {}
     for (const key of ['weeklyDemand', 'stock']) {
       const last = await db

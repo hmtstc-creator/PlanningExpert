@@ -73,7 +73,7 @@ export const OEE_SUGGESTED = {
  */
 export const TODAY_DEFAULTS = {
   sapStaleHours: 36,
-  planStaleHours: 3,
+  planStaleHours: 24,
   overloadPercent: 100,
   bottleneckWeeks: 2,
 } as const

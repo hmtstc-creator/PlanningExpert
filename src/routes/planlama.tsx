@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery } from '../lib/convexTransport'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { isoWeekLabel, plantClock } from '../lib/dates'
 import { WeekGantt, type WeekGanttJob, type WeekGanttPress } from '../components/WeekGantt'
@@ -40,6 +40,7 @@ interface PlanStatus {
   requestedAt?: number
   scheduledFor?: number
   runningSince?: number
+  dataChangedAt?: number
   lastRunAt?: number
   lastError?: string
   lastErrorAt?: number
@@ -47,8 +48,8 @@ interface PlanStatus {
 
 function PlanlamaPage() {
   // Plan sunucuda hesaplanıyor (convex/planEngine.ts) ve saklanıyor; sayfa
-  // yalnızca son hesabı okur. Girdi değişince sunucu birkaç saniye içinde
-  // yeniden hesaplar, yeni sonuç buraya kendiliğinden gelir.
+  // yalnızca son hesabı okur. Hesap yalnızca elle: "Calculate plan"
+  // (planlamacı, 2026-10-07). Girdi değişince plan "güncel değil" işaretlenir.
   const run = useQuery(api.planRuns.latest) as PlanRun | null | undefined
   const planStatus = useQuery(api.planRuns.status) as PlanStatus | null | undefined
   const requestNow = useMutation(api.planRuns.requestNow)
@@ -76,17 +77,7 @@ function PlanlamaPage() {
   const [ovPress, setOvPress] = useState('')
   const [ovDate, setOvDate] = useState('')
 
-  // Henüz hiç hesap yoksa (ilk kurulum) bir kere iste.
-  const askedFirstRun = useRef(false)
-  useEffect(() => {
-    if (run === null && !askedFirstRun.current) {
-      askedFirstRun.current = true
-      void requestNow({})
-    }
-  }, [run, requestNow])
-
-  // Şimdiki zaman çizgisi canlı kalır; plan saat başı ve her değişiklikte
-  // sunucuda yenilenir.
+  // Şimdiki zaman çizgisi canlı kalır; plan yalnızca "Calculate plan" ile yenilenir.
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 60_000)
@@ -181,6 +172,8 @@ function PlanlamaPage() {
     planStatus != null &&
     ((planStatus.runningSince !== undefined && nowMs - planStatus.runningSince < 10 * 60_000) ||
       (planStatus.scheduledFor !== undefined && planStatus.scheduledFor > nowMs - 60_000))
+  // Son hesaptan sonra plan girdisi değişti (elle hesaplanana kadar plan güncel değil).
+  const stale = !!run && !recalculating && (planStatus?.dataChangedAt ?? 0) > run.computedAt
   const failedLast =
     planStatus?.lastError !== undefined &&
     (planStatus.lastErrorAt ?? 0) > (planStatus.lastRunAt ?? 0)
@@ -262,13 +255,16 @@ function PlanlamaPage() {
             ({new Date(run.computedAt).toLocaleString('en-GB')})
           </span>
         ) : run === null ? (
-          <span className="text-muted-foreground">The first plan is being calculated…</span>
+          <span className="text-muted-foreground">No plan yet — press Calculate plan.</span>
         ) : (
           <span className="text-muted-foreground">Loading the plan…</span>
         )}
         {recalculating && (
+          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">Calculating…</span>
+        )}
+        {stale && (
           <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-            Data changed — recalculating…
+            Data changed {minutesAgo(planStatus!.dataChangedAt!, nowMs)} — the plan is not up to date, press Calculate plan
           </span>
         )}
         {failedLast && (
@@ -279,9 +275,9 @@ function PlanlamaPage() {
         <button
           onClick={() => void requestNow({})}
           disabled={recalculating}
-          className="ml-auto rounded-md border border-input px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+          className={`ml-auto rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${stale || run === null ? 'bg-foreground text-background hover:opacity-90' : 'border border-input hover:bg-muted'}`}
         >
-          Recalculate now
+          {recalculating ? 'Calculating…' : 'Calculate plan'}
         </button>
       </div>
 
@@ -422,6 +418,7 @@ function PlanlamaPage() {
             engineJobs.length === 0 ||
             inputsLoading ||
             recalculating ||
+            stale ||
             truncatedInputs.length > 0
           }
           title={
@@ -430,8 +427,10 @@ function PlanlamaPage() {
               : inputsLoading
                 ? 'Still loading the plan'
                 : recalculating
-                  ? 'The data changed — wait for the plan to be recalculated'
-                  : undefined
+                  ? 'Wait for the calculation to finish'
+                  : stale
+                    ? 'The data changed — press Calculate plan first'
+                    : undefined
           }
           className="rounded-md bg-foreground px-5 py-2.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
         >

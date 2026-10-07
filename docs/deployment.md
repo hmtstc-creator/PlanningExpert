@@ -6,7 +6,7 @@ parçadır; ikisi ayrı düşünülür:
 | Parça | Ne | Nerede çalışır |
 |---|---|---|
 | **Arayüz** | TanStack Start (Vite + Nitro) — sayfalar ve sunucu tarafı render | VPS'te Node süreci (`node .output/server/index.mjs`) |
-| **Sunucu + veritabanı** | Convex: bütün `convex/*.ts` işlevleri, tablolar, zamanlayıcı (saat başı plan), dosyalar (fotoğraflar), Node action'ları (`auth.ts`, `planEngine.ts`) | A) Convex Cloud **ya da** B) VPS'te kendi barındırılan Convex |
+| **Sunucu + veritabanı** | Convex: bütün `convex/*.ts` işlevleri, tablolar, zamanlayıcı (günlük özet, gece temizliği; plan elle hesaplanır), dosyalar (fotoğraflar), Node action'ları (`auth.ts`, `planEngine.ts`) | A) Convex Cloud **ya da** B) VPS'te kendi barındırılan Convex |
 
 Kodda Vercel'e bağlı bir şey yok; Nitro VPS'te varsayılan Node sunucusu
 üretir.

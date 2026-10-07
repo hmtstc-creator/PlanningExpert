@@ -4,17 +4,8 @@ import { internal } from './_generated/api'
 
 const crons = cronJobs()
 
-/**
- * Saat başı yeniden hesap. Veri değişmese de plan eskir: günün geçen
- * saatleri kapasiteden düşer ve vardiya başında yeni gün açılır. Değişiklik
- * olduğunda zaten birkaç saniye içinde hesaplanıyor; bu yalnızca saatin
- * ilerlemesi için. Birinci vardiya genelde saat başında başladığı için
- * dakika 5'te çalışır — yeni gün açıldıktan hemen sonra.
- */
-// Fabrika başına: tenancy.recomputeAll her fabrikanın hesabını ayrı kurar.
-crons.hourly('recompute plan', { minuteUTC: 5 }, internal.tenancy.recomputeAll, {
-  trigger: 'clock',
-})
+// Plan saat başı yeniden hesaplanmaz: yalnızca elle (Planning → Calculate plan;
+// planlamacı, 2026-10-07 — otomatik hesap Convex'in okuma / yazma kotasını dolduruyordu).
 
 /**
  * Günlük özet e-postası: her 15 dakikada bir, saati gelen plant'ler

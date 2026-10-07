@@ -2622,6 +2622,12 @@
     }
   },
   "planStatus": {
+    "dataChangedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
     "key": {
       "fieldType": {
         "type": "string"

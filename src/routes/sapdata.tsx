@@ -102,8 +102,8 @@ function SapDataPage() {
         info={
           <>
             <p>
-              The saved file replaces the previous one entirely. The plan is recalculated on the
-              server a few seconds after every save.
+              The saved file replaces the previous one entirely. The plan uses it after the next
+              calculation — press <b>Calculate plan</b> on Planning when the day's files are saved.
             </p>
             <p>
               Master data (cavities, SPM, weights, machines) is maintained on{' '}
@@ -399,13 +399,13 @@ function UsageBadge({ upload, status }: { upload: SapUpload | undefined; status:
     case 'recalculating':
       return (
         <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-          Saved — plan recalculating…
+          Saved — plan calculating…
         </span>
       )
     case 'notYet':
       return (
         <span className="rounded bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
-          Saved — not in the plan yet
+          Saved — not in the plan yet (Planning → Calculate plan)
         </span>
       )
     case 'none':
