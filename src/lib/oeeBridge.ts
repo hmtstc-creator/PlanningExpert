@@ -647,19 +647,11 @@ export function topN(rows: Level3Row[], n = 5): Level3Row[] {
 
 // ---- dönem ---------------------------------------------------------------------------
 
-export type PeriodPreset = 'yesterday' | 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth' | 'custom'
+/** Dönem seçimi: tek gün ya da tarih aralığı (planlamacı, 2026-10-07). */
+export type PeriodMode = 'day' | 'range'
 
-export const PERIOD_PRESETS: { key: PeriodPreset; label: string }[] = [
-  { key: 'yesterday', label: 'Yesterday' },
-  { key: 'thisWeek', label: 'This week' },
-  { key: 'lastWeek', label: 'Last week' },
-  { key: 'thisMonth', label: 'This month' },
-  { key: 'lastMonth', label: 'Last month' },
-  { key: 'custom', label: 'Custom' },
-]
-
-/** Özel aralık en çok bu kadar gün (önceki dönemle birlikte okunur). */
-export const MAX_CUSTOM_DAYS = 31
+/** Tarih aralığı en çok bu kadar gün (önceki dönemle birlikte okunur). */
+export const MAX_RANGE_DAYS = 31
 
 const shiftDay = (iso: string, n: number) => {
   const d = new Date(`${iso}T00:00:00Z`)
@@ -668,46 +660,19 @@ const shiftDay = (iso: string, n: number) => {
 }
 export const daysBetween = (from: string, to: string) =>
   Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1
-const mondayOf = (iso: string) => shiftDay(iso, -((new Date(`${iso}T00:00:00Z`).getUTCDay() + 6) % 7))
 
-/**
- * Dönemin günleri. `today`: bugünün tarihi (yerel); veri dünle biter, bu
- * yüzden "this week / this month" bugünü içermez. Özel aralık en çok
- * MAX_CUSTOM_DAYS.
- */
-export function periodRange(preset: PeriodPreset, today: string, custom?: { from: string; to: string }): { from: string; to: string } {
-  const y = shiftDay(today, -1)
-  switch (preset) {
-    case 'yesterday':
-      return { from: y, to: y }
-    case 'thisWeek': {
-      const m = mondayOf(today)
-      // Pazartesi: bu haftanın verisi yok (veri dünle biter) — geçen hafta.
-      return m === today ? periodRange('lastWeek', today) : { from: m, to: y }
-    }
-    case 'lastWeek': {
-      const m = shiftDay(mondayOf(today), -7)
-      return { from: m, to: shiftDay(m, 6) }
-    }
-    case 'thisMonth': {
-      const first = `${today.slice(0, 8)}01`
-      // Ayın 1'i: bu ayın verisi yok — geçen ay.
-      return first === today ? periodRange('lastMonth', today) : { from: first, to: y }
-    }
-    case 'lastMonth': {
-      const first = `${today.slice(0, 8)}01`
-      const last = shiftDay(first, -1)
-      return { from: `${last.slice(0, 8)}01`, to: last }
-    }
-    case 'custom': {
-      const from = custom?.from ?? y
-      let to = custom?.to ?? y
-      if (to < from) to = from
-      if (daysBetween(from, to) > MAX_CUSTOM_DAYS) to = shiftDay(from, MAX_CUSTOM_DAYS - 1)
-      return { from, to }
-    }
-  }
+/** Seçilen günler: tek gün ya da aralık (ters girilirse çevrilir, en çok MAX_RANGE_DAYS). */
+export function selectedRange(mode: PeriodMode, day: string, range: { from: string; to: string }): { from: string; to: string } {
+  if (mode === 'day') return { from: day, to: day }
+  const from = range.from <= range.to ? range.from : range.to
+  let to = range.from <= range.to ? range.to : range.from
+  if (daysBetween(from, to) > MAX_RANGE_DAYS) to = shiftDay(from, MAX_RANGE_DAYS - 1)
+  return { from, to }
 }
+
+/** Aralık bir takvim ayının tamamı mı (karşılaştırma önceki ayın tamamıyla). */
+export const isWholeMonth = (r: { from: string; to: string }) =>
+  r.from.endsWith('-01') && r.from.slice(0, 7) === r.to.slice(0, 7) && shiftDay(r.to, 1).endsWith('-01')
 
 /**
  * Karşılaştırma dönemi: ay dönemlerinde önceki takvim ayı (tam ay ↔ önceki

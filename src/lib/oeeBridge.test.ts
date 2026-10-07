@@ -229,19 +229,18 @@ describe('OEE köprüsü', () => {
 })
 
 describe('köprü dönemi', () => {
-  it('hazır dönemler (bugün 2026-10-06 Salı)', async () => {
-    const { periodRange } = await import('./oeeBridge')
-    const t = '2026-10-06'
-    expect(periodRange('yesterday', t)).toEqual({ from: '2026-10-05', to: '2026-10-05' })
-    expect(periodRange('thisWeek', t)).toEqual({ from: '2026-10-05', to: '2026-10-05' })
-    expect(periodRange('lastWeek', t)).toEqual({ from: '2026-09-28', to: '2026-10-04' })
-    expect(periodRange('thisMonth', t)).toEqual({ from: '2026-10-01', to: '2026-10-05' })
-    expect(periodRange('lastMonth', t)).toEqual({ from: '2026-09-01', to: '2026-09-30' })
-    expect(periodRange('custom', t, { from: '2026-08-01', to: '2026-09-30' })).toEqual({ from: '2026-08-01', to: '2026-08-31' })
-    expect(periodRange('lastMonth', '2026-01-15')).toEqual({ from: '2025-12-01', to: '2025-12-31' })
-    // Pazartesi "this week" ve ayın 1'i "this month": veri dünle biter — önceki hafta / ay.
-    expect(periodRange('thisWeek', '2026-10-05')).toEqual({ from: '2026-09-28', to: '2026-10-04' })
-    expect(periodRange('thisMonth', '2026-10-01')).toEqual({ from: '2026-09-01', to: '2026-09-30' })
+  it('tek gün ya da tarih aralığı (ters girilen çevrilir, en çok 31 gün)', async () => {
+    const { selectedRange, isWholeMonth, previousRange } = await import('./oeeBridge')
+    const r = { from: '2026-09-01', to: '2026-09-30' }
+    expect(selectedRange('day', '2026-10-05', r)).toEqual({ from: '2026-10-05', to: '2026-10-05' })
+    expect(selectedRange('range', '2026-10-05', r)).toEqual(r)
+    expect(selectedRange('range', '', { from: '2026-09-30', to: '2026-09-01' })).toEqual(r)
+    expect(selectedRange('range', '', { from: '2026-08-01', to: '2026-09-30' })).toEqual({ from: '2026-08-01', to: '2026-08-31' })
+    // Ayın tamamı önceki ayın tamamıyla, diğerleri önceki eşit dönemle karşılaştırılır.
+    expect(isWholeMonth(r)).toBe(true)
+    expect(isWholeMonth({ from: '2026-09-01', to: '2026-09-29' })).toBe(false)
+    expect(previousRange(r, isWholeMonth(r))).toEqual({ from: '2026-08-01', to: '2026-08-31' })
+    expect(previousRange({ from: '2026-10-05', to: '2026-10-05' })).toEqual({ from: '2026-10-04', to: '2026-10-04' })
   })
 
   it('önceki eşit dönem ve veriye kırpma', async () => {

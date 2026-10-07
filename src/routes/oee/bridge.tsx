@@ -17,24 +17,34 @@ import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelecti
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import { areaNames, costCentersOf, inScope, scopeLabel, type DayRow, type DowntimeDay, type OrderRow, type ShiftRow } from '../../lib/oee'
 import {
-  MAX_CUSTOM_DAYS,
+  addDaysIso,
+  areaNames,
+  costCentersOf,
+  inScope,
+  scopeLabel,
+  type DayRow,
+  type DowntimeDay,
+  type OrderRow,
+  type ShiftRow,
+} from '../../lib/oee'
+import {
+  MAX_RANGE_DAYS,
   MAX_EVENT_DAYS,
-  PERIOD_PRESETS,
   buildBridge,
   clipToData,
   daysBetween,
   level3,
   level3Views,
   matchedLossDays,
-  periodRange,
   previousRange,
+  isWholeMonth,
+  selectedRange,
   shiftSlice,
   topN,
   type Level3By,
   type LossItem,
-  type PeriodPreset,
+  type PeriodMode,
 } from '../../lib/oeeBridge'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
@@ -65,19 +75,24 @@ function BridgePage() {
   const canOpen = useCanOpen()
   const coverage = useQuery(api.oee.coverage) as { days: { from: string; to: string } | null } | undefined
   const today = localIso(new Date())
-  const [preset, setPreset] = useState<PeriodPreset>('yesterday')
-  const [custom, setCustom] = useState(() => periodRange('lastWeek', today))
+  // Dönem: tek gün ya da tarih aralığı (planlamacı, 2026-10-07); boşsa son yüklenen gün.
+  const [mode, setMode] = useState<PeriodMode>('day')
+  const [dayRaw, setDay] = useState('')
+  const [rangeRaw, setRange] = useState<{ from: string; to: string } | null>(null)
   const [machineRaw, setMachine] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
   const [view, setView] = useState<Level3By | null>(null)
   const [shift, setShift] = useState(0)
   const sheetRef = useRef<HTMLDivElement>(null)
 
-  const wanted = periodRange(preset, today, custom)
   const lastDay = coverage?.days?.to ?? null
+  const fallbackDay = lastDay ?? addDaysIso(today, -1)
+  const day = dayRaw || fallbackDay
+  const range = rangeRaw ?? { from: addDaysIso(fallbackDay, -6), to: fallbackDay }
+  const wanted = selectedRange(mode, day, range)
   const cur = clipToData(wanted, lastDay)
-  // Ay dönemleri önceki takvim ayıyla karşılaştırılır.
-  const prev = cur ? previousRange(cur, preset === 'thisMonth' || preset === 'lastMonth') : null
+  // Bir takvim ayının tamamı önceki ayın tamamıyla, diğerleri önceki eşit dönemle karşılaştırılır.
+  const prev = cur ? previousRange(cur, isWholeMonth(wanted)) : null
   const firstDay = coverage?.days?.from ?? null
   // Önceki dönem ilk yüklenen günden önce başlıyorsa karşılaştırma yapılmaz (yarım dönem).
   const prevFull = !!prev && !!firstDay && prev.from >= firstDay
@@ -177,37 +192,57 @@ function BridgePage() {
 
   const periodControl = (
     <>
-      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
         Period
-        <select
-          value={preset}
-          onChange={(e) => setPreset(e.target.value as PeriodPreset)}
-          className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
-        >
-          {PERIOD_PRESETS.map((p) => (
-            <option key={p.key} value={p.key}>
-              {p.label}
-            </option>
+        <div className="flex rounded-md border border-input p-0.5" role="group" aria-label="Period">
+          {(
+            [
+              ['day', 'Single day'],
+              ['range', 'Date range'],
+            ] as [PeriodMode, string][]
+          ).map(([m, text]) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              onClick={() => setMode(m)}
+              className={`rounded px-2.5 py-1 text-sm font-medium ${mode === m ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+            >
+              {text}
+            </button>
           ))}
-        </select>
-      </label>
-      {preset === 'custom' && (
+        </div>
+      </div>
+      {mode === 'day' ? (
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          Day
+          <input
+            type="date"
+            value={day}
+            max={lastDay ?? undefined}
+            onChange={(e) => e.target.value && setDay(e.target.value)}
+            className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
+          />
+        </label>
+      ) : (
         <>
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             From
             <input
               type="date"
-              value={custom.from}
-              onChange={(e) => e.target.value && setCustom((c) => ({ ...c, from: e.target.value }))}
+              value={range.from}
+              max={lastDay ?? undefined}
+              onChange={(e) => e.target.value && setRange({ ...range, from: e.target.value })}
               className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            To (max {MAX_CUSTOM_DAYS} days)
+            To (max {MAX_RANGE_DAYS} days)
             <input
               type="date"
-              value={custom.to}
-              onChange={(e) => e.target.value && setCustom((c) => ({ ...c, to: e.target.value }))}
+              value={range.to}
+              max={lastDay ?? undefined}
+              onChange={(e) => e.target.value && setRange({ ...range, to: e.target.value })}
               className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
             />
           </label>

@@ -74,17 +74,17 @@ duruş → planlı bakım / kalıp tamiri; setup → adet × ortalama süre).
 - Not explained / Other planned stops: makine başına fark (hangi makine
   nedenini yazmıyor).
 Satırların toplamı her zaman Level 2 kalemine eşit (test). Her satırda
-önceki dönem: ay dönemlerinde önceki takvim ayı (tam ay ↔ tam ay, ay başından
-bugüne ↔ önceki ayın aynı günleri), diğerlerinde önceki eşit dönem;
+önceki dönem: aralık bir takvim ayının tamamıysa önceki ayın tamamı,
+diğerlerinde hemen önceki eşit dönem (tek gün ↔ önceki gün);
 önceki dönem ilk yüklenen günden önce başlıyorsa karşılaştırma yok.
 
 ## Ekran
 
 1. Başlık, bilgi (tanımlar, "Dashboard ile aynı OEE" kuralı), ilgili sayfalar, A3 yazdır.
 2. Seçim: alan → hat / makine (OEE sayfalarıyla ortak, hatırlanır) + hatta
-   tek makine; dönem: Yesterday, This week, Last week, This month, Last
-   month, Custom (en çok 31 gün). Dönem son yüklenen güne kırpılır;
-   Pazartesi "This week" ve ayın 1'i "This month" önceki hafta / aya döner.
+   tek makine; dönem: **Single day** ya da **Date range** (en çok 31 gün;
+   planlamacı 2026-10-07: hazır dönemler yerine). Varsayılan son yüklenen
+   gün; dönem son yüklenen güne kırpılır.
 3. Kutular: OEE, Availability, Performance, Quality (önceki döneme göre
    fark, kaybın Loading'e payı), ÖNCELİK kalemi.
 4. Köprü (% of loading; ipucunda saat ve dakika), renkler: toplamlar mavi,
