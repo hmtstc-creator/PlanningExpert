@@ -144,7 +144,7 @@ function OeeDataPage() {
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="OEE Data"
-        summary="The uploaded sheets in the order of the file (Report: Shiftly KPI, Shiftly Order Based KPI; Downtimes). Days, weeks and months are calculated from the shifts."
+        summary="The uploaded sheets in the order of the file (Report: Shiftly KPI, Shiftly Order Based KPI; Downtimes). Days, weeks and months are calculated from the shifts. Only work centers defined on Work Center Definitions are shown."
         links={relatedPages('/oee/data')}
       />
       <OeeControls selection={sel} rows={dayRows} config={config} upload />

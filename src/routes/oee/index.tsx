@@ -9,7 +9,6 @@ import { useQuery } from '../../lib/convexTransport'
 import {
   addDaysIso,
   areaNames,
-  inScope,
   monthlyTrend,
   scopeLabel,
   trendGaps,
@@ -42,7 +41,6 @@ function OeeDashboard() {
   const days = (useQuery(api.oee.days, { from, to: sel.sunday }) ?? []) as DayRow[]
   const shifts = (useQuery(api.oee.shifts, { from: sel.monday, to: sel.sunday }) ?? []) as ShiftRow[]
   const periods = useQuery(api.oee.periods) as { weekly: WeeklyRow[]; monthly: MonthlyRow[] } | undefined
-  const presses = (useQuery(api.presses.list) ?? []) as { name: string }[]
   const weekly = periods?.weekly ?? []
   const monthly = periods?.monthly ?? []
 
@@ -51,14 +49,9 @@ function OeeDashboard() {
   const month = useMemo(() => monthlyTrend(days, monthly, scope, config, sel.date), [days, monthly, scope, config, sel.date])
   const weeks = useMemo(() => weeklyTrend(days, weekly, scope, config, sel.monday, weeksN), [days, weekly, scope, config, sel.monday, weeksN])
   const week = useMemo(() => weekShiftTrend(shifts, scope, config, sel.monday), [shifts, scope, config, sel.monday])
-  // Press Definitions ile ad eşleşmesi: alanında en az bir iş merkezi tanımlı pres
-  // ise (pres alanı), tanımsız olanlar işaretlenir.
-  const known = new Set(presses.map((p) => p.name))
-  const wcs = [...new Set(scopeRows.filter((r) => inScope(r, scope, config)).map((r) => r.workCenter))]
-  const unknown = new Set(wcs.some((wc) => known.has(wc)) ? wcs.filter((wc) => !known.has(wc)) : [])
   const label = scopeLabel(scope, config)
   const h = (m: number) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}`
-  const shiftNote = `Shifts worked = loading time ÷ net shift (${h(net.average)} h = shift ${net.timesDefined ? '' : '8:00 h assumed '}− planned stops ${h(net.plannedAverage)} h: breaks, meals, meetings). Shift times: Company settings → Shifts; planned stops: Planning → Calendar.`
+  const shiftNote = `Shifts worked = loading time ÷ net shift (${h(net.average)} h = shift ${net.timesDefined ? '' : '8:00 h assumed '}− planned stops ${h(net.plannedAverage)} h: breaks, meals, meetings). Counts only the work centers listed below — those defined on Work Center Definitions with a cost center of the plant. Shift times: Company settings → Shifts; planned stops: Planning → Calendar.`
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
@@ -72,6 +65,10 @@ function OeeDashboard() {
               <b>OEE = Availability × Performance × Quality</b>. Availability = Production time ÷ Loading
               time, Performance = Operation time ÷ Production time, Quality = Good ÷ (Good + Scrap +
               Reject).
+            </p>
+            <p>
+              Only work centers defined on Work Center Definitions with a cost center of the plant are shown and counted; rows of
+              other machines in the files are kept but left out until they are defined.
             </p>
             <p>
               Every day, week, month and group adds up the times first and divides once. A day is the
@@ -101,7 +98,7 @@ function OeeDashboard() {
 
       <Section title={`Monthly OEE — ${label}`} note={`${sel.date.slice(0, 4)}, up to ${sel.date.slice(0, 7)}`}>
         <OeeBarChart points={month.total} ariaLabel={`Monthly OEE ${label}`} />
-        <PeriodTable total={month.total} rows={[...month.byWorkCenter]} unknown={unknown} />
+        <PeriodTable total={month.total} rows={[...month.byWorkCenter]} />
       </Section>
 
       <Section title={`Last ${weeksN} weeks — ${label}`} note={`up to W${sel.week.week}`}>
@@ -109,7 +106,6 @@ function OeeDashboard() {
         <PeriodTable
           total={weeks.total}
           rows={[...weeks.byWorkCenter]}
-          unknown={unknown}
           shiftsWorked={{ of: (p) => (p.times.loadingMin > 0 ? p.times.loadingMin / net.average : null), note: shiftNote }}
         />
       </Section>
@@ -122,7 +118,6 @@ function OeeDashboard() {
         <PeriodTable
           total={week.slots}
           rows={[...week.byWorkCenter]}
-          unknown={unknown}
           shiftsWorked={{
             of: (p) => (p.times.loadingMin > 0 ? p.times.loadingMin / (net.byShift[Number(p.key.split('|')[1])] ?? net.average) : null),
             note: shiftNote,

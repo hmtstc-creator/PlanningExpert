@@ -341,6 +341,24 @@ export const lastImport = guardedQuery({
   },
 })
 
+/**
+ * OEE'de sayılan iş merkezleri (planlamacı, 2026-10-07): Work Center
+ * Definitions'ta tanımlı ve fabrikanın bir masraf yerine bağlı olanlar.
+ * Tanımsız iş merkezinin (ör. PRS-103) satırları saklı kalır ama hiçbir OEE
+ * sayfasında görünmez ve toplamlara (OEE, çalışılan vardiya …) girmez;
+ * tanımlanınca geçmişiyle görünür. Hiç tanım yoksa süzülmez (yeni fabrika).
+ */
+async function oeeWorkCenters(ctx: Ctx): Promise<Set<string> | null> {
+  const codes = new Set((ctx.plant?.costCenters ?? []).map((c: Ctx) => c.code))
+  const names = (await ctx.db.query('presses').collect()).filter((p: Ctx) => p.costCenter && codes.has(p.costCenter)).map((p: Ctx) => p.name)
+  return names.length ? new Set(names) : null
+}
+
+async function definedOnly<T extends { workCenter: string }>(ctx: Ctx, rows: T[]): Promise<T[]> {
+  const wcs = await oeeWorkCenters(ctx)
+  return wcs ? rows.filter((r) => wcs.has(r.workCenter)) : rows
+}
+
 /** Tarih indeksli OEE tabloları (tablo adı parametre: tip burada bilerek gevşek). */
 type DatedTable = 'oeeDays' | 'oeeShifts' | 'oeeOrders' | 'oeeLossDays' | 'oeeDowntimeDays'
 
@@ -354,7 +372,7 @@ const byDate = (table: DatedTable) =>
         .query(table)
         .withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to))
         .collect()
-      return rows.map(strip)
+      return (await definedOnly(ctx, rows)).map(strip)
     },
   })
 
@@ -384,8 +402,8 @@ export const periods = guardedQuery({
   modules: OEE,
   args: {},
   handler: async (ctx) => ({
-    weekly: (await ctx.db.query('oeeWeekly').collect()).map(strip),
-    monthly: (await ctx.db.query('oeeMonthly').collect()).filter((m: Ctx) => m.year !== undefined).map(strip),
+    weekly: (await definedOnly(ctx, await ctx.db.query('oeeWeekly').collect())).map(strip),
+    monthly: (await definedOnly(ctx, await ctx.db.query('oeeMonthly').collect())).filter((m: Ctx) => m.year !== undefined).map(strip),
   }),
 })
 
@@ -401,7 +419,7 @@ export const downtimeDays = guardedQuery({
       .query('oeeDowntimeDays')
       .withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to))
       .collect()
-    return rows.map(strip)
+    return (await definedOnly(ctx, rows)).map(strip)
   },
 })
 

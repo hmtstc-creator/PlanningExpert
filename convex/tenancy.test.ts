@@ -329,6 +329,22 @@ describe('fabrika ayrımı', () => {
       ['6597582', 'PROGRESSIVE-DIE-6', 'M315SP024', 12],
       ['6597583', 'M315SP024', 'PROGRESSIVE-DIE-6', 10],
     ])
+
+    // OEE'de yalnızca Work Center Definitions'ta fabrikanın masraf yerine bağlı iş merkezleri
+    // sayılır. Tanım yokken her şey görünür; PRS-107 tanımlanınca tanımsız PRS-106 gizlenir
+    // (veri silinmez), PRS-106 de tanımlanınca geçmişiyle geri gelir.
+    await t.mutation(api.oee.upsertShifts, { token: boss, rows: [{ ...row, workCenter: 'PRS-107' }] })
+    const wcs = async () =>
+      ((await t.query(api.oee.days, { token: boss, from: '2026-09-21', to: '2026-09-21' })) as Any[]).map((d) => d.workCenter).sort()
+    expect(await wcs()).toEqual(['PRS-106', 'PRS-107'])
+    await t.mutation(api.presses.upsert, { token: boss, name: 'PRS-107', hall: 'H', costCenter: '51010171' })
+    expect(await wcs()).toEqual(['PRS-107'])
+    expect(((await t.query(api.oee.shifts, { token: boss, from: '2026-09-21', to: '2026-09-21' })) as Any[]).map((d) => d.workCenter)).toEqual(['PRS-107'])
+    // Masraf yerine bağlı değilse tanımlı sayılmaz.
+    await t.mutation(api.presses.upsert, { token: boss, name: 'PRS-106', hall: 'H' })
+    expect(await wcs()).toEqual(['PRS-107'])
+    await t.mutation(api.presses.upsert, { token: boss, name: 'PRS-106', hall: 'H', costCenter: '51010171' })
+    expect(await wcs()).toEqual(['PRS-106', 'PRS-107'])
   })
 
   it('KPI: yalnızca fabrikanın masraf yerleri; dashboard yalnızca KPI izinli fabrikalar; OEE kök verisi', async () => {

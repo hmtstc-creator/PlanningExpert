@@ -248,6 +248,8 @@ export function OeeUploadButton() {
   // Yalnızca bu fabrikanın masraf yerlerinin satırları yüklenir.
   const plant = usePlant().ctx?.active
   const last = useQuery(api.oee.lastImport) as { fileName: string; uploadedAt: number; uploadedBy?: string } | null | undefined
+  // OEE'de sayılan iş merkezleri: Work Center Definitions'ta fabrikanın masraf yerine bağlı olanlar (convex/oee.ts).
+  const presses = (useQuery(api.presses.list) ?? []) as { name: string; costCenter?: string }[]
   const calls: OeeApi = {
     upsertShifts: useMutation(api.oee.upsertShifts),
     upsertDaily: useMutation(api.oee.upsertDaily),
@@ -288,6 +290,13 @@ export function OeeUploadButton() {
       if (!kept) throw new Error(`No row of this file belongs to the cost centers of ${plant?.plantName} (${codes.join(', ')}).`)
       await importOee(parsed, file.name, calls, (step) => setState({ kind: 'busy', step }))
       const other = skipped.length ? ` Not this plant (skipped): ${skipped.map((s) => `${s.costCenter} ${s.rows.toLocaleString('en-GB')}`).join(', ')}.` : ''
+      const defined = new Set(presses.filter((p) => p.costCenter && codes.includes(p.costCenter)).map((p) => p.name))
+      const hidden = defined.size
+        ? [...new Set([...parsed.shifts, ...parsed.downtimes].map((r) => r.workCenter))].filter((wc) => !defined.has(wc)).sort()
+        : []
+      const notDefined = hidden.length
+        ? ` Stored but not shown — not in Work Center Definitions: ${hidden.join(', ')}.`
+        : ''
       setState({
         kind: 'done',
         text: `✓ ${plant?.plantName}: added / updated ${[
@@ -298,7 +307,7 @@ export function OeeUploadButton() {
           parsed.monthly.length && `${parsed.monthly.length} monthly`,
         ]
           .filter(Boolean)
-          .join(', ')}. Nothing was deleted.${other}`,
+          .join(', ')}. Nothing was deleted.${other}${notDefined}`,
       })
     } catch (e) {
       setState({ kind: 'error', text: friendlyError(e).message || 'Upload failed' })

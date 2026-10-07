@@ -601,3 +601,13 @@ Dashboard sayfasının adı **OEE Trend Analysis**. Değişiklikler:
 - Seçilen gün / hafta / önceki hafta / kalite kutuları kaldırıldı.
 - **Yükleme tek noktadan:** "Upload data" yalnızca OEE Data sayfasında; Settings
   ve kılavuz oraya bağlantı verir.
+
+## Yalnızca tanımlı iş merkezleri (2026-10-07, planlamacı)
+
+OEE sayfaları (Trend Analysis, Losses Trend, Loss Bridge, Data) yalnızca
+**Work Center Definitions'ta tanımlı ve fabrikanın bir masraf yerine bağlı**
+iş merkezlerini gösterir ve sayar (OEE, çalışılan vardiya, kayıplar). Süzme
+sunucuda, bütün OEE okumalarında aynı kuralla (convex/oee.ts oeeWorkCenters).
+Tanımsız iş merkezinin (ör. PRS-103) yüklenen satırları silinmez; tanımlanınca
+geçmişiyle görünür. Fabrikada hiç tanım yoksa süzülmez. Yükleme mesajı
+saklanıp gösterilmeyen iş merkezlerini yazar. Test: tenancy.test.ts.
