@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  DEFAULT_SHIFT_MIN,
   effectiveShifts,
   normalizeShifts,
   oeeShiftCodes,
@@ -8,6 +9,7 @@ import {
   shiftMinutes,
   shiftOfCode,
   shiftProblems,
+  standardShiftMinutes,
   type ShiftDef,
 } from './shifts'
 
@@ -62,5 +64,12 @@ describe('vardiya tanımı', () => {
     expect(shiftMinutes({ start: '22:00', end: '06:00' })).toBe(480)
     expect(shiftMinutes({ start: '06:00' })).toBeNull()
     expect(shiftLabel(normalizeShifts(std)[0])).toBe('1 · Early 06:00–14:00')
+  })
+
+  it('vardiya süresi: saati tanımlı vardiyaların ortalaması, yoksa 8 saat (Dashboard: Loading ÷ süre = çalışılan vardiya)', () => {
+    expect(standardShiftMinutes(std)).toEqual({ minutes: 480, defined: true })
+    expect(standardShiftMinutes([{ start: '06:00', end: '18:00' }, { start: '18:00', end: '06:00' }])).toEqual({ minutes: 720, defined: true })
+    expect(standardShiftMinutes([{}])).toEqual({ minutes: DEFAULT_SHIFT_MIN, defined: false })
+    expect(standardShiftMinutes(undefined).defined).toBe(false)
   })
 })

@@ -80,6 +80,20 @@ export function shiftMinutes(s: Pick<ShiftDef, 'start' | 'end'>): number | null 
   return d > 0 ? d : d + 1440
 }
 
+/** Saati tanımlı değilse varsayılan vardiya süresi (dk). */
+export const DEFAULT_SHIFT_MIN = 480
+
+/**
+ * Bir vardiyanın süresi (dk): saati tanımlı vardiyaların ortalaması; hiçbirinin
+ * saati yoksa 8 saat varsayılır (`defined: false`). Dashboard'da "kaç vardiya
+ * çalışıldı" = Loading ÷ bu süre.
+ */
+export function standardShiftMinutes(shifts: Pick<ShiftDef, 'start' | 'end'>[] | undefined | null): { minutes: number; defined: boolean } {
+  const known = (shifts ?? []).map(shiftMinutes).filter((m): m is number => m !== null && m > 0)
+  if (!known.length) return { minutes: DEFAULT_SHIFT_MIN, defined: false }
+  return { minutes: known.reduce((a, b) => a + b, 0) / known.length, defined: true }
+}
+
 /** Ekranda: "1 · Early 06:00–14:00". */
 export function shiftLabel(s: ShiftDef): string {
   return `${s.number} · ${s.name}${s.start && s.end ? ` ${s.start}–${s.end}` : ''}`

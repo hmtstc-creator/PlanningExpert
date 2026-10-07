@@ -23,6 +23,8 @@ import {
   type WeeklyRow,
 } from '../../lib/oee'
 import { relatedPages } from '../../lib/navigation'
+import { usePlant } from '../../lib/plantContext'
+import { standardShiftMinutes } from '../../lib/shifts'
 
 export const Route = createFileRoute('/oee/')({
   component: OeeDashboard,
@@ -31,6 +33,8 @@ export const Route = createFileRoute('/oee/')({
 function OeeDashboard() {
   const sel = useOeeSelection()
   const { config } = useOeeConfig()
+  // Kaç vardiya çalışıldı = Loading ÷ vardiya süresi (Company settings → Shifts).
+  const shiftLen = standardShiftMinutes(usePlant().ctx?.active?.shifts)
   const weeksN = config.trendWeeks || 1
   const yearStart = `${sel.date.slice(0, 4)}-01-01`
   const trendFrom = addDaysIso(sel.monday, -7 * (weeksN - 1))
@@ -113,12 +117,12 @@ function OeeDashboard() {
 
       <Section title={`Monthly OEE — ${label}`} note={`${sel.date.slice(0, 4)}, up to ${sel.date.slice(0, 7)}`}>
         <OeeBarChart points={month.total} ariaLabel={`Monthly OEE ${label}`} />
-        <PeriodTable total={month.total} rows={[...month.byWorkCenter]} unknown={unknown} />
+        <PeriodTable total={month.total} rows={[...month.byWorkCenter]} unknown={unknown} shift={shiftLen} />
       </Section>
 
       <Section title={`Last ${weeksN} weeks — ${label}`} note={`up to W${sel.week.week}`}>
         <OeeBarChart points={weeks.total} ariaLabel={`Weekly OEE ${label}`} />
-        <PeriodTable total={weeks.total} rows={[...weeks.byWorkCenter]} unknown={unknown} />
+        <PeriodTable total={weeks.total} rows={[...weeks.byWorkCenter]} unknown={unknown} shift={shiftLen} />
       </Section>
 
       <Section

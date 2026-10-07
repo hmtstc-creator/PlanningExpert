@@ -580,3 +580,14 @@ yüklenen haftalık / aylık satırlar silinmez).
   deneme), CLR (TPM / otonom bakım), DEV (yeni operatör eğitimi), SDK (planlı
   duruş). OEE Settings → "Suggest from data" bunları ekler; eklenmezse
   "Unassigned" görünür.
+
+## Çalışılan vardiya (2026-10-07, planlamacı)
+
+Dashboard'un aylık ve haftalık tablolarının altında iki toplam satırı:
+**Loading time (h)** (kapsamdaki iş merkezlerinin toplamı) ve **Shifts
+worked** = Loading ÷ vardiya süresi. Vardiya süresi Company settings →
+Shifts'teki başlangıç / bitiş saatlerinin ortalaması; saat tanımlı değilse
+8 saat varsayılır ve satırda "assumed" yazar (src/lib/shifts.ts
+standardShiftMinutes). Loading planlı duruşları (molalar) içermediği için
+sonuç kayıtlı vardiya sayısından biraz düşüktür: "kaç tam vardiyalık
+yükleme" anlamındadır.

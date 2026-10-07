@@ -299,11 +299,14 @@ export function PeriodTable({
   total,
   rows,
   unknown,
+  shift,
 }: {
   total: SeriesPoint[]
   rows: [string, SeriesPoint[]][]
   /** Press Definitions'ta olmayan iş merkezleri (işaretlenir). */
   unknown?: Set<string>
+  /** Verilirse altta toplam Loading (saat) ve çalışılan vardiya = Loading ÷ vardiya süresi. */
+  shift?: { minutes: number; defined: boolean }
 }) {
   if (!total.length) return null
   const cell = (p: SeriesPoint) => {
@@ -349,6 +352,34 @@ export function PeriodTable({
               {pts.map(cell)}
             </tr>
           ))}
+          {shift && (
+            <>
+              <tr className="border-t-2 border-border text-muted-foreground">
+                <td className="whitespace-nowrap px-2 py-1">Loading time (h)</td>
+                {total.map((p) => (
+                  <td key={p.key} className="px-2 py-1 text-right tabular-nums">
+                    {p.times.loadingMin > 0 ? Math.round(p.times.loadingMin / 60).toLocaleString('en-GB') : '—'}
+                  </td>
+                ))}
+              </tr>
+              <tr
+                className="border-t border-border font-semibold text-foreground"
+                title={`Loading time ÷ ${(shift.minutes / 60).toFixed(1)} h per shift${shift.defined ? ' (Company settings → Shifts)' : ' (8 h assumed — set the shift times on Company settings → Shifts)'}`}
+              >
+                <td className="whitespace-nowrap px-2 py-1">
+                  Shifts worked{' '}
+                  <span className="font-normal text-muted-foreground">
+                    (÷ {(shift.minutes / 60).toFixed(1)} h{shift.defined ? '' : ' assumed'})
+                  </span>
+                </td>
+                {total.map((p) => (
+                  <td key={p.key} className="px-2 py-1 text-right tabular-nums">
+                    {p.times.loadingMin > 0 ? (p.times.loadingMin / shift.minutes).toFixed(1) : '—'}
+                  </td>
+                ))}
+              </tr>
+            </>
+          )}
         </tbody>
       </table>
     </div>
