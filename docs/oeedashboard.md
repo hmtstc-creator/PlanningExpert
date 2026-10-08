@@ -619,3 +619,11 @@ kayıt yeni satırla birebir aynıysa yazma atlanır (src/lib/oeeStore.ts
 `sameStored`, convex/oee.ts `upsert`). Aynı dosyayı / aynı günleri tekrar
 yüklemek yalnızca okuma harcar; değişen satır her zamanki gibi güncellenir.
 Convex Database I/O kotası için (plan hesabının elle yapılmasıyla birlikte).
+
+## Haftanın günleri (2026-10-08, planlamacı)
+
+Trend Analysis'te haftalık trend ile vardiya grafiği arasında **Week Wnn by
+day**: seçilen haftanın Pazartesi–Pazar günleri; OEE çubukları, Performans
+çizgisi, altında Shifts worked (Loading ÷ ortalama net vardiya), Total ve
+presler. Günler gün × iş merkezi kayıtlarından toplam ÷ toplam
+(src/lib/oee.ts `weekDailyTrend`; 7 günün toplamı haftayla aynı — test).

@@ -571,6 +571,20 @@ export function monthlyTrend(days: DayRow[], monthly: MonthlyRow[], scope: Scope
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
+/**
+ * Seçilen haftanın günleri (Pzt … Paz), gün × iş merkezi kayıtlarından
+ * (toplam ÷ toplam). Etiket: "Mon 05.10".
+ */
+export function weekDailyTrend(days: DayRow[], scope: Scope, c: OeeConfig, monday: string) {
+  const all = new Map<string, PeriodTimes>()
+  for (const d of days) addTo(all, `${d.date}|${d.workCenter}`, d, 'days')
+  const keys = Array.from({ length: 7 }, (_, i) => {
+    const date = addDaysIso(monday, i)
+    return { key: date, label: `${DAY_LABELS[i]} ${date.slice(8, 10)}.${date.slice(5, 7)}` }
+  })
+  return trend(all, keys, scope, c)
+}
+
 /** Vardiya numarası ayardan; tanımsız kod null. */
 export const shiftNumber = (code: string, c: OeeConfig): number | null => c.shifts.find((s) => s.code === code)?.number ?? null
 

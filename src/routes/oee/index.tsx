@@ -13,6 +13,7 @@ import {
   scopeLabel,
   trendGaps,
   weeklyTrend,
+  weekDailyTrend,
   weekShiftTrend,
   type DayRow,
   type MonthlyRow,
@@ -49,6 +50,7 @@ function OeeDashboard() {
   const month = useMemo(() => monthlyTrend(days, monthly, scope, config, sel.date), [days, monthly, scope, config, sel.date])
   const weeks = useMemo(() => weeklyTrend(days, weekly, scope, config, sel.monday, weeksN), [days, weekly, scope, config, sel.monday, weeksN])
   const week = useMemo(() => weekShiftTrend(shifts, scope, config, sel.monday), [shifts, scope, config, sel.monday])
+  const daily = useMemo(() => weekDailyTrend(days, scope, config, sel.monday), [days, scope, config, sel.monday])
   const label = scopeLabel(scope, config)
   const h = (m: number) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}`
   const shiftNote = `Shifts worked = loading time ÷ net shift (${h(net.average)} h = shift ${net.timesDefined ? '' : '8:00 h assumed '}− planned stops ${h(net.plannedAverage)} h: breaks, meals, meetings). Counts only the work centers listed below — those defined on Work Center Definitions with a cost center of the plant. Shift times: Company settings → Shifts; planned stops: Planning → Calendar.`
@@ -110,6 +112,15 @@ function OeeDashboard() {
         <PeriodTable
           total={weeks.total}
           rows={[...weeks.byWorkCenter]}
+          shiftsWorked={{ of: (p) => (p.times.loadingMin > 0 ? p.times.loadingMin / net.average : null), note: shiftNote }}
+        />
+      </Section>
+
+      <Section title={`Week W${sel.week.week} by day — ${label}`} note={`${sel.monday} – ${sel.sunday}`}>
+        <OeeBarChart points={daily.total} ariaLabel={`Daily OEE week ${sel.week.week} ${label}`} />
+        <PeriodTable
+          total={daily.total}
+          rows={[...daily.byWorkCenter]}
           shiftsWorked={{ of: (p) => (p.times.loadingMin > 0 ? p.times.loadingMin / net.average : null), note: shiftNote }}
         />
       </Section>

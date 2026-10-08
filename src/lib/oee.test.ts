@@ -31,6 +31,7 @@ import {
   suggestConfig,
   visibleChartGroups,
   sumTimes,
+  weekDailyTrend,
   weekShiftTrend,
   weekTimes,
   weeklyTrend,
@@ -129,6 +130,15 @@ describe('oee workbook', () => {
     const worst = dies.filter((d) => d.workCenter === 'PRS-110').sort((a, b) => a.weightedOee! - b.weightedOee!)[0]
     expect(worst.equipment).toBe('M250SP015RO')
     expect(worst.weightedOee!).toBeCloseTo(0.5492753430543721, 10)
+  })
+
+  it('the week by day: seven days, their sum is the week (sum ÷ sum)', () => {
+    const wk = mondayOfWeek(2026, 39)
+    const d = weekDailyTrend(days, transfer, plant, wk)
+    expect(d.total.map((p) => p.label)).toEqual(['Mon 21.09', 'Tue 22.09', 'Wed 23.09', 'Thu 24.09', 'Fri 25.09', 'Sat 26.09', 'Sun 27.09'])
+    const w = weeklyTrend(days, [], transfer, plant, wk, 1).total[0]
+    expect(sumTimes(d.total.map((p) => ({ ...p.times, date: '', workCenter: '', costCenter: '' }) as never)).loadingMin).toBeCloseTo(w.times.loadingMin, 6)
+    expect(ratios(d.total[0].times).oee).toBeCloseTo(ratios(totalsFor(days, transfer, plant, wk, wk)).oee!, 9)
   })
 
   it('the week shift chart uses the shift numbers of the settings', () => {
