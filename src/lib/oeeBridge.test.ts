@@ -194,8 +194,8 @@ describe('OEE köprüsü', () => {
     expect(pr).toHaveLength(1)
     const best = Math.max(...b.items.filter((i) => i.rankable).map((i) => i.minutes))
     expect(pr[0].minutes).toBe(best)
-    // Gizli grup ("#") kendi kalemi, öncelik olamaz; açıklanmayana karışmaz.
-    expect(b.items.find((i) => i.label === 'Undefined')).toMatchObject({ rankable: false })
+    // "#" duruşları (tanımsız) köprünün hiçbir kalemine girmez (planlamacı, 2026-10-07).
+    expect(b.items.find((i) => i.label === 'Undefined')).toBeUndefined()
   })
 
   it('vardiyası olmayan gün × makinenin duruşu köprüye girmez', () => {
@@ -340,10 +340,37 @@ describe('denetçi bulguları (2026-10-06)', () => {
     expect(sumRows(speedRows)).toBeCloseTo(0, 9)
   })
 
-  it('gizlenmemiş "#" grubu da öncelik olamaz', () => {
+  it('"#" duruşları hesaptan çıkar: kalem yok, fark adımında kalır, köprü kapanır, OEE aynı', () => {
     const open = { ...plant, lossGroups: plant.lossGroups.map((g) => (g.code === '#' ? { ...g, hidden: false } : g)) }
     const b = buildBridge(pDays, pLoss, open)
-    expect(b.items.find((i) => i.label === 'Undefined')?.rankable).toBe(false)
+    expectCloses(b)
+    expect(b.items.some((i) => i.groups.includes('#'))).toBe(false)
+    expect(b.oee).toBeCloseTo(ratios(sumTimes(pDays)).oee!, 9)
+    // "#" dakikaları kadar fark adımı büyür (kayıtlar daha az açıklar).
+    const hash = pLoss.reduce(
+      (a, l) =>
+        a +
+        Object.entries(l.codes)
+          .filter(([k]) => k.split('|').includes('#'))
+          .reduce((x, [, [m]]) => x + m, 0),
+      0,
+    )
+    expect(hash).toBeGreaterThan(0)
+    const withHash = { ...plant, lossReasonCodes: plant.lossReasonCodes }
+    const recorded = (x: typeof b) =>
+      x.items.filter((i) => i.family === 'availability' && i.key !== 'av:unexplained').reduce((a, i) => a + i.minutes, 0)
+    expect(b.totals.loading - b.totals.production - recorded(b)).toBeCloseTo(b.notExplained, 6)
+    expect(buildBridge(pDays, pLoss, withHash).warnings.some((w) => w.includes('Reason Code “#”'))).toBe(true)
+    // Level 3 de "#" görmez: açıklanmayanın makine kırılımı adımla aynı.
+    const un = b.items.find((i) => i.key === 'av:unexplained')!
+    const rows = level3(
+      un,
+      'machine',
+      open,
+      { days: pDays, lossDays: matchedLossDays(pDays, pLoss), orders: [] },
+      { days: [], lossDays: [], orders: [] },
+    )
+    expect(rows.reduce((a, r) => a + r.minutes, 0)).toBeCloseTo(b.notExplained, 6)
   })
 })
 

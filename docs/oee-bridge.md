@@ -141,3 +141,12 @@ tanımında standartlansın.
   Company settings'e yönlendirir. Tanım yoksa eski OEE ayarı geçerlidir.
 - **Loss Bridge:** vardiya seçimi (adlar tanımdan) ve Level 3'te duruş
   kalemleri için kalıba göre kırılım (adet ve MTTR ile), en çok 8 günlük dönem.
+
+## "#" duruşları hesaptan çıkar (2026-10-07, planlamacı)
+
+Reason Code 1 ya da 2'si "#" olan (tanımsız) duruşlar köprünün hiçbir
+kalemine, Level 3'e, kalıp ve vardiya kırılımına girmez
+(src/lib/oeeBridge.ts `isUndefinedCode`). OEE ve A / P / Q MES sürelerinden
+geldiği için değişmez; bu dakikalar Loading − Production'ın içinde
+olduğundan gri "Not explained / Over-recorded" fark adımında kalır, köprü
+yine kapanır. Veri notu kaç dakikanın dışarıda kaldığını yazar.
