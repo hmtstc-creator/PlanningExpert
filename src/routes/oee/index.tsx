@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useMemo, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
@@ -17,11 +17,13 @@ import {
   weekShiftTrend,
   type DayRow,
   type MonthlyRow,
+  type SeriesPoint,
   type ShiftRow,
   type WeeklyRow,
 } from '../../lib/oee'
 import { relatedPages } from '../../lib/navigation'
-import { usePlant } from '../../lib/plantContext'
+import { periodOfPoint } from '../../lib/oeeBridge'
+import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { netShiftMinutes } from '../../lib/shifts'
 
 export const Route = createFileRoute('/oee/')({
@@ -48,10 +50,24 @@ function OeeDashboard() {
   const scopeRows = useMemo(() => [...days, ...weekly, ...monthly], [days, weekly, monthly])
   const scope = effectiveScope(sel.scope, areaNames(scopeRows, config))
   const month = useMemo(() => monthlyTrend(days, monthly, scope, config, sel.date), [days, monthly, scope, config, sel.date])
-  const weeks = useMemo(() => weeklyTrend(days, weekly, scope, config, sel.monday, weeksN), [days, weekly, scope, config, sel.monday, weeksN])
+  const weeks = useMemo(
+    () => weeklyTrend(days, weekly, scope, config, sel.monday, weeksN),
+    [days, weekly, scope, config, sel.monday, weeksN],
+  )
   const week = useMemo(() => weekShiftTrend(shifts, scope, config, sel.monday), [shifts, scope, config, sel.monday])
   const daily = useMemo(() => weekDailyTrend(days, scope, config, sel.monday), [days, scope, config, sel.monday])
   const label = scopeLabel(scope, config)
+  // Sütuna tıklayınca Loss Bridge o dönemle (ve vardiyayla) açılır; alan seçimi
+  // sayfalar arasında ortak (planlamacı, 2026-10-13).
+  const navigate = useNavigate()
+  const canOpen = useCanOpen()
+  const toBridge = canOpen('/oee/bridge')
+    ? (p: SeriesPoint) => {
+        const link = periodOfPoint(p.key)
+        if (link) void navigate({ to: '/oee/bridge', search: link })
+      }
+    : undefined
+  const hint = 'Click: open in Loss Bridge'
   const h = (m: number) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}`
   const shiftNote = `Shifts worked = loading time ÷ net shift (${h(net.average)} h = shift ${net.timesDefined ? '' : '8:00 h assumed '}− planned stops ${h(net.plannedAverage)} h: breaks, meals, meetings). Counts only the work centers listed below — those defined on Work Center Definitions with a cost center of the plant. Shift times, MES codes and planned stops: Work calendar.`
 
@@ -64,22 +80,20 @@ function OeeDashboard() {
         info={
           <>
             <p>
-              <b>OEE = Availability × Performance × Quality</b>. Availability = Production time ÷ Loading
-              time, Performance = Operation time ÷ Production time, Quality = Good ÷ (Good + Scrap +
-              Reject).
+              <b>OEE = Availability × Performance × Quality</b>. Availability = Production time ÷ Loading time, Performance = Operation time
+              ÷ Production time, Quality = Good ÷ (Good + Scrap + Reject).
             </p>
             <p>
-              Only work centers defined on Work Center Definitions with a cost center of the plant are shown and counted; rows of
-              other machines in the files are kept but left out until they are defined.
+              Only work centers defined on Work Center Definitions with a cost center of the plant are shown and counted; rows of other
+              machines in the files are kept but left out until they are defined.
             </p>
             <p>
-              Every day, week, month and group adds up the times first and divides once. A day is the
-              sum of its shifts (Report → Shiftly KPI); a week or month is the sum of its days (Weekly /
-              Monthly KPI rows uploaded earlier are kept where they cover more loading time).
+              Every day, week, month and group adds up the times first and divides once. A day is the sum of its shifts (Report → Shiftly
+              KPI); a week or month is the sum of its days (Weekly / Monthly KPI rows uploaded earlier are kept where they cover more
+              loading time).
             </p>
             <p>
-              Areas, cost center names and shift numbers come from{' '}
-              <Link to="/oee/settings">OEE Settings</Link>.
+              Areas, cost center names and shift numbers come from <Link to="/oee/settings">OEE Settings</Link>.
             </p>
           </>
         }
@@ -103,12 +117,12 @@ function OeeDashboard() {
       )}
 
       <Section title={`Monthly OEE — ${label}`} note={`${sel.date.slice(0, 4)}, up to ${sel.date.slice(0, 7)}`}>
-        <OeeBarChart points={month.total} ariaLabel={`Monthly OEE ${label}`} />
+        <OeeBarChart points={month.total} ariaLabel={`Monthly OEE ${label}`} onSelect={toBridge} selectHint={hint} />
         <PeriodTable total={month.total} rows={[...month.byWorkCenter]} />
       </Section>
 
       <Section title={`Last ${weeksN} weeks — ${label}`} note={`up to W${sel.week.week}`}>
-        <OeeBarChart points={weeks.total} ariaLabel={`Weekly OEE ${label}`} />
+        <OeeBarChart points={weeks.total} ariaLabel={`Weekly OEE ${label}`} onSelect={toBridge} selectHint={hint} />
         <PeriodTable
           total={weeks.total}
           rows={[...weeks.byWorkCenter]}
@@ -117,7 +131,7 @@ function OeeDashboard() {
       </Section>
 
       <Section title={`Week W${sel.week.week} by day — ${label}`} note={`${sel.monday} – ${sel.sunday}`}>
-        <OeeBarChart points={daily.total} ariaLabel={`Daily OEE week ${sel.week.week} ${label}`} />
+        <OeeBarChart points={daily.total} ariaLabel={`Daily OEE week ${sel.week.week} ${label}`} onSelect={toBridge} selectHint={hint} />
         <PeriodTable
           total={daily.total}
           rows={[...daily.byWorkCenter]}
@@ -129,7 +143,7 @@ function OeeDashboard() {
         title={`Week W${sel.week.week} by shift — ${label}`}
         note={`${sel.monday} – ${sel.sunday}${week.unknown.length ? ` · shift codes not numbered in Settings: ${week.unknown.join(', ')}` : ''}`}
       >
-        <OeeBarChart points={week.slots} ariaLabel={`Shift OEE week ${sel.week.week} ${label}`} />
+        <OeeBarChart points={week.slots} ariaLabel={`Shift OEE week ${sel.week.week} ${label}`} onSelect={toBridge} selectHint={hint} />
         <PeriodTable
           total={week.slots}
           rows={[...week.byWorkCenter]}
@@ -141,7 +155,11 @@ function OeeDashboard() {
       </Section>
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Losses behind these numbers: <Link to="/oee/losses" className="underline">Losses Trend</Link>.
+        Losses behind these numbers:{' '}
+        <Link to="/oee/losses" className="underline">
+          Losses Trend
+        </Link>
+        .
       </p>
     </div>
   )

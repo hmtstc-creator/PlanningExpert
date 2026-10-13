@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Printer } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { FAMILY_SWATCH, hours, pctOf } from '../../components/OeeBridgeCharts'
@@ -10,13 +10,14 @@ import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
 import { areaNames, costCentersOf, inScope, scopeLabel, type DayRow, type OrderRow, type ShiftRow } from '../../lib/oee'
-import { MAX_EVENT_DAYS, hasParts, matchedLossDays, shiftSlice } from '../../lib/oeeBridge'
+import { MAX_EVENT_DAYS, hasParts, matchedLossDays, parsePeriodLink, shiftSlice } from '../../lib/oeeBridge'
 import { dailyReport, type ReportLoss, type ReportRow } from '../../lib/oeeDailyReport'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
 import { useCanOpen } from '../../lib/plantContext'
 import { printSheet } from '../../lib/printSheet'
 
 export const Route = createFileRoute('/oee/report')({
+  validateSearch: parsePeriodLink,
   component: ReportPage,
 })
 
@@ -31,10 +32,12 @@ function ReportPage() {
   const sel = useOeeSelection()
   const { config } = useOeeConfig()
   const canOpen = useCanOpen()
-  const period = useOeePeriod()
+  const link = Route.useSearch()
+  const period = useOeePeriod(link)
   const { lastDay, wanted, cur, eventsOk } = period
   const [machineRaw, setMachine] = useState('')
-  const [shift, setShift] = useState(0)
+  const [shift, setShift] = useState(link.shift ?? 0)
+  useEffect(() => setShift(link.shift ?? 0), [link.shift, link.from, link.to])
   const sheetRef = useRef<HTMLDivElement>(null)
 
   const q = cur ? { from: cur.from, to: cur.to } : { from: wanted.from, to: wanted.to }

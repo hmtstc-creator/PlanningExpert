@@ -190,3 +190,16 @@ iş yeri için bir satır ve en altta toplam:
   toplam satırında malzemenin yanında iş yeri yazar. Sipariş verisinin
   kapsamadığı hız kaybı "Not in order data".
 - Print düğmesi sayfayı yazdırır.
+
+## Trend Analysis'ten Loss Bridge'e (2026-10-13, planlamacı)
+
+Trend Analysis'teki dört grafiğin (aylık, haftalık, haftanın günleri,
+vardiyalar) sütununa tıklayınca Loss Bridge o sütunun dönemiyle açılır;
+filtre yeniden kurulmaz:
+
+- ay → ayın tamamı (tarih aralığı), hafta → Pazartesi–Pazar, gün → tek gün,
+  vardiya → o gün ve o vardiya,
+- alan / masraf yeri seçimi sayfalar arasında zaten ortak (tarayıcıda saklı),
+- dönem URL'de: `/oee/bridge?from=2026-09-21&to=2026-09-27&shift=2`
+  (`periodOfPoint`, `parsePeriodLink`; testli). Daily Report da aynı
+  parametreleri okur. Loss Bridge'i açma izni olmayana sütun tıklanmaz.

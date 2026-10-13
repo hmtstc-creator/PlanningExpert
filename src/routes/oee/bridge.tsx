@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Printer } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { BridgeChart, FAMILY_LABEL, FAMILY_SWATCH, Level2Bars, Level3Table, Gauge, hours, pctOf } from '../../components/OeeBridgeCharts'
@@ -17,6 +17,7 @@ import {
   level3,
   level3Views,
   matchedLossDays,
+  parsePeriodLink,
   shiftSlice,
   topN,
   type Level3By,
@@ -28,6 +29,7 @@ import { useCanOpen } from '../../lib/plantContext'
 import { printSheet } from '../../lib/printSheet'
 
 export const Route = createFileRoute('/oee/bridge')({
+  validateSearch: parsePeriodLink,
   component: BridgePage,
 })
 
@@ -48,12 +50,14 @@ function BridgePage() {
   const { config } = useOeeConfig()
   const canOpen = useCanOpen()
   // Dönem: tek gün ya da tarih aralığı; boşsa son yüklenen gün (OeePeriodControl).
-  const period = useOeePeriod()
+  const link = Route.useSearch()
+  const period = useOeePeriod(link)
   const { lastDay, firstDay, wanted, cur, prev, prevFull } = period
   const [machineRaw, setMachine] = useState('')
   const [picked, setPicked] = useState<string | null>(null)
   const [view, setView] = useState<Level3By | null>(null)
-  const [shift, setShift] = useState(0)
+  const [shift, setShift] = useState(link.shift ?? 0)
+  useEffect(() => setShift(link.shift ?? 0), [link.shift, link.from, link.to])
   const sheetRef = useRef<HTMLDivElement>(null)
 
   // Sorgu aralığı: önceki dönemin başından bu dönemin sonuna (veri yoksa dünkü gün, boş döner).

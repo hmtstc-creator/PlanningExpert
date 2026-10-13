@@ -27,8 +27,10 @@
 
 import {
   UNASSIGNED,
+  addDaysIso,
   daysFromShifts,
   lossDayOf,
+  mondayOfWeek,
   shiftNumber,
   type DayRow,
   type DowntimeDay,
@@ -764,6 +766,50 @@ export function clipToData(
 }
 
 // ---- vardiya ---------------------------------------------------------------------
+
+/** Loss Bridge / Daily Report bağlantısı: dönem ve isteğe bağlı vardiya (URL'de). */
+export interface PeriodLink {
+  from: string
+  to: string
+  shift?: number
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/** URL'den gelen dönem: geçerli tarihler ve pozitif vardiya numarası; değilse boş. */
+export function parsePeriodLink(s: Record<string, unknown>): Partial<PeriodLink> {
+  const out: Partial<PeriodLink> = {}
+  if (typeof s.from === 'string' && ISO_DAY.test(s.from)) out.from = s.from
+  if (typeof s.to === 'string' && ISO_DAY.test(s.to)) out.to = s.to
+  if (out.from && !out.to) out.to = out.from
+  if (!out.from) delete out.to
+  const shift = Number(s.shift)
+  if (Number.isInteger(shift) && shift > 0) out.shift = shift
+  return out
+}
+
+/**
+ * Trend grafiğindeki sütunun dönemi (planlamacı, 2026-10-13: sütuna
+ * tıklayınca Loss Bridge o dönemle açılır). Anahtarlar: ay `2026-09`, hafta
+ * `2026-W38`, gün `2026-09-21`, vardiya `2026-09-21|2`.
+ */
+export function periodOfPoint(key: string): PeriodLink | null {
+  let m = /^(\d{4})-W(\d{2})$/.exec(key)
+  if (m) {
+    const from = mondayOfWeek(Number(m[1]), Number(m[2]))
+    return { from, to: addDaysIso(from, 6) }
+  }
+  m = /^(\d{4})-(\d{2})$/.exec(key)
+  if (m) {
+    const from = `${m[1]}-${m[2]}-01`
+    const next = Number(m[2]) === 12 ? `${Number(m[1]) + 1}-01-01` : `${m[1]}-${String(Number(m[2]) + 1).padStart(2, '0')}-01`
+    return { from, to: addDaysIso(next, -1) }
+  }
+  if (ISO_DAY.test(key)) return { from: key, to: key }
+  m = /^(\d{4}-\d{2}-\d{2})\|(\d+)$/.exec(key)
+  if (m) return { from: m[1], to: m[1], shift: Number(m[2]) }
+  return null
+}
 
 /** Ham duruşlar en çok bu kadar gün okunur (convex/oee.ts MAX_EVENT_DAYS). */
 export const MAX_EVENT_DAYS = 8

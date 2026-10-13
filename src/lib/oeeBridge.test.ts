@@ -434,3 +434,29 @@ describe('vardiya ve parça (ham duruşlarla)', () => {
     expect(level3(setup, 'part', cfg, { days: pDays, lossDays: noParts, orders: [] }, none)).toEqual([])
   })
 })
+
+describe('Trend Analysis sütunundan Loss Bridge dönemi', () => {
+  it('ay, hafta, gün ve vardiya', async () => {
+    const { periodOfPoint } = await import('./oeeBridge')
+    expect(periodOfPoint('2026-09')).toEqual({ from: '2026-09-01', to: '2026-09-30' })
+    expect(periodOfPoint('2026-02')).toEqual({ from: '2026-02-01', to: '2026-02-28' })
+    expect(periodOfPoint('2026-12')).toEqual({ from: '2026-12-01', to: '2026-12-31' })
+    expect(periodOfPoint('2026-W39')).toEqual({ from: '2026-09-21', to: '2026-09-27' })
+    expect(periodOfPoint('2026-W01')).toEqual({ from: '2025-12-29', to: '2026-01-04' })
+    expect(periodOfPoint('2026-09-21')).toEqual({ from: '2026-09-21', to: '2026-09-21' })
+    expect(periodOfPoint('2026-09-21|2')).toEqual({ from: '2026-09-21', to: '2026-09-21', shift: 2 })
+    expect(periodOfPoint('PRS-106')).toBeNull()
+  })
+
+  it('URL: geçersiz değerler yok sayılır', async () => {
+    const { parsePeriodLink } = await import('./oeeBridge')
+    expect(parsePeriodLink({ from: '2026-09-21', to: '2026-09-27', shift: '2' })).toEqual({
+      from: '2026-09-21',
+      to: '2026-09-27',
+      shift: 2,
+    })
+    expect(parsePeriodLink({ from: '2026-09-21' })).toEqual({ from: '2026-09-21', to: '2026-09-21' })
+    expect(parsePeriodLink({ to: '2026-09-21', shift: 'x' })).toEqual({})
+    expect(parsePeriodLink({ from: '21.09.2026', shift: -1 })).toEqual({})
+  })
+})

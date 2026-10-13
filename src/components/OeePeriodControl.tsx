@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
@@ -11,6 +11,7 @@ import {
   isWholeMonth,
   previousRange,
   selectedRange,
+  type PeriodLink,
   type PeriodMode,
 } from '../lib/oeeBridge'
 import { usePlant } from '../lib/plantContext'
@@ -26,13 +27,23 @@ export type DateRange = { from: string; to: string }
 /**
  * Loss Bridge ve Daily Report'un dönemi: tek gün ya da tarih aralığı
  * (planlamacı, 2026-10-07); boşsa son yüklenen gün. Dönem son yüklenen güne
- * kırpılır; önceki dönem karşılaştırma içindir.
+ * kırpılır; önceki dönem karşılaştırma içindir. `link`: URL'deki dönem
+ * (Trend Analysis'te tıklanan sütun) — sayfa o dönemle açılır, filtre yeniden
+ * kurulmaz (planlamacı, 2026-10-13).
  */
-export function useOeePeriod() {
+export function useOeePeriod(link: Partial<PeriodLink> = {}) {
   const coverage = useQuery(api.oee.coverage) as { days: DateRange | null } | undefined
-  const [mode, setMode] = useState<PeriodMode>('day')
-  const [dayRaw, setDay] = useState('')
-  const [rangeRaw, setRange] = useState<DateRange | null>(null)
+  const linked = !!link.from && !!link.to
+  const [mode, setMode] = useState<PeriodMode>(linked && link.from !== link.to ? 'range' : 'day')
+  const [dayRaw, setDay] = useState(linked ? link.from! : '')
+  const [rangeRaw, setRange] = useState<DateRange | null>(linked ? { from: link.from!, to: link.to! } : null)
+  // Sayfa açıkken yeni bağlantı gelirse (başka sütun) dönem ona geçer.
+  useEffect(() => {
+    if (!link.from || !link.to) return
+    setMode(link.from !== link.to ? 'range' : 'day')
+    setDay(link.from)
+    setRange({ from: link.from, to: link.to })
+  }, [link.from, link.to])
   const lastDay = coverage?.days?.to ?? null
   const firstDay = coverage?.days?.from ?? null
   const fallbackDay = lastDay ?? addDaysIso(localIso(new Date()), -1)

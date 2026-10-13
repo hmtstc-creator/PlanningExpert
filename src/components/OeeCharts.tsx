@@ -77,7 +77,20 @@ function Tooltip({ x, y, width, children }: { x: number; y: number; width: numbe
  * yorumu için). İkisi de yüzde: tek eksen. Etiket: çubuk değeri çubuğun,
  * performans değeri noktanın üstünde (14 noktaya kadar; fazlası ipucunda).
  */
-export function OeeBarChart({ points, height = 240, ariaLabel }: { points: SeriesPoint[]; height?: number; ariaLabel: string }) {
+export function OeeBarChart({
+  points,
+  height = 240,
+  ariaLabel,
+  onSelect,
+  selectHint,
+}: {
+  points: SeriesPoint[]
+  height?: number
+  ariaLabel: string
+  /** Sütuna tıklanınca (verisi olan sütunlar); ör. Loss Bridge'i o dönemle açar. */
+  onSelect?: (p: SeriesPoint) => void
+  selectHint?: string
+}) {
   const { ref, width } = useWidth()
   const [hover, setHover] = useState<number | null>(null)
   const perf = points.map((p) => (p.oee === null ? null : ratios(p.times).performance))
@@ -120,14 +133,25 @@ export function OeeBarChart({ points, height = 240, ariaLabel }: { points: Serie
           Performance
         </span>
       </div>
-      <svg width={width} height={height} role="img" aria-label={`${ariaLabel} — OEE bars, performance line`} onMouseLeave={() => setHover(null)}>
+      <svg
+        width={width}
+        height={height}
+        role="img"
+        aria-label={`${ariaLabel} — OEE bars, performance line`}
+        onMouseLeave={() => setHover(null)}
+      >
         <Grid width={width} height={height} max={max} top={top0} />
         {points.map((p, i) => {
           const v = p.oee ?? 0
           const top = y(v)
           const hgt = Math.max(0, base - top)
           return (
-            <g key={p.key} onMouseEnter={() => setHover(i)}>
+            <g
+              key={p.key}
+              onMouseEnter={() => setHover(i)}
+              onClick={() => onSelect && p.oee !== null && onSelect(p)}
+              style={{ cursor: onSelect && p.oee !== null ? 'pointer' : undefined }}
+            >
               <rect x={PAD_L + col * i} y={PAD_T} width={col} height={base - PAD_T} fill="transparent" />
               {p.oee !== null && hgt > 0 && (
                 <path
@@ -193,6 +217,7 @@ export function OeeBarChart({ points, height = 240, ariaLabel }: { points: Serie
           <p className="text-muted-foreground">
             A {pct(hr.availability)} · Q {pct(hr.quality)}
           </p>
+          {onSelect && selectHint && <p className="mt-1 text-[11px] font-medium text-[var(--viz-1)]">{selectHint}</p>}
         </Tooltip>
       )}
       {h && !hr && (
