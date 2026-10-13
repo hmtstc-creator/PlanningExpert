@@ -1455,6 +1455,26 @@
       },
       "optional": true
     },
+    "partList": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "array",
+          "value": {
+            "type": "union",
+            "value": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "optional": true
+    },
     "plantId": {
       "fieldType": {
         "type": "id",

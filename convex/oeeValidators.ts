@@ -101,6 +101,8 @@ export const lossDayFields = {
   codes: v.optional(cells),
   /** [rc1, rc2, metin, dakika, adet] */
   reasonList: v.optional(cells),
+  /** [rc1, rc2, MATERIAL, dakika, adet] */
+  partList: v.optional(cells),
   /** @deprecated ilk biçim; okunmaz. */
   groups: v.optional(cells),
   /** @deprecated ilk biçim; okunmaz. */

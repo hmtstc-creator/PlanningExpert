@@ -90,22 +90,26 @@ diğerlerinde hemen önceki eşit dönem (tek gün ↔ önceki gün);
 4. Köprü (% of loading; ipucunda saat ve dakika), renkler: toplamlar mavi,
    availability turuncu, kayıt–MES farkı gri, performans mor, kalite pembe,
    OEE yeşil; toplam çubuklarında A / P / Q. Altında "Outside OEE" planlı
-   duruşlar (bilgi). Tıklanan kayıp Level 3'ü açar.
-5. OEE dağılımı · Level 1 · Level 2 (öncelik işaretli, tıklanır).
-6. Level 3: ilk 5 + diğerleri, önceki dönem, aksiyon bağlantısı (kalıp
-   problemleri, makine arızaları, Losses Trend).
+   duruşlar (bilgi). Köprü geniş ekranda yarım genişlikte; tıklanan adımın
+   ayrıntısı hemen sağında (planlamacı, 2026-10-13).
+5. Ayrıntı paneli: adımın payı, süresi, duruş sayısı, MTTR; Level 3 ilk 8 +
+   diğerleri (nedene / makineye / parçaya göre), önceki dönem; "Hours by part
+   (MATERIAL)" kısa listesi (hangi parçadan kaç saat); aksiyon bağlantısı
+   (kalıp problemleri, makine arızaları, Losses Trend).
+6. OEE dağılımı · Level 1 · Level 2 (öncelik işaretli, tıklanınca panel o
+   kalemi gösterir).
 7. Veri notları ve köprü tablosu.
 
 Telefonda köprü yatay çubuklara döner (12+ adım 360 px'e sığmaz).
 
 ## Kapsam dışı / bilinen sınırlar
 
-- **Vardiya filtresi ve parça kırılımı en çok 8 gün:** duruş özetleri
-  (`oeeLossDays`) vardiyayı ve kalıbı tutmuyor; vardiya seçilince ya da
-  "By part" görünümünde köprü ham duruşlardan (`oeeDowntimeDays`, vardiya
-  kodu Shift Definition / Shift Group, parça MATERIAL) ve vardiya kayıtlarından
-  (`oeeShifts`) kurulur. Bu yüzden dönem 8 günü geçince vardiya seçimi
-  kapanır. Vardiyada planlanmamış süre (takvim) gösterilmez; vardiyaların
+- **Vardiya filtresi en çok 8 gün:** duruş özetleri (`oeeLossDays`)
+  vardiyayı tutmuyor; vardiya seçilince köprü ham duruşlardan
+  (`oeeDowntimeDays`, vardiya kodu Shift Definition / Shift Group) ve vardiya
+  kayıtlarından (`oeeShifts`) kurulur. Bu yüzden dönem 8 günü geçince vardiya
+  seçimi kapanır. Parça kırılımı ise özetin `partList`'inden gelir, her dönemde
+  çalışır (eski özetlerde ham duruşlardan, en çok 8 gün). Vardiyada planlanmamış süre (takvim) gösterilmez; vardiyaların
   toplamı tüm güne eşittir (test).
 - MES'in plansız duruş toplamı (Unscheduled) ile duruş kayıtları neden
   tutmuyor — MES sahibine sorulmalı (açık konu, docs/oeedashboard.md karar 10).
@@ -157,4 +161,10 @@ yine kapanır. Veri notu kaç dakikanın dışarıda kaldığını yazar.
 sütununa (Mold Number değil), hız kaybı ve hurda / ret siparişin **Material -
 Key**'ine göre kırılır. Parça adları planlamadaki parça (malzeme) kodlarıyla
 aynıdır. MATERIAL "#" ya da boşsa "(no part)". Satırın altında makine yazar.
+
+Duruş özetleri (`oeeLossDays.partList`: [rc1, rc2, MATERIAL, dakika, adet])
+parça kırılımını da tutar, böylece "hangi parçadan kaç saat" 31 günlük
+aralıkta da görünür (ham duruşlar en çok 8 gün okunur). Eski özetler bir
+kerelik "rebuild" adımıyla (OEE sayfası açılınca otomatik, `rebuildStored`
+'losses') ya da dosya yeniden yüklenince tamamlanır; hiçbir şey silinmez.
 

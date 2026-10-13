@@ -150,6 +150,11 @@ export interface LossDay {
   codes: Record<string, [number, number]>
   /** `${rc1}|${rc2}|${metin}` → [dakika, adet] */
   reasons: Record<string, [number, number]>
+  /**
+   * `${rc1}|${rc2}|${MATERIAL}` → [dakika, adet]. Parça kırılımı her dönem
+   * için (ham duruşlar en çok 8 gün okunur). Eski özetlerde yok.
+   */
+  parts?: Record<string, [number, number]>
 }
 
 export const EMPTY_TIMES: OeeTimes = {
@@ -620,6 +625,7 @@ export function totalsFor(days: DayRow[], scope: Scope, c: OeeConfig, from: stri
 export function lossDayOf(day: DowntimeDay): LossDay {
   const codes: Record<string, [number, number]> = {}
   const reasons: Record<string, [number, number]> = {}
+  const parts: Record<string, [number, number]> = {}
   for (const e of day.events) {
     const k = `${e.rc1}|${e.rc2}`
     const c = codes[k] ?? [0, 0]
@@ -627,8 +633,11 @@ export function lossDayOf(day: DowntimeDay): LossDay {
     const rk = `${k}|${e.textEn}`
     const r = reasons[rk] ?? [0, 0]
     reasons[rk] = [r[0] + e.minutes, r[1] + 1]
+    const pk = `${k}|${e.material}`
+    const p = parts[pk] ?? [0, 0]
+    parts[pk] = [p[0] + e.minutes, p[1] + 1]
   }
-  return { date: day.date, costCenter: day.costCenter, workCenter: day.workCenter, codes, reasons }
+  return { date: day.date, costCenter: day.costCenter, workCenter: day.workCenter, codes, reasons, parts }
 }
 
 /** Grafik sütunları: ayardaki sıra; tanımsız grup "Unassigned"; en sonda Speed. */

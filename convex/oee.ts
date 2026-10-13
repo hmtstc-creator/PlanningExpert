@@ -270,7 +270,7 @@ export const rebuildStored = guardedMutation({
         .query('oeeLossDays')
         .withIndex('by_key', (q: Ctx) => q.eq('date', doc.date).eq('workCenter', doc.workCenter))
         .first()
-      if (lossHit?.codes) continue
+      if (lossHit?.codes && lossHit.partList) continue
       await upsert(ctx, lossHit, 'oeeLossDays', toStoredLoss(lossDayOf(fromStoredDay(doc))))
     }
     return { cursor: page.continueCursor, isDone: page.isDone, count: page.page.length }
@@ -444,7 +444,7 @@ export const coverage = guardedQuery({
     const lastDown = await ctx.db.query('oeeDowntimeDays').withIndex('by_date').order('desc').first()
     const days = await span('oeeDays')
     const shifts = await span('oeeShifts')
-    const oldLoss = (d: Ctx) => d && !d.codes
+    const oldLoss = (d: Ctx) => d && (!d.codes || !d.partList)
     return {
       needsRebuild: {
         days: !!shifts && (!days || days.from > shifts.from || days.to < shifts.to),

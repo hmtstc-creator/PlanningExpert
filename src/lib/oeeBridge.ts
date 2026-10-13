@@ -124,7 +124,7 @@ const withoutUndefined = (l: LossDay): LossDay => {
         return !isUndefinedCode(rc1, rc2)
       }),
     )
-  return { ...l, codes: keep(l.codes), reasons: keep(l.reasons) }
+  return { ...l, codes: keep(l.codes), reasons: keep(l.reasons), ...(l.parts && { parts: keep(l.parts) }) }
 }
 
 /** "#" duruşlarının dakikası (veri notu için). */
@@ -491,17 +491,21 @@ export type Level3By = 'reason' | 'machine' | 'part'
 const partLabel = (material: string) => (material && material !== '#' ? material : NO_PART)
 export const NO_PART = '(no part)'
 
+/** Kayıp özetlerinin hepsinde parça kırılımı var mı (yoksa ham duruşlar gerekir). */
+export const hasParts = (lossDays: LossDay[]) => lossDays.every((l) => !!l.parts)
+
 /**
  * Bir kalemin Level 3 kırılımında hangi görünümler var. Parça görünümü
- * (planlamacı, 2026-10-13: kalıp değil parça): duruşlarda ham duruşlarla
- * (en çok 8 gün), hız ve kalitede sipariş verisiyle.
+ * (planlamacı, 2026-10-13: kalıp değil parça): duruşlarda kayıp özetinin
+ * parça kırılımıyla (eski özetlerde ham duruşlarla, en çok 8 gün), hız ve
+ * kalitede sipariş verisiyle.
  */
-export function level3Views(item: LossItem, withEvents = false): Level3By[] {
+export function level3Views(item: LossItem, withParts = false): Level3By[] {
   if (item.key === 'pf:speed') return ['part', 'machine']
   if (item.family === 'quality') return ['part', 'machine']
   if (item.key === 'av:unexplained' || item.key === 'pl:other') return ['machine']
   if (item.family === 'planned') return ['reason', 'machine']
-  return withEvents ? ['reason', 'machine', 'part'] : ['reason', 'machine']
+  return withParts ? ['reason', 'machine', 'part'] : ['reason', 'machine']
 }
 
 function addRow(map: Map<string, Level3Row>, key: string, label: string, minutes: number, count: number, prev: boolean, sub?: string) {
@@ -648,12 +652,23 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
 
   // Kayıtlı kayıp duruş kalemi: grupları; nedene, makineye ya da parçaya göre.
   if (by === 'part') {
-    for (const [set, isPrev] of sets)
+    for (const [set, isPrev] of sets) {
+      if (set.lossDays.length && hasParts(set.lossDays)) {
+        for (const l of set.lossDays)
+          for (const [k, [m, n]] of Object.entries(l.parts ?? {})) {
+            const [rc1, rc2, ...mat] = k.split('|')
+            if (!c.lossReasonCodes.includes(rc1) || !groups.has(rc2)) continue
+            const material = mat.join('|')
+            addRow(map, `${l.workCenter}|${material}`, partLabel(material), m, n, isPrev, l.workCenter)
+          }
+        continue
+      }
       for (const d of set.events ?? [])
         for (const e of d.events) {
           if (!c.lossReasonCodes.includes(e.rc1) || !groups.has(e.rc2)) continue
           addRow(map, `${d.workCenter}|${e.material}`, partLabel(e.material), e.minutes, 1, isPrev, d.workCenter)
         }
+    }
     return finish(map, true)
   }
   for (const [set, isPrev] of sets) {

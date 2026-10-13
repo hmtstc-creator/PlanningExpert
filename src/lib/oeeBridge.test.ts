@@ -418,4 +418,19 @@ describe('vardiya ve parça (ham duruşlarla)', () => {
     const mats = new Set(pEvents.flatMap((d) => d.events.map((e) => e.material)))
     expect(rows.filter((r) => r.key !== '__others').every((r) => mats.has(r.label) || r.label === '(no part)')).toBe(true)
   })
+
+  it('parça kırılımı kayıp özetinden de aynı (ham duruş gerekmez, her dönem)', () => {
+    const b = buildBridge(pDays, pLoss, cfg)
+    const setup = b.items.find((i) => i.label === 'Setup')!
+    const none = { days: [], lossDays: [], orders: [] }
+    const fromSummary = level3(setup, 'part', cfg, { days: pDays, lossDays: pLoss, orders: [] }, none)
+    const noParts = pLoss.map(({ parts: _parts, ...l }) => l)
+    const fromEvents = level3(setup, 'part', cfg, { days: pDays, lossDays: noParts, orders: [], events: pEvents }, none)
+    expect(pLoss.every((l) => l.parts)).toBe(true)
+    expect(fromSummary.map((r) => [r.key, r.minutes.toFixed(6), r.count])).toEqual(
+      fromEvents.map((r) => [r.key, r.minutes.toFixed(6), r.count]),
+    )
+    // Eski özetlerde (parçasız) ham duruş yoksa satır yok.
+    expect(level3(setup, 'part', cfg, { days: pDays, lossDays: noParts, orders: [] }, none)).toEqual([])
+  })
 })

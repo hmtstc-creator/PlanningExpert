@@ -75,7 +75,8 @@ export const fromStoredDay = (d: StoredDowntimeDay): DowntimeDay => ({ ...d, eve
 
 /**
  * Kayıp özeti sunucuda diziyle durur: alan adında serbest metin olmaz.
- * `codes`: [rc1, rc2, dakika, adet]; `reasonList`: [rc1, rc2, metin, dakika, adet].
+ * `codes`: [rc1, rc2, dakika, adet]; `reasonList`: [rc1, rc2, metin, dakika, adet];
+ * `partList`: [rc1, rc2, MATERIAL, dakika, adet] (yoksa eski özet, parçasız).
  * Eski biçimdeki (groups/reasons) kayıtlar okunmaz; o günler yeniden
  * yüklenince yeni biçimle yazılır.
  */
@@ -85,6 +86,7 @@ export interface StoredLossDay {
   workCenter: string
   codes?: Cell[][]
   reasonList?: Cell[][]
+  partList?: Cell[][]
 }
 
 export function toStoredLoss(l: LossDay): StoredLossDay {
@@ -100,6 +102,12 @@ export function toStoredLoss(l: LossDay): StoredLossDay {
       const [rc1, rc2, ...text] = k.split('|')
       return [rc1, rc2, text.join('|'), m, c]
     }),
+    ...(l.parts && {
+      partList: Object.entries(l.parts).map(([k, [m, c]]) => {
+        const [rc1, rc2, ...material] = k.split('|')
+        return [rc1, rc2, material.join('|'), m, c]
+      }),
+    }),
   }
 }
 
@@ -109,7 +117,13 @@ export function fromStoredLoss(l: StoredLossDay): LossDay | null {
   for (const [rc1, rc2, m, c] of l.codes) codes[`${s(rc1)}|${s(rc2)}`] = [n(m), n(c)]
   const reasons: Record<string, [number, number]> = {}
   for (const [rc1, rc2, text, m, c] of l.reasonList ?? []) reasons[`${s(rc1)}|${s(rc2)}|${s(text)}`] = [n(m), n(c)]
-  return { date: l.date, costCenter: l.costCenter, workCenter: l.workCenter, codes, reasons }
+  const out: LossDay = { date: l.date, costCenter: l.costCenter, workCenter: l.workCenter, codes, reasons }
+  if (l.partList) {
+    const parts: Record<string, [number, number]> = {}
+    for (const [rc1, rc2, mat, m, c] of l.partList) parts[`${s(rc1)}|${s(rc2)}|${s(mat)}`] = [n(m), n(c)]
+    out.parts = parts
+  }
+  return out
 }
 
 /** Okunabilen (yeni biçimdeki) kayıp özetleri. */
