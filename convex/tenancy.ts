@@ -8,7 +8,7 @@ import { isPlantTable } from './plantDb'
 import { LEGACY_ROLE_GROUPS, MODULES, isBoardUser, isPlatform, uniformPermissions } from '../src/lib/tenancy'
 import { digestDue, localNow } from '../src/lib/digest'
 import { SIGNIN_KEEP_MS } from '../src/lib/signinGuard'
-import { effectiveShifts } from '../src/lib/shifts'
+import { calendarShifts, effectiveShifts } from '../src/lib/shifts'
 
 /**
  * Şirket / fabrika bağlamı ve tek seferlik geçiş (docs/plant-genisletme.md).
@@ -208,6 +208,14 @@ export const context = userQuery({
     if (!state?.value?.done) return { ...base, migration: { started: !!state, done: false }, plants: [], active: null }
     const plants = await visiblePlants(ctx.db, user)
     const active = await activePlant(ctx.db, user, ctx.session)
+    // Vardiyalar Working calendar'dan; takvimde kod yoksa eski tanımın kodları (Company settings → Shifts).
+    const legacy = active ? effectiveShifts(active.plant.shifts, active.company.shifts) : null
+    const calendar = active
+      ? await ctx.db
+          .query('globalShiftSettings')
+          .withIndex('by_key', (q) => q.eq('plantId', active.plant._id).eq('key', 'default'))
+          .first()
+      : null
     return {
       ...base,
       migration: { started: true, done: true },
@@ -228,9 +236,9 @@ export const context = userQuery({
             country: active.plant.country ?? '',
             costCenters: active.plant.costCenters ?? [],
             departments: active.plant.departments ?? [],
-            // Geçerli vardiyalar: plant'in kendi tanımı, yoksa şirket standardı (Company settings → Shifts).
-            shifts: effectiveShifts(active.plant.shifts, active.company.shifts).shifts,
-            shiftSource: effectiveShifts(active.plant.shifts, active.company.shifts).source,
+            // Geçerli vardiyalar: Working calendar (saatler + MES kodları).
+            shifts: calendarShifts(calendar, legacy?.shifts ?? []),
+            shiftSource: calendar ? 'calendar' : (legacy?.source ?? 'none'),
             timeZone: active.plant.timeZone ?? '',
             access: active.access,
             // Alan izinleri: düzenleme düğmeleri bunlara bakar.

@@ -25,6 +25,7 @@ import {
   useOvertimeData,
 } from '../components/OvertimePanels'
 import { usePlant } from '../lib/plantContext'
+import { ShiftCodesEditor } from '../components/ShiftCodesEditor'
 
 export const Route = createFileRoute('/takvim')({
   component: TakvimPage,
@@ -98,6 +99,7 @@ function totalMinutes(p: WeekPattern, shiftMinutes: number, overtimeShiftMinutes
 
 function PressCalendarSection() {
   const plantCountry = usePlant().ctx?.active?.country ?? ''
+  const canEditCalendar = usePlant().canArea('planning.calendar', 'edit')
   const { results: products } = usePaginatedQuery(
     api.products.list,
     {},
@@ -1155,6 +1157,12 @@ function PressCalendarSection() {
       </div>
       <div className="mt-3 rounded-md border border-border p-3">
         <ShiftTable shiftStartMinute={shiftStartMinute} shiftMinutes={shiftMinutes} />
+        <ShiftCodesEditor
+          shiftMinutes={globalSettings?.shiftMinutes ?? shiftMinutes}
+          shiftStartMinute={globalSettings?.shiftStartMinute ?? shiftStartMinute}
+          saved={globalSettings?.shiftCodes}
+          canEdit={canEditCalendar && !!globalSettings}
+        />
       </div>
       <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
         What these settings do

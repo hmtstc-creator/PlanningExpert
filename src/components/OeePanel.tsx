@@ -44,7 +44,7 @@ export function useOeeConfig(): { config: OeeConfig; problems: string[]; loaded:
   // Masraf yeri adları fabrika tanımından (tek kaynak).
   const plantCcs = usePlant().ctx?.active?.costCenters
   const departments = usePlant().ctx?.active?.departments
-  // Vardiya kodları Company settings → Shifts'ten (şirket standardı ya da plant'in kendi); yoksa OEE ayarındaki eski liste.
+  // Vardiya kodları Working calendar'dan (takvimde kod yoksa eski Company settings → Shifts tanımı); yoksa OEE ayarındaki eski liste.
   const plantShifts = usePlant().ctx?.active?.shifts
   const config = useMemo(() => {
     const c = withPlantCostCenters(doc?.config ?? EMPTY_CONFIG, plantCcs ?? [], departments ?? [])

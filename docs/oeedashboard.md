@@ -643,3 +643,15 @@ iki sayfa (**Shiftly KPI**, **Downtimes (1)**), ilk satır ve A sütunu boş
   için), aynı ya da ayrı dosyada yüklenebilir.
 - Gerçek dosya (05–13.10.2026): 364 vardiya, 9.221 duruş, eksik sütun yok;
   PRS-106 05.10 UB64 OEE 66,67 (MES ile aynı). Test: src/lib/oee.test.ts.
+
+## Vardiyalar tek yerde: Working calendar (2026-10-13, planlamacı)
+
+"Takvimde zaten vardiya tanımlıyorum, ayrıca plant bilgilerinde istiyorsun":
+Company settings → Shifts sekmesi kaldırıldı. Vardiyalar Working calendar'dan:
+saatler vardiya süresi ve 1. vardiya başlangıcından (en çok 3), planlı
+duruşlar Planned stops'tan, MES kodları (UB61 …) aynı sayfada "Shifts and
+planning rules" → **MES shift codes (OEE)** (globalShiftSettings.shiftCodes,
+pressCalendar.saveShiftCodes; takvim düzenleme izni). Takvimde kod girilmemişse
+eski Company settings → Shifts kodları ve adları kullanılır (kaybolmaz;
+src/lib/shifts.ts `calendarShifts`, test). OEE Settings'in Shifts kartı
+takvime yönlendirir.

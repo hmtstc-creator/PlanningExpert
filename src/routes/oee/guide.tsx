@@ -111,7 +111,7 @@ function OeeGuidePage() {
             Organization (in Settings you only choose how to pick inside a department),
           </li>
           <li>
-            shift numbers of the shift codes (UB61 …) — on Company settings → Shifts, for the company or per plant,
+            shift numbers of the shift codes (UB61 …) — on the Work calendar (Shifts and planning rules), where the shift times and planned stops are,
           </li>
           <li>which Reason Code 1 is a loss and which is a planned break,</li>
           <li>names of the loss groups (Reason Code 2), their chart columns and which are breakdowns,</li>

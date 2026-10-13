@@ -1,5 +1,6 @@
-// Vardiya tanımı (Company settings → Shifts): şirket standardı, plant isterse
-// kendi tanımını yapar. Her vardiyanın numarası (1, 2, 3 …), adı, saatleri
+// Vardiya tanımı: Working calendar (saatler, MES kodları; 2026-10-13). Eski
+// Company settings → Shifts tanımı (şirket standardı, plant isterse kendi)
+// yalnızca takvimde kod yokken okunur. Her vardiyanın numarası (1, 2, 3 …), adı, saatleri
 // ve MES'in kullandığı kodları (ör. Vardiya 1 = UB61, UB64) vardır. OEE
 // modülü vardiyaları bu kodlarla numaralar (src/lib/oee.ts shiftNumber).
 
@@ -13,9 +14,45 @@ export interface ShiftDef {
   codes: string[]
 }
 
-export type ShiftSource = 'plant' | 'company' | 'none'
+export type ShiftSource = 'calendar' | 'plant' | 'company' | 'none'
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
+
+/** Working calendar'ın vardiya ayarı (globalShiftSettings). */
+export interface CalendarShiftSettings {
+  shiftMinutes: number
+  shiftStartMinute?: number
+  /** Vardiya numarası → MES kodları (UB61 …). */
+  shiftCodes?: { number: number; codes: string[] }[]
+}
+
+const clock = (m: number) => {
+  const x = ((m % 1440) + 1440) % 1440
+  return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`
+}
+
+/**
+ * Vardiyalar tek yerden: Working calendar (planlamacı, 2026-10-13: "takvimde
+ * zaten vardiya tanımlıyorum"). Saatler takvimin vardiya süresi ve 1. vardiya
+ * başlangıcından (en çok 3 vardiya, planlı duruşlar da 1–3); MES kodları
+ * takvimden — takvimde hiç kod girilmemişse eski tanımdaki (Company settings →
+ * Shifts) kodlar ve adlar kullanılır, kaybolmaz.
+ */
+export function calendarShifts(settings: CalendarShiftSettings | null | undefined, legacy: ShiftDef[]): ShiftDef[] {
+  if (!settings || !(settings.shiftMinutes > 0)) return normalizeShifts(legacy)
+  const count = Math.min(3, Math.floor(1440 / settings.shiftMinutes))
+  const start0 = settings.shiftStartMinute ?? 7 * 60
+  const own = settings.shiftCodes
+  return normalizeShifts(
+    Array.from({ length: count }, (_, i) => {
+      const number = i + 1
+      const old = legacy.find((s) => s.number === number)
+      const start = start0 + i * settings.shiftMinutes
+      const codes = own ? (own.find((x) => x.number === number)?.codes ?? []) : (old?.codes ?? [])
+      return { number, name: old?.name || `Shift ${number}`, start: clock(start), end: clock(start + settings.shiftMinutes), codes }
+    }),
+  )
+}
 
 /** Kodlar büyük harf ve boşluksuz; vardiyalar numaraya göre. */
 export function normalizeShifts(list: ShiftDef[]): ShiftDef[] {
@@ -90,13 +127,13 @@ export interface NetShifts {
   average: number
   /** Vardiyaların planlı duruşlarının ortalaması (dk). */
   plannedAverage: number
-  /** Vardiya saatleri Company settings → Shifts'te tanımlı mı (değilse 8 saat varsayılır). */
+  /** Vardiya saatleri Working calendar'da tanımlı mı (değilse 8 saat varsayılır). */
   timesDefined: boolean
 }
 
 /**
  * Bir vardiyanın net süresi (planlamacı, 2026-10-07): vardiya süresi
- * (Company settings → Shifts, saat yoksa 8 saat) − o vardiyanın planlı
+ * (Working calendar, saat yoksa 8 saat) − o vardiyanın planlı
  * duruşları (Planning → Calendar → Planned stops: çay, yemek, toplantı …).
  * Loading planlı duruşları içermez; "kaç vardiya çalışıldı" = Loading ÷ net süre.
  */

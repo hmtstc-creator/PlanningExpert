@@ -358,6 +358,8 @@ export default defineSchema({
     // Birinci vardiyanın başlangıç saati (gece yarısından dakika).
     // Planda gerçek saat göstermek için kullanılır.
     shiftStartMinute: v.optional(v.number()),
+    // Vardiya numarası → MES vardiya kodları (UB61 …); OEE vardiyaları buradan.
+    shiftCodes: v.optional(v.array(v.object({ number: v.number(), codes: v.array(v.string()) }))),
     // Kapasite düzeltme katsayısı (0–1). Performans sayfasında ölçülen
     // gerçekleşme oranı buraya yazılabilir; planlama kapasiteyi bu oranla
     // çarpar, böylece plan gerçekçi olur.

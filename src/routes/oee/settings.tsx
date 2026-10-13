@@ -213,12 +213,12 @@ function OeeSettingsPage() {
       </Card>
 
       <Card title="Shifts" info="Shift code of the files (Shift Defination, e.g. UB61) → shift number (1st, 2nd, 3rd …). Used for the week-by-shift chart and the Loss Bridge shift filter.">
-        {plantShifts?.length ? (
+        {plantShifts?.some((s) => s.codes.length) ? (
           <p className="text-sm text-muted-foreground">
-            From <b>Company settings → Shifts</b> ({shiftSource === 'plant' ? "this plant's own shifts" : 'company standard'}):{' '}
-            {plantShifts.map((s) => `${s.number} ${s.name} = ${s.codes.join(', ') || '—'}`).join(' · ')}.{' '}
-            {canOpen('/settings') && (
-              <Link to="/settings" className="font-medium text-foreground underline">
+            From the <b>Work calendar</b>{shiftSource === 'calendar' ? '' : ' (codes entered earlier)'}:{' '}
+            {plantShifts.map((s) => `${s.number}. shift ${s.start ?? ''}–${s.end ?? ''} = ${s.codes.join(', ') || '—'}`).join(' · ')}.{' '}
+            {canOpen('/takvim') && (
+              <Link to="/takvim" className="font-medium text-foreground underline">
                 Change there →
               </Link>
             )}
@@ -226,7 +226,7 @@ function OeeSettingsPage() {
         ) : (
           <>
             <p className="mb-2 text-xs text-muted-foreground">
-              Better: define the company's shifts and their codes once on <b>Company settings → Shifts</b> — every plant and page then uses them.
+              Better: enter the MES codes of each shift once on the <b>Work calendar</b> (Shifts and planning rules) — every page then uses them.
             </p>
             <Rows
               head={['Shift code', 'Shift number', '']}

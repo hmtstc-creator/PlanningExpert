@@ -595,6 +595,32 @@
       },
       "optional": true
     },
+    "shiftCodes": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "number": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "codes": {
+              "fieldType": {
+                "type": "array",
+                "value": {
+                  "type": "string"
+                }
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": true
+    },
     "shiftMinutes": {
       "fieldType": {
         "type": "number"

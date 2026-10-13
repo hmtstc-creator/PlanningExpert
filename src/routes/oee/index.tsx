@@ -32,7 +32,7 @@ function OeeDashboard() {
   const sel = useOeeSelection()
   const { config } = useOeeConfig()
   // Kaç vardiya çalışıldı = Loading ÷ net vardiya süresi (vardiya − planlı duruşlar:
-  // çay, yemek, toplantı; Company settings → Shifts ve Planning → Planned stops).
+  // çay, yemek, toplantı; Working calendar: vardiya saatleri ve Planned stops).
   const stops = useQuery(api.oee.plannedStopMinutes) as { shiftIndex: number; durationMinutes: number }[] | undefined
   const net = netShiftMinutes(usePlant().ctx?.active?.shifts, stops)
   const weeksN = config.trendWeeks || 1
@@ -53,7 +53,7 @@ function OeeDashboard() {
   const daily = useMemo(() => weekDailyTrend(days, scope, config, sel.monday), [days, scope, config, sel.monday])
   const label = scopeLabel(scope, config)
   const h = (m: number) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}`
-  const shiftNote = `Shifts worked = loading time ÷ net shift (${h(net.average)} h = shift ${net.timesDefined ? '' : '8:00 h assumed '}− planned stops ${h(net.plannedAverage)} h: breaks, meals, meetings). Counts only the work centers listed below — those defined on Work Center Definitions with a cost center of the plant. Shift times: Company settings → Shifts; planned stops: Planning → Calendar.`
+  const shiftNote = `Shifts worked = loading time ÷ net shift (${h(net.average)} h = shift ${net.timesDefined ? '' : '8:00 h assumed '}− planned stops ${h(net.plannedAverage)} h: breaks, meals, meetings). Counts only the work centers listed below — those defined on Work Center Definitions with a cost center of the plant. Shift times, MES codes and planned stops: Work calendar.`
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">

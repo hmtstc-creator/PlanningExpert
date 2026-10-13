@@ -125,7 +125,7 @@ function BridgePage() {
   const machine = machineOptions.includes(machineRaw) ? machineRaw : ''
   const inSel = (r: { workCenter: string; costCenter: string }) => inScope(r, scope, config) && (!machine || r.workCenter === machine)
   const wcCostCenter = useMemo(() => costCentersOf(dayRows), [dayRows])
-  // Vardiyalar: Company settings → Shifts (adlarıyla), yoksa OEE ayarındaki kodların numaraları.
+  // Vardiyalar: Working calendar (adlarıyla), yoksa OEE ayarındaki kodların numaraları.
   const shiftOptions = useMemo(() => {
     const named = ctx?.active?.shifts ?? []
     const numbers = [...new Set(config.shifts.map((x) => x.number))].sort((a, b) => a - b)

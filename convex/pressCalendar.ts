@@ -49,6 +49,7 @@ const globalSettingsValidator = v.union(
     acceptedPerformanceRate: v.optional(v.number()),
     migratedSetupGap10: v.optional(v.boolean()),
     migratedCalendarV2: v.optional(v.boolean()),
+    shiftCodes: v.optional(v.array(v.object({ number: v.number(), codes: v.array(v.string()) }))),
   }),
   v.null(),
 )
@@ -65,6 +66,39 @@ export const getGlobalSettings = guardedQuery({
         .withIndex('by_key', (q) => q.eq('key', 'default'))
         .first(),
     ),
+})
+
+/**
+ * Vardiyaların MES kodları (Working calendar → Shifts and planning rules):
+ * OEE vardiyaları numaralar ve Loss Bridge'in vardiya filtresi buradan okur.
+ * Plan girdisi değil.
+ */
+export const saveShiftCodes = guardedMutation({
+  areas: ['planning.calendar'],
+  args: { shiftCodes: v.array(v.object({ number: v.number(), codes: v.array(v.string()) })) },
+  returns: v.null(),
+  affectsPlan: false,
+  handler: async (ctx, { shiftCodes }) => {
+    const clean = shiftCodes
+      .map((s) => ({ number: s.number, codes: [...new Set(s.codes.map((c) => c.trim().toUpperCase()).filter(Boolean))] }))
+      .sort((a, b) => a.number - b.number)
+    const owner = new Map<string, number>()
+    for (const s of clean) {
+      if (!Number.isInteger(s.number) || s.number < 1 || s.number > 3) throw new ConvexError('A shift number is 1, 2 or 3')
+      for (const c of s.codes) {
+        const o = owner.get(c)
+        if (o !== undefined && o !== s.number) throw new ConvexError(`Code ${c} is in shift ${o} and shift ${s.number}`)
+        owner.set(c, s.number)
+      }
+    }
+    const existing = await ctx.db
+      .query('globalShiftSettings')
+      .withIndex('by_key', (q) => q.eq('key', 'default'))
+      .first()
+    if (!existing) throw new ConvexError('Save the shift length on the Work calendar first')
+    await ctx.db.patch(existing._id, { shiftCodes: clean })
+    return null
+  },
 })
 
 export const saveGlobalSettings = guardedMutation({

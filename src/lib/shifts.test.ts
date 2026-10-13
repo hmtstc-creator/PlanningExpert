@@ -9,6 +9,7 @@ import {
   shiftMinutes,
   shiftOfCode,
   shiftProblems,
+  calendarShifts,
   netShiftMinutes,
   type ShiftDef,
 } from './shifts'
@@ -80,4 +81,25 @@ describe('vardiya tanımı', () => {
     expect(none.timesDefined).toBe(false)
     expect(netShiftMinutes(undefined, []).average).toBe(DEFAULT_SHIFT_MIN)
   })
+
+  it('vardiyalar Working calendardan: saatler vardiya süresi ve başlangıçtan; kod yoksa eski tanımın kodları', () => {
+    const cal = { shiftMinutes: 480, shiftStartMinute: 7 * 60 }
+    const legacy = normalizeShifts(std)
+    const s = calendarShifts(cal, legacy)
+    expect(s.map((x) => [x.number, x.start, x.end])).toEqual([
+      [1, '07:00', '15:00'],
+      [2, '15:00', '23:00'],
+      [3, '23:00', '07:00'],
+    ])
+    // Takvimde kod yok: eski tanımın kodları ve adları kaybolmaz.
+    expect(s.map((x) => x.codes)).toEqual(legacy.map((x) => x.codes))
+    expect(s[0].name).toBe(legacy[0].name)
+    // Takvimde kod varsa onlar geçerli.
+    const own = calendarShifts({ ...cal, shiftCodes: [{ number: 1, codes: ['ub61', 'UB64'] }] }, legacy)
+    expect(own.map((x) => x.codes)).toEqual([['UB61', 'UB64'], [], []])
+    // 12 saatlik vardiya: 2 vardiya; takvim yoksa eski tanım.
+    expect(calendarShifts({ shiftMinutes: 720 }, []).map((x) => x.number)).toEqual([1, 2])
+    expect(calendarShifts(null, legacy)).toEqual(legacy)
+  })
 })
+
