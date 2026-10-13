@@ -100,10 +100,10 @@ Telefonda köprü yatay çubuklara döner (12+ adım 360 px'e sığmaz).
 
 ## Kapsam dışı / bilinen sınırlar
 
-- **Vardiya filtresi ve kalıp kırılımı en çok 8 gün:** duruş özetleri
+- **Vardiya filtresi ve parça kırılımı en çok 8 gün:** duruş özetleri
   (`oeeLossDays`) vardiyayı ve kalıbı tutmuyor; vardiya seçilince ya da
-  "By die" görünümünde köprü ham duruşlardan (`oeeDowntimeDays`, vardiya
-  kodu Shift Definition / Shift Group, kalıp Mold) ve vardiya kayıtlarından
+  "By part" görünümünde köprü ham duruşlardan (`oeeDowntimeDays`, vardiya
+  kodu Shift Definition / Shift Group, parça MATERIAL) ve vardiya kayıtlarından
   (`oeeShifts`) kurulur. Bu yüzden dönem 8 günü geçince vardiya seçimi
   kapanır. Vardiyada planlanmamış süre (takvim) gösterilmez; vardiyaların
   toplamı tüm güne eşittir (test).
@@ -145,8 +145,16 @@ tanımında standartlansın.
 ## "#" duruşları hesaptan çıkar (2026-10-07, planlamacı)
 
 Reason Code 1 ya da 2'si "#" olan (tanımsız) duruşlar köprünün hiçbir
-kalemine, Level 3'e, kalıp ve vardiya kırılımına girmez
+kalemine, Level 3'e, parça ve vardiya kırılımına girmez
 (src/lib/oeeBridge.ts `isUndefinedCode`). OEE ve A / P / Q MES sürelerinden
 geldiği için değişmez; bu dakikalar Loading − Production'ın içinde
 olduğundan gri "Not explained / Over-recorded" fark adımında kalır, köprü
 yine kapanır. Veri notu kaç dakikanın dışarıda kaldığını yazar.
+
+## Level 3: kalıp değil parça (2026-10-13, planlamacı)
+
+"By die" görünümü **By part** oldu: duruş kalemleri ham duruşun **MATERIAL**
+sütununa (Mold Number değil), hız kaybı ve hurda / ret siparişin **Material -
+Key**'ine göre kırılır. Parça adları planlamadaki parça (malzeme) kodlarıyla
+aynıdır. MATERIAL "#" ya da boşsa "(no part)". Satırın altında makine yazar.
+

@@ -110,7 +110,7 @@ const hiddenGroup = (code: string, c: OeeConfig) => !!c.lossGroups.find((g) => g
 
 /**
  * Tanımsız duruş: Reason Code 1 ya da 2 "#" (planlamacı, 2026-10-07: köprünün
- * hesaplarından çıkar). Hiçbir kaleme, Level 3'e, kalıp / vardiya kırılımına
+ * hesaplarından çıkar). Hiçbir kaleme, Level 3'e, parça / vardiya kırılımına
  * girmez; Loading − Production'ın parçası olduğundan "Not explained" farkında
  * kalır (köprü yine kapanır, OEE değişmez).
  */
@@ -485,18 +485,23 @@ export interface Level3Row {
   sub?: string
 }
 
-export type Level3By = 'reason' | 'machine' | 'die'
+export type Level3By = 'reason' | 'machine' | 'part'
+
+/** Parça (MATERIAL / Material - Key; planlamadaki parça adıyla aynı). "#" ya da boşsa parçasız. */
+const partLabel = (material: string) => (material && material !== '#' ? material : NO_PART)
+export const NO_PART = '(no part)'
 
 /**
- * Bir kalemin Level 3 kırılımında hangi görünümler var. Kayıtlı kayıp
- * duruşlarında kalıp görünümü ham duruşlarla (en çok 8 gün) olur.
+ * Bir kalemin Level 3 kırılımında hangi görünümler var. Parça görünümü
+ * (planlamacı, 2026-10-13: kalıp değil parça): duruşlarda ham duruşlarla
+ * (en çok 8 gün), hız ve kalitede sipariş verisiyle.
  */
 export function level3Views(item: LossItem, withEvents = false): Level3By[] {
-  if (item.key === 'pf:speed') return ['die', 'machine']
-  if (item.family === 'quality') return ['die', 'machine']
+  if (item.key === 'pf:speed') return ['part', 'machine']
+  if (item.family === 'quality') return ['part', 'machine']
   if (item.key === 'av:unexplained' || item.key === 'pl:other') return ['machine']
   if (item.family === 'planned') return ['reason', 'machine']
-  return withEvents ? ['reason', 'machine', 'die'] : ['reason', 'machine']
+  return withEvents ? ['reason', 'machine', 'part'] : ['reason', 'machine']
 }
 
 function addRow(map: Map<string, Level3Row>, key: string, label: string, minutes: number, count: number, prev: boolean, sub?: string) {
@@ -519,7 +524,7 @@ export interface Level3Set {
   days: DayRow[]
   lossDays: LossDay[]
   orders: OrderRow[]
-  /** Ham duruşlar (kalıp kırılımı için; en çok 8 gün okunur). */
+  /** Ham duruşlar (parça kırılımı için; en çok 8 gün okunur). */
   events?: DowntimeDay[]
 }
 
@@ -545,7 +550,7 @@ export const NOT_IN_ORDERS = 'Not in order data'
  *   süresiyle sınırlı, köprüdeki gibi),
  * - hız: kalıba (Order Based) ya da makineye göre; sipariş verisinin
  *   kapsamadığı kısım "Not in order data",
- * - hurda / ret: kalemin süresi adede göre dağıtılır (kalıp ya da makine),
+ * - hurda / ret: kalemin süresi adede göre dağıtılır (parça ya da makine),
  * - açıklanmayan ve diğer planlı: makine başına fark.
  */
 export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Set, prev: Level3Set): Level3Row[] {
@@ -563,12 +568,12 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
 
   if (item.key === 'pf:speed') {
     for (const [set, isPrev] of sets) {
-      if (by === 'die') {
+      if (by === 'part') {
         let covered = 0
         for (const o of set.orders) {
           const m = o.productionMin - o.operatingMin
           covered += m
-          addRow(map, `${o.workCenter}|${o.equipment}`, o.equipment || '(no die)', m, 0, isPrev, o.workCenter)
+          addRow(map, `${o.workCenter}|${o.material}`, partLabel(o.material), m, 0, isPrev, o.workCenter)
         }
         const total = sum(set.days.map((d) => d.productionMin - d.operatingMin))
         if (Math.abs(total - covered) >= 0.05) addRow(map, '__noorders', NOT_IN_ORDERS, total - covered, 0, isPrev)
@@ -585,10 +590,10 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
       const per = minutes / count
       let covered = 0
       const rows: { key: string; label: string; n: number; sub?: string }[] =
-        by === 'die'
+        by === 'part'
           ? set.orders.map((o) => ({
-              key: `${o.workCenter}|${o.equipment}`,
-              label: o.equipment || '(no die)',
+              key: `${o.workCenter}|${o.material}`,
+              label: partLabel(o.material),
               n: scrap ? o.scrap : o.reject,
               sub: o.workCenter,
             }))
@@ -641,13 +646,13 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
     return finish(map, true)
   }
 
-  // Kayıtlı kayıp duruş kalemi: grupları; nedene, makineye ya da kalıba göre.
-  if (by === 'die') {
+  // Kayıtlı kayıp duruş kalemi: grupları; nedene, makineye ya da parçaya göre.
+  if (by === 'part') {
     for (const [set, isPrev] of sets)
       for (const d of set.events ?? [])
         for (const e of d.events) {
           if (!c.lossReasonCodes.includes(e.rc1) || !groups.has(e.rc2)) continue
-          addRow(map, `${d.workCenter}|${e.mold}`, e.mold || '(no die)', e.minutes, 1, isPrev, d.workCenter)
+          addRow(map, `${d.workCenter}|${e.material}`, partLabel(e.material), e.minutes, 1, isPrev, d.workCenter)
         }
     return finish(map, true)
   }

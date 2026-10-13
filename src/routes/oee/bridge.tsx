@@ -60,7 +60,7 @@ function localIso(d: Date) {
 const dm = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`
 const rangeText = (r: { from: string; to: string }) => (r.from === r.to ? dm(r.from) : `${dm(r.from)} – ${dm(r.to)}`)
 
-const VIEW_LABEL: Record<Level3By, string> = { reason: 'By reason', machine: 'By machine', die: 'By die' }
+const VIEW_LABEL: Record<Level3By, string> = { reason: 'By reason', machine: 'By machine', part: 'By part' }
 
 /**
  * OEE Loss Bridge (docs/oee-bridge.md): seçilen makine ya da hattın
@@ -106,7 +106,7 @@ function BridgePage() {
   // Vardiya filtresi ve duruşların kalıp kırılımı ham duruşlarla: en çok 8 günlük dönem.
   const eventsOk = !!cur && !!prev && daysBetween(cur.from, cur.to) <= MAX_EVENT_DAYS
   const shiftOn = shift > 0 && eventsOk
-  const needEvents = eventsOk && (shiftOn || view === 'die')
+  const needEvents = eventsOk && (shiftOn || view === 'part')
   const shiftRows = (useQuery(api.oee.shifts, shiftOn ? q : 'skip') ?? []) as ShiftRow[]
   const curEvRaw = useQuery(api.oee.downtimeDays, needEvents && cur ? { from: cur.from, to: cur.to } : 'skip') as
     StoredDowntimeDay[] | undefined
@@ -482,7 +482,7 @@ function BridgePage() {
                 )}
               </div>
               <div className="mt-2">
-                {activeView === 'die' && eventsLoading ? (
+                {activeView === 'part' && eventsLoading ? (
                   <p className="text-xs text-muted-foreground">Loading the downtimes…</p>
                 ) : l3.length ? (
                   <Level3Table
@@ -494,7 +494,7 @@ function BridgePage() {
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    {selectedItem.key === 'pf:speed' && activeView === 'die'
+                    {selectedItem.key === 'pf:speed' && activeView === 'part'
                       ? 'No order-based data for this period.'
                       : 'Nothing recorded for this loss.'}
                   </p>

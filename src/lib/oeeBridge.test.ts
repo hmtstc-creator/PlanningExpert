@@ -312,7 +312,7 @@ describe('denetçi bulguları (2026-10-06)', () => {
       shift: '',
       order: '1',
       equipment: 'D-1',
-      material: '',
+      material: 'M315SP024',
       good: 90,
       scrap: 6,
       reject: 4,
@@ -326,13 +326,14 @@ describe('denetçi bulguları (2026-10-06)', () => {
       performance: 0,
       oee: 0,
     }
-    const rows = level3(scrap, 'die', plant, { days, lossDays: [], orders: [order] }, none)
+    const rows = level3(scrap, 'part', plant, { days, lossDays: [], orders: [order] }, none)
     expect(sumRows(rows)).toBeCloseTo(scrap.minutes, 9)
-    expect(rows.map((r) => r.label)).toEqual(['D-1', 'Not in order data'])
+    // Parçaya göre (MATERIAL; kalıp değil — planlamacı, 2026-10-13).
+    expect(rows.map((r) => r.label)).toEqual(['M315SP024', 'Not in order data'])
     expect(rows[0].count).toBe(6)
     const speedRows = level3(
       b.items.find((i) => i.key === 'pf:speed') ?? { ...scrap, key: 'pf:speed', family: 'performance', minutes: 0 },
-      'die',
+      'part',
       plant,
       { days, lossDays: [], orders: [order] },
       none,
@@ -374,7 +375,7 @@ describe('denetçi bulguları (2026-10-06)', () => {
   })
 })
 
-describe('vardiya ve kalıp (ham duruşlarla)', () => {
+describe('vardiya ve parça (ham duruşlarla)', () => {
   const cfg: OeeConfig = {
     ...plant,
     shifts: [
@@ -399,19 +400,22 @@ describe('vardiya ve kalıp (ham duruşlarla)', () => {
     expect(buildBridge(whole.days, whole.lossDays, cfg).oee).toBeCloseTo(all.oee!, 9)
   })
 
-  it('duruş kaleminin kalıp kırılımı Level 2 ile aynı toplam', () => {
+  it('duruş kaleminin parça (MATERIAL) kırılımı Level 2 ile aynı toplam', () => {
     const b = buildBridge(pDays, pLoss, cfg)
     const setup = b.items.find((i) => i.label === 'Setup')!
-    expect(level3Views(setup, true)).toContain('die')
-    expect(level3Views(setup, false)).not.toContain('die')
+    expect(level3Views(setup, true)).toContain('part')
+    expect(level3Views(setup, false)).not.toContain('part')
     const rows = level3(
       setup,
-      'die',
+      'part',
       cfg,
       { days: pDays, lossDays: pLoss, orders: [], events: pEvents },
       { days: [], lossDays: [], orders: [] },
     )
     expect(rows.reduce((a, r) => a + r.minutes, 0)).toBeCloseTo(setup.minutes, 6)
     expect(rows[0].sub).toBeTruthy()
+    // Etiket duruşun MATERIAL'i (Mold Number değil).
+    const mats = new Set(pEvents.flatMap((d) => d.events.map((e) => e.material)))
+    expect(rows.filter((r) => r.key !== '__others').every((r) => mats.has(r.label) || r.label === '(no part)')).toBe(true)
   })
 })
