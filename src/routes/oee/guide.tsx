@@ -28,7 +28,7 @@ function OeeGuidePage() {
     <div className="w-full max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="How to use OEE"
-        summary="Two files from the system — Report and Downtimes. Once: the year so far and your plant settings. Then: the last two weeks whenever you like."
+        summary="One file from the system, as downloaded (rapor.xlsx: Shiftly KPI + Downtimes). Once: the year so far and your plant settings. Then: the last two weeks whenever you like."
         links={relatedPages('/oee/guide')}
       />
 
@@ -66,23 +66,32 @@ function OeeGuidePage() {
       </section>
 
       <Step n={1} title="Once — load the year so far">
-        <p>Export two files from your system, from the first Monday of the year until today:</p>
+        <p>
+          Download the report from your system <b>as it is</b> (e.g. <b>rapor.xlsx</b>), from the first Monday of the year until
+          today. It has two sheets; the empty first row and the empty column A are fine:
+        </p>
         <ul>
           <li>
-            <b>Report</b> — sheets <b>Shiftly KPI</b> (one row per shift and machine: Date, Plant - Key, Cost Center - Key,
-            Work Center, Shift Defination, Shift Definition Txt, quantities, times, Availability, Quality, Performance, Oee) and{' '}
-            <b>Shiftly Order Based KPI</b> (one row per shift, machine and order: Order, Material - Key, Var_Equipment = die,
-            quantities, times and the “(Order)” rates).
+            <b>Shiftly KPI</b> — one row per shift and machine: Date, Plant - Key, Cost Center - Key, Work Center, Shift Defination
+            (UB61 …), Shift Definition Txt, GOODQUANTITY, SCRAPQUANTITY, REJECTQUANTITY, Scheduled / Unscheduled Downtime(Min), Net
+            Operating / Net Production / Loading Time(Min), Availability, Quality, Performance. <b>Oee</b> may be missing — it is
+            calculated (A × P × Q, the same as the MES).
           </li>
           <li>
-            <b>Downtimes</b> — one row per stoppage (Work Center - Key (Not Compounded), Order Number, MATERIAL, Mold Number, Shift
-            Defination, Reason Code 1–5, Reason Code Defination EN / TR, Stoppage Duration, start and end).
+            <b>Downtimes</b> — one row per stoppage: Date, Plant, Plant - Key, Cost Center - Key, Work Center - Key (Not Compounded),
+            Order Number, MATERIAL, Mold Number, Shift Group, Shift Defination, Reason Code 1–5, Reason Code Defination EN / TR,
+            Stoppage Duration, Stoppage Duration(Min), StartDate, StartTime, EndDate. <b>EndTime</b> may be missing — the end is start
+            + duration.
+          </li>
+          <li>
+            Optional: <b>Shiftly Order Based KPI</b> (Order, Material - Key, Var_Equipment = die) — only for the die and speed
+            analysis; it can be in the same file or a separate one.
           </li>
         </ul>
         <p>
-          On <Link to="/oee/data">OEE Data</Link> press <b>Upload data</b> once for each file. The program finds the sheets by their names and the columns by their titles
-          (the order of the columns and an empty first row or column do not matter). Days, weeks and months are calculated from the
-          shifts — no Daily, Weekly or Monthly KPI is needed.
+          On <Link to="/oee/data">OEE Data</Link> press <b>Upload data</b> and choose the file. The program finds the sheets by their
+          names and the columns by their titles (the order of the columns does not matter). Days, weeks and months are calculated
+          from the shifts — no Daily, Weekly or Monthly KPI is needed.
         </p>
         <p>
           <b>Every file must start on a Monday</b> (or on 1 January). A file that starts on another day is not uploaded at all —
@@ -114,8 +123,8 @@ function OeeGuidePage() {
 
       <Step n={3} title="Every time — upload the last two weeks">
         <p>
-          Export <b>Report</b> and <b>Downtimes</b> for the last two weeks, <b>starting on a Monday</b>, and upload both — daily,
-          weekly, whenever you like.
+          Download the same report for the last two weeks, <b>starting on a Monday</b>, and upload it — daily, weekly, whenever you
+          like.
         </p>
         <ul>
           <li>

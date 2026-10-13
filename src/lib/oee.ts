@@ -1204,13 +1204,15 @@ const num = (v: unknown) => {
 }
 const str = (v: unknown) => (v === null || v === undefined ? '' : String(v).trim())
 
-type Col = { key: string; names: string[] }
+/** `optional`: dosyada olmayabilir (ham MES dışa aktarımı, 2026-10-13) — eksikse sorun sayılmaz. */
+type Col = { key: string; names: string[]; optional?: boolean }
 
 function reader(header: unknown[], cols: Col[]) {
   const idx = new Map(cols.map((c) => [c.key, headerIndex(header, c.names)]))
-  const missing = cols.filter((c) => idx.get(c.key)! < 0).map((c) => c.names[0])
+  const missing = cols.filter((c) => !c.optional && idx.get(c.key)! < 0).map((c) => c.names[0])
   return {
     missing,
+    has: (key: string) => (idx.get(key) ?? -1) >= 0,
     get: (row: unknown[], key: string) => {
       const i = idx.get(key) ?? -1
       return i >= 0 ? row[i] : undefined
@@ -1227,26 +1229,41 @@ const TIME_COLS: Col[] = [
   { key: 'operating', names: ['Net Operating Time(Min)', 'Net Operating Time (min)'] },
   { key: 'production', names: ['Net Production Time(Min)', 'Net Production Time (min)'] },
   { key: 'loading', names: ['Loading Time(Min)', 'Loading Time (min)'] },
-  { key: 'availability', names: ['Availability', 'Availability (Order)'] },
-  { key: 'quality', names: ['Quality', 'Quality (Order)'] },
-  { key: 'performance', names: ['Performance', 'Performance (Order)'] },
-  { key: 'oee', names: ['Oee', 'OEE', 'Oee (Order)'] },
+  // Oranlar dosyada yoksa sürelerden hesaplanır (ham dışa aktarımda "Oee" sütunu yok).
+  { key: 'availability', names: ['Availability', 'Availability (Order)'], optional: true },
+  { key: 'quality', names: ['Quality', 'Quality (Order)'], optional: true },
+  { key: 'performance', names: ['Performance', 'Performance (Order)'], optional: true },
+  { key: 'oee', names: ['Oee', 'OEE', 'Oee (Order)'], optional: true },
 ]
 
-function timesFrom(get: (row: unknown[], key: string) => unknown, row: unknown[]) {
+/**
+ * Satırın süreleri ve oranları (%). Oran sütunu dosyada yoksa MES'in tanımıyla
+ * hesaplanır: A = Production ÷ Loading, P = Operation ÷ Production,
+ * Q = Good ÷ (Good + Scrap + Reject), OEE = A × P × Q (gerçek dosyada 25 bin
+ * satırda MES'in Oee sütunuyla birebir aynı).
+ */
+function timesFrom(r: { get: (row: unknown[], key: string) => unknown; has: (key: string) => boolean }, row: unknown[]) {
+  const t = {
+    good: num(r.get(row, 'good')),
+    scrap: num(r.get(row, 'scrap')),
+    reject: num(r.get(row, 'reject')),
+    scheduledMin: num(r.get(row, 'sched')),
+    unscheduledMin: num(r.get(row, 'unsched')),
+    operatingMin: num(r.get(row, 'operating')),
+    productionMin: num(r.get(row, 'production')),
+    loadingMin: num(r.get(row, 'loading')),
+  }
+  const pieces = t.good + t.scrap + t.reject
+  const a = t.loadingMin > 0 ? (t.productionMin / t.loadingMin) * 100 : 0
+  const p = t.productionMin > 0 ? (t.operatingMin / t.productionMin) * 100 : 0
+  const q = pieces > 0 ? (t.good / pieces) * 100 : 100
+  const pick = (key: string, fallback: number) => (r.has(key) ? num(r.get(row, key)) : fallback)
   return {
-    good: num(get(row, 'good')),
-    scrap: num(get(row, 'scrap')),
-    reject: num(get(row, 'reject')),
-    scheduledMin: num(get(row, 'sched')),
-    unscheduledMin: num(get(row, 'unsched')),
-    operatingMin: num(get(row, 'operating')),
-    productionMin: num(get(row, 'production')),
-    loadingMin: num(get(row, 'loading')),
-    availability: num(get(row, 'availability')),
-    quality: num(get(row, 'quality')),
-    performance: num(get(row, 'performance')),
-    oee: num(get(row, 'oee')),
+    ...t,
+    availability: pick('availability', a),
+    quality: pick('quality', q),
+    performance: pick('performance', p),
+    oee: pick('oee', (a * p * q) / 10_000),
   }
 }
 
@@ -1324,7 +1341,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         workCenter: wc,
         shiftGroup: str(r.get(row, 'sg')),
         shiftDefinition: str(r.get(row, 'sd')),
-        ...timesFrom(r.get, row),
+        ...timesFrom(r, row),
       })
       n++
     }
@@ -1357,7 +1374,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         costCenter: str(r.get(row, 'cc')),
         workCenter: wc,
         scheduledSec: num(r.get(row, 'schedSec')),
-        ...timesFrom(r.get, row),
+        ...timesFrom(r, row),
       })
       n++
     }
@@ -1401,7 +1418,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         order: str(r.get(row, 'order')),
         equipment: str(r.get(row, 'eq')),
         material: str(r.get(row, 'mat')),
-        ...timesFrom(r.get, row),
+        ...timesFrom(r, row),
       })
       n++
     }
@@ -1445,7 +1462,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         costCenter: str(r.get(row, 'cc')),
         workCenter: wc,
         scheduledSec: num(r.get(row, 'schedSec')),
-        ...timesFrom(r.get, row),
+        ...timesFrom(r, row),
         sheet: name,
       })
       n++
@@ -1480,7 +1497,7 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         costCenter: str(r.get(row, 'cc')),
         workCenter: wc,
         scheduledSec: num(r.get(row, 'schedSec')),
-        ...timesFrom(r.get, row),
+        ...timesFrom(r, row),
       })
       n++
     }
@@ -1505,17 +1522,18 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
       { key: 'sd', names: ['Shift Defination', 'Shift Definition'] },
       { key: 'rc1', names: ['Reason Code 1'] },
       { key: 'rc2', names: ['Reason Code 2'] },
-      { key: 'rc3', names: ['Reason Code 3'] },
-      { key: 'rc4', names: ['Reason Code 4'] },
-      { key: 'rc5', names: ['Reason Code 5'] },
+      { key: 'rc3', names: ['Reason Code 3'], optional: true },
+      { key: 'rc4', names: ['Reason Code 4'], optional: true },
+      { key: 'rc5', names: ['Reason Code 5'], optional: true },
       { key: 'en', names: ['Reason Code Defination EN', 'Reason Code Definition EN'] },
       { key: 'tr', names: ['Reason Code Defination TR', 'Reason Code Definition TR'] },
       { key: 'sec', names: ['Stoppage Duration'] },
       { key: 'min', names: ['Stoppage Duration(Min)', 'Stoppage Duration (Min)'] },
       { key: 'sdate', names: ['StartDate'] },
       { key: 'stime', names: ['StartTime'] },
-      { key: 'edate', names: ['EndDate'] },
-      { key: 'etime', names: ['EndTime'] },
+      // Bitiş dosyada yoksa başlangıç + süreden hesaplanır (ham dışa aktarımda EndTime yok).
+      { key: 'edate', names: ['EndDate'], optional: true },
+      { key: 'etime', names: ['EndTime'], optional: true },
     ])
     if (r.missing.length) out.problems.push(`${name}: missing columns ${r.missing.join(', ')}`)
     const sheetDates: { date: string }[] = []
@@ -1530,6 +1548,11 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         { date, plant: str(r.get(row, 'plant')), plantKey: str(r.get(row, 'plantKey')), costCenter: str(r.get(row, 'cc')), workCenter: wc, events: [] }
       const seconds = num(r.get(row, 'sec'))
       const minutesRaw = r.get(row, 'min')
+      const minutes = minutesRaw === undefined || minutesRaw === '' || minutesRaw === null ? seconds / 60 : num(minutesRaw)
+      const startDate = toIsoDate(r.get(row, 'sdate')) ?? date
+      const startTime = toTime(r.get(row, 'stime'))
+      // Bitiş saati yoksa: başlangıç + süre (saniye varsa saniyeyle).
+      const end = r.has('etime') ? null : endOf(startDate, startTime, seconds > 0 ? seconds : minutes * 60)
       day.events.push({
         order: str(r.get(row, 'order')),
         material: str(r.get(row, 'mat')),
@@ -1544,11 +1567,11 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
         textEn: str(r.get(row, 'en')),
         textTr: str(r.get(row, 'tr')),
         seconds,
-        minutes: minutesRaw === undefined || minutesRaw === '' ? seconds / 60 : num(minutesRaw),
-        startDate: toIsoDate(r.get(row, 'sdate')) ?? date,
-        startTime: toTime(r.get(row, 'stime')),
-        endDate: toIsoDate(r.get(row, 'edate')) ?? date,
-        endTime: toTime(r.get(row, 'etime')),
+        minutes,
+        startDate,
+        startTime,
+        endDate: end ? end.date : (toIsoDate(r.get(row, 'edate')) ?? date),
+        endTime: end ? end.time : toTime(r.get(row, 'etime')),
       })
       days.set(key, day)
       sheetDates.push({ date })
@@ -1559,6 +1582,14 @@ export function parseOeeWorkbook(sheets: Record<string, SheetRows>, today = new 
   }
   out.downtimes.push(...days.values())
   return out
+}
+
+/** Başlangıç + süre (saniye) → bitiş tarihi ve saati; başlangıç saati yoksa boş. */
+function endOf(date: string, time: string, seconds: number): { date: string; time: string } {
+  if (!time) return { date, time: '' }
+  const t = new Date(Date.parse(`${date}T${time}Z`) + Math.round(seconds) * 1000)
+  if (!Number.isFinite(t.getTime())) return { date, time: '' }
+  return { date: t.toISOString().slice(0, 10), time: t.toISOString().slice(11, 19) }
 }
 
 /** Bir tarih listesinin ilk ve son günü. */

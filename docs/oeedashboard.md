@@ -627,3 +627,19 @@ day**: seçilen haftanın Pazartesi–Pazar günleri; OEE çubukları, Performan
 çizgisi, altında Shifts worked (Loading ÷ ortalama net vardiya), Total ve
 presler. Günler gün × iş merkezi kayıtlarından toplam ÷ toplam
 (src/lib/oee.ts `weekDailyTrend`; 7 günün toplamı haftayla aynı — test).
+
+## Ham dışa aktarım biçimi: rapor.xlsx (2026-10-13, planlamacı)
+
+Planlamacı sistemden indirdiği dosyayı **olduğu gibi** yükler: tek dosya,
+iki sayfa (**Shiftly KPI**, **Downtimes (1)**), ilk satır ve A sütunu boş
+(başlık 2. satırda, B sütunundan başlar — zaten okunuyordu).
+
+- Shiftly KPI'da **Oee** sütunu yok: dosyada yoksa A × P × Q ile hesaplanır
+  (MES'in tanımı; önceki dosyada 25 bin satırda Oee ile fark 0). Availability,
+  Quality, Performance da yoksa sürelerden hesaplanır.
+- Downtimes'ta **EndTime** yok: bitiş = başlangıç + süre (saniye), gece
+  yarısını geçebilir. Reason Code 3–5 de isteğe bağlı.
+- Shiftly Order Based KPI bu dosyada yok; isteğe bağlı (kalıp ve hız analizi
+  için), aynı ya da ayrı dosyada yüklenebilir.
+- Gerçek dosya (05–13.10.2026): 364 vardiya, 9.221 duruş, eksik sütun yok;
+  PRS-106 05.10 UB64 OEE 66,67 (MES ile aynı). Test: src/lib/oee.test.ts.

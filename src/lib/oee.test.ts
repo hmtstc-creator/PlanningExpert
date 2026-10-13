@@ -450,3 +450,41 @@ describe('dosya biçimi 2026-10-06 (Report.xlsx + Downtimes.xlsx)', () => {
   })
 })
 
+describe('ham MES dışa aktarımı (rapor.xlsx, 2026-10-13)', () => {
+  // Tek dosya, iki sayfa; ilk satır ve A sütunu boş; Shiftly'de "Oee", Downtimes'ta "EndTime" yok.
+  const blank = (n: number) => Array.from({ length: n }, () => null)
+  const sheets: Record<string, SheetRows> = {
+    'Shiftly KPI': [
+      blank(18),
+      [null, 'Date', 'Plant - Key', 'Cost Center - Key', 'Work Center', 'Shift Defination', 'Shift Definition Txt', 'GOODQUANTITY', 'SCRAPQUANTITY', 'REJECTQUANTITY', 'Scheduled Downtime(Min)', 'Unscheduled Downtime(Min)', 'Net Operating Time(Min)', 'Net Production Time(Min)', 'Loading Time(Min)', 'Availability', 'Quality', 'Performance'],
+      [null, 46300, '5101', '51010171', 'PRS-106', 'UB64', 'Early Shift', 6000, 0, 0, 30, 109.116666666667, 300, 366.2, 449.983333333333, 81.3807918811808, 100, 81.9224467504096],
+    ],
+    'Downtimes (1)': [
+      blank(23),
+      [null, 'Date', 'Plant', 'Plant - Key', 'Cost Center - Key', 'Work Center - Key (Not Compounded)', 'Order Number', 'MATERIAL', 'Mold Number', 'Shift Group', 'Shift Defination', 'Reason Code 1', 'Reason Code 2', 'Reason Code 3', 'Reason Code 4', 'Reason Code 5', 'Reason Code Defination EN', 'Reason Code Defination TR', 'Stoppage Duration', 'Stoppage Duration(Min)', 'StartDate', 'StartTime', 'EndDate'],
+      [null, 46300, 'Romanya Martur', '5101', '51010171', 'PRS-106', '6607489', 'M315SP003', 'TRANSFER-DIE-1', 'UB', 'UB66', 'SCHED_DOWN', 'UTS', 'UTS02', 'S105', '#', 'MEAL BREAK (20 MIN)', "YEMEK MOLASI (20')", 1200, 20, 46301, '03:00:00', 46301],
+      [null, 46300, 'Romanya Martur', '5101', '51010171', 'PRS-106', '6607489', 'M315SP003', 'TRANSFER-DIE-1', 'UB', 'UB66', 'UNSCD_DOWN', 'ARZ', 'ARZ01', 'S414', 'S417', 'PRESS PNEUMATIC', 'PRES PNOMATIK', 68, 1.13333333333333, 46300, '23:59:30', 46301],
+    ],
+  }
+  const p = parseOeeWorkbook(sheets)
+
+  it('eksik sütun sorunu yok; Monday kuralı geçer', () => {
+    expect(p.problems).toEqual([])
+    expect(p.read.map((r) => [r.kind, r.rows])).toEqual([
+      ['shiftly', 1],
+      ['downtimes', 2],
+    ])
+  })
+
+  it('Oee yoksa A × P × Q (MES ile aynı: 66,67)', () => {
+    expect(p.shifts[0]).toMatchObject({ date: '2026-10-05', shiftGroup: 'UB64', shiftDefinition: 'Early Shift' })
+    expect(p.shifts[0].oee).toBeCloseTo(66.66913589392205, 9)
+  })
+
+  it('EndTime yoksa bitiş = başlangıç + süre (gece yarısını geçebilir)', () => {
+    const [meal, stop] = p.downtimes[0].events
+    expect(meal).toMatchObject({ startDate: '2026-10-06', startTime: '03:00:00', endDate: '2026-10-06', endTime: '03:20:00' })
+    expect(stop).toMatchObject({ startDate: '2026-10-05', startTime: '23:59:30', endDate: '2026-10-06', endTime: '00:00:38' })
+  })
+})
+

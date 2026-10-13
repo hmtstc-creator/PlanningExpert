@@ -289,7 +289,7 @@ export function OeeUploadButton() {
       const names = readWorkbook(buf, { bookSheets: true }).SheetNames
       const wanted = names.filter((n) => sheetKind(n))
       if (!wanted.length) {
-        throw new Error('No OEE sheet in this file — upload the Report (Shiftly KPI, Shiftly Order Based KPI) or the Downtimes file.')
+        throw new Error('No OEE sheet in this file — upload the report as downloaded (sheets Shiftly KPI and Downtimes; Shiftly Order Based KPI optional).')
       }
       const book = readWorkbook(buf, { sheets: wanted, dense: true })
       const sheets: Record<string, SheetRows> = {}
