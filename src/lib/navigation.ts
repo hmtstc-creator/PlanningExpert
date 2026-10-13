@@ -156,6 +156,7 @@ export const MODULE_AREAS: Area[] = [
     link('/oee', 'Trend Analysis', 'Monthly, 10 weeks and the selected week — OEE and performance', 'dashboard'),
     link('/oee/losses', 'Losses Trend', 'Losses, dies, breakdowns and setups', 'trendDown'),
     link('/oee/bridge', 'Loss Bridge', 'From calendar time to OEE, loss by loss — priorities', 'chartDown'),
+    link('/oee/report', 'Daily Report', 'One page: OEE, top 3 losses with materials, speed loss per work center', 'sheet'),
     {
       label: 'Menu',
       icon: 'grid',
@@ -283,7 +284,8 @@ const RELATED_PAGES: Record<string, string[]> = {
   // OEE
   '/oee': ['/oee/losses', '/oee/bridge', '/oee/data', '/kpi/monthly/dashboard', '/machine-followup/breakdowns'],
   '/oee/losses': ['/oee', '/oee/bridge', '/machine-followup/breakdowns', '/die-followup/problems', '/oee/data'],
-  '/oee/bridge': ['/oee', '/oee/losses', '/die-followup/problems', '/machine-followup/breakdowns', '/oee/settings'],
+  '/oee/bridge': ['/oee', '/oee/losses', '/oee/report', '/die-followup/problems', '/machine-followup/breakdowns', '/oee/settings'],
+  '/oee/report': ['/oee/bridge', '/oee', '/oee/losses', '/die-followup/problems', '/machine-followup/breakdowns'],
   '/oee/data': ['/oee', '/oee/settings', '/oee/guide'],
   '/oee/settings': ['/settings', '/oee/data', '/oee/guide', '/makineler'],
   '/oee/guide': ['/oee/settings', '/oee/data', '/oee'],
@@ -317,6 +319,7 @@ const LABELS: Record<string, string> = {
   '/oee': 'OEE Trend Analysis',
   '/oee/losses': 'OEE Losses',
   '/oee/bridge': 'OEE Loss Bridge',
+  '/oee/report': 'OEE Daily Report',
   '/oee/data': 'OEE Data',
   '/oee/settings': 'OEE Settings',
   '/oee/guide': 'OEE Guide',

@@ -52,6 +52,7 @@ import { Route as OeeBridgeRouteImport } from './routes/oee/bridge'
 import { Route as OeeDataRouteImport } from './routes/oee/data'
 import { Route as OeeGuideRouteImport } from './routes/oee/guide'
 import { Route as OeeLossesRouteImport } from './routes/oee/losses'
+import { Route as OeeReportRouteImport } from './routes/oee/report'
 import { Route as OeeSettingsRouteImport } from './routes/oee/settings'
 import { Route as KpiMonthlyDashboardRouteImport } from './routes/kpi/monthly/dashboard'
 import { Route as KpiMonthlyEntryRouteImport } from './routes/kpi/monthly/entry'
@@ -275,6 +276,11 @@ const OeeLossesRoute = OeeLossesRouteImport.update({
   path: '/oee/losses',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OeeReportRoute = OeeReportRouteImport.update({
+  id: '/oee/report',
+  path: '/oee/report',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OeeSettingsRoute = OeeSettingsRouteImport.update({
   id: '/oee/settings',
   path: '/oee/settings',
@@ -341,6 +347,7 @@ export interface FileRoutesByFullPath {
   '/oee/data': typeof OeeDataRoute
   '/oee/guide': typeof OeeGuideRoute
   '/oee/losses': typeof OeeLossesRoute
+  '/oee/report': typeof OeeReportRoute
   '/oee/settings': typeof OeeSettingsRoute
   '/die-followup/': typeof DieFollowupIndexRoute
   '/kpi/': typeof KpiIndexRoute
@@ -391,6 +398,7 @@ export interface FileRoutesByTo {
   '/oee/data': typeof OeeDataRoute
   '/oee/guide': typeof OeeGuideRoute
   '/oee/losses': typeof OeeLossesRoute
+  '/oee/report': typeof OeeReportRoute
   '/oee/settings': typeof OeeSettingsRoute
   '/die-followup': typeof DieFollowupIndexRoute
   '/kpi': typeof KpiIndexRoute
@@ -442,6 +450,7 @@ export interface FileRoutesById {
   '/oee/data': typeof OeeDataRoute
   '/oee/guide': typeof OeeGuideRoute
   '/oee/losses': typeof OeeLossesRoute
+  '/oee/report': typeof OeeReportRoute
   '/oee/settings': typeof OeeSettingsRoute
   '/die-followup/': typeof DieFollowupIndexRoute
   '/kpi/': typeof KpiIndexRoute
@@ -494,6 +503,7 @@ export interface FileRouteTypes {
     | '/oee/data'
     | '/oee/guide'
     | '/oee/losses'
+    | '/oee/report'
     | '/oee/settings'
     | '/die-followup/'
     | '/kpi/'
@@ -544,6 +554,7 @@ export interface FileRouteTypes {
     | '/oee/data'
     | '/oee/guide'
     | '/oee/losses'
+    | '/oee/report'
     | '/oee/settings'
     | '/die-followup'
     | '/kpi'
@@ -594,6 +605,7 @@ export interface FileRouteTypes {
     | '/oee/data'
     | '/oee/guide'
     | '/oee/losses'
+    | '/oee/report'
     | '/oee/settings'
     | '/die-followup/'
     | '/kpi/'
@@ -645,6 +657,7 @@ export interface RootRouteChildren {
   OeeDataRoute: typeof OeeDataRoute
   OeeGuideRoute: typeof OeeGuideRoute
   OeeLossesRoute: typeof OeeLossesRoute
+  OeeReportRoute: typeof OeeReportRoute
   OeeSettingsRoute: typeof OeeSettingsRoute
   DieFollowupIndexRoute: typeof DieFollowupIndexRoute
   KpiIndexRoute: typeof KpiIndexRoute
@@ -959,6 +972,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OeeLossesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oee/report': {
+      id: '/oee/report'
+      path: '/oee/report'
+      fullPath: '/oee/report'
+      preLoaderRoute: typeof OeeReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/oee/settings': {
       id: '/oee/settings'
       path: '/oee/settings'
@@ -1037,6 +1057,7 @@ const rootRouteChildren: RootRouteChildren = {
   OeeDataRoute: OeeDataRoute,
   OeeGuideRoute: OeeGuideRoute,
   OeeLossesRoute: OeeLossesRoute,
+  OeeReportRoute: OeeReportRoute,
   OeeSettingsRoute: OeeSettingsRoute,
   DieFollowupIndexRoute: DieFollowupIndexRoute,
   KpiIndexRoute: KpiIndexRoute,

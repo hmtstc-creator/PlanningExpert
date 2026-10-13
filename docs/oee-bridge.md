@@ -168,3 +168,23 @@ aralıkta da görünür (ham duruşlar en çok 8 gün okunur). Eski özetler bir
 kerelik "rebuild" adımıyla (OEE sayfası açılınca otomatik, `rebuildStored`
 'losses') ya da dosya yeniden yüklenince tamamlanır; hiçbir şey silinmez.
 
+
+## OEE Daily Report (2026-10-13, planlamacı)
+
+Yeni sayfa **OEE → Daily Report** (`/oee/report`): tek sayfada, seçimin her
+iş yeri için bir satır ve en altta toplam:
+
+| Work center | OEE (A · P · Q) | Loss 1 | Materials | Loss 2 | Materials | Loss 3 | Materials | Speed loss | Materials |
+
+- Filtreler Loss Bridge'inkiler (ortak `OeePeriodControl`): masraf yeri /
+  alan, tek gün ya da tarih aralığı (en çok 31 gün), vardiya (en çok 8 gün),
+  makine. Önceki dönemle karşılaştırma yok.
+- Hesap köprüyle aynı (`src/lib/oeeDailyReport.ts`, test edilir): satırın
+  OEE'si iş yerinin köprüsünün OEE'si; kayıplar Loading'in yüzdesi ve saat.
+- **En büyük 3 kayıp**: öncelik olabilecek kalemler (duruş grupları, hurda,
+  ret), çoktan aza; açıklanmayan fark ve hız kaybı değil — hız kaybının kendi
+  sütunu var.
+- **Materials**: kaybın parça kırılımının (Level 3 "By part") ilk 3'ü, saatle;
+  toplam satırında malzemenin yanında iş yeri yazar. Sipariş verisinin
+  kapsamadığı hız kaybı "Not in order data".
+- Print düğmesi sayfayı yazdırır.
