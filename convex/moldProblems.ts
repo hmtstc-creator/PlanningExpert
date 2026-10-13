@@ -19,6 +19,8 @@ const rowValidator = v.object({
   solvedAt: v.optional(v.number()),
   downtimeMinutes: v.optional(v.number()),
   photos: v.optional(v.array(v.id('_storage'))),
+  press: v.optional(v.string()),
+  action: v.optional(v.string()),
 })
 
 export const list = guardedQuery({
@@ -67,6 +69,9 @@ export const report = guardedMutation({
     downtimeMinutes: v.optional(v.number()),
     photos: v.optional(v.array(v.id('_storage'))),
     reportedBy: v.optional(v.string()),
+    /** OEE Loss Bridge'den: duruşun presi ve yapılacak aksiyon. */
+    press: v.optional(v.string()),
+    action: v.optional(v.string()),
   },
   returns: v.id('moldProblems'),
   handler: async (ctx, args) => {
@@ -96,10 +101,12 @@ export const report = guardedMutation({
       status: 'open',
       downtimeMinutes: args.downtimeMinutes,
       photos: args.photos,
+      press: args.press?.trim() || undefined,
+      action: args.action?.trim() || undefined,
     })
     await ctx.db.insert('changeLog', {
       title: `Mold problem — ${material} ${operation}`,
-      detail: `${problemType} on ${args.occurredAt}.${args.description ? ` ${args.description}` : ''}`,
+      detail: `${problemType} on ${args.occurredAt}${args.press ? ` (${args.press.trim()})` : ''}.${args.description ? ` ${args.description}` : ''}${args.action ? ` Action: ${args.action.trim()}` : ''}`,
       category: 'maintenance',
       author: args.reportedBy,
       createdAt: Date.now(),

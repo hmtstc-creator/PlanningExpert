@@ -585,6 +585,10 @@ export default defineSchema({
     downtimeMinutes: v.optional(v.number()),
     /** Convex dosya deposundaki fotoğraf kimlikleri. */
     photos: v.optional(v.array(v.id('_storage'))),
+    /** Duruşun olduğu pres (OEE Loss Bridge'den eklenen takipte). */
+    press: v.optional(v.string()),
+    /** Yapılacak iş: takip eden kişinin yazdığı aksiyon. */
+    action: v.optional(v.string()),
   })
     .index('by_material', ['plantId', 'material'])
     .index('by_status', ['plantId', 'status'])

@@ -33,6 +33,9 @@ type Problem = {
   solvedAt?: number
   downtimeMinutes?: number
   photoUrls: (string | null)[]
+  /** OEE Loss Bridge'den eklenen takipte duruşun presi ve aksiyon. */
+  press?: string
+  action?: string
 }
 
 function MoldProblemPage() {
@@ -322,7 +325,8 @@ function MoldProblemPage() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    <MaterialLink code={p.material} /> · {p.operation} · {p.problemType}
+                    <MaterialLink code={p.material} />
+                    {p.press ? ` · ${p.press}` : ''} · {p.operation} · {p.problemType}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {p.occurredAt}
@@ -343,6 +347,12 @@ function MoldProblemPage() {
 
               {p.description && (
                 <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{p.description}</p>
+              )}
+
+              {p.action && (
+                <p className="mt-2 whitespace-pre-wrap rounded-md bg-sky-50 p-2 text-sm text-sky-950">
+                  <strong>Action:</strong> {p.action}
+                </p>
               )}
 
               {p.photoUrls.filter(Boolean).length > 0 && (

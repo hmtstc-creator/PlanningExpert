@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { BridgeChart, FAMILY_LABEL, FAMILY_SWATCH, Level2Bars, Level3Table, Gauge, hours, pctOf } from '../../components/OeeBridgeCharts'
+import { DieFollowUpDialog, type FollowUpDraft } from '../../components/DieFollowUpDialog'
 import { OeePeriodFields, dm, rangeText, useOeePeriod, useShiftOptions } from '../../components/OeePeriodControl'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
@@ -14,10 +15,12 @@ import {
   MAX_EVENT_DAYS,
   buildBridge,
   hasParts,
+  isPartRow,
   level3,
   level3Views,
   matchedLossDays,
   parsePeriodLink,
+  partDays,
   shiftSlice,
   topN,
   type Level3By,
@@ -25,7 +28,7 @@ import {
   type LossItem,
 } from '../../lib/oeeBridge'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
-import { useCanOpen } from '../../lib/plantContext'
+import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { printSheet } from '../../lib/printSheet'
 
 export const Route = createFileRoute('/oee/bridge')({
@@ -145,6 +148,23 @@ function BridgePage() {
     return level3(selectedItem, activeView, config, now, prevOk ? before : { days: [], lossDays: [], orders: [] })
   }, [selectedItem, activeView, now, before, config, prevOk])
   const l3 = topN(l3All, 8)
+  // Parça saatine tıklayınca Die Follow-up'a takip konusu (planlamacı, 2026-10-13).
+  const { canArea } = usePlant()
+  const [draft, setDraft] = useState<FollowUpDraft | null>(null)
+  const followUp =
+    canArea('die.problems', 'edit') || canArea('planning.plan', 'edit')
+      ? (r: Level3Row) => {
+          if (!selectedItem || !now || !cur) return
+          setDraft({
+            material: r.label,
+            press: r.sub ?? machine,
+            loss: selectedItem.label,
+            minutes: r.minutes,
+            days: partDays(selectedItem, r.key, config, now),
+            period: rangeText(cur),
+          })
+        }
+      : undefined
   // Yan panelde her zaman "hangi parçadan kaç saat" (planlamacı, 2026-10-13):
   // seçili görünüm parça değilse ayrıca kısa liste.
   const partRows = useMemo(() => {
@@ -361,6 +381,21 @@ function BridgePage() {
                       unit={selectedItem.family === 'quality' ? 'pcs' : 'min'}
                       showMttr={selectedItem.groups.length > 0}
                       compact
+                      action={
+                        activeView === 'part' && followUp
+                          ? (r) =>
+                              isPartRow(r) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => followUp(r)}
+                                  className="rounded border border-border px-1.5 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted print:hidden"
+                                  title="Add to Die Follow-up with an action"
+                                >
+                                  + Follow up
+                                </button>
+                              ) : null
+                          : undefined
+                      }
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground">
@@ -370,7 +405,9 @@ function BridgePage() {
                     </p>
                   )}
                 </div>
-                {partRows.length > 0 && <PartHours rows={partRows} total={selectedItem.minutes} onMore={() => setView('part')} />}
+                {partRows.length > 0 && (
+                  <PartHours rows={partRows} total={selectedItem.minutes} onMore={() => setView('part')} onPick={followUp} />
+                )}
                 <ActionLinks item={selectedItem} canOpen={canOpen} />
               </section>
             ) : (
@@ -443,6 +480,7 @@ function BridgePage() {
           </details>
         </div>
       )}
+      {draft && <DieFollowUpDialog draft={draft} onClose={() => setDraft(null)} />}
     </div>
   )
 }
@@ -569,7 +607,18 @@ function StepHeader({ item, previous, rows }: { item: LossItem; previous?: LossI
 }
 
 /** Adımın parçalara (MATERIAL) göre saatleri: kısa liste. */
-function PartHours({ rows, total, onMore }: { rows: Level3Row[]; total: number; onMore: () => void }) {
+function PartHours({
+  rows,
+  total,
+  onMore,
+  onPick,
+}: {
+  rows: Level3Row[]
+  total: number
+  onMore: () => void
+  /** Saate tıklayınca Die Follow-up'a takip konusu (yetkisi olana). */
+  onPick?: (r: Level3Row) => void
+}) {
   const max = Math.max(1e-9, ...rows.map((r) => Math.abs(r.minutes)))
   return (
     <div className="mt-3 border-t border-border pt-2">
@@ -593,7 +642,18 @@ function PartHours({ rows, total, onMore }: { rows: Level3Row[]; total: number; 
                 opacity: r.key === '__others' ? 0.35 : 1,
               }}
             />
-            <span className="text-right font-semibold tabular-nums">{hours(r.minutes)}</span>
+            {onPick && isPartRow(r) ? (
+              <button
+                type="button"
+                onClick={() => onPick(r)}
+                title="Add to Die Follow-up with an action"
+                className="justify-self-end rounded-md border border-[var(--viz-1)]/40 bg-[var(--viz-1)]/10 px-1.5 py-0.5 text-right font-semibold text-foreground tabular-nums hover:bg-[var(--viz-1)]/20 print:border-0 print:bg-transparent"
+              >
+                {hours(r.minutes)}
+              </button>
+            ) : (
+              <span className="text-right font-semibold tabular-nums">{hours(r.minutes)}</span>
+            )}
             <span className="text-right tabular-nums text-muted-foreground">{total > 0 ? pctOf(r.minutes / total, 0) : '—'}</span>
           </li>
         ))}

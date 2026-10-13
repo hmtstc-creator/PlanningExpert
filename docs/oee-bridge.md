@@ -203,3 +203,20 @@ filtre yeniden kurulmaz:
 - dönem URL'de: `/oee/bridge?from=2026-09-21&to=2026-09-27&shift=2`
   (`periodOfPoint`, `parsePeriodLink`; testli). Daily Report da aynı
   parametreleri okur. Loss Bridge'i açma izni olmayana sütun tıklanmaz.
+
+## Parça saatinden Die Follow-up'a (2026-10-13, planlamacı)
+
+Ayrıntı panelindeki "Hours by part (MATERIAL)" saatleri düğmedir (parça
+görünümünde tabloda "+ Follow up"). Tıklayınca açılan pencere:
+
+- hazır gelir: parça (MATERIAL), pres (iş yeri), kayıp kalemi, süre ve duruş
+  tarihi — dönemde birden çok gün varsa en çok duruşun olduğu gün; diğer
+  günler tek tıkla seçilir (`partDays`, günlerin toplamı satıra eşit, testli),
+- seçilir: operasyon (OEE verisinde yok → "Not known" = "—") ve problem tipi
+  (kayıp kalemi listede yoksa başa eklenir),
+- **Action** zorunlu: kaydetmeden önce yapılacak iş yazılır,
+- Save → Die Problems'ta açık problem (`moldProblems.press`, `.action`
+  isteğe bağlı alanlar; listede pres ve "Action" kutusu görünür).
+
+Düğme yalnızca Die Problems ya da Plan düzenleme izni olana çıkar; parçasız
+"(no part)", "Not in order data" ve "Others" satırları eklenmez.

@@ -1040,6 +1040,12 @@
     }
   },
   "moldProblems": {
+    "action": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
     "description": {
       "fieldType": {
         "type": "string"
@@ -1084,6 +1090,12 @@
       "fieldType": {
         "type": "id",
         "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
       },
       "optional": true
     },

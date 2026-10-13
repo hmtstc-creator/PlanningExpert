@@ -163,13 +163,26 @@ describe('fabrika ayrımı', () => {
     await expect(t.query(api.planRuns.status, { token: dt })).rejects.toThrow(/view permission/)
     await t.mutation(api.moldProblems.report, { token: dt, material: 'M1', operation: 'OP10', problemType: 'Burr', occurredAt: '2026-10-01' })
     expect((await t.query(api.moldProblems.list, { token: dt })).length).toBe(1)
+    // OEE Loss Bridge'den: pres ve aksiyon saklanır.
+    await t.mutation(api.moldProblems.report, {
+      token: dt,
+      material: 'M2',
+      operation: '—',
+      problemType: 'STP',
+      occurredAt: '2026-10-02',
+      downtimeMinutes: 30,
+      press: 'PRS-109',
+      action: '  Check the coil feeder  ',
+    })
+    const fromOee = (await t.query(api.moldProblems.list, { token: dt })).find((p: Any) => p.material === 'M2')!
+    expect([fromOee.press, fromOee.action, fromOee.status]).toEqual(['PRS-109', 'Check the coil feeder', 'open'])
     // Plant 1'de bu problem görünmez.
     expect((await t.query(api.moldProblems.list, { token: boss })).length).toBe(0)
 
     // Şirket askıya alınır: düzenleme yok, okuma var.
     await t.mutation(api.platform.updateCompany, { token: boss, id: companyId, name: 'Company 1', modules: ['planning', 'oee', 'die', 'machine'], status: 'suspended' })
     await expect(t.mutation(api.moldProblems.report, { token: dt, material: 'M2', operation: 'OP10', problemType: 'Burr', occurredAt: '2026-10-01' })).rejects.toThrow(/edit permission/)
-    expect((await t.query(api.moldProblems.list, { token: dt })).length).toBe(1)
+    expect((await t.query(api.moldProblems.list, { token: dt })).length).toBe(2)
     // Modül kapatılınca görünmez.
     await t.mutation(api.platform.updateCompany, { token: boss, id: companyId, name: 'Company 1', modules: ['planning', 'oee', 'machine'], status: 'active' })
     await expect(t.query(api.moldProblems.list, { token: dt })).rejects.toThrow(/view permission/)

@@ -693,6 +693,27 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
   return finish(map, true)
 }
 
+/**
+ * Level 3 parça satırının günleri: hangi gün o makinede o parçadan kaç dakika
+ * (Die Follow-up'a eklerken duruş tarihi; planlamacı, 2026-10-13). Her gün
+ * için aynı `level3` kuralı çalışır, toplam satırınkine eşittir.
+ */
+export function partDays(item: LossItem, rowKey: string, c: OeeConfig, set: Level3Set): { date: string; minutes: number }[] {
+  const empty: Level3Set = { days: [], lossDays: [], orders: [] }
+  const dates = [...new Set(set.days.map((d) => d.date))].sort()
+  const out: { date: string; minutes: number }[] = []
+  for (const date of dates) {
+    const on = <T extends { date: string }>(xs: T[]) => xs.filter((x) => x.date === date)
+    const day: Level3Set = { days: on(set.days), lossDays: on(set.lossDays), orders: on(set.orders), events: set.events && on(set.events) }
+    const row = level3(item, 'part', c, day, empty).find((r) => r.key === rowKey)
+    if (row && row.minutes > 0.05) out.push({ date, minutes: row.minutes })
+  }
+  return out
+}
+
+/** Parça satırı Die Follow-up'a eklenebilir mi: gerçek bir parça (parçasız, sipariş dışı ve "Others" değil). */
+export const isPartRow = (r: Level3Row) => r.key.includes('|') && r.label !== NO_PART
+
 /** En çok `n` satır; kalanı "Others" satırında. */
 export function topN(rows: Level3Row[], n = 5): Level3Row[] {
   if (rows.length <= n) return rows

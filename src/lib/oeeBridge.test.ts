@@ -460,3 +460,24 @@ describe('Trend Analysis sütunundan Loss Bridge dönemi', () => {
     expect(parsePeriodLink({ from: '21.09.2026', shift: -1 })).toEqual({})
   })
 })
+
+describe('parça satırının günleri (Die Follow-up)', () => {
+  it('günlerin toplamı satıra eşit; parçasız satır eklenmez', async () => {
+    const { partDays, isPartRow } = await import('./oeeBridge')
+    const days = allDays.filter((d) => inScope(d, progressive, plant))
+    const losses = matchedLossDays(
+      days,
+      allLoss.filter((l) => inScope(l, progressive, plant)),
+    )
+    const set = { days, lossDays: losses, orders: [] }
+    const b = buildBridge(days, losses, plant)
+    const setup = b.items.find((i) => i.label === 'Setup')!
+    const rows = level3(setup, 'part', plant, set, { days: [], lossDays: [], orders: [] })
+    const row = rows.find(isPartRow)!
+    const perDay = partDays(setup, row.key, plant, set)
+    expect(perDay.length).toBeGreaterThan(0)
+    expect(perDay.reduce((a, d) => a + d.minutes, 0)).toBeCloseTo(row.minutes, 6)
+    expect(isPartRow({ ...row, key: '__others' })).toBe(false)
+    expect(isPartRow({ ...row, label: '(no part)' })).toBe(false)
+  })
+})
