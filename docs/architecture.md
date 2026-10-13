@@ -276,3 +276,15 @@ düğmesine basar. Plan girdisini değiştiren her yazma (`guardedMutation`,
 (convex/planQueue.ts `markPlanChanged`); Planning, Capacity ve Today "plan
 güncel değil" uyarısı verir, güncel olmayan plan onaylanamaz. Today'in "eski
 plan" eşiği varsayılan 24 saat.
+
+## Yetki neden ulaşmıyor (2026-10-13, planlamacı)
+
+"Kullanıcıyı gruba ekledim, yetkiler görünmüyor" durumunda kural doğruydu
+(aynı akış testte çalışıyor); yetkiyi sıfırlayan ayarlar görünmüyordu.
+Users & permissions → kullanıcı paneli artık gruptan gelen ama etkisiz kalan
+yetkinin sebebini plant başına yazar (src/lib/peopleTree.ts `accessIssues`):
+modül şirkette kiralı değil, **plant'te kapalı** (General'i etkilemez, bu
+yüzden fark edilmiyordu) ya da grup o plant'i kapsamıyor. Company settings →
+Organization'daki plant modül kutuları "Modules used in this plant" oldu
+(tik = açık; eskiden "switched off here", tik = kapalı — ters okunuyordu);
+kapalı modül kırmızı yazılır.

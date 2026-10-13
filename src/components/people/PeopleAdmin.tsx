@@ -6,6 +6,7 @@ import { validatePassword } from '../../lib/authRules'
 import { useCurrentUser } from '../../lib/currentUser'
 import { friendlyError } from '../../lib/mutationErrors'
 import {
+  accessIssues,
   draftAreaLevel,
   groupDraft,
   groupPayload,
@@ -864,6 +865,14 @@ function UserPanel({
           </tbody>
         </table>
       </div>
+      {company.plants.some((p) => accessIssues(preview, p, company, groups).length > 0) && (
+        <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+          <p className="font-semibold">Why a permission of the groups does not reach {d.name || 'this user'}:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {company.plants.flatMap((p) => accessIssues(preview, p, company, groups).map((t) => <li key={`${p._id}${t}`}>{`${p.name} — ${t}`}</li>))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

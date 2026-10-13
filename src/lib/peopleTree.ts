@@ -5,6 +5,7 @@
 import {
   AREAS,
   MODULES,
+  MODULE_LABELS,
   areaAccessFor,
   groupAreaLevel,
   type AreaAccess,
@@ -115,3 +116,26 @@ export function userAreas(u: PeopleUser, companyId: string, plant: PlantLike, co
   const gl: GroupLike[] = groups.map((g) => ({ ...g, companyId }))
   return areaAccessFor({ _id: u._id, companyId, isCreator: u.isCreator, groupIds: u.groupIds }, plant, company, gl)
 }
+
+/**
+ * Gruptan gelen yetki bu plant'te neden etkisiz (planlamacı, 2026-10-13: "gruba
+ * ekledim, yetkiler görünmüyor"): modülü veren grup var ama sonuç "none" ise
+ * sebebi — modül şirkette kiralı değil, bu plant'te kapalı, ya da grup bu
+ * plant'i kapsamıyor. Boş liste: sorun yok.
+ */
+export function accessIssues(u: PeopleUser, plant: PlantLike & { disabledModules?: string[] }, company: CompanyLike, groups: PeopleGroup[]): string[] {
+  if (u.isCreator) return []
+  const mine = groups.filter((g) => u.groupIds.includes(g._id))
+  const out: string[] = []
+  for (const m of MODULES) {
+    const givers = mine.filter((g) => AREAS.some((a) => a.module === m && groupAreaLevel({ permissions: g.permissions, areas: g.areas }, a.key) !== 'none'))
+    if (!givers.length) continue
+    const label = MODULE_LABELS[m]
+    if (!company.modules.includes(m)) out.push(`${label}: not rented by the company`)
+    else if ((plant.disabledModules ?? []).includes(m)) out.push(`${label}: switched off in this plant (Company settings → Organization → plant → Modules used in this plant)`)
+    else if (!givers.some((g) => g.allPlants || g.plantIds.includes(plant._id)))
+      out.push(`${label}: ${givers.map((g) => g.name).join(', ')} does not cover this plant (group → Plants)`)
+  }
+  return out
+}
+

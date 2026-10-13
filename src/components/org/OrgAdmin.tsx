@@ -766,17 +766,24 @@ function PlantPanel({ plant: p, company: c, isPlatform, onSelect }: { plant: Org
 
       {isPlatform && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
-          <span className="text-muted-foreground">Modules switched off here:</span>
-          {c.modules.map((m) => (
-            <label key={m} className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={disabled.includes(m)}
-                onChange={(e) => void updatePlant({ id: p._id, name: p.name, disabledModules: (e.target.checked ? [...disabled, m] : disabled.filter((x) => x !== m)).sort() })}
-              />
-              {MODULE_LABELS[m]}
-            </label>
-          ))}
+          {/* Tik = açık (2026-10-13: "kapalı" kutusu ters okunuyordu; kapalı modül kullanıcıların yetkisini sıfırlar, General'i değil). */}
+          <span className="text-muted-foreground" title="An unticked module is off in this plant: no user except Generals sees it, whatever their groups give.">
+            Modules used in this plant:
+          </span>
+          {c.modules.map((m) => {
+            const off = disabled.includes(m)
+            return (
+              <label key={m} className={`flex items-center gap-1 ${off ? 'font-semibold text-destructive' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={!off}
+                  onChange={(e) => void updatePlant({ id: p._id, name: p.name, disabledModules: (e.target.checked ? disabled.filter((x) => x !== m) : [...disabled, m]).sort() })}
+                />
+                {MODULE_LABELS[m]}
+                {off && ' (off — users see nothing of it)'}
+              </label>
+            )
+          })}
         </div>
       )}
 
