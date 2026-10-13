@@ -382,40 +382,45 @@ function BridgeRows({ bars, bridge, selected, onSelect, selectable, priority }: 
   )
 }
 
-/** %100 sütun: parçalar aşağıdan yukarı, yanında adı ve payı. */
-export function StackColumn({
-  title,
-  parts,
-}: {
-  title: string
-  parts: { label: string; share: number; color: string; strong?: boolean }[]
-}) {
-  const shown = parts.filter((p) => p.share > 0.0005)
+/**
+ * Hız göstergesi gibi 180°'lik yarım daire (planlamacı, 2026-10-13): %0 solda,
+ * %100 sağda; renkli yay ve ibre değeri gösterir (100'ü aşan değer sağda durur).
+ */
+export function Gauge({ value, color, label }: { value: number | null; color: string; label: string }) {
+  const cx = 100
+  const cy = 100
+  const r = 78
+  const f = value === null ? 0 : Math.min(1, Math.max(0, value))
+  const at = (frac: number, radius = r) => {
+    const a = Math.PI * (1 - frac)
+    return [cx + radius * Math.cos(a), cy - radius * Math.sin(a)] as const
+  }
+  const arc = (to: number) => {
+    const [x0, y0] = at(0)
+    const [x1, y1] = at(to)
+    return `M ${x0} ${y0} A ${r} ${r} 0 0 1 ${x1} ${y1}`
+  }
+  const [nx, ny] = at(f, r - 24)
   return (
-    <div>
-      <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</p>
-      <div className="mt-2 flex h-56 gap-3">
-        <div className="flex w-14 flex-col-reverse overflow-hidden rounded-md">
-          {shown.map((p) => (
-            <div
-              key={p.label}
-              title={`${p.label}: ${pctOf(p.share)}`}
-              style={{ height: `${p.share * 100}%`, background: p.color }}
-              className="border-t-2 border-background first:border-t-0"
-            />
-          ))}
-        </div>
-        <div className="flex flex-col-reverse justify-start">
-          {shown.map((p) => (
-            <div key={p.label} style={{ height: `${p.share * 100}%` }} className="flex min-h-4 items-center">
-              <span className={`text-xs tabular-nums ${p.strong ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>
-                {p.label} <b className="text-foreground">{pctOf(p.share)}</b>
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <svg viewBox="-16 -12 232 124" className="mx-auto block w-full max-w-[240px]" role="img" aria-label={`${label} ${pctOf(value)}`}>
+      <path d={arc(1)} fill="none" stroke="var(--viz-grid)" strokeWidth={16} strokeLinecap="butt" />
+      {f > 0 && <path d={arc(f)} fill="none" stroke={color} strokeWidth={16} strokeLinecap="butt" />}
+      {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+        const [x0, y0] = at(t, r + 9)
+        const [x1, y1] = at(t, r + 13)
+        return <line key={t} x1={x0} y1={y0} x2={x1} y2={y1} stroke="var(--viz-axis)" strokeWidth={1.2} />
+      })}
+      {[0, 0.5, 1].map((t) => {
+        const [x, y] = at(t, r + 21)
+        return (
+          <text key={t} x={x} y={t === 0.5 ? y + 3 : y + 12} textAnchor="middle" fontSize={9} fill="var(--viz-axis)">
+            {t * 100}%
+          </text>
+        )
+      })}
+      {value !== null && <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="var(--foreground)" strokeWidth={3} strokeLinecap="round" />}
+      <circle cx={cx} cy={cy} r={6} fill="var(--foreground)" />
+    </svg>
   )
 }
 
@@ -561,14 +566,26 @@ export function Level3Table({
                     />
                   </td>
                 )}
-                {base ? <td className="py-1.5 pr-2 text-right font-semibold tabular-nums">{pctOf(r.minutes / base)}</td> : null}
-                <td className={`py-1.5 pr-2 text-right tabular-nums ${base ? '' : 'font-semibold'}`}>{hours(r.minutes)}</td>
+                {base ? (
+                  <td className="py-1.5 pr-2 text-right font-semibold whitespace-nowrap tabular-nums">{pctOf(r.minutes / base)}</td>
+                ) : null}
+                <td className={`py-1.5 pr-2 text-right whitespace-nowrap tabular-nums ${base ? '' : 'font-semibold'}`}>
+                  {hours(r.minutes)}
+                </td>
                 {!compact && (
-                  <td className="py-1.5 pr-2 text-right tabular-nums text-muted-foreground">{total > 0 ? pctOf(cum / total, 0) : '—'}</td>
+                  <td className="py-1.5 pr-2 text-right whitespace-nowrap tabular-nums text-muted-foreground">
+                    {total > 0 ? pctOf(cum / total, 0) : '—'}
+                  </td>
                 )}
-                <td className="py-1.5 pr-2 text-right tabular-nums">{r.count ? r.count.toLocaleString('en-GB') : '—'}</td>
-                {showMttr && <td className="py-1.5 pr-2 text-right tabular-nums">{r.mttr === null ? '—' : `${r.mttr.toFixed(1)} min`}</td>}
-                <td className="py-1.5 pr-2 text-right tabular-nums text-muted-foreground">{r.previous ? hours(r.previous) : '—'}</td>
+                <td className="py-1.5 pr-2 text-right whitespace-nowrap tabular-nums">{r.count ? r.count.toLocaleString('en-GB') : '—'}</td>
+                {showMttr && (
+                  <td className="py-1.5 pr-2 text-right whitespace-nowrap tabular-nums">
+                    {r.mttr === null ? '—' : `${r.mttr.toFixed(1)} min`}
+                  </td>
+                )}
+                <td className="py-1.5 pr-2 text-right whitespace-nowrap tabular-nums text-muted-foreground">
+                  {r.previous ? hours(r.previous) : '—'}
+                </td>
                 {action && <td className="py-1.5 text-right whitespace-nowrap">{isOthers ? null : action(r)}</td>}
               </tr>
             )

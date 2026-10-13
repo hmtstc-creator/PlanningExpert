@@ -3,31 +3,13 @@ import { Printer } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import {
-  BridgeChart,
-  FAMILY_LABEL,
-  FAMILY_SWATCH,
-  Level2Bars,
-  Level3Table,
-  StackColumn,
-  hours,
-  pctOf,
-} from '../../components/OeeBridgeCharts'
+import { BridgeChart, FAMILY_LABEL, FAMILY_SWATCH, Level2Bars, Level3Table, Gauge, hours, pctOf } from '../../components/OeeBridgeCharts'
 import { OeePeriodFields, dm, rangeText, useOeePeriod, useShiftOptions } from '../../components/OeePeriodControl'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import {
-  areaNames,
-  costCentersOf,
-  inScope,
-  scopeLabel,
-  type DayRow,
-  type DowntimeDay,
-  type OrderRow,
-  type ShiftRow,
-} from '../../lib/oee'
+import { areaNames, costCentersOf, inScope, scopeLabel, type DayRow, type DowntimeDay, type OrderRow, type ShiftRow } from '../../lib/oee'
 import {
   MAX_EVENT_DAYS,
   buildBridge,
@@ -258,32 +240,48 @@ function BridgePage() {
             </button>
           </div>
 
-          {/* Kutular */}
+          {/* Göstergeler: 180° yarım daire, altında süreler (planlamacı, 2026-10-13). */}
           <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-5">
-            <Tile
+            <GaugeTile
               label="OEE"
-              value={pctOf(b!.oee)}
+              value={b!.oee}
               delta={delta(b!.oee, pb?.oee)}
-              sub={`${hours(b!.baseMinutes)} loading · ${b!.coverage.dayRows} machine-day(s)`}
+              color="var(--viz-3)"
+              lines={[
+                ['Loading time', hours(b!.totals.loading)],
+                ['Effective time', hours(b!.totals.effective)],
+              ]}
               strong
             />
-            <Tile
+            <GaugeTile
               label={`Availability${config.lossGroups.some((g) => g.family === 'performance') ? ' (bridge split)' : ''}`}
-              value={pctOf(b!.availability)}
+              value={b!.availability}
               delta={delta(b!.availability, pb?.availability)}
-              sub={`loss ${pctOf(b!.level1?.availability)} of loading`}
+              color={FAMILY_SWATCH.availability}
+              lines={[
+                ['Production time', hours(b!.totals.production)],
+                ['÷ Loading time', hours(b!.totals.loading)],
+              ]}
             />
-            <Tile
+            <GaugeTile
               label="Performance"
-              value={pctOf(b!.performance)}
+              value={b!.performance}
               delta={delta(b!.performance, pb?.performance)}
-              sub={`loss ${pctOf(b!.level1?.performance)} of loading`}
+              color={FAMILY_SWATCH.performance}
+              lines={[
+                ['Operation time', hours(b!.totals.operating)],
+                ['÷ Production time', hours(b!.totals.production)],
+              ]}
             />
-            <Tile
+            <GaugeTile
               label="Quality"
-              value={pctOf(b!.quality)}
+              value={b!.quality}
               delta={delta(b!.quality, pb?.quality)}
-              sub={`loss ${pctOf(b!.level1?.quality)} of loading`}
+              color={FAMILY_SWATCH.quality}
+              lines={[
+                ['Effective time', hours(b!.totals.effective)],
+                ['÷ Operation time', hours(b!.totals.operating)],
+              ]}
             />
             {priority ? (
               <button
@@ -315,7 +313,10 @@ function BridgePage() {
                 </h3>
                 <Legend />
               </div>
-              <p className="mt-1 text-[11px] text-muted-foreground print:hidden">Click a step — its details open on the right.</p>
+              <p className="mt-1 text-[11px] text-muted-foreground print:hidden">
+                Click a step — its details open <span className="hidden lg:inline">on the right</span>
+                <span className="lg:hidden">below</span>.
+              </p>
               <div className="mt-2">
                 <BridgeChart bridge={b!} selected={selectedItem?.key ?? null} onSelect={(k) => setPicked(k)} selectable={selectable} />
               </div>
@@ -375,54 +376,8 @@ function BridgePage() {
             )}
           </div>
 
-          {/* Dağılım */}
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[auto_auto_1fr]">
-            <section className="rounded-xl border border-border p-4">
-              <StackColumn
-                title="OEE deployment"
-                parts={[
-                  {
-                    label: 'OEE',
-                    share: b!.level1?.oee ?? 0,
-                    color: 'var(--viz-3)',
-                    strong: true,
-                  },
-                  {
-                    label: 'Loss',
-                    share: 1 - (b!.level1?.oee ?? 0),
-                    color: '#c0362c',
-                  },
-                ]}
-              />
-            </section>
-            <section className="rounded-xl border border-border p-4">
-              <StackColumn
-                title="Level 1 — OEE + losses = 100%"
-                parts={[
-                  {
-                    label: 'OEE',
-                    share: b!.level1?.oee ?? 0,
-                    color: 'var(--viz-3)',
-                    strong: true,
-                  },
-                  {
-                    label: 'Availability',
-                    share: b!.level1?.availability ?? 0,
-                    color: FAMILY_SWATCH.availability,
-                  },
-                  {
-                    label: 'Performance',
-                    share: b!.level1?.performance ?? 0,
-                    color: FAMILY_SWATCH.performance,
-                  },
-                  {
-                    label: 'Quality',
-                    share: b!.level1?.quality ?? 0,
-                    color: FAMILY_SWATCH.quality,
-                  },
-                ]}
-              />
-            </section>
+          {/* Level 2 (OEE dağılımı ve Level 1 kaldırıldı, planlamacı 2026-10-13). */}
+          <div className="mt-4">
             <section className="min-w-0 rounded-xl border border-border p-4">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Level 2 — losses, % of loading</p>
@@ -484,6 +439,50 @@ function BridgePage() {
           </details>
         </div>
       )}
+    </div>
+  )
+}
+
+function GaugeTile({
+  label,
+  value,
+  delta,
+  color,
+  lines,
+  strong,
+}: {
+  label: string
+  value: number | null
+  delta: number | null
+  color: string
+  lines: [string, string][]
+  strong?: boolean
+}) {
+  return (
+    <div className={`rounded-xl border p-3 ${strong ? 'border-[var(--viz-3)]/50 bg-emerald-50/50' : 'border-border'}`}>
+      <p className="flex items-baseline justify-between gap-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+        <span className="truncate">{label}</span>
+        {delta !== null && Math.abs(delta) >= 0.05 && (
+          <span
+            className={`text-xs font-semibold normal-case tabular-nums ${delta > 0 ? 'text-emerald-700' : 'text-destructive'}`}
+            title="Change against the previous period (points)"
+          >
+            {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}
+          </span>
+        )}
+      </p>
+      <div className="mt-1">
+        <Gauge value={value} color={color} label={label} />
+      </div>
+      <p className="-mt-1 text-center text-2xl font-bold text-foreground tabular-nums">{pctOf(value)}</p>
+      <dl className="mt-1 space-y-0.5 text-[11px]">
+        {lines.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-2">
+            <dt className="text-muted-foreground">{k}</dt>
+            <dd className="font-semibold text-foreground tabular-nums">{v}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   )
 }

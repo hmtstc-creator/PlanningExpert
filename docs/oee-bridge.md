@@ -85,8 +85,10 @@ diğerlerinde hemen önceki eşit dönem (tek gün ↔ önceki gün);
    tek makine; dönem: **Single day** ya da **Date range** (en çok 31 gün;
    planlamacı 2026-10-07: hazır dönemler yerine). Varsayılan son yüklenen
    gün; dönem son yüklenen güne kırpılır.
-3. Kutular: OEE, Availability, Performance, Quality (önceki döneme göre
-   fark, kaybın Loading'e payı), ÖNCELİK kalemi.
+3. Göstergeler (planlamacı, 2026-10-13): OEE, Availability, Performance,
+   Quality hız göstergesi gibi 180° yarım dairede (önceki döneme göre fark);
+   altlarında süreler — OEE: Loading ve Effective; A: Production ÷ Loading;
+   P: Operation ÷ Production; Q: Effective ÷ Operation. Yanında ÖNCELİK.
 4. Köprü (% of loading; ipucunda saat ve dakika), renkler: toplamlar mavi,
    availability turuncu, kayıt–MES farkı gri, performans mor, kalite pembe,
    OEE yeşil; toplam çubuklarında A / P / Q. Altında "Outside OEE" planlı
@@ -96,8 +98,8 @@ diğerlerinde hemen önceki eşit dönem (tek gün ↔ önceki gün);
    diğerleri (nedene / makineye / parçaya göre), önceki dönem; "Hours by part
    (MATERIAL)" kısa listesi (hangi parçadan kaç saat); aksiyon bağlantısı
    (kalıp problemleri, makine arızaları, Losses Trend).
-6. OEE dağılımı · Level 1 · Level 2 (öncelik işaretli, tıklanınca panel o
-   kalemi gösterir).
+6. Level 2 (öncelik işaretli, tıklanınca panel o kalemi gösterir). "OEE
+   deployment" ve "Level 1" sütunları kaldırıldı (2026-10-13).
 7. Veri notları ve köprü tablosu.
 
 Telefonda köprü yatay çubuklara döner (12+ adım 360 px'e sığmaz).
