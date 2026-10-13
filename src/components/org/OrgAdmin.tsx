@@ -711,7 +711,9 @@ function useSaveStructure(plant: OrgPlant) {
   return { save, error, clearError, pending }
 }
 
-function PlantPanel({ plant: p, company: c, isPlatform, onSelect }: { plant: OrgPlant; company: CompanyRow; isPlatform: boolean; onSelect: (n: OrgNode) => void }) {
+function PlantPanel({ plant: p, company: c, onSelect }: { plant: OrgPlant; company: CompanyRow; isPlatform: boolean; onSelect: (n: OrgNode) => void }) {
+  // Plant'te modül açıp kapatmak General'in işi — Company settings'te de (yalnızca Administration'da değil).
+  const canSwitchModules = usePlant().isPlatform
   const { run: updatePlant, error, clearError } = useSafeMutation(api.platform.updatePlant)
   const { run: deletePlant, error: deleteError } = useSafeMutation(api.platform.deletePlant)
   const structure = useSaveStructure(p)
@@ -764,7 +766,7 @@ function PlantPanel({ plant: p, company: c, isPlatform, onSelect }: { plant: Org
         </button>
       </div>
 
-      {isPlatform && (
+      {(canSwitchModules || disabled.length > 0) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
           {/* Tik = açık (2026-10-13: "kapalı" kutusu ters okunuyordu; kapalı modül kullanıcıların yetkisini sıfırlar, General'i değil). */}
           <span className="text-muted-foreground" title="An unticked module is off in this plant: no user except Generals sees it, whatever their groups give.">
@@ -777,6 +779,8 @@ function PlantPanel({ plant: p, company: c, isPlatform, onSelect }: { plant: Org
                 <input
                   type="checkbox"
                   checked={!off}
+                  disabled={!canSwitchModules}
+                  title={canSwitchModules ? undefined : 'Only a General can switch a module on or off in a plant'}
                   onChange={(e) => void updatePlant({ id: p._id, name: p.name, disabledModules: (e.target.checked ? disabled.filter((x) => x !== m) : [...disabled, m]).sort() })}
                 />
                 {MODULE_LABELS[m]}

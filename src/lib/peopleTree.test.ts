@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { accessIssues, draftAreaLevel, groupDraft, groupPayload, groupRow, peopleTree, userAreas, type PeopleGroup, type PeopleUser } from './peopleTree'
+import { accessIssues, switchedOffModules, draftAreaLevel, groupDraft, groupPayload, groupRow, peopleTree, userAreas, type PeopleGroup, type PeopleUser } from './peopleTree'
 
 const planners: PeopleGroup = {
   _id: 'g1',
@@ -62,6 +62,9 @@ describe('yetki neden ulaşmıyor (gruba eklendi ama görmüyor)', () => {
     expect(accessIssues(u, { ...plant, disabledModules: ['planning'] }, company, [planners])[0]).toMatch(/^PlanningExpert: switched off in this plant/)
     expect(accessIssues(u, plant, company, [{ ...planners, allPlants: false, plantIds: ['p2'] }])[0]).toMatch(/Planners does not cover this plant/)
     expect(accessIssues(u, plant, { ...company, modules: ['oee'] }, [planners])[0]).toMatch(/not rented/)
+    // Tek tıkla açılacak modüller: grubun verdiği ve plantte kapalı olanlar.
+    expect(switchedOffModules(u, { ...plant, disabledModules: ['planning', 'oee', 'die'] }, company, [planners])).toEqual(['planning'])
+    expect(switchedOffModules(u, plant, company, [planners])).toEqual([])
     // Creator ve grubu olmayan için uyarı yok (ayrı uyarıları var).
     expect(accessIssues({ ...u, isCreator: true }, { ...plant, disabledModules: ['planning'] }, company, [planners])).toEqual([])
   })

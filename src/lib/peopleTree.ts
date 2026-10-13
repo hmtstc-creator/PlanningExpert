@@ -139,3 +139,15 @@ export function accessIssues(u: PeopleUser, plant: PlantLike & { disabledModules
   return out
 }
 
+/** Kullanıcının gruplarının verdiği ama bu plant'te kapalı olan modüller (tek tıkla açmak için). */
+export function switchedOffModules(u: PeopleUser, plant: PlantLike & { disabledModules?: string[] }, company: CompanyLike, groups: PeopleGroup[]): Module[] {
+  if (u.isCreator) return []
+  const mine = groups.filter((g) => u.groupIds.includes(g._id) && (g.allPlants || g.plantIds.includes(plant._id)))
+  return MODULES.filter(
+    (m) =>
+      company.modules.includes(m) &&
+      (plant.disabledModules ?? []).includes(m) &&
+      mine.some((g) => AREAS.some((a) => a.module === m && groupAreaLevel({ permissions: g.permissions, areas: g.areas }, a.key) !== 'none')),
+  )
+}
+

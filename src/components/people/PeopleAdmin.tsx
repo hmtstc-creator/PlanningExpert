@@ -5,8 +5,10 @@ import { useAction, useMutation, useQuery } from '../../lib/convexTransport'
 import { validatePassword } from '../../lib/authRules'
 import { useCurrentUser } from '../../lib/currentUser'
 import { friendlyError } from '../../lib/mutationErrors'
+import { usePlant } from '../../lib/plantContext'
 import {
   accessIssues,
+  switchedOffModules,
   draftAreaLevel,
   groupDraft,
   groupPayload,
@@ -153,6 +155,8 @@ export function PeopleAdmin({ companyId }: { companyId: string }) {
         <Legend />
       </div>
 
+      <SwitchedOffPlants company={company} modules={modules} />
+
       {tree.noGroup.length > 0 && (
         <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-950">
           <button className="text-left underline decoration-amber-400 underline-offset-2 hover:decoration-amber-700" onClick={() => select({ kind: 'noGroup' })}>
@@ -244,6 +248,47 @@ export function PeopleAdmin({ companyId }: { companyId: string }) {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Plant'te kapalı modül: grupları ne verirse versin kullanıcılar o modülü
+ * görmez (General hariç — bu yüzden fark edilmiyordu). Burada, sayfa
+ * değiştirmeden açılır (planlamacı, 2026-10-13).
+ */
+function SwitchedOffPlants({ company, modules }: { company: CompanyRow; modules: Module[] }) {
+  const canSwitch = usePlant().isPlatform
+  const { run, error, clearError } = useSafeMutation(api.platform.updatePlant)
+  const plants = company.plants.map((p) => ({ p, off: modules.filter((m) => (p.disabledModules ?? []).includes(m)) })).filter((x) => x.off.length)
+  if (!plants.length) return null
+  return (
+    <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-foreground">
+      <ErrorBanner message={error} onDismiss={clearError} />
+      {plants.map(({ p, off }) => {
+        const names = off.map((m) => MODULE_LABELS[m]).join(', ')
+        return (
+          <div key={p._id} className="flex flex-wrap items-center gap-2 py-0.5">
+            <span>
+              <b>{p.name}:</b> {names} {off.length === 1 ? 'is' : 'are'} switched off — no user of this plant sees {off.length === 1 ? 'it' : 'them'}, whatever
+              their groups give.
+            </span>
+            {canSwitch ? (
+              <button
+                className="rounded-md bg-foreground px-2.5 py-1 font-medium text-background hover:opacity-90"
+                onClick={() =>
+                  window.confirm(`Turn ${names} on in ${p.name}?`) &&
+                  void run({ id: p._id, name: p.name, disabledModules: (p.disabledModules ?? []).filter((m) => !off.includes(m as Module)) })
+                }
+              >
+                Turn on in {p.name}
+              </button>
+            ) : (
+              <span className="text-muted-foreground">Only a General can turn modules on.</span>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -714,6 +759,9 @@ function UserPanel({
   const { run: update, error: updateError, clearError } = useSafeMutation(api.users.update)
   const { run: remove, error: removeError } = useSafeMutation(api.users.remove)
   const { run: signOutAll, error: signOutError } = useSafeMutation(api.users.signOutEverywhere)
+  // Plant'te kapalı modülü buradan açmak: yalnızca General (sunucu da denetler).
+  const canSwitchModules = usePlant().isPlatform
+  const { run: switchModules, error: switchError } = useSafeMutation(api.platform.updatePlant)
   const [signedOut, setSignedOut] = useState<number | null>(null)
   const setPassword = useAction(api.auth.setPasswordAsAdmin)
   const initial = { name: u.name, email: u.email ?? '', active: u.active, isCreator: u.isCreator, groupIds: [...u.groupIds].sort() }
@@ -727,7 +775,7 @@ function UserPanel({
 
   return (
     <div>
-      <ErrorBanner message={updateError ?? removeError ?? signOutError ?? pwError} onDismiss={() => (clearError(), setPwError(null))} />
+      <ErrorBanner message={updateError ?? removeError ?? signOutError ?? switchError ?? pwError} onDismiss={() => (clearError(), setPwError(null))} />
       <div className="flex flex-wrap items-center gap-2">
         <Chip kind={d.isCreator ? 'creator' : 'user'} className="h-6 min-w-6 text-xs" />
         <input className={`w-48 font-semibold ${input}`} value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} aria-label="Name" />
@@ -871,6 +919,28 @@ function UserPanel({
           <ul className="mt-1 list-disc space-y-0.5 pl-4">
             {company.plants.flatMap((p) => accessIssues(preview, p, company, groups).map((t) => <li key={`${p._id}${t}`}>{`${p.name} — ${t}`}</li>))}
           </ul>
+          {/* Düzeltme burada, sayfa değiştirmeden (planlamacı, 2026-10-13). */}
+          {company.plants.map((p) => {
+            const off = switchedOffModules(preview, p, company, groups)
+            if (!off.length) return null
+            const names = off.map((m) => MODULE_LABELS[m]).join(', ')
+            return canSwitchModules ? (
+              <button
+                key={p._id}
+                className="mt-2 mr-2 rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background hover:opacity-90"
+                onClick={() =>
+                  window.confirm(`Turn ${names} on in ${p.name}? Every user's groups then apply there (for everyone, not only ${d.name}).`) &&
+                  void switchModules({ id: p._id, name: p.name, disabledModules: (p.disabledModules ?? []).filter((m) => !off.includes(m as Module)) })
+                }
+              >
+                Turn on {names} in {p.name}
+              </button>
+            ) : (
+              <p key={p._id} className="mt-2">
+                {names} {off.length === 1 ? 'is' : 'are'} switched off in {p.name} — only a General can turn {off.length === 1 ? 'it' : 'them'} on.
+              </p>
+            )
+          })}
         </div>
       )}
     </div>

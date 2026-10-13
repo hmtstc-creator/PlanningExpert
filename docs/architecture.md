@@ -288,3 +288,10 @@ yüzden fark edilmiyordu) ya da grup o plant'i kapsamıyor. Company settings →
 Organization'daki plant modül kutuları "Modules used in this plant" oldu
 (tik = açık; eskiden "switched off here", tik = kapalı — ters okunuyordu);
 kapalı modül kırmızı yazılır.
+
+Ek (aynı gün): düzeltme sayfa değiştirmeden yapılır. Users & permissions'ın
+en üstünde, bir plant'te kapalı modül varsa kırmızı uyarı ve **Turn on in
+<plant>** düğmesi; kullanıcı panelinde de **Turn on … in <plant>** (General;
+diğerlerine "only a General can turn modules on"). Company settings →
+Organization → plant panelinde modül kutuları artık görünür (eskiden yalnızca
+Administration'da); General değiştirir, diğerleri kapalı olanı görür.
