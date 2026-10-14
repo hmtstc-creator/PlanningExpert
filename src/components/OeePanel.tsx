@@ -26,13 +26,12 @@ import { usePlant } from '../lib/plantContext'
 import { oeeShiftCodes } from '../lib/shifts'
 import { importOee, type OeeApi } from '../lib/oeeStore'
 import { checkExcelFile, readWorkbook } from '../lib/safeExcel'
+import { useOeeFilters } from '../lib/oeeFilters'
 
 /**
  * OEE sayfalarının ortak parçaları: ayar (kullanıcının OEE ayarları), alan /
  * masraf yeri / makine seçimi, tarih (varsayılan dün) ve yükleme düğmesi.
  */
-
-const KEY = 'oee-selection'
 
 function localIso(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -54,31 +53,24 @@ export function useOeeConfig(): { config: OeeConfig; problems: string[]; loaded:
   return { config, problems: doc === undefined ? [] : configProblems(config), loaded: doc !== undefined, savedAt: doc?.updatedAt ?? null }
 }
 
+/**
+ * Ortak seçim: alan / masraf yeri ve gün (src/lib/oeeFilters.ts) — bütün OEE
+ * sayfalarında aynı, sayfa değişince kaybolmaz. Gün seçilmemişse son yüklenen
+ * gün (yoksa dün).
+ */
 export function useOeeSelection() {
-  const [saved, setSaved] = useState<Scope>(() => {
-    try {
-      const v = JSON.parse(window.localStorage.getItem(KEY) ?? 'null')
-      if (v && typeof v.area === 'string' && typeof v.key === 'string') return v
-    } catch {
-      // Saklanamıyorsa varsayılan.
-    }
-    return { area: '', key: 'all' }
-  })
-  const [date, setDate] = useState(() => {
+  const [f, set] = useOeeFilters()
+  const coverage = useQuery(api.oee.coverage) as { days: { from: string; to: string } | null } | undefined
+  const yesterday = () => {
     const d = new Date()
     d.setDate(d.getDate() - 1)
     return localIso(d)
-  })
-  const setScope = (s: Scope) => {
-    setSaved(s)
-    try {
-      window.localStorage.setItem(KEY, JSON.stringify(s))
-    } catch {
-      // Yalnızca bu oturumda kalır.
-    }
   }
+  const date = f.date || coverage?.days?.to || yesterday()
+  const setScope = (scope: Scope) => set({ scope, machine: '' })
+  const setDate = (d: string) => set({ date: d })
   const monday = mondayOfIso(date)
-  return { scope: saved, setScope, date, setDate, monday, sunday: addDaysIso(monday, 6), week: isoWeek(date) }
+  return { scope: f.scope, setScope, date, setDate, monday, sunday: addDaysIso(monday, 6), week: isoWeek(date) }
 }
 
 /** Seçili alan ayarda yoksa ilk alan kullanılır. */
@@ -92,24 +84,24 @@ export function effectiveScope(scope: Scope, areas: string[]): Scope {
  * sayfa açılınca bir kez tamamlar: yalnızca ekler, hiçbir şey silmez.
  */
 export function OeeRebuildNotice() {
-  const coverage = useQuery(api.oee.coverage) as { needsRebuild?: { days: boolean; losses: boolean } } | undefined
+  const coverage = useQuery(api.oee.coverage) as { needsRebuild?: { days: boolean; losses: boolean; stops?: boolean } } | undefined
   const rebuild = useMutation(api.oee.rebuildStored)
   const [state, setState] = useState<{ kind: 'idle' | 'done' } | { kind: 'busy'; text: string } | { kind: 'error'; text: string }>({ kind: 'idle' })
   const started = useRef(false)
   const need = coverage?.needsRebuild
   useEffect(() => {
-    if (!need || (!need.days && !need.losses) || started.current) return
+    if (!need || (!need.days && !need.losses && !need.stops) || started.current) return
     started.current = true
     void (async () => {
       try {
-        for (const step of ['days', 'losses'] as const) {
+        for (const step of ['days', 'losses', 'stops'] as const) {
           if (!need[step]) continue
           let cursor: string | null = null
           let n = 0
           for (;;) {
             const r = (await rebuild({ step, cursor })) as { cursor: string; isDone: boolean; count: number }
             n += r.count
-            setState({ kind: 'busy', text: `${step === 'days' ? 'Day totals' : 'Loss summaries'}: ${n}` })
+            setState({ kind: 'busy', text: `${step === 'days' ? 'Day totals' : step === 'losses' ? 'Loss summaries' : 'Downtime durations'}: ${n}` })
             if (r.isDone) break
             cursor = r.cursor
           }
@@ -153,6 +145,8 @@ export function OeeControls({
   period,
   upload = false,
   notes,
+  extra,
+  actions,
 }: {
   selection: ReturnType<typeof useOeeSelection>
   /** Seçenekler için iş merkezi / masraf yeri listesi. */
@@ -164,6 +158,10 @@ export function OeeControls({
   upload?: boolean
   /** Verilirse veri notları sayfayı kaplamaz: tarihin yanında info düğmesinde (Trend Analysis). */
   notes?: string[]
+  /** Sayfaya özel alanlar (ör. MTTR & MTBF'te en az dakika). */
+  extra?: ReactNode
+  /** Sağda: ör. A4 yazdırma düğmesi. */
+  actions?: ReactNode
 }) {
   const { setScope, date, setDate, week } = selection
   const areas = useMemo(() => areaNames(rows, config), [rows, config])
@@ -183,16 +181,17 @@ export function OeeControls({
           </Link>
         </div>
       )}
-      <div className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-border p-3 text-sm">
+      {/* Ortak filtre çubuğu: toz mavi, kayarken üstte (Aksiyonlar sunumu, 2026-10-14). */}
+      <div className="oee-filter-bar sticky top-0 z-30 mt-4 flex flex-wrap items-end gap-x-4 gap-y-3 rounded-lg border px-4 py-3 text-sm print:hidden">
         {areas.length > 0 && (
-          <div className="flex flex-wrap rounded-md border border-border p-0.5" role="group" aria-label="Area">
+          <div className="flex flex-wrap rounded-md border p-0.5" role="group" aria-label="Area">
             {areas.map((a) => (
               <button
                 key={a}
                 type="button"
                 onClick={() => setScope({ area: a, key: 'all' })}
                 aria-pressed={scope.area === a}
-                className={`rounded px-3 py-1 text-xs font-semibold ${scope.area === a ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+                className={`rounded px-3.5 py-1.5 text-sm font-semibold ${scope.area === a ? 'bg-[#1e3a5f] text-white dark:bg-[#dbe7f3] dark:text-[#1e3a5f]' : 'text-muted-foreground hover:bg-muted'}`}
               >
                 {a}
               </button>
@@ -226,7 +225,7 @@ export function OeeControls({
                 className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
               />
             </label>
-            <span className="pb-2 text-xs text-muted-foreground">
+            <span className="filter-note pb-2 text-xs">
               Week <strong className="text-foreground">W{week.week}</strong>
               {coverage?.days && ` · data ${coverage.days.from} – ${coverage.days.to}`}
             </span>
@@ -245,6 +244,8 @@ export function OeeControls({
             )}
           </>
         )}
+        {extra}
+        {actions && <div className="ml-auto flex items-end gap-2">{actions}</div>}
         {/* Yükleme yalnızca OEE düzenleme izniyle (board görünümünde yok). */}
         {upload && canEditOee && (
           <div className="ml-auto">

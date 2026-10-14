@@ -28,6 +28,7 @@ import {
   type LossItem,
 } from '../../lib/oeeBridge'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
+import { reasonShiftParts } from '../../lib/oeeReliability'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { printSheet } from '../../lib/printSheet'
 
@@ -56,11 +57,10 @@ function BridgePage() {
   const link = Route.useSearch()
   const period = useOeePeriod(link)
   const { lastDay, firstDay, wanted, cur, prev, prevFull } = period
-  const [machineRaw, setMachine] = useState('')
+  // Vardiya ve makine bütün OEE sayfalarında ortak (src/lib/oeeFilters.ts).
+  const { shift, setShift, machine: machineRaw, setMachine } = period
   const [picked, setPicked] = useState<string | null>(null)
   const [view, setView] = useState<Level3By | null>(null)
-  const [shift, setShift] = useState(link.shift ?? 0)
-  useEffect(() => setShift(link.shift ?? 0), [link.shift, link.from, link.to])
   const sheetRef = useRef<HTMLDivElement>(null)
 
   // Sorgu aralığı: önceki dönemin başından bu dönemin sonuna (veri yoksa dünkü gün, boş döner).
@@ -78,13 +78,18 @@ function BridgePage() {
   const partsReady = shiftOn || storedParts
   const needEvents = eventsOk && (shiftOn || (view === 'part' && !storedParts))
   const shiftRows = (useQuery(api.oee.shifts, shiftOn ? q : 'skip') ?? []) as ShiftRow[]
-  const curEvRaw = useQuery(api.oee.downtimeDays, needEvents && cur ? { from: cur.from, to: cur.to } : 'skip') as
+  // Bu dönemin ham duruşları kısa dönemde her zaman: kalemlerin vardiyası ve
+  // kaleme tıklayınca hangi referans / vardiya (Aksiyonlar sunumu, 2026-10-14).
+  const curEvRaw = useQuery(api.oee.downtimeDays, eventsOk && cur ? { from: cur.from, to: cur.to } : 'skip') as
     StoredDowntimeDay[] | undefined
   const prevEvRaw = useQuery(api.oee.downtimeDays, needEvents && prev ? { from: prev.from, to: prev.to } : 'skip') as
     StoredDowntimeDay[] | undefined
   const curEvents = useMemo(() => (curEvRaw ?? []).map(fromStoredDay), [curEvRaw])
   const prevEvents = useMemo(() => (prevEvRaw ?? []).map(fromStoredDay), [prevEvRaw])
   const eventsLoading = needEvents && (curEvRaw === undefined || prevEvRaw === undefined)
+  const [reason, setReason] = useState<string | null>(null)
+  // Başka adım seçilince neden süzgeci kalkar.
+  useEffect(() => setReason(null), [picked, view])
 
   const scope = effectiveScope(sel.scope, areaNames(dayRows, config))
   const machineOptions = useMemo(
@@ -173,6 +178,25 @@ function BridgePage() {
     if (!fromOrders && !partsReady) return []
     return topN(level3(selectedItem, 'part', config, now, prevOk ? before : { days: [], lossDays: [], orders: [] }), 6)
   }, [selectedItem, activeView, views.join(), now, before, config, prevOk, partsReady]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Nedenlerin vardiyası ve neden × parça × vardiya (ham duruşlar, en çok 8 gün).
+  const stopDetail = useMemo(() => {
+    if (!selectedItem || !now || !eventsOk || curEvRaw === undefined || !selectedItem.groups.length || selectedItem.family === 'planned') return null
+    return reasonShiftParts(now.events ?? [], selectedItem.groups, config)
+  }, [selectedItem, now, eventsOk, curEvRaw, config])
+  const pickedReason = activeView === 'reason' && reason && stopDetail?.parts.has(reason) ? reason : null
+  const reasonParts = pickedReason ? (stopDetail?.parts.get(pickedReason) ?? []) : []
+  const shiftCell =
+    activeView === 'reason' && stopDetail
+      ? (r: Level3Row) => {
+          const by = stopDetail.shifts.get(r.label)
+          if (!by) return '—'
+          return [...by]
+            .filter(([, m]) => m > 0.05)
+            .sort((a, b) => (a[0] ?? 99) - (b[0] ?? 99))
+            .map(([sh, m]) => `S${sh ?? '?'} ${Math.round(m)}′`)
+            .join(' · ')
+        }
+      : undefined
   const prevItems = useMemo(() => new Map((prevOk ? (pb?.items ?? []) : []).map((i) => [i.key, i])), [pb, prevOk])
   const selectable = useMemo(() => new Set(items.map((i) => i.key)), [items])
 
@@ -264,65 +288,70 @@ function BridgePage() {
             </button>
           </div>
 
-          {/* Göstergeler: 180° yarım daire, altında süreler (planlamacı, 2026-10-13). */}
-          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-5">
-            <GaugeTile
-              label="OEE"
-              value={b!.oee}
-              delta={delta(b!.oee, pb?.oee)}
-              color="var(--viz-3)"
-              lines={[
-                ['Loading time', hours(b!.totals.loading)],
-                ['Effective time', hours(b!.totals.effective)],
-              ]}
-              strong
-            />
-            <GaugeTile
-              label={`Availability${config.lossGroups.some((g) => g.family === 'performance') ? ' (bridge split)' : ''}`}
-              value={b!.availability}
-              delta={delta(b!.availability, pb?.availability)}
-              color={FAMILY_SWATCH.availability}
-              lines={[
-                ['Production time', hours(b!.totals.production)],
-                ['÷ Loading time', hours(b!.totals.loading)],
-              ]}
-            />
-            <GaugeTile
-              label="Performance"
-              value={b!.performance}
-              delta={delta(b!.performance, pb?.performance)}
-              color={FAMILY_SWATCH.performance}
-              lines={[
-                ['Operation time', hours(b!.totals.operating)],
-                ['÷ Production time', hours(b!.totals.production)],
-              ]}
-            />
-            <GaugeTile
-              label="Quality"
-              value={b!.quality}
-              delta={delta(b!.quality, pb?.quality)}
-              color={FAMILY_SWATCH.quality}
-              lines={[
-                ['Effective time', hours(b!.totals.effective)],
-                ['÷ Operation time', hours(b!.totals.operating)],
-              ]}
-            />
-            {priority ? (
-              <button
-                type="button"
-                onClick={() => setPicked(priority.key)}
-                className="col-span-2 rounded-xl border-2 border-destructive/60 bg-destructive/5 p-3 text-left lg:col-span-1"
-              >
-                <p className="text-[11px] font-bold tracking-wide text-destructive uppercase">Priority · {FAMILY_LABEL[priority.family]}</p>
-                <p className="mt-0.5 truncate text-lg font-bold text-foreground">{priority.label}</p>
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  {pctOf(priority.share)} of loading · {hours(priority.minutes)}
-                  {prevPriority && ` · before ${pctOf(prevPriority.share)}`}
-                </p>
-              </button>
-            ) : (
-              <Tile label="Priority" value="—" sub="no attackable loss" />
-            )}
+          {/* Göstergeler yarı boyda solda tek blok; sağda "Pay Attention" (Aksiyonlar sunumu, 2026-10-14). */}
+          <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <section className="min-w-0 rounded-xl border border-border p-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <GaugeTile
+                  label="OEE"
+                  value={b!.oee}
+                  delta={delta(b!.oee, pb?.oee)}
+                  color="var(--viz-3)"
+                  lines={[
+                    ['Loading', hours(b!.totals.loading)],
+                    ['Effective', hours(b!.totals.effective)],
+                  ]}
+                  strong
+                />
+                <GaugeTile
+                  label={`Availability${config.lossGroups.some((g) => g.family === 'performance') ? ' (bridge)' : ''}`}
+                  value={b!.availability}
+                  delta={delta(b!.availability, pb?.availability)}
+                  color={FAMILY_SWATCH.availability}
+                  lines={[
+                    ['Production', hours(b!.totals.production)],
+                    ['÷ Loading', hours(b!.totals.loading)],
+                  ]}
+                />
+                <GaugeTile
+                  label="Performance"
+                  value={b!.performance}
+                  delta={delta(b!.performance, pb?.performance)}
+                  color={FAMILY_SWATCH.performance}
+                  lines={[
+                    ['Operation', hours(b!.totals.operating)],
+                    ['÷ Production', hours(b!.totals.production)],
+                  ]}
+                />
+                <GaugeTile
+                  label="Quality"
+                  value={b!.quality}
+                  delta={delta(b!.quality, pb?.quality)}
+                  color={FAMILY_SWATCH.quality}
+                  lines={[
+                    ['Effective', hours(b!.totals.effective)],
+                    ['÷ Operation', hours(b!.totals.operating)],
+                  ]}
+                />
+              </div>
+              {priority ? (
+                <button
+                  type="button"
+                  onClick={() => setPicked(priority.key)}
+                  className="mt-2 flex w-full flex-wrap items-baseline gap-x-2 rounded-lg border-2 border-destructive/60 bg-destructive/5 px-3 py-1.5 text-left"
+                >
+                  <span className="text-[11px] font-bold tracking-wide text-destructive uppercase">Priority · {FAMILY_LABEL[priority.family]}</span>
+                  <span className="text-sm font-bold text-foreground">{priority.label}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {pctOf(priority.share)} of loading · {hours(priority.minutes)}
+                    {prevPriority && ` · before ${pctOf(prevPriority.share)}`}
+                  </span>
+                </button>
+              ) : (
+                <p className="mt-2 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground">Priority: — no attackable loss</p>
+              )}
+            </section>
+            <PayAttention />
           </div>
 
           {/* Köprü yarım genişlikte; yanında tıklanan adımın ayrıntısı (planlamacı, 2026-10-13). */}
@@ -381,6 +410,9 @@ function BridgePage() {
                       unit={selectedItem.family === 'quality' ? 'pcs' : 'min'}
                       showMttr={selectedItem.groups.length > 0}
                       compact
+                      shift={shiftCell}
+                      onRow={activeView === 'reason' && stopDetail ? (r) => setReason(reason === r.label ? null : r.label) : undefined}
+                      activeKey={pickedReason}
                       action={
                         activeView === 'part' && followUp
                           ? (r) =>
@@ -405,8 +437,15 @@ function BridgePage() {
                     </p>
                   )}
                 </div>
-                {partRows.length > 0 && (
-                  <PartHours rows={partRows} total={selectedItem.minutes} onMore={() => setView('part')} onPick={followUp} />
+                {activeView === 'reason' && stopDetail && (
+                  <p className="mt-1 text-[11px] text-muted-foreground print:hidden">
+                    Click an item: below, which part (reference) and which shift it was lost in.
+                  </p>
+                )}
+                {pickedReason ? (
+                  <ReasonParts reason={pickedReason} rows={reasonParts} onClear={() => setReason(null)} />
+                ) : (
+                  partRows.length > 0 && <PartHours rows={partRows} total={selectedItem.minutes} onMore={() => setView('part')} onPick={followUp} />
                 )}
                 <ActionLinks item={selectedItem} canOpen={canOpen} />
               </section>
@@ -417,8 +456,9 @@ function BridgePage() {
             )}
           </div>
 
-          {/* Level 2 (OEE dağılımı ve Level 1 kaldırıldı, planlamacı 2026-10-13). */}
-          <div className="mt-4">
+          {/* Level 2 ve köprü tablosu hesapta duruyor, ekranda gösterilmez: üstteki
+              grafik aynısını veriyor (Aksiyonlar sunumu, 2026-10-14). */}
+          <div className="mt-4" hidden>
             <section className="min-w-0 rounded-xl border border-border p-4">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Level 2 — losses, % of loading</p>
@@ -431,7 +471,7 @@ function BridgePage() {
           </div>
 
           {/* Tablo */}
-          <details className="mt-4 rounded-xl border border-border p-4">
+          <details className="mt-4 rounded-xl border border-border p-4" hidden>
             <summary className="cursor-pointer text-sm font-semibold text-foreground">Bridge table</summary>
             <div className="mt-2 overflow-x-auto">
               <table className="w-full text-xs">
@@ -485,6 +525,7 @@ function BridgePage() {
   )
 }
 
+/** Yarı boy gösterge (Aksiyonlar sunumu, 2026-10-14): dört gösterge sol blokta yan yana. */
 function GaugeTile({
   label,
   value,
@@ -501,26 +542,26 @@ function GaugeTile({
   strong?: boolean
 }) {
   return (
-    <div className={`rounded-xl border p-3 ${strong ? 'border-[var(--viz-3)]/50 bg-emerald-50/50' : 'border-border'}`}>
-      <p className="flex items-baseline justify-between gap-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+    <div className={`min-w-0 rounded-lg border px-2 py-1.5 ${strong ? 'border-[var(--viz-3)]/50 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-border'}`}>
+      <p className="flex items-baseline justify-between gap-1 text-[10px] font-bold tracking-wide text-foreground uppercase">
         <span className="truncate">{label}</span>
         {delta !== null && Math.abs(delta) >= 0.05 && (
           <span
-            className={`text-xs font-semibold normal-case tabular-nums ${delta > 0 ? 'text-emerald-700' : 'text-destructive'}`}
+            className={`text-[10px] font-semibold normal-case tabular-nums ${delta > 0 ? 'text-emerald-700' : 'text-destructive'}`}
             title="Change against the previous period (points)"
           >
             {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}
           </span>
         )}
       </p>
-      <div className="mt-1">
+      <div className="mx-auto max-w-[120px]">
         <Gauge value={value} color={color} label={label} />
       </div>
-      <p className="-mt-1 text-center text-2xl font-bold text-foreground tabular-nums">{pctOf(value)}</p>
-      <dl className="mt-1 space-y-0.5 text-[11px]">
+      <p className="-mt-1 text-center text-lg font-bold text-foreground tabular-nums">{pctOf(value)}</p>
+      <dl className="mt-0.5 space-y-0 text-[10px] leading-tight">
         {lines.map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">{k}</dt>
+          <div key={k} className="flex justify-between gap-1">
+            <dt className="truncate text-muted-foreground">{k}</dt>
             <dd className="font-semibold text-foreground tabular-nums">{v}</dd>
           </div>
         ))}
@@ -529,55 +570,94 @@ function GaugeTile({
   )
 }
 
-function Tile({
-  label,
-  value,
-  sub,
-  delta,
-  strong,
-}: {
-  label: string
-  value: string
-  sub?: string
-  delta?: number | null
-  strong?: boolean
-}) {
+/** "Pay Attention": ileride dikkat edilecek bilgilerle dolacak (şimdilik boş — planlamacı, 2026-10-14). */
+function PayAttention() {
   return (
-    <div className={`rounded-xl border p-3 ${strong ? 'border-[var(--viz-3)]/50 bg-emerald-50/50' : 'border-border'}`}>
-      <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-0.5 flex items-baseline gap-2">
-        <span className="text-2xl font-bold text-foreground tabular-nums">{value}</span>
-        {delta !== undefined && delta !== null && Math.abs(delta) >= 0.05 && (
-          <span
-            className={`text-xs font-semibold tabular-nums ${delta > 0 ? 'text-emerald-700' : 'text-destructive'}`}
-            title="Change against the previous period (points)"
-          >
-            {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}
-          </span>
-        )}
-      </p>
-      {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
+    <section className="flex min-h-[9rem] min-w-0 flex-col rounded-xl border-2 border-amber-400/70 bg-amber-50/60 p-3 dark:bg-amber-950/20">
+      <h3 className="text-sm font-bold tracking-wide text-amber-900 uppercase dark:text-amber-200">Pay Attention</h3>
+      <p className="mt-auto text-xs text-amber-900/60 dark:text-amber-200/60">Nothing here yet.</p>
+    </section>
+  )
+}
+
+/** Seçilen nedenin hangi parçada (referans), hangi makinede, hangi vardiyada kaybettirdiği. */
+function ReasonParts({
+  reason,
+  rows,
+  onClear,
+}: {
+  reason: string
+  rows: { material: string; workCenter: string; shift: number | null; count: number; minutes: number }[]
+  onClear: () => void
+}) {
+  const total = rows.reduce((a, r) => a + r.minutes, 0)
+  return (
+    <div className="mt-3 border-t border-border pt-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xs font-semibold text-foreground">
+          Hours by part (MATERIAL) · <span className="text-sky-800 dark:text-sky-300">{reason}</span>
+        </p>
+        <button type="button" onClick={onClear} className="text-[11px] text-muted-foreground underline underline-offset-2 print:hidden">
+          All items
+        </button>
+      </div>
+      {rows.length === 0 ? (
+        <p className="mt-1 text-xs text-muted-foreground">No downtime rows for this item.</p>
+      ) : (
+        <table className="mt-1.5 w-full text-xs">
+          <thead className="text-muted-foreground">
+            <tr className="border-b border-border">
+              <th className="py-1 pr-2 text-left font-medium">Part (reference)</th>
+              <th className="py-1 pr-2 text-left font-medium">Work center</th>
+              <th className="py-1 pr-2 text-left font-medium">Shift</th>
+              <th className="py-1 pr-2 text-right font-medium">Stops</th>
+              <th className="py-1 pr-2 text-right font-medium">Time</th>
+              <th className="py-1 text-right font-medium">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 12).map((r) => (
+              <tr key={`${r.workCenter}|${r.material}|${r.shift ?? ''}`} className="border-b border-border/60 last:border-0">
+                <td className="py-1 pr-2 font-semibold text-foreground">{r.material}</td>
+                <td className="py-1 pr-2 text-muted-foreground">{r.workCenter}</td>
+                <td className="py-1 pr-2 tabular-nums">{r.shift ? `Shift ${r.shift}` : '—'}</td>
+                <td className="py-1 pr-2 text-right tabular-nums">{r.count}</td>
+                <td className="py-1 pr-2 text-right font-semibold tabular-nums">{hours(r.minutes)}</td>
+                <td className="py-1 text-right tabular-nums text-muted-foreground">{total > 0 ? pctOf(r.minutes / total, 0) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }
 
-/** Yan panelin başı: adımın payı, süresi, önceki dönem ve duruş sayısı. */
+/**
+ * Yan panelin başı: solda aile ve adım, hemen yanında payı, süresi, duruş
+ * sayısı ve MTTR — kalın başlıklarla (Aksiyonlar sunumu, 2026-10-14).
+ */
 function StepHeader({ item, previous, rows }: { item: LossItem; previous?: LossItem; rows: Level3Row[] }) {
   const count = rows.reduce((a, r) => a + r.count, 0)
   const delta = previous ? (item.share - previous.share) * 100 : null
   const isStops = item.groups.length > 0
+  const stat = 'min-w-[4.5rem] rounded-md bg-muted/60 px-2 py-1'
+  const dt = 'text-[10px] font-bold tracking-wide text-foreground uppercase'
+  const dd = 'text-sm font-bold text-foreground tabular-nums'
   return (
-    <div>
-      <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-        <span className="h-2.5 w-2.5 rounded-sm" style={{ background: FAMILY_SWATCH[item.family] }} />
-        {FAMILY_LABEL[item.family]}
-        {item.priority && <span className="rounded bg-destructive px-1 py-px text-[9px] font-bold text-white">PRIORITY</span>}
-      </p>
-      <p className="mt-0.5 text-lg font-bold text-foreground">{item.label}</p>
-      <dl className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
-        <div>
-          <dt className="text-muted-foreground">% of loading</dt>
-          <dd className="font-semibold text-foreground tabular-nums">
+    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-foreground uppercase">
+          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: FAMILY_SWATCH[item.family] }} />
+          {FAMILY_LABEL[item.family]}
+          {item.priority && <span className="rounded bg-destructive px-1 py-px text-[9px] font-bold text-white">PRIORITY</span>}
+        </p>
+        <p className="mt-0.5 text-xl font-bold text-foreground">{item.label}</p>
+      </div>
+      <dl className="flex flex-wrap gap-1.5">
+        <div className={stat}>
+          <dt className={dt}>% of loading</dt>
+          <dd className={dd}>
             {pctOf(item.share)}
             {delta !== null && Math.abs(delta) >= 0.05 && (
               // Kayıp arttıysa kötü.
@@ -587,19 +667,17 @@ function StepHeader({ item, previous, rows }: { item: LossItem; previous?: LossI
             )}
           </dd>
         </div>
-        <div>
-          <dt className="text-muted-foreground">Time</dt>
-          <dd className="font-semibold text-foreground tabular-nums">{hours(item.minutes)}</dd>
+        <div className={stat}>
+          <dt className={dt}>Time</dt>
+          <dd className={dd}>{hours(item.minutes)}</dd>
         </div>
-        <div>
-          <dt className="text-muted-foreground">{item.family === 'quality' ? 'Pieces' : 'Stops'}</dt>
-          <dd className="font-semibold text-foreground tabular-nums">{count ? count.toLocaleString('en-GB') : '—'}</dd>
+        <div className={stat}>
+          <dt className={dt}>{item.family === 'quality' ? 'Pieces' : 'Stops'}</dt>
+          <dd className={dd}>{count ? count.toLocaleString('en-GB') : '—'}</dd>
         </div>
-        <div>
-          <dt className="text-muted-foreground">{isStops ? 'MTTR' : 'Previous'}</dt>
-          <dd className="font-semibold text-foreground tabular-nums">
-            {isStops ? (count ? `${(item.minutes / count).toFixed(1)} min` : '—') : previous ? pctOf(previous.share) : '—'}
-          </dd>
+        <div className={stat}>
+          <dt className={dt}>{isStops ? 'MTTR' : 'Previous'}</dt>
+          <dd className={dd}>{isStops ? (count ? `${(item.minutes / count).toFixed(1)} min` : '—') : previous ? pctOf(previous.share) : '—'}</dd>
         </div>
       </dl>
     </div>
@@ -690,12 +768,13 @@ function ActionLinks({ item, canOpen }: { item: LossItem; canOpen: (p: string) =
     links.push(
       { to: '/die-followup/problems', label: 'Die problems' },
       { to: '/machine-followup/breakdowns', label: 'Machine breakdowns' },
-      { to: '/oee/losses', label: 'Losses Trend (setups, MTTR / MTBF)' },
+      { to: '/oee/mttr', label: 'MTTR & MTBF' },
+      { to: '/oee/losses', label: 'Losses Trend (setups)' },
     )
   } else if (item.family === 'performance') {
     links.push({
-      to: '/oee/losses',
-      label: 'Losses Trend (worst dies, speed loss)',
+      to: '/oee/dies',
+      label: 'Dies OEE Trend (worst dies, speed loss)',
     })
   } else if (item.family === 'quality') {
     links.push({ to: '/die-followup/problems', label: 'Die problems' })
