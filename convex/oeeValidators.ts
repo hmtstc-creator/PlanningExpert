@@ -109,6 +109,18 @@ export const lossDayFields = {
   reasons: v.optional(cells),
 }
 
+/**
+ * Gün × iş merkezi duruş süresi histogramı (MTTR / MTBF eşikleri ve süre
+ * kovaları): [rc1, rc2, metin, tam dakika dilimi, adet, dakika]
+ * (src/lib/oeeReliability.ts).
+ */
+export const stopDayFields = {
+  date: v.string(),
+  costCenter: v.string(),
+  workCenter: v.string(),
+  bins: cells,
+}
+
 /** Daily KPI satırı (ilk kurulum geçmişi). */
 export const dailyFields = {
   date: v.string(),

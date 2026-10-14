@@ -21,6 +21,8 @@ export interface ReportLoss {
   /** Loading time'a oranı (0–1). */
   share: number
   count: number
+  /** Kalemin Reason Code 2 kodları (duruş kalemlerinde; ayrıntı paneli için). */
+  groups: string[]
   /** En çok kayıp veren malzemeler (MATERIAL / Material - Key). */
   parts: ReportPart[]
 }
@@ -47,7 +49,7 @@ function lossOf(item: LossItem, set: Level3Set, c: OeeConfig, topParts: number, 
     .filter((r) => r.minutes > 0.05)
     .slice(0, topParts)
     .map((r) => ({ label: r.label, minutes: r.minutes, ...(r.sub && r.sub !== workCenter && { sub: r.sub }) }))
-  return { key: item.key, label: item.label, family: item.family, minutes: item.minutes, share: item.share, count: item.count, parts }
+  return { key: item.key, label: item.label, family: item.family, minutes: item.minutes, share: item.share, count: item.count, groups: item.groups, parts }
 }
 
 /** Bir veri kümesinin raporu: kayıp kalemleri köprüdeki gibi, malzemeleri parça kırılımından. */

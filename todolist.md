@@ -420,6 +420,13 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 - [ ] **P2 — Bildirim yok.** Alarm, geciken iş ya da kalıp ömrü için
   e-posta / mobil bildirim yok; kullanıcı sayfayı açınca görüyor.
 
+## OEE — Aksiyonlar sunumu (2026-10-14)
+
+- [x] ✅ 8 slaytın hepsi uygulandı; ayrıntı ve slayt × yapılan tablosu: docs/oeedashboard.md → "Aksiyonlar sunumu".
+- [ ] **[S]** Yayından sonra OEE veri yetkisiyle bir OEE sayfasını bir kez aç: eski duruşların süre histogramı kurulur (MTTR & MTBF'in yıl / 10 hafta tabloları bununla dolar).
+- [ ] **[S]** Chrome'da "Save as PDF" hedefi için bir kez Masaüstü klasörünü seç (tarayıcı dosyayı kendisi masaüstüne yazamaz; ad hazır gelir).
+- [ ] **[K]** Loss Bridge → "Pay Attention" bloğunun içeriği (şimdilik boş).
+
 ## 5. Yönetici gözüyle değerlendirme — CEO ve üretim direktörü (2026-10-05)
 
 Soru: "Bu programı açtığımda bugün neye karar vermem gerektiğini, neden ve

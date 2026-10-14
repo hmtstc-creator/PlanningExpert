@@ -111,7 +111,7 @@ export function bridgeBars(b: Bridge): Bar[] {
 const PAD_L = 48
 const PAD_R = 12
 const PAD_T = 64
-const PAD_B = 104
+const PAD_B = 118
 
 /** Tooltip içeriği (her iki yerleşimde aynı). */
 function StepTip({ step, base }: { step: BridgeStep; base: number }) {
@@ -187,7 +187,7 @@ interface LayoutProps {
 
 function BridgeColumns({ width, bars, bridge, selected, onSelect, selectable, priority }: LayoutProps & { width: number }) {
   const [hover, setHover] = useState<number | null>(null)
-  const height = 420
+  const height = 440
   const max = Math.max(1, ...bars.map((b) => b.hi))
   const min = Math.min(0, ...bars.map((b) => b.lo))
   const plotH = height - PAD_T - PAD_B
@@ -301,12 +301,13 @@ function BridgeColumns({ width, bars, bridge, selected, onSelect, selectable, pr
                 x={x(i)}
                 y={height - PAD_B + 12}
                 textAnchor="end"
-                fontSize={10.5}
-                fontWeight={isLoss ? 400 : 700}
-                fill="var(--viz-axis)"
+                fontSize={13}
+                fontWeight={isLoss ? 600 : 700}
+                fill="var(--viz-value)"
                 transform={`rotate(-40 ${x(i)} ${height - PAD_B + 12})`}
               >
-                {b.step.label.length > 22 ? `${b.step.label.slice(0, 21)}…` : b.step.label}
+                {/* Okunur eksen yazıları: STP, YNT … (Aksiyonlar sunumu, 2026-10-14). */}
+                {b.step.label.length > 18 ? `${b.step.label.slice(0, 17)}…` : b.step.label}
               </text>
             </g>
           )
@@ -505,6 +506,9 @@ export function Level3Table({
   showMttr,
   action,
   compact,
+  shift,
+  onRow,
+  activeKey,
 }: {
   rows: Level3Row[]
   total: number
@@ -515,6 +519,11 @@ export function Level3Table({
   action?: (r: Level3Row) => ReactNode
   /** Dar panel: çubuk ve kümülatif sütunu yok. */
   compact?: boolean
+  /** Vardiya sütunu (hangi vardiyada; ham duruşlardan, en çok 8 gün). */
+  shift?: (r: Level3Row) => ReactNode
+  /** Satıra tıklayınca (ör. Hours by part o kaleme süzülür). */
+  onRow?: (r: Level3Row) => void
+  activeKey?: string | null
 }) {
   const max = Math.max(1e-9, ...rows.map((r) => Math.abs(r.minutes)))
   let cum = 0
@@ -525,6 +534,7 @@ export function Level3Table({
           <tr className="border-b border-border">
             <th className="py-1.5 pr-2 text-left font-medium">#</th>
             <th className="py-1.5 pr-2 text-left font-medium">Item</th>
+            {shift && <th className="py-1.5 pr-2 text-left font-medium">Shift</th>}
             {!compact && <th className="w-[35%] py-1.5 pr-2 font-medium" />}
             {base ? <th className="py-1.5 pr-2 text-right font-medium">% of loading</th> : null}
             <th className="py-1.5 pr-2 text-right font-medium">Time</th>
@@ -546,7 +556,11 @@ export function Level3Table({
             cum += r.minutes
             const isOthers = r.key === '__others'
             return (
-              <tr key={r.key} className="border-b border-border/60 last:border-0">
+              <tr
+                key={r.key}
+                onClick={onRow && !isOthers ? () => onRow(r) : undefined}
+                className={`border-b border-border/60 last:border-0 ${onRow && !isOthers ? 'cursor-pointer hover:bg-muted/60' : ''} ${activeKey === r.key ? 'bg-sky-100/70 dark:bg-sky-900/30' : ''}`}
+              >
                 <td className="py-1.5 pr-2 tabular-nums text-muted-foreground">{isOthers ? '' : i + 1}</td>
                 <td className="py-1.5 pr-2">
                   <span className={i === 0 && !isOthers ? 'font-semibold text-foreground' : 'text-foreground'}>{r.label}</span>
@@ -555,6 +569,7 @@ export function Level3Table({
                     <span className="ml-1.5 rounded bg-destructive px-1 py-px text-[9px] font-bold text-white">PRIORITY</span>
                   )}
                 </td>
+                {shift && <td className="py-1.5 pr-2 whitespace-nowrap text-muted-foreground tabular-nums">{isOthers ? '' : shift(r)}</td>}
                 {!compact && (
                   <td className="py-1.5 pr-2">
                     <span

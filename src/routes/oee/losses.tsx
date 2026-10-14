@@ -1,10 +1,14 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { Legend, LineTrendChart, StackedShareChart, pct } from '../../components/OeeCharts'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { InfoTip, PageHeader } from '../../components/PageHeader'
+import { PrintA4Button, PrintFilterHeader } from '../../components/OeePrint'
+import { dm } from '../../components/OeePeriodControl'
+import { ddmmyy } from '../../lib/oeeFilters'
+import { printSheet } from '../../lib/printSheet'
 import { useQuery } from '../../lib/convexTransport'
 import {
   BREAK_KEY,
@@ -14,8 +18,6 @@ import {
   chartGroups,
   chartShare,
   visibleChartGroups,
-  costCentersOf,
-  dieTable,
   groupLabel,
   inScope,
   isoWeek,
@@ -23,7 +25,6 @@ import {
   lossCoverage,
   lossForPeriod,
   reasonPareto,
-  reliability,
   scopeLabel,
   setupAnalysis,
   startupRunOf,
@@ -123,11 +124,11 @@ function LossesPage() {
   )
   const gap = useMemo(() => weekGap(dayRows, lossDays, scope, config, sel.monday), [dayRows, lossDays, scope, config, sel.monday])
   const reasons = useMemo(() => reasonPareto(lossDays, scope, config, sel.monday), [lossDays, scope, config, sel.monday])
-  const ccOf = useMemo(() => costCentersOf(dayRows), [dayRows])
-  const dies = useMemo(() => dieTable(orders, scope, config, sel.monday, sel.sunday, ccOf), [orders, scope, config, sel.monday, sel.sunday, ccOf])
-  const reli = useMemo(() => reliability(dayRows, lossDays, scope, config, sel.monday, sel.sunday), [dayRows, lossDays, scope, config, sel.monday, sel.sunday])
   const setups = useMemo(() => setupAnalysis(downtimes, orders, scope, config, sel.monday, sel.sunday), [downtimes, orders, scope, config, sel.monday, sel.sunday])
-  const breakdownCodes = config.lossGroups.filter((g) => g.breakdown).map((g) => g.code)
+  // A4 çıktı: adı seçili günle "GGAAYY LOSSES TREND" (Aksiyonlar sunumu, 2026-10-14).
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const fileName = `${ddmmyy(sel.date)} LOSSES TREND`
+  const filters = [label, `Date ${dm(sel.date)}`, `Week W${sel.week.week} (${dm(sel.monday)} – ${dm(sel.sunday)}) vs W${isoWeek(prevMonday).week}`]
 
   const stackParts = (b: LossBreakdown) => [
     { key: 'oee', label: 'OEE', value: b.oee ?? 0 },
@@ -136,10 +137,10 @@ function LossesPage() {
   const noData = dayRows.length === 0 && lossDays.length === 0
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
+    <div className="mx-auto w-full max-w-[297mm] px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="Losses Trend"
-        summary="Where the time goes: losses of the selected week against the week before, dies, breakdowns and setups."
+        summary="Where the time goes: losses of the selected week against the week before, top reasons and setups. Dies: Dies OEE Trend; breakdowns: MTTR & MTBF."
         links={relatedPages('/oee/losses')}
         info={
           <>
@@ -158,7 +159,12 @@ function LossesPage() {
         }
       />
 
-      <OeeControls selection={sel} rows={dayRows} config={config} />
+      <OeeControls
+        selection={sel}
+        rows={dayRows}
+        config={config}
+        actions={<PrintA4Button fileName={fileName} onPrint={() => sheetRef.current && printSheet(sheetRef.current, fileName, 'A4')} />}
+      />
       <OeeDataNotice items={coverageNotes} />
 
       {noData && (
@@ -167,106 +173,108 @@ function LossesPage() {
         </p>
       )}
 
-      <Section title={`Week W${sel.week.week} — daily % of Loading · ${label}`} note={`${sel.monday} – ${sel.sunday}`}>
-        <Legend items={[{ key: 'oee', label: 'OEE' }, ...chartColumns.map((c) => ({ key: c, label: c }))]} />
-        <StackedShareChart columns={days.map((d) => ({ key: d.key, label: d.label, parts: stackParts(d.b) }))} ariaLabel="Daily OEE and losses" />
-        <div className="mt-2 overflow-x-auto rounded-md border border-border">
-          <table className="w-full text-xs">
-            <thead className="bg-muted text-muted-foreground">
-              <tr>
-                <th className="px-2 py-1.5 text-left font-medium">% of Loading</th>
-                {days.map((d) => (
-                  <th key={d.key} className="px-2 py-1.5 text-right font-medium">{d.label}</th>
-                ))}
-                <th className="px-2 py-1.5 text-right font-medium">Week</th>
-                <th className="px-2 py-1.5 text-right font-medium">Previous</th>
-                <th className="px-2 py-1.5 text-right font-medium">Gap (pts)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[{ key: 'oee', label: 'OEE' }, ...columns.map((c) => ({ key: c, label: c }))].map((g) => {
-                const v = (b: LossBreakdown) => (g.key === 'oee' ? b.oee ?? 0 : chartShare(b, g.key))
-                const gp = gapText(v(weekCur), v(weekPrev), g.key === 'oee')
-                return (
-                  <tr key={g.key} className="border-t border-border">
-                    <td className="px-2 py-1 font-medium text-foreground">{g.label}</td>
-                    {days.map((d) => (
-                      <td key={d.key} className="px-2 py-1 text-right tabular-nums">{d.b.loadingMin > 0 ? pct(v(d.b)) : '—'}</td>
-                    ))}
-                    <td className="px-2 py-1 text-right font-semibold tabular-nums">{pct(v(weekCur))}</td>
-                    <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{pct(v(weekPrev))}</td>
-                    <td className={`px-2 py-1 text-right tabular-nums ${gp.tone}`}>{gp.text}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Section>
+      <div ref={sheetRef} className="oee-viz bg-background">
+        <PrintFilterHeader title="LOSSES TREND" filters={filters} />
+        <Section title={`Week W${sel.week.week} — daily % of Loading · ${label}`} note={`${sel.monday} – ${sel.sunday}`}>
+          <Legend items={[{ key: 'oee', label: 'OEE' }, ...chartColumns.map((c) => ({ key: c, label: c }))]} />
+          <StackedShareChart columns={days.map((d) => ({ key: d.key, label: d.label, parts: stackParts(d.b) }))} ariaLabel="Daily OEE and losses" />
+          <div className="mt-2 overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1.5 text-left font-medium">% of Loading</th>
+                  {days.map((d) => (
+                    <th key={d.key} className="px-2 py-1.5 text-right font-medium">{d.label}</th>
+                  ))}
+                  <th className="px-2 py-1.5 text-right font-medium">Week</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Previous</th>
+                  <th className="px-2 py-1.5 text-right font-medium">Gap (pts)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[{ key: 'oee', label: 'OEE' }, ...columns.map((c) => ({ key: c, label: c }))].map((g) => {
+                  const v = (b: LossBreakdown) => (g.key === 'oee' ? b.oee ?? 0 : chartShare(b, g.key))
+                  const gp = gapText(v(weekCur), v(weekPrev), g.key === 'oee')
+                  return (
+                    <tr key={g.key} className="border-t border-border">
+                      <td className="px-2 py-1 font-medium text-foreground">{g.label}</td>
+                      {days.map((d) => (
+                        <td key={d.key} className="px-2 py-1 text-right tabular-nums">{d.b.loadingMin > 0 ? pct(v(d.b)) : '—'}</td>
+                      ))}
+                      <td className="px-2 py-1 text-right font-semibold tabular-nums">{pct(v(weekCur))}</td>
+                      <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{pct(v(weekPrev))}</td>
+                      <td className={`px-2 py-1 text-right tabular-nums ${gp.tone}`}>{gp.text}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Section>
 
-      <Section title={`Week gap by work center and cost center — W${sel.week.week} vs W${isoWeek(prevMonday).week}`} info="Each cell: this week's loss share, and the change against the previous week in percentage points.">
-        <div className="overflow-x-auto rounded-md border border-border">
-          <table className="w-full text-xs">
-            <thead className="bg-muted text-muted-foreground">
-              <tr>
-                <th className="px-2 py-1.5 text-left font-medium">Machine / cost center</th>
-                <th className="px-2 py-1.5 text-right font-medium">OEE</th>
-                {columns.map((c) => (
-                  <th key={c} className="px-2 py-1.5 text-right font-medium">{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {gap.map((r) => {
-                const oeeGap = gapText(r.current.oee ?? 0, r.previous.oee ?? 0, true)
-                return (
-                  <tr key={r.key} className={`border-t border-border ${r.isGroup ? 'bg-muted/40 font-semibold' : ''}`}>
-                    <td className="whitespace-nowrap px-2 py-1 text-foreground">{r.label}</td>
-                    <td className="px-2 py-1 text-right tabular-nums">
-                      {pct(r.current.oee)}{' '}
-                      <span className={`text-[10px] ${oeeGap.tone}`}>
-                        {r.previous.loadingMin > 0 ? oeeGap.text : ''}
-                      </span>
-                    </td>
-                    {columns.map((col) => {
-                      const cur = chartShare(r.current, col)
-                      const gp = gapText(cur, chartShare(r.previous, col))
-                      return (
-                        <td key={col} className="px-2 py-1 text-right tabular-nums">
-                          {r.current.loadingMin > 0 ? pct(cur) : '—'}{' '}
-                          <span className={`text-[10px] ${gp.tone}`}>{r.previous.loadingMin > 0 ? gp.text : ''}</span>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Section>
+        <Section title={`Week gap by work center and cost center — W${sel.week.week} vs W${isoWeek(prevMonday).week}`} info="Each cell: this week's loss share, and the change against the previous week in percentage points.">
+          <div className="overflow-x-auto rounded-md border border-border">
+            <table className="w-full text-xs">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1.5 text-left font-medium">Machine / cost center</th>
+                  <th className="px-2 py-1.5 text-right font-medium">OEE</th>
+                  {columns.map((c) => (
+                    <th key={c} className="px-2 py-1.5 text-right font-medium">{c}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {gap.map((r) => {
+                  const oeeGap = gapText(r.current.oee ?? 0, r.previous.oee ?? 0, true)
+                  return (
+                    <tr key={r.key} className={`border-t border-border ${r.isGroup ? 'bg-muted/40 font-semibold' : ''}`}>
+                      <td className="whitespace-nowrap px-2 py-1 text-foreground">{r.label}</td>
+                      <td className="px-2 py-1 text-right tabular-nums">
+                        {pct(r.current.oee)}{' '}
+                        <span className={`text-[10px] ${oeeGap.tone}`}>
+                          {r.previous.loadingMin > 0 ? oeeGap.text : ''}
+                        </span>
+                      </td>
+                      {columns.map((col) => {
+                        const cur = chartShare(r.current, col)
+                        const gp = gapText(cur, chartShare(r.previous, col))
+                        return (
+                          <td key={col} className="px-2 py-1 text-right tabular-nums">
+                            {r.current.loadingMin > 0 ? pct(cur) : '—'}{' '}
+                            <span className={`text-[10px] ${gp.tone}`}>{r.previous.loadingMin > 0 ? gp.text : ''}</span>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Section>
 
-      <Section
-        title={`Loss trend — last ${weeksN} weeks · ${label}`}
-        info="Weeks without uploaded downtimes show only Speed (Production − Operation); the downtime groups start with the uploaded Downtimes file."
-      >
-        <Legend items={chartColumns.map((c, i) => ({ key: c, label: c, slot: i + 1 }))} />
-        <LineTrendChart
-          labels={trend.map((t) => t.label)}
-          series={chartColumns.map((col, i) => ({
-            key: col,
-            label: col,
-            // Yığılmış grafikte 1. renk OEE'nin; kayıplar aynı renkleri korur.
-            slot: i + 1,
-            values: trend.map((t) => (t.b.loadingMin > 0 && (t.hasDowntime || col === SPEED) ? chartShare(t.b, col) : null)),
-          }))}
-          ariaLabel="Weekly loss trend"
-        />
-      </Section>
+        <Section
+          title={`Loss trend — last ${weeksN} weeks · ${label}`}
+          info="Weeks without uploaded downtimes show only Speed (Production − Operation); the downtime groups start with the uploaded Downtimes file."
+        >
+          <Legend items={chartColumns.map((c, i) => ({ key: c, label: c, slot: i + 1 }))} />
+          <LineTrendChart
+            labels={trend.map((t) => t.label)}
+            series={chartColumns.map((col, i) => ({
+              key: col,
+              label: col,
+              // Yığılmış grafikte 1. renk OEE'nin; kayıplar aynı renkleri korur.
+              slot: i + 1,
+              values: trend.map((t) => (t.b.loadingMin > 0 && (t.hasDowntime || col === SPEED) ? chartShare(t.b, col) : null)),
+            }))}
+            ariaLabel="Weekly loss trend"
+          />
+        </Section>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <Section title="Top downtime reasons" note={`W${sel.week.week}, counted as loss`} flush>
+        <Section title="Top downtime reasons" note={`W${sel.week.week}, counted as loss`}>
           <SimpleTable
+            fit
             head={['Reason', 'Group', 'Count', 'This week', 'Previous', 'Change']}
             rows={reasons.slice(0, config.topN || reasons.length).map((r) => {
               const d = r.minutes - r.previousMinutes
@@ -283,75 +291,15 @@ function LossesPage() {
               ]
             })}
           />
+          <p className="mt-2 text-xs text-muted-foreground print:hidden">
+            Breakdowns (MTTR and MTBF): <Link to="/oee/mttr" className="underline">MTTR &amp; MTBF</Link> · Dies:{' '}
+            <Link to="/oee/dies" className="underline">Dies OEE Trend</Link>
+          </p>
         </Section>
 
-        <Section
-          title="Breakdowns — MTTR and MTBF"
-          note={`W${sel.week.week}`}
-          flush
-          info="MTTR = breakdown minutes ÷ breakdowns (average repair). MTBF = production time ÷ breakdowns (average running time between two breakdowns). The loss groups shown here are ticked as 'breakdown' on OEE Settings."
-        >
-          {breakdownCodes.length === 0 ? (
-            <p className="mt-2 text-xs text-muted-foreground">
-              No loss group is marked as a breakdown on <Link to="/oee/settings" className="underline">Settings</Link>.
-            </p>
-          ) : (
-            <SimpleTable
-              head={['Machine', ...breakdownCodes.flatMap((c) => [`${groupLabel(c, config)} — count`, 'min', 'MTTR', 'MTBF'])]}
-              rows={reli.map((r) => [
-                r.workCenter,
-                ...breakdownCodes.flatMap((c) => {
-                  const g = r.groups[c]
-                  return [String(g.count), minutes(g.minutes), g.mttrMin === null ? '—' : minutes(g.mttrMin), g.mtbfMin === null ? '—' : minutes(g.mtbfMin)]
-                }),
-              ])}
-            />
-          )}
-        </Section>
+        <SetupSection area={scope.area} setups={setups} week={sel.week.week} loaded={downRaw.length > 0} config={config} />
       </div>
-
-      <DieSection dies={dies} week={sel.week.week} top={config.topN || 10} />
-
-      <SetupSection area={scope.area} setups={setups} week={sel.week.week} loaded={downRaw.length > 0} config={config} />
     </div>
-  )
-}
-
-function DieSection({ dies, week, top }: { dies: ReturnType<typeof dieTable>; week: number; top: number }) {
-  const [press, setPress] = useState('all')
-  const presses = [...new Set(dies.map((d) => d.workCenter))].sort()
-  const list = dies.filter((d) => press === 'all' || d.workCenter === press)
-  const worst = [...list].filter((d) => d.weightedOee !== null).sort((a, b) => a.weightedOee! - b.weightedOee!).slice(0, top)
-  const speed = [...list].sort((a, b) => b.speedLossMin - a.speedLossMin).filter((d) => d.speedLossMin > 0).slice(0, top)
-  return (
-    <section className="mt-6 rounded-lg border border-border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          Dies — W{week}
-          <InfoTip label="About die OEE">
-            Die OEE is weighted by good quantity, as in the file: Σ(OEE × good) ÷ Σ good (Order Based KPI,
-            TOTAL1). Speed loss = Production − Operation time of the die's orders.
-          </InfoTip>
-        </h2>
-        <PressPicker presses={presses} value={press} onChange={setPress} />
-      </div>
-      <div className="mt-2 grid gap-4 xl:grid-cols-2">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground">Worst {top} dies by OEE</p>
-          <SimpleTable
-            head={['Die', 'Press', 'Orders', 'Good', 'Loading', 'OEE']}
-            rows={worst.map((d) => [d.equipment || '(no die)', d.workCenter, String(d.orders), d.good.toLocaleString('en-GB'), minutes(d.loadingMin), pct(d.weightedOee)])}
-          />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-muted-foreground">Most speed loss</p>
-          <SimpleTable
-            head={['Die', 'Press', 'Good', 'Speed loss', 'OEE']}
-            rows={speed.map((d) => [d.equipment || '(no die)', d.workCenter, d.good.toLocaleString('en-GB'), minutes(d.speedLossMin), pct(d.weightedOee)])}
-          />
-        </div>
-      </div>
-    </section>
   )
 }
 
@@ -447,54 +395,65 @@ function SetupSection({ setups, week, loaded, config, area }: { setups: SetupRow
         </div>
       </div>
       {!loaded && <p className="mt-2 text-xs text-muted-foreground">No downtime rows for this week.</p>}
-      {summary.length > 0 && (
-        <SimpleTable
-          head={['Press', 'Setups', 'Planned', 'Unplanned', 'OK', 'NOK', 'Open', 'Avg setup', 'Avg to production', 'NOK main reasons']}
-          rows={summary.map((s) => [
-            s.press,
-            String(s.count),
-            String(s.planned),
-            String(s.unplanned),
-            <span key="ok" className="text-emerald-700">{s.ok}</span>,
-            <span key="nok" className={s.nok ? 'font-semibold text-destructive' : ''}>
-              {s.nok} ({s.count ? Math.round((s.nok / s.count) * 100) : 0}%)
-            </span>,
-            String(s.open),
-            s.avgSetup === null ? '—' : minutes(s.avgSetup),
-            s.avgToRun === null ? '—' : minutes(s.avgToRun),
-            s.reasons || '—',
-          ])}
-        />
-      )}
-      {reasonRows.length > 0 && (
-        <div className="mt-3">
-          <p className="text-xs font-medium text-muted-foreground">
-            Why NOK setups did not start {press === 'all' ? '' : `— ${press}`}
-          </p>
-          <SimpleTable
-            head={['Reason', 'Main reason of', 'Seen in NOK setups', 'Time lost after setup']}
-            rows={reasonRows.map(([k, v]) => [reasonLabel(k, config), `${v.main} setup(s)`, String(v.setups), v.lost ? minutes(v.lost) : '—'])}
-          />
-        </div>
-      )}
+      {/* Özet solda, NOK nedenleri yanında; genişlik içeriğe göre (Aksiyonlar sunumu, 2026-10-14). */}
+      <div className="flex flex-col items-start gap-4 lg:flex-row">
+        {summary.length > 0 && (
+          <div className="min-w-0">
+            <SimpleTable
+              fit
+              head={['Press', 'Setups', 'Planned', 'Unplanned', 'OK', 'NOK', 'Open', 'Avg setup', 'Avg to prod.', 'NOK main reasons']}
+              rows={summary.map((s) => [
+                s.press,
+                String(s.count),
+                String(s.planned),
+                String(s.unplanned),
+                <span key="ok" className="text-emerald-700">{s.ok}</span>,
+                <span key="nok" className={s.nok ? 'font-semibold text-destructive' : ''}>
+                  {s.nok} ({s.count ? Math.round((s.nok / s.count) * 100) : 0}%)
+                </span>,
+                String(s.open),
+                s.avgSetup === null ? '—' : minutes(s.avgSetup),
+                s.avgToRun === null ? '—' : minutes(s.avgToRun),
+                s.reasons || '—',
+              ])}
+            />
+          </div>
+        )}
+        {reasonRows.length > 0 && (
+          <div className="min-w-0">
+            <p className="mt-2 text-xs font-medium text-muted-foreground">
+              Why NOK setups did not start {press === 'all' ? '' : `— ${press}`}
+            </p>
+            <SimpleTable
+              fit
+              head={['Reason', 'Main reason of', 'Seen in NOK', 'Lost after setup']}
+              rows={reasonRows.map(([k, v]) => [reasonLabel(k, config), `${v.main} setup(s)`, String(v.setups), v.lost ? minutes(v.lost) : '—'])}
+            />
+          </div>
+        )}
+      </div>
       {list.length > 0 && (
         <div className="mt-3">
+          {/* Order ve Good yok: parça numarası yeterli, üretilen adet setup'a bağlanamaz.
+              Setup type: STP'nin alt detayı (Downtimes metni: DIE SETUP, GRIPPER SETUP …). */}
           <SimpleTable
-            head={['Press', 'Setup', 'Order', 'Die / material', 'Type', 'Setup time', 'Result', 'To production', 'Downtime after setup', 'Main reason', 'Good']}
+            fit
+            head={['Press', 'Setup', 'Part', 'Setup type', 'Kind', 'Setup time', 'Result', 'To production', 'Downtime after setup']}
             rows={list.map((s) => [
               s.workCenter,
               `${s.start.slice(5)} – ${s.end.slice(11)}`,
-              s.order,
               s.material,
+              s.texts.join(' + ') || '—',
               s.kind,
               minutes(s.setupMin),
-              <span key="r" className={STATUS[s.status].tone}>{s.status.toUpperCase()}</span>,
+              <span key="r" className={STATUS[s.status].tone}>
+                {s.status.toUpperCase()}
+                {s.mainReason ? ` · ${reasonLabel(s.mainReason, config)}` : ''}
+              </span>,
               s.timeToRunMin !== null
                 ? minutes(s.timeToRunMin)
-                : `${minutes(s.runMin)} run${s.nextSetup ? ` · next setup ${s.nextSetup.slice(5)}` : ''}`,
+                : `${minutes(s.runMin)} run${s.nextSetup ? ` · next ${s.nextSetup.slice(11)}` : ''}`,
               lostText(s.lost, config),
-              s.mainReason ? reasonLabel(s.mainReason, config) : '—',
-              s.good.toLocaleString('en-GB'),
             ])}
           />
         </div>
@@ -516,15 +475,16 @@ function PressPicker({ presses, value, onChange }: { presses: string[]; value: s
   )
 }
 
-function SimpleTable({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
+/** `fit`: tablo içeriği kadar geniş, sayfayı boydan boya kaplamaz. */
+function SimpleTable({ head, rows, fit }: { head: string[]; rows: ReactNode[][]; fit?: boolean }) {
   if (!rows.length) return <p className="mt-2 text-xs text-muted-foreground">Nothing for this week.</p>
   return (
-    <div className="mt-2 max-h-[28rem] overflow-auto rounded-md border border-border">
-      <table className="w-full text-xs">
+    <div className={`mt-2 max-h-[28rem] overflow-auto rounded-md border border-border ${fit ? 'w-fit max-w-full' : ''}`}>
+      <table className={`${fit ? 'w-auto' : 'w-full'} text-xs`}>
         <thead className="sticky top-0 bg-muted text-muted-foreground">
           <tr>
             {head.map((h) => (
-              <th key={h} className="px-2 py-1.5 text-left font-medium">{h}</th>
+              <th key={h} className={`px-2 py-1.5 text-left font-medium whitespace-nowrap ${fit ? 'pr-4' : ''}`}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -532,7 +492,12 @@ function SimpleTable({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
           {rows.map((r, i) => (
             <tr key={i} className="border-t border-border align-top">
               {r.map((c, j) => (
-                <td key={j} className={`px-2 py-1 ${j === 0 ? 'whitespace-nowrap font-medium text-foreground' : 'tabular-nums'}`}>{c}</td>
+                <td
+                  key={j}
+                  className={`px-2 py-1 ${j === 0 ? 'whitespace-nowrap font-medium text-foreground' : 'tabular-nums'} ${fit ? 'pr-4' : ''} ${fit && j < r.length - 1 ? 'whitespace-nowrap' : ''}`}
+                >
+                  {c}
+                </td>
               ))}
             </tr>
           ))}
@@ -544,7 +509,7 @@ function SimpleTable({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
 
 function Section({ title, note, info, flush, children }: { title: string; note?: string; info?: string; flush?: boolean; children: ReactNode }) {
   return (
-    <section className={`${flush ? '' : 'mt-6'} rounded-lg border border-border p-4`}>
+    <section className={`print-avoid-break ${flush ? '' : 'mt-6'} rounded-lg border border-border p-4`}>
       <h2 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold text-foreground">
         {title}
         {note && <span className="text-xs font-normal text-muted-foreground">{note}</span>}
