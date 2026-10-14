@@ -50,10 +50,12 @@ Kontrol: bot etkilenmeden kurulum için yer var mı (en az 3 GB boş RAM, 20 GB 
 
 ### 🔑 Kapı 1 — senden
 
-- Alan adları: **PORTAL_HOST** (site, ör. `portal.firma.com`) ve **API_HOST**
-  (Convex, ör. `api.portal.firma.com`). Prova için ayrıca `portal-test…` olabilir.
-- DNS: iki **A kaydı → 2.28.102.179** (PORTAL_HOST'u taşıma gecesine kadar
-  Vercel'de bırakmak istersen önce yalnızca API_HOST ve test adı).
+- Alan adı (karar 2026-10-14: ücretli alan adı yok): **sslip.io** — DNS kaydı
+  gerekmez, ad IP'ye kendiliğinden çözülür, Caddy Let's Encrypt sertifikasını alır.
+  - **PORTAL_HOST** = `portal.2-28-102-179.sslip.io`
+  - **API_HOST** = `api.2-28-102-179.sslip.io`
+  Eski adres `planningexpert.vercel.app` taşıma gecesi kapanır; kullanıcılar
+  yeni adreste bir kez yeniden giriş yapar (oturum bilgisi adrese bağlı).
 - Hetzner: Firewall (22 yalnızca senin IP'n / Hetzner konsolu, 80, 443),
   sunucu Backups açık, **Storage Box** (sunucu dışı yedek) ve VPS'in SSH
   anahtarının Storage Box'a eklenmesi.
