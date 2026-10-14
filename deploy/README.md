@@ -47,7 +47,7 @@ Ubuntu 24.04, 4 çekirdek, 7,6 GiB RAM (botlar ~5 GB; kullanılabilir ~2,6 GB), 
 66 GB boş. Docker 29 + compose var; node, caddy, unzip yok. ufw: yalnızca
 `tailscale0`. 80, 443, 3000, 3210, 6791 boş. GitHub erişimi var.
 
-### Aşama 1 — Hazırlık
+### Aşama 1 — Hazırlık ✅ (2026-10-14)
 
 ```bash
 apt-get install -y unzip                                   # yedek kontrolü için
@@ -58,18 +58,23 @@ install -d -m 700 /etc/planningexpert
 
 Kontrol: `node -v` (v22), botlar çalışıyor (`docker ps` sayısı aynı), `free -m`.
 
-### Aşama 2 — Tailscale cihazı + boş Convex
+### Aşama 2 — Tailscale cihazı + boş Convex (2026-10-14: backend ✅, Funnel onay bekliyor)
 
 ```bash
 cd /opt/planningexpert/deploy
 cp .env.example .env && chmod 600 .env     # INSTANCE_SECRET=$(openssl rand -hex 32), sürüm etiketleri
+# Giriş (🔑 Ahmet onaylar). containerboot, TS_AUTHKEY yokken 60 sn sonra yeniden
+# başlayıp her seferinde YENİ bağlantı üretir; bu yüzden ya .env'e tek kullanımlık
+# TS_AUTHKEY, ya da aynı volume'la geçici kapsayıcıda bir kez:
+#   tailscaled --tun=userspace-networking --statedir=/var/lib/tailscale &
+#   tailscale up --accept-dns=false --timeout=40m     # yalnız bu bayrak (--hostname verme)
 docker compose up -d ts
-docker compose logs ts | grep -i login      # 🔑 giriş bağlantısı → Ahmet onaylar
 docker compose exec ts tailscale status --json | grep DNSName   # → planningexpert.<tailnet>.ts.net
 # .env: CONVEX_PUBLIC_URL=https://planningexpert.<tailnet>.ts.net:8443
 docker compose up -d backend
 docker compose exec backend ./generate_admin_key.sh   # → /etc/planningexpert/portal.env (chmod 600)
-docker compose exec ts tailscale funnel status        # 🔑 Funnel kapalıysa bağlantı → Ahmet açar
+docker compose exec ts tailscale funnel status        # 🔑 tailnet'te HTTPS + Funnel kapalıysa
+# bağlantı çıkar → Ahmet açar; sonra `docker compose restart ts` (serve.json yeniden yüklenir)
 ```
 
 - `CONVEX_BACKEND_TAG`: o günkü son kararlı sürüm, `.env`'e yazılır (latest değil).
