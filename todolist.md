@@ -144,7 +144,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   - [ ] Aşama 1 — Sunucu hazırlığı (Node 22, unzip, `/opt/planningexpert`)
   - [ ] Aşama 2 — Tailscale cihazı "planningexpert" + boş Convex (SQLite, bellek
     sınırlı); 🔑 Tailscale giriş / Funnel onay bağlantıları
-  - [ ] **[S] 🔑 Kapı 2** — Convex Cloud (`perceptive-frog-787`) `prod:` anahtarını
+  - [ ] **[S] 🔑 Kapı 2** — Convex Cloud (`amiable-shrimp-598`) `prod:` anahtarını
     sunucuda `/etc/planningexpert/cloud.env`'e yaz
   - [ ] Aşama 3 — Prova: Cloud export → VPS import → `compare-exports` OK,
     giriş / OEE / plan / fotoğraf testi, süre ölçümü

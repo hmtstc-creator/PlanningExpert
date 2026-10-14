@@ -94,7 +94,7 @@ Funnel) cevap veriyor; `docker stats --no-stream` bellek sınırları; botlar et
 
 ### 🔑 Kapı 2 — Convex Cloud anahtarı
 
-Convex panel → `perceptive-frog-787` (production) → Settings → Deploy keys → **prod:**
+Convex panel → `amiable-shrimp-598` (production) → Settings → Deploy keys → **prod:**
 anahtarı. Sunucuda `/etc/planningexpert/cloud.env`'e (chmod 600) Ahmet yazar ya da
 sunucu oturumuna kendisi verir. Taşımadan sonra silinir.
 
