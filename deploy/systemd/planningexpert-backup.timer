@@ -1,5 +1,5 @@
 [Unit]
-Description=Production Portal — daily backup at 02:15
+Description=PlanningExpert — daily backup at 02:15
 
 [Timer]
 OnCalendar=*-*-* 02:15:00

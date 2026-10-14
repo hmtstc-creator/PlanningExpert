@@ -16,6 +16,12 @@ describe('CSP: Convex adresleri', () => {
     expect(o).not.toContain('wss://files.portal.example.com')
   })
 
+  it('Tailscale Funnel adresi, kapı numarasıyla', () => {
+    const o = convexOrigins('https://planningexpert.tail1234.ts.net:8443')
+    expect(o).toContain('https://planningexpert.tail1234.ts.net:8443')
+    expect(o).toContain('wss://planningexpert.tail1234.ts.net:8443')
+  })
+
   it('okunamayan adres yok sayılır', () => {
     expect(convexOrigins('not a url')).toHaveLength(3)
   })

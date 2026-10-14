@@ -1,7 +1,9 @@
 # Dağıtım (deploy) — VPS
 
 Durum (2026-10-14): site ve veritabanı Vercel + Convex Cloud'dan kendi VPS'imize
-(Hetzner CX33 "Karabasan") taşınıyor — **seçenek B**. Adım adım kitap, betikler
+(Hetzner CX33, Karabasan botuyla aynı makine) taşınıyor — **seçenek B**. Adres
+ücretsiz: Tailscale Funnel (`https://planningexpert.<tailnet>.ts.net`), sunucuda
+internete kapı açılmaz; Convex SQLite ile, bellek sınırlı. Adım adım kitap, betikler
 ve sunucu dosyaları: **[deploy/README.md](../deploy/README.md)**. Program iki
 parçadır; ikisi ayrı düşünülür:
 
@@ -66,7 +68,8 @@ kurallar ve geri dönüş: [deploy/README.md](../deploy/README.md). Özet:
 
 Öneri: müşteriye "veri bizim sunucumuzda" denecekse **B**, değilse
 geçişi hızlı yapmak için önce **A**, sonra B. **Karar (2026-10-14): B** —
-Convex de VPS'e taşınır (Postgres ile, Docker Compose: deploy/convex/).
+Convex de VPS'e taşınır (SQLite, Docker Compose: deploy/compose.yml; sunucunun
+belleği botlarla paylaşıldığı için Postgres yok).
 
 ## Yayın adımları (her iki seçenekte)
 
@@ -82,7 +85,7 @@ node .output/server/index.mjs          # systemd / pm2 ile, önünde nginx/caddy
   henüz olmayan işlevi çağırır (ekranda "function has not been pushed").
 - **A** için `CONVEX_DEPLOY_KEY` = Convex panelinden `prod:` anahtarı.
 - **B** için Convex CLI `CONVEX_SELF_HOSTED_URL` ve `CONVEX_SELF_HOSTED_ADMIN_KEY`
-  ile çalışır (`/etc/portal/portal.env`; admin anahtarı:
+  ile çalışır (`/etc/planningexpert/portal.env`; admin anahtarı:
   `docker compose exec backend ./generate_admin_key.sh`). `VITE_CONVEX_URL` =
   backend'in dışarıdan erişilen adresi (betik kendisi ayarlar).
 - Şema değişikliği geriye uyumludur (docs/architecture.md kural 12): yeni

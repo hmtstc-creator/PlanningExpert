@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Günlük yedek (systemd timer, her gece 02:15 — deploy/systemd/portal-backup.timer):
+# Günlük yedek (systemd timer, her gece 02:15 — deploy/systemd/planningexpert-backup.timer):
 # production verisi + dosyalar (fotoğraflar). Son 30 yedek tutulur.
 # BACKUP_REMOTE tanımlıysa (Hetzner Storage Box) yedek sunucu dışına da kopyalanır;
-# kopyalanamazsa betik hata verir (journalctl -u portal-backup).
+# kopyalanamazsa betik hata verir (journalctl -u planningexpert-backup).
 # Hedef: scripts/convex-target.sh (kendi sunucumuz ya da Convex Cloud production).
 set -euo pipefail
 cd "$(dirname "$0")/.."

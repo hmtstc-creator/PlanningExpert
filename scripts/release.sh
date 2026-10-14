@@ -12,7 +12,12 @@ cd "$(dirname "$0")/.."
 
 echo "== 1/4 verify"
 npm ci
-npm run verify
+if [ "${SKIP_LOCAL_VERIFY:-}" = "1" ]; then
+  # Küçük sunucu (botlarla aynı makine): testler CI'da koşar; yalnızca CI'da yeşil commit yayınlanır.
+  echo "Skipping local tests (SKIP_LOCAL_VERIFY=1) — commit $(git rev-parse --short HEAD) must be green in CI."
+else
+  npm run verify
+fi
 
 echo "== 2/4 backup"
 mkdir -p backups
@@ -23,6 +28,12 @@ test -s "backups/before-release-${STAMP}.zip" || { echo "Backup is empty — sto
 echo "== 3/4 + 4/4 deploy functions, then build the interface"
 rm -rf convex/_generated
 npx convex codegen
-npx convex deploy --cmd 'npm run build' --cmd-url-env-var-name VITE_CONVEX_URL
+if [ -n "${CONVEX_SELF_HOSTED_URL:-}" ]; then
+  # Kendi sunucumuz: önce işlevler, sonra site — sitenin adresi VITE_CONVEX_URL (Funnel).
+  npx convex deploy
+  NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}" npm run build
+else
+  npx convex deploy --cmd 'npm run build' --cmd-url-env-var-name VITE_CONVEX_URL
+fi
 
-echo "Done (${CONVEX_TARGET}). Backup: backups/before-release-${STAMP}.zip — restart the web process: sudo systemctl restart portal"
+echo "Done (${CONVEX_TARGET}). Backup: backups/before-release-${STAMP}.zip — restart the site: docker compose -f deploy/compose.yml restart web"

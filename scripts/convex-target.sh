@@ -12,7 +12,9 @@ fi
 if [ -n "${CONVEX_SELF_HOSTED_URL:-}" ]; then
   : "${CONVEX_SELF_HOSTED_ADMIN_KEY:?CONVEX_SELF_HOSTED_ADMIN_KEY is not set (docker compose exec backend ./generate_admin_key.sh)}"
   CONVEX_TARGET="self-hosted ${CONVEX_SELF_HOSTED_URL}"
-  export VITE_CONVEX_URL="$CONVEX_SELF_HOSTED_URL"
+  # CLI sunucuda yerelden bağlanabilir (http://127.0.0.1:3210); site dışarıdan
+  # görünen adresle (CONVEX_PUBLIC_URL, Funnel) derlenir.
+  export VITE_CONVEX_URL="${CONVEX_PUBLIC_URL:-$CONVEX_SELF_HOSTED_URL}"
 else
   : "${CONVEX_DEPLOY_KEY:?Set CONVEX_SELF_HOSTED_URL + CONVEX_SELF_HOSTED_ADMIN_KEY (own server) or CONVEX_DEPLOY_KEY (Convex Cloud production)}"
   case "$CONVEX_DEPLOY_KEY" in

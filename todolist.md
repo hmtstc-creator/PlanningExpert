@@ -138,20 +138,21 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 - [ ] **P0 — VPS'e taşıma (karar 2026-10-14: B — arayüz ve Convex VPS'te).**
   Kitap: **deploy/README.md**. Bulut oturumu hazırlar ve yönetir, sunucudaki
   Claude Code (Remote Control) çalıştırır, sen yalnızca 🔑 kapılarda.
-  - [ ] Aşama 0 — Envanter (salt okunur: OS, kaynaklar, portlar, Karabasan botu)
-  - [ ] **[S] 🔑 Kapı 1** — alan adları (PORTAL_HOST, API_HOST), DNS A kayıtları
-    → 2.28.102.179, Hetzner Firewall (22/80/443), sunucu Backups, Storage Box
-  - [ ] Aşama 1 — Sunucu hazırlığı (docker, Node 22, Caddy, `portal` kullanıcısı)
-  - [ ] Aşama 2 — Convex'i kendi sunucumuzda kur (Postgres, sürümler sabit, boş)
-  - [ ] **[S] 🔑 Kapı 2** — Convex Cloud `prod:` anahtarını sunucuda
-    `/etc/portal/cloud.env`'e yaz
+  - [x] ✅ Aşama 0 — Envanter (Ubuntu 24.04, ~2,6 GB boş RAM, internete kapı yok)
+  - [x] ✅ **[S] 🔑 Kapı 1** — adres: Tailscale Funnel (ücretsiz,
+    `planningexpert.<tailnet>.ts.net`); kurulum onayı sunucu oturumunda verildi
+  - [ ] Aşama 1 — Sunucu hazırlığı (Node 22, unzip, `/opt/planningexpert`)
+  - [ ] Aşama 2 — Tailscale cihazı "planningexpert" + boş Convex (SQLite, bellek
+    sınırlı); 🔑 Tailscale giriş / Funnel onay bağlantıları
+  - [ ] **[S] 🔑 Kapı 2** — Convex Cloud (`perceptive-frog-787`) `prod:` anahtarını
+    sunucuda `/etc/planningexpert/cloud.env`'e yaz
   - [ ] Aşama 3 — Prova: Cloud export → VPS import → `compare-exports` OK,
     giriş / OEE / plan / fotoğraf testi, süre ölçümü
   - [ ] **[S] 🔑 Kapı 3** — kesinti saati, kullanıcılara duyuru
   - [ ] Aşama 4 — Taşıma gecesi: Cloud pause → son export → import →
     `compare-exports` OK → yayın → DNS → duman testi
-  - [ ] Aşama 5 — Gece yedeği + Storage Box, aylık geri yükleme provası,
-    UptimeRobot
+  - [ ] Aşama 5 — Gece yedeği (isteğe bağlı Storage Box), aylık geri yükleme
+    provası
   - [ ] **[S] 🔑** 2 hafta sonra Vercel kapatılır; 30 gün sonra Convex Cloud
     deployment'ı silinir
 - [x] ✅ **P0 — Geliştirirken canlı veri korunur** (2026-10-03): şema kapısı
@@ -163,7 +164,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   arayüz kopyası, anonimleştirilmiş veriyle.
 - [ ] **P0 — Yedek yok.** Tek koruma, şirket bazında elle alınan JSON
   dışa aktarımı; geri yükleme hiç denenmedi. VPS'e taşınınca (B): gece yedeği
-  `portal-backup.timer` + Storage Box, aylık geri yükleme provası
+  `planningexpert-backup.timer` (isteğe bağlı Storage Box), aylık geri yükleme provası
   (deploy/README.md → Aşama 5); `compare-exports` ile doğrulanır.
   - [ ] **[S]** Convex panel → production → Backup & Restore: günlük yedek.
   - [ ] **[S]** İlk geri yükleme provası (boş bir deployment'a).
