@@ -36,6 +36,10 @@ silinmez; her aşamanın kontrolü geçmeden sonrakine geçilmez.
 6. Gizli değerler yalnızca sunucuda, `chmod 600` dosyalarda (`deploy/.env`,
    `/etc/planningexpert/*.env`); sohbette, mesajda, git'te yok.
 7. `docker compose down -v`, `docker system prune --volumes` **asla** (veriyi siler).
+8. Backend süreçleri `ps` ile listelenmez: komut satırında `--instance-secret` taşır
+   (günlüğe düşer). Durum yalnızca `docker compose ps`, healthcheck ve
+   `curl …/version` ile. Gizli değerli dosyalar `cat` ile değil, yalnızca
+   "dolu mu" (`grep -c`) diye kontrol edilir.
 
 ## Aşamalar
 
@@ -58,7 +62,12 @@ install -d -m 700 /etc/planningexpert
 
 Kontrol: `node -v` (v22), botlar çalışıyor (`docker ps` sayısı aynı), `free -m`.
 
-### Aşama 2 — Tailscale cihazı + boş Convex (2026-10-14: backend ✅, Funnel onay bekliyor)
+### Aşama 2 — Tailscale cihazı + boş Convex (2026-10-14: backend ✅, Funnel ✅)
+
+> Not (2026-10-14): ilk kurulumda iki gizli değer oturum günlüğüne kısmen düştü
+> (tırnaksız anahtar, `ps`); veri gelmeden önce boş volume silinip yeni
+> INSTANCE_SECRET ve admin anahtarıyla yeniden kuruldu. **Aşama 3'ten sonra
+> volume silmek yok.**
 
 ```bash
 cd /opt/planningexpert/deploy
