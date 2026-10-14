@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# Günlük yedek (cron, ör. her gece 02:15): production verisi + dosyalar.
-# Son 30 yedek tutulur; yedekler ayrıca sunucu dışına kopyalanmalı (S3 vb.).
-# Gerekli: CONVEX_DEPLOY_KEY (production).
+# Günlük yedek (systemd timer, her gece 02:15 — deploy/systemd/portal-backup.timer):
+# production verisi + dosyalar (fotoğraflar). Son 30 yedek tutulur.
+# BACKUP_REMOTE tanımlıysa (Hetzner Storage Box) yedek sunucu dışına da kopyalanır;
+# kopyalanamazsa betik hata verir (journalctl -u portal-backup).
+# Hedef: scripts/convex-target.sh (kendi sunucumuz ya da Convex Cloud production).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-: "${CONVEX_DEPLOY_KEY:?CONVEX_DEPLOY_KEY is not set}"
+. scripts/convex-target.sh
 mkdir -p backups
 FILE="backups/daily-$(date -u +%Y%m%d-%H%M%S).zip"
 npx convex export --include-file-storage --path "$FILE"
 test -s "$FILE" || { echo "Backup is empty"; exit 1; }
 ls -1t backups/daily-*.zip | tail -n +31 | xargs -r rm --
 echo "Backup written: $FILE"
+if [ -n "${BACKUP_REMOTE:-}" ]; then
+  rsync -a -e "ssh -p ${BACKUP_REMOTE_PORT:-23} -o BatchMode=yes" "$FILE" "$BACKUP_REMOTE"
+  echo "Copied off-site: ${BACKUP_REMOTE}"
+fi

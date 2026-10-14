@@ -11,10 +11,11 @@ export const Route = createFileRoute('/tani')({
 
 const CONVEX_URL: string = (import.meta as any).env?.VITE_CONVEX_URL ?? ''
 
-/** https://mutlu-kedi-123.convex.cloud → mutlu-kedi-123 */
+/** https://mutlu-kedi-123.convex.cloud → mutlu-kedi-123; kendi sunucumuzda (self-hosted) adresin tamamı. */
 function deploymentName(url: string): string {
   try {
-    return new URL(url).hostname.split('.')[0]
+    const host = new URL(url).hostname
+    return host.endsWith('.convex.cloud') ? host.split('.')[0] : host
   } catch {
     return '(unreadable)'
   }

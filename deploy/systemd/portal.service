@@ -1,0 +1,25 @@
+# /etc/systemd/system/portal.service — arayüz (TanStack Start / Nitro Node sunucusu).
+# Yalnızca 127.0.0.1:3000'de dinler; dışarıya Caddy açar.
+[Unit]
+Description=Production Portal (web)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=portal
+Group=portal
+WorkingDirectory=/opt/portal
+ExecStart=/usr/bin/node .output/server/index.mjs
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+Restart=always
+RestartSec=3
+# Sertleştirme
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

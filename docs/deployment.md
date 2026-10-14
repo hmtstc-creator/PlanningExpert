@@ -1,6 +1,8 @@
 # Dağıtım (deploy) — VPS
 
-Durum (2026-10-03): site Vercel'den bir VPS'e taşınacak. Program iki
+Durum (2026-10-14): site ve veritabanı Vercel + Convex Cloud'dan kendi VPS'imize
+(Hetzner CX33 "Karabasan") taşınıyor — **seçenek B**. Adım adım kitap, betikler
+ve sunucu dosyaları: **[deploy/README.md](../deploy/README.md)**. Program iki
 parçadır; ikisi ayrı düşünülür:
 
 | Parça | Ne | Nerede çalışır |
@@ -33,21 +35,25 @@ mesajında).
 **Geri dönüş:** `npx convex import --replace backups/<dosya>.zip` (önce boş
 bir deployment'ta denenir; production'a yalnızca gerçek bir kayıpta).
 
-## VPS'e taşıma kontrol listesi — seçenek A (2026-10-03 kararı: haftaya)
+## VPS'e taşıma
 
-Seçenek A'da veritabanı Convex'te kalır; taşınan yalnızca arayüzdür, veri
-yerinden oynamaz.
+Seçenek B'nin aşamaları (envanter → sunucu hazırlığı → boş Convex → prova →
+taşıma gecesi → sonrası), kapılar (🔑 senden istenenler), veri kaybını önleyen
+kurallar ve geri dönüş: [deploy/README.md](../deploy/README.md). Özet:
 
-1. Taşımadan önce `scripts/backup.sh` ile yedek al, dosyayı sunucu dışına kopyala.
-2. VPS'te arayüzü **aynı production Convex adresiyle** kur (`VITE_CONVEX_URL`);
-   eski site çalışmaya devam eder (iki adres aynı veriye bakar).
-3. VPS adresinde giriş yap; **System → Connection diagnostics**'te deployment
-   adı eski siteyle aynı mı, kayıt sayıları aynı mı bak.
-4. Birkaç kullanıcıyla VPS adresini dene; sorun yoksa alan adını (DNS) VPS'e
-   çevir. Eski siteyi bir hafta açık tut (geri dönüş yolu).
-5. VPS'te `scripts/backup.sh` için cron ve `scripts/release.sh` ile yayın.
+- Convex Cloud'daki veri taşıma boyunca **yalnızca okunur**; taşıma gecesi
+  dondurulur (pause), 30 gün silinmez.
+- Veri `npx convex export --include-file-storage` → kendi sunucumuzda
+  `npx convex import --replace-all`; ardından oradan geri alınan yedek
+  `scripts/compare-exports.mjs` ile kaynağa **tablo tablo, kimlik kimlik**
+  karşılaştırılır. Fark varsa açılış yapılmaz.
+- Yayın ve yedek betikleri iki hedefi de bilir (`scripts/convex-target.sh`):
+  kendi sunucumuz (`CONVEX_SELF_HOSTED_URL` + `_ADMIN_KEY`) ya da Convex Cloud
+  (`CONVEX_DEPLOY_KEY`); ikisi birden tanımlıysa durur.
+- CSP, `VITE_CONVEX_URL` kendi alan adımızsa onu da izinli yapar
+  (`src/lib/securityHeaders.ts`).
 
-## Karar: Convex nerede? (2026-10-03: **A**, taşıma haftaya)
+## Karar: Convex nerede? (2026-10-03: A → **2026-10-14: B**, planlamacı)
 
 | | A) Arayüz VPS, Convex Cloud | B) Hepsi VPS (self-hosted Convex) |
 |---|---|---|
@@ -59,7 +65,8 @@ yerinden oynamaz.
 | Risk | Dış bağımlılık | Tek sunucu = tek arıza noktası; izleme ve yedek şart |
 
 Öneri: müşteriye "veri bizim sunucumuzda" denecekse **B**, değilse
-geçişi hızlı yapmak için önce **A**, sonra B.
+geçişi hızlı yapmak için önce **A**, sonra B. **Karar (2026-10-14): B** —
+Convex de VPS'e taşınır (Postgres ile, Docker Compose: deploy/convex/).
 
 ## Yayın adımları (her iki seçenekte)
 
@@ -74,9 +81,10 @@ node .output/server/index.mjs          # systemd / pm2 ile, önünde nginx/caddy
 - **Sıra önemli:** önce `convex deploy`, sonra arayüz. Tersi olursa arayüz
   henüz olmayan işlevi çağırır (ekranda "function has not been pushed").
 - **A** için `CONVEX_DEPLOY_KEY` = Convex panelinden `prod:` anahtarı.
-- **B** için Convex CLI self-hosted backend'in adresi ve admin anahtarıyla
-  çalışır (Convex self-hosting belgesindeki ortam değişkenleri; kurulumda
-  doğrulanacak). `VITE_CONVEX_URL` = backend'in dışarıdan erişilen adresi.
+- **B** için Convex CLI `CONVEX_SELF_HOSTED_URL` ve `CONVEX_SELF_HOSTED_ADMIN_KEY`
+  ile çalışır (`/etc/portal/portal.env`; admin anahtarı:
+  `docker compose exec backend ./generate_admin_key.sh`). `VITE_CONVEX_URL` =
+  backend'in dışarıdan erişilen adresi (betik kendisi ayarlar).
 - Şema değişikliği geriye uyumludur (docs/architecture.md kural 12): yeni
   alan `v.optional`. Alan kaldırmak iki adımda yapılır: önce veri temizlenir,
   sonra şemadan silinir.

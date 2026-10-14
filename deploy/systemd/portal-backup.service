@@ -1,0 +1,10 @@
+# Günlük yedek (portal-backup.timer tetikler): scripts/backup.sh.
+[Unit]
+Description=Production Portal — daily Convex backup
+
+[Service]
+Type=oneshot
+User=portal
+WorkingDirectory=/opt/portal
+EnvironmentFile=/etc/portal/portal.env
+ExecStart=/opt/portal/scripts/backup.sh

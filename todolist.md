@@ -14,7 +14,7 @@ Ayrıntı ve gerekçe ilgili maddede; karar verilince madde güncellenir.
 
 | # | Karar | Madde |
 |---|---|---|
-| ~~K1~~ | ✅ **A** (arayüz VPS, Convex bulutta) — taşıma haftaya | 4.1 |
+| ~~K1~~ | ✅ ~~A~~ → **B** (2026-10-14): arayüz **ve Convex** VPS'te (Hetzner CX33) | 4.1 |
 | K2 | Yedek hedefi: kabul edilen veri kaybı (RPO) ve geri dönüş süresi (RTO) | 4.1 |
 | ~~K3~~ | ✅ Evet: bölümün OEE'si olur, ayrı OEE alanı yok | 2, 4.2 |
 | ~~K4~~ | ✅ Hayır, gerek yok | 4.2 |
@@ -135,8 +135,25 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   - [ ] **[S]** VPS'te yayın yalnızca CI yeşilken: yayın betiği önce
     `npm run verify` çalıştırır (docs/deployment.md); GitHub'da `main` için
     "Require status checks".
-- [ ] **P0 — VPS'e taşıma (karar: A — arayüz VPS, Convex bulutta; haftaya).**
-  Kontrol listesi: docs/deployment.md → "VPS'e taşıma kontrol listesi".
+- [ ] **P0 — VPS'e taşıma (karar 2026-10-14: B — arayüz ve Convex VPS'te).**
+  Kitap: **deploy/README.md**. Bulut oturumu hazırlar ve yönetir, sunucudaki
+  Claude Code (Remote Control) çalıştırır, sen yalnızca 🔑 kapılarda.
+  - [ ] Aşama 0 — Envanter (salt okunur: OS, kaynaklar, portlar, Karabasan botu)
+  - [ ] **[S] 🔑 Kapı 1** — alan adları (PORTAL_HOST, API_HOST), DNS A kayıtları
+    → 2.28.102.179, Hetzner Firewall (22/80/443), sunucu Backups, Storage Box
+  - [ ] Aşama 1 — Sunucu hazırlığı (docker, Node 22, Caddy, `portal` kullanıcısı)
+  - [ ] Aşama 2 — Convex'i kendi sunucumuzda kur (Postgres, sürümler sabit, boş)
+  - [ ] **[S] 🔑 Kapı 2** — Convex Cloud `prod:` anahtarını sunucuda
+    `/etc/portal/cloud.env`'e yaz
+  - [ ] Aşama 3 — Prova: Cloud export → VPS import → `compare-exports` OK,
+    giriş / OEE / plan / fotoğraf testi, süre ölçümü
+  - [ ] **[S] 🔑 Kapı 3** — kesinti saati, kullanıcılara duyuru
+  - [ ] Aşama 4 — Taşıma gecesi: Cloud pause → son export → import →
+    `compare-exports` OK → yayın → DNS → duman testi
+  - [ ] Aşama 5 — Gece yedeği + Storage Box, aylık geri yükleme provası,
+    UptimeRobot
+  - [ ] **[S] 🔑** 2 hafta sonra Vercel kapatılır; 30 gün sonra Convex Cloud
+    deployment'ı silinir
 - [x] ✅ **P0 — Geliştirirken canlı veri korunur** (2026-10-03): şema kapısı
   (alan / tablo kaldırma, zorunlu yapma, daraltma CI'da durur), yayın öncesi
   zorunlu yedek (`scripts/release.sh`), günlük yedek (`scripts/backup.sh`),
@@ -145,8 +162,9 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   denemenin yolu yok. → VPS'te ayrı bir staging Convex deployment'ı +
   arayüz kopyası, anonimleştirilmiş veriyle.
 - [ ] **P0 — Yedek yok.** Tek koruma, şirket bazında elle alınan JSON
-  dışa aktarımı; geri yükleme hiç denenmedi. Kodla çözülemez, Convex
-  hesabından açılır — adımlar README → "Yedek ve geri yükleme".
+  dışa aktarımı; geri yükleme hiç denenmedi. VPS'e taşınınca (B): gece yedeği
+  `portal-backup.timer` + Storage Box, aylık geri yükleme provası
+  (deploy/README.md → Aşama 5); `compare-exports` ile doğrulanır.
   - [ ] **[S]** Convex panel → production → Backup & Restore: günlük yedek.
   - [ ] **[S]** İlk geri yükleme provası (boş bir deployment'a).
   - [ ] **[K]** Göze alınan veri kaybı (RPO, ör. 24 saat) ve geri dönüş
