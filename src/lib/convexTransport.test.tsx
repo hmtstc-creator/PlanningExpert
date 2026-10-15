@@ -150,3 +150,23 @@ describe('transport choice', () => {
     }
   })
 })
+
+// ---- Bağlanırken HTTPS'in cevabı da kullanılır ------------------------------
+
+import { pickResult } from './convexTransport'
+
+describe('pickResult (WebSocket kurulurken bekletme yok)', () => {
+  it('bağlanırken WebSocket cevabı yoksa HTTPS cevabı gösterilir', () => {
+    expect(pickResult('connecting', undefined, { name: 'admin' })).toEqual({ name: 'admin' })
+  })
+  it('WebSocket cevabı varsa o gösterilir', () => {
+    expect(pickResult('connecting', { name: 'ws' }, { name: 'http' })).toEqual({ name: 'ws' })
+    expect(pickResult('websocket', { name: 'ws' }, { name: 'http' })).toEqual({ name: 'ws' })
+  })
+  it('oturum yok (null) da bir cevaptır', () => {
+    expect(pickResult('connecting', null, { name: 'http' })).toBeNull()
+  })
+  it('HTTPS modunda yalnızca HTTPS', () => {
+    expect(pickResult('http', { name: 'ws' }, undefined)).toBeUndefined()
+  })
+})

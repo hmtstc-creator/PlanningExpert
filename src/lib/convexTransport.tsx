@@ -306,13 +306,24 @@ function withToken(args: any, token: string | null): any {
 
 export function useQuery(fn: any, args?: any): any {
   const { mode, token } = useTransport()
-  const useHttp = mode === 'http'
   // Jeton değişince nesne kimliği de değişsin ki sorgu yeniden çalışsın.
   const withAuth = useMemo(() => withToken(args ?? {}, token), [args, token])
-  // Hook kuralları: ikisi de her render'da çağrılır, biri devre dışı kalır.
-  const wsResult = useConvexQuery(fn, useHttp ? 'skip' : withAuth)
-  const { data } = useHttpQuery<unknown>(useHttp, fn, withAuth)
-  return useHttp ? data : wsResult
+  // Hook kuralları: ikisi de her render'da çağrılır.
+  const wsResult = useConvexQuery(fn, mode === 'http' ? 'skip' : withAuth)
+  // Bağlantı kurulurken ("connecting") HTTPS de hemen sorulur: WebSocket'i
+  // engelleyen ağlarda sayfa 7–15 sn "Checking your session…"da bekliyordu
+  // (2026-10-15). Hangisi önce gelirse o gösterilir.
+  const { data } = useHttpQuery<unknown>(mode !== 'websocket', fn, withAuth)
+  return pickResult(mode, wsResult, data)
+}
+
+/**
+ * Gösterilecek cevap: HTTPS modunda HTTPS'inki; aksi halde WebSocket'inki,
+ * o henüz gelmediyse (bağlanırken ya da yeni geçişte) HTTPS'inki.
+ */
+export function pickResult(mode: TransportMode, ws: unknown, http: unknown): unknown {
+  if (mode === 'http') return http
+  return ws !== undefined ? ws : http
 }
 
 /**
