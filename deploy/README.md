@@ -15,7 +15,8 @@ kullanılmaz. Adres (ücretsiz, Tailscale Funnel; sunucuda internete kapı açı
 | `dashboard` | Convex paneli — yalnızca gerektiğinde (`--profile tools`) | `deploy/compose.yml` |
 | Yedek | Her gece 02:15, son 30 (isteğe bağlı sunucu dışı kopya) | `scripts/backup.sh`, `deploy/systemd/` |
 
-Kod `/opt/planningexpert`'te, dal `claude/vps-tasima`. Gizli değerler yalnızca
+Kod `/opt/planningexpert`'te, dal **`main`** (sunucu yalnızca `main`'den güncellenir;
+yeni iş kısa ömürlü bir dalda yapılır, CI yeşilken PR ile `main`'e girer). Gizli değerler yalnızca
 sunucuda: `deploy/.env` ve `/etc/planningexpert/portal.env` (ikisi de `chmod 600`).
 
 ## Mantık: kim ne yapar
@@ -137,7 +138,7 @@ Kullanıcı ilk girişte parolasını değiştirmek zorundadır.
 ```bash
 apt-get install -y unzip
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
-git clone -b claude/vps-tasima https://github.com/hmtstc-creator/PlanningExpert /opt/planningexpert
+git clone -b main https://github.com/hmtstc-creator/PlanningExpert /opt/planningexpert
 install -d -m 700 /etc/planningexpert
 
 cd /opt/planningexpert/deploy
@@ -176,3 +177,5 @@ systemctl daemon-reload && systemctl enable --now planningexpert-backup.timer
   Funnel ve boş Convex kuruldu.
 - 2026-10-16: taşıma tamamlandı — her şey VPS'te. Vercel ve Convex Cloud artık
   kullanılmıyor; depodan onlara ait ayar, betik ve talimatlar kaldırıldı.
+- 2026-10-16: sunucu `claude/vps-tasima` dalından `main`'e geçti (bir kez:
+  `git fetch origin && git checkout main && git pull`).
