@@ -220,3 +220,20 @@ görünümünde tabloda "+ Follow up"). Tıklayınca açılan pencere:
 
 Düğme yalnızca Die Problems ya da Plan düzenleme izni olana çıkar; parçasız
 "(no part)", "Not in order data" ve "Others" satırları eklenmez.
+
+## Neden × parça saatinden ve Daily Report'tan Die Follow-up'a (2026-10-16, planlamacı)
+
+Aynı pencere iki yerden daha açılır; süreler aynı mavi düğme (`FollowUpTime`):
+
+- **Loss Bridge**, "By reason" görünümünde bir nedene tıklayınca çıkan
+  "Hours by part (MATERIAL) · <neden>" tablosunun **Time** sütunu: parça, iş
+  yeri, kayıp kalemi, neden ve vardiya hazır gelir; duruş günleri satırın
+  kendi duruşlarından (`reasonShiftParts` → `days`, günlerin toplamı satıra
+  eşit, testli).
+- **OEE Daily Report** sağ paneli, "Where and when" ve "Other downtimes of
+  this part" tablolarının **Time** sütunu: parça, iş yeri, satırın kayıp
+  grubu, nedeni, vardiyası, günü ve süresi hazır gelir; açıklama
+  "OEE Daily Report: …" ile başlar.
+
+İzin ve kurallar yukarıdakiyle aynı: yalnızca Die Problems ya da Plan
+düzenleme izni olana; "(no part)" satırları eklenmez; Action zorunlu.

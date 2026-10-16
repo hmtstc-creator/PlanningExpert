@@ -344,6 +344,16 @@ export function partOrders(orders: OrderRow[], workCenter: string | null, materi
   return [...map.values()].sort((a, b) => a.date.localeCompare(b.date) || (a.shift ?? 99) - (b.shift ?? 99))
 }
 
+/** Neden × parça × vardiya satırı; `days`: o satırın duruşları gün gün (Die Follow-up tarihi). */
+export interface ReasonPartRow {
+  material: string
+  workCenter: string
+  shift: number | null
+  count: number
+  minutes: number
+  days: { date: string; minutes: number }[]
+}
+
 /**
  * Köprüde seçili kalemin nedenleri için vardiya dağılımı ve neden × parça ×
  * vardiya satırları (Loss Bridge yan paneli: "MARKING LABEL UPDATING hangi
@@ -353,10 +363,10 @@ export function reasonShiftParts(
   events: DowntimeDay[],
   groups: string[],
   c: OeeConfig,
-): { shifts: Map<string, Map<number | null, number>>; parts: Map<string, { material: string; workCenter: string; shift: number | null; count: number; minutes: number }[]> } {
+): { shifts: Map<string, Map<number | null, number>>; parts: Map<string, ReasonPartRow[]> } {
   const gs = new Set(groups)
   const shifts = new Map<string, Map<number | null, number>>()
-  const partMap = new Map<string, Map<string, { material: string; workCenter: string; shift: number | null; count: number; minutes: number }>>()
+  const partMap = new Map<string, Map<string, ReasonPartRow>>()
   for (const d of events) {
     for (const e of d.events as DowntimeEvent[]) {
       if (undefinedCode(e.rc1, e.rc2) || !c.lossReasonCodes.includes(e.rc1) || !gs.has(e.rc2)) continue
@@ -368,13 +378,17 @@ export function reasonShiftParts(
       const pm = partMap.get(text) ?? new Map()
       const material = e.material && e.material !== '#' ? e.material : '(no part)'
       const k = `${d.workCenter}|${material}|${sh ?? ''}`
-      const r = pm.get(k) ?? { material, workCenter: d.workCenter, shift: sh, count: 0, minutes: 0 }
+      const r = pm.get(k) ?? { material, workCenter: d.workCenter, shift: sh, count: 0, minutes: 0, days: [] }
       r.count += 1
       r.minutes += e.minutes
+      const day = r.days.find((x) => x.date === d.date)
+      if (day) day.minutes += e.minutes
+      else r.days.push({ date: d.date, minutes: e.minutes })
       pm.set(k, r)
       partMap.set(text, pm)
     }
   }
+  for (const m of partMap.values()) for (const r of m.values()) r.days.sort((a, b) => a.date.localeCompare(b.date))
   const parts = new Map([...partMap].map(([t, m]) => [t, [...m.values()].sort((a, b) => b.minutes - a.minutes)]))
   return { shifts, parts }
 }

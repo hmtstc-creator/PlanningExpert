@@ -136,6 +136,16 @@ describe('parça ve vardiya ayrıntısı', () => {
       expect(rows.reduce((a, r) => a + r.minutes, 0)).toBeCloseTo(byShift, 3)
     }
   })
+  it('her satırın günleri sıralı ve toplamı satırın süresi (Die Follow-up tarihi)', () => {
+    const { parts } = reasonShiftParts(parsed.downtimes, ['KLP'], plant)
+    const rows = [...parts.values()].flat()
+    expect(rows.length).toBeGreaterThan(0)
+    for (const r of rows) {
+      expect(r.days.length).toBeGreaterThan(0)
+      expect(r.days.map((d) => d.date)).toEqual([...r.days.map((d) => d.date)].sort())
+      expect(r.days.reduce((a, d) => a + d.minutes, 0)).toBeCloseTo(r.minutes, 3)
+    }
+  })
 })
 
 describe('çıktı adı', () => {
