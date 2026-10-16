@@ -3,6 +3,7 @@ import { Printer } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
+import { DieFollowUpDialog, FollowUpTime, type FollowUpDraft } from '../../components/DieFollowUpDialog'
 import { FAMILY_SWATCH, hours, pctOf } from '../../components/OeeBridgeCharts'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { OeePeriodFields, dm, rangeText, useOeePeriod, useShiftOptions } from '../../components/OeePeriodControl'
@@ -14,7 +15,7 @@ import { MAX_EVENT_DAYS, NOT_IN_ORDERS, NO_PART, hasParts, matchedLossDays, pars
 import { dailyReport, type ReportLoss, type ReportRow } from '../../lib/oeeDailyReport'
 import { partOrders, partStops, type DetailRow } from '../../lib/oeeReliability'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
-import { useCanOpen } from '../../lib/plantContext'
+import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { printSheet } from '../../lib/printSheet'
 
 export const Route = createFileRoute('/oee/report')({
@@ -336,6 +337,23 @@ function FocusPanel({
     }
     return { kind, focusRows, others, byGroup: [...byGroup].sort((a, b) => b[1].minutes - a[1].minutes) }
   }, [focus, set, config])
+  // Süreye tıklayınca Die Follow-up'a takip konusu (planlamacı, 2026-10-16) — Loss Bridge'deki gibi.
+  const { canArea } = usePlant()
+  const [draft, setDraft] = useState<FollowUpDraft | null>(null)
+  const followUp =
+    focus && (canArea('die.problems', 'edit') || canArea('planning.plan', 'edit'))
+      ? (r: DetailRow) =>
+          setDraft({
+            material: focus.material,
+            press: focus.workCenter ?? '',
+            loss: r.group === 'Speed' ? 'Speed loss' : groupLabel(r.group, config),
+            detail: [r.text, r.shift ? `Shift ${r.shift}` : ''].filter(Boolean).join(' · '),
+            minutes: r.minutes,
+            days: [{ date: r.date, minutes: r.minutes }],
+            period,
+            source: 'OEE Daily Report',
+          })
+      : undefined
 
   if (!focus || !detail)
     return (
@@ -375,7 +393,14 @@ function FocusPanel({
         <p className="mt-3 text-xs text-muted-foreground">Loading the downtimes…</p>
       ) : (
         <>
-          <DetailTable title="Where and when" rows={detail.focusRows} unit={unit} countLabel={detail.kind === 'speed' ? 'Orders' : undefined} highlight />
+          <DetailTable
+            title="Where and when"
+            rows={detail.focusRows}
+            unit={unit}
+            countLabel={detail.kind === 'speed' ? 'Orders' : undefined}
+            highlight
+            onPick={followUp}
+          />
           {detail.byGroup.length > 0 && (
             <div className="mt-3">
               <p className="text-xs font-semibold text-foreground">All downtime losses of this part</p>
@@ -391,9 +416,11 @@ function FocusPanel({
               </ul>
             </div>
           )}
-          {detail.others.length > 0 && <DetailTable title="Other downtimes of this part" rows={detail.others} unit="min" />}
+          {detail.others.length > 0 && <DetailTable title="Other downtimes of this part" rows={detail.others} unit="min" onPick={followUp} />}
+          {followUp && <p className="mt-2 text-[11px] text-muted-foreground print:hidden">Click a time to add it to Die Follow-up with an action.</p>}
         </>
       )}
+      {draft && <DieFollowUpDialog draft={draft} onClose={() => setDraft(null)} />}
     </aside>
   )
 }
@@ -404,12 +431,15 @@ function DetailTable({
   unit,
   countLabel,
   highlight,
+  onPick,
 }: {
   title: string
   rows: DetailRow[]
   unit: 'min' | 'pcs'
   countLabel?: string
   highlight?: boolean
+  /** Süreye tıklayınca Die Follow-up'a takip konusu (yetkisi olana). */
+  onPick?: (r: DetailRow) => void
 }) {
   return (
     <div className="mt-3">
@@ -440,7 +470,11 @@ function DetailTable({
                     <span className="font-semibold text-foreground">{r.group}</span> · {r.text}
                   </td>
                   <td className="px-2 py-1 text-right tabular-nums">{Math.round(r.count)}</td>
-                  {unit === 'min' && <td className="px-2 py-1 text-right font-semibold tabular-nums text-foreground">{hours(r.minutes)}</td>}
+                  {unit === 'min' && (
+                    <td className="px-2 py-1 text-right font-semibold tabular-nums text-foreground">
+                      {onPick && r.minutes > 0 ? <FollowUpTime minutes={r.minutes} onClick={() => onPick(r)} /> : hours(r.minutes)}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

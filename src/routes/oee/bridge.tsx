@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { BridgeChart, FAMILY_LABEL, FAMILY_SWATCH, Level2Bars, Level3Table, Gauge, hours, pctOf } from '../../components/OeeBridgeCharts'
-import { DieFollowUpDialog, type FollowUpDraft } from '../../components/DieFollowUpDialog'
+import { DieFollowUpDialog, FollowUpTime, type FollowUpDraft } from '../../components/DieFollowUpDialog'
 import { OeePeriodFields, dm, rangeText, useOeePeriod, useShiftOptions } from '../../components/OeePeriodControl'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
@@ -13,6 +13,7 @@ import { relatedPages } from '../../lib/navigation'
 import { areaNames, costCentersOf, inScope, scopeLabel, type DayRow, type DowntimeDay, type OrderRow, type ShiftRow } from '../../lib/oee'
 import {
   MAX_EVENT_DAYS,
+  NO_PART,
   buildBridge,
   hasParts,
   isPartRow,
@@ -28,7 +29,7 @@ import {
   type LossItem,
 } from '../../lib/oeeBridge'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
-import { reasonShiftParts } from '../../lib/oeeReliability'
+import { reasonShiftParts, type ReasonPartRow } from '../../lib/oeeReliability'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { printSheet } from '../../lib/printSheet'
 
@@ -156,20 +157,20 @@ function BridgePage() {
   // Parça saatine tıklayınca Die Follow-up'a takip konusu (planlamacı, 2026-10-13).
   const { canArea } = usePlant()
   const [draft, setDraft] = useState<FollowUpDraft | null>(null)
-  const followUp =
-    canArea('die.problems', 'edit') || canArea('planning.plan', 'edit')
-      ? (r: Level3Row) => {
-          if (!selectedItem || !now || !cur) return
-          setDraft({
-            material: r.label,
-            press: r.sub ?? machine,
-            loss: selectedItem.label,
-            minutes: r.minutes,
-            days: partDays(selectedItem, r.key, config, now),
-            period: rangeText(cur),
-          })
-        }
-      : undefined
+  const canFollow = canArea('die.problems', 'edit') || canArea('planning.plan', 'edit')
+  const followUp = canFollow
+    ? (r: Level3Row) => {
+        if (!selectedItem || !now || !cur) return
+        setDraft({
+          material: r.label,
+          press: r.sub ?? machine,
+          loss: selectedItem.label,
+          minutes: r.minutes,
+          days: partDays(selectedItem, r.key, config, now),
+          period: rangeText(cur),
+        })
+      }
+    : undefined
   // Yan panelde her zaman "hangi parçadan kaç saat" (planlamacı, 2026-10-13):
   // seçili görünüm parça değilse ayrıca kısa liste.
   const partRows = useMemo(() => {
@@ -185,6 +186,22 @@ function BridgePage() {
   }, [selectedItem, now, eventsOk, curEvRaw, config])
   const pickedReason = activeView === 'reason' && reason && stopDetail?.parts.has(reason) ? reason : null
   const reasonParts = pickedReason ? (stopDetail?.parts.get(pickedReason) ?? []) : []
+  // Neden × parça × vardiya saatine tıklayınca da Die Follow-up (planlamacı, 2026-10-16).
+  const followReason =
+    canFollow && pickedReason
+      ? (r: ReasonPartRow) => {
+          if (!selectedItem || !cur) return
+          setDraft({
+            material: r.material,
+            press: r.workCenter,
+            loss: selectedItem.label,
+            detail: [pickedReason, r.shift ? `Shift ${r.shift}` : ''].filter(Boolean).join(' · '),
+            minutes: r.minutes,
+            days: r.days,
+            period: rangeText(cur),
+          })
+        }
+      : undefined
   const shiftCell =
     activeView === 'reason' && stopDetail
       ? (r: Level3Row) => {
@@ -443,7 +460,7 @@ function BridgePage() {
                   </p>
                 )}
                 {pickedReason ? (
-                  <ReasonParts reason={pickedReason} rows={reasonParts} onClear={() => setReason(null)} />
+                  <ReasonParts reason={pickedReason} rows={reasonParts} onClear={() => setReason(null)} onPick={followReason} />
                 ) : (
                   partRows.length > 0 && <PartHours rows={partRows} total={selectedItem.minutes} onMore={() => setView('part')} onPick={followUp} />
                 )}
@@ -585,10 +602,13 @@ function ReasonParts({
   reason,
   rows,
   onClear,
+  onPick,
 }: {
   reason: string
-  rows: { material: string; workCenter: string; shift: number | null; count: number; minutes: number }[]
+  rows: ReasonPartRow[]
   onClear: () => void
+  /** Saate tıklayınca Die Follow-up'a takip konusu (yetkisi olana). */
+  onPick?: (r: ReasonPartRow) => void
 }) {
   const total = rows.reduce((a, r) => a + r.minutes, 0)
   return (
@@ -622,7 +642,9 @@ function ReasonParts({
                 <td className="py-1 pr-2 text-muted-foreground">{r.workCenter}</td>
                 <td className="py-1 pr-2 tabular-nums">{r.shift ? `Shift ${r.shift}` : '—'}</td>
                 <td className="py-1 pr-2 text-right tabular-nums">{r.count}</td>
-                <td className="py-1 pr-2 text-right font-semibold tabular-nums">{hours(r.minutes)}</td>
+                <td className="py-1 pr-2 text-right font-semibold tabular-nums">
+                  {onPick && r.material !== NO_PART ? <FollowUpTime minutes={r.minutes} onClick={() => onPick(r)} /> : hours(r.minutes)}
+                </td>
                 <td className="py-1 text-right tabular-nums text-muted-foreground">{total > 0 ? pctOf(r.minutes / total, 0) : '—'}</td>
               </tr>
             ))}
@@ -721,14 +743,7 @@ function PartHours({
               }}
             />
             {onPick && isPartRow(r) ? (
-              <button
-                type="button"
-                onClick={() => onPick(r)}
-                title="Add to Die Follow-up with an action"
-                className="justify-self-end rounded-md border border-[var(--viz-1)]/40 bg-[var(--viz-1)]/10 px-1.5 py-0.5 text-right font-semibold text-foreground tabular-nums hover:bg-[var(--viz-1)]/20 print:border-0 print:bg-transparent"
-              >
-                {hours(r.minutes)}
-              </button>
+              <FollowUpTime minutes={r.minutes} onClick={() => onPick(r)} className="justify-self-end" />
             ) : (
               <span className="text-right font-semibold tabular-nums">{hours(r.minutes)}</span>
             )}
