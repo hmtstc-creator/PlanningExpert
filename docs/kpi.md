@@ -11,7 +11,7 @@ seçilebilsin; masraf yerleri fabrikanınkiler, kök veri aynı.
 |---|---|
 | /kpi | Monthly KPI ve Weekly KPI, her birinde Data entry ve Dashboard |
 | /kpi/monthly/entry | Yıl + masraf yeri seçilir (2026-10-06): sütunlarda aylar (Ocak–Aralık + yıl), satırlarda her göstergenin Plan / Actual'ı, altında hesaplananlar. Masraf yerinin satırları (Direct / Indirect) sekme. Excel gibi: Enter / ↑ ↓ satır, Tab ay; Excel'den yapıştırılan blok aylara ve alt satırlara yayılır (TR ve EN sayı biçimi). Kayıt yalnızca seçili masraf yerinin o yılını yazar (convex/kpi.ts saveRange; kural src/lib/kpiSeries.ts). Yıl sütunu: saat ve adet toplam, operatör ortalama, oranlar toplamdan |
-| /kpi/monthly/dashboard | Tek A3 yatay sayfa: 10 KPI kartı (seçilen ay, plan, fark, Ocak–Aralık trendi) + masraf yeri tablosu; Print / PDF (A3) |
+| /kpi/monthly/dashboard | Tek A3 yatay sayfa: 10 KPI kartı (seçilen ay, plan, fark, Ocak–Aralık trendi) + masraf yeri tablosu; Save PDF (A3) |
 | /kpi/weekly/entry | Aylıkla aynı ekran (2026-10-06): sütunlarda seçilen haftayla biten 13 ISO hafta (dashboard ile aynı; yıl geçişi dahil), oklar 13 hafta kaydırır — gelecek haftaların planı ileri hafta seçilerek girilir. Toplam sütunu 13 hafta |
 | /kpi/weekly/dashboard | Aynı sayfa; trend seçilen haftayla biten 13 hafta |
 
@@ -49,8 +49,8 @@ seçilebilsin; masraf yerleri fabrikanınkiler, kök veri aynı.
 - Fabrika ve masraf yeri seçimi (yalnızca KPI izni olan fabrikalar;
   sunucu yetkisiz fabrikayı reddeder). Varsayılan: seçili fabrika, bütün
   masraf yerleri.
-- Print / PDF (A3): yalnızca sayfa yazdırılır (A3 yatay, kenarsız);
-  tarayıcıda "Save as PDF".
+- Save PDF (A3): sayfa A3 yatay, kenarsız PDF olur (`GGAAYY KPI WEEKLY` /
+  `GGAAYY KPI MONTHLY`, dönemin ilk günü); docs/pdf.md.
 - Renkler: gerçekleşen mavi çubuk, plan turuncu çizgi (renk körlüğü
   kontrolünden geçti); fark ▲▼ ve "better / worse" yazısıyla (yalnızca renk değil).
 

@@ -42,6 +42,7 @@ export const PAGE_KEYWORDS: Record<string, string> = {
   '/oee/mttr': 'mttr mtbf arıza tamir süresi arızalar arası süre arz klp stp setup kalıp rulo breakdown',
   '/oee/dies': 'kalıp kalıplar die dies oee trend en kötü hız kaybı',
   '/oee/report': 'günlük rapor daily report iş yeri işyeri oee kayıp malzeme parça hız kaybı tek sayfa',
+  '/oee/agent': 'ajan raporu agent report günlük analiz ceo yönetim özeti kritik uyarı kalıp pres makine vardiya tekrar eden duruş açık konu',
   '/oee/bridge': 'kayıp köprüsü bridge şelale waterfall teep oee kayıp öncelik pareto level',
   '/oee/data': 'oee veri tablo yükleme',
   '/oee/settings': 'oee ayar bölüm vardiya kayıp grubu',

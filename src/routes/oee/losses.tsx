@@ -5,10 +5,11 @@ import { api } from '../../../convex/_generated/api'
 import { Legend, LineTrendChart, StackedShareChart, pct } from '../../components/OeeCharts'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { InfoTip, PageHeader } from '../../components/PageHeader'
-import { PrintA4Button, PrintFilterHeader } from '../../components/OeePrint'
+import { PrintFilterHeader } from '../../components/OeePrint'
 import { dm } from '../../components/OeePeriodControl'
-import { ddmmyy } from '../../lib/oeeFilters'
-import { printSheet } from '../../lib/printSheet'
+import { SavePdfButton } from '../../components/SavePdfButton'
+import { pdfFileName } from '../../lib/pdfFile'
+import { sheetToPdf } from '../../lib/pdfSheet'
 import { useQuery } from '../../lib/convexTransport'
 import {
   BREAK_KEY,
@@ -125,9 +126,9 @@ function LossesPage() {
   const gap = useMemo(() => weekGap(dayRows, lossDays, scope, config, sel.monday), [dayRows, lossDays, scope, config, sel.monday])
   const reasons = useMemo(() => reasonPareto(lossDays, scope, config, sel.monday), [lossDays, scope, config, sel.monday])
   const setups = useMemo(() => setupAnalysis(downtimes, orders, scope, config, sel.monday, sel.sunday), [downtimes, orders, scope, config, sel.monday, sel.sunday])
-  // A4 çıktı: adı seçili günle "GGAAYY LOSSES TREND" (Aksiyonlar sunumu, 2026-10-14).
+  // A4 PDF: adı seçili günle "GGAAYY LOSSES TREND" (Aksiyonlar sunumu, 2026-10-14; Save PDF 2026-10-16).
   const sheetRef = useRef<HTMLDivElement>(null)
-  const fileName = `${ddmmyy(sel.date)} LOSSES TREND`
+  const fileName = pdfFileName(sel.date, 'LOSSES TREND')
   const filters = [label, `Date ${dm(sel.date)}`, `Week W${sel.week.week} (${dm(sel.monday)} – ${dm(sel.sunday)}) vs W${isoWeek(prevMonday).week}`]
 
   const stackParts = (b: LossBreakdown) => [
@@ -163,7 +164,12 @@ function LossesPage() {
         selection={sel}
         rows={dayRows}
         config={config}
-        actions={<PrintA4Button fileName={fileName} onPrint={() => sheetRef.current && printSheet(sheetRef.current, fileName, 'A4')} />}
+        actions={
+          <SavePdfButton
+            fileName={fileName}
+            make={() => sheetToPdf(sheetRef.current!, { size: 'A4', orientation: 'landscape', pages: 'flow' })}
+          />
+        }
       />
       <OeeDataNotice items={coverageNotes} />
 

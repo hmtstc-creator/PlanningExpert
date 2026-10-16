@@ -2,6 +2,15 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+/* `print:` hem yazdırmada hem PDF kopyasında (src/lib/pdfSheet.ts → .pdf-capture). */
+@custom-variant print {
+  @media print {
+    @slot;
+  }
+  &:where(.pdf-capture, .pdf-capture *) {
+    @slot;
+  }
+}
 
 :root {
   --radius: 0.625rem;
@@ -296,18 +305,22 @@
   color: var(--filter-ink);
 }
 
-/* Çıktıda (A4 / A3) kaydırma kutuları açılır: tablo kesilmez, satırlar sayfaya sığar. */
-@media print {
-  .oee-viz .overflow-auto,
-  .oee-viz .overflow-x-auto {
-    overflow: visible !important;
-    max-height: none !important;
-  }
-  .oee-viz td,
-  .oee-viz th {
-    white-space: normal !important;
-  }
-  .oee-viz select {
-    display: none;
-  }
+/* PDF'te (A4 / A3) kaydırma kutuları açılır: tablo kesilmez, satırlar sayfaya sığar. */
+.pdf-capture .oee-viz .overflow-auto,
+.pdf-capture .oee-viz .overflow-x-auto,
+.pdf-capture .overflow-auto,
+.pdf-capture .overflow-x-auto {
+  overflow: visible !important;
+  max-height: none !important;
+}
+.pdf-capture .oee-viz td,
+.pdf-capture .oee-viz th {
+  white-space: normal !important;
+}
+.pdf-capture .oee-viz select,
+.pdf-capture .sticky {
+  position: static !important;
+}
+.pdf-capture .oee-viz select {
+  display: none;
 }

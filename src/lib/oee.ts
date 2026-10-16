@@ -195,6 +195,8 @@ export interface OeeConfig {
     hidden?: boolean
     /** Loss Bridge'de ailesi (docs/oee-bridge.md); yoksa availability (MES gibi). */
     family?: 'availability' | 'performance'
+    /** Agent Report'taki rolü (src/lib/oeeAgent.ts); yoksa adından tahmin, 'none' = rolü yok. */
+    agent?: 'die' | 'machine' | 'none'
   }[]
   /** Setup sayılan duruş metinleri (Reason Code Definition EN). */
   setupTexts: { text: string; kind: 'planned' | 'unplanned' }[]
@@ -211,6 +213,8 @@ export interface OeeConfig {
    * bozulmasın diye alan duruyor.
    */
   bridgeBase?: 'loading' | 'shift'
+  /** Agent Report eşikleri (src/lib/oeeAgent.ts → AGENT_DEFAULTS); yoksa varsayılanlar. */
+  agent?: Partial<import('./oeeAgent').AgentThresholds>
 }
 
 export const EMPTY_CONFIG: OeeConfig = {

@@ -4,10 +4,11 @@ import { useMemo, useRef, type ReactNode } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { OeeBarChart, PeriodTable } from '../../components/OeeCharts'
 import { OeeControls, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
-import { PrintA4Button, PrintFilterHeader } from '../../components/OeePrint'
+import { PrintFilterHeader } from '../../components/OeePrint'
 import { dm } from '../../components/OeePeriodControl'
-import { ddmmyy } from '../../lib/oeeFilters'
-import { printSheet } from '../../lib/printSheet'
+import { SavePdfButton } from '../../components/SavePdfButton'
+import { pdfFileName } from '../../lib/pdfFile'
+import { sheetToPdf } from '../../lib/pdfSheet'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import {
@@ -73,9 +74,9 @@ function OeeDashboard() {
     : undefined
   const hint = 'Click: open in Loss Bridge'
   const h = (m: number) => `${Math.floor(m / 60)}:${String(Math.round(m % 60)).padStart(2, '0')}`
-  // A4 çıktı: adı seçili günle "GGAAYY OEE TREND" (Aksiyonlar sunumu, 2026-10-14).
+  // A4 PDF: adı seçili günle "GGAAYY OEE TREND" (Aksiyonlar sunumu, 2026-10-14; Save PDF 2026-10-16).
   const sheetRef = useRef<HTMLDivElement>(null)
-  const fileName = `${ddmmyy(sel.date)} OEE TREND`
+  const fileName = pdfFileName(sel.date, 'OEE TREND')
   const filters = [`${label}`, `Date ${dm(sel.date)}`, `Week W${sel.week.week} (${dm(sel.monday)} – ${dm(sel.sunday)})`, `${weeksN} weeks`]
   const shiftNote = `Shifts worked = loading time ÷ net shift (${h(net.average)} h = shift ${net.timesDefined ? '' : '8:00 h assumed '}− planned stops ${h(net.plannedAverage)} h: breaks, meals, meetings). Counts only the work centers listed below — those defined on Work Center Definitions with a cost center of the plant. Shift times, MES codes and planned stops: Work calendar.`
 
@@ -112,7 +113,12 @@ function OeeDashboard() {
         rows={scopeRows}
         config={config}
         notes={[...trendGaps(month).map((t) => `Monthly — ${t}`), ...trendGaps(weeks).map((t) => `Weekly — ${t}`)]}
-        actions={<PrintA4Button fileName={fileName} onPrint={() => sheetRef.current && printSheet(sheetRef.current, fileName, 'A4')} />}
+        actions={
+          <SavePdfButton
+            fileName={fileName}
+            make={() => sheetToPdf(sheetRef.current!, { size: 'A4', orientation: 'landscape', pages: 'flow' })}
+          />
+        }
       />
 
       {days.length === 0 && monthly.length === 0 && weekly.length === 0 && (

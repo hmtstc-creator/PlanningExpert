@@ -22,6 +22,8 @@ Dashboard. Tek sistem, tek adres; her plant'in verisi ayrıdır.
 | `docs/plant-genisletme.md` | Çok şirket / çok plant ve yetki modeli |
 | `docs/board.md` | Holding, Board Dashboard, organizasyon ağacı |
 | `docs/oeedashboard.md` | OEE kararları ve dosya biçimi |
+| `docs/oee-agent-report.md` | OEE Agent Report: günün kısa notları, kurallar ve eşikler |
+| `docs/pdf.md` | Save PDF: sitedeki bütün çıktılar, dosya adları |
 | `docs/kpi.md` | KPI modülü |
 | `docs/deployment.md` | VPS'te yayın, veri güvenliği, yerel geliştirme |
 | `deploy/README.md` | **Sunucu kitabı**: güncelleme, yedek, geri yükleme, sıfırdan kurulum |

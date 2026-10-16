@@ -170,6 +170,8 @@ export const configFields = {
       hidden: v.optional(v.boolean()),
       // Loss Bridge ailesi (docs/oee-bridge.md); yoksa availability.
       family: v.optional(v.union(v.literal('availability'), v.literal('performance'))),
+      // Agent Report rolü (src/lib/oeeAgent.ts); yoksa adından tahmin.
+      agent: v.optional(v.union(v.literal('die'), v.literal('machine'), v.literal('none'))),
     }),
   ),
   setupTexts: v.array(v.object({ text: v.string(), kind: v.union(v.literal('planned'), v.literal('unplanned')) })),
@@ -178,4 +180,20 @@ export const configFields = {
   topN: v.number(),
   // Loss Bridge'in OEE tabanı; yoksa 'loading' (MES).
   bridgeBase: v.optional(v.union(v.literal('loading'), v.literal('shift'))),
+  // Agent Report eşikleri (src/lib/oeeAgent.ts → AGENT_DEFAULTS); yoksa varsayılanlar.
+  agent: v.optional(
+    v.object({
+      partLossMin: v.optional(v.number()),
+      partLossStops: v.optional(v.number()),
+      machineLossMin: v.optional(v.number()),
+      oeeDropPoints: v.optional(v.number()),
+      repeatDays: v.optional(v.number()),
+      shiftPatternDays: v.optional(v.number()),
+      scrapFactor: v.optional(v.number()),
+      mttrFactor: v.optional(v.number()),
+      minLoadingMin: v.optional(v.number()),
+      undefinedSharePct: v.optional(v.number()),
+      summaryNotes: v.optional(v.number()),
+    }),
+  ),
 }

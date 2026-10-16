@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Printer } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
@@ -8,6 +7,7 @@ import { DieFollowUpDialog, FollowUpTime, type FollowUpDraft } from '../../compo
 import { OeePeriodFields, dm, rangeText, useOeePeriod, useShiftOptions } from '../../components/OeePeriodControl'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
+import { SavePdfButton } from '../../components/SavePdfButton'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
 import { areaNames, costCentersOf, inScope, scopeLabel, type DayRow, type DowntimeDay, type OrderRow, type ShiftRow } from '../../lib/oee'
@@ -31,7 +31,8 @@ import {
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
 import { reasonShiftParts, type ReasonPartRow } from '../../lib/oeeReliability'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
-import { printSheet } from '../../lib/printSheet'
+import { pdfFileName } from '../../lib/pdfFile'
+import { sheetToPdf } from '../../lib/pdfSheet'
 
 export const Route = createFileRoute('/oee/bridge')({
   validateSearch: parsePeriodLink,
@@ -296,13 +297,13 @@ function BridgePage() {
             <h2 className="text-base font-semibold text-foreground">
               {label} <span className="font-normal text-muted-foreground">· {cur ? rangeText(cur) : ''}</span>
             </h2>
-            <button
-              type="button"
-              onClick={() => sheetRef.current && printSheet(sheetRef.current, `OEE loss bridge ${label} ${cur?.from ?? ''}`)}
-              className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground print:hidden"
-            >
-              <Printer className="h-3.5 w-3.5" aria-hidden /> Print A3
-            </button>
+            <SavePdfButton
+              variant="plain"
+              label="Save PDF (A3)"
+              fileName={pdfFileName(cur?.to ?? '', 'OEE LOSS BRIDGE')}
+              disabled={!cur}
+              make={() => sheetToPdf(sheetRef.current!, { size: 'A3', orientation: 'landscape', pages: 'fit' })}
+            />
           </div>
 
           {/* Göstergeler yarı boyda solda tek blok; sağda "Pay Attention" (Aksiyonlar sunumu, 2026-10-14). */}

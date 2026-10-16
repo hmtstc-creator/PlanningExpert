@@ -21,7 +21,10 @@ import {
 import { usePlant } from '../lib/plantContext'
 import { KpiPeriodPicker, defaultSlot } from './KpiPeriodPicker'
 import { relatedPages } from '../lib/navigation'
-import { printSheet } from '../lib/printSheet'
+import { mondayOfWeek } from '../lib/oee'
+import { pdfFileName } from '../lib/pdfFile'
+import { sheetToPdf } from '../lib/pdfSheet'
+import { SavePdfButton } from './SavePdfButton'
 
 /**
  * KPI dashboard'u — tek A3 (yatay) sayfa. Ölçü sabit: aylıkta her zaman 12
@@ -129,7 +132,7 @@ export function KpiDashboardPage({ period }: { period: KpiPeriod }) {
               selected {period === 'month' ? 'month' : 'week'} in the cards and the table.
             </p>
             <p>Several plants and cost centers can be combined: hours and pieces are added up and every percentage is calculated once from the sums.</p>
-            <p>Print / PDF opens the print dialog with an A3 landscape page — choose “Save as PDF”.</p>
+            <p>Save PDF creates the A3 landscape page as a PDF file; Chrome and Edge open the save window on the Desktop with the name filled in.</p>
           </>
         }
       />
@@ -179,14 +182,19 @@ export function KpiDashboardPage({ period }: { period: KpiPeriod }) {
             {!allCcs.length && <span>No cost center defined for the selected plants.</span>}
           </div>
         </fieldset>
-        <button
-          type="button"
-          className="ml-auto rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background disabled:opacity-40"
-          disabled={!view}
-          onClick={() => sheetRef.current && printSheet(sheetRef.current, `KPI_${period === 'month' ? 'Monthly' : 'Weekly'}_${slotKey(slot)}`)}
-        >
-          Print / PDF (A3)
-        </button>
+        <span className="ml-auto">
+          {/* Dosya adı: dönemin ilk günü — hafta için Pazartesi, ay için 1'i (Save PDF, 2026-10-16). */}
+          <SavePdfButton
+            variant="plain"
+            label="Save PDF (A3)"
+            disabled={!view}
+            fileName={pdfFileName(
+              period === 'month' ? `${slot.year}-${String(slot.num).padStart(2, '0')}-01` : mondayOfWeek(slot.year, slot.num),
+              period === 'month' ? 'KPI MONTHLY' : 'KPI WEEKLY',
+            )}
+            make={() => sheetToPdf(sheetRef.current!, { size: 'A3', orientation: 'landscape', pages: 'fit', marginMm: 0 })}
+          />
+        </span>
       </div>
 
       <div ref={box} className="mt-4 w-full overflow-hidden" style={{ height: SHEET_H * scale }}>
@@ -217,7 +225,7 @@ export interface SheetView {
   perCc: { label: string; result: KpiResult }[]
 }
 
-/** A3 sayfasının kendisi (ekranda ölçekli, yazdırmada 1:1). */
+/** A3 sayfasının kendisi (ekranda ölçekli, PDF'te 1:1). */
 export const KpiSheet = forwardRef<
   HTMLDivElement,
   { title: string; sub: string; slots: KpiSlot[]; view: SheetView | null; period: KpiPeriod; emptyText: string; printedOn?: string }
