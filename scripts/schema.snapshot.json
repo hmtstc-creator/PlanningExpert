@@ -1800,6 +1800,80 @@
     }
   },
   "oeeSettings": {
+    "agent": {
+      "fieldType": {
+        "type": "object",
+        "value": {
+          "partLossMin": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "partLossStops": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "machineLossMin": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "oeeDropPoints": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "repeatDays": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "shiftPatternDays": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "scrapFactor": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "mttrFactor": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "minLoadingMin": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "undefinedSharePct": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "summaryNotes": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          }
+        }
+      },
+      "optional": true
+    },
     "areas": {
       "fieldType": {
         "type": "array",
@@ -1946,6 +2020,26 @@
                   {
                     "type": "literal",
                     "value": "performance"
+                  }
+                ]
+              },
+              "optional": true
+            },
+            "agent": {
+              "fieldType": {
+                "type": "union",
+                "value": [
+                  {
+                    "type": "literal",
+                    "value": "die"
+                  },
+                  {
+                    "type": "literal",
+                    "value": "machine"
+                  },
+                  {
+                    "type": "literal",
+                    "value": "none"
                   }
                 ]
               },

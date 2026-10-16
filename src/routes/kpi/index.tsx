@@ -12,7 +12,7 @@ const GROUPS = [
     text: 'Plan and actual per cost center, month by month.',
     links: [
       { to: '/kpi/monthly/entry', label: 'Data entry', hint: 'Choose month and year, enter plan and actual' },
-      { to: '/kpi/monthly/dashboard', label: 'Dashboard', hint: 'One A3 page: 12 months, cards and table; print / PDF' },
+      { to: '/kpi/monthly/dashboard', label: 'Dashboard', hint: 'One A3 page: 12 months, cards and table; Save PDF' },
     ],
   },
   {
@@ -20,7 +20,7 @@ const GROUPS = [
     text: 'The same KPIs per ISO week.',
     links: [
       { to: '/kpi/weekly/entry', label: 'Data entry', hint: 'Choose week and year, enter plan and actual' },
-      { to: '/kpi/weekly/dashboard', label: 'Dashboard', hint: 'One A3 page: 13 weeks, cards and table; print / PDF' },
+      { to: '/kpi/weekly/dashboard', label: 'Dashboard', hint: 'One A3 page: 13 weeks, cards and table; Save PDF' },
     ],
   },
 ] as const

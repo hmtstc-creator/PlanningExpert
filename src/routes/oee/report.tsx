@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Printer } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
@@ -8,6 +7,7 @@ import { FAMILY_SWATCH, hours, pctOf } from '../../components/OeeBridgeCharts'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { OeePeriodFields, dm, rangeText, useOeePeriod, useShiftOptions } from '../../components/OeePeriodControl'
 import { PageHeader } from '../../components/PageHeader'
+import { SavePdfButton } from '../../components/SavePdfButton'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
 import { areaNames, costCentersOf, groupLabel, inScope, scopeLabel, type DayRow, type DowntimeDay, type OeeConfig, type OrderRow, type ShiftRow } from '../../lib/oee'
@@ -16,7 +16,8 @@ import { dailyReport, type ReportLoss, type ReportRow } from '../../lib/oeeDaily
 import { partOrders, partStops, type DetailRow } from '../../lib/oeeReliability'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
-import { printSheet } from '../../lib/printSheet'
+import { pdfFileName } from '../../lib/pdfFile'
+import { sheetToPdf } from '../../lib/pdfSheet'
 
 export const Route = createFileRoute('/oee/report')({
   validateSearch: parsePeriodLink,
@@ -149,13 +150,13 @@ function ReportPage() {
               <h2 className="text-base font-semibold text-foreground">
                 OEE daily report · {label} <span className="font-normal text-muted-foreground">· {cur ? rangeText(cur) : ''}</span>
               </h2>
-              <button
-                type="button"
-                onClick={() => sheetRef.current && printSheet(sheetRef.current, `OEE daily report ${label} ${cur?.from ?? ''}`)}
-                className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground print:hidden"
-              >
-                <Printer className="h-3.5 w-3.5" aria-hidden /> Print
-              </button>
+              <SavePdfButton
+                variant="plain"
+                label="Save PDF (A3)"
+                fileName={pdfFileName(cur?.to ?? '', 'OEE DAILY REPORT')}
+                disabled={!cur}
+                make={() => sheetToPdf(sheetRef.current!, { size: 'A3', orientation: 'landscape', pages: 'fit' })}
+              />
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground print:hidden">Click a part (reference): its days, shifts and loss details open on the right.</p>
             <ReportTable rows={report.rows} total={report.rows.length > 1 ? report.total : null} focus={focus} onPick={setFocus} />

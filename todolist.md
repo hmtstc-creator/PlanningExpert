@@ -412,7 +412,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 
 - [x] ✅ 8 slaytın hepsi uygulandı; ayrıntı ve slayt × yapılan tablosu: docs/oeedashboard.md → "Aksiyonlar sunumu".
 - [ ] **[S]** Yayından sonra OEE veri yetkisiyle bir OEE sayfasını bir kez aç: eski duruşların süre histogramı kurulur (MTTR & MTBF'in yıl / 10 hafta tabloları bununla dolar).
-- [ ] **[S]** Chrome'da "Save as PDF" hedefi için bir kez Masaüstü klasörünü seç (tarayıcı dosyayı kendisi masaüstüne yazamaz; ad hazır gelir).
+- [x] ✅ Bütün çıktılar "Save PDF" (2026-10-16): Chrome / Edge'de kayıt penceresi Masaüstünde, ad dolu açılır (docs/pdf.md). Firefox / Safari'de indirme klasörüne iner.
 - [ ] **[K]** Loss Bridge → "Pay Attention" bloğunun içeriği (şimdilik boş).
 
 ## 5. Yönetici gözüyle değerlendirme — CEO ve üretim direktörü (2026-10-05)

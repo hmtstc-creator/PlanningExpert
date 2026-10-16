@@ -341,6 +341,10 @@ export const saveSettings = guardedMutation({
     if (!(config.startupRunMin > 0) || !(config.trendWeeks > 0) || !(config.topN > 0)) {
       throw new ConvexError('Production after setup, trend weeks and list size must be above 0')
     }
+    // Agent Report eşikleri (src/lib/oeeAgent.ts): verilen her değer 0'dan büyük.
+    for (const [k, val] of Object.entries(config.agent ?? {})) {
+      if (val !== undefined && !(Number.isFinite(val) && val > 0)) throw new ConvexError(`Agent Report: ${k} must be above 0`)
+    }
     // Alan = bölüm (K3): bölümler ve masraf yeri ataması Organization'dan gelir; burada denetlenmez.
     const doc = { key: 'default', ...config, updatedAt: Date.now(), updatedBy: ctx.sessionUser?.name }
     const hit = await ctx.db

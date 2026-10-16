@@ -6,6 +6,7 @@ import { OeeRebuildNotice, useOeeConfig } from '../../components/OeePanel'
 import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
+import { agentThresholds, groupRole, type AgentThresholds } from '../../lib/oeeAgent'
 import { addDaysIso, configProblems, dataCostCenters, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
@@ -274,10 +275,10 @@ function OeeSettingsPage() {
 
       <Card
         title="Loss groups"
-        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. Bridge family: where the group sits in the Loss Bridge — Availability as the MES counts it (default), or Performance (e.g. short stops in the TPM way). It changes the availability / performance split there, never the OEE."
+        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. Bridge family: where the group sits in the Loss Bridge — Availability as the MES counts it (default), or Performance (e.g. short stops in the TPM way). It changes the availability / performance split there, never the OEE. Agent role: whether the Agent Report reads the group as a die loss (Die Follow-up) or a machine loss (Machine Follow-up); Auto guesses it from the chart column and the name."
       >
         <Rows
-          head={['Reason Code 2', 'Name', 'Chart column', 'In charts', 'Breakdown', 'Bridge family', '']}
+          head={['Reason Code 2', 'Name', 'Chart column', 'In charts', 'Breakdown', 'Bridge family', 'Agent role', '']}
           rows={c.lossGroups.map((g, i) => [
             g.code,
             <input key="l" className={input} value={g.label} onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />,
@@ -308,6 +309,26 @@ function OeeSettingsPage() {
             >
               <option value="availability">Availability</option>
               <option value="performance">Performance</option>
+            </select>,
+            <select
+              key="a"
+              className={input}
+              value={g.agent ?? 'auto'}
+              onChange={(e) => {
+                const v = e.target.value
+                set({
+                  lossGroups: c.lossGroups.map((x, j) => {
+                    if (j !== i) return x
+                    const { agent: _agent, ...rest } = x
+                    return v === 'auto' ? rest : { ...rest, agent: v as 'die' | 'machine' | 'none' }
+                  }),
+                })
+              }}
+            >
+              <option value="auto">Auto ({roleName(groupRole(g.code, { ...c, lossGroups: [{ ...g, agent: undefined }] }))})</option>
+              <option value="die">Die loss</option>
+              <option value="machine">Machine loss</option>
+              <option value="none">Neither</option>
             </select>,
             <RemoveButton key="r" onClick={() => set({ lossGroups: c.lossGroups.filter((_, j) => j !== i) })} />,
           ])}
@@ -340,6 +361,33 @@ function OeeSettingsPage() {
               ]
             })}
         />
+      </Card>
+
+      <Card
+        title="Agent Report"
+        info="When a note is written on OEE → Agent Report. A note needs at least this much on the day; comparisons use the last 7 days or the 4 weeks before the day."
+      >
+        <div className="flex flex-wrap gap-4 text-sm">
+          {AGENT_FIELDS.map(([key, text]) => (
+            <NumberField
+              key={key}
+              label={text}
+              value={agentThresholds(c)[key]}
+              onChange={(v) => set({ agent: { ...(c.agent ?? {}), [key]: v } })}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          className="mt-2 text-xs text-muted-foreground underline underline-offset-2"
+          onClick={() => {
+            const { agent: _a, ...rest } = c
+            setDraft(rest)
+            setState({ kind: 'idle' })
+          }}
+        >
+          Back to the defaults
+        </button>
       </Card>
 
       <Card title="Numbers">
@@ -421,7 +469,23 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
   return (
     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
       {label}
-      <input type="number" min={1} className={`${input} w-28`} value={value || ''} onChange={(e) => onChange(Number(e.target.value))} />
+      <input type="number" min={1} step="any" className={`${input} w-28`} value={value || ''} onChange={(e) => onChange(Number(e.target.value))} />
     </label>
   )
 }
+
+const AGENT_FIELDS: [keyof AgentThresholds, string][] = [
+  ['partLossMin', 'Die loss of a part: min per day'],
+  ['partLossStops', '… or stops per day'],
+  ['machineLossMin', 'Machine loss of a work center: min per day'],
+  ['oeeDropPoints', 'OEE against the 4-week average: points'],
+  ['repeatDays', 'Repeating: days of the last 7'],
+  ['shiftPatternDays', 'Shift pattern: weakest on days of the last 5'],
+  ['scrapFactor', 'Scrap + reject: times the 7-day rate'],
+  ['mttrFactor', 'Time per stop: times the 7-day average'],
+  ['minLoadingMin', 'Compare only with loading of at least (min)'],
+  ['undefinedSharePct', 'Downtime without a reason: % of the day'],
+  ['summaryNotes', 'Notes in the management summary'],
+]
+
+const roleName = (r: 'die' | 'machine' | null) => (r === 'die' ? 'die' : r === 'machine' ? 'machine' : 'neither')

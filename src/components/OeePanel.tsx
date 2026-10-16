@@ -160,7 +160,7 @@ export function OeeControls({
   notes?: string[]
   /** Sayfaya özel alanlar (ör. MTTR & MTBF'te en az dakika). */
   extra?: ReactNode
-  /** Sağda: ör. A4 yazdırma düğmesi. */
+  /** Sağda: ör. Save PDF düğmesi. */
   actions?: ReactNode
 }) {
   const { setScope, date, setDate, week } = selection

@@ -80,7 +80,7 @@ diğerlerinde hemen önceki eşit dönem (tek gün ↔ önceki gün);
 
 ## Ekran
 
-1. Başlık, bilgi (tanımlar, "Dashboard ile aynı OEE" kuralı), ilgili sayfalar, A3 yazdır.
+1. Başlık, bilgi (tanımlar, "Dashboard ile aynı OEE" kuralı), ilgili sayfalar, Save PDF (A3).
 2. Seçim: alan → hat / makine (OEE sayfalarıyla ortak, hatırlanır) + hatta
    tek makine; dönem: **Single day** ya da **Date range** (en çok 31 gün;
    planlamacı 2026-10-07: hazır dönemler yerine). Varsayılan son yüklenen
@@ -189,7 +189,7 @@ iş yeri için bir satır ve en altta toplam:
 - **Materials**: kaybın parça kırılımının (Level 3 "By part") ilk 3'ü, saatle;
   toplam satırında malzemenin yanında iş yeri yazar. Sipariş verisinin
   kapsamadığı hız kaybı "Not in order data".
-- Print düğmesi sayfayı yazdırır.
+- Save PDF (A3) düğmesi sayfayı PDF yapar (`GGAAYY OEE LOSS BRIDGE`; docs/pdf.md).
 
 ## Trend Analysis'ten Loss Bridge'e (2026-10-13, planlamacı)
 
