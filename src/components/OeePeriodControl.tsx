@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
@@ -14,6 +14,7 @@ import {
   type PeriodLink,
   type PeriodMode,
 } from '../lib/oeeBridge'
+import { useOeeFilters } from '../lib/oeeFilters'
 import { usePlant } from '../lib/plantContext'
 
 function localIso(d: Date) {
@@ -33,22 +34,33 @@ export type DateRange = { from: string; to: string }
  */
 export function useOeePeriod(link: Partial<PeriodLink> = {}) {
   const coverage = useQuery(api.oee.coverage) as { days: DateRange | null } | undefined
-  const linked = !!link.from && !!link.to
-  const [mode, setMode] = useState<PeriodMode>(linked && link.from !== link.to ? 'range' : 'day')
-  const [dayRaw, setDay] = useState(linked ? link.from! : '')
-  const [rangeRaw, setRange] = useState<DateRange | null>(linked ? { from: link.from!, to: link.to! } : null)
-  // Sayfa açıkken yeni bağlantı gelirse (başka sütun) dönem ona geçer.
+  // Dönem, vardiya ve makine bütün OEE sayfalarında ortak (src/lib/oeeFilters.ts).
+  const [f, set] = useOeeFilters()
+  // Bağlantıyla gelince (Trend Analysis'te tıklanan sütun) dönem bir kez ona
+  // geçer; sonra kullanıcı filtreyi yine değiştirebilir.
+  const key = link.from && link.to ? `${link.from}|${link.to}|${link.shift ?? ''}` : ''
+  const applied = useRef('')
   useEffect(() => {
-    if (!link.from || !link.to) return
-    setMode(link.from !== link.to ? 'range' : 'day')
-    setDay(link.from)
-    setRange({ from: link.from, to: link.to })
-  }, [link.from, link.to])
+    if (!key || applied.current === key) return
+    applied.current = key
+    set({
+      mode: link.from !== link.to ? 'range' : 'day',
+      date: link.from!,
+      range: { from: link.from!, to: link.to! },
+      ...(link.shift !== undefined && { shift: link.shift }),
+    })
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  // İlk çizimde (bağlantı henüz uygulanmadan) bağlantıdaki dönem.
+  const linked = !!key && applied.current !== key
+  const mode: PeriodMode = linked ? (link.from !== link.to ? 'range' : 'day') : f.mode
+  const setMode = (m: PeriodMode) => set({ mode: m })
+  const setDay = (d: string) => set({ date: d })
+  const setRange = (r: DateRange) => set({ range: r })
   const lastDay = coverage?.days?.to ?? null
   const firstDay = coverage?.days?.from ?? null
   const fallbackDay = lastDay ?? addDaysIso(localIso(new Date()), -1)
-  const day = dayRaw || fallbackDay
-  const range = rangeRaw ?? { from: addDaysIso(fallbackDay, -6), to: fallbackDay }
+  const day = (linked ? link.from! : f.date) || fallbackDay
+  const range = (linked ? { from: link.from!, to: link.to! } : f.range) ?? { from: addDaysIso(fallbackDay, -6), to: fallbackDay }
   const wanted = selectedRange(mode, day, range)
   const cur = clipToData(wanted, lastDay)
   // Bir takvim ayının tamamı önceki ayın tamamıyla, diğerleri önceki eşit dönemle karşılaştırılır.
@@ -57,7 +69,28 @@ export function useOeePeriod(link: Partial<PeriodLink> = {}) {
   const prevFull = !!prev && !!firstDay && prev.from >= firstDay
   // Ham duruş ve vardiya kayıtları en çok 8 günlük dönemde okunur.
   const eventsOk = !!cur && daysBetween(cur.from, cur.to) <= MAX_EVENT_DAYS
-  return { mode, setMode, day, setDay, range, setRange, lastDay, firstDay, wanted, cur, prev, prevFull, eventsOk }
+  const shift = linked && link.shift !== undefined ? link.shift : f.shift
+  const setShift = (n: number) => set({ shift: n })
+  const setMachine = (m: string) => set({ machine: m })
+  return {
+    mode,
+    setMode,
+    day,
+    setDay,
+    range,
+    setRange,
+    lastDay,
+    firstDay,
+    wanted,
+    cur,
+    prev,
+    prevFull,
+    eventsOk,
+    shift,
+    setShift,
+    machine: f.machine,
+    setMachine,
+  }
 }
 
 export type OeePeriod = ReturnType<typeof useOeePeriod>
@@ -98,7 +131,7 @@ export function OeePeriodFields({
   const { mode, setMode, day, setDay, range, setRange, lastDay, cur, prev, eventsOk } = p
   return (
     <>
-      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+      <div className="filter-label flex flex-col gap-1">
         Period
         <div className="flex rounded-md border border-input p-0.5" role="group" aria-label="Period">
           {(
@@ -192,7 +225,7 @@ export function OeePeriodFields({
           </select>
         </label>
       )}
-      <span className="pb-2 text-xs text-muted-foreground">
+      <span className="filter-note pb-2 text-xs">
         {cur ? (
           <>
             <strong className="text-foreground">{rangeText(cur)}</strong> · {daysBetween(cur.from, cur.to)} day(s)

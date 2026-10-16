@@ -2182,6 +2182,53 @@
       "optional": false
     }
   },
+  "oeeStopDays": {
+    "bins": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "array",
+          "value": {
+            "type": "union",
+            "value": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      "optional": false
+    },
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
   "oeeWeekly": {
     "availability": {
       "fieldType": {

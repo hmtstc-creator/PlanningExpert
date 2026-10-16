@@ -4,8 +4,11 @@ Pres üretimi için kiralanan, çok şirketli üretim planlama portalı:
 PlanningExpert (plan), OEE, KPI, Die Follow-up, Machine Follow-up ve Board
 Dashboard. Tek sistem, tek adres; her plant'in verisi ayrıdır.
 
-- Arayüz: React 19 + TanStack Start/Router + Tailwind v4 (Vercel)
-- Sunucu ve veritabanı: Convex
+- Arayüz: React 19 + TanStack Start/Router + Tailwind v4
+- Sunucu ve veritabanı: Convex (self-hosted)
+- **Hepsi kendi VPS'imizde** (Hetzner, Docker Compose, Tailscale Funnel):
+  site, veritabanı, yedek ve yayın sunucuda yönetilir. Dış barındırma
+  hizmeti (Vercel, Convex Cloud) kullanılmaz — `deploy/README.md`.
 - Hesap kütüphanesi: `src/lib` (saf TypeScript, React'e ve Convex'e bağlı değil)
 
 ## Belgeler
@@ -20,7 +23,8 @@ Dashboard. Tek sistem, tek adres; her plant'in verisi ayrıdır.
 | `docs/board.md` | Holding, Board Dashboard, organizasyon ağacı |
 | `docs/oeedashboard.md` | OEE kararları ve dosya biçimi |
 | `docs/kpi.md` | KPI modülü |
-| `docs/deployment.md` | VPS'e dağıtım, Convex Cloud / self-hosted kararı |
+| `docs/deployment.md` | VPS'te yayın, veri güvenliği, yerel geliştirme |
+| `deploy/README.md` | **Sunucu kitabı**: güncelleme, yedek, geri yükleme, sıfırdan kurulum |
 | Sitede **Planning Logic** | Kullanıcıya dönük plan kuralları |
 
 ## Organizasyon
@@ -38,9 +42,12 @@ Yetki = grup × plant × modül (*yok · görür · düzenler*).
 
 ```bash
 npm install
+npx convex dev         # işlevleri yerel Convex'e yükler ve izler (.env.local)
 npm run dev            # arayüz (http://localhost:3000)
-npx convex dev         # Convex işlevlerini izler ve deploy eder (.env.local)
 ```
+
+Yerel Convex bilgisayarda Docker ile çalışır, bulut hesabı gerekmez:
+docs/deployment.md → Yerel geliştirme.
 
 ## Doğrulama (her değişiklikten önce)
 
@@ -49,20 +56,27 @@ npm run verify         # tip kontrolü + bütün testler + build
 ```
 
 Aynısı her push'ta GitHub Actions'ta koşar (`.github/workflows/ci.yml`).
-Kırmızı CI = main bozuk; önce o düzeltilir.
+Kırmızı CI = main bozuk; önce o düzeltilir. GitHub yalnızca kodu ve CI'ı
+tutar; yayın yapmaz.
 
-## Yayın (deploy)
+## Yayın (deploy) — VPS
 
-Site VPS'e taşınıyor: adımlar ve "Convex nerede çalışacak" kararı
-**docs/deployment.md**'de. Özet: `npm run verify` → `npx convex deploy` →
-`npm run build` → `node .output/server/index.mjs`.
+Yayın sunucuda, CI'ı yeşil commit'ten yapılır (**deploy/README.md →
+Güncelleme**):
+
+```bash
+cd /opt/planningexpert && git pull
+set -a; . /etc/planningexpert/portal.env; set +a
+./scripts/release.sh                              # yedek → convex deploy → site derlemesi
+docker compose -f deploy/compose.yml restart web
+```
 
 ## Yedek ve geri yükleme
 
-- **Convex yedeği:** Convex panelinde production deployment → *Backup &
-  Restore*: periyodik (günlük) yedek açılır; plan bunu desteklemiyorsa en
-  azından her büyük değişiklikten önce *Backup now*. Ayda bir, yedek boş bir
-  deployment'a geri yüklenerek denenir (todolist.md 4.1).
+- **Gece yedeği (VPS):** her gece 02:15 `scripts/backup.sh` — veri ve
+  dosyalar (fotoğraflar), son 30 tutulur, isteğe bağlı sunucu dışına kopya.
+  Her yayından önce de yedek alınır. Ayda bir, yedek geçici bir Convex'e geri
+  yüklenip `scripts/compare-exports.mjs` ile doğrulanır (deploy/README.md).
 - **Şirket dışa aktarımı:** Company settings → Organization → şirket → *Export data
   (JSON)*: o şirketin bütün plant verisi tek dosya (kiralama bitince ya da
   elle yedek).
@@ -91,8 +105,8 @@ Site VPS'e taşınıyor: adımlar ve "Convex nerede çalışacak" kararı
   hesap 15 dakika kilitlenir (creator yeni parola verince açılır).
 - Boş kurulumda ilk hesap `admin` / `admin` olarak açılır ve ilk girişte
   değiştirilmesi zorunludur. Parola unutulursa: creator yeni geçici parola
-  verir; site sahibinin parolası Convex panelinden `auth:resetPassword` ile
-  sıfırlanır.
+  verir; site sahibinin parolası sunucuda `npx convex run auth:resetPassword`
+  ile sıfırlanır (deploy/README.md → Parola sıfırlama).
 
 ## Yeni plant kurulumu
 
@@ -103,12 +117,13 @@ kullanıcılar ve gruplar.
 
 ## Sorun giderme: "Telefonda girdiğim veri bilgisayarda görünmüyor"
 
-İki cihaz farklı Convex deployment'ına bakıyordur.
+İki cihaz farklı Convex sunucusuna bakıyordur.
 
 1. **System → Connection Diagnostics** sayfasını iki cihazda da aç.
-2. **Deployment** adlarını karşılaştır.
-3. Farklıysa build başka bir Convex deployment'ına bakıyordur (preview
-   anahtarı ya da başka adres); production'ınkiyle yeniden build et.
+2. **Deployment** adreslerini karşılaştır.
+3. Farklıysa cihazlardan biri eski bir derlemeyi ya da başka bir adresi
+   açıyordur; doğru adres `https://planningexpert.<tailnet>.ts.net`. Gerekirse
+   sunucuda `./scripts/release.sh` ile yeniden derle.
 4. Aynıysa ve sayılar farklıysa tarayıcı önbelleğidir — sayfayı yenile.
 
 ## Notlar

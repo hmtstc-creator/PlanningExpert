@@ -870,6 +870,8 @@ export interface SetupRow {
   start: string
   end: string
   kind: 'planned' | 'unplanned' | 'mixed'
+  /** Setup'ın duruş metinleri (DIE SETUP - UNPLANNED, GRIPPER SETUP …): STP'nin alt detayı. */
+  texts: string[]
   setupMin: number
   status: SetupStatus
   /** Setup bitişinden ayardaki üretim süresine ulaşana kadar geçen süre (OK ise). */
@@ -963,7 +965,7 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
       return cur + (need - run) <= limit ? cur + (need - run) : null
     }
 
-    const blocks: { s: number; e: number; order: string; material: string; kinds: Set<string>; min: number }[] = []
+    const blocks: { s: number; e: number; order: string; material: string; kinds: Set<string>; texts: Set<string>; min: number }[] = []
     for (const sp of spans) {
       const kind = setupKind.get(sp.ev.textEn.trim().toUpperCase())
       if (!kind) continue
@@ -974,9 +976,18 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
         last.order = sp.ev.order || last.order
         last.material = sp.ev.material || last.material
         last.kinds.add(kind)
+        last.texts.add(sp.ev.textEn.trim())
         last.min += sp.ev.minutes
       } else {
-        blocks.push({ s: sp.s, e: sp.e, order: sp.ev.order, material: sp.ev.material, kinds: new Set([kind]), min: sp.ev.minutes })
+        blocks.push({
+          s: sp.s,
+          e: sp.e,
+          order: sp.ev.order,
+          material: sp.ev.material,
+          kinds: new Set([kind]),
+          texts: new Set([sp.ev.textEn.trim()]),
+          min: sp.ev.minutes,
+        })
       }
     }
 
@@ -1004,6 +1015,7 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
         start: fmtMin(b.s),
         end: fmtMin(b.e),
         kind: b.kinds.size > 1 ? 'mixed' : (([...b.kinds][0] ?? 'planned') as 'planned' | 'unplanned'),
+        texts: [...b.texts],
         setupMin: b.min,
         status,
         timeToRunMin: reached !== null ? reached - b.e : null,

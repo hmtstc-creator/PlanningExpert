@@ -7,6 +7,7 @@ import { useQuery } from '../lib/convexTransport'
 import { useCurrentUser } from '../lib/currentUser'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { ErrorBanner } from './ErrorBanner'
+import { hours } from './OeeBridgeCharts'
 
 export interface FollowUpDraft {
   material: string
@@ -17,6 +18,24 @@ export interface FollowUpDraft {
   /** O parçanın o presteki duruşları, gün gün (dönem içinde). */
   days: { date: string; minutes: number }[]
   period: string
+  /** Neden ve vardiya (ör. "MOLD PART BREAKAGE · Shift 2"). */
+  detail?: string
+  /** Hangi sayfadan (açıklamanın başı); yoksa OEE Loss Bridge. */
+  source?: string
+}
+
+/** Tıklanınca Die Follow-up penceresini açan süre (saat) düğmesi — Loss Bridge ve Daily Report'ta aynı görünüm. */
+export function FollowUpTime({ minutes, onClick, className = '' }: { minutes: number; onClick: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Add to Die Follow-up with an action"
+      className={`rounded-md border border-[var(--viz-1)]/40 bg-[var(--viz-1)]/10 px-1.5 py-0.5 text-right font-semibold text-foreground tabular-nums hover:bg-[var(--viz-1)]/20 print:border-0 print:bg-transparent ${className}`}
+    >
+      {hours(minutes)}
+    </button>
+  )
 }
 
 /** Operasyon bilinmiyorsa (OEE verisinde operasyon yok). */
@@ -25,7 +44,7 @@ const NO_OPERATION = '—'
 const dm = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`
 
 /**
- * OEE Loss Bridge'den Die Follow-up'a takip konusu (planlamacı, 2026-10-13):
+ * OEE Loss Bridge ve Daily Report'tan Die Follow-up'a takip konusu (planlamacı, 2026-10-13 / 10-16):
  * parça, pres, duruş tarihi ve süresi hazır gelir; kullanıcı aksiyonu yazıp
  * kaydeder. Kayıt Die Problems'ta açık problem olarak görünür.
  */
@@ -44,7 +63,7 @@ export function DieFollowUpDialog({ draft, onClose }: { draft: FollowUpDraft; on
   const [operation, setOperation] = useState(NO_OPERATION)
   const [problemType, setProblemType] = useState(draft.loss)
   const [description, setDescription] = useState(
-    `OEE Loss Bridge: ${draft.loss} — ${Math.round(draft.minutes)} min on ${draft.press} (${draft.period}).`,
+    `${draft.source ?? 'OEE Loss Bridge'}: ${draft.loss}${draft.detail ? ` (${draft.detail})` : ''} — ${Math.round(draft.minutes)} min${draft.press ? ` on ${draft.press}` : ''} (${draft.period}).`,
   )
   const [action, setAction] = useState('')
   const [saved, setSaved] = useState(false)
@@ -59,7 +78,7 @@ export function DieFollowUpDialog({ draft, onClose }: { draft: FollowUpDraft; on
       description: description.trim() || undefined,
       downtimeMinutes: minutes.trim() === '' ? undefined : Math.max(0, Math.round(Number(minutes))),
       reportedBy: currentUser ?? undefined,
-      press: draft.press,
+      press: draft.press || undefined,
       action: action.trim(),
     })
     if (done) setSaved(true)
@@ -81,7 +100,7 @@ export function DieFollowUpDialog({ draft, onClose }: { draft: FollowUpDraft; on
             <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Add to Die Follow-up</p>
             <p className="mt-0.5 text-lg font-bold">{draft.material}</p>
             <p className="text-xs text-muted-foreground">
-              {draft.press} · {draft.loss} · {(draft.minutes / 60).toFixed(1)} h in {draft.period}
+              {[draft.press, draft.loss, draft.detail].filter(Boolean).join(' · ')} · {(draft.minutes / 60).toFixed(1)} h in {draft.period}
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Close">
@@ -91,7 +110,8 @@ export function DieFollowUpDialog({ draft, onClose }: { draft: FollowUpDraft; on
 
         {saved ? (
           <div className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900">
-            ✓ Added as an open problem for {draft.material} ({draft.press}).{' '}
+            ✓ Added as an open problem for {draft.material}
+            {draft.press ? ` (${draft.press})` : ''}.{' '}
             <Link to="/die-followup/problems" className="font-medium underline">
               Open Die Problems
             </Link>

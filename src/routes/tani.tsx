@@ -11,10 +11,10 @@ export const Route = createFileRoute('/tani')({
 
 const CONVEX_URL: string = (import.meta as any).env?.VITE_CONVEX_URL ?? ''
 
-/** https://mutlu-kedi-123.convex.cloud → mutlu-kedi-123 */
+/** VPS'teki Convex sunucumuzun adresi (ör. planningexpert.<tailnet>.ts.net:8443). */
 function deploymentName(url: string): string {
   try {
-    return new URL(url).hostname.split('.')[0]
+    return new URL(url).host
   } catch {
     return '(unreadable)'
   }
@@ -63,7 +63,7 @@ function TaniPage() {
   const [https, setHttps] = useState<HttpsState>(CONVEX_URL ? 'checking' : 'no-url')
   const [ws, setWs] = useState<WsState | null>(null)
 
-  // 1) HTTPS erişimi: convex.cloud alan adına hiç ulaşılabiliyor mu?
+  // 1) HTTPS erişimi: Convex sunucumuzun adresine hiç ulaşılabiliyor mu?
   // no-cors ile cevabın içeriği okunamaz ama ULAŞILABİLDİĞİ anlaşılır;
   // engelliyse istek reddedilir.
   useEffect(() => {
@@ -119,11 +119,9 @@ function TaniPage() {
       body: (
         <>
           <code>VITE_CONVEX_URL</code> is not set. This is not a network problem
-          but a missing build setting (docs/deployment.md). The build command must be:{' '}
-          <code className="break-all">
-            npx convex codegen &amp;&amp; npx convex deploy --cmd 'npm run build'
-            --cmd-url-env-var-name VITE_CONVEX_URL
-          </code>
+          but a missing build setting (docs/deployment.md). Build on the server
+          with <code className="break-all">./scripts/release.sh</code> (it sets the
+          address from <code>CONVEX_PUBLIC_URL</code>).
         </>
       ),
     }
@@ -147,7 +145,7 @@ function TaniPage() {
           </p>
           <p className="mt-2">
             For a permanent fix, ask IT to allow <strong>WebSocket (wss://)</strong>
-            traffic to <code>*.convex.cloud</code> on port 443.
+            traffic to <code>{deployment}</code>.
           </p>
         </>
       ),
@@ -161,7 +159,7 @@ function TaniPage() {
       body: (
         <>
           <p>
-            <code>{deployment}.convex.cloud</code> is reachable over HTTPS, but
+            <code>{deployment}</code> is reachable over HTTPS, but
             the <strong>WebSocket connection cannot be established</strong>. The
             app receives live data over WebSocket, which is why the page loads
             but no data arrives.
@@ -172,7 +170,7 @@ function TaniPage() {
           </p>
           <p className="mt-2">
             <strong>Request for IT:</strong> allow <strong>WebSocket (wss://)</strong>
-            traffic to <code>*.convex.cloud</code> on port 443.
+            traffic to <code>{deployment}</code>.
           </p>
         </>
       ),
@@ -180,16 +178,16 @@ function TaniPage() {
   } else {
     verdict = {
       tone: 'bad',
-      title: 'convex.cloud cannot be reached at all',
+      title: 'The database server cannot be reached at all',
       body: (
         <>
           <p>
-            This device cannot reach <code>{deployment}.convex.cloud</code> even
+            This device cannot reach <code>{deployment}</code> even
             over HTTPS. The domain is fully blocked or sits behind a proxy.
           </p>
           <p className="mt-2">
-            <strong>Request for IT:</strong> whitelist <code>*.convex.cloud</code>
-            (port 443, HTTPS and WebSocket).
+            <strong>Request for IT:</strong> whitelist <code>{deployment}</code>
+            (HTTPS and WebSocket).
           </p>
         </>
       ),
@@ -298,8 +296,8 @@ function TaniPage() {
           </li>
           <li>
             Both connected but the <strong>Deployment</strong> names differ: the
-            build points at another Convex deployment (a <code>preview:</code> deploy key, or another
-            self-hosted URL). Build with the production deployment's key or URL.
+            build points at another Convex server (an old build or another
+            URL). Rebuild on the server with <code>./scripts/release.sh</code>.
           </li>
           <li>
             Same deployment but different row counts: browser cache — reload the

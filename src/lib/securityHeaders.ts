@@ -8,15 +8,41 @@
  * betik yüklenemez, veri yalnızca kendi sunucumuza ve Convex'e gider,
  * <object> ve başka sitede çerçeve (clickjacking) kapalıdır.
  */
-const CONVEX = ['https://*.convex.cloud', 'wss://*.convex.cloud', 'https://*.convex.site']
+/**
+ * VPS'teki kendi Convex sunucumuz (self-hosted, deploy/README.md): adresi build
+ * sırasında VITE_CONVEX_URL'den gelir (ör. https://planningexpert.<tailnet>.ts.net:8443);
+ * HTTPS ve WebSocket olarak izin verilir. `siteUrl`: backend'in ikinci
+ * adresi (CONVEX_SITE_ORIGIN; dosya / HTTP uçları), verilirse o da. Başka
+ * Convex adresine (bulut) izin yoktur.
+ */
+export function convexOrigins(url: string | undefined, siteUrl?: string): string[] {
+  const out: string[] = []
+  for (const [raw, socket] of [
+    [url, true],
+    [siteUrl, false],
+  ] as const) {
+    if (!raw) continue
+    try {
+      const u = new URL(raw)
+      out.push(`${u.protocol}//${u.host}`)
+      if (socket) out.push(`${u.protocol === 'http:' ? 'ws' : 'wss'}://${u.host}`)
+    } catch {
+      // Okunamayan adres yok sayılır.
+    }
+  }
+  return [...new Set(out)]
+}
+
+const env = typeof process === 'undefined' ? {} : process.env
+const CONVEX = convexOrigins(env.VITE_CONVEX_URL, env.CONVEX_SITE_ORIGIN)
 
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: ${CONVEX[0]}`,
+  ['img-src', "'self'", 'data:', 'blob:', ...CONVEX.filter((o) => o.startsWith('http'))].join(' '),
   "font-src 'self' data:",
-  `connect-src 'self' ${CONVEX.join(' ')}`,
+  ['connect-src', "'self'", ...CONVEX].join(' '),
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",

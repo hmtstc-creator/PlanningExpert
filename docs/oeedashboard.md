@@ -501,8 +501,8 @@ bir sonraki plan hesabında yeni metinle yazılır.
 - Plant genişletme: aşama 1–6 ve 7'nin ilk sürümü uygulandı (2026-10-02,
   docs/plant-genisletme.md → "Uygulama"). OEE verisi ve ayarları fabrika
   başına; karşılaştırma ekranının içeriği konuşulacak.
-- Deploy (2026-10-02): Vercel, TanStack Start 1.168.54'teki XSS açığı yüzünden
-  build'i durdurdu → 1.168.60'a güncellendi.
+- Güvenlik (2026-10-02): TanStack Start 1.168.54'teki XSS açığı yüzünden
+  1.168.60'a güncellendi.
 - ~~MB51 eski satırlar~~ → sorun değil, veriler yenilenebilir.
 - ~~APR setup süresi~~ → alan bazlı süre (APR 10 dk). Parça bazlı setup
   süresi Master Data'da — ileride.
@@ -655,3 +655,26 @@ pressCalendar.saveShiftCodes; takvim düzenleme izni). Takvimde kod girilmemişs
 eski Company settings → Shifts kodları ve adları kullanılır (kaybolmaz;
 src/lib/shifts.ts `calendarShifts`, test). OEE Settings'in Shifts kartı
 takvime yönlendirir.
+
+## Aksiyonlar sunumu (2026-10-14, planlamacı)
+
+Sunumdaki 8 slayt (9. boş) ve yapılanlar:
+
+| Slayt | Sayfa | İstek | Yapılan |
+|---|---|---|---|
+| 1 | Daily Report | Tablo solda sığsın; referansa tıklayınca sağda gün, vardiya, kayıp tipi, detay | Tablo ekranın ~%64'ü (kayıp ve parçaları tek hücrede). Parçaya tıklayınca sağ panel: o parçanın o kayıptaki gün × vardiya × neden satırları (ilk duruş saati, adet, süre), parçanın bütün duruş kayıpları (grup başına) ve diğer duruşları. Hız ve hurda / ret için sipariş satırları. Ham duruşlardan: en çok 8 günlük dönem. |
+| 1, 2, 3, 6 | Bütün OEE sayfaları | Filtre belirgin (toz mavi), her sayfada aynı, sayfa değişince kaybolmasın | Ortak filtre çubuğu: toz mavi zemin, kalın etiketler, sayfa kayarken üstte. Alan / masraf yeri, gün, dönem, vardiya, makine tek yerde (`src/lib/oeeFilters.ts`): alan tarayıcıda, diğerleri oturumda kalır. |
+| 2 | Trend Analysis | A4 boyutu; A4 print → "GGAAYY OEE TREND" PDF, filtreler görünsün | Sayfa A4 yatay genişliğinde. "Print A4": yalnızca grafikler ve tablolar, A4 yatay, bölümler sayfa arasında bölünmez; başta başlık ve seçili filtreler. Kayıt penceresi "141026 OEE TREND" adıyla açılır. **Tarayıcı dosyayı kendisi masaüstüne yazamaz**: Chrome'da hedef "Save as PDF", klasör bir kez Masaüstü seçilir, sonra hatırlanır. |
+| 3 | Losses Trend | Aynı (GGAAYY LOSSES TREND) | Aynı. |
+| 4 | Losses Trend | Dies bölümü yeni "Dies OEE Trend" sayfasına; Setup bölümü dar | `/oee/dies` (OEE → Menu): haftanın en kötü kalıpları, en çok hız kaybı ve aynı kalıpların son haftalardaki OEE'si. Setup tabloları içerik kadar geniş. |
+| 5 | Losses Trend → Setups | Özet solda, yanında NOK nedenleri; Order No ve Good yok; Main reason yerine STP'nin alt detayı | Özet ve "Why NOK" yan yana. Liste: Press, Setup, Part, **Setup type** (Downtimes metni: DIE SETUP - UNPLANNED, GRIPPER SETUP …; birleşen setup'larda "+" ile), Kind, süre, sonuç (NOK'ta ana nedeni yanında), üretime geçiş, sonrası duruşlar. |
+| 6 | Loss Bridge | Göstergeler yarı boy solda, sağda boş "Pay Attention"; köprü eksen yazıları okunur; Level 2 ve Bridge table görünmesin | Dört gösterge sol blokta, altında ince öncelik şeridi; sağda "Pay Attention" (boş, sonra doldurulacak). Eksen yazıları 13 pt, kalın. Level 2 ve köprü tablosu hesapta duruyor, ekranda gizli. |
+| 7 | Loss Bridge → yan panel | % of loading / time / stops / MTTR başlığın yanına, kalın; kalemlerde vardiya; kaleme tıklayınca hangi referans ve vardiya | İstatistikler başlığın yanında kutucuklarda, kalın başlıklarla. "By reason" tablosunda **Shift** sütunu (S1 61′ · S3 12′). Kaleme tıklayınca "Hours by part" o kaleme süzülür: parça, makine, vardiya, adet, süre. Ham duruşlardan: en çok 8 günlük dönem. |
+| 8 | Yeni: MTTR & MTBF | OEE altında; Losses Trend'deki tablo buraya; ARZ, KLP, STP (kalıp setup planlı / plansız, rulo setup); yıllık (aylar), son 10 hafta, mevcut hafta (günler); MTTR sol, MTBF sağ; min dakika girdi hücresi; < 2, 2–10, > 10 dk kırılımı | `/oee/mttr` (OEE çubuğunda). Üstte haftanın makine tablosu (bütün kategoriler). Kategori düğmeleri (ARZ, KLP: OEE Settings'te "breakdown" işaretli gruplar; STP: setup metinleri seçilir, varsayılan DIE SETUP planlı / plansız ve COIL SETUP). Ekran ikiye: solda MTTR, sağda MTBF; her birinde yıl (aylar), son haftalar, hafta (günler). Filtre çubuğunda **Min. duration (min)**: altındaki duruşlar MTTR / MTBF'e girmez. Altta süre kovaları (< 2, 2–10, ≥ 10 dk): adet, toplam süre, MTTR, MTBF, presler; seçilen haftada parçalar ve vardiyalar. |
+
+Hesap ve veri:
+
+- **MTTR** = duruş dakikası ÷ duruş sayısı; **MTBF** = production time ÷ duruş sayısı (eski tabloyla aynı; eşik 0'da birebir — test).
+- Duruş satırı çok (ayda ~30 000): yılın MTTR / MTBF'i için yüklemede gün × iş merkezi başına **süre histogramı** saklanır (`oeeStopDays`: Reason Code 1, 2, metin, tam dakika dilimi → adet, dakika; `src/lib/oeeReliability.ts`). Eşik tam dakikayla: 9.7 dk, 10 dk eşiğinin altındadır; kovalar < 2, 2–< 10, ≥ 10.
+- Önceden yüklenmiş veri için histogram, herhangi bir OEE sayfası OEE veri yetkisiyle açılınca bir kez kurulur (yalnızca ekler, hiçbir şey silmez — gün toplamları ve kayıp özetleriyle aynı yol).
+- Parça / vardiya ayrıntısı (Daily Report paneli, Bridge vardiya sütunu, kovaların parça ve vardiyası) ham duruşlardan okunur: en çok 8 gün.

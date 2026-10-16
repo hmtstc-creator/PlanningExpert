@@ -154,13 +154,15 @@ export const MODULE_AREAS: Area[] = [
   PLANNING,
   area('oee', 'OEE', 'OEE', '/oee', 'activity', 'emerald', 'oee', [
     link('/oee', 'Trend Analysis', 'Monthly, 10 weeks and the selected week — OEE and performance', 'dashboard'),
-    link('/oee/losses', 'Losses Trend', 'Losses, dies, breakdowns and setups', 'trendDown'),
+    link('/oee/losses', 'Losses Trend', 'Losses of the week, top reasons and setups', 'trendDown'),
     link('/oee/bridge', 'Loss Bridge', 'From calendar time to OEE, loss by loss — priorities', 'chartDown'),
     link('/oee/report', 'Daily Report', 'One page: OEE, top 3 losses with materials, speed loss per work center', 'sheet'),
+    link('/oee/mttr', 'MTTR & MTBF', 'ARZ, KLP and setups: repair time and time between stops — year, 10 weeks, week', 'wrench'),
     {
       label: 'Menu',
       icon: 'grid',
       children: [
+        link('/oee/dies', 'Dies OEE Trend', 'Worst dies, speed loss and their OEE over the last weeks', 'anvil'),
         link('/oee/data', 'Data', 'The uploaded sheets, as in the file', 'sheet'),
         link('/oee/settings', 'Settings', 'Departments, shifts, loss groups, setups', 'settings'),
         link('/oee/guide', 'How to use', 'First setup and routine uploads', 'book'),
@@ -283,7 +285,9 @@ const RELATED_PAGES: Record<string, string[]> = {
   '/kayitlar': ['/planlama', '/planlogic', '/settings'],
   // OEE
   '/oee': ['/oee/losses', '/oee/bridge', '/oee/data', '/kpi/monthly/dashboard', '/machine-followup/breakdowns'],
-  '/oee/losses': ['/oee', '/oee/bridge', '/machine-followup/breakdowns', '/die-followup/problems', '/oee/data'],
+  '/oee/losses': ['/oee', '/oee/bridge', '/oee/mttr', '/oee/dies', '/machine-followup/breakdowns', '/oee/data'],
+  '/oee/mttr': ['/oee/losses', '/oee/bridge', '/machine-followup/breakdowns', '/oee/settings'],
+  '/oee/dies': ['/oee/losses', '/die-followup/problems', '/oee/report', '/oee/data'],
   '/oee/bridge': ['/oee', '/oee/losses', '/oee/report', '/die-followup/problems', '/machine-followup/breakdowns', '/oee/settings'],
   '/oee/report': ['/oee/bridge', '/oee', '/oee/losses', '/die-followup/problems', '/machine-followup/breakdowns'],
   '/oee/data': ['/oee', '/oee/settings', '/oee/guide'],
@@ -320,6 +324,8 @@ const LABELS: Record<string, string> = {
   '/oee/losses': 'OEE Losses',
   '/oee/bridge': 'OEE Loss Bridge',
   '/oee/report': 'OEE Daily Report',
+  '/oee/mttr': 'OEE MTTR & MTBF',
+  '/oee/dies': 'Dies OEE Trend',
   '/oee/data': 'OEE Data',
   '/oee/settings': 'OEE Settings',
   '/oee/guide': 'OEE Guide',

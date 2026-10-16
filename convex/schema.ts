@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from 'convex/server'
 import { v } from 'convex/values'
-import { configFields, dayFields, downtimeDayFields, lossDayFields, monthlyFields, orderFields, shiftFields, weeklyFields } from './oeeValidators'
+import { configFields, dayFields, downtimeDayFields, lossDayFields, monthlyFields, orderFields, shiftFields, stopDayFields, weeklyFields } from './oeeValidators'
 
 /**
  * Fabrika anahtarı (docs/plant-genisletme.md). Fabrikaya ait her tabloda
@@ -862,6 +862,10 @@ export default defineSchema({
     .index('by_key', ['plantId', 'date', 'workCenter'])
     .index('by_plant', ['plantId']),
   oeeLossDays: defineTable({ ...lossDayFields, ...plantField })
+    .index('by_date', ['plantId', 'date'])
+    .index('by_key', ['plantId', 'date', 'workCenter'])
+    .index('by_plant', ['plantId']),
+  oeeStopDays: defineTable({ ...stopDayFields, ...plantField })
     .index('by_date', ['plantId', 'date'])
     .index('by_key', ['plantId', 'date', 'workCenter'])
     .index('by_plant', ['plantId']),

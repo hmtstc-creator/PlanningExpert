@@ -1,8 +1,8 @@
 // Veri sunucusuna (Convex) bu bilgisayardan ulaşılabiliyor mu?
 //
-// Giriş ekranı bunu gösterir: şirket ağı ya da güvenlik yazılımı
-// `*.convex.cloud` adresini engellerse sayfa açılır ama giriş hiçbir zaman
-// cevap alamaz. Kullanıcı sebebini görmeli ve IT'ye ne soracağını bilmeli.
+// Giriş ekranı bunu gösterir: şirket ağı ya da güvenlik yazılımı VPS'teki
+// Convex adresini (VITE_CONVEX_URL, Funnel :8443) engellerse sayfa açılır ama
+// giriş hiçbir zaman cevap alamaz. Kullanıcı sebebini görmeli ve IT'ye ne soracağını bilmeli.
 
 import { useEffect, useState } from 'react'
 

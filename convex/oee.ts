@@ -12,6 +12,7 @@ import {
 } from './oeeValidators'
 import { daysFromShifts, lossDayOf } from '../src/lib/oee'
 import { fromStoredDay, mergeEvents, sameStored, toStoredDay, toStoredLoss } from '../src/lib/oeeStore'
+import { stopDayOf } from '../src/lib/oeeReliability'
 
 /**
  * OEE Trend and Losses — veri.
@@ -227,10 +228,20 @@ export const upsertDowntimeDays = guardedMutation({
         .withIndex('by_key', (q: Ctx) => q.eq('date', incoming.date).eq('workCenter', incoming.workCenter))
         .first()
       await upsert(ctx, lossHit, 'oeeLossDays', toStoredLoss(lossDayOf(next)))
+      await upsertStops(ctx, next)
     }
     return days.length
   },
 })
+
+/** Gün × iş merkezinin duruş süresi histogramı (MTTR / MTBF; src/lib/oeeReliability.ts). */
+async function upsertStops(ctx: Ctx, day: ReturnType<typeof fromStoredDay>) {
+  const hit = await ctx.db
+    .query('oeeStopDays')
+    .withIndex('by_key', (q: Ctx) => q.eq('date', day.date).eq('workCenter', day.workCenter))
+    .first()
+  await upsert(ctx, hit, 'oeeStopDays', stopDayOf(day))
+}
 
 /**
  * İlk sürümle yüklenen veride gün toplamları (oeeDays) ve yeni biçim kayıp
@@ -241,7 +252,7 @@ export const upsertDowntimeDays = guardedMutation({
 export const rebuildStored = guardedMutation({
   areas: ['oee.data'],
   modules: OEE,
-  args: { step: v.union(v.literal('days'), v.literal('losses')), cursor: v.union(v.string(), v.null()) },
+  args: { step: v.union(v.literal('days'), v.literal('losses'), v.literal('stops')), cursor: v.union(v.string(), v.null()) },
   returns: v.object({ cursor: v.string(), isDone: v.boolean(), count: v.number() }),
   affectsPlan: false,
   handler: async (ctx, { step, cursor }) => {
@@ -265,6 +276,17 @@ export const rebuildStored = guardedMutation({
     }
     // Duruş kayıtları büyük: küçük sayfa.
     const page = await ctx.db.query('oeeDowntimeDays').withIndex('by_date').paginate({ cursor, numItems: 40 })
+    if (step === 'stops') {
+      // Süre histogramı (MTTR / MTBF sayfası, 2026-10-14): yalnızca eksik olanlar.
+      for (const doc of page.page) {
+        const hit = await ctx.db
+          .query('oeeStopDays')
+          .withIndex('by_key', (q: Ctx) => q.eq('date', doc.date).eq('workCenter', doc.workCenter))
+          .first()
+        if (!hit) await ctx.db.insert('oeeStopDays', stopDayOf(fromStoredDay(doc)))
+      }
+      return { cursor: page.continueCursor, isDone: page.isDone, count: page.page.length }
+    }
     for (const doc of page.page) {
       const lossHit = await ctx.db
         .query('oeeLossDays')
@@ -362,7 +384,7 @@ async function definedOnly<T extends { workCenter: string }>(ctx: Ctx, rows: T[]
 }
 
 /** Tarih indeksli OEE tabloları (tablo adı parametre: tip burada bilerek gevşek). */
-type DatedTable = 'oeeDays' | 'oeeShifts' | 'oeeOrders' | 'oeeLossDays' | 'oeeDowntimeDays'
+type DatedTable = 'oeeDays' | 'oeeShifts' | 'oeeOrders' | 'oeeLossDays' | 'oeeDowntimeDays' | 'oeeStopDays'
 
 const byDate = (table: DatedTable) =>
   guardedQuery({
@@ -384,6 +406,8 @@ export const days = byDate('oeeDays')
 export const shifts = byDate('oeeShifts')
 export const orders = byDate('oeeOrders')
 export const lossDays = byDate('oeeLossDays')
+/** Duruş süresi histogramı (MTTR / MTBF: yıl, 10 hafta, hafta). */
+export const stopDays = byDate('oeeStopDays')
 
 /**
  * Planlı duruşların vardiya başına süreleri (Planning → Calendar → Planned stops:
@@ -445,10 +469,18 @@ export const coverage = guardedQuery({
     const days = await span('oeeDays')
     const shifts = await span('oeeShifts')
     const oldLoss = (d: Ctx) => d && (!d.codes || !d.partList)
+    const firstDown = await ctx.db.query('oeeDowntimeDays').withIndex('by_date').order('asc').first()
+    const hasStops = async (d: Ctx) =>
+      !d ||
+      !!(await ctx.db
+        .query('oeeStopDays')
+        .withIndex('by_key', (q: Ctx) => q.eq('date', d.date).eq('workCenter', d.workCenter))
+        .first())
     return {
       needsRebuild: {
         days: !!shifts && (!days || days.from > shifts.from || days.to < shifts.to),
         losses: !!lastDown && (!lastLoss || oldLoss(lastLoss) || oldLoss(firstLoss)),
+        stops: !(await hasStops(lastDown)) || !(await hasStops(firstDown)),
       },
       days,
       shifts,

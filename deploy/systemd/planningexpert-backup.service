@@ -1,0 +1,10 @@
+# Günlük yedek (planningexpert-backup.timer tetikler): scripts/backup.sh.
+[Unit]
+Description=PlanningExpert — daily Convex backup
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/planningexpert
+EnvironmentFile=/etc/planningexpert/portal.env
+ExecStart=/opt/planningexpert/scripts/backup.sh

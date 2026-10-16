@@ -14,7 +14,7 @@ Ayrıntı ve gerekçe ilgili maddede; karar verilince madde güncellenir.
 
 | # | Karar | Madde |
 |---|---|---|
-| ~~K1~~ | ✅ **A** (arayüz VPS, Convex bulutta) — taşıma haftaya | 4.1 |
+| ~~K1~~ | ✅ ~~A~~ → **B** (2026-10-14): arayüz **ve Convex** VPS'te (Hetzner CX33) | 4.1 |
 | K2 | Yedek hedefi: kabul edilen veri kaybı (RPO) ve geri dönüş süresi (RTO) | 4.1 |
 | ~~K3~~ | ✅ Evet: bölümün OEE'si olur, ayrı OEE alanı yok | 2, 4.2 |
 | ~~K4~~ | ✅ Hayır, gerek yok | 4.2 |
@@ -113,8 +113,8 @@ Holding → Company → Plant → Department → Cost center → Work center
 
 - MB51'de hareket türü olmayan eski satırlar: sorun değil, veriler
   yenilenebilir. *(docs/decisions.md, madde 13 → oeedashboard.md)*
-- Deploy: Vercel güvenlik açığı nedeniyle TanStack Start 1.168.60'a
-  yükseltildi; paket güncellemeleri düzenli izlenmeli (bkz. 4.1).
+- TanStack Start güvenlik açığı nedeniyle 1.168.60'a yükseltildi; paket
+  güncellemeleri düzenli izlenmeli (bkz. 4.1).
 
 ---
 
@@ -135,20 +135,27 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   - [ ] **[S]** VPS'te yayın yalnızca CI yeşilken: yayın betiği önce
     `npm run verify` çalıştırır (docs/deployment.md); GitHub'da `main` için
     "Require status checks".
-- [ ] **P0 — VPS'e taşıma (karar: A — arayüz VPS, Convex bulutta; haftaya).**
-  Kontrol listesi: docs/deployment.md → "VPS'e taşıma kontrol listesi".
+- [x] ✅ **P0 — VPS'e taşıma** (karar 2026-10-14: B; tamamlandı 2026-10-16):
+  site, Convex ve yedek kendi sunucumuzda (Hetzner, Docker Compose, Tailscale
+  Funnel). Vercel ve Convex Cloud kullanılmıyor; depodan onlara ait ayar, betik ve
+  talimatlar kaldırıldı. İşletim kitabı: **deploy/README.md**.
+  - [ ] **[S] 🔑** Vercel projesini ve Vercel'in GitHub bağlantısını (GitHub →
+    Settings → Applications) kaldır; Convex Cloud deployment'ını sil (son yedeği
+    saklı); sunucuda `/etc/planningexpert/cloud.env` varsa sil.
+  - [ ] Gece yedeği timer'ı açık mı, ilk geri yükleme provası (deploy/README.md)
 - [x] ✅ **P0 — Geliştirirken canlı veri korunur** (2026-10-03): şema kapısı
   (alan / tablo kaldırma, zorunlu yapma, daraltma CI'da durur), yayın öncesi
   zorunlu yedek (`scripts/release.sh`), günlük yedek (`scripts/backup.sh`),
   kurallar: docs/deployment.md → "Veri güvenliği".
 - [ ] **P0 — Staging yok.** Değişikliği gerçek veriye benzer bir yerde
-  denemenin yolu yok. → VPS'te ayrı bir staging Convex deployment'ı +
+  denemenin yolu yok. → VPS'te ayrı bir staging Convex (self-hosted) +
   arayüz kopyası, anonimleştirilmiş veriyle.
 - [ ] **P0 — Yedek yok.** Tek koruma, şirket bazında elle alınan JSON
-  dışa aktarımı; geri yükleme hiç denenmedi. Kodla çözülemez, Convex
-  hesabından açılır — adımlar README → "Yedek ve geri yükleme".
-  - [ ] **[S]** Convex panel → production → Backup & Restore: günlük yedek.
-  - [ ] **[S]** İlk geri yükleme provası (boş bir deployment'a).
+  dışa aktarımı; geri yükleme hiç denenmedi. VPS'te: gece yedeği
+  `planningexpert-backup.timer` (isteğe bağlı Storage Box), aylık geri yükleme provası
+  (deploy/README.md → Geri yükleme provası); `compare-exports` ile doğrulanır.
+  - [ ] **[S]** Sunucu dışı kopya: `BACKUP_REMOTE` (Storage Box).
+  - [ ] İlk geri yükleme provası (geçici Convex'e).
   - [ ] **[K]** Göze alınan veri kaybı (RPO, ör. 24 saat) ve geri dönüş
     süresi (RTO, ör. 4 saat) — müşteri sözleşmesine girecek değerler.
 - [x] ✅ **P0 — İzleme yoktu** (2026-10-03, uygulama içi ilk adım):
@@ -169,7 +176,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   kararı doğru, ama müşteri neyin değiştiğini bilmiyor.
   → Kullanıcıya dönük değişiklik günlüğü (sürüm notları). Riskli
   özellikler için şirket bazında aç/kapa bayrağı.
-- [ ] **P1 — Bağımlılık güncelliği.** Vercel'in build'i durdurmasıyla
+- [ ] **P1 — Bağımlılık güncelliği.** TanStack Start açığıyla
   öğrendik. → Dependabot / Renovate ve aylık güncelleme günü.
 - [ ] **P2 — Test kalitesi.** Uçtan uca (ekran) test yok.
   - [x] ✅ vitest kapanışta takılması ve "module is not defined" gürültüsü
@@ -400,6 +407,13 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   eski" göstergesi.
 - [ ] **P2 — Bildirim yok.** Alarm, geciken iş ya da kalıp ömrü için
   e-posta / mobil bildirim yok; kullanıcı sayfayı açınca görüyor.
+
+## OEE — Aksiyonlar sunumu (2026-10-14)
+
+- [x] ✅ 8 slaytın hepsi uygulandı; ayrıntı ve slayt × yapılan tablosu: docs/oeedashboard.md → "Aksiyonlar sunumu".
+- [ ] **[S]** Yayından sonra OEE veri yetkisiyle bir OEE sayfasını bir kez aç: eski duruşların süre histogramı kurulur (MTTR & MTBF'in yıl / 10 hafta tabloları bununla dolar).
+- [ ] **[S]** Chrome'da "Save as PDF" hedefi için bir kez Masaüstü klasörünü seç (tarayıcı dosyayı kendisi masaüstüne yazamaz; ad hazır gelir).
+- [ ] **[K]** Loss Bridge → "Pay Attention" bloğunun içeriği (şimdilik boş).
 
 ## 5. Yönetici gözüyle değerlendirme — CEO ve üretim direktörü (2026-10-05)
 
