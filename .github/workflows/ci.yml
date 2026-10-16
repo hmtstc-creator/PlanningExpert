@@ -1,5 +1,6 @@
 # Her push ve PR'da: tip kontrolü, testler, build. Kırmızıysa main'e giden
-# değişiklik bozuk demektir (Vercel ayrıca deploy eder; bu kapı uyarır).
+# değişiklik bozuk demektir. Yayın burada değil, VPS'te yalnızca yeşil commit'ten
+# yapılır (deploy/README.md → Güncelleme).
 name: CI
 
 on:

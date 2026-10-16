@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { convexOrigins } from './securityHeaders'
 
 describe('CSP: Convex adresleri', () => {
-  it('Convex Cloud: yalnızca bulut adresleri', () => {
-    expect(convexOrigins('https://happy-cat-123.convex.cloud')).toEqual(['https://*.convex.cloud', 'wss://*.convex.cloud', 'https://*.convex.site'])
-    expect(convexOrigins(undefined)).toHaveLength(3)
+  it('adres yoksa yalnızca kendi sitemiz (bulut adresi eklenmez)', () => {
+    expect(convexOrigins(undefined)).toEqual([])
+    expect(convexOrigins('https://planningexpert.tail1234.ts.net:8443').some((o) => o.includes('convex.cloud'))).toBe(false)
   })
 
   it('kendi sunucumuzdaki Convex: HTTPS, WebSocket ve site adresi eklenir', () => {
@@ -23,6 +23,6 @@ describe('CSP: Convex adresleri', () => {
   })
 
   it('okunamayan adres yok sayılır', () => {
-    expect(convexOrigins('not a url')).toHaveLength(3)
+    expect(convexOrigins('not a url')).toEqual([])
   })
 })

@@ -1,18 +1,19 @@
 # Dağıtım (deploy) — VPS
 
-Durum (2026-10-14): site ve veritabanı Vercel + Convex Cloud'dan kendi VPS'imize
-(Hetzner CX33, Karabasan botuyla aynı makine) taşınıyor — **seçenek B**. Adres
-ücretsiz: Tailscale Funnel (`https://planningexpert.<tailnet>.ts.net`), sunucuda
-internete kapı açılmaz; Convex SQLite ile, bellek sınırlı. Adım adım kitap, betikler
-ve sunucu dosyaları: **[deploy/README.md](../deploy/README.md)**. Program iki
-parçadır; ikisi ayrı düşünülür:
+Site ve veritabanı **kendi VPS'imizde** çalışır (Hetzner CX33, Karabasan botuyla aynı
+makine). Dış barındırma hizmeti yoktur: Vercel ve Convex Cloud kullanılmaz (taşıma
+2026-10-16'da tamamlandı). Adres ücretsiz: Tailscale Funnel
+(`https://planningexpert.<tailnet>.ts.net`), sunucuda internete kapı açılmaz; Convex
+SQLite ile, bellek sınırlı. Sunucu kitabı (güncelleme, yedek, geri yükleme, kurulum):
+**[deploy/README.md](../deploy/README.md)**. Program iki parçadır:
 
 | Parça | Ne | Nerede çalışır |
 |---|---|---|
-| **Arayüz** | TanStack Start (Vite + Nitro) — sayfalar ve sunucu tarafı render | VPS'te Node süreci (`node .output/server/index.mjs`) |
-| **Sunucu + veritabanı** | Convex: bütün `convex/*.ts` işlevleri, tablolar, zamanlayıcı (günlük özet, gece temizliği; plan elle hesaplanır), dosyalar (fotoğraflar), Node action'ları (`auth.ts`, `planEngine.ts`) | A) Convex Cloud **ya da** B) VPS'te kendi barındırılan Convex |
+| **Arayüz** | TanStack Start (Vite + Nitro) — sayfalar ve sunucu tarafı render | VPS'te `web` kapsayıcısı (`node .output/server/index.mjs`) |
+| **Sunucu + veritabanı** | Convex (self-hosted): bütün `convex/*.ts` işlevleri, tablolar, zamanlayıcı (günlük özet, gece temizliği; plan elle hesaplanır), dosyalar (fotoğraflar), Node action'ları (`auth.ts`, `planEngine.ts`) | VPS'te `backend` kapsayıcısı (`deploy/compose.yml`) |
 
-Kodda Vercel'e bağlı bir şey yok; Nitro VPS'te varsayılan Node sunucusu
+GitHub yalnızca kodu ve CI'ı (`.github/workflows/ci.yml`: tip + test + build) tutar;
+yayını sunucu yapar (`scripts/release.sh`). Nitro VPS'te varsayılan Node sunucusunu
 üretir.
 
 ## Veri güvenliği — geliştirme sürerken canlı veri korunur
@@ -22,10 +23,11 @@ veritabanı hiçbir zaman silinmez, sıfırlanmaz, şeması daraltılmaz.**
 
 | Risk | Önlem | Nerede |
 |---|---|---|
-| Şemadan alan / tablo kaldırmak, alanı zorunlu yapmak, tipi daraltmak | **Şema kapısı**: canlı şemanın kaydı `scripts/schema.snapshot.json`; yeni şema yalnızca genişleyebilir, aksi CI'da kırmızı (deploy'a gitmez). Yeni alan eklenince `npm run schema:snapshot` | `convex/schemaGuard.test.ts`, `src/lib/schemaCompat.ts` |
-| Yayın sırasında bir şey ters gitmesi | **Yayın betiği** önce doğrular, sonra production'ın tam yedeğini alır (dosyalar dahil), yedek yoksa durur; sonra Convex, en son arayüz | `scripts/release.sh` |
-| Günlük veri kaybı | **Günlük yedek** (cron), son 30 tutulur; sunucu dışına da kopyalanır | `scripts/backup.sh` |
-| Geliştirirken production'a yazmak | Geliştirme **ayrı dev deployment**'ta (`npx convex dev` kendi dev veritabanına yazar). `.env.local`'daki `CONVEX_DEPLOYMENT` production olmamalı; production'a yalnızca `scripts/release.sh` yazar (prod anahtarı olmadan çalışmaz) | — |
+| Şemadan alan / tablo kaldırmak, alanı zorunlu yapmak, tipi daraltmak | **Şema kapısı**: canlı şemanın kaydı `scripts/schema.snapshot.json`; yeni şema yalnızca genişleyebilir, aksi CI'da kırmızı (yayınlanmaz). Yeni alan eklenince `npm run schema:snapshot` | `convex/schemaGuard.test.ts`, `src/lib/schemaCompat.ts` |
+| Yayın sırasında bir şey ters gitmesi | **Yayın betiği** önce doğrular, sonra canlı verinin tam yedeğini alır (dosyalar dahil), yedek yoksa durur; sonra Convex, en son arayüz | `scripts/release.sh` |
+| Günlük veri kaybı | **Günlük yedek** (systemd timer, 02:15), son 30 tutulur; isteğe bağlı sunucu dışına kopya | `scripts/backup.sh`, `deploy/systemd/` |
+| Yanlış veritabanına yazmak | Betikler yalnızca kendi Convex sunucumuza yazar (`CONVEX_SELF_HOSTED_URL` + `_ADMIN_KEY`); başka bir Convex anahtarı tanımlıysa durur | `scripts/convex-target.sh` |
+| Geliştirirken canlıya yazmak | Geliştirme **yerel** bir Convex'te (aşağıda "Yerel geliştirme"); canlı sunucuya yalnızca sunucudaki `scripts/release.sh` yazar | — |
 | Veriyi dönüştüren geçiş | Geçiş bir kerelik bayrakla, tekrar çalışırsa zararsız, eski alanı silmeden (docs/architecture.md kural 12) | `planRuns.migrateSettings`, `tenancy.backfill` |
 | Elle silme | Tek kayıt, onaylı; şirket / plant silme ad yazılarak, şirket için askıdan 90 gün sonra; kullanımdaki work center / parça / cost center silinmez | `convex/platform.ts`, `workCenterRefs.ts`, `materialRefs.ts` |
 
@@ -34,88 +36,82 @@ bırakır, bir geçiş alanı boşaltır, yayınlanır; (2) bir sonraki yayında
 şemadan ve `scripts/schema.snapshot.json`'dan elle çıkarılır (gerekçe commit
 mesajında).
 
-**Geri dönüş:** `npx convex import --replace backups/<dosya>.zip` (önce boş
-bir deployment'ta denenir; production'a yalnızca gerçek bir kayıpta).
+**Geri dönüş:** yedekten `npx convex import --replace-all` — önce geçici bir
+Convex'te denenir (deploy/README.md → Geri yükleme provası, Geri dönüş).
 
-## VPS'e taşıma
-
-Seçenek B'nin aşamaları (envanter → sunucu hazırlığı → boş Convex → prova →
-taşıma gecesi → sonrası), kapılar (🔑 senden istenenler), veri kaybını önleyen
-kurallar ve geri dönüş: [deploy/README.md](../deploy/README.md). Özet:
-
-- Convex Cloud'daki veri taşıma boyunca **yalnızca okunur**; taşıma gecesi
-  dondurulur (pause), 30 gün silinmez.
-- Veri `npx convex export --include-file-storage` → kendi sunucumuzda
-  `npx convex import --replace-all`; ardından oradan geri alınan yedek
-  `scripts/compare-exports.mjs` ile kaynağa **tablo tablo, kimlik kimlik**
-  karşılaştırılır. Fark varsa açılış yapılmaz.
-- Yayın ve yedek betikleri iki hedefi de bilir (`scripts/convex-target.sh`):
-  kendi sunucumuz (`CONVEX_SELF_HOSTED_URL` + `_ADMIN_KEY`) ya da Convex Cloud
-  (`CONVEX_DEPLOY_KEY`); ikisi birden tanımlıysa durur.
-- CSP, `VITE_CONVEX_URL` kendi alan adımızsa onu da izinli yapar
-  (`src/lib/securityHeaders.ts`).
-
-## Karar: Convex nerede? (2026-10-03: A → **2026-10-14: B**, planlamacı)
-
-| | A) Arayüz VPS, Convex Cloud | B) Hepsi VPS (self-hosted Convex) |
-|---|---|---|
-| Kurulum | En kolay: yalnızca arayüz taşınır | Convex backend (Docker) + veritabanı (Postgres önerilir) + dashboard |
-| Veri | Convex'te (ABD/AB bölgesi) | Tamamen sizin sunucunuzda (KVKK / müşteri isteği için güçlü) |
-| Yedek | Convex panelinden | **Sizin işiniz**: Postgres yedeği + Convex dışa aktarımı, zamanlanmış |
-| Güncelleme | Convex yapar | Backend imajını siz güncellersiniz |
-| Maliyet | Convex planı | VPS kaynakları (plan motoru CPU ister) |
-| Risk | Dış bağımlılık | Tek sunucu = tek arıza noktası; izleme ve yedek şart |
-
-Öneri: müşteriye "veri bizim sunucumuzda" denecekse **B**, değilse
-geçişi hızlı yapmak için önce **A**, sonra B. **Karar (2026-10-14): B** —
-Convex de VPS'e taşınır (SQLite, Docker Compose: deploy/compose.yml; sunucunun
-belleği botlarla paylaşıldığı için Postgres yok).
-
-## Yayın adımları (her iki seçenekte)
+## Yayın adımları
 
 ```bash
-npm ci
-npm run verify                         # tip + test + build; kırmızıysa yayınlama
-npx convex deploy                      # önce Convex işlevleri ve şema
-VITE_CONVEX_URL=<convex adresi> npm run build
-node .output/server/index.mjs          # systemd / pm2 ile, önünde nginx/caddy (HTTPS)
+# GitHub'da commit'in CI'ı yeşil olduktan sonra, sunucuda:
+cd /opt/planningexpert && git pull
+set -a; . /etc/planningexpert/portal.env; set +a
+./scripts/release.sh                         # yedek → convex deploy → site derlemesi
+docker compose -f deploy/compose.yml restart web
 ```
 
 - **Sıra önemli:** önce `convex deploy`, sonra arayüz. Tersi olursa arayüz
   henüz olmayan işlevi çağırır (ekranda "function has not been pushed").
-- **A** için `CONVEX_DEPLOY_KEY` = Convex panelinden `prod:` anahtarı.
-- **B** için Convex CLI `CONVEX_SELF_HOSTED_URL` ve `CONVEX_SELF_HOSTED_ADMIN_KEY`
-  ile çalışır (`/etc/planningexpert/portal.env`; admin anahtarı:
+- Convex CLI `CONVEX_SELF_HOSTED_URL` ve `CONVEX_SELF_HOSTED_ADMIN_KEY` ile çalışır
+  (`/etc/planningexpert/portal.env`; admin anahtarı:
   `docker compose exec backend ./generate_admin_key.sh`). `VITE_CONVEX_URL` =
-  backend'in dışarıdan erişilen adresi (betik kendisi ayarlar).
+  backend'in dışarıdan erişilen adresi (`CONVEX_PUBLIC_URL`; betik kendisi ayarlar).
+- CSP yalnızca bu adrese izin verir (`src/lib/securityHeaders.ts`); başka bir Convex
+  adresine bağlanan bir derleme tarayıcıda engellenir.
 - Şema değişikliği geriye uyumludur (docs/architecture.md kural 12): yeni
   alan `v.optional`. Alan kaldırmak iki adımda yapılır: önce veri temizlenir,
   sonra şemadan silinir.
 
-## B seçilirse VPS'te olması gerekenler
+## Yerel geliştirme
 
-- Convex backend + Postgres (Docker Compose), Convex dashboard (yalnızca
-  VPN / IP kısıtlı).
-- Günlük otomatik yedek (Postgres dump + dosya deposu) başka bir yere
-  (S3 vb.); ayda bir geri yükleme provası.
-- HTTPS (caddy / nginx + Let's Encrypt), güvenlik duvarı (yalnızca 443).
-- İzleme: sunucu ayakta mı (dış uptime kontrolü), disk / CPU alarmı; uygulama
-  hataları zaten System errors'ta.
-- Saat başı plan hesabı (`convex/crons.ts`) backend'le birlikte çalışır;
-  ayrı cron gerekmez.
+Geliştirme bulut hesabı olmadan, bilgisayarda çalışan geçici bir Convex ile:
+
+```bash
+docker run -d --name pe-dev -p 127.0.0.1:3210:3210 -p 127.0.0.1:3211:3211 \
+  -e INSTANCE_SECRET="$(openssl rand -hex 32)" ghcr.io/get-convex/convex-backend:<sürüm>
+docker exec pe-dev ./generate_admin_key.sh
+# .env.local (git'e girmez):
+#   CONVEX_SELF_HOSTED_URL=http://127.0.0.1:3210
+#   CONVEX_SELF_HOSTED_ADMIN_KEY='…'
+#   VITE_CONVEX_URL=http://127.0.0.1:3210
+npx convex dev                                # işlevleri yerel Convex'e yükler, izler
+npm run dev                                   # arayüz: http://localhost:3000
+```
+
+Canlı veriye benzer veriyle denemek için bir gece yedeği yerel Convex'e
+`npx convex import --replace-all` ile yüklenebilir (yedek kişisel veri içerir;
+bilgisayarda bırakılmaz).
+
+## Sunucuda olması gerekenler
+
+- Convex backend (SQLite) + site + Tailscale (Docker Compose, `deploy/compose.yml`);
+  Convex paneli yalnızca gerektiğinde (`--profile tools`), dışarıya açılmaz.
+- Günlük otomatik yedek, isteğe bağlı sunucu dışına kopya; ayda bir geri yükleme
+  provası (`scripts/compare-exports.mjs` ile doğrulanır).
+- HTTPS: Tailscale Funnel; güvenlik duvarı: yalnızca `tailscale0`.
+- İzleme: sunucu ayakta mı (dış uptime kontrolü — todolist.md 4.1), disk / bellek;
+  uygulama hataları zaten System errors'ta.
+- Zamanlanmış işler (`convex/crons.ts`) backend'le birlikte çalışır; ayrı cron
+  gerekmez.
+
+## Karar geçmişi: Convex nerede?
+
+2026-10-03: önce arayüz VPS'e, Convex bulutta (A). **2026-10-14: B** — Convex de
+VPS'e (veri tamamen bizim sunucumuzda; SQLite, çünkü sunucunun belleği botlarla
+paylaşılıyor, Postgres yok). 2026-10-16: taşıma tamamlandı; bulut hizmetleri
+bırakıldı. Bedeli: yedek ve backend güncellemesi bizim işimiz, tek sunucu = tek
+arıza noktası (izleme ve yedek şart).
 
 ## Günlük özet e-postası (Today & daily digest)
 
 E-posta Resend üzerinden gider. Anahtar programda ve veritabanında **tutulmaz**;
-Convex ortam değişkenidir (Convex dashboard → Settings → Environment Variables,
-ya da `npx convex env set`):
+Convex sunucumuzun ortam değişkenidir (sunucuda `npx convex env set`, ya da Convex
+paneli → Settings → Environment Variables; deploy/README.md → Ortam değişkenleri):
 
 | Değişken | Ne | Örnek |
 |---|---|---|
 | `RESEND_API_KEY` | Resend API anahtarı | `re_…` |
 | `DIGEST_FROM` | Gönderen (doğrulanmış alan adı) | `Production Portal <portal@firma.com>` |
-| `APP_URL` | İsteğe bağlı: e-postadaki bağlantılar | `https://portal.firma.com` |
+| `APP_URL` | İsteğe bağlı: e-postadaki bağlantılar | `https://planningexpert.<tailnet>.ts.net` |
 
 Alıcılar, gün, saat ve içerik Company settings → Today & daily digest'te.
 Ayarlanmamışsa özet gönderilmez ve sayfa nedenini söyler.
-

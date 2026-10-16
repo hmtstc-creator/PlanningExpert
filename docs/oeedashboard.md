@@ -501,8 +501,8 @@ bir sonraki plan hesabında yeni metinle yazılır.
 - Plant genişletme: aşama 1–6 ve 7'nin ilk sürümü uygulandı (2026-10-02,
   docs/plant-genisletme.md → "Uygulama"). OEE verisi ve ayarları fabrika
   başına; karşılaştırma ekranının içeriği konuşulacak.
-- Deploy (2026-10-02): Vercel, TanStack Start 1.168.54'teki XSS açığı yüzünden
-  build'i durdurdu → 1.168.60'a güncellendi.
+- Güvenlik (2026-10-02): TanStack Start 1.168.54'teki XSS açığı yüzünden
+  1.168.60'a güncellendi.
 - ~~MB51 eski satırlar~~ → sorun değil, veriler yenilenebilir.
 - ~~APR setup süresi~~ → alan bazlı süre (APR 10 dk). Parça bazlı setup
   süresi Master Data'da — ileride.

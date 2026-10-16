@@ -113,8 +113,8 @@ Holding → Company → Plant → Department → Cost center → Work center
 
 - MB51'de hareket türü olmayan eski satırlar: sorun değil, veriler
   yenilenebilir. *(docs/decisions.md, madde 13 → oeedashboard.md)*
-- Deploy: Vercel güvenlik açığı nedeniyle TanStack Start 1.168.60'a
-  yükseltildi; paket güncellemeleri düzenli izlenmeli (bkz. 4.1).
+- TanStack Start güvenlik açığı nedeniyle 1.168.60'a yükseltildi; paket
+  güncellemeleri düzenli izlenmeli (bkz. 4.1).
 
 ---
 
@@ -135,39 +135,27 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   - [ ] **[S]** VPS'te yayın yalnızca CI yeşilken: yayın betiği önce
     `npm run verify` çalıştırır (docs/deployment.md); GitHub'da `main` için
     "Require status checks".
-- [ ] **P0 — VPS'e taşıma (karar 2026-10-14: B — arayüz ve Convex VPS'te).**
-  Kitap: **deploy/README.md**. Bulut oturumu hazırlar ve yönetir, sunucudaki
-  Claude Code (Remote Control) çalıştırır, sen yalnızca 🔑 kapılarda.
-  - [x] ✅ Aşama 0 — Envanter (Ubuntu 24.04, ~2,6 GB boş RAM, internete kapı yok)
-  - [x] ✅ **[S] 🔑 Kapı 1** — adres: Tailscale Funnel (ücretsiz,
-    `planningexpert.<tailnet>.ts.net`); kurulum onayı sunucu oturumunda verildi
-  - [ ] Aşama 1 — Sunucu hazırlığı (Node 22, unzip, `/opt/planningexpert`)
-  - [ ] Aşama 2 — Tailscale cihazı "planningexpert" + boş Convex (SQLite, bellek
-    sınırlı); 🔑 Tailscale giriş / Funnel onay bağlantıları
-  - [ ] **[S] 🔑 Kapı 2** — Convex Cloud (`amiable-shrimp-598`) `prod:` anahtarını
-    sunucuda `/etc/planningexpert/cloud.env`'e yaz
-  - [ ] Aşama 3 — Prova: Cloud export → VPS import → `compare-exports` OK,
-    giriş / OEE / plan / fotoğraf testi, süre ölçümü
-  - [ ] **[S] 🔑 Kapı 3** — kesinti saati, kullanıcılara duyuru
-  - [ ] Aşama 4 — Taşıma gecesi: Cloud pause → son export → import →
-    `compare-exports` OK → yayın → DNS → duman testi
-  - [ ] Aşama 5 — Gece yedeği (isteğe bağlı Storage Box), aylık geri yükleme
-    provası
-  - [ ] **[S] 🔑** 2 hafta sonra Vercel kapatılır; 30 gün sonra Convex Cloud
-    deployment'ı silinir
+- [x] ✅ **P0 — VPS'e taşıma** (karar 2026-10-14: B; tamamlandı 2026-10-16):
+  site, Convex ve yedek kendi sunucumuzda (Hetzner, Docker Compose, Tailscale
+  Funnel). Vercel ve Convex Cloud kullanılmıyor; depodan onlara ait ayar, betik ve
+  talimatlar kaldırıldı. İşletim kitabı: **deploy/README.md**.
+  - [ ] **[S] 🔑** Vercel projesini ve Vercel'in GitHub bağlantısını (GitHub →
+    Settings → Applications) kaldır; Convex Cloud deployment'ını sil (son yedeği
+    saklı); sunucuda `/etc/planningexpert/cloud.env` varsa sil.
+  - [ ] Gece yedeği timer'ı açık mı, ilk geri yükleme provası (deploy/README.md)
 - [x] ✅ **P0 — Geliştirirken canlı veri korunur** (2026-10-03): şema kapısı
   (alan / tablo kaldırma, zorunlu yapma, daraltma CI'da durur), yayın öncesi
   zorunlu yedek (`scripts/release.sh`), günlük yedek (`scripts/backup.sh`),
   kurallar: docs/deployment.md → "Veri güvenliği".
 - [ ] **P0 — Staging yok.** Değişikliği gerçek veriye benzer bir yerde
-  denemenin yolu yok. → VPS'te ayrı bir staging Convex deployment'ı +
+  denemenin yolu yok. → VPS'te ayrı bir staging Convex (self-hosted) +
   arayüz kopyası, anonimleştirilmiş veriyle.
 - [ ] **P0 — Yedek yok.** Tek koruma, şirket bazında elle alınan JSON
-  dışa aktarımı; geri yükleme hiç denenmedi. VPS'e taşınınca (B): gece yedeği
+  dışa aktarımı; geri yükleme hiç denenmedi. VPS'te: gece yedeği
   `planningexpert-backup.timer` (isteğe bağlı Storage Box), aylık geri yükleme provası
-  (deploy/README.md → Aşama 5); `compare-exports` ile doğrulanır.
-  - [ ] **[S]** Convex panel → production → Backup & Restore: günlük yedek.
-  - [ ] **[S]** İlk geri yükleme provası (boş bir deployment'a).
+  (deploy/README.md → Geri yükleme provası); `compare-exports` ile doğrulanır.
+  - [ ] **[S]** Sunucu dışı kopya: `BACKUP_REMOTE` (Storage Box).
+  - [ ] İlk geri yükleme provası (geçici Convex'e).
   - [ ] **[K]** Göze alınan veri kaybı (RPO, ör. 24 saat) ve geri dönüş
     süresi (RTO, ör. 4 saat) — müşteri sözleşmesine girecek değerler.
 - [x] ✅ **P0 — İzleme yoktu** (2026-10-03, uygulama içi ilk adım):
@@ -188,7 +176,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   kararı doğru, ama müşteri neyin değiştiğini bilmiyor.
   → Kullanıcıya dönük değişiklik günlüğü (sürüm notları). Riskli
   özellikler için şirket bazında aç/kapa bayrağı.
-- [ ] **P1 — Bağımlılık güncelliği.** Vercel'in build'i durdurmasıyla
+- [ ] **P1 — Bağımlılık güncelliği.** TanStack Start açığıyla
   öğrendik. → Dependabot / Renovate ve aylık güncelleme günü.
 - [ ] **P2 — Test kalitesi.** Uçtan uca (ekran) test yok.
   - [x] ✅ vitest kapanışta takılması ve "module is not defined" gürültüsü

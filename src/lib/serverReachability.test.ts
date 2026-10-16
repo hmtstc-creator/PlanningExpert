@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 async function load() {
   vi.resetModules()
-  vi.stubEnv('VITE_CONVEX_URL', 'https://happy-cat-123.convex.cloud')
+  vi.stubEnv('VITE_CONVEX_URL', 'https://planningexpert.tail1234.ts.net:8443')
   return import('./serverReachability')
 }
 
@@ -48,7 +48,7 @@ describe('probeServer', () => {
 describe('login error messages', () => {
   it('turns a network error into advice that names the server', async () => {
     const { friendlyNetworkError } = await load()
-    expect(friendlyNetworkError(new TypeError('Failed to fetch'))).toContain('happy-cat-123.convex.cloud')
+    expect(friendlyNetworkError(new TypeError('Failed to fetch'))).toContain('planningexpert.tail1234.ts.net:8443')
     expect(friendlyNetworkError(new Error('Request timed out'))).toContain('could not be reached')
     expect(friendlyNetworkError(new Error('Wrong user name or password'))).toBe('Wrong user name or password')
   })

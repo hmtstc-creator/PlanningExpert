@@ -3,10 +3,10 @@
 //
 //   node scripts/compare-exports.mjs <kaynak.zip> <hedef.zip>
 //
-// Kaynak: Convex Cloud'dan alınan son yedek. Hedef: VPS'teki Convex'e yüklendikten
-// sonra oradan YENİDEN alınan yedek. Her tablo için belge sayısı ve kimlikler
-// (_id) birebir aynı olmalı, dosya deposundaki (fotoğraflar) dosyalar da.
-// Fark varsa çıkış kodu 1: taşıma durur (deploy/README.md → Aşama 4).
+// Kaynak: geri yüklenen yedek (ör. backups/daily-….zip). Hedef: o yedek bir
+// Convex'e yüklendikten sonra oradan YENİDEN alınan yedek. Her tablo için belge
+// sayısı ve kimlikler (_id) birebir aynı olmalı, dosya deposundaki (fotoğraflar)
+// dosyalar da. Fark varsa çıkış kodu 1 (deploy/README.md → Geri yükleme provası).
 //
 // Bağımlılık yok: zip'in içindekiler dizini Node'un zlib'iyle okunur.
 

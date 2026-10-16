@@ -3,7 +3,7 @@
 # production verisi + dosyalar (fotoğraflar). Son 30 yedek tutulur.
 # BACKUP_REMOTE tanımlıysa (Hetzner Storage Box) yedek sunucu dışına da kopyalanır;
 # kopyalanamazsa betik hata verir (journalctl -u planningexpert-backup).
-# Hedef: scripts/convex-target.sh (kendi sunucumuz ya da Convex Cloud production).
+# Hedef: VPS'teki kendi Convex sunucumuz (scripts/convex-target.sh).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/convex-target.sh

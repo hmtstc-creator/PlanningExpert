@@ -4,8 +4,8 @@
 #   2. production verisinin yedeği (dosyalar dahil) — alınamazsa durur
 #   3. Convex işlevleri ve şema — Convex, mevcut veriye uymayan şemayı reddeder
 #   4. arayüz build'i (Convex adresiyle)
-# Hedef: kendi sunucumuzdaki Convex (CONVEX_SELF_HOSTED_URL + _ADMIN_KEY) ya da
-# Convex Cloud production (CONVEX_DEPLOY_KEY, "prod:") — scripts/convex-target.sh.
+# Hedef: VPS'teki kendi Convex sunucumuz (CONVEX_SELF_HOSTED_URL + _ADMIN_KEY) —
+# scripts/convex-target.sh. Sunucuda: deploy/README.md → Güncelleme.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/convex-target.sh
@@ -28,12 +28,8 @@ test -s "backups/before-release-${STAMP}.zip" || { echo "Backup is empty — sto
 echo "== 3/4 + 4/4 deploy functions, then build the interface"
 rm -rf convex/_generated
 npx convex codegen
-if [ -n "${CONVEX_SELF_HOSTED_URL:-}" ]; then
-  # Kendi sunucumuz: önce işlevler, sonra site — sitenin adresi VITE_CONVEX_URL (Funnel).
-  npx convex deploy
-  NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}" npm run build
-else
-  npx convex deploy --cmd 'npm run build' --cmd-url-env-var-name VITE_CONVEX_URL
-fi
+# Önce işlevler, sonra site — sitenin adresi VITE_CONVEX_URL (Funnel).
+npx convex deploy
+NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}" npm run build
 
 echo "Done (${CONVEX_TARGET}). Backup: backups/before-release-${STAMP}.zip — restart the site: docker compose -f deploy/compose.yml restart web"
