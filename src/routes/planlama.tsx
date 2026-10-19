@@ -1,63 +1,30 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMutation, useQuery } from '../lib/convexTransport'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
-import { isoWeekLabel, plantClock } from '../lib/dates'
+import { plantClock } from '../lib/dates'
 import { WeekGantt, type WeekGanttJob, type WeekGanttPress } from '../components/WeekGantt'
 import { productionDayOf } from '../lib/shiftTimeline'
 import { useCurrentUser } from '../lib/currentUser'
-import { diffPlans } from '../lib/planDiff'
-import { groupPlanWeeks, RAW_URGENT_DAYS, type PlanRun, type SnapshotJob } from '../lib/planPipeline'
-import { fixForUnplanned } from '../lib/unplannedFix'
 import { type PlanDataSources } from '../lib/sapUploads'
-import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { InfoTip, PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
-import { formatClock } from '../components/plan/format'
-import { DataCoveragePanel } from '../components/plan/DataCoveragePanel'
-import { DecisionCell, LateJobs } from '../components/plan/LateJobs'
-import { IndependentCheck, OptimisationPanel } from '../components/plan/PlanChecks'
-import { AlarmBanner, PlanCheck, PlanDataLine, Stat } from '../components/plan/PlanPanels'
+import { PlanDataLine } from '../components/plan/PlanPanels'
 import { PressStartPanel } from '../components/plan/PressStartPanel'
 import { JobDialog, type JobDraft } from '../components/plan/JobDialog'
+import { dayMonth, minutesAgo, usePlanState } from '../components/plan/usePlanState'
 export const Route = createFileRoute('/planlama')({
   component: PlanlamaPage,
 })
 
-/**
- * Gün içi dakikayı gerçek saate çevirir. `shiftStartMinute` birinci
- * the start of the first shift (minutes from midnight, e.g. 480 = 08:00).
- * Vardiya numarası da ayrıca gösterilir.
- */
-function minutesAgo(ms: number, now: number): string {
-  const minutes = Math.max(0, Math.round((now - ms) / 60_000))
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes} min ago`
-  const hours = Math.floor(minutes / 60)
-  return `${hours} h ${minutes % 60} min ago`
-}
-
-interface PlanStatus {
-  requestedAt?: number
-  scheduledFor?: number
-  runningSince?: number
-  dataChangedAt?: number
-  lastRunAt?: number
-  lastError?: string
-  lastErrorAt?: number
-}
-
 function PlanlamaPage() {
   // Plan sunucuda hesaplanıyor (convex/planEngine.ts) ve saklanıyor; sayfa
   // yalnızca son hesabı okur. Hesap yalnızca elle: "Calculate plan"
-  // (planlamacı, 2026-10-07). Girdi değişince plan "güncel değil" işaretlenir.
-  const run = useQuery(api.planRuns.latest) as PlanRun | null | undefined
-  const planStatus = useQuery(api.planRuns.status) as PlanStatus | null | undefined
+  // (planlamacı, 2026-10-07). Bu sayfa Gantt ve araçlarıdır; özet, tablolar ve
+  // denetimler Overview'da (planlamacı, 2026-10-19).
+  const { run, planStatus, latestSnapshot, nowMs, shiftMinutes, shiftStartMinute, engineJobs, weeks, recalculating, stale, failedLast } =
+    usePlanState()
   const requestNow = useMutation(api.planRuns.requestNow)
-  const latestSnapshot = useQuery(api.planSnapshots.latest) as
-    | { createdAt: number; truncated?: boolean; jobCount: number; jobs: SnapshotJob[] }
-    | null
-    | undefined
   const approve = useMutation(api.planSnapshots.approve)
   const overrideRows = (useQuery(api.planOverrides.list) ?? []) as {
     _id: string
@@ -105,46 +72,23 @@ function PlanlamaPage() {
   const [ovPress, setOvPress] = useState('')
   const [ovDate, setOvDate] = useState('')
 
-  // Şimdiki zaman çizgisi canlı kalır; plan yalnızca "Calculate plan" ile yenilenir.
-  const [nowMs, setNowMs] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), 60_000)
-    return () => clearInterval(id)
-  }, [])
-
   const inputsLoading = run === undefined
-  const shiftMinutes = run?.shiftMinutes ?? SETTINGS_DEFAULTS.shiftMinutes
-  const shiftStartMinute = run?.shiftStartMinute ?? SETTINGS_DEFAULTS.shiftStartMinute
-  const capacityFactor = run?.capacityFactor ?? SETTINGS_DEFAULTS.capacityFactor
   const horizonWeeks = run?.horizonWeeks ?? 4
   const globalFrozenDays = run?.globalFrozenDays ?? 0
   const truncatedInputs = run?.truncatedInputs ?? []
   const presses = run?.presses ?? []
   const plannedStops = run?.plannedStops ?? []
-  const warnings = run?.warnings ?? []
-  const rawNeeds = run?.rawNeeds ?? []
-  // Plan sayfasında yalnızca acil hammadde: ilk eksik iş RAW_URGENT_DAYS iş günü
-  // içinde. Sınır motordan gelir (tek hesap); eski planlarda bugünden sayılır.
-  const rawUrgentUntil = run?.rawUrgentUntil ?? run?.todayIso ?? ''
-  const rawUrgentDays = run?.rawUrgentDays ?? RAW_URGENT_DAYS
-  // Toplamda yetse de yoldaki rulo geç geliyorsa iş durur: ilk eksik iş esas.
-  const shortRaw = rawNeeds.filter((r) => r.shortFrom)
-  const urgentRaw = shortRaw.filter((r) => r.shortFrom!.date <= rawUrgentUntil)
-  const laterRaw = shortRaw.length - urgentRaw.length
   const unplanned = run?.unplanned ?? []
   const frozenCount = run?.frozenCount ?? 0
-  const thisWeekCapacity = run?.thisWeekCapacity ?? { full: 0, remaining: 0, elapsed: 0 }
-  const horizonMonday = new Date(`${run?.horizonStart ?? '1970-01-05'}T00:00:00`)
   const horizonStart = run?.horizonStart ?? ''
+  const planChecksOk = (run?.audit?.ok ?? true) && (run?.validation?.summary.rulesBroken ?? 0) === 0
+  const lateCount = run?.lateItems?.length ?? engineJobs.filter((j) => j.late).length
 
   const { date: todayIso, clockMinute: nowClockMinute } = productionDayOf(
     plantClock(nowMs, run?.timeZone),
     shiftStartMinute,
   )
 
-  /** Motorun yeni planı — dondurulmuş taahhütler hariç. */
-  const engineJobs = useMemo(() => (run?.jobs ?? []).filter((j) => !j.frozen), [run])
-  const weeks = useMemo(() => (run ? groupPlanWeeks(run) : []), [run])
   // Tek, kesintisiz Gantt: bütün haftaların günleri ve işleri bir arada.
   // Haftaya bölünmüş grafikler arasında gidip gelmek izlemeyi yoruyordu.
   const allDates = useMemo(
@@ -182,29 +126,6 @@ function PlanlamaPage() {
       })),
     [run],
   )
-
-  // Onaylı planla canlı planın farkı — "onayladığımdan bu yana ne değişti".
-  const planDiff = useMemo(() => {
-    if (!latestSnapshot || !run) return null
-    // Kırpılmış bir onaylı planla karşılaştırmak yalan söyler: saklanmayan
-    // işler "plandan düştü" gibi görünür.
-    if (latestSnapshot.truncated) return null
-    return diffPlans(latestSnapshot.jobs, engineJobs)
-  }, [latestSnapshot, run, engineJobs])
-
-  const lateCount = engineJobs.filter((j) => j.late).length
-  const totalPlannedQty = engineJobs.reduce((s, j) => s + j.quantity, 0)
-
-  // Girdi değişti ama yeni hesap henüz gelmedi: ekrandaki plan eskidir.
-  const recalculating =
-    planStatus != null &&
-    ((planStatus.runningSince !== undefined && nowMs - planStatus.runningSince < 10 * 60_000) ||
-      (planStatus.scheduledFor !== undefined && planStatus.scheduledFor > nowMs - 60_000))
-  // Son hesaptan sonra plan girdisi değişti (elle hesaplanana kadar plan güncel değil).
-  const stale = !!run && !recalculating && (planStatus?.dataChangedAt ?? 0) > run.computedAt
-  const failedLast =
-    planStatus?.lastError !== undefined &&
-    (planStatus.lastErrorAt ?? 0) > (planStatus.lastRunAt ?? 0)
 
   async function handleApprove() {
     if (!run) return
@@ -311,29 +232,6 @@ function PlanlamaPage() {
 
       {run && <PlanDataLine sources={(run as { dataSources?: PlanDataSources }).dataSources} />}
 
-      {thisWeekCapacity.full > 0 && (
-        <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-          This week ({isoWeekLabel(horizonMonday)}):{' '}
-          <strong className="text-foreground">
-            {Math.round(thisWeekCapacity.remaining / 60).toLocaleString('en-GB')} h
-          </strong>{' '}
-          still available of {Math.round(thisWeekCapacity.full / 60).toLocaleString('en-GB')} h —{' '}
-          {Math.round(thisWeekCapacity.elapsed / 60).toLocaleString('en-GB')} h have already
-          gone by.{' '}
-          <InfoTip label="About this week's hours">
-            Days that have passed and the hours already elapsed today are excluded from the plan.
-          </InfoTip>
-        </p>
-      )}
-
-      {capacityFactor !== 1 && (
-        <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-          Capacity is adjusted by the measured attainment rate:{' '}
-          <strong className="text-foreground">%{Math.round(capacityFactor * 100)}</strong>.
-          You can update this factor on the Performance page.
-        </p>
-      )}
-
       {truncatedInputs.length > 0 && (
         <div className="mt-6 rounded-lg border-2 border-destructive bg-destructive/10 p-4">
           <p className="text-sm font-semibold text-destructive">
@@ -371,73 +269,6 @@ function PlanlamaPage() {
         </p>
       )}
 
-      {run?.alarms && <AlarmBanner alarms={run.alarms} />}
-
-      {(run?.pressesWithoutCalendar?.length ?? 0) > 0 && (
-        <div className="mt-4 rounded-lg border border-destructive bg-destructive/10 p-3 text-sm">
-          <p className="font-semibold text-destructive">
-            {run!.pressesWithoutCalendar!.length} work center(s) have no Work Calendar pattern:{' '}
-            {run!.pressesWithoutCalendar!.join(', ')}
-          </p>
-          <p className="mt-1 text-xs text-foreground">
-            These work centers get no capacity and nothing is planned on them until their days and shifts
-            are defined on the{' '}
-            <Link to="/takvim" className="underline">
-              Work Calendar
-            </Link>{' '}
-            page.
-          </p>
-        </div>
-      )}
-
-      {run?.dataCoverage && <DataCoveragePanel coverage={run.dataCoverage} />}
-
-      {run && ((run.lateRepair?.rounds ?? 0) > 0 || (run.lateItems?.length ?? 0) > 0) && (
-        <LateJobs
-          run={run}
-          jobs={engineJobs.filter((j) => j.late)}
-          shiftMinutes={shiftMinutes}
-          shiftStartMinute={shiftStartMinute}
-        />
-      )}
-
-      {run?.dailyUntil && (
-        <p className="mt-4 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-          Sales days come from <strong className="text-foreground">ZPP_DAILY</strong> up to{' '}
-          {run.dailyUntil}; after that the weekly ZPP is spread over working days.
-        </p>
-      )}
-
-      {warnings.length > 0 && (
-        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-medium text-amber-900">Needs attention</p>
-          <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-800">
-            {warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Planned jobs" value={engineJobs.length.toLocaleString('en-GB')} />
-        <Stat label="Planned qty" value={totalPlannedQty.toLocaleString('en-GB')} />
-        <Stat
-          label="Unplanned"
-          value={unplanned.length.toLocaleString('en-GB')}
-          warn={unplanned.length > 0}
-        />
-        <Stat
-          label={run?.lateItems ? 'Late materials' : 'Late jobs'}
-          value={(run?.lateItems?.length ?? lateCount).toLocaleString('en-GB')}
-          warn={(run?.lateItems?.length ?? lateCount) > 0}
-        />
-      </div>
-
-      {run?.optimisation && <OptimisationPanel opt={run.optimisation} />}
-
-      {run?.validation && <IndependentCheck v={run.validation} />}
-
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           onClick={() => void handleApprove()}
@@ -471,6 +302,18 @@ function PlanlamaPage() {
             {latestSnapshot.jobCount} jobs
           </span>
         )}
+        {run && (
+          // Onaydan önce bakılacak özet; ayrıntılar Overview'da.
+          <Link
+            to="/planningexpert"
+            className={`ml-auto rounded-md px-2.5 py-1 text-xs font-medium hover:underline ${
+              planChecksOk ? 'bg-emerald-50 text-emerald-800' : 'bg-destructive/10 text-destructive'
+            }`}
+          >
+            {planChecksOk ? 'Plan check: all rules hold ✓' : 'Plan check: rules broken — see Overview'}
+            {` · ${lateCount} late · ${unplanned.length} unplanned`}
+          </Link>
+        )}
       </div>
 
       {latestSnapshot?.truncated && (
@@ -483,60 +326,103 @@ function PlanlamaPage() {
         </p>
       )}
 
-      {planDiff && planDiff.changes.length > 0 && (
-        <div className="mt-6 rounded-lg border border-border p-4">
+      {inputsLoading && (
+        <p className="mt-8 text-sm text-muted-foreground">Loading data…</p>
+      )}
+
+      {weeks.length === 0 && !inputsLoading && (
+        <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          No jobs to plan. Make sure ZPP demand, MB52 stock and{' '}
+          <Link to="/makineler" className="underline">
+            work center definitions
+          </Link>{' '}
+          have been uploaded.
+        </p>
+      )}
+
+      {weeks.length > 0 && (
+        <div className="mt-8">
           <h2 className="text-sm font-semibold text-foreground">
-            Changes since the approved plan
+            Plan{' '}
+            <span className="font-normal text-muted-foreground">
+              · {dayMonth(allDates[0])} – {dayMonth(allDates[allDates.length - 1])} ·{' '}
+              {allJobs.length} jobs
+            </span>
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Approved: {new Date(latestSnapshot!.createdAt).toLocaleString('en-GB')} ·{' '}
-            {planDiff.addedCount} new, {planDiff.removedCount} dropped,{' '}
-            {planDiff.movedCount} moved, {planDiff.quantityCount} quantity changed,{' '}
-            {planDiff.sameCount} unchanged.
-          </p>
-          <div className="mt-2 max-h-80 overflow-auto rounded-md border border-border">
-            <table className="w-full text-left text-sm">
-              <thead className="sticky top-0 bg-muted text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Material</th>
-                  <th className="px-3 py-2 font-medium">Change</th>
-                  <th className="px-3 py-2 font-medium">Approved</th>
-                  <th className="px-3 py-2 font-medium">Now</th>
-                </tr>
-              </thead>
-              <tbody>
-                {planDiff.changes.map((c) => (
-                  <tr key={c.material} className="border-t border-border align-top">
-                    <td className="px-3 py-2 font-medium text-foreground">{c.material}</td>
-                    <td className="px-3 py-2">
-                      <span className={CHANGE_STYLE[c.kind]}>{CHANGE_LABEL[c.kind]}</span>
-                    </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {c.approvedSlots.length > 0 ? (
-                        <>
-                          {Math.round(c.approvedQty).toLocaleString('en-GB')} pcs
-                          <br />
-                          {c.approvedSlots.join(', ')}
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {c.currentSlots.length > 0 ? (
-                        <>
-                          {Math.round(c.currentQty).toLocaleString('en-GB')} pcs
-                          <br />
-                          {c.currentSlots.join(', ')}
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div className="mt-2">
+            <WeekGantt
+              dates={allDates}
+              // `nowClockMinute` gece yarısından itibaren sayar (gece
+              // vardiyasında 1440'ı aşar), grafiğin ekseni de öyle.
+              now={{ date: todayIso, clockMinute: nowClockMinute }}
+              stops={plannedStops}
+              shiftStartMinute={shiftStartMinute}
+              shiftMinutes={shiftMinutes}
+              presses={presses.map(
+                (p): WeekGanttPress => ({
+                  name: p.name,
+                  hall: p.hall,
+                  category: p.category,
+                  frequencyStop: p.frequencyStop,
+                  days: allDates.map((d) => ({
+                    date: d,
+                    shifts: shiftsByPressDate.get(`${p.name}|${d}`) ?? 0,
+                    overtime: overtimeByPressDate.get(`${p.name}|${d}`),
+                    capacityMinutes: capacityByPressDate.get(`${p.name}|${d}`) ?? 0,
+                  })),
+                }),
+              )}
+              jobs={[
+                ...allJobs.map(
+                  (j): WeekGanttJob => ({
+                    date: j.date,
+                    press: j.press,
+                    material: j.material,
+                    quantity: j.quantity,
+                    late: j.late,
+                    frozen: j.frozen,
+                    setupStartMinute: j.setupStartMinute,
+                    setupMinutes: j.setupMinutes,
+                    endMinute: j.endMinute,
+                    segments: j.segments,
+                    waitReason: j.waitReason,
+                    urgentSetup: j.urgentSetup,
+                    bucketLabel: j.bucketLabel,
+                    quantityFixed: !j.frozen && quantityRules.has(`${j.material}|${j.bucketLabel}`),
+                    locked: j.locked,
+                  }),
+                ),
+                ...ganttMaintenance,
+              ]}
+              onJobClick={(clicked) => {
+                const job = allJobs.find(
+                  (j) =>
+                    j.material === clicked.material &&
+                    j.press === clicked.press &&
+                    j.date === clicked.date &&
+                    j.setupStartMinute === clicked.setupStartMinute,
+                )
+                if (!job) return
+                const key = `${job.material}|${job.press}|${job.date}|${Math.round(job.setupStartMinute)}`
+                const lock = job.locked ? lockByKey.get(key) : undefined
+                if (job.locked && !lock) return
+                // Lot: aynı malzeme + kova; kalıp ömrüyle bölünmüşse birden çok iş.
+                const lot = engineJobs.filter((j) => j.material === job.material && j.bucketLabel === job.bucketLabel)
+                const lotQuantity = lot.reduce((sum, j) => sum + j.quantity, 0)
+                const coils = lot.reduce((sum, j) => sum + (j.coilsNeeded ?? 0), 0)
+                setJobDraft({
+                  job,
+                  bucket: job.bucketLabel,
+                  lotQuantity: lotQuantity || job.quantity,
+                  lotJobCount: Math.max(1, lot.length),
+                  piecesPerCoil: coils > 0 ? lotQuantity / coils : undefined,
+                  override: quantityRules.get(`${job.material}|${job.bucketLabel}`),
+                  lock: lock && { id: lock._id, approvedBy: lock.approvedBy, createdAt: lock.createdAt },
+                })
+              }}
+            />
+            {jobDraft && <JobDialog draft={jobDraft} onClose={() => setJobDraft(null)} />}
           </div>
         </div>
       )}
@@ -656,361 +542,6 @@ function PlanlamaPage() {
           </ul>
         )}
       </div>
-
-      {run?.audit && <PlanCheck audit={run.audit} jobCount={run.jobs.length} />}
-
-      {inputsLoading && (
-        <p className="mt-8 text-sm text-muted-foreground">Loading data…</p>
-      )}
-
-      {weeks.length === 0 && !inputsLoading && (
-        <p className="mt-8 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          No jobs to plan. Make sure ZPP demand, MB52 stock and{' '}
-          <Link to="/makineler" className="underline">
-            work center definitions
-          </Link>{' '}
-          have been uploaded.
-        </p>
-      )}
-
-      {weeks.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-sm font-semibold text-foreground">
-            Plan{' '}
-            <span className="font-normal text-muted-foreground">
-              · {dayMonth(allDates[0])} – {dayMonth(allDates[allDates.length - 1])} ·{' '}
-              {allJobs.length} jobs
-            </span>
-          </h2>
-
-          <div className="mt-2">
-            <WeekGantt
-              dates={allDates}
-              // `nowClockMinute` gece yarısından itibaren sayar (gece
-              // vardiyasında 1440'ı aşar), grafiğin ekseni de öyle.
-              now={{ date: todayIso, clockMinute: nowClockMinute }}
-              stops={plannedStops}
-              shiftStartMinute={shiftStartMinute}
-              shiftMinutes={shiftMinutes}
-              presses={presses.map(
-                (p): WeekGanttPress => ({
-                  name: p.name,
-                  hall: p.hall,
-                  category: p.category,
-                  frequencyStop: p.frequencyStop,
-                  days: allDates.map((d) => ({
-                    date: d,
-                    shifts: shiftsByPressDate.get(`${p.name}|${d}`) ?? 0,
-                    overtime: overtimeByPressDate.get(`${p.name}|${d}`),
-                    capacityMinutes: capacityByPressDate.get(`${p.name}|${d}`) ?? 0,
-                  })),
-                }),
-              )}
-              jobs={[
-                ...allJobs.map(
-                  (j): WeekGanttJob => ({
-                    date: j.date,
-                    press: j.press,
-                    material: j.material,
-                    quantity: j.quantity,
-                    late: j.late,
-                    frozen: j.frozen,
-                    setupStartMinute: j.setupStartMinute,
-                    setupMinutes: j.setupMinutes,
-                    endMinute: j.endMinute,
-                    segments: j.segments,
-                    waitReason: j.waitReason,
-                    urgentSetup: j.urgentSetup,
-                    bucketLabel: j.bucketLabel,
-                    quantityFixed: !j.frozen && quantityRules.has(`${j.material}|${j.bucketLabel}`),
-                    locked: j.locked,
-                  }),
-                ),
-                ...ganttMaintenance,
-              ]}
-              onJobClick={(clicked) => {
-                const job = allJobs.find(
-                  (j) =>
-                    j.material === clicked.material &&
-                    j.press === clicked.press &&
-                    j.date === clicked.date &&
-                    j.setupStartMinute === clicked.setupStartMinute,
-                )
-                if (!job) return
-                const key = `${job.material}|${job.press}|${job.date}|${Math.round(job.setupStartMinute)}`
-                const lock = job.locked ? lockByKey.get(key) : undefined
-                if (job.locked && !lock) return
-                // Lot: aynı malzeme + kova; kalıp ömrüyle bölünmüşse birden çok iş.
-                const lot = engineJobs.filter((j) => j.material === job.material && j.bucketLabel === job.bucketLabel)
-                const lotQuantity = lot.reduce((sum, j) => sum + j.quantity, 0)
-                const coils = lot.reduce((sum, j) => sum + (j.coilsNeeded ?? 0), 0)
-                setJobDraft({
-                  job,
-                  bucket: job.bucketLabel,
-                  lotQuantity: lotQuantity || job.quantity,
-                  lotJobCount: Math.max(1, lot.length),
-                  piecesPerCoil: coils > 0 ? lotQuantity / coils : undefined,
-                  override: quantityRules.get(`${job.material}|${job.bucketLabel}`),
-                  lock: lock && { id: lock._id, approvedBy: lock.approvedBy, createdAt: lock.createdAt },
-                })
-              }}
-            />
-            {jobDraft && <JobDialog draft={jobDraft} onClose={() => setJobDraft(null)} />}
-          </div>
-
-          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Job lists by week
-          </h3>
-          {weeks.map((week) => (
-            <details key={week.weekStart} className="mt-2 rounded-lg border border-border">
-              <summary className="cursor-pointer px-3 py-2 text-sm text-foreground hover:bg-muted/40">
-                <span className="font-semibold">
-                  {isoWeekLabel(new Date(`${week.weekStart}T00:00:00`))}
-                </span>{' '}
-                <span className="text-muted-foreground">
-                  · {dayMonth(week.dates[0])} – {dayMonth(week.dates[week.dates.length - 1])} ·{' '}
-                  {week.jobs.length} jobs
-                  {week.idlePresses.length > 0 &&
-                    ` · idle: ${week.idlePresses.map((p) => `${p.name} (${p.reason})`).join(', ')}`}
-                </span>
-              </summary>
-            <div className="overflow-x-auto border-t border-border">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">Day</th>
-                    <th className="px-3 py-2 font-medium">Work center</th>
-                    <th className="px-3 py-2 font-medium">Material</th>
-                    <th className="px-3 py-2 font-medium">Required</th>
-                    <th className="px-3 py-2 font-medium">Qty</th>
-                    <th className="px-3 py-2 font-medium">Shots</th>
-                    <th className="px-3 py-2 font-medium">Coils</th>
-                    <th className="px-3 py-2 font-medium">Setup start</th>
-                    <th className="px-3 py-2 font-medium">End</th>
-                    <th className="px-3 py-2 font-medium">Reason</th>
-                    <th className="px-3 py-2 font-medium" title="Order in which the engine placed the job, and when each eligible work center would have finished it at that moment">
-                      Why this work center
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {week.jobs.map((job, i) => (
-                    <tr key={`${job.press}-${job.material}-${i}`} className="border-t border-border">
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {new Date(`${job.date}T00:00:00`).toLocaleDateString('en-GB', {
-                          weekday: 'short',
-                          day: '2-digit',
-                        })}
-                      </td>
-                      <td className="px-3 py-2 font-medium text-foreground">{job.press}</td>
-                      <td className="px-3 py-2 text-foreground">
-                        {job.material}
-                        {job.coProduct && (
-                          <span className="text-muted-foreground"> +{job.coProduct}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        <span className={job.late ? 'text-destructive' : 'text-muted-foreground'}>
-                          {job.bucketLabel}
-                          {job.late && ' ⚠'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-foreground">
-                        {job.quantity.toLocaleString('en-GB')}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {job.shots.toLocaleString('en-GB')}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">{job.coilsNeeded}</td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {formatClock(job.setupStartMinute, shiftMinutes, shiftStartMinute)}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {formatClock(job.endMinute, shiftMinutes, shiftStartMinute)}
-                        {job.spansDays && (
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            (
-                            {new Date(`${job.endDate}T00:00:00`).toLocaleDateString('en-GB', {
-                              weekday: 'short',
-                              day: '2-digit',
-                            })}
-                            )
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{job.reason}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        <DecisionCell
-                          decision={job.decision}
-                          chosen={job.frozen ? undefined : job.press}
-                          shiftMinutes={shiftMinutes}
-                          shiftStartMinute={shiftStartMinute}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            </details>
-          ))}
-        </div>
-      )}
-
-      {urgentRaw.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-sm font-semibold text-destructive">
-            Raw material — urgent ({urgentRaw.length}): coil stock runs out within the next {rawUrgentDays} working days
-          </h2>
-          <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-            {laterRaw > 0 && `${laterRaw} more run short later in the plan.`}
-            <InfoTip label="About urgent raw material">
-              Planned quantity × gross weight per piece, walked in plan order against the coil stock
-              in MB52 (locations ticked Raw material on <Link to="/depolar">Storage Locations</Link>)
-              plus the coils in transit from their arrival day. Only coils that stop a job in the
-              next {rawUrgentDays} working days are listed (set on the{' '}
-              <Link to="/takvim">Work Calendar</Link>). Co-products are not counted twice. The full
-              requirement is on <Link to="/hammadde">Raw Material Coverage</Link>.
-            </InfoTip>
-          </p>
-          <div className="mt-2 overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-muted text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Raw material</th>
-                  <th className="px-3 py-2 font-medium">Required (kg)</th>
-                  <th className="px-3 py-2 font-medium">Stock (kg)</th>
-                  <th className="px-3 py-2 font-medium">In transit (kg)</th>
-                  <th className="px-3 py-2 font-medium">Short (kg)</th>
-                  <th className="px-3 py-2 font-medium">First job without coil</th>
-                  <th className="px-3 py-2 font-medium">Used by</th>
-                </tr>
-              </thead>
-              <tbody>
-                {urgentRaw.map((r) => (
-                  <tr key={r.rawMaterial} className="border-t border-border">
-                    <td className="px-3 py-2 font-medium text-foreground">{r.rawMaterial}</td>
-                    <td className="px-3 py-2 text-foreground">
-                      {Math.round(r.requiredKg).toLocaleString('en-GB')}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {Math.round(r.availableKg).toLocaleString('en-GB')}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {r.inTransitKg ? Math.round(r.inTransitKg).toLocaleString('en-GB') : '—'}
-                    </td>
-                    <td className="px-3 py-2 font-medium text-destructive">
-                      {r.shortageKg > 0
-                        ? Math.round(r.shortageKg).toLocaleString('en-GB')
-                        : 'in transit arrives too late'}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-xs text-foreground">
-                      {r.shortFrom ? `${dayMonth(r.shortFrom.date)} · ${r.shortFrom.press} · ${r.shortFrom.material}` : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {r.materials.join(', ')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {unplanned.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-sm font-semibold text-destructive">
-            Unplanned ({unplanned.length})
-          </h2>
-          <div className="mt-2 overflow-x-auto rounded-lg border border-destructive/30">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-destructive/10 text-destructive">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Material</th>
-                  <th className="px-3 py-2 font-medium">Qty</th>
-                  <th className="px-3 py-2 font-medium">Phase</th>
-                  <th className="px-3 py-2 font-medium">Required week</th>
-                  <th className="px-3 py-2 font-medium">Reason</th>
-                  <th className="px-3 py-2 font-medium">Work centers tried</th>
-                  <th className="px-3 py-2 font-medium">Fix</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unplanned.map((u, i) => {
-                  // Her sebebin somut bir çaresi var; listeyi okuyup ne
-                  // yapacağını aramak planlamacının işi olmamalı.
-                  const fix = fixForUnplanned(u.reason)
-                  return (
-                    <tr key={`${u.material}-${i}`} className="border-t border-border">
-                      <td className="px-3 py-2 font-medium text-foreground">{u.material}</td>
-                      <td className="px-3 py-2 text-foreground">
-                        {Math.round(u.quantity).toLocaleString('en-GB')}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">{u.phase}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{u.dueDate}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{u.reason}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        <DecisionCell
-                          decision={u.decision}
-                          shiftMinutes={shiftMinutes}
-                          shiftStartMinute={shiftStartMinute}
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-xs whitespace-nowrap">
-                        {fix.to ? (
-                          <Link
-                            to={fix.to}
-                            className="text-foreground underline hover:no-underline"
-                          >
-                            {fix.label}
-                          </Link>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setOvMaterial(u.material)
-                              setOvKind('priority')
-                              document
-                                .getElementById('plan-overrides')
-                                ?.scrollIntoView({ behavior: 'smooth' })
-                            }}
-                            className="text-foreground underline hover:no-underline"
-                          >
-                            {fix.label}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   )
-}
-
-const CHANGE_LABEL: Record<string, string> = {
-  added: 'new',
-  removed: 'dropped',
-  moved: 'moved',
-  quantity: 'qty changed',
-  same: 'unchanged',
-}
-
-const CHANGE_STYLE: Record<string, string> = {
-  added: 'rounded bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800',
-  removed: 'rounded bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive',
-  moved: 'rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900',
-  quantity: 'rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-900',
-  same: 'text-xs text-muted-foreground',
-}
-
-/** Kalıp ve makine alarmlarının plan sayfasındaki özeti. */
-
-function dayMonth(iso: string | undefined): string {
-  if (!iso) return ''
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
 }
