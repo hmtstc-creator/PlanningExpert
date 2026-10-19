@@ -130,6 +130,8 @@ export interface WeekGanttJob {
   bucketLabel?: string
   /** Lot adedi planlamacı tarafından elle verildi (Plan overrides). */
   quantityFixed?: boolean
+  /** Tek tek onaylanmış (kilitli) iş: dondurulmuş gibi çizilir ama tıklanır. */
+  locked?: boolean
 }
 
 export interface WeekGanttDay {
@@ -170,8 +172,8 @@ interface Props {
    */
   now?: { date: string; clockMinute: number }
   /**
-   * İşe tıklanınca (planlamacı adedi değiştirir). Dondurulmuş işler ve bakım
-   * tıklanamaz.
+   * İşe tıklanınca (adet, tek iş onayı, hariç tutma). Bakım ve tam plan
+   * onayından dondurulmuş işler tıklanamaz; tek tek onaylanan işler tıklanır.
    */
   onJobClick?: (job: WeekGanttJob) => void
 }
@@ -471,7 +473,7 @@ export function WeekGantt({
           breaks: stopsOnRow.filter((st) => st.start >= start && st.end <= end),
           label: maintenanceBar
             ? job.material
-            : `${job.material} · ${job.quantity.toLocaleString('en-GB')}${job.quantityFixed ? ' ✎' : ''}${carriedOver ? ' ↻' : ''}`,
+            : `${job.material} · ${job.quantity.toLocaleString('en-GB')}${job.quantityFixed ? ' ✎' : ''}${job.locked ? ' ✓' : ''}${carriedOver ? ' ↻' : ''}`,
           title: maintenanceBar
             ? `${job.material} · ${toClock(start)}–${toClock(end)}`
             : [
@@ -482,7 +484,7 @@ export function WeekGantt({
                 carriedOver ? `continued from ${job.date}` : '',
                 job.urgentSetup ? 'urgent: setup may overlap another' : '',
                 job.quantityFixed ? 'quantity set by hand (Plan overrides)' : '',
-                job.frozen ? 'FROZEN (approved plan)' : '',
+                job.locked ? 'APPROVED — locked job' : job.frozen ? 'FROZEN (approved plan)' : '',
                 job.late ? 'LATE — starts after the stock runs out' : '',
               ]
                 .filter(Boolean)
@@ -662,7 +664,13 @@ export function WeekGantt({
             Quantity set by hand
           </span>
         )}
-        {jobs.some((j) => j.frozen) && (
+        {jobs.some((j) => j.locked) && (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">✓</span>
+            Approved job (locked)
+          </span>
+        )}
+        {jobs.some((j) => j.frozen && !j.locked) && (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
               className="inline-block h-3 w-3 rounded-sm bg-muted-foreground"
@@ -975,7 +983,8 @@ export function WeekGantt({
                         const local = (x: number) => px(x - bar.start)
                         const hit = isMatch(bar.job)
                         const focused = current?.bar === bar
-                        const editable = !!onJobClick && !bar.maintenance && !bar.job.frozen && !!bar.job.bucketLabel
+                        const editable =
+                          !!onJobClick && !bar.maintenance && (bar.job.locked || (!bar.job.frozen && !!bar.job.bucketLabel))
                         return (
                           <div
                             key={`bar-${idx}`}

@@ -41,6 +41,7 @@ const TABLE_LABELS: Record<string, string> = {
   changeLog: 'Change log',
   moldMaintenance: 'Mold maintenance',
   planOverrides: 'Plan overrides',
+  planJobLocks: 'Approved jobs (locked)',
   officialHolidays: 'Public holidays',
   machines: 'Machines (deprecated)',
   machinePriorities: 'Machine priorities (deprecated)',

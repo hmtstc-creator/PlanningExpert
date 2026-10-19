@@ -808,6 +808,36 @@ export default defineSchema({
   }).index('by_created', ['plantId', 'createdAt'])
     .index('by_plant', ['plantId']),
 
+  // Tek tek onaylanan (kilitli) işler: Plan grafiğinde işe tıklayıp "Approve
+  // this job". Dondurulmuş ufuktan bağımsız olarak yeniden hesapta yerinde
+  // kalır; kilit kaldırılınca iş yeniden motora döner.
+  planJobLocks: defineTable({
+    ...plantField,
+    material: v.string(),
+    press: v.string(),
+    hall: v.string(),
+    date: v.string(),
+    phase: v.string(),
+    quantity: v.number(),
+    shots: v.number(),
+    coilsNeeded: v.number(),
+    setupStartMinute: v.number(),
+    endMinute: v.number(),
+    endDate: v.optional(v.string()),
+    segments: v.array(
+      v.object({
+        kind: v.string(),
+        date: v.string(),
+        start: v.number(),
+        end: v.number(),
+      }),
+    ),
+    reason: v.string(),
+    approvedBy: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index('by_plant', ['plantId'])
+    .index('by_material', ['plantId', 'material']),
+
   // MB51'den yüklenen gerçekleşen üretim hareketleri. Plan/gerçek
   // karşılaştırması ve performans faktörü buradan beslenir.
   // Yoldaki hammadde (rulo) — kullanıcının Excel listesi; MRP'de planlı giriş.
