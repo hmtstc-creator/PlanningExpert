@@ -142,10 +142,11 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
   site, Convex ve yedek kendi sunucumuzda (Hetzner, Docker Compose, Tailscale
   Funnel). Vercel ve Convex Cloud kullanılmıyor; depodan onlara ait ayar, betik ve
   talimatlar kaldırıldı. İşletim kitabı: **deploy/README.md**.
-  - [ ] **[S] 🔑** Vercel projesini ve Vercel'in GitHub bağlantısını (GitHub →
+  - [x] **[S] 🔑** (2026-10-19) Vercel projesini ve Vercel'in GitHub bağlantısını (GitHub →
     Settings → Applications) kaldır; Convex Cloud deployment'ını sil (son yedeği
     saklı); sunucuda `/etc/planningexpert/cloud.env` varsa sil.
-  - [ ] Gece yedeği timer'ı açık mı, ilk geri yükleme provası (deploy/README.md)
+  - [x] Gece yedeği timer'ı kuruldu ve denendi (2026-10-19; önceden kurulmamıştı; UMask=0077 ile yedekler 600).
+    İlk geri yükleme provası aşağıda (P0 — Yedek yok).
 - [x] ✅ **P0 — Geliştirirken canlı veri korunur** (2026-10-03): şema kapısı
   (alan / tablo kaldırma, zorunlu yapma, daraltma CI'da durur), yayın öncesi
   zorunlu yedek (`scripts/release.sh`), günlük yedek (`scripts/backup.sh`),
