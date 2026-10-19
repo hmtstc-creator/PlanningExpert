@@ -1,6 +1,7 @@
 import { v } from 'convex/values'
 
 import { guardedMutation, guardedQuery } from './guarded'
+import { PLAN_APPROVED_TITLE } from '../src/lib/updates'
 
 const jobValidator = v.object({
   material: v.string(),
@@ -80,7 +81,7 @@ export const approve = guardedMutation({
       jobs: truncated ? args.jobs.slice(0, MAX_STORED_JOBS) : args.jobs,
     })
     await ctx.db.insert('changeLog', {
-      title: `Plan approved — ${args.jobs.length} jobs`,
+      title: `${PLAN_APPROVED_TITLE} — ${args.jobs.length} jobs`,
       detail:
         `${args.jobs.length} jobs planned from ${args.horizonStart} onwards, ` +
         `${args.unplannedCount} items could not be planned.` +

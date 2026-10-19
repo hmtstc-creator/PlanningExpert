@@ -6,6 +6,7 @@ import { useQuery } from '../lib/convexTransport'
 import type { Module } from '../lib/tenancy'
 
 import { Cockpit } from '../components/Cockpit'
+import { NewUpdatesChip, UpdatesPanel, useUpdates, type Updates } from '../components/UpdatesPanel'
 import { SearchButton } from '../components/nav/CommandPalette'
 import { ACCENTS, IconTile, NavIcon } from '../components/nav/NavIcon'
 import { useCurrentUser } from '../lib/currentUser'
@@ -27,21 +28,25 @@ function greeting(hour: number) {
 }
 
 /**
- * Portalın ana sayfası: karşılama (gün, hafta, plant, arama ve kişinin
- * kısayolları), kurulum listesi, Today (kararlar) ve modüller — her modül
- * kartında en çok kullanılan sayfalarına doğrudan bağlantı. Giriş ekranı
- * bunun da önündedir (LoginGate kökte).
+ * Portalın ana sayfası: karşılama (gün, hafta, plant, arama, kişinin
+ * kısayolları ve son ziyaretten beri yeni olaylar), Updates (son gelişmeler
+ * ve verinin son yayını — docs/updates.md), kurulum listesi, Today (kararlar)
+ * ve modüller — her modül kartında en çok kullanılan sayfalarına doğrudan
+ * bağlantı. Giriş ekranı bunun da önündedir (LoginGate kökte).
  */
 function PortalHome() {
   const { ctx, can, canManage } = usePlant()
+  const { name } = useCurrentUser()
+  const updates = useUpdates(name, ctx?.isBoard ? undefined : ctx?.active?.plantId)
   // Board görünümü doğrudan Board Dashboard'la açılır.
   if (ctx?.isBoard) return <Navigate to="/board" />
   // Yalnızca bu fabrikada izni olan modüller.
   const modules = PORTAL_MODULES.filter((m) => (m.to === '/board' ? can('kpi') || can('oee') : !m.module || can(m.module)))
   return (
     <div className="pb-24">
-      <Hero />
+      <Hero updates={updates} />
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
+        {ctx?.active && <UpdatesPanel updates={updates} className="relative z-10 -mt-6" />}
         {canManage && ctx?.active && <SetupChecklist can={can} />}
         {ctx?.active && <Cockpit className="mt-8" />}
 
@@ -63,8 +68,8 @@ function PortalHome() {
   )
 }
 
-/** Karşılama: tarih, hafta, plant; arama; sabitlenen ve son açılan sayfalar. */
-function Hero() {
+/** Karşılama: tarih, hafta, plant; arama; sabitlenen ve son açılan sayfalar; yeni olaylar. */
+function Hero({ updates }: { updates: Updates }) {
   const { ctx } = usePlant()
   const { name } = useCurrentUser()
   const { pins, recent } = useShortcuts(name)
@@ -107,6 +112,11 @@ function Hero() {
         <div className="mt-6">
           <SearchButton variant="hero" />
         </div>
+        {updates.newCount > 0 && (
+          <div className="mt-4">
+            <NewUpdatesChip count={updates.newCount} />
+          </div>
+        )}
         {(pinned.length > 0 || recentPages.length > 0) && (
           <div className="mt-5 flex flex-wrap items-center gap-2">
             {pinned.map((p) => (
@@ -247,7 +257,7 @@ function SetupChecklist({ can }: { can: (m: Module) => boolean }) {
   if (!open.length) return null
   const pct = Math.round(((steps.length - open.length) / steps.length) * 100)
   return (
-    <section className="relative z-10 -mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-lg shadow-amber-900/5">
+    <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-lg shadow-amber-900/5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground">
           Plant setup — {steps.length - open.length} of {steps.length} done

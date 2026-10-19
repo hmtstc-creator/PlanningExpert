@@ -47,6 +47,7 @@ Saf hesap kütüphanesi (src/lib/*.ts — React'e de Convex'e de bağlı değil)
   settingsDefaults.ts       AYAR VARSAYILANLARININ TEK YERİ
   mutationErrors.ts         sunucu hatasını kullanıcı diline çevirme
   oee.ts / oeeStore.ts      OEE: toplam ÷ toplam oranlar, kayıplar, setup; yükleme
+  cockpit.ts / updates.ts   ana sayfa: Today (kararlar) ve Updates (son olaylar, verinin tazeliği)
   tenancy.ts                YETKİNİN TEK KURALI (platform, creator, grup × fabrika × modül)
   navigation.ts             menü + sayfalar arası kısayollar (RELATED_PAGES)
 ```
@@ -94,6 +95,9 @@ Aynı değer farklı sayfalarda farklı görünmemeli. Her bilgi tek yerden geli
 | Kapasite katsayısı | ayar `capacityFactor` (Performance sayfası) | plan |
 | Planlı duruş | Work Calendar planlı duruş tablosu | kapasite, Gantt, mesai |
 | Hata metni | `friendlyError()` | tüm kayıt işlemleri |
+| Son SAP yüklemesi | `currentUploads()` (convex/sapUploads.ts) | SAP Data, ana sayfa Updates |
+| Verinin son yayını, son olaylar | `src/lib/updates.ts` (`buildFreshness`, `buildFeed`) ← convex/updates.ts | ana sayfa Updates |
+| Eskime eşikleri (SAP, plan) | `todayThresholds()` (convex/cockpit.ts) | Today, günlük özet, Updates |
 
 Kural: bir tanım (ör. "106 + 107 toplamı") koda elle yazılmaz; ilgili
 tanımdan (kategori) türetilir.
@@ -195,8 +199,10 @@ Bunlar kodu değiştiren herkes (ve Claude) için bağlayıcıdır.
       yana kayan sekmeler; çekmecede arama, modül ızgarası, alanın sayfaları
       (gruplar katlanır), hesap.
     - Portal ana sayfası: karşılama (gün, ISO hafta, plant, büyük arama,
-      kısayollar), kurulum listesi, Today, modül kartları (her kartta en çok
-      4 sayfaya doğrudan bağlantı), yönetim kısayolları.
+      kısayollar, "N new since your last visit"), **Updates** (son olaylar ve
+      her verinin son yayını — docs/updates.md), kurulum listesi, Today, modül
+      kartları (her kartta en çok 4 sayfaya doğrudan bağlantı), yönetim
+      kısayolları.
     Menü bir ağaçtır (`NavNode`), en çok üç kademe. Kural testi:
     `src/lib/navigation.test.ts` (derinlik, tekrar, sayfası olmayan bağlantı).
     Yönetim modül menülerinde yoktur; kullanıcı menüsünden açılır:
