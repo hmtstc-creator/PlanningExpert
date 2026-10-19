@@ -77,7 +77,8 @@ export interface CockpitInput {
 }
 
 const hours = (ms: number) => ms / 3_600_000
-const ageText = (ms: number) => {
+/** Geçen süre okunur biçimde: "25 min", "5 h", "3 days". */
+export const ageText = (ms: number) => {
   const h = hours(ms)
   return h < 1 ? `${Math.max(1, Math.round(h * 60))} min` : h < 48 ? `${Math.round(h)} h` : `${Math.round(h / 24)} days`
 }

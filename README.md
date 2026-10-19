@@ -24,6 +24,7 @@ Dashboard. Tek sistem, tek adres; her plant'in verisi ayrıdır.
 | `docs/oeedashboard.md` | OEE kararları ve dosya biçimi |
 | `docs/oee-agent-report.md` | OEE Agent Report: günün kısa notları, kurallar ve eşikler |
 | `docs/pdf.md` | Save PDF: sitedeki bütün çıktılar, dosya adları |
+| `docs/updates.md` | Ana sayfa Updates: son gelişmeler ve verinin son yayını |
 | `docs/kpi.md` | KPI modülü |
 | `docs/deployment.md` | VPS'te yayın, veri güvenliği, yerel geliştirme |
 | `deploy/README.md` | **Sunucu kitabı**: güncelleme, yedek, geri yükleme, sıfırdan kurulum |

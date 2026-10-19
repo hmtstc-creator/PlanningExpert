@@ -39,6 +39,9 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 | 37 | İlk kurulum kullanıcısı admin / admin | yalnızca platformun ilk kurulumu (hiç kullanıcı yokken); fabrikada kullanıcıyı creator geçici şifreyle açar | `convex/auth.ts` | P | Kalır |
 | 38 | Hatalı girişte kilit | art arda 5 hatalı parola | `src/lib/authRules.ts` (MAX_FAILED_LOGINS) | P | P — 2026-10-03 |
 | 39 | Kilit süresi | 15 dakika; yeni parola verilince hemen kalkar | `src/lib/authRules.ts` (LOCKOUT_MS) | P | P — 2026-10-03 |
+| 40 | Ana sayfa Updates: akışın geriye baktığı süre | 7 gün | `src/lib/updates.ts` (FEED_WINDOW_DAYS) | P | |
+| 41 | Ana sayfa Updates: akıştaki en çok olay | 12 | `src/lib/updates.ts` (FEED_LIMIT) | P | |
+| 42 | Updates'in okuduğu son kayıtlar (teknik) | Die / Machine konusu 50, Change Log 200 (plan onayı), OEE yüklemesi 10 | `convex/updates.ts` | P (teknik) | |
 
 Not: Eski "14 gün stok = acil" kuralının kodu kaldırıldı; acil tanımı stok
 projeksiyonundan gelir.

@@ -99,7 +99,10 @@ Holding → Company → Plant → Department → Cost center → Work center
 ### Planlama ve sabit değerler
 - [ ] **[K]** Koddaki sabit sayılar için P (programda kalır) / K
   (kullanıcı tanımlar) kararı — kararı boş olan satırlar: 1–10, 13–21, 23,
-  24, 28. Öneriler tabloda var. *(docs/fixeddefinitions.md)*
+  24, 28, 40–42. Öneriler tabloda var. *(docs/fixeddefinitions.md)*
+- [ ] **[K]** Ana sayfa Updates (2026-10-19, uygulandı): KPI girişlerinin son
+  güncellenme tarihi de görünsün mü (indeks gerekir), OEE verisine eskime
+  eşiği olsun mu (bugün yalnızca tarih)? *(docs/updates.md)*
 - [ ] **[G]** Hammadde: talep yoksa sipariş yok; kanban ileride ayrı
   kural. *(docs/decisions.md, src/lib/rawMrp.ts)*
 
