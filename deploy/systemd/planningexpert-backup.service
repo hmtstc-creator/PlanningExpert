@@ -7,4 +7,6 @@ Type=oneshot
 User=root
 WorkingDirectory=/opt/planningexpert
 EnvironmentFile=/etc/planningexpert/portal.env
+# Yedekler veri içerir: dosyalar 600 oluşsun (varsayılan umask 644 verir).
+UMask=0077
 ExecStart=/opt/planningexpert/scripts/backup.sh

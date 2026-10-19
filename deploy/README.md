@@ -179,3 +179,6 @@ systemctl daemon-reload && systemctl enable --now planningexpert-backup.timer
   kullanılmıyor; depodan onlara ait ayar, betik ve talimatlar kaldırıldı.
 - 2026-10-16: sunucu `claude/vps-tasima` dalından `main`'e geçti (bir kez:
   `git fetch origin && git checkout main && git pull`).
+- 2026-10-19: gece yedeği timer'ı kuruldu (o güne dek kurulmamıştı), ilk `daily-*.zip`
+  denendi. Vercel GitHub uygulaması, Vercel projesi ve Convex Cloud deployment'ı
+  silindi; sunucudan `/etc/planningexpert/cloud.env` silindi.
