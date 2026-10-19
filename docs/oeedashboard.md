@@ -675,6 +675,7 @@ Sunumdaki 8 slayt (9. boş) ve yapılanlar:
 Hesap ve veri:
 
 - **MTTR** = duruş dakikası ÷ duruş sayısı; **MTBF** = production time ÷ duruş sayısı (eski tabloyla aynı; eşik 0'da birebir — test).
+- MTBF'in payı (net production time) yalnızca **duruş verisi yüklü günlerden** sayılır (2026-10-19): Shiftly KPI'de olup Downtimes'ta olmayan günün üretimi paya girip duruşları paydaya girmediğinde MTBF şişiyordu. Seçilen haftada böyle gün varsa sayfada uyarı çıkar. Filtrenin altında formülleri ve haftanın tablosundan canlı bir örneği gösteren bilgi bloğu; haftanın makine tablosunda **Prod. time** sütunu (MTBF elle doğrulanabilsin).
 - Duruş satırı çok (ayda ~30 000): yılın MTTR / MTBF'i için yüklemede gün × iş merkezi başına **süre histogramı** saklanır (`oeeStopDays`: Reason Code 1, 2, metin, tam dakika dilimi → adet, dakika; `src/lib/oeeReliability.ts`). Eşik tam dakikayla: 9.7 dk, 10 dk eşiğinin altındadır; kovalar < 2, 2–< 10, ≥ 10.
 - Önceden yüklenmiş veri için histogram, herhangi bir OEE sayfası OEE veri yetkisiyle açılınca bir kez kurulur (yalnızca ekler, hiçbir şey silmez — gün toplamları ve kayıp özetleriyle aynı yol).
 - Parça / vardiya ayrıntısı (Daily Report paneli, Bridge vardiya sütunu, kovaların parça ve vardiyası) ham duruşlardan okunur: en çok 8 gün.

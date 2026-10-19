@@ -104,6 +104,20 @@ describe('MTTR / MTBF', () => {
     if (b.count && a.count) expect(b.mttr!).toBeGreaterThanOrEqual(a.mttr!)
   })
 
+  it('duruş verisi olmayan günün üretimi MTBF payına girmez', () => {
+    const c = cat('KLP')
+    const base = relGrid(stops, days, period, c, { lo: 0, hi: Infinity }, all, plant).total[0]
+    // Duruş dosyasında olmayan bir gün: Shiftly'de üretim var, duruş satırı yok.
+    const extra = days.map((d) => ({ ...d, date: '2099-01-01' }))
+    const wide = [{ key: 'p', label: 'P', from, to: '2099-12-31' }]
+    const g = relGrid(stops, [...days, ...extra], wide, c, { lo: 0, hi: Infinity }, all, plant).total[0]
+    expect(g.count).toBe(base.count)
+    expect(g.production).toBeCloseTo(base.production, 6)
+    expect(g.mtbf!).toBeCloseTo(base.mtbf!, 6)
+    const b = bucketRows(stops, [...days, ...extra], from, '2099-12-31', c, all, plant)
+    expect(b[0].cell.production).toBeCloseTo(base.production, 6)
+  })
+
   it('süre kovaları toplamı tüm duruşlara eşit', () => {
     for (const c of cats) {
       const rows = bucketRows(stops, days, from, to, c, all, plant)

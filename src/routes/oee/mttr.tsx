@@ -7,7 +7,7 @@ import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelecti
 import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import { addDaysIso, areaNames, isoWeek, scopeLabel, type DayRow } from '../../lib/oee'
+import { addDaysIso, areaNames, inScope, isoWeek, scopeLabel, type DayRow } from '../../lib/oee'
 import {
   BUCKETS,
   bucketDetail,
@@ -16,6 +16,7 @@ import {
   fromStoredStops,
   relCategories,
   relGrid,
+  stopDates,
   type DurationRange,
   type RelCategory,
   type RelCell,
@@ -155,7 +156,21 @@ function MttrPage() {
     [categories, stops, days, span.from, span.to, weekEvents, scope, config],
   )
 
+  // Seçilen haftada üretimi olup duruş verisi olmayan günler: MTBF'e girmez.
+  const uncovered = useMemo(() => {
+    const covered = stopDates(stops)
+    const out = new Set<string>()
+    for (const d of days)
+      if (d.date >= sel.monday && d.date <= sel.sunday && d.productionMin > 0 && !covered.has(d.date) && inScope(d, scope, config)) out.add(d.date)
+    return [...out].sort()
+  }, [stops, days, sel.monday, sel.sunday, scope, config])
+
   const notes = [
+    ...(uncovered.length && stops.length
+      ? [
+          `No downtime data yet for ${uncovered.map(dm).join(', ')} — production on ${uncovered.length === 1 ? 'that day' : 'those days'} is left out of MTBF until the downtimes are uploaded.`,
+        ]
+      : []),
     ...(stopRaw !== undefined && stops.length === 0 && coverage?.downtimes
       ? ['Downtime durations are being prepared from the uploaded downtimes — the tables fill when it is done (open this page with OEE data rights once).']
       : []),
@@ -172,7 +187,8 @@ function MttrPage() {
           <>
             <p>
               <b>MTTR</b> = stop minutes ÷ number of stops (average duration of one stop). <b>MTBF</b> = production time ÷ number of stops
-              (average running time between two stops). Production time: Shiftly KPI, same machines and days.
+              (average running time between two stops). Production time: net production time of the Shiftly KPI, same machines and days —
+              only days whose downtimes are uploaded.
             </p>
             <p>
               <b>Minimum duration</b>: stops shorter than this many minutes are left out of MTTR and MTBF (e.g. 10 → only stops of 10 minutes
@@ -205,6 +221,7 @@ function MttrPage() {
           </label>
         }
       />
+      <FormulaNote data={weekByMachine} minMinutes={prefs.minMinutes} />
       <OeeDataNotice items={notes} />
 
       {/* Haftanın makine tablosu (Losses Trend'den taşındı). */}
@@ -314,6 +331,8 @@ function MttrPage() {
 function WeekMachineTable({ data }: { data: { cat: RelCategory; grid: RelGrid }[] }) {
   const wcs = data[0]?.grid.rows.map((r) => r.workCenter) ?? []
   if (!data.length || !wcs.length) return <p className="mt-2 text-xs text-muted-foreground">Nothing for this week.</p>
+  // Production time aynı makine ve hafta için her kategoride aynı: ilk kategoriden.
+  const prod = (c: RelCell | undefined) => (c && c.production > 0 ? dur(c.production) : '—')
   const th = 'px-2 py-1.5 pr-3 text-right font-medium whitespace-nowrap'
   const cells = (c: RelCell | undefined, strong = false) => (
     <>
@@ -329,6 +348,7 @@ function WeekMachineTable({ data }: { data: { cat: RelCategory; grid: RelGrid }[
         <thead className="bg-muted text-muted-foreground">
           <tr>
             <th className="px-2 py-1.5 text-left font-medium" />
+            <th className="px-2 py-1.5 text-left font-medium" />
             {data.map((d) => (
               <th key={d.cat.key} colSpan={4} className="border-l border-border px-2 py-1.5 text-center font-bold text-foreground">
                 {d.cat.label}
@@ -337,6 +357,9 @@ function WeekMachineTable({ data }: { data: { cat: RelCategory; grid: RelGrid }[
           </tr>
           <tr>
             <th className="px-2 py-1.5 text-left font-medium">Machine</th>
+            <th className={th} title="Net production time (Shiftly KPI) — the numerator of MTBF">
+              Prod. time
+            </th>
             {data.map((d) => (
               <FourHeads key={d.cat.key} className={th} />
             ))}
@@ -346,6 +369,7 @@ function WeekMachineTable({ data }: { data: { cat: RelCategory; grid: RelGrid }[
           {wcs.map((wc, i) => (
             <tr key={wc} className="border-t border-border">
               <td className="px-2 py-1 font-medium whitespace-nowrap text-foreground">{wc}</td>
+              <td className="px-2 py-1 pr-3 text-right text-muted-foreground tabular-nums">{prod(data[0].grid.rows[i]?.cells[0])}</td>
               {data.map((d) => (
                 <Fragment key={d.cat.key}>{cells(d.grid.rows[i]?.cells[0])}</Fragment>
               ))}
@@ -353,6 +377,7 @@ function WeekMachineTable({ data }: { data: { cat: RelCategory; grid: RelGrid }[
           ))}
           <tr className="border-t border-border bg-muted/40 font-semibold">
             <td className="px-2 py-1 text-foreground">Total</td>
+            <td className="px-2 py-1 pr-3 text-right tabular-nums">{prod(data[0].grid.total[0])}</td>
             {data.map((d) => (
               <Fragment key={d.cat.key}>{cells(d.grid.total[0], true)}</Fragment>
             ))}
@@ -360,6 +385,54 @@ function WeekMachineTable({ data }: { data: { cat: RelCategory; grid: RelGrid }[
         </tbody>
       </table>
     </div>
+  )
+}
+
+/**
+ * Filtrenin altında sabit bilgi bloğu: MTTR / MTBF formülleri ve haftanın
+ * tablosundan canlı bir örnek (en çok duruşu olan makine × kategori).
+ */
+function FormulaNote({ data, minMinutes }: { data: { cat: RelCategory; grid: RelGrid }[]; minMinutes: number }) {
+  let ex: { wc: string; cat: string; c: RelCell } | null = null
+  for (const d of data)
+    for (const r of d.grid.rows) {
+      const c = r.cells[0]
+      if (c && c.count > 0 && c.production > 0 && (!ex || c.count > ex.c.count)) ex = { wc: r.workCenter, cat: d.cat.label, c }
+    }
+  const code = 'rounded bg-background px-1 py-0.5 font-mono text-[11px] text-foreground'
+  return (
+    <aside className="mt-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100">
+      <p className="font-semibold">How the numbers are calculated</p>
+      <ul className="mt-1 list-disc space-y-0.5 pl-4">
+        <li>
+          <b>MTTR</b> <span className={code}>= stop minutes ÷ number of stops</span> — average length of one stop.
+        </li>
+        <li>
+          <b>MTBF</b> <span className={code}>= production time ÷ number of stops</span> — average running time between two stops of that
+          category. Production time is the <i>net production time</i> of the Shiftly KPI (loading time minus every unplanned stop), for the same
+          machines and days, counted only on days whose downtimes are uploaded.
+        </li>
+        <li>
+          Each category is counted on its own: ARZ MTBF counts only ARZ stops, even though the machine also stops for KLP and STP in between.
+          <b> Total</b> = all machines summed (Σ time ÷ Σ stops), not the average of the machine values.
+        </li>
+        <li>
+          {minMinutes > 0 ? (
+            <>
+              Only stops of <b>{minMinutes} min</b> and longer are counted (shorter ones are left out of the count, MTTR and MTBF).
+            </>
+          ) : (
+            <>Every stop is counted (min. duration 0).</>
+          )}
+        </li>
+        {ex && (
+          <li>
+            Example, {ex.wc} · {ex.cat}: MTTR = {dur(ex.c.minutes)} ÷ {ex.c.count} = <b>{dur(ex.c.mttr)}</b>, MTBF = {dur(ex.c.production)} ÷{' '}
+            {ex.c.count} = <b>{dur(ex.c.mtbf)}</b>.
+          </li>
+        )}
+      </ul>
+    </aside>
   )
 }
 

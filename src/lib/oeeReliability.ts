@@ -172,8 +172,19 @@ export interface RelGrid {
 }
 
 /**
+ * Production time yalnızca duruş verisi yüklü günlerden sayılır. Shiftly KPI
+ * bir günü içerip Downtimes dosyası içermiyorsa (dosya daha erken bitiyor ya
+ * da histogram henüz kurulmamış) o günün üretimi MTBF'in payına girer ama
+ * duruşları paydaya girmez: MTBF olduğundan yüksek çıkar. Duruş verisi olan
+ * günler: herhangi bir iş merkezinde en az bir duruş satırı olan tarihler
+ * (molalar da duruş satırıdır; çalışılan her gün en az bir satır vardır).
+ */
+export const stopDates = (stops: StopDay[]) => new Set(stops.map((d) => d.date))
+
+/**
  * İş merkezi × dönem MTTR / MTBF. Yalnızca `range` içindeki duruşlar sayılır
- * (ör. en az 10 dk). MTBF = dönemin production time'ı ÷ duruş sayısı.
+ * (ör. en az 10 dk). MTBF = dönemin production time'ı ÷ duruş sayısı;
+ * production time yalnızca duruş verisi olan günlerden (stopDates).
  */
 export function relGrid(
   stops: StopDay[],
@@ -185,6 +196,7 @@ export function relGrid(
   c: OeeConfig,
 ): RelGrid {
   const sc = (r: { workCenter: string; costCenter: string }) => inScope(r, scope, c)
+  const covered = stopDates(stops)
   const scopedDays = days.filter(sc)
   const scopedStops = stops.filter(sc)
   const wcs = [...new Set(scopedDays.map((d) => d.workCenter))].sort()
@@ -200,7 +212,7 @@ export function relGrid(
       }
     }
     let production = 0
-    for (const d of scopedDays) if (d.date >= from && d.date <= to && (!wc || d.workCenter === wc)) production += d.productionMin
+    for (const d of scopedDays) if (d.date >= from && d.date <= to && covered.has(d.date) && (!wc || d.workCenter === wc)) production += d.productionMin
     return relCell(count, minutes, production)
   }
   return {
@@ -221,7 +233,8 @@ export interface BucketRow {
 /** Süre kovaları (< 2, 2–10, ≥ 10 dk): toplam dakika, adet, MTTR, MTBF ve preslere dağılımı. */
 export function bucketRows(stops: StopDay[], days: DayRow[], from: string, to: string, cat: RelCategory, scope: Scope, c: OeeConfig): BucketRow[] {
   const sc = (r: { date: string; workCenter: string; costCenter: string }) => r.date >= from && r.date <= to && inScope(r, scope, c)
-  const production = days.filter(sc).reduce((a, d) => a + d.productionMin, 0)
+  const covered = stopDates(stops)
+  const production = days.filter((d) => sc(d) && covered.has(d.date)).reduce((a, d) => a + d.productionMin, 0)
   return BUCKETS.map((bk) => {
     const press = new Map<string, { count: number; minutes: number }>()
     let count = 0
