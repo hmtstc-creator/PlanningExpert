@@ -697,10 +697,14 @@ export default defineSchema({
   planOverrides: defineTable({
     ...plantField,
     material: v.string(),
-    // 'exclude' | 'pin' | 'priority'
+    // 'exclude' | 'pin' | 'priority' | 'quantity'
     kind: v.string(),
     press: v.optional(v.string()),
     date: v.optional(v.string()),
+    // 'quantity': hangi lot (talep kovası, ör. 'Backlog' ya da ZPP haftası)
+    // ve planlamacının verdiği adet. Bir malzemenin her lotunun ayrı kuralı olur.
+    bucket: v.optional(v.string()),
+    qty: v.optional(v.number()),
     note: v.optional(v.string()),
     createdAt: v.number(),
   }).index('by_material', ['plantId', 'material'])

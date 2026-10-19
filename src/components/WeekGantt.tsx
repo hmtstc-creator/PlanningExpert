@@ -126,6 +126,10 @@ export interface WeekGanttJob {
   waitReason?: string
   /** Setup bakiye/geç iş kuralıyla başka bir setup'la çakışabildi. */
   urgentSetup?: boolean
+  /** Talep kovası: lotun kimliği (malzeme + kova) — adet değiştirmek için. */
+  bucketLabel?: string
+  /** Lot adedi planlamacı tarafından elle verildi (Plan overrides). */
+  quantityFixed?: boolean
 }
 
 export interface WeekGanttDay {
@@ -165,6 +169,11 @@ interface Props {
    * geçtiğini, hangisinin sırada olduğunu okuyamaz.
    */
   now?: { date: string; clockMinute: number }
+  /**
+   * İşe tıklanınca (planlamacı adedi değiştirir). Dondurulmuş işler ve bakım
+   * tıklanamaz.
+   */
+  onJobClick?: (job: WeekGanttJob) => void
 }
 
 interface PlacedBlock extends Segment {
@@ -248,6 +257,7 @@ export function WeekGantt({
   shiftStartMinute,
   shiftMinutes,
   now,
+  onJobClick,
 }: Props) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [dayFilter, setDayFilter] = useState<string | null>(null)
@@ -461,7 +471,7 @@ export function WeekGantt({
           breaks: stopsOnRow.filter((st) => st.start >= start && st.end <= end),
           label: maintenanceBar
             ? job.material
-            : `${job.material} · ${job.quantity.toLocaleString('en-GB')}${carriedOver ? ' ↻' : ''}`,
+            : `${job.material} · ${job.quantity.toLocaleString('en-GB')}${job.quantityFixed ? ' ✎' : ''}${carriedOver ? ' ↻' : ''}`,
           title: maintenanceBar
             ? `${job.material} · ${toClock(start)}–${toClock(end)}`
             : [
@@ -471,6 +481,7 @@ export function WeekGantt({
                 coilCount > 0 ? `${coilCount} × ${(press.frequencyStop ?? 'frequency stop').toLowerCase()}` : '',
                 carriedOver ? `continued from ${job.date}` : '',
                 job.urgentSetup ? 'urgent: setup may overlap another' : '',
+                job.quantityFixed ? 'quantity set by hand (Plan overrides)' : '',
                 job.frozen ? 'FROZEN (approved plan)' : '',
                 job.late ? 'LATE — starts after the stock runs out' : '',
               ]
@@ -644,6 +655,12 @@ export function WeekGantt({
             }
             label="Late"
           />
+        )}
+        {jobs.some((j) => j.quantityFixed) && (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">✎</span>
+            Quantity set by hand
+          </span>
         )}
         {jobs.some((j) => j.frozen) && (
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -958,11 +975,25 @@ export function WeekGantt({
                         const local = (x: number) => px(x - bar.start)
                         const hit = isMatch(bar.job)
                         const focused = current?.bar === bar
+                        const editable = !!onJobClick && !bar.maintenance && !bar.job.frozen && !!bar.job.bucketLabel
                         return (
                           <div
                             key={`bar-${idx}`}
-                            title={bar.title}
+                            title={editable ? `${bar.title} · click to change the quantity` : bar.title}
+                            {...(editable && {
+                              role: 'button',
+                              tabIndex: 0,
+                              onClick: () => onJobClick(bar.job),
+                              onKeyDown: (e: React.KeyboardEvent) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  onJobClick(bar.job)
+                                }
+                              },
+                            })}
                             className={`absolute top-1 overflow-hidden rounded-md shadow-sm transition-opacity ${
+                              editable ? 'cursor-pointer hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground' : ''
+                            } ${
                               focused
                                 ? 'z-10 ring-[3px] ring-foreground ring-offset-1 ring-offset-card'
                                 : hit

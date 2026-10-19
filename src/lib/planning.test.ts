@@ -205,6 +205,60 @@ describe('buildDemandSchedule', () => {
   })
 })
 
+describe('buildDemandSchedule — elle verilen lot adedi (Plan overrides → quantity)', () => {
+  const rows = [
+    {
+      material: 'A',
+      overdue: 0,
+      periods: [
+        { label: 'W1', qty: 1000 },
+        { label: 'W2', qty: 1000 },
+        { label: 'W3', qty: 1000 },
+      ],
+      stock: 0,
+    },
+  ]
+  const qtyBy = (entries: { bucketLabel: string; qty: number }[]) =>
+    Object.fromEntries(entries.map((e) => [e.bucketLabel, e.qty]))
+
+  it('fazla üretim sonraki lotlardan düşer, toplam aynı kalır', () => {
+    const entries = buildDemandSchedule(rows, noProducts, {
+      baseMonday,
+      quantityOverrides: new Map([['A|W1', 2500]]),
+    })
+    expect(qtyBy(entries)).toEqual({ W1: 2500, W3: 500 })
+  })
+
+  it('eksik üretim bir sonraki lota eklenir; 0 lotu atlar', () => {
+    const less = buildDemandSchedule(rows, noProducts, { baseMonday, quantityOverrides: new Map([['A|W1', 400]]) })
+    expect(qtyBy(less)).toEqual({ W1: 400, W2: 1600, W3: 1000 })
+    const skipped = buildDemandSchedule(rows, noProducts, { baseMonday, quantityOverrides: new Map([['A|W2', 0]]) })
+    expect(qtyBy(skipped)).toEqual({ W1: 1000, W3: 2000 })
+  })
+
+  it('kuralı olmayan malzeme etkilenmez', () => {
+    const plain = buildDemandSchedule(rows, noProducts, { baseMonday })
+    const other = buildDemandSchedule(rows, noProducts, { baseMonday, quantityOverrides: new Map([['B|W1', 5]]) })
+    expect(qtyBy(other)).toEqual(qtyBy(plain))
+  })
+
+  it('rulo beslemeli lotta adet tam ruloya yukarı yuvarlanır', () => {
+    // 1 kg/parça, 1000 kg rulo → 1000 parça/rulo.
+    const coilFed = new Map<string, ProductSpec>([
+      ['A', { code: 'A', moldCavities: 1, spm: 20, grossWeight: 1, coilWeight: 1000, setupMinutes: 30 }],
+    ])
+    const small = [{ material: 'A', overdue: 0, periods: rows[0].periods.map((p) => ({ ...p, qty: 300 })), stock: 0 }]
+    expect(qtyBy(buildDemandSchedule(small, coilFed, { baseMonday }))).toEqual({ W1: 1000 })
+    expect(
+      qtyBy(buildDemandSchedule(small, coilFed, { baseMonday, quantityOverrides: new Map([['A|W1', 1500]]) })),
+    ).toEqual({ W1: 2000 })
+    // Lot atlanınca ihtiyaç bir sonraki lota (tam ruloyla) geçer.
+    expect(
+      qtyBy(buildDemandSchedule(small, coilFed, { baseMonday, quantityOverrides: new Map([['A|W1', 0]]) })),
+    ).toEqual({ W2: 1000 })
+  })
+})
+
 describe('computeRunPlan', () => {
   const product = {
     code: 'M1',

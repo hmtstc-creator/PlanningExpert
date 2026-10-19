@@ -134,6 +134,16 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   Dashboard).
 - Mimari ve geliştirme kuralları: `docs/architecture.md`.
 
+### Lot adedini elle değiştirme (2026-10-19)
+- Plan grafiğinde işe tıklanır → yeni adet → "Save & recalculate". Adet Plan
+  overrides'a `quantity` kuralı olarak yazılır (malzeme + talep kovası, ör.
+  `Backlog`, ZPP haftası); plan yine motordan çıkar.
+- Adet rulo beslemeli lotta tam ruloya, minimum lotlu parçada Min. lot'a yukarı
+  yuvarlanır. Fark aynı parçanın sonraki lotlarına akar: fazlası sonrakini
+  azaltır, eksiği bir sonraki lota eklenir. 0 lotu atlar.
+- Dondurulmuş işler tıklanmaz. Kovası artık talepte olmayan kural etkisizdir;
+  listeden kaldırılır. Elle verilen adetli işte grafikte ✎ görünür.
+
 ## Aksiyon listesi
 
 Uygulandı (2026-09-26, "programı düzelt"):

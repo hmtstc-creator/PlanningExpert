@@ -166,6 +166,13 @@ export interface DemandScheduleOptions {
   isWorkingDate?: (iso: string) => boolean
   /** ZPP_DAILY'nin kapsadığı son gün (ISO); yoksa günlük veri kullanılmaz. */
   dailyUntil?: string | null
+  /**
+   * Planlamacının elle verdiği lot adedi: `malzeme|kova` → adet (Plan
+   * overrides → quantity). Lot bu adede (rulo / minimum lota yukarı
+   * yuvarlanmış) sabitlenir; fark sonraki lotlara akar — fazla üretim sonraki
+   * ihtiyacı düşürür, eksik üretim sonraki lota eklenir.
+   */
+  quantityOverrides?: Map<string, number>
 }
 
 /** Talep takvimi: bugün ve ufuktaki her haftanın açık (talep alan) günleri. */
@@ -345,7 +352,7 @@ export function buildDemandSchedule(
   // Rulo lotu: bağlanan rulo sonuna kadar basılır, bu yüzden ihtiyaç tam
   // ruloya yuvarlanır ve fazlası EN ERKEN kaleme eklenir — rulo tek seferde
   // bitirilir, haftaya bölünmez.
-  roundMaterialsToCoilLot(entriesByMaterial, products, pairedWith)
+  roundMaterialsToCoilLot(entriesByMaterial, products, pairedWith, options.quantityOverrides)
 
   // Lotların ZAMANI: haftanın başı değil, öngörülen stoğun bittiği gün.
   timeLotsByProjectedStock(entriesByMaterial, rows, options, pairedWith, calendar, dayDemand)
@@ -615,8 +622,12 @@ function roundMaterialsToCoilLot(
   entriesByMaterial: Map<string, DemandEntry[]>,
   products: Map<string, ProductSpec>,
   pairedWith: Map<string, string>,
+  quantityOverrides?: Map<string, number>,
 ): void {
   const done = new Set<string>()
+  // Haftanın lotu ilk kalemdir (setWeekQuantity); elle verilen adet onun kovasına bağlı.
+  const fixedOf = (week: DemandEntry[]) =>
+    week.length > 0 ? quantityOverrides?.get(`${week[0].material}|${week[0].bucketLabel}`) : undefined
 
   for (const [material] of entriesByMaterial) {
     if (done.has(material)) continue
@@ -637,7 +648,11 @@ function roundMaterialsToCoilLot(
     // Minimum lot, vuruş cinsinden (asıl ürünün göz sayısıyla).
     const minShots =
       primary && (primary.minLotQty ?? 0) > 0 ? Math.ceil((primary.minLotQty ?? 0) / cavitiesOf(primary)) : 0
-    if (lotShots <= 0 && minShots <= 0) continue
+    const lotRounding = lotShots > 0 || minShots > 0
+    const overridden =
+      !!quantityOverrides?.size &&
+      [...own, ...other].some((e) => quantityOverrides.has(`${e.material}|${e.bucketLabel}`))
+    if (!lotRounding && !overridden) continue
 
     const ownCavities = cavitiesOf(product)
     const partnerCavities = cavitiesOf(partnerProduct)
@@ -659,22 +674,46 @@ function roundMaterialsToCoilLot(
       const ownNeed = Math.max(0, ownQty - carry)
       const otherNeed = Math.max(0, otherQty - partnerCarry)
 
-      // Her ürünün ihtiyacı kendi göz sayısıyla vuruşa çevrilir; rulo
-      // ikisini birden beslediği için büyük olan belirler.
-      const requiredShots = Math.max(
-        Math.ceil(ownNeed / ownCavities),
-        Math.ceil(otherNeed / partnerCavities),
-      )
       // Rulo: tam rulo katı. Minimum lot: en az o kadar, üstü ihtiyaç kadar.
-      const produceShots =
-        requiredShots <= 0
+      const roundShots = (shots: number) =>
+        shots <= 0
           ? 0
           : lotShots > 0
-            ? Math.ceil(requiredShots / lotShots) * lotShots
-            : Math.max(requiredShots, minShots)
+            ? Math.ceil(shots / lotShots) * lotShots
+            : Math.max(shots, minShots)
 
-      const producedOwn = produceShots * ownCavities
-      const producedPartner = produceShots * partnerCavities
+      const ownFixed = fixedOf(ownWeek)
+      const otherFixed = fixedOf(otherWeek)
+      let producedOwn: number
+      let producedPartner: number
+      if (ownFixed !== undefined || otherFixed !== undefined) {
+        // Elle verilen adet: vuruşa çevrilip rulo / minimum lota yuvarlanır.
+        // Yuvarlama ve eş ürün yoksa adet olduğu gibi kalır.
+        if (lotRounding || partner) {
+          const fixedShots =
+            ownFixed !== undefined
+              ? Math.ceil(ownFixed / ownCavities)
+              : Math.ceil((otherFixed ?? 0) / partnerCavities)
+          const shots = roundShots(fixedShots)
+          producedOwn = shots * ownCavities
+          producedPartner = shots * partnerCavities
+        } else {
+          producedOwn = Math.max(0, ownFixed ?? 0)
+          producedPartner = 0
+        }
+      } else if (lotRounding) {
+        // Her ürünün ihtiyacı kendi göz sayısıyla vuruşa çevrilir; rulo
+        // ikisini birden beslediği için büyük olan belirler.
+        const produceShots = roundShots(
+          Math.max(Math.ceil(ownNeed / ownCavities), Math.ceil(otherNeed / partnerCavities)),
+        )
+        producedOwn = produceShots * ownCavities
+        producedPartner = produceShots * partnerCavities
+      } else {
+        // Yuvarlamasız malzeme: elle sabitlenen lotun farkı sonraki haftalara akar.
+        producedOwn = ownNeed
+        producedPartner = otherNeed
+      }
       carry += producedOwn - ownQty
       partnerCarry += producedPartner - otherQty
 
