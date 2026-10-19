@@ -78,6 +78,19 @@ function kindOfStop(stopKind: string): BlockKind {
 const ZOOM_STEPS = [3, 5, 8, 14, 24, 40, 70, 120] as const
 const DEFAULT_ZOOM = 4
 
+/** Araç çubuğu düğmeleri: planlamacının gözü önce buraya gitsin diye büyük. */
+const TOOL_BUTTON = 'h-10 rounded-lg px-3.5 text-sm font-semibold shadow-sm transition-colors disabled:opacity-40'
+const TOOL_IDLE = 'border border-border bg-background text-foreground hover:bg-muted'
+const TOOL_ACTIVE = 'bg-foreground text-background'
+
+/** Arama vurgusu: plandaki hiçbir türün rengi değil, uzaktan seçilsin. */
+const SEARCH_FILL = '#ea580c'
+
+/** Referans karşılaştırması: büyük/küçük harf ve boşluk fark etmez. */
+function normalizeRef(text: string): string {
+  return text.replace(/\s+/g, '').toUpperCase()
+}
+
 export interface WeekGanttSegment {
   kind: 'setup' | 'quality' | 'run' | 'coil' | 'maintenance'
   /**
@@ -239,6 +252,10 @@ export function WeekGantt({
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [dayFilter, setDayFilter] = useState<string | null>(null)
   const [weekFilter, setWeekFilter] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [matchIndex, setMatchIndex] = useState(0)
+  const needle = normalizeRef(search)
+  const isMatch = (job: WeekGanttJob) => needle !== '' && normalizeRef(job.material).includes(needle)
 
   // Birden fazla haftalık grafik: önce hafta seçilir, sonra o haftanın günü.
   const weekList = useMemo(() => {
@@ -513,6 +530,40 @@ export function WeekGantt({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollKey])
 
+  // Aranan referansın görünen çubukları, plandaki sırasıyla. Önceki/sonraki
+  // bunlar arasında gezer; gösterilen günlerin dışındaki işler ayrıca sayılır.
+  const matches = useMemo(() => {
+    if (!needle) return []
+    return rows
+      .flatMap((r) => r.bars.filter((b) => normalizeRef(b.job.material).includes(needle)).map((b) => ({ press: r.press.name, bar: b })))
+      .sort((a, b) => a.bar.start - b.bar.start || a.press.localeCompare(b.press))
+  }, [rows, needle])
+  const matchedJobs = needle ? jobs.filter(isMatch) : []
+  const hiddenJobs = matchedJobs.filter((j) => !matches.some((m) => m.bar.job === j)).length
+  const matchedMaterials = Array.from(new Set(matchedJobs.map((j) => j.material)))
+  const current = matches.length > 0 ? matches[Math.min(matchIndex, matches.length - 1)] : null
+
+  const scrollToBar = (bar: Bar) => {
+    const el = scroller.current
+    if (!el) return
+    const x = bar.start * (ZOOM_STEPS[zoom] / 60)
+    el.scrollTo({ left: Math.max(0, x - 120), behavior: 'smooth' })
+  }
+
+  // Yeni bir referans yazılınca ilk eşleşmeye git.
+  useEffect(() => {
+    setMatchIndex(0)
+    if (matches.length > 0) scrollToBar(matches[0].bar)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needle])
+
+  const stepMatch = (dir: 1 | -1) => {
+    if (matches.length === 0) return
+    const next = (Math.min(matchIndex, matches.length - 1) + dir + matches.length) % matches.length
+    setMatchIndex(next)
+    scrollToBar(matches[next].bar)
+  }
+
   const byCategory = useMemo(() => {
     const map = new Map<string, typeof rows>()
     for (const row of rows) {
@@ -626,7 +677,7 @@ export function WeekGantt({
             onClick={() => setZoom((z) => Math.max(0, z - 1))}
             disabled={zoom === 0}
             aria-label="Zoom out"
-            className="h-8 w-8 rounded-md border border-border text-base leading-none text-foreground hover:bg-muted disabled:opacity-40"
+            className={`${TOOL_BUTTON} ${TOOL_IDLE} w-10 px-0 text-lg leading-none`}
           >
             −
           </button>
@@ -634,7 +685,7 @@ export function WeekGantt({
             onClick={() => setZoom((z) => Math.min(ZOOM_STEPS.length - 1, z + 1))}
             disabled={zoom === ZOOM_STEPS.length - 1}
             aria-label="Zoom in"
-            className="h-8 w-8 rounded-md border border-border text-base leading-none text-foreground hover:bg-muted disabled:opacity-40"
+            className={`${TOOL_BUTTON} ${TOOL_IDLE} w-10 px-0 text-lg leading-none`}
           >
             +
           </button>
@@ -644,7 +695,7 @@ export function WeekGantt({
               setDayFilter(null)
               setWeekFilter(null)
             }}
-            className="ml-1 h-8 rounded-md border border-border px-2 text-xs text-muted-foreground hover:bg-muted"
+            className={`${TOOL_BUTTON} ${TOOL_IDLE} ml-1`}
           >
             Reset
           </button>
@@ -656,11 +707,7 @@ export function WeekGantt({
               setDayFilter(null)
               setWeekFilter(null)
             }}
-            className={`h-8 rounded-md px-2 text-xs ${
-              dayFilter === null && weekFilter === null
-                ? 'bg-foreground text-background'
-                : 'border border-border text-muted-foreground hover:bg-muted'
-            }`}
+            className={`${TOOL_BUTTON} ${dayFilter === null && weekFilter === null ? TOOL_ACTIVE : TOOL_IDLE}`}
           >
             {multiWeek ? 'Whole plan' : 'Whole week'}
           </button>
@@ -672,18 +719,18 @@ export function WeekGantt({
                   setWeekFilter(w.key)
                   setDayFilter(null)
                 }}
-                className={`h-8 rounded-md px-2 text-xs ${
+                className={`${TOOL_BUTTON} ${
                   weekFilter === w.key && dayFilter === null
-                    ? 'bg-foreground text-background'
+                    ? TOOL_ACTIVE
                     : weekFilter === w.key
-                      ? 'border border-foreground text-foreground'
-                      : 'border border-border text-muted-foreground hover:bg-muted'
+                      ? 'border-2 border-foreground bg-background text-foreground'
+                      : TOOL_IDLE
                 }`}
               >
                 {w.label}
               </button>
             ))}
-          {multiWeek && dayButtons.length > 0 && <span className="mx-1 h-5 w-px bg-border" aria-hidden />}
+          {multiWeek && dayButtons.length > 0 && <span className="mx-1 h-6 w-px bg-border" aria-hidden />}
           {dayButtons.map((date) => (
             <button
               key={date}
@@ -692,15 +739,64 @@ export function WeekGantt({
                 // One day on screen deserves a readable scale.
                 setZoom((z) => Math.max(z, 5))
               }}
-              className={`h-8 rounded-md px-2 text-xs ${
-                dayFilter === date
-                  ? 'bg-foreground text-background'
-                  : 'border border-border text-muted-foreground hover:bg-muted'
-              }`}
+              className={`${TOOL_BUTTON} ${dayFilter === date ? TOOL_ACTIVE : TOOL_IDLE}`}
             >
               {dayLabel(date)}
             </button>
           ))}
+        </div>
+
+        {/* Referans arama: yazılan malzemenin çubukları turuncuya boyanır, diğerleri soluklaşır. */}
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <div className="relative">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  stepMatch(e.shiftKey ? -1 : 1)
+                } else if (e.key === 'Escape') setSearch('')
+              }}
+              placeholder="Find reference…"
+              aria-label="Find a reference in the plan"
+              className={`h-10 w-56 rounded-lg border-2 bg-background px-3 text-sm font-medium text-foreground shadow-sm outline-none placeholder:font-normal placeholder:text-muted-foreground focus:border-[#ea580c] ${
+                needle ? 'border-[#ea580c]' : 'border-border'
+              }`}
+            />
+          </div>
+          {needle && (
+            <>
+              <button
+                onClick={() => stepMatch(-1)}
+                disabled={matches.length === 0}
+                aria-label="Previous match"
+                className={`${TOOL_BUTTON} ${TOOL_IDLE} w-10 px-0`}
+              >
+                ‹
+              </button>
+              <button
+                onClick={() => stepMatch(1)}
+                disabled={matches.length === 0}
+                aria-label="Next match"
+                className={`${TOOL_BUTTON} ${TOOL_IDLE} w-10 px-0`}
+              >
+                ›
+              </button>
+              <span
+                className={`text-sm font-medium tabular-nums ${matchedJobs.length === 0 ? 'text-destructive' : 'text-foreground'}`}
+                title={matchedMaterials.join(', ')}
+              >
+                {matchedJobs.length === 0
+                  ? 'Not in the plan'
+                  : matches.length === 0
+                    ? `${matchedJobs.length} job${matchedJobs.length === 1 ? '' : 's'} outside this view`
+                    : `${Math.min(matchIndex, matches.length - 1) + 1} / ${matches.length}` +
+                      (hiddenJobs > 0 ? ` · ${hiddenJobs} more outside this view` : '')}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -737,14 +833,18 @@ export function WeekGantt({
                 >
                   {category}
                 </p>
-                {catRows.map(({ press }) => (
+                {catRows.map(({ press, bars }) => (
                   <div
                     key={press.name}
                     className="flex items-center"
                     style={{ height: ROW_HEIGHT }}
                   >
                     <span
-                      className="truncate pl-1 pr-2 text-xs font-medium text-foreground"
+                      className={`truncate pl-1 pr-2 text-xs ${
+                        needle && bars.some((b) => isMatch(b.job))
+                          ? 'font-bold text-[#ea580c]'
+                          : 'font-medium text-foreground'
+                      }`}
                       title={`${press.name} · ${press.hall}`}
                     >
                       {press.name}
@@ -856,16 +956,29 @@ export function WeekGantt({
                       {bars.map((bar, idx) => {
                         const width = Math.max(2, px(bar.end - bar.start))
                         const local = (x: number) => px(x - bar.start)
+                        const hit = isMatch(bar.job)
+                        const focused = current?.bar === bar
                         return (
                           <div
                             key={`bar-${idx}`}
                             title={bar.title}
-                            className="absolute top-1 overflow-hidden rounded-md shadow-sm"
+                            className={`absolute top-1 overflow-hidden rounded-md shadow-sm transition-opacity ${
+                              focused
+                                ? 'z-10 ring-[3px] ring-foreground ring-offset-1 ring-offset-card'
+                                : hit
+                                  ? 'z-10 ring-2 ring-[#ea580c] ring-offset-1 ring-offset-card'
+                                  : ''
+                            }`}
                             style={{
                               left: px(bar.start),
                               width,
                               height: ROW_HEIGHT - 12,
-                              backgroundColor: bar.maintenance ? COLORS.maintenance.fill : COLORS.run.fill,
+                              opacity: needle && !hit ? 0.25 : 1,
+                              backgroundColor: hit
+                                ? SEARCH_FILL
+                                : bar.maintenance
+                                  ? COLORS.maintenance.fill
+                                  : COLORS.run.fill,
                               backgroundImage: bar.maintenance
                                 ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.45) 0 4px, transparent 4px 8px)'
                                 : bar.job.frozen
