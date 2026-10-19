@@ -474,6 +474,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const pins = new Map<string, string>()
   for (const o of inputs.overrides) if (o.kind === 'pin' && o.press) pins.set(o.material, o.press)
   const excluded = new Set(inputs.overrides.filter((o) => o.kind === 'exclude').map((o) => o.material))
+  const handSetQty = new Set(inputs.overrides.filter((o) => o.kind === 'quantity').map((o) => o.material))
   const eligibleOf = (g: string): string[] => {
     const p = primaryOf(g)
     if (!p) return []
@@ -1878,7 +1879,10 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   for (const [m, short] of shortAtEnd) {
     r11.check()
     if (unplannedGroups.has(groupOf(m)) || excluded.has(m)) continue
-    r11.fail(`${m}: ${Math.round(short)} pcs of horizon demand have no stock, production or unplanned entry.`)
+    r11.fail(
+      `${m}: ${Math.round(short)} pcs of horizon demand have no stock, production or unplanned entry.` +
+        (handSetQty.has(m) ? ' A lot quantity was set by hand (Plan overrides).' : ''),
+    )
   }
   r11.check(Math.max(0, groupsAll.size - shortAtEnd.size))
 

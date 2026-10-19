@@ -9,6 +9,8 @@ const overrideValidator = v.object({
   kind: v.string(),
   press: v.optional(v.string()),
   date: v.optional(v.string()),
+  bucket: v.optional(v.string()),
+  qty: v.optional(v.number()),
   note: v.optional(v.string()),
   createdAt: v.number(),
 })
@@ -20,8 +22,9 @@ export const list = guardedQuery({
 })
 
 /**
- * Bir malzeme için müdahale kaydeder. Aynı malzemenin önceki müdahalesi
- * varsa değiştirilir — bir malzemenin aynı anda tek kuralı olur.
+ * Bir malzeme için müdahale kaydeder. Aynı malzemenin önceki sıra / pres
+ * kuralı varsa değiştirilir — bir malzemenin aynı anda tek böyle kuralı olur.
+ * Adet kuralları (`setQuantity`) ayrıdır ve korunur.
  */
 export const set = guardedMutation({
   areas: ['planning.plan'],
@@ -47,7 +50,7 @@ export const set = guardedMutation({
       .query('planOverrides')
       .withIndex('by_material', (q) => q.eq('material', material))
       .collect()
-    await Promise.all(existing.map((e) => ctx.db.delete(e._id)))
+    await Promise.all(existing.filter((e) => e.kind !== 'quantity').map((e) => ctx.db.delete(e._id)))
 
     await ctx.db.insert('planOverrides', {
       material,
@@ -69,6 +72,60 @@ export const set = guardedMutation({
       category: 'decision',
       createdAt: Date.now(),
     })
+    return null
+  },
+})
+
+/**
+ * Bir lotun adedini elle sabitler (Plan grafiğinde işe tıklayıp). Lot,
+ * malzeme + talep kovasıyla tanınır; plan yeniden hesaplanınca motor bu
+ * adedi rulo / minimum lota yuvarlar, farkı sonraki lotlara aktarır.
+ */
+export const setQuantity = guardedMutation({
+  areas: ['planning.plan'],
+  args: {
+    material: v.string(),
+    bucket: v.string(),
+    qty: v.number(),
+    /** Grafikteki eski adet — yalnızca Change Log için. */
+    previousQty: v.optional(v.number()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const material = args.material.trim()
+    const bucket = args.bucket.trim()
+    if (!material || !bucket) throw new ConvexError('Material and lot are required')
+    if (!Number.isFinite(args.qty) || args.qty < 0) throw new ConvexError('Quantity must be 0 or more')
+    const qty = Math.round(args.qty)
+
+    const existing = await ctx.db
+      .query('planOverrides')
+      .withIndex('by_material', (q) => q.eq('material', material))
+      .collect()
+    await Promise.all(
+      existing.filter((e) => e.kind === 'quantity' && e.bucket === bucket).map((e) => ctx.db.delete(e._id)),
+    )
+    await ctx.db.insert('planOverrides', { material, kind: 'quantity', bucket, qty, createdAt: Date.now() })
+    await ctx.db.insert('changeLog', {
+      title: `Plan override — ${material}`,
+      detail:
+        `Lot ${bucket}: quantity set to ${qty.toLocaleString('en-GB')} pcs` +
+        (args.previousQty !== undefined ? ` (was ${Math.round(args.previousQty).toLocaleString('en-GB')})` : ''),
+      category: 'decision',
+      createdAt: Date.now(),
+    })
+    return null
+  },
+})
+
+/** Tek bir kuralı kaldırır (Plan overrides listesindeki "Remove"). */
+export const remove = guardedMutation({
+  areas: ['planning.plan'],
+  args: { id: v.id('planOverrides') },
+  returns: v.null(),
+  handler: async (ctx, { id }) => {
+    const row = await ctx.db.get(id)
+    if (row) await ctx.db.delete(id)
     return null
   },
 })

@@ -2528,6 +2528,12 @@
     }
   },
   "planOverrides": {
+    "bucket": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
     "createdAt": {
       "fieldType": {
         "type": "number"
@@ -2568,6 +2574,12 @@
     "press": {
       "fieldType": {
         "type": "string"
+      },
+      "optional": true
+    },
+    "qty": {
+      "fieldType": {
+        "type": "number"
       },
       "optional": true
     }

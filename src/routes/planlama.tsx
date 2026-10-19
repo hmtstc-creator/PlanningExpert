@@ -19,6 +19,7 @@ import { DecisionCell, LateJobs } from '../components/plan/LateJobs'
 import { IndependentCheck, OptimisationPanel } from '../components/plan/PlanChecks'
 import { AlarmBanner, PlanCheck, PlanDataLine, Stat } from '../components/plan/PlanPanels'
 import { PressStartPanel } from '../components/plan/PressStartPanel'
+import { LotQuantityDialog, type LotDraft } from '../components/plan/LotQuantityDialog'
 export const Route = createFileRoute('/planlama')({
   component: PlanlamaPage,
 })
@@ -64,10 +65,23 @@ function PlanlamaPage() {
     kind: string
     press?: string
     date?: string
+    bucket?: string
+    qty?: number
     note?: string
   }[]
   const setOverride = useMutation(api.planOverrides.set)
-  const clearOverride = useMutation(api.planOverrides.clear)
+  const removeOverride = useMutation(api.planOverrides.remove)
+  // Grafikte işe tıklanınca açılan adet penceresi.
+  const [lotDraft, setLotDraft] = useState<LotDraft | null>(null)
+  const quantityRules = useMemo(
+    () =>
+      new Map(
+        overrideRows
+          .filter((o) => o.kind === 'quantity' && o.bucket && o.qty !== undefined)
+          .map((o) => [`${o.material}|${o.bucket}`, { id: o._id, qty: o.qty! }]),
+      ),
+    [overrideRows],
+  )
 
   const { name: currentUser } = useCurrentUser()
   const [approving, setApproving] = useState(false)
@@ -518,7 +532,8 @@ function PlanlamaPage() {
           Plan overrides
           <InfoTip label="About plan overrides">
             The plan is always computed by the engine; the rules below are fed in as input, so your
-            override persists but the plan still comes out of the engine.
+            override persists but the plan still comes out of the engine. To change a lot's quantity,
+            click the job on the plan chart.
           </InfoTip>
         </h2>
 
@@ -607,13 +622,15 @@ function PlanlamaPage() {
                       ? '— excluded from planning'
                       : o.kind === 'priority'
                         ? '— moved to front'
-                        : `— pinned to ${o.press}${o.date ? ` (${o.date})` : ''}`}
+                        : o.kind === 'quantity'
+                          ? `— lot ${o.bucket}: ${(o.qty ?? 0).toLocaleString('en-GB')} pcs`
+                          : `— pinned to ${o.press}${o.date ? ` (${o.date})` : ''}`}
                   </span>
                 </span>
                 <button
                   onClick={() => {
-                    if (window.confirm(`Remove the planning rule for ${o.material}?`)) {
-                      void clearOverride({ material: o.material })
+                    if (window.confirm(`Remove this planning rule for ${o.material}?`)) {
+                      void removeOverride({ id: o._id })
                     }
                   }}
                   className="text-xs text-destructive hover:underline"
@@ -690,11 +707,32 @@ function PlanlamaPage() {
                     segments: j.segments,
                     waitReason: j.waitReason,
                     urgentSetup: j.urgentSetup,
+                    bucketLabel: j.bucketLabel,
+                    quantityFixed: quantityRules.has(`${j.material}|${j.bucketLabel}`),
                   }),
                 ),
                 ...ganttMaintenance,
               ]}
+              onJobClick={(clicked) => {
+                if (!clicked.bucketLabel) return
+                // Lot: aynı malzeme + kova; kalıp ömrüyle bölünmüşse birden çok iş.
+                const lot = engineJobs.filter(
+                  (j) => j.material === clicked.material && j.bucketLabel === clicked.bucketLabel,
+                )
+                if (lot.length === 0) return
+                const quantity = lot.reduce((sum, j) => sum + j.quantity, 0)
+                const coils = lot.reduce((sum, j) => sum + (j.coilsNeeded ?? 0), 0)
+                setLotDraft({
+                  material: clicked.material,
+                  bucket: clicked.bucketLabel,
+                  quantity,
+                  jobCount: lot.length,
+                  piecesPerCoil: coils > 0 ? quantity / coils : undefined,
+                  override: quantityRules.get(`${clicked.material}|${clicked.bucketLabel}`),
+                })
+              }}
             />
+            {lotDraft && <LotQuantityDialog draft={lotDraft} onClose={() => setLotDraft(null)} />}
           </div>
 
           <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

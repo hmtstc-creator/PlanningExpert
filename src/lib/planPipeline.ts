@@ -176,7 +176,7 @@ export interface PlanInputs {
   officialHolidays: { date: string; name: string }[]
   latestSnapshot: { createdAt: number; truncated?: boolean; jobs: SnapshotJob[] } | null
   plannedStops: PlannedStop[]
-  overrides: { material: string; kind: string; press?: string; date?: string }[]
+  overrides: { material: string; kind: string; press?: string; date?: string; bucket?: string; qty?: number }[]
   moldMaintenance: MoldMaintenanceRow[]
   readiness: MoldReadinessRow[]
   pressMaintenance: PressMaintenanceRow[]
@@ -555,6 +555,12 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       today: todayIso,
       safetyStockDays,
       dailyUntil: daily.until,
+      // Plan overrides → quantity: planlamacının grafikte değiştirdiği lot adedi.
+      quantityOverrides: new Map(
+        inputs.overrides
+          .filter((o) => o.kind === 'quantity' && o.bucket && o.qty !== undefined && o.qty >= 0)
+          .map((o) => [`${o.material}|${o.bucket}`, o.qty!]),
+      ),
     }
 
   // ---- Kapasite kovaları ---------------------------------------------------
@@ -715,7 +721,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     }
   }
 
-  const overrides: PlanOverride[] = inputs.overrides.map((o) => ({
+  // Adet kuralı talebe girer (demandOptions); motorun sıra / pres kuralları değildir.
+  const overrides: PlanOverride[] = inputs.overrides.filter((o) => o.kind !== 'quantity').map((o) => ({
     material: o.material,
     kind: o.kind as PlanOverride['kind'],
     press: o.press,
