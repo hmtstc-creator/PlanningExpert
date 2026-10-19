@@ -116,7 +116,7 @@ function LateItemsBody({ items, repair }: { items: LateItem[]; repair: PlanRun['
       </p>
       {items.length > 0 && (
         <div className="mt-3 overflow-x-auto rounded-md border border-destructive/30 bg-background">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[48rem] text-left text-sm">
             <thead className="bg-destructive/10 text-destructive">
               <tr>
                 <th className="px-3 py-2 font-medium">Material</th>
@@ -194,7 +194,7 @@ function LateJobsBody({
       </p>
       {jobs.length > 0 && (
         <div className="mt-3 overflow-x-auto rounded-md border border-destructive/30 bg-background">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[48rem] text-left text-sm">
             <thead className="bg-destructive/10 text-destructive">
               <tr>
                 <th className="px-3 py-2 font-medium">Material</th>

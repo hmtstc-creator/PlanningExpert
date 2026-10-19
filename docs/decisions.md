@@ -151,6 +151,18 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - **Exclude from planning** (isteğe bağlı neden, ör. hammadde eksik): parça
   `exclude` kuralıyla plandan çıkar; kilitli işleri kalır.
 
+### Overview ve Production Plan (2026-10-19)
+- **Overview** planın tam özetidir: plan durumu (Calculate plan), Today kartları
+  (aynı satırda eşit yükseklik), ana sayılar (Backlog, Late materials, Unplanned,
+  Planned jobs, Planned qty, Approved plan), geciken malzemelerin tamamı, **pres
+  bazında plan** (her preste sırayla malzeme, başlangıç, bitiş, adet), planlanamayan
+  talep, acil hammadde, onaylı plana göre değişenler ve planın denetimleri.
+- Overview'dan kaldırıldı: Materials, Work centers, Demand records, Demand in
+  horizon, Available stock, Warnings kartları ve "Needs attention" listesi.
+- **Production Plan** yalnızca Gantt ve araçları: plan ayarları (pres başlangıcı),
+  Calculate plan, Approve plan (yanında kısa plan denetimi özeti), Gantt ve iş
+  penceresi, Plan overrides.
+
 ## Aksiyon listesi
 
 Uygulandı (2026-09-26, "programı düzelt"):
