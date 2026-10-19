@@ -38,7 +38,8 @@ export function Cockpit({ className = '' }: { className?: string }) {
           <p>The limits are this plant's own: Company settings → Today &amp; daily digest.</p>
         </InfoTip>
       </h2>
-      <div className="mt-2 grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {/* Kartlar aynı satırda eşit yükseklikte (planlamacı, 2026-10-19). */}
+      <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {signals.map((s) => {
           const t = TONE[s.level]
           const Icon = t.icon
@@ -62,11 +63,11 @@ export function Cockpit({ className = '' }: { className?: string }) {
             </>
           )
           return canOpen(s.to) ? (
-            <Link key={s.key} to={s.to} className={`block rounded-lg border p-3 transition-colors hover:border-foreground/40 ${t.box}`}>
+            <Link key={s.key} to={s.to} className={`block h-full rounded-xl border p-4 transition-colors hover:border-foreground/40 ${t.box}`}>
               {body}
             </Link>
           ) : (
-            <div key={s.key} className={`rounded-lg border p-3 ${t.box}`}>
+            <div key={s.key} className={`h-full rounded-xl border p-4 ${t.box}`}>
               {body}
             </div>
           )

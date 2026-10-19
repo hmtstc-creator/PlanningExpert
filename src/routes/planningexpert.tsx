@@ -4,7 +4,7 @@ import { Cockpit } from '../components/Cockpit'
 import { useMemo } from 'react'
 
 import { api } from '../../convex/_generated/api'
-import { countedLocations, isFinishedStockRow, type LocationFlags } from '../lib/stockLocations'
+import { type LocationFlags } from '../lib/stockLocations'
 import { PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
 
@@ -40,38 +40,16 @@ function HomePage() {
   // holidays. Either one missing silently changes how capacity is computed.
   const calendarReady = !!calendar && !!shiftSettings
 
-  // Plan ile aynı kural: Storage Locations matrisinde "Finished goods" tikli depolar.
-  const counted = useMemo(() => countedLocations(locations), [locations])
-
-  // Yalnızca mamul (master data kodu) adedi: MB52'deki rulo satırları kg'dır,
-  // adetle toplanmaz.
-  const availableStock = useMemo(() => {
-    const finished = new Set(products.map((p) => p.code))
-    let total = 0
-    for (const s of stockRows) {
-      if (finished.has(s.material) && isFinishedStockRow(counted, s.storageLocation)) total += s.unrestricted ?? 0
-    }
-    return total
-  }, [stockRows, counted, products])
-
-  const productCodes = useMemo(() => new Set(products.map((p) => p.code)), [products])
-
   // Toplam bakiye (gecikmiş talep) — planın ilk önceliği budur.
   const backlogQty = useMemo(
     () => weekly.reduce((sum, w) => sum + Math.abs(w.overdue ?? 0), 0),
     [weekly],
   )
 
-  // Ufuktaki toplam talep (ZPP kovalarının toplamı).
-  const horizonDemandQty = useMemo(
-    () =>
-      weekly.reduce(
-        (sum, w) => sum + w.periods.reduce((s, p) => s + Math.abs(p.qty), 0),
-        0,
-      ),
-    [weekly],
-  )
-
+  // Yalnızca planı engelleyen kurulum eksikleri (planlamacı, 2026-10-19: veri
+  // sayıları ve bilgi uyarıları — talepte master data'sı olmayan malzeme,
+  // tanımsız depo, max shot, bakiye — Overview'dan kaldırıldı; bakiye kendi
+  // kartında, ayrıntılar kendi sayfalarında).
   const warnings = useMemo(() => {
     const list: { level: 'high' | 'medium'; text: string; link?: string }[] = []
 
@@ -81,28 +59,6 @@ function HomePage() {
         level: 'high',
         text: `${missingMachine.length} materials have no main machine set — they cannot be planned.`,
         link: '/referanslar',
-      })
-    }
-
-    const unknownMaterials = weekly.filter((w) => !productCodes.has(w.material))
-    if (unknownMaterials.length > 0) {
-      list.push({
-        level: 'medium',
-        text: `${unknownMaterials.length} materials in demand have no master data record — they are skipped in planning.`,
-        link: '/referanslar',
-      })
-    }
-
-    const definedLocs = new Set(locations.map((l) => l.code))
-    const undefinedLocs = new Set<string>()
-    for (const s of stockRows) {
-      if (s.storageLocation && !definedLocs.has(s.storageLocation)) undefinedLocs.add(s.storageLocation)
-    }
-    if (undefinedLocs.size > 0) {
-      list.push({
-        level: 'medium',
-        text: `${undefinedLocs.size} storage locations in MB52 are not defined yet — a location counts only when it is ticked on Storage Locations.`,
-        link: '/depolar',
       })
     }
 
@@ -134,37 +90,8 @@ function HomePage() {
       })
     }
 
-    const missingMaxShots = products.filter((p) => !p.maxShots).length
-    if (missingMaxShots > 0) {
-      list.push({
-        level: 'medium',
-        text: `${missingMaxShots} materials have no max shot limit — mold life cannot be tracked.`,
-        link: '/die-followup/maintenance',
-      })
-    }
-
-    const overdueCount = weekly.filter((w) => (w.overdue ?? 0) < 0).length
-    if (overdueCount > 0) {
-      list.push({
-        level: 'high',
-        text: `${overdueCount} materials have overdue demand.`,
-        link: '/siparisler',
-      })
-    }
-
     return list
-  }, [
-    products,
-    weekly,
-    stockRows,
-    locations,
-    calendar,
-    calendarReady,
-    shiftSettings,
-    templates,
-    productCodes,
-    presses,
-  ])
+  }, [products, calendar, calendarReady, shiftSettings, templates, presses])
 
   const dataReady = products.length > 0 && weekly.length > 0 && stockRows.length > 0
 
@@ -185,74 +112,49 @@ function HomePage() {
         </p>
       )}
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard label="Materials" value={products.length} hint="with a master data record" to="/referanslar" />
-        <StatCard label="Work centers" value={presses.length} hint={`${new Set(presses.map((p) => p.hall)).size} halls`} to="/makineler" />
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <StatCard
           label="Backlog"
           value={Math.round(backlogQty).toLocaleString('en-GB')}
-          hint="overdue demand — the plan\u2019s first priority"
+          hint="overdue demand — the plan’s first priority"
           to="/siparisler"
           danger={backlogQty > 0}
         />
         <StatCard
           label="Warnings"
           value={warnings.length}
-          hint={warnings.some((w) => w.level === 'high') ? 'critical items' : 'review'}
-          to="/planlama"
+          hint={warnings.length === 0 ? 'none — setup is complete' : 'setup the plan needs — see below'}
+          to={warnings[0]?.link ?? '/planlama'}
           danger={warnings.some((w) => w.level === 'high')}
-        />
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard label="Demand records" value={weekly.length} hint="ZPP materials" to="/siparisler" />
-        <StatCard
-          label="Demand in horizon"
-          value={Math.round(horizonDemandQty).toLocaleString('en-GB')}
-          hint="sum of ZPP buckets"
-          to="/siparisler"
-        />
-        <StatCard
-          label="Available stock"
-          value={Math.round(availableStock).toLocaleString('en-GB')}
-          hint="locations counted in planning"
-          to="/stoklar"
         />
         <StatCard
           label="Approved plan"
           value={snapshot ? `${snapshot.jobCount} jobs` : 'none'}
-          hint={
-            snapshot
-              ? new Date(snapshot.createdAt).toLocaleDateString('en-GB')
-              : 'not approved yet'
-          }
+          hint={snapshot ? `approved ${new Date(snapshot.createdAt).toLocaleDateString('en-GB')}` : 'not approved yet'}
           to="/planlama"
         />
       </div>
 
       {warnings.length > 0 && (
-        <section className="mt-8">
-          <h2 className="font-semibold text-foreground">Needs attention</h2>
-          <div className="mt-3 space-y-2">
-            {warnings.map((w, i) => (
-              <Link
-                key={i}
-                to={w.link ?? '/planningexpert'}
-                className={`flex items-start gap-3 rounded-lg border p-3 text-sm transition-colors hover:bg-muted/40 ${
-                  w.level === 'high' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'
-                }`}
-              >
-                <span className="mt-0.5">{w.level === 'high' ? '🔴' : '🟡'}</span>
-                <span>{w.text}</span>
-              </Link>
-            ))}
-          </div>
+        <section className="mt-6 space-y-2">
+          {warnings.map((w, i) => (
+            <Link
+              key={i}
+              to={w.link ?? '/planningexpert'}
+              className={`flex items-start gap-3 rounded-lg border p-3 text-sm transition-colors hover:bg-muted/40 ${
+                w.level === 'high' ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'
+              }`}
+            >
+              <span className="mt-0.5">{w.level === 'high' ? '🔴' : '🟡'}</span>
+              <span>{w.text}</span>
+            </Link>
+          ))}
         </section>
       )}
 
       <section className="mt-8">
-        <h2 className="font-semibold text-foreground">Daily workflow</h2>
-        <ol className="mt-3 space-y-2">
+        <h2 className="text-sm font-semibold text-foreground">Daily workflow</h2>
+        <ol className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
           <StepItem n={1} done={weekly.length > 0} title="Upload SAP data" desc="ZPP and ZPP_DAILY → Demand, MB52 → Stock" to="/siparisler" />
           <StepItem n={2} done={locations.length > 0} title="Check storage locations" desc="Which stock do we really have?" to="/depolar" />
           <StepItem n={3} done={presses.length > 0} title="Define work centers" desc="Which work center is in which hall — the crane constraint" to="/makineler" />
@@ -274,9 +176,9 @@ function HomePage() {
 
 function StatCard({ label, value, hint, to, danger }: { label: string; value: number | string; hint: string; to: string; danger?: boolean }) {
   return (
-    <Link to={to} className={`rounded-lg border p-4 transition-colors hover:bg-muted/40 ${danger ? 'border-red-200 bg-red-50' : 'border-border'}`}>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-2xl font-bold ${danger ? 'text-red-700' : 'text-foreground'}`}>{value}</p>
+    <Link to={to} className={`rounded-xl border p-4 transition-colors hover:bg-muted/40 ${danger ? 'border-red-200 bg-red-50' : 'border-border bg-card'}`}>
+      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${danger ? 'text-red-700' : 'text-foreground'}`}>{value}</p>
       <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
     </Link>
   )
@@ -285,7 +187,7 @@ function StatCard({ label, value, hint, to, danger }: { label: string; value: nu
 function StepItem({ n, done, title, desc, to }: { n: number; done: boolean; title: string; desc: string; to: string }) {
   return (
     <li>
-      <Link to={to} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/40">
+      <Link to={to} className="flex h-full items-center gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:bg-muted/40">
         <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${done ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
           {done ? '✓' : n}
         </span>
