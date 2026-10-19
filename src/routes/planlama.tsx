@@ -19,7 +19,7 @@ import { DecisionCell, LateJobs } from '../components/plan/LateJobs'
 import { IndependentCheck, OptimisationPanel } from '../components/plan/PlanChecks'
 import { AlarmBanner, PlanCheck, PlanDataLine, Stat } from '../components/plan/PlanPanels'
 import { PressStartPanel } from '../components/plan/PressStartPanel'
-import { LotQuantityDialog, type LotDraft } from '../components/plan/LotQuantityDialog'
+import { JobDialog, type JobDraft } from '../components/plan/JobDialog'
 export const Route = createFileRoute('/planlama')({
   component: PlanlamaPage,
 })
@@ -71,8 +71,22 @@ function PlanlamaPage() {
   }[]
   const setOverride = useMutation(api.planOverrides.set)
   const removeOverride = useMutation(api.planOverrides.remove)
-  // Grafikte işe tıklanınca açılan adet penceresi.
-  const [lotDraft, setLotDraft] = useState<LotDraft | null>(null)
+  // Tek tek onaylanan (kilitli) işler.
+  const jobLocks = (useQuery(api.planJobLocks.list) ?? []) as {
+    _id: string
+    material: string
+    press: string
+    date: string
+    setupStartMinute: number
+    approvedBy?: string
+    createdAt: number
+  }[]
+  const lockByKey = useMemo(
+    () => new Map(jobLocks.map((l) => [`${l.material}|${l.press}|${l.date}|${Math.round(l.setupStartMinute)}`, l])),
+    [jobLocks],
+  )
+  // Grafikte işe tıklanınca açılan pencere: adet, tek iş onayı, hariç tut.
+  const [jobDraft, setJobDraft] = useState<JobDraft | null>(null)
   const quantityRules = useMemo(
     () =>
       new Map(
@@ -532,8 +546,8 @@ function PlanlamaPage() {
           Plan overrides
           <InfoTip label="About plan overrides">
             The plan is always computed by the engine; the rules below are fed in as input, so your
-            override persists but the plan still comes out of the engine. To change a lot's quantity,
-            click the job on the plan chart.
+            override persists but the plan still comes out of the engine. Click a job on the plan chart
+            to change its lot quantity, approve (lock) just that job, or exclude the part.
           </InfoTip>
         </h2>
 
@@ -619,7 +633,7 @@ function PlanlamaPage() {
                   <strong>{o.material}</strong>{' '}
                   <span className="text-muted-foreground">
                     {o.kind === 'exclude'
-                      ? '— excluded from planning'
+                      ? `— excluded from planning${o.note ? ` (${o.note})` : ''}`
                       : o.kind === 'priority'
                         ? '— moved to front'
                         : o.kind === 'quantity'
@@ -708,31 +722,40 @@ function PlanlamaPage() {
                     waitReason: j.waitReason,
                     urgentSetup: j.urgentSetup,
                     bucketLabel: j.bucketLabel,
-                    quantityFixed: quantityRules.has(`${j.material}|${j.bucketLabel}`),
+                    quantityFixed: !j.frozen && quantityRules.has(`${j.material}|${j.bucketLabel}`),
+                    locked: j.locked,
                   }),
                 ),
                 ...ganttMaintenance,
               ]}
               onJobClick={(clicked) => {
-                if (!clicked.bucketLabel) return
-                // Lot: aynı malzeme + kova; kalıp ömrüyle bölünmüşse birden çok iş.
-                const lot = engineJobs.filter(
-                  (j) => j.material === clicked.material && j.bucketLabel === clicked.bucketLabel,
+                const job = allJobs.find(
+                  (j) =>
+                    j.material === clicked.material &&
+                    j.press === clicked.press &&
+                    j.date === clicked.date &&
+                    j.setupStartMinute === clicked.setupStartMinute,
                 )
-                if (lot.length === 0) return
-                const quantity = lot.reduce((sum, j) => sum + j.quantity, 0)
+                if (!job) return
+                const key = `${job.material}|${job.press}|${job.date}|${Math.round(job.setupStartMinute)}`
+                const lock = job.locked ? lockByKey.get(key) : undefined
+                if (job.locked && !lock) return
+                // Lot: aynı malzeme + kova; kalıp ömrüyle bölünmüşse birden çok iş.
+                const lot = engineJobs.filter((j) => j.material === job.material && j.bucketLabel === job.bucketLabel)
+                const lotQuantity = lot.reduce((sum, j) => sum + j.quantity, 0)
                 const coils = lot.reduce((sum, j) => sum + (j.coilsNeeded ?? 0), 0)
-                setLotDraft({
-                  material: clicked.material,
-                  bucket: clicked.bucketLabel,
-                  quantity,
-                  jobCount: lot.length,
-                  piecesPerCoil: coils > 0 ? quantity / coils : undefined,
-                  override: quantityRules.get(`${clicked.material}|${clicked.bucketLabel}`),
+                setJobDraft({
+                  job,
+                  bucket: job.bucketLabel,
+                  lotQuantity: lotQuantity || job.quantity,
+                  lotJobCount: Math.max(1, lot.length),
+                  piecesPerCoil: coils > 0 ? lotQuantity / coils : undefined,
+                  override: quantityRules.get(`${job.material}|${job.bucketLabel}`),
+                  lock: lock && { id: lock._id, approvedBy: lock.approvedBy, createdAt: lock.createdAt },
                 })
               }}
             />
-            {lotDraft && <LotQuantityDialog draft={lotDraft} onClose={() => setLotDraft(null)} />}
+            {jobDraft && <JobDialog draft={jobDraft} onClose={() => setJobDraft(null)} />}
           </div>
 
           <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

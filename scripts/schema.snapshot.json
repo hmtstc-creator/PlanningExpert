@@ -2527,6 +2527,134 @@
       "optional": false
     }
   },
+  "planJobLocks": {
+    "approvedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "coilsNeeded": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "endDate": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "endMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "hall": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "material": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "phase": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "quantity": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "reason": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "segments": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "kind": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "date": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "start": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "end": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": false
+    },
+    "setupStartMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "shots": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
   "planOverrides": {
     "bucket": {
       "fieldType": {

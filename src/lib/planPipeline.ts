@@ -98,6 +98,13 @@ export interface SnapshotJob {
   reason: string
 }
 
+/**
+ * Planlamacının tek tek onayladığı iş (Plan grafiğinde işe tıklayıp "Approve
+ * this job", 2026-10-19). Dondurulmuş ufuktan bağımsız olarak kilitlidir:
+ * yeniden hesapta yerinde kalır, motor etrafına planlar.
+ */
+export type ApprovedJobLock = SnapshotJob & { approvedBy?: string; createdAt: number }
+
 export interface PlanSettings {
   shiftMinutes?: number
   overtimeShiftMinutes?: number
@@ -175,6 +182,8 @@ export interface PlanInputs {
   workCalendar: { workingDays?: string[]; holidays?: string[] } | null
   officialHolidays: { date: string; name: string }[]
   latestSnapshot: { createdAt: number; truncated?: boolean; jobs: SnapshotJob[] } | null
+  /** Tek tek onaylanmış (kilitli) işler. */
+  jobLocks?: ApprovedJobLock[]
   plannedStops: PlannedStop[]
   overrides: { material: string; kind: string; press?: string; date?: string; bucket?: string; qty?: number }[]
   moldMaintenance: MoldMaintenanceRow[]
@@ -207,7 +216,11 @@ export interface PlanInputs {
   }[]
 }
 
-export type PlanJob = ScheduledJob & { frozen?: boolean }
+export type PlanJob = ScheduledJob & {
+  frozen?: boolean
+  /** Tek tek onaylanmış iş (kilit kaldırılabilir). */
+  locked?: boolean
+}
 
 export interface MaintenanceBlock {
   press: string
@@ -438,16 +451,24 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     frozenUntilByPress.set(press.name, isoDate(addDays(new Date(`${todayIso}T00:00:00`), days - 1)))
   }
   const snapshot = inputs.latestSnapshot
+  // Tek tek onaylanan işler onaylı planın parçasıdır ve her zaman kilitlidir.
+  // Aynı iş tam plan onayında da varsa kilit esastır (dondurma gününün
+  // ötesinde de yerinde kalsın), kopyası sayılmaz.
+  const lockKey = (j: SnapshotJob) => `${j.material}|${j.press}|${j.date}|${Math.round(j.setupStartMinute)}`
+  const lockJobs: SnapshotJob[] = (inputs.jobLocks ?? []).filter((l) => (l.segments?.length ?? 0) > 0)
+  const lockKeys = new Set(lockJobs.map(lockKey))
+  const lockSet = new Set(lockJobs)
+  const lockOf = new Map((inputs.jobLocks ?? []).map((l) => [l as SnapshotJob, l]))
   // Kırpılmış bir onaylı plan eksiktir; onunla dondurmak sahada olmayan bir
   // planı dondurmak olur.
-  const dayFrozenJobs =
-    !snapshot || snapshot.truncated || frozenUntilByPress.size === 0
-      ? []
-      : snapshot.jobs.filter((job) => {
-          const until = frozenUntilByPress.get(job.press)
-          if (!until || job.date < todayIso) return false
-          return job.date <= until && (job.segments?.length ?? 0) > 0
-        })
+  const snapshotJobs = snapshot && !snapshot.truncated ? snapshot.jobs.filter((j) => !lockKeys.has(lockKey(j))) : []
+  const approvedJobs = [...snapshotJobs, ...lockJobs]
+  const dayFrozenJobs = approvedJobs.filter((job) => {
+    if (job.date < todayIso || (job.segments?.length ?? 0) === 0) return false
+    if (lockSet.has(job)) return true
+    const until = frozenUntilByPress.get(job.press)
+    return !!until && job.date <= until
+  })
   // Şu an çalışan onaylı iş (dün başlamış olsa, dondurma kapalı olsa bile)
   // presinde kalır: kalıbı takılıdır, rulosu yarım. Eskiden her pres "şimdi
   // boş" sayılıyor, sekiz pres birden setup sırasına giriyordu.
@@ -458,16 +479,13 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   }
   const startedBeforeNow = (job: SnapshotJob) =>
     job.date < todayIso || (job.date === todayIso && job.setupStartMinute < nowNet)
-  const runningJobs =
-    !snapshot || snapshot.truncated
-      ? []
-      : snapshot.jobs.filter(
-          (job) =>
-            (job.segments?.length ?? 0) > 0 &&
-            startedBeforeNow(job) &&
-            endsAfterNow(job) &&
-            !dayFrozenJobs.includes(job),
-        )
+  const runningJobs = approvedJobs.filter(
+    (job) =>
+      (job.segments?.length ?? 0) > 0 &&
+      startedBeforeNow(job) &&
+      endsAfterNow(job) &&
+      !dayFrozenJobs.includes(job),
+  )
   // Planlamacı bir presi belli bir ana kadar tuttuysa (operatör yok,
   // hammadde yok…) o presin bu andan önce başlayan onaylı işleri yapılamaz:
   // serbest bırakılır, motor onları tutulma bittikten sonra yeniden planlar.
@@ -508,10 +526,10 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // dondurulmuş ufuk olarak sayılıyor.) Varsayım: onaylı plan uygulandı.
   const stockUploadedAt = inputs.stock.reduce((max, r) => Math.max(max, r.uploadedAt ?? 0), 0)
   const producedSinceStock = { quantity: 0, jobs: 0, stockDay: '' }
-  if (snapshot && !snapshot.truncated && stockUploadedAt > 0) {
+  if (approvedJobs.length > 0 && stockUploadedAt > 0) {
     const upload = productionDayOf(plantClock(stockUploadedAt, timeZone), shiftStartMinute)
     producedSinceStock.stockDay = upload.date
-    for (const job of snapshot.jobs) {
+    for (const job of approvedJobs) {
       // Dondurulmuş ya da şu an çalışan iş yukarıda sayıldı; henüz bitmemiş
       // iş üretilmiş sayılmaz. Bu sabah biten iş (dondurma kapalıyken
       // eskiden hiç sayılmıyordu) sayılır.
@@ -707,6 +725,10 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       }
       shiftedJobs.set(job, copy)
       frozenJobs[frozenJobs.indexOf(job)] = copy
+      if (lockSet.has(job)) {
+        lockSet.add(copy)
+        lockOf.set(copy, lockOf.get(job)!)
+      }
     }
     if (delay > 0) {
       for (const seg of fromGlobal(windows, 0, delay, 'maintenance')) {
@@ -1241,8 +1263,12 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         runMinutes: 0,
         setupMinutes: 0,
         qualityApprovalMinutes: 0,
-        reason: `Frozen — from the plan approved on ${approvedOn}`,
+        reason: lockSet.has(job)
+          ? `Approved job — locked on ${isoDate(plantClock(lockOf.get(job)?.createdAt ?? 0, timeZone))}` +
+            (lockOf.get(job)?.approvedBy ? ` by ${lockOf.get(job)!.approvedBy}` : '')
+          : `Frozen — from the plan approved on ${approvedOn}`,
         frozen: true,
+        locked: lockSet.has(job) || undefined,
       }),
     ),
     ...result.jobs,
@@ -1652,12 +1678,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // Hata verirse plan yine de çıkar.
   // Doğrulama, planlamacının müdahalesinden sonraki onaylı planı görür:
   // serbest bırakılan işler yok, kaydırılan işler yeni yerinde.
-  const effectiveSnapshot = snapshot
-    ? {
-        ...snapshot,
-        jobs: snapshot.jobs.filter((j) => !released.has(j)).map((j) => shiftedJobs.get(j) ?? j),
-      }
-    : snapshot
+  const effectiveSnapshot =
+    snapshot || lockJobs.length > 0
+      ? {
+          createdAt: snapshot?.createdAt ?? 0,
+          truncated: snapshot?.truncated && lockJobs.length === 0,
+          jobs: approvedJobs.filter((j) => !released.has(j)).map((j) => shiftedJobs.get(j) ?? j),
+        }
+      : snapshot
   run.validation = safeValidatePlan({ ...inputs, latestSnapshot: effectiveSnapshot }, run, nowMs)
   run.dataCoverage = dataCoverageOf(inputs)
   return run

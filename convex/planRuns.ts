@@ -69,6 +69,7 @@ export const smallInputs = plantInternalQuery({
         .first(),
       plannedStops: await ctx.db.query('plannedStops').collect(),
       overrides: await ctx.db.query('planOverrides').collect(),
+      jobLocks: await ctx.db.query('planJobLocks').collect(),
       moldMaintenance: await ctx.db.query('moldMaintenance').collect(),
       readiness: await ctx.db.query('moldReadiness').collect(),
       pressMaintenance: await ctx.db.query('pressMaintenance').collect(),

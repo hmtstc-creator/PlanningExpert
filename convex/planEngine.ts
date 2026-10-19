@@ -77,6 +77,7 @@ async function loadInputs(ctx: Ctx, plantId: string): Promise<PlanInputs> {
     pressOvertime: (small.pressOvertime ?? []).filter(onPress),
     pressMaintenance: (small.pressMaintenance ?? []).filter(onPress),
     overrides: (small.overrides ?? []).filter(keep),
+    jobLocks: (small.jobLocks ?? []).filter(keep),
     products: scope.products,
     weeklyDemand: demand.rows.filter(keep),
     dailyDemand: daily.rows.filter(keep),

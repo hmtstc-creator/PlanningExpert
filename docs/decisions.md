@@ -143,6 +143,13 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   azaltır, eksiği bir sonraki lota eklenir. 0 lotu atlar.
 - Dondurulmuş işler tıklanmaz. Kovası artık talepte olmayan kural etkisizdir;
   listeden kaldırılır. Elle verilen adetli işte grafikte ✎ görünür.
+- Aynı pencerede **Approve this job**: iş olduğu gibi kilitlenir (`planJobLocks`),
+  dondurulmuş ufuktan bağımsız olarak yeniden hesapta aynı pres ve saatte kalır;
+  adedi talebi karşılar. Grafikte ✓; kilitli işe tıklayınca **Remove approval**.
+  Tam plan onayı ("Approve plan") ayrı ve aynen çalışır; aynı iş ikisinde de
+  varsa bir kez sayılır.
+- **Exclude from planning** (isteğe bağlı neden, ör. hammadde eksik): parça
+  `exclude` kuralıyla plandan çıkar; kilitli işleri kalır.
 
 ## Aksiyon listesi
 

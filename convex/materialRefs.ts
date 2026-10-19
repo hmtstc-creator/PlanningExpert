@@ -16,6 +16,7 @@ const BY_MATERIAL: { table: string; label: string }[] = [
   { table: 'moldReadiness', label: 'die readiness' },
   { table: 'moldAlarms', label: 'die alarms' },
   { table: 'planOverrides', label: 'plan overrides' },
+  { table: 'planJobLocks', label: 'approved jobs' },
 ]
 
 export async function materialUsage(db: Any, code: string): Promise<Usage[]> {
