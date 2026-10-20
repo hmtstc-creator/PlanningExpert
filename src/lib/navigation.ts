@@ -154,7 +154,7 @@ export const MODULE_AREAS: Area[] = [
   PLANNING,
   area('oee', 'OEE', 'OEE', '/oee', 'activity', 'emerald', 'oee', [
     link('/oee', 'Trend Analysis', 'Monthly, 10 weeks and the selected week — OEE and performance', 'dashboard'),
-    link('/oee/losses', 'Losses Trend', 'Losses of the week, top reasons and setups', 'trendDown'),
+    link('/oee/losses', 'Losses Trend', 'One loss and its sub-losses — trend by week or day', 'trendDown'),
     link('/oee/bridge', 'Loss Bridge', 'From calendar time to OEE, loss by loss — priorities', 'chartDown'),
     link('/oee/report', 'Daily Report', 'One page: OEE, top 3 losses with materials, speed loss per work center', 'sheet'),
     link('/oee/agent', 'Agent Report', 'The day in short notes for management: dies, presses, shifts, repeats, open topics', 'clipboard'),

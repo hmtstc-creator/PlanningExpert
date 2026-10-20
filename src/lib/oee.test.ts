@@ -35,6 +35,9 @@ import {
   weekShiftTrend,
   weekTimes,
   weeklyTrend,
+  subLosses,
+  UNASSIGNED,
+  type LossDay,
   type OeeConfig,
   type SheetRows,
   type WeeklyRow,
@@ -488,3 +491,30 @@ describe('ham MES dışa aktarımı (rapor.xlsx, 2026-10-13)', () => {
   })
 })
 
+
+describe('subLosses (Losses Trend: alt kayıplar)', () => {
+  const cfg = {
+    ...EMPTY_CONFIG,
+    lossReasonCodes: ['UNSCD_DOWN'],
+    lossGroups: [
+      { code: 'STP', label: 'Setup', chart: 'STP', breakdown: false },
+      { code: 'MB', label: 'Breakdown', chart: 'Breakdown', breakdown: true },
+    ],
+  }
+  const day = (reasons: Record<string, [number, number]>): LossDay => ({ date: '2026-10-19', costCenter: 'C', workCenter: 'W', codes: {}, reasons })
+  it('groups the loss column by downtime text, loss codes only', () => {
+    const out = subLosses(
+      [
+        day({ 'UNSCD_DOWN|STP|DIE SETUP': [60, 2], 'UNSCD_DOWN|STP|GRIPPER SETUP': [20, 1], 'UNSCD_DOWN|MB|MOTOR': [30, 1], 'SCHED|STP|DIE SETUP': [99, 1] }),
+        day({ 'UNSCD_DOWN|STP|DIE SETUP': [15, 1] }),
+      ],
+      cfg,
+      'STP',
+    )
+    expect(Object.fromEntries(out)).toEqual({ 'DIE SETUP': { minutes: 75, count: 3 }, 'GRIPPER SETUP': { minutes: 20, count: 1 } })
+  })
+  it('an unnamed group belongs to Unassigned', () => {
+    const out = subLosses([day({ 'UNSCD_DOWN|XX|SOMETHING': [5, 1] })], cfg, UNASSIGNED)
+    expect(out.get('SOMETHING')).toEqual({ minutes: 5, count: 1 })
+  })
+})

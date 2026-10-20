@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { Legend, LineTrendChart, StackedShareChart, pct } from '../../components/OeeCharts'
+import { Legend, LineTrendChart, pct } from '../../components/OeeCharts'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
-import { InfoTip, PageHeader } from '../../components/PageHeader'
+import { PageHeader } from '../../components/PageHeader'
 import { PrintFilterHeader } from '../../components/OeePrint'
 import { dm } from '../../components/OeePeriodControl'
 import { SavePdfButton } from '../../components/SavePdfButton'
@@ -12,35 +12,25 @@ import { pdfFileName } from '../../lib/pdfFile'
 import { sheetToPdf } from '../../lib/pdfSheet'
 import { useQuery } from '../../lib/convexTransport'
 import {
-  BREAK_KEY,
   SPEED,
   addDaysIso,
   areaNames,
   chartGroups,
   chartShare,
-  visibleChartGroups,
-  groupLabel,
   inScope,
   isoWeek,
   lossBreakdown,
   lossCoverage,
   lossForPeriod,
-  reasonPareto,
   scopeLabel,
-  setupAnalysis,
-  startupRunOf,
+  subLosses,
   sumTimes,
-  weekGap,
   weekTimes,
   type DayRow,
-  type LossBreakdown,
-  type OeeConfig,
-  type OrderRow,
-  type SetupRow,
-  type SetupStatus,
+  type LossDay,
   type WeeklyRow,
 } from '../../lib/oee'
-import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
+import { fromStoredLosses, type StoredLossDay } from '../../lib/oeeStore'
 import { relatedPages } from '../../lib/navigation'
 
 export const Route = createFileRoute('/oee/losses')({
@@ -50,112 +40,150 @@ export const Route = createFileRoute('/oee/losses')({
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 const minutes = (m: number) => (m >= 90 ? `${(m / 60).toFixed(1)} h` : `${Math.round(m)} min`)
-/** Fark (puan). Kayıpta artış kötüdür (kırmızı); OEE'de artış iyidir. */
-const gapText = (cur: number, prev: number, higherIsBetter = false) => {
+/** Fark (puan). Kayıpta artış kötüdür (kırmızı). */
+const gapText = (cur: number, prev: number) => {
   const d = (cur - prev) * 100
-  if (Math.abs(d) < 0.05) return { text: '0.0', tone: 'text-muted-foreground' }
-  const worse = higherIsBetter ? d < 0 : d > 0
-  return { text: `${d > 0 ? '▲ +' : '▼ '}${d.toFixed(1)}`, tone: worse ? 'text-destructive' : 'text-emerald-700' }
+  if (Math.abs(d) < 0.05) return { text: '0.0 pts', tone: 'text-muted-foreground' }
+  return { text: `${d > 0 ? '▲ +' : '▼ '}${d.toFixed(1)} pts`, tone: d > 0 ? 'text-destructive' : 'text-emerald-700' }
 }
 
+/** Bir dönem: Loading ve o dönemin duruş özetleri. */
+interface Period {
+  key: string
+  label: string
+  loadingMin: number
+  lossDays: LossDay[]
+  /** Duruş verisi yoksa yalnızca Speed bilinir. */
+  hasDowntime: boolean
+  share: (column: string) => number
+}
+
+/**
+ * Losses Trend (planlamacı, 2026-10-20): tek grafik. Bir kayıp seçilir (ör.
+ * STP), istenirse altındaki bir alt kayıp (duruş metni, ör. DIE SETUP); grafik
+ * ikisinin % of Loading trendini çizer. Altında o kaybın alt kayıpları bu hafta
+ * ile geçen haftayı karşılaştırır; satıra tıklamak alt kaybı seçer.
+ */
 function LossesPage() {
   const sel = useOeeSelection()
   const { config } = useOeeConfig()
-  const weeksN = config.trendWeeks || 1
+  const weeksN = Math.max(2, config.trendWeeks || 1)
   const trendFrom = addDaysIso(sel.monday, -7 * (weeksN - 1))
   const prevMonday = addDaysIso(sel.monday, -7)
   const dayRows = (useQuery(api.oee.days, { from: trendFrom, to: sel.sunday }) ?? []) as DayRow[]
   const periods = useQuery(api.oee.periods) as { weekly: WeeklyRow[] } | undefined
   const lossRaw = (useQuery(api.oee.lossDays, { from: trendFrom, to: sel.sunday }) ?? []) as StoredLossDay[]
-  const orders = (useQuery(api.oee.orders, { from: prevMonday, to: sel.sunday }) ?? []) as OrderRow[]
-  // Pazar gecesi biten setup'ın ilk üretim saati Pazartesiye taşabilir: bir gün fazla.
-  const downRaw = (useQuery(api.oee.downtimeDays, { from: sel.monday, to: addDaysIso(sel.sunday, 1) }) ?? []) as StoredDowntimeDay[]
   const lossDays = useMemo(() => fromStoredLosses(lossRaw), [lossRaw])
-  const downtimes = useMemo(() => downRaw.map(fromStoredDay), [downRaw])
   const scope = effectiveScope(sel.scope, areaNames(dayRows, config))
   const label = scopeLabel(scope, config)
   const columns = useMemo(() => chartGroups(config, lossDays), [config, lossDays])
-  // Grafiklerde gizli gruplar (Settings → In charts) yalnızca tablolarda.
-  const chartColumns = useMemo(() => visibleChartGroups(columns, config), [columns, config])
+
+  const [view, setView] = useState<'weeks' | 'days'>('weeks')
+  const [picked, setPicked] = useState<string | null>(null)
+  const [sub, setSub] = useState<string>('')
+  const loss = picked && columns.includes(picked) ? picked : (columns[0] ?? SPEED)
+  const pickLoss = (col: string) => {
+    setPicked(col)
+    setSub('')
+  }
 
   const coverageNotes = useMemo(() => {
     const cov = lossCoverage(dayRows, lossDays, scope, config, sel.monday, sel.sunday)
-    const dm = (d: string) => `${d.slice(8)}.${d.slice(5, 7)}`
+    const d2 = (d: string) => `${d.slice(8)}.${d.slice(5, 7)}`
     const out: string[] = []
-    if (cov.noDowntimes.length) out.push(`No downtimes uploaded for ${cov.noDowntimes.map(dm).join(', ')} — losses of these days are missing from the percentages.`)
-    if (cov.noShifts.length) out.push(`Downtimes without shift data for ${cov.noShifts.map(dm).join(', ')} — no loading time, so no loss percentage for these days.`)
-    const diff = cov.unscheduledKpi - cov.unscheduledDowntimes
-    if (Math.abs(diff) >= 1) {
-      const top = cov.byWorkCenter
-        .slice(0, 5)
-        .map((r) => `${r.workCenter} ${r.kpi - r.downtimes > 0 ? '+' : ''}${Math.round(r.kpi - r.downtimes)}`)
-        .join(', ')
-      out.push(
-        `Unscheduled downtime W${sel.week.week}: ${Math.round(cov.unscheduledKpi)} min in Shiftly KPI, ${Math.round(cov.unscheduledDowntimes)} min in Downtimes (difference ${Math.round(diff)} min${top ? `; most: ${top}` : ''}). The loss groups show the Downtimes minutes.`,
-      )
-    }
+    if (cov.noDowntimes.length) out.push(`No downtimes uploaded for ${cov.noDowntimes.map(d2).join(', ')} — losses of these days are missing from the percentages.`)
+    if (cov.noShifts.length) out.push(`Downtimes without shift data for ${cov.noShifts.map(d2).join(', ')} — no loading time, so no loss percentage for these days.`)
     return out
-  }, [dayRows, lossDays, scope, config, sel.monday, sel.sunday, sel.week.week])
+  }, [dayRows, lossDays, scope, config, sel.monday, sel.sunday])
 
-  const days = useMemo(
-    () =>
-      DAY_LABELS.map((d, i) => {
-        const date = addDaysIso(sel.monday, i)
-        return { key: date, label: `${d} ${date.slice(8)}`, b: lossForPeriod(dayRows, lossDays, scope, config, date, date) }
-      }),
-    [dayRows, lossDays, scope, config, sel.monday],
-  )
-  const weekCur = lossForPeriod(dayRows, lossDays, scope, config, sel.monday, sel.sunday)
-  const weekPrev = lossForPeriod(dayRows, lossDays, scope, config, prevMonday, addDaysIso(prevMonday, 6))
+  // Haftalar: süreler OEE Dashboard ile aynı kaynaktan (günler ya da yüklenen hafta).
   const perWeek = useMemo(() => weekTimes(dayRows, periods?.weekly ?? []), [dayRows, periods])
-  const trend = useMemo(
+  const weekPeriods = useMemo<Period[]>(
     () =>
       Array.from({ length: weeksN }, (_, i) => {
         const monday = addDaysIso(sel.monday, -7 * (weeksN - 1 - i))
         const { year, week } = isoWeek(monday)
         const end = addDaysIso(monday, 6)
         const key = `${year}-W${String(week).padStart(2, '0')}|`
-        // Hafta süreleri OEE Dashboard ile aynı kaynaktan (günler ya da yüklenen hafta).
         const times = sumTimes([...perWeek].filter(([k, w]) => k.startsWith(key) && inScope(w, scope, config)).map(([, w]) => w.times))
         const lds = lossDays.filter((d) => d.date >= monday && d.date <= end && inScope(d, scope, config))
-        // Duruş verisi olmayan haftada yalnızca Speed bilinir; gruplar boş kalır.
-        return { label: `W${week}`, b: lossBreakdown(times, lds, config), hasDowntime: lds.length > 0 }
+        const b = lossBreakdown(times, lds, config)
+        return { key: monday, label: `W${week}`, loadingMin: b.loadingMin, lossDays: lds, hasDowntime: lds.length > 0, share: (col) => chartShare(b, col) }
       }),
     [perWeek, lossDays, scope, config, sel.monday, weeksN],
   )
-  const gap = useMemo(() => weekGap(dayRows, lossDays, scope, config, sel.monday), [dayRows, lossDays, scope, config, sel.monday])
-  const reasons = useMemo(() => reasonPareto(lossDays, scope, config, sel.monday), [lossDays, scope, config, sel.monday])
-  const setups = useMemo(() => setupAnalysis(downtimes, orders, scope, config, sel.monday, sel.sunday), [downtimes, orders, scope, config, sel.monday, sel.sunday])
-  // A4 PDF: adı seçili günle "GGAAYY LOSSES TREND" (Aksiyonlar sunumu, 2026-10-14; Save PDF 2026-10-16).
+  const dayPeriods = useMemo<Period[]>(
+    () =>
+      DAY_LABELS.map((d, i) => {
+        const date = addDaysIso(sel.monday, i)
+        const b = lossForPeriod(dayRows, lossDays, scope, config, date, date)
+        const lds = lossDays.filter((x) => x.date === date && inScope(x, scope, config))
+        return { key: date, label: `${d} ${date.slice(8)}`, loadingMin: b.loadingMin, lossDays: lds, hasDowntime: lds.length > 0, share: (col) => chartShare(b, col) }
+      }),
+    [dayRows, lossDays, scope, config, sel.monday],
+  )
+  const shown = view === 'weeks' ? weekPeriods : dayPeriods
+
+  /** Alt kaybın dönemdeki payı (% of Loading). */
+  const subShare = (p: Period, text: string) =>
+    p.loadingMin > 0 ? (subLosses(p.lossDays, config, loss).get(text)?.minutes ?? 0) / p.loadingMin : 0
+  const valueOf = (p: Period, text?: string) => {
+    if (p.loadingMin <= 0 || (!p.hasDowntime && loss !== SPEED)) return null
+    return text ? subShare(p, text) : p.share(loss)
+  }
+
+  // Bu hafta ve geçen hafta (haftalık dönemlerin son ikisi).
+  const cur = weekPeriods[weekPeriods.length - 1]
+  const prev = weekPeriods[weekPeriods.length - 2]
+  const subRows = useMemo(() => {
+    if (!cur || loss === SPEED) return []
+    const now = subLosses(cur.lossDays, config, loss)
+    const before = prev ? subLosses(prev.lossDays, config, loss) : new Map()
+    const texts = new Set([...now.keys(), ...before.keys()])
+    return [...texts]
+      .map((text) => {
+        const a = now.get(text) ?? { minutes: 0, count: 0 }
+        const b = before.get(text) ?? { minutes: 0, count: 0 }
+        return {
+          text,
+          count: a.count,
+          minutes: a.minutes,
+          share: cur.loadingMin > 0 ? a.minutes / cur.loadingMin : 0,
+          prevShare: prev && prev.loadingMin > 0 ? b.minutes / prev.loadingMin : 0,
+        }
+      })
+      .sort((x, y) => y.minutes - x.minutes || y.prevShare - x.prevShare)
+  }, [cur, prev, loss, config])
+  const subLabel = sub && subRows.some((r) => r.text === sub) ? sub : ''
+
+  const curValue = cur ? valueOf(cur, subLabel || undefined) : null
+  const prevValue = prev ? valueOf(prev, subLabel || undefined) : null
+  const gp = curValue !== null && prevValue !== null ? gapText(curValue, prevValue) : null
+  const lossIndex = columns.indexOf(loss)
+
+  // A4 PDF: adı seçili günle "GGAAYY LOSSES TREND".
   const sheetRef = useRef<HTMLDivElement>(null)
   const fileName = pdfFileName(sel.date, 'LOSSES TREND')
-  const filters = [label, `Date ${dm(sel.date)}`, `Week W${sel.week.week} (${dm(sel.monday)} – ${dm(sel.sunday)}) vs W${isoWeek(prevMonday).week}`]
-
-  const stackParts = (b: LossBreakdown) => [
-    { key: 'oee', label: 'OEE', value: b.oee ?? 0 },
-    ...chartColumns.map((col) => ({ key: col, label: col, value: chartShare(b, col) })),
-  ]
+  const filters = [label, `Loss ${loss}${subLabel ? ` → ${subLabel}` : ''}`, `Week W${sel.week.week} (${dm(sel.monday)} – ${dm(sel.sunday)})`]
   const noData = dayRows.length === 0 && lossDays.length === 0
 
   return (
     <div className="mx-auto w-full max-w-[297mm] px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="Losses Trend"
-        summary="Where the time goes: losses of the selected week against the week before, top reasons and setups. Dies: Dies OEE Trend; breakdowns: MTTR & MTBF."
+        summary="Pick a loss — and, if you like, one of its sub-losses — and follow its trend."
         links={relatedPages('/oee/losses')}
         info={
           <>
             <p>
-              A loss is its downtime minutes (Downtimes; Reason Code 1 marked as a loss in Settings,
-              grouped by Reason Code 2) ÷ Loading time of the same machines and days — the "% of
-              Loading" of the BoardReport. <b>Speed</b> = (Production − Operation) ÷ Loading.
+              A loss is its downtime minutes (Downtimes; Reason Code 1 marked as a loss in Settings, grouped by
+              Reason Code 2 into the chart columns) ÷ Loading time of the same machines and days — "% of
+              Loading". <b>Speed</b> = (Production − Operation) ÷ Loading and has no sub-losses.
             </p>
             <p>
-              Group names and chart columns are set on <Link to="/oee/settings">OEE Settings</Link>;
-              a Reason Code 2 that is not named there shows as "Unassigned". Groups unticked under "In
-              charts" (e.g. unexplained downtimes) are left out of the charts and shown in the tables.
+              A sub-loss is the downtime text under the loss (e.g. STP → DIE SETUP). Groups and columns are set on{' '}
+              <Link to="/oee/settings">OEE Settings</Link>. Dies: Dies OEE Trend; breakdowns: MTTR &amp; MTBF.
             </p>
-            <p>Gap = this week − previous week, in percentage points: ▲ red is worse, ▼ green is better.</p>
           </>
         }
       />
@@ -165,10 +193,7 @@ function LossesPage() {
         rows={dayRows}
         config={config}
         actions={
-          <SavePdfButton
-            fileName={fileName}
-            make={() => sheetToPdf(sheetRef.current!, { size: 'A4', orientation: 'landscape', pages: 'flow' })}
-          />
+          <SavePdfButton fileName={fileName} make={() => sheetToPdf(sheetRef.current!, { size: 'A4', orientation: 'landscape', pages: 'flow' })} />
         }
       />
       <OeeDataNotice items={coverageNotes} />
@@ -179,349 +204,149 @@ function LossesPage() {
         </p>
       )}
 
+      {/* Seçim */}
+      <div className="mt-6 space-y-3 print:hidden">
+        <div>
+          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Loss</p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {columns.map((col) => (
+              <button
+                key={col}
+                type="button"
+                onClick={() => pickLoss(col)}
+                className={`h-10 rounded-lg px-3.5 text-sm font-semibold shadow-sm transition-colors ${
+                  col === loss ? 'bg-foreground text-background' : 'border border-border bg-background text-foreground hover:bg-muted'
+                }`}
+              >
+                {col}
+              </button>
+            ))}
+          </div>
+        </div>
+        {loss !== SPEED && (
+          <label className="block max-w-md">
+            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Sub-loss</span>
+            <select
+              value={subLabel}
+              onChange={(e) => setSub(e.target.value)}
+              className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+            >
+              <option value="">All of {loss}</option>
+              {subRows.map((r) => (
+                <option key={r.text} value={r.text}>
+                  {r.text} — {pct(r.share)} this week
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+
       <div ref={sheetRef} className="oee-viz bg-background">
         <PrintFilterHeader title="LOSSES TREND" filters={filters} />
-        <Section title={`Week W${sel.week.week} — daily % of Loading · ${label}`} note={`${sel.monday} – ${sel.sunday}`}>
-          <Legend items={[{ key: 'oee', label: 'OEE' }, ...chartColumns.map((c) => ({ key: c, label: c }))]} />
-          <StackedShareChart columns={days.map((d) => ({ key: d.key, label: d.label, parts: stackParts(d.b) }))} ariaLabel="Daily OEE and losses" />
-          <div className="mt-2 overflow-x-auto rounded-md border border-border">
-            <table className="w-full text-xs">
-              <thead className="bg-muted text-muted-foreground">
-                <tr>
-                  <th className="px-2 py-1.5 text-left font-medium">% of Loading</th>
-                  {days.map((d) => (
-                    <th key={d.key} className="px-2 py-1.5 text-right font-medium">{d.label}</th>
-                  ))}
-                  <th className="px-2 py-1.5 text-right font-medium">Week</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Previous</th>
-                  <th className="px-2 py-1.5 text-right font-medium">Gap (pts)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[{ key: 'oee', label: 'OEE' }, ...columns.map((c) => ({ key: c, label: c }))].map((g) => {
-                  const v = (b: LossBreakdown) => (g.key === 'oee' ? b.oee ?? 0 : chartShare(b, g.key))
-                  const gp = gapText(v(weekCur), v(weekPrev), g.key === 'oee')
-                  return (
-                    <tr key={g.key} className="border-t border-border">
-                      <td className="px-2 py-1 font-medium text-foreground">{g.label}</td>
-                      {days.map((d) => (
-                        <td key={d.key} className="px-2 py-1 text-right tabular-nums">{d.b.loadingMin > 0 ? pct(v(d.b)) : '—'}</td>
-                      ))}
-                      <td className="px-2 py-1 text-right font-semibold tabular-nums">{pct(v(weekCur))}</td>
-                      <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{pct(v(weekPrev))}</td>
-                      <td className={`px-2 py-1 text-right tabular-nums ${gp.tone}`}>{gp.text}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        <section className="print-avoid-break mt-4 rounded-xl border border-border p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">
+                {loss}
+                {subLabel && <span className="text-muted-foreground"> → {subLabel}</span>}
+              </h2>
+              <p className="text-xs text-muted-foreground">% of Loading · {label}</p>
+            </div>
+            <div className="flex items-end gap-5">
+              <div className="text-right">
+                <p className="text-[11px] tracking-wide text-muted-foreground uppercase">W{sel.week.week}</p>
+                <p className="text-2xl font-bold tabular-nums text-foreground">{pct(curValue)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] tracking-wide text-muted-foreground uppercase">W{isoWeek(prevMonday).week}</p>
+                <p className="text-lg font-semibold tabular-nums text-muted-foreground">{pct(prevValue)}</p>
+              </div>
+              {gp && <p className={`whitespace-nowrap pb-1 text-sm font-semibold tabular-nums ${gp.tone}`}>{gp.text}</p>}
+              <div className="flex rounded-lg border border-border p-0.5 print:hidden">
+                {(['weeks', 'days'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setView(v)}
+                    className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium ${view === v ? 'bg-foreground text-background' : 'text-muted-foreground hover:bg-muted'}`}
+                  >
+                    {v === 'weeks' ? `${weeksN} weeks` : `Days W${sel.week.week}`}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </Section>
 
-        <Section title={`Week gap by work center and cost center — W${sel.week.week} vs W${isoWeek(prevMonday).week}`} info="Each cell: this week's loss share, and the change against the previous week in percentage points.">
-          <div className="overflow-x-auto rounded-md border border-border">
-            <table className="w-full text-xs">
-              <thead className="bg-muted text-muted-foreground">
-                <tr>
-                  <th className="px-2 py-1.5 text-left font-medium">Machine / cost center</th>
-                  <th className="px-2 py-1.5 text-right font-medium">OEE</th>
-                  {columns.map((c) => (
-                    <th key={c} className="px-2 py-1.5 text-right font-medium">{c}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {gap.map((r) => {
-                  const oeeGap = gapText(r.current.oee ?? 0, r.previous.oee ?? 0, true)
-                  return (
-                    <tr key={r.key} className={`border-t border-border ${r.isGroup ? 'bg-muted/40 font-semibold' : ''}`}>
-                      <td className="whitespace-nowrap px-2 py-1 text-foreground">{r.label}</td>
-                      <td className="px-2 py-1 text-right tabular-nums">
-                        {pct(r.current.oee)}{' '}
-                        <span className={`text-[10px] ${oeeGap.tone}`}>
-                          {r.previous.loadingMin > 0 ? oeeGap.text : ''}
-                        </span>
-                      </td>
-                      {columns.map((col) => {
-                        const cur = chartShare(r.current, col)
-                        const gp = gapText(cur, chartShare(r.previous, col))
+          <div className="mt-3">
+            <Legend
+              items={[
+                { key: loss, label: loss, slot: lossIndex + 1 },
+                ...(subLabel ? [{ key: 'sub', label: subLabel, slot: lossIndex + 2 }] : []),
+              ]}
+            />
+            <LineTrendChart
+              height={280}
+              labels={shown.map((p) => p.label)}
+              series={[
+                { key: loss, label: loss, slot: lossIndex + 1, values: shown.map((p) => valueOf(p)) },
+                ...(subLabel ? [{ key: 'sub', label: subLabel, slot: lossIndex + 2, values: shown.map((p) => valueOf(p, subLabel)) }] : []),
+              ]}
+              ariaLabel={`${loss} trend`}
+            />
+            {loss !== SPEED && shown.some((p) => p.loadingMin > 0 && !p.hasDowntime) && (
+              <p className="mt-1 text-xs text-muted-foreground">Periods without uploaded downtimes are left empty.</p>
+            )}
+          </div>
+
+          {/* Alt kayıplar: bu hafta ve geçen hafta; satıra tıklamak seçer. */}
+          {loss !== SPEED && (
+            <div className="mt-4">
+              <p className="text-xs font-medium text-muted-foreground">
+                Sub-losses of {loss} — W{sel.week.week} vs W{isoWeek(prevMonday).week}
+              </p>
+              {subRows.length === 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">No {loss} downtimes in these two weeks.</p>
+              ) : (
+                <div className="mt-2 max-h-[22rem] overflow-auto rounded-lg border border-border">
+                  <table className="w-full min-w-[32rem] text-sm">
+                    <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Sub-loss</th>
+                        <th className="px-3 py-2 text-right font-medium">Count</th>
+                        <th className="px-3 py-2 text-right font-medium">Time</th>
+                        <th className="px-3 py-2 text-right font-medium">W{sel.week.week}</th>
+                        <th className="px-3 py-2 text-right font-medium">W{isoWeek(prevMonday).week}</th>
+                        <th className="px-3 py-2 text-right font-medium">Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subRows.map((r) => {
+                        const g = gapText(r.share, r.prevShare)
+                        const active = r.text === subLabel
                         return (
-                          <td key={col} className="px-2 py-1 text-right tabular-nums">
-                            {r.current.loadingMin > 0 ? pct(cur) : '—'}{' '}
-                            <span className={`text-[10px] ${gp.tone}`}>{r.previous.loadingMin > 0 ? gp.text : ''}</span>
-                          </td>
+                          <tr
+                            key={r.text}
+                            onClick={() => setSub(active ? '' : r.text)}
+                            className={`cursor-pointer border-t border-border hover:bg-muted/50 ${active ? 'bg-muted font-semibold' : ''}`}
+                          >
+                            <td className="px-3 py-1.5 text-foreground">{r.text}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums">{r.count}</td>
+                            <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">{minutes(r.minutes)}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums">{pct(r.share)}</td>
+                            <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{pct(r.prevShare)}</td>
+                            <td className={`whitespace-nowrap px-3 py-1.5 text-right tabular-nums ${g.tone}`}>{g.text}</td>
+                          </tr>
                         )
                       })}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Section>
-
-        <Section
-          title={`Loss trend — last ${weeksN} weeks · ${label}`}
-          info="Weeks without uploaded downtimes show only Speed (Production − Operation); the downtime groups start with the uploaded Downtimes file."
-        >
-          <Legend items={chartColumns.map((c, i) => ({ key: c, label: c, slot: i + 1 }))} />
-          <LineTrendChart
-            labels={trend.map((t) => t.label)}
-            series={chartColumns.map((col, i) => ({
-              key: col,
-              label: col,
-              // Yığılmış grafikte 1. renk OEE'nin; kayıplar aynı renkleri korur.
-              slot: i + 1,
-              values: trend.map((t) => (t.b.loadingMin > 0 && (t.hasDowntime || col === SPEED) ? chartShare(t.b, col) : null)),
-            }))}
-            ariaLabel="Weekly loss trend"
-          />
-        </Section>
-
-        <Section title="Top downtime reasons" note={`W${sel.week.week}, counted as loss`}>
-          <SimpleTable
-            fit
-            head={['Reason', 'Group', 'Count', 'This week', 'Previous', 'Change']}
-            rows={reasons.slice(0, config.topN || reasons.length).map((r) => {
-              const d = r.minutes - r.previousMinutes
-              return [
-                r.text,
-                groupLabel(r.group, config),
-                String(r.count),
-                minutes(r.minutes),
-                minutes(r.previousMinutes),
-                <span key="d" className={d > 0 ? 'text-destructive' : d < 0 ? 'text-emerald-700' : ''}>
-                  {d > 0 ? '▲ ' : d < 0 ? '▼ ' : ''}
-                  {minutes(Math.abs(d))}
-                </span>,
-              ]
-            })}
-          />
-          <p className="mt-2 text-xs text-muted-foreground print:hidden">
-            Breakdowns (MTTR and MTBF): <Link to="/oee/mttr" className="underline">MTTR &amp; MTBF</Link> · Dies:{' '}
-            <Link to="/oee/dies" className="underline">Dies OEE Trend</Link>
-          </p>
-        </Section>
-
-        <SetupSection area={scope.area} setups={setups} week={sel.week.week} loaded={downRaw.length > 0} config={config} />
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </div>
-  )
-}
-
-const STATUS: Record<SetupStatus, { label: string; tone: string }> = {
-  ok: { label: 'OK — produced after setup', tone: 'text-emerald-700' },
-  nok: { label: 'NOK — could not get into production', tone: 'text-destructive' },
-  open: { label: 'Open — not known yet', tone: 'text-muted-foreground' },
-}
-
-const reasonLabel = (code: string, c: OeeConfig) =>
-  code === BREAK_KEY ? 'Breaks' : code === 'next-setup' ? 'Next setup came' : groupLabel(code, c)
-
-const lostText = (lost: Record<string, number>, c: OeeConfig) =>
-  Object.entries(lost)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, m]) => `${reasonLabel(k, c)} ${minutes(m)}`)
-    .join(' · ') || '—'
-
-function SetupSection({ setups, week, loaded, config, area }: { setups: SetupRow[]; week: number; loaded: boolean; config: OeeConfig; area: string }) {
-  const [press, setPress] = useState('all')
-  const [status, setStatus] = useState<'all' | SetupStatus>('all')
-  const presses = [...new Set(setups.map((s) => s.workCenter))].sort()
-  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
-  const summary = presses.map((p) => {
-    const rows = setups.filter((s) => s.workCenter === p)
-    const nok = rows.filter((s) => s.status === 'nok')
-    const main = new Map<string, number>()
-    for (const r of nok) main.set(r.mainReason ?? '', (main.get(r.mainReason ?? '') ?? 0) + 1)
-    return {
-      press: p,
-      count: rows.length,
-      planned: rows.filter((s) => s.kind !== 'unplanned').length,
-      unplanned: rows.filter((s) => s.kind === 'unplanned').length,
-      ok: rows.filter((s) => s.status === 'ok').length,
-      nok: nok.length,
-      open: rows.filter((s) => s.status === 'open').length,
-      avgSetup: avg(rows.map((s) => s.setupMin)),
-      avgToRun: avg(rows.filter((s) => s.timeToRunMin !== null).map((s) => s.timeToRunMin!)),
-      reasons: [...main].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${reasonLabel(k, config)} ${n}`).join(', '),
-    }
-  })
-  // NOK nedenleri: ana neden sayısı ve setup sonrası kaybedilen süre (seçilen pres).
-  const nokRows = setups.filter((s) => s.status === 'nok' && (press === 'all' || s.workCenter === press))
-  const reasonMap = new Map<string, { main: number; lost: number; setups: number }>()
-  for (const r of nokRows) {
-    const m = reasonMap.get(r.mainReason ?? '') ?? { main: 0, lost: 0, setups: 0 }
-    m.main += 1
-    reasonMap.set(r.mainReason ?? '', m)
-    for (const [k, v] of Object.entries(r.lost)) {
-      const x = reasonMap.get(k) ?? { main: 0, lost: 0, setups: 0 }
-      x.lost += v
-      x.setups += 1
-      reasonMap.set(k, x)
-    }
-  }
-  const reasonRows = [...reasonMap].filter(([k]) => k).sort((a, b) => b[1].main - a[1].main || b[1].lost - a[1].lost)
-  const list = setups.filter((s) => (press === 'all' || s.workCenter === press) && (status === 'all' || s.status === status))
-  return (
-    <section className="mt-6 rounded-lg border border-border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          Setups — W{week}
-          <InfoTip label="About the setup analysis">
-            <p>
-              Only the downtime texts marked as a <b>setup</b> on OEE Settings count as a setup
-              ({config.setupTexts.map((t) => t.text).join(', ') || 'none yet'}). Other adjustments are
-              not a setup; after a setup they are a reason for not starting.
-            </p>
-            <p>
-              <b>OK</b>: after the setup ends, the machine produced {startupRunOf(area, config)} minutes (time
-              without any downtime) before the next setup. <b>NOK</b>: it did not — it could not get
-              into production. The downtimes between the end of the setup and that point (or the next
-              setup) are the reasons; breaks are shown apart. <b>Open</b>: the data ends before it is
-              known.
-            </p>
-            <p>Setup records with no production between them (shift change, break) count as one setup.</p>
-          </InfoTip>
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          <PressPicker presses={presses} value={press} onChange={setPress} />
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as 'all' | SetupStatus)}
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-          >
-            <option value="all">All results</option>
-            {(Object.keys(STATUS) as SetupStatus[]).map((k) => (
-              <option key={k} value={k}>
-                {STATUS[k].label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      {!loaded && <p className="mt-2 text-xs text-muted-foreground">No downtime rows for this week.</p>}
-      {/* Özet solda, NOK nedenleri yanında; genişlik içeriğe göre (Aksiyonlar sunumu, 2026-10-14). */}
-      <div className="flex flex-col items-start gap-4 lg:flex-row">
-        {summary.length > 0 && (
-          <div className="min-w-0">
-            <SimpleTable
-              fit
-              head={['Press', 'Setups', 'Planned', 'Unplanned', 'OK', 'NOK', 'Open', 'Avg setup', 'Avg to prod.', 'NOK main reasons']}
-              rows={summary.map((s) => [
-                s.press,
-                String(s.count),
-                String(s.planned),
-                String(s.unplanned),
-                <span key="ok" className="text-emerald-700">{s.ok}</span>,
-                <span key="nok" className={s.nok ? 'font-semibold text-destructive' : ''}>
-                  {s.nok} ({s.count ? Math.round((s.nok / s.count) * 100) : 0}%)
-                </span>,
-                String(s.open),
-                s.avgSetup === null ? '—' : minutes(s.avgSetup),
-                s.avgToRun === null ? '—' : minutes(s.avgToRun),
-                s.reasons || '—',
-              ])}
-            />
-          </div>
-        )}
-        {reasonRows.length > 0 && (
-          <div className="min-w-0">
-            <p className="mt-2 text-xs font-medium text-muted-foreground">
-              Why NOK setups did not start {press === 'all' ? '' : `— ${press}`}
-            </p>
-            <SimpleTable
-              fit
-              head={['Reason', 'Main reason of', 'Seen in NOK', 'Lost after setup']}
-              rows={reasonRows.map(([k, v]) => [reasonLabel(k, config), `${v.main} setup(s)`, String(v.setups), v.lost ? minutes(v.lost) : '—'])}
-            />
-          </div>
-        )}
-      </div>
-      {list.length > 0 && (
-        <div className="mt-3">
-          {/* Order ve Good yok: parça numarası yeterli, üretilen adet setup'a bağlanamaz.
-              Setup type: STP'nin alt detayı (Downtimes metni: DIE SETUP, GRIPPER SETUP …). */}
-          <SimpleTable
-            fit
-            head={['Press', 'Setup', 'Part', 'Setup type', 'Kind', 'Setup time', 'Result', 'To production', 'Downtime after setup']}
-            rows={list.map((s) => [
-              s.workCenter,
-              `${s.start.slice(5)} – ${s.end.slice(11)}`,
-              s.material,
-              s.texts.join(' + ') || '—',
-              s.kind,
-              minutes(s.setupMin),
-              <span key="r" className={STATUS[s.status].tone}>
-                {s.status.toUpperCase()}
-                {s.mainReason ? ` · ${reasonLabel(s.mainReason, config)}` : ''}
-              </span>,
-              s.timeToRunMin !== null
-                ? minutes(s.timeToRunMin)
-                : `${minutes(s.runMin)} run${s.nextSetup ? ` · next ${s.nextSetup.slice(11)}` : ''}`,
-              lostText(s.lost, config),
-            ])}
-          />
-        </div>
-      )}
-    </section>
-  )
-}
-
-function PressPicker({ presses, value, onChange }: { presses: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="rounded-md border border-input bg-background px-2 py-1 text-xs">
-      <option value="all">All work centers</option>
-      {presses.map((p) => (
-        <option key={p} value={p}>
-          {p}
-        </option>
-      ))}
-    </select>
-  )
-}
-
-/** `fit`: tablo içeriği kadar geniş, sayfayı boydan boya kaplamaz. */
-function SimpleTable({ head, rows, fit }: { head: string[]; rows: ReactNode[][]; fit?: boolean }) {
-  if (!rows.length) return <p className="mt-2 text-xs text-muted-foreground">Nothing for this week.</p>
-  return (
-    <div className={`mt-2 max-h-[28rem] overflow-auto rounded-md border border-border ${fit ? 'w-fit max-w-full' : ''}`}>
-      <table className={`${fit ? 'w-auto' : 'w-full'} text-xs`}>
-        <thead className="sticky top-0 bg-muted text-muted-foreground">
-          <tr>
-            {head.map((h) => (
-              <th key={h} className={`px-2 py-1.5 text-left font-medium whitespace-nowrap ${fit ? 'pr-4' : ''}`}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="border-t border-border align-top">
-              {r.map((c, j) => (
-                <td
-                  key={j}
-                  className={`px-2 py-1 ${j === 0 ? 'whitespace-nowrap font-medium text-foreground' : 'tabular-nums'} ${fit ? 'pr-4' : ''} ${fit && j < r.length - 1 ? 'whitespace-nowrap' : ''}`}
-                >
-                  {c}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function Section({ title, note, info, flush, children }: { title: string; note?: string; info?: string; flush?: boolean; children: ReactNode }) {
-  return (
-    <section className={`print-avoid-break ${flush ? '' : 'mt-6'} rounded-lg border border-border p-4`}>
-      <h2 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold text-foreground">
-        {title}
-        {note && <span className="text-xs font-normal text-muted-foreground">{note}</span>}
-        {info && <InfoTip label={title}>{info}</InfoTip>}
-      </h2>
-      <div className="mt-2">{children}</div>
-    </section>
   )
 }

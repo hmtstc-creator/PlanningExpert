@@ -699,6 +699,30 @@ export function lossBreakdown(times: OeeTimes, lossDays: LossDay[], c: OeeConfig
   return { loadingMin: times.loadingMin, groups, counts, chart, oee: oeeOf(times) }
 }
 
+/** Kayıp grubunun (Reason Code 2) grafik sütunu; ayarda yoksa "Unassigned". */
+export const lossColumnOf = (rc2: string, c: OeeConfig) => c.lossGroups.find((g) => g.code === rc2)?.chart || UNASSIGNED
+
+/**
+ * Bir kayıp sütununun alt kayıpları: kayıp sayılan duruşların metni (ör. STP →
+ * DIE SETUP, GRIPPER SETUP …), dakika ve adet (Losses Trend, 2026-10-20).
+ * Speed'in alt kaybı yoktur (Production − Operation).
+ */
+export function subLosses(lossDays: LossDay[], c: OeeConfig, column: string): Map<string, { minutes: number; count: number }> {
+  const out = new Map<string, { minutes: number; count: number }>()
+  for (const d of lossDays) {
+    for (const [k, [m, n]] of Object.entries(d.reasons)) {
+      const [rc1, rc2, ...rest] = k.split('|')
+      if (!c.lossReasonCodes.includes(rc1) || lossColumnOf(rc2, c) !== column) continue
+      const text = rest.join('|') || rc2
+      const row = out.get(text) ?? { minutes: 0, count: 0 }
+      row.minutes += m
+      row.count += n
+      out.set(text, row)
+    }
+  }
+  return out
+}
+
 /** Grafik sütununun Loading'e oranı (0–1). */
 export const chartShare = (b: LossBreakdown, col: string) => (b.loadingMin > 0 ? (b.chart[col] ?? 0) / b.loadingMin : 0)
 
