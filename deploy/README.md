@@ -53,6 +53,19 @@ sunucuda: `deploy/.env` ve `/etc/planningexpert/portal.env` (ikisi de `chmod 600
 
 Önce GitHub'da o commit'in CI'ı (`verify`: tip + test + build) **yeşil** olmalı.
 
+Tek komut (2026-10-20'den beri; sunucudaki Claude oturumunda bu betiğe kalıcı izin
+verilir, her adım için onay istenmez):
+
+```bash
+/opt/planningexpert/scripts/deploy.sh          # main'de yeni commit yoksa bir şey yapmaz
+/opt/planningexpert/scripts/deploy.sh --force  # yine de yeniden yayınla
+```
+
+Betik sırayla: bellek ≥ 1 GB değilse durur → `main`'i ileri sarar (ff-only) →
+`portal.env` → `SKIP_LOCAL_VERIFY=1 ./scripts/release.sh` (aşağıda) → yedekleri
+`chmod 600` → `restart web` → yerel / Funnel 200, kapsayıcılar, backend restart / OOM,
+bellek, Karabasan kapsayıcı sayısı. Gizli değerler çıktıda maskelenir. Elle aynısı:
+
 ```bash
 cd /opt/planningexpert
 free -m                                    # kullanılabilir ≥ 1 GB + derleme payı
