@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 // docs/wiki bütünlüğü: dizin her sayfayı listeler, bütün göreli bağlantılar çalışır,
-// her sayfada "Son güncelleme" satırı vardır. Wiki, yeni sohbet açılmadığı için
+// her sayfada "Son güncelleme" satırı vardır. Wiki, oturumlar arası
 // programın kalıcı hafızasıdır (docs/wiki/README.md).
 
 const WIKI = join(process.cwd(), 'docs/wiki')
