@@ -5,7 +5,7 @@ gelince ilk bakılan yer burasıdır. Burası dağınık belgelerin (`docs/*.md`
 sitedeki *Planning Logic*) yerine geçmez; hepsine **yön gösterir** ve konuşmalarda alınan
 kararları, öğrenilenleri ve sürüm geçmişini tek yerde toplar.
 
-> Son güncelleme: 2026-10-22 · main `af3a041` (PR #21)
+> Son güncelleme: 2026-10-22 · main `f905340` (PR #22)
 
 ## Nereden başlamalı
 

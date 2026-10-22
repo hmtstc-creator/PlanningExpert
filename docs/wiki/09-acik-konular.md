@@ -17,7 +17,6 @@
 - **Lot bölme Min. lotun altına inmez** (r8 "tam rulo **ya da** ≥ Min. lot" izin verse de bölme muhafazakârdır). Min. lotlu parçalarda bölme hiç denenmez.
 - **WebSocket yedek modunun kök nedeni sunucuda doğrulanamadı** (zayıf mobil sinyal ya da yayın sonrası meşgul sunucu olası). PR #20 geri dönüşü ve ölçüm satırını ekledi; tekrar ederse *Live data check* değeri istenir.
 - **Sunucu oturumuna mesaj gönderilemez** (bulut oturumundan): yayın zamanlayıcıdadır; sunucu oturumu yalnızca gözlemci / işletmendir.
-- **İlk otomatik silme:** birleşen PR'ın dalını silen iş akışı yalnızca tek seferlik temizlikte gözlemlendi; bir sonraki PR'da `on-merge` işinin çalıştığı doğrulanmalı.
 - **Losses Trend'den çıkan setup analizi** ayrı bir sayfa olarak istenirse yeniden eklenecek (PR #12 notu).
 - **Sabit sayılar** (`docs/fixeddefinitions.md`): bazıları hâlâ kodda; kullanıcı ayarına taşınması tartışılacak.
 
