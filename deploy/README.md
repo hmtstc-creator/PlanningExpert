@@ -63,7 +63,7 @@ zamanlayıcı ilk elle yayında kendiliğinden açılır.
 
 **Güvenlik:** `deploy.sh` `deploy/systemd/planningexpert-*` birimlerini **root** olarak
 kurar ve `main`'deki her commit otomatik yayınlanır. Bu yüzden `main`'e yazma yetkisi
-sınırlı tutulmalı ve GitHub'da branch protection açık olmalı (PR + `verify` zorunlu).
+sınırlı tutulmalıdır; `main` GitHub'da ruleset ile korunur (PR + `verify` zorunlu; bkz. `docs/wiki/05-yayin-ve-isletim.md`).
 
 ```bash
 systemctl list-timers planningexpert-autodeploy.timer   # sonraki kontrol

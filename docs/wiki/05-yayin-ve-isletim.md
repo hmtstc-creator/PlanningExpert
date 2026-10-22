@@ -37,7 +37,7 @@ Geri yükleme provası ayda bir (`deploy/README.md`). Şirket bazında dışa ak
 
 ## Güvenlik notları
 
-- Yayın otomatik olduğu için **GitHub'da `main` için branch protection açılmalı** (PR + `verify` zorunlu) — bkz. [09](09-acik-konular.md).
+- Yayın otomatik olduğu için `main` **ruleset ile korunur** (2026-10-22, *Settings → Rules → Rulesets → `main koruması`*, bypass listesi boş): silme ve force push yasak, doğrusal geçmiş, PR zorunlu (0 onay — tek kişi kendi PR'ını onaylayamaz), yalnız **squash**, `verify` yeşil olmalı (*up to date* zorunlu değil). Doğrudan `main`'e push reddedilir; her şey dal → PR → CI yoluyla girer.
 - Sunucudaki Claude oturumunun kalıcı izni yalnızca `deploy.sh` ve ilgili mesajlaşma içindir. Bulut oturumu sunucu oturumuna mesaj **gönderemez**
   (güvenilmeyen cihaz kuralı); sunucu bulut oturumuna yazabilir. Bu yüzden yayın zamanlayıcıya bırakıldı.
 - Gizli değerler (jeton, anahtar, parola) çıktıya, commit'e, PR'a yazılmaz.
