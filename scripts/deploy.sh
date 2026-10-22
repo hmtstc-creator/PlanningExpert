@@ -43,6 +43,14 @@ install_units() {
 }
 
 main() {
+  # Tek yayın: elle çalıştırma ve otomatik zamanlayıcı aynı kilidi alır. İlk
+  # kurulumda `enable --now` zamanlayıcıyı hemen tetikler; o ikinci çalıştırma
+  # burada sessizce çıkar (2026-10-22: iki yayın paralel koştu, biri yedekte kaldı).
+  exec 9>/run/planningexpert-deploy.lock
+  if ! flock -n 9; then
+    echo "another deploy is running — nothing to do."
+    exit 0
+  fi
   local force=0
   [ "${1:-}" = "--force" ] && force=1
   cd "$(dirname "$0")/.."
