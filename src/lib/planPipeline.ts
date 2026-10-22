@@ -1367,13 +1367,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
 
   const lateCount = result.jobs.filter((j) => j.late).length
   const lateMaterialCount = new Set(result.jobs.filter((j) => j.late).map((j) => j.material)).size
-  // Acil hammadde: stoğun (ve yoldan gelenin) yetmediği ilk iş önümüzdeki
-  // RAW_URGENT_DAYS İŞ GÜNÜ içinde başlıyor (bugün dahil). Diğer eksikler Raw
-  // Material Coverage'da izlenir.
+  // Acil hammadde: stoğun (ve yoldan gelenin) yetmediği ilk işin sacı
+  // önümüzdeki RAW_URGENT_DAYS İŞ GÜNÜ içinde GEREKİYOR (bugün dahil). Öne
+  // çekilmiş işte bu, planlanan gün değil lotun ihtiyaç günüdür: mamul stoğu
+  // yetiyorsa iş bekleyebilir. Diğer eksikler Raw Material Coverage'da izlenir.
   let rawUrgentUntil = todayIso
   const rawUrgentDays = Math.max(1, Math.round(s.rawUrgentDays ?? SETTINGS_DEFAULTS.rawUrgentDays))
   for (let n = isWorkingDate(todayIso) ? 1 : 0; n < rawUrgentDays; n++) rawUrgentUntil = nextWorkingDate(rawUrgentUntil)
-  const rawShortages = rawNeeds.filter((r) => !!r.shortFrom && r.shortFrom.date <= rawUrgentUntil).length
+  const rawShortages = rawNeeds.filter((r) => !!r.shortFrom && r.shortFrom.needDate <= rawUrgentUntil).length
   const warnings = buildWarnings({
     inputs,
     holidayCount: holidays.size,
