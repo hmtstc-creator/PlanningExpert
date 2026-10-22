@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #29 | 2026-10-22 | Organization map açılınca "Something went wrong" (React #185) düzeltildi: boş sorgu sonuçları için sabit dizi; `OrgMap.test.tsx` | `useQuery(...) ?? []` her çizimde yeni dizi üretiyordu → graph → `setNodes` → sonsuz döngü (Structure görünümünde users/groups hep `skip`) |
 | #27 | 2026-10-22 | **Organization map** (`/admin/map`, yalnız General): yapı (holding → … → work center) ve bir şirketin kullanıcı / grupları sonsuz tuvalde; sürükle-bırakla şirket → holding, masraf yeri → bölüm, kullanıcı → grup, grup → plant; kırmızı çerçeve + "To fix" listesi. Yeni bağımlılık `@xyflow/react` 12.10.0 | Eski ağaç sayfasında aynı adlı plant'ler ve bağsız kayıtlar gözden kaçıyordu. Şema değişmedi, eski mutation'lar kullanılır; eski sayfalar harita netleşince silinecek → `docs/board.md` |
 | #26 | 2026-10-22 | `main` ruleset ile korundu (PR + `verify` zorunlu, squash, force push / silme yasak); açık konudan çıktı | Yayın otomatik; main'e giren her şey ~5 dk sonra canlı → [05](05-yayin-ve-isletim.md) |
 | #24 | 2026-10-22 | Wiki: #22 sürüm günlüğüne işlendi; otomatik dal silme açık konulardan çıktı | Devir adımı (docs PR) → [09](09-acik-konular.md) |
