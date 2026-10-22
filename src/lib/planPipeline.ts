@@ -301,7 +301,13 @@ export interface LateItem {
   /** İlk geç lotun teslim anı ("Tue 29 Sep 08:00"). */
   deadline: string
   ready: string
+  /** İlk geç lotun teslim anına kadar gereken adet (ZPP günlük talebinin birikimi). */
   neededQuantity: number
+  /** Bu adedin teslim anında hazır olan kısmı; geri kalanı gecikmeli gelir. */
+  onTimeQty?: number
+  /** Tüm geç lotlarda gecikmeli gelecek toplam adet. */
+  lateQty?: number
+  /** Son gereken parçanın gecikmesi (saat). */
   lateHours: number
   /** @deprecated Eski planlar için; ekran `why` ve `calc` gösterir. */
   suggestion: string
@@ -326,6 +332,14 @@ export interface LateCalc {
   now: string
   /** Bu lotun gecikmesi = hazır − teslim (saat). Kalemin `lateHours`'u lotların en büyüğüdür. */
   lateHours: number
+  /**
+   * Teslim anında hazır olan pay: gereken adedin `onTimeQty`'si zamanında,
+   * kalan `lateQty` gecikmeli gelir. Gecikmeli parçaların ortalama ve son
+   * gecikmesi (saat); `lateHours` son parçanın gecikmesidir.
+   */
+  onTimeQty: number
+  lateQty: number
+  avgLateHours: number
   setupMinutes: number
   qualityMinutes: number
   /** Teslim anına kadar gereken adedin üretim süresi (dk). */
@@ -1442,6 +1456,56 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       return a + Math.max(0, seg.end - (seg.date === todayIso ? Math.max(seg.start, nowNet) : seg.start))
     }, 0)
 
+  /**
+   * Gereken adedin teslim anında hazır olan payı. Üretim, işin üretim
+   * parçaları boyunca düzgün akar (adet ∝ üretim dakikası); setup ve onay
+   * adet vermez. Gecikmeli parçaların ortalaması, gereken adedin gecikmeli
+   * kısmından örneklenerek bulunur.
+   */
+  const lateShare = (job: ScheduledJob) => {
+    const needed = job.neededQuantity ?? job.quantity
+    const runs = (job.segments ?? []).filter((seg) => seg.kind === 'run' && seg.end > seg.start)
+    const totalRun = runs.reduce((a, seg) => a + (seg.end - seg.start), 0)
+    if (!job.deadlineDate || job.deadlineMinute === undefined || totalRun <= 0 || needed <= 0 || job.quantity <= 0) return undefined
+    const deadline = clockTs(job.deadlineDate, netToClock(job.deadlineMinute, fullDay))
+    const dayOf = (date: string) => pressDayOf(job.press, date)
+    // Teslim anına kadar üretilen net dakika.
+    let doneMin = 0
+    for (const seg of runs) {
+      const day = dayOf(seg.date)
+      const startTs = clockTs(seg.date, netToClock(seg.start, day))
+      if (deadline <= startTs) continue
+      const net = clockToNet((deadline - Date.parse(`${seg.date}T00:00:00Z`)) / 60_000, day)
+      doneMin += Math.max(0, Math.min(seg.end, net) - seg.start)
+    }
+    const perMin = job.quantity / totalRun
+    const onTimeQty = Math.min(needed, Math.round(doneMin * perMin))
+    // p. parçanın hazır olduğu an: üretim dakikası p/perMin.
+    const readyTsOf = (pieces: number) => {
+      let left = pieces / perMin
+      for (const seg of runs) {
+        const len = seg.end - seg.start
+        if (left <= len + 1e-9) return clockTs(seg.date, netToClock(seg.start + left, dayOf(seg.date)))
+        left -= len
+      }
+      const last = runs[runs.length - 1]
+      return clockTs(last.date, netToClock(last.end, dayOf(last.date)))
+    }
+    const lateQty = Math.max(0, needed - onTimeQty)
+    const samples = 12
+    let sum = 0
+    for (let i = 0; i < samples; i++) {
+      const p = onTimeQty + ((i + 0.5) / samples) * lateQty
+      sum += Math.max(0, readyTsOf(p) - deadline) / 3_600_000
+    }
+    return {
+      needed,
+      onTimeQty,
+      lateQty,
+      avgLateHours: lateQty > 0 ? Math.round((sum / samples) * 10) / 10 : 0,
+    }
+  }
+
   // Planlamacının öne aldığı ya da prese sabitlediği malzemeler (Plan overrides).
   const overridden = new Set(inputs.overrides.filter((o) => o.kind === 'priority' || o.kind === 'pin').map((o) => o.material))
   const explainLate = (job: ScheduledJob): { why: string[]; calc: LateCalc } | undefined => {
@@ -1453,6 +1517,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     const start = setupTs(job)
     const ready = clockTs(job.readyDate, netToClock(job.readyMinute, pressDayOf(job.press, job.readyDate)))
     const deadline = dueTs(job)
+    const share = lateShare(job)
     const off = Math.max(0, (ready - start) / 60_000 - ownMinutes)
     const toDeadline = (deadline - nowTs) / 3_600_000
     // Aynı preste bu işten önce başlayan ve henüz bitmemiş işler.
@@ -1471,12 +1536,37 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     const sumOf = (kind: string) => before.filter((b) => b.kind === kind)
     const hoursOf = (list: typeof before) => Math.round(list.reduce((a, b) => a + b.hours, 0) * 10) / 10
 
+    // Setup başlangıcından teslim anına bu preste üretim yapılabilen net süre.
+    let availMin = 0
+    if (job.deadlineDate && job.deadlineMinute !== undefined) {
+      const deadlineClock = netToClock(job.deadlineMinute, fullDay)
+      for (let d = job.date; d <= job.deadlineDate; d = isoDate(addDays(new Date(`${d}T00:00:00`), 1))) {
+        const day = pressDayOf(job.press, d)
+        const from = d === job.date ? job.setupStartMinute : 0
+        const to = d === job.deadlineDate ? clockToNet(deadlineClock, day) : day.netMinutes
+        availMin += Math.max(0, to - from)
+      }
+    }
     const why: string[] = []
+    if (share && share.lateQty > 0) {
+      const pct = (q: number) => `${Math.round((q / share.needed) * 100)}%`
+      why.push(
+        `${pct(share.onTimeQty)} (${share.onTimeQty.toLocaleString('en-GB')} of ${share.needed.toLocaleString('en-GB')} pcs) of what is needed by ${tsLabel(deadline)} is ready on time; ` +
+          `the other ${pct(share.lateQty)} (${share.lateQty.toLocaleString('en-GB')} pcs) arrive ${share.avgLateHours} h late on average, the last one ${Math.round(((ready - deadline) / 3_600_000) * 10) / 10} h late.`,
+      )
+    }
+    const noRoom = deadline > nowTs && start < deadline && availMin < ownMinutes - 1
     if (deadline <= nowTs) {
       why.push(`Already due when the plan was calculated (${tsLabel(nowTs)}): the stock did not cover ${tsLabel(deadline)} — backlog or a need before today.`)
     } else if (ownMinutes / 60 > toDeadline) {
       why.push(
         `Cannot be ready in time even if started now: setup + approval + production of ${needed.toLocaleString('en-GB')} pcs need ${h1(ownMinutes)} h of press time, only ${Math.round(toDeadline * 10) / 10} h are left until the deadline.`,
+      )
+    }
+    if (noRoom) {
+      why.push(
+        `Not enough press time before the deadline: from the setup start to ${tsLabel(deadline)} ${job.press} has ${h1(availMin)} h of production time; ` +
+          `setup + approval + production of the needed ${needed.toLocaleString('en-GB')} pcs take ${h1(ownMinutes)} h — short by ${h1(ownMinutes - availMin)} h.`,
       )
     }
     if (beforeHours > 0) {
@@ -1492,7 +1582,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       }
     }
     if (job.waitReason) why.push(`The press waited before the setup: ${job.waitReason}.`)
-    if (off >= 1) why.push(`${h1(off)} h between setup start and ready the press is not working (no shift, weekend, breaks — Work Calendar).`)
+    if (off >= 1 && !noRoom) why.push(`${h1(off)} h between setup start and ready the press is not working (no shift, weekend, breaks — Work Calendar).`)
     if (capacityFactor < 1) why.push(`Capacity factor ${Math.round(capacityFactor * 100)}%: every day is planned with less time than the shifts give.`)
     if (why.length === 0) why.push(`Setup starts ${tsLabel(start)}; production needs ${h1(ownMinutes)} h, so the needed quantity is ready ${tsLabel(ready)}.`)
 
@@ -1505,6 +1595,9 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         deadline: tsLabel(deadline),
         now: tsLabel(nowTs),
         lateHours: Math.round(((ready - deadline) / 3_600_000) * 10) / 10,
+        onTimeQty: share?.onTimeQty ?? 0,
+        lateQty: share?.lateQty ?? needed,
+        avgLateHours: share?.avgLateHours ?? Math.round(((ready - deadline) / 3_600_000) * 10) / 10,
         setupMinutes: Math.round(job.setupMinutes),
         qualityMinutes: Math.round(job.qualityApprovalMinutes),
         runMinutes: Math.round(runNeeded),
@@ -1542,7 +1635,13 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         lots: list.length,
         deadline: first.deadlineLabel ?? first.dueDate,
         ready: first.readyDate ?? first.date,
-        neededQuantity: list.reduce((a, j) => a + (j.neededQuantity ?? j.quantity), 0),
+        neededQuantity: first.neededQuantity ?? first.quantity,
+        ...(explained
+          ? {
+              onTimeQty: explained.calc.onTimeQty,
+              lateQty: sorted.reduce((a, j) => a + (lateShare(j)?.lateQty ?? j.neededQuantity ?? j.quantity), 0),
+            }
+          : {}),
         lateHours: Math.round(maxLate * 10) / 10,
         suggestion:
           `≈${Math.round(maxLate * 10) / 10} h more on ${presses.join('/')} before ${first.deadlineLabel ?? first.dueDate}: ` +

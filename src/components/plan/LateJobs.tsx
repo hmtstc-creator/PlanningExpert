@@ -95,6 +95,20 @@ function lateText(hours: number): string {
   return hours >= 24 ? `${h} h (${(hours / 24).toFixed(1)} days)` : `${h} h`
 }
 
+const pcsText = (n: number) => Math.round(n).toLocaleString('en-GB')
+/** Gereken adedin teslim anında hazır olan payı: "85% (5,100 pcs)". */
+function onTimeText(item: LateItem): string {
+  if (item.onTimeQty === undefined || item.neededQuantity <= 0) return '—'
+  return `${Math.round((item.onTimeQty / item.neededQuantity) * 100)}% (${pcsText(item.onTimeQty)} pcs)`
+}
+/** Gecikmeli gelen pay: "15% (900 pcs) · avg 0.8 h, last 1.5 h". */
+function lateShareText(item: LateItem): string {
+  const qty = item.calc?.lateQty ?? item.neededQuantity
+  const pct = item.neededQuantity > 0 ? Math.round((qty / item.neededQuantity) * 100) : 100
+  const avg = item.calc && item.calc.avgLateHours > 0 ? `avg ${lateText(item.calc.avgLateHours)}, ` : ''
+  return `${pct}% (${pcsText(qty)} pcs) · ${avg}last ${lateText(item.lateHours)}`
+}
+
 /**
  * Malzeme bazında geç liste: ihtiyaç günü sabah 08:00'e kadar gereken adet
  * hazır olmuyorsa geçtir. Bir malzeme bir kez yazılır (ilk geç lotu). Her
@@ -130,12 +144,15 @@ function LateItemsBody({ items, repair }: { items: LateItem[]; repair: PlanRun['
               <li key={item.material} className="rounded-md border border-destructive/30 bg-background p-3 text-sm">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="font-medium text-foreground">{item.material}</span>
-                  <span className="whitespace-nowrap font-medium text-destructive">{lateText(item.lateHours)}</span>
+                  <span className="whitespace-nowrap font-medium text-destructive">last {lateText(item.lateHours)} late</span>
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {item.presses.join(', ')}
                   {item.lots > 1 && ` · ${item.lots} late lots`} · {item.neededQuantity.toLocaleString('en-GB')} pcs needed by{' '}
-                  {item.deadline} · ready {item.calc?.ready ?? item.ready}
+                  {item.deadline}
+                </p>
+                <p className="mt-1 text-xs text-foreground">
+                  On time: <b>{onTimeText(item)}</b> · Late: <b className="text-destructive">{lateShareText(item)}</b>
                 </p>
                 {item.why && (
                   <ul className="mt-2 list-disc space-y-0.5 pl-4 text-xs text-foreground">
@@ -173,8 +190,8 @@ function LateItemsBody({ items, repair }: { items: LateItem[]; repair: PlanRun['
                 <th className="px-3 py-2 font-medium">Material</th>
                 <th className="px-3 py-2 font-medium">Needed by</th>
                 <th className="px-3 py-2 text-right font-medium">Needed qty</th>
-                <th className="px-3 py-2 font-medium">Ready</th>
-                <th className="px-3 py-2 font-medium">Late</th>
+                <th className="px-3 py-2 font-medium">On time</th>
+                <th className="px-3 py-2 font-medium">Late share</th>
                 <th className="px-3 py-2 font-medium">Why late</th>
               </tr>
             </thead>
@@ -199,9 +216,14 @@ function LateItemsBody({ items, repair }: { items: LateItem[]; repair: PlanRun['
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
                         {item.neededQuantity.toLocaleString('en-GB')}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.calc?.ready ?? item.ready}</td>
-                      <td className="whitespace-nowrap px-3 py-2 font-medium text-destructive">
-                        {lateText(item.lateHours)}
+                      <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{onTimeText(item)}</td>
+                      <td className="px-3 py-2 font-medium text-destructive">
+                        {lateShareText(item)}
+                        {item.lots > 1 && item.lateQty !== undefined && (
+                          <span className="block text-xs font-normal text-muted-foreground">
+                            {pcsText(item.lateQty)} pcs late in all {item.lots} lots
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-xs text-foreground">
                         {item.why ? (
@@ -253,13 +275,17 @@ function LateCalcView({ item, calc }: { item: LateItem; calc: LateCalc }) {
           </li>
           {calc.pressOffHours > 0 && <li>+ {calc.pressOffHours} h with the press not working (no shift, weekend, breaks).</li>}
           <li>
-            Needed quantity ready: <b className="text-foreground">{calc.ready}</b>.
+            At the deadline <b className="text-foreground">{pcsText(calc.onTimeQty)} of {pcsText(calc.neededQuantity)} pcs</b> are ready
+            ({calc.neededQuantity > 0 ? Math.round((calc.onTimeQty / calc.neededQuantity) * 100) : 0}% on time); the other{' '}
+            {pcsText(calc.lateQty)} pcs follow while the press runs. All needed pieces ready:{' '}
+            <b className="text-foreground">{calc.ready}</b>.
           </li>
           <li>
             Needed by: <b className="text-foreground">{calc.deadline}</b>.
           </li>
           <li>
-            Late = ready − needed by = <b className="text-destructive">{lateText(calc.lateHours)}</b>.
+            Last needed piece late = ready − needed by = <b className="text-destructive">{lateText(calc.lateHours)}</b>
+            {calc.avgLateHours > 0 && <> (the late pieces are {lateText(calc.avgLateHours)} late on average)</>}.
             {item.lots > 1 && item.lateHours > calc.lateHours && ` The worst of its ${item.lots} late lots is ${lateText(item.lateHours)}.`}
           </li>
         </ol>
