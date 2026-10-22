@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #26 | 2026-10-22 | `main` ruleset ile korundu (PR + `verify` zorunlu, squash, force push / silme yasak); açık konudan çıktı | Yayın otomatik; main'e giren her şey ~5 dk sonra canlı → [05](05-yayin-ve-isletim.md) |
 | #24 | 2026-10-22 | Wiki: #22 sürüm günlüğüne işlendi; otomatik dal silme açık konulardan çıktı | Devir adımı (docs PR) → [09](09-acik-konular.md) |
 | #23 | 2026-10-22 | **Token tasarrufu:** bir iş = bir oturum, `/yeni-is` ve `/devir` skill'leri, büyük dosya listesi, `.claude/settings.json` ile üretilmiş / ağır dosyaları okuma yasağı | Tek sohbet 563k / 1M token'a çıkmıştı → [07](07-calisma-sozlesmesi.md) |
 | #22 | 2026-10-22 | **Wiki** (`docs/wiki`), mimari etki kontrolü, `architecture.test.ts` ve `wiki.test.ts` | Yeni sohbet açılmayacağı için kalıcı hafıza; **birleşen PR dalının otomatik silinmesi ilk kez gerçek PR'da doğrulandı** (`claude/wiki` birleşmeden hemen sonra silindi) → [07](07-calisma-sozlesmesi.md) |

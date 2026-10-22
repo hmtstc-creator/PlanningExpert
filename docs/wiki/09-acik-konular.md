@@ -6,15 +6,14 @@
 
 | Konu | Ne | Neden |
 |---|---|---|
-| **Branch protection** | GitHub → Settings → Branches → `main` için *Require a pull request* + *Require status checks: verify* | Yayın otomatik; main'e giren her şey ~5 dk sonra canlı. `deploy.sh` birimleri **root** kurar |
 | Gerçek veride lot bölme | Yayından sonra planı yeniden hesaplat; plan kontrolünde *Lots split…* satırına bak | Testler küçük senaryo; gerçek 30.000'lik lot davranışı doğrulanmadı |
 | Gerçek veride geç iş payı | Overview → Late materials → *On time / Late share* ve *Why late* sayılarını bir örnekte elle doğrula | Yeni tanım ([03](03-gec-is-tanimi.md)) |
 | Tedarik süreleri | Raw Material Coverage → *Lead times* tablosunu doldur (varsayılan 14 gün tahmindir) | Girilmeyen sac varsayılanı kullanır, "not entered" görünür |
 
 ## Devam
 
-- **Yarım iş yok.** main `fef0b72`, açık PR yok, açık dal yok (yalnız `main`).
-- **Sıradaki adım:** yukarıdaki kullanıcı doğrulamaları (branch protection, gerçek veride lot bölme ve geç iş payı, tedarik süreleri). Sonuç / sorun gelirse yeni oturumda ele alınır.
+- **Yarım iş yok.** `main` ruleset ile korunuyor (bkz. [05](05-yayin-ve-isletim.md)); açık PR / dal yok.
+- **Sıradaki adım:** yukarıdaki kullanıcı doğrulamaları (gerçek veride lot bölme ve geç iş payı, tedarik süreleri). Sonuç / sorun gelirse yeni oturumda ele alınır.
 - **Dikkat edilecek yerler:** lot bölme `src/lib/planPipeline.ts` `planOnce` (satır ~899) ve yerel arama "Lot bölme" bloğu (~1264), `splitLot` `src/lib/scheduler.ts` (~176);
   geç iş payı `lateShare` (~1465), `explainLate` (~1511), `lateItems` (~1622). Satır numaraları kayabilir; `grep` ile bul.
 
