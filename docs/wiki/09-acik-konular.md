@@ -16,6 +16,7 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 - **Yarım iş yok.** `main` ruleset ile korunuyor (bkz. [05](05-yayin-ve-isletim.md)); açık PR / dal yok.
 - **Sıradaki adım:** Organization map (`/admin/map`) kullanıcıda denenir; sonraki adımlar `todolist.md` §1 *Organization map*. Kararlar (§0) bekler; iyileştirmeler todolist'ten tek tek yapılır.
+- **Organization map dosyaları:** kurallar ve yerleşim `src/lib/orgMap.ts` (`structureGraph`, `peopleGraph`, `dropAction`, `removeAction`), ekran `src/components/org/OrgMap.tsx` (`apply` = sunucu çağrıları), sayfa `src/routes/admin_.map.tsx`. Yol `admin_.map` düz dosya: `admin.tsx` Outlet çizmediği için iç içe olmamalı.
 - **Dikkat edilecek yerler:** lot bölme `src/lib/planPipeline.ts` `planOnce` (satır ~899) ve yerel arama "Lot bölme" bloğu (~1264), `splitLot` `src/lib/scheduler.ts` (~176);
   geç iş payı `lateShare` (~1465), `explainLate` (~1511), `lateItems` (~1622). Satır numaraları kayabilir; `grep` ile bul.
 
