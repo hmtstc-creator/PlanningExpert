@@ -55,7 +55,9 @@ okuduğu **tek yerdir**; kodla çelişmemeli, eksik kalmamalı.
 
 ## Yayın akışı
 
-- Dal → `npm run verify` → taslak PR → CI `verify` yeşil → squash merge. `main`'e doğrudan
+- Dal → `npm run verify` → taslak PR → CI `verify` yeşil → squash merge. **Birleştirmeyi Claude yapar**
+  (kullanıcı kararı 2026-10-22): CI yeşil ve açık yorum yoksa PR hazır yapılır ve squash merge edilir;
+  kullanıcıdan beklenmez. `main`'e doğrudan
   push yok. Birleşen PR'ın dalını GitHub iş akışı kendisi siler.
 - Yayın sunucuda `planningexpert-autodeploy.timer` ile otomatiktir (5 dakikada bir
   `scripts/deploy.sh`); elle çalıştırmak gerekmez. Ayrıntı: `deploy/README.md`.
