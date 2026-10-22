@@ -1,0 +1,43 @@
+# Birleştirilen PR'ın dalını siler (2026-10-22: temizlik elle yapılmasın).
+#  - pull_request closed + merged: o PR'ın dalı hemen silinir.
+#  - workflow_dispatch: geride kalmış, birleştirilmiş PR dalları bir kerede temizlenir.
+# Yalnızca bu depodaki dallar silinir; main ve açık PR'ı olan dallar silinmez.
+name: Delete merged branches
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  on-merge:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref != github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the merged branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ github.event.pull_request.head.ref }}
+        run: gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${REF}" || echo "already gone"
+
+  sweep:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete branches of merged PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          open=$(gh pr list -R "$REPO" --state open --json headRefName -q '.[].headRefName')
+          gh pr list -R "$REPO" --state merged --limit 200 --json headRefName,headRepositoryOwner,isCrossRepository -q '.[] | select(.isCrossRepository==false) | .headRefName' | sort -u | while read -r ref; do
+            [ -z "$ref" ] && continue
+            [ "$ref" = "$DEFAULT" ] && continue
+            if echo "$open" | grep -qx "$ref"; then echo "keep $ref (open PR)"; continue; fi
+            gh api -X DELETE "repos/$REPO/git/refs/heads/$ref" >/dev/null 2>&1 && echo "deleted $ref" || echo "skip $ref (not found)"
+          done
