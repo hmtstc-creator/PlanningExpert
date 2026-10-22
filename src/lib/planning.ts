@@ -130,6 +130,11 @@ export interface DemandEntry {
    * arkaya (artı) sıralanır. Teslim anı değişmez, yalnızca sıra.
    */
   orderShift?: number
+  /**
+   * Yerel arama lotu bölmüş: bu lot, tam rulo sınırında bölünmüş bir parçadır
+   * (`index` 1'den başlar). Parçalar arasına başka bir lot girebilir.
+   */
+  splitPart?: { index: number; of: number; label: string }
 }
 
 export interface DeliveryCheckpoint {

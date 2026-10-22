@@ -679,6 +679,18 @@ function PlanLogicPage() {
             back. Each move rebuilds the whole plan and is kept only if the plan
             gets better (at most 150 moves or one minute).
           </li>
+          <li>
+            <b>Lot split</b> (also local search): a long lot that runs before a late
+            part on the same work center — say 30,000 pcs — is cut in 2 or 3 parts so the late part
+            runs <i>between</i> them: 15,000, the late part, then the other 15,000.
+            Parts are always whole coils (a mounted coil is never cut), the first part covers
+            what is needed first (rounded up to whole coils), and a lot is not split if a part would
+            fall below the Min. lot. The part that covers no need is only coil surplus and
+            is planned as fill, so it no longer holds up urgent parts. The second part needs another
+            setup, so a split is kept only when it saves a late part; the plan marks the jobs{' '}
+            <i>"lot split 1/2"</i> and the plan check lists the lots that were split. A quantity
+            change on the chart applies to the whole lot.
+          </li>
         </ul>
       </section>
 
