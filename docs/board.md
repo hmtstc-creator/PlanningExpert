@@ -108,7 +108,7 @@ masraf yeri. Kural kodu: `src/lib/orgTree.ts` (+ test), sunucu:
 
 Administration → **Organization map** (`/admin/map`, yalnızca General): aynı
 ağaç sonsuz bir tuvalde, soldan sağa (Holding → … → Work center); ikinci
-görünümde seçilen şirketin **Plant ← Group ← User** bağları. Kaydırılır,
+görünümde seçilen şirketin **Company → Plant → Group → User** ağacı (kullanıcı grubunun altında; her plant'i gören grup doğrudan şirkete bağlı). Kaydırılır,
 yakınlaştırılır, düğüm açılıp kapanır (work center'lar başta kapalı), ad /
 kodla aranır; eksiği olan düğüm kırmızı çerçeveli ve sağdaki "To fix"
 listesinde (tıklayınca oraya gider).

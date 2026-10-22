@@ -89,9 +89,11 @@ describe('peopleGraph', () => {
   const g = peopleGraph(companies[0], users, groups)
   const node = (id: string) => g.nodes.find((n) => n.id === id)!
 
-  it('links groups to the plants they see and users to their groups', () => {
-    expect(g.edges.filter((e) => e.kind === 'access').map((e) => e.id).sort()).toEqual(['g:g1>p:p1', 'g:g2>p:p1', 'g:g2>p:p2'])
-    expect(g.edges.filter((e) => e.kind === 'member').map((e) => e.id)).toEqual(['u:u1>g:g1'])
+  it('reads left to right: plant → group → user; an all-plants group hangs from the company', () => {
+    expect(g.edges.filter((e) => e.kind === 'access').map((e) => e.id).sort()).toEqual(['c:c1>g:g2', 'p:p1>g:g1'])
+    expect(g.edges.filter((e) => e.kind === 'member').map((e) => e.id)).toEqual(['g:g1>u:u1'])
+    // Hiçbir kenar sağdan sola dönmez.
+    for (const e of g.edges) expect(node(e.source).x, e.id).toBeLessThan(node(e.target).x)
     expect(node('u:u2').warnings[0]).toContain('In no group')
     expect(node('u:u3').warnings).toEqual([])
   })
@@ -102,8 +104,9 @@ describe('peopleGraph', () => {
     expect(dropAction(node('u:u1'), node('g:g1'), ctx)).toBeNull()
     expect(dropAction(node('g:g1'), node('p:p2'), ctx)).toMatchObject({ kind: 'groupPlant', plantId: 'p2', add: true })
     expect(dropAction(node('g:g2'), node('p:p2'), ctx)).toBeNull()
-    const member = g.edges.find((e) => e.id === 'u:u1>g:g1')!
-    expect(removeAction(member, g.nodes, groups)).toMatchObject({ kind: 'userGroup', add: false })
-    expect(removeAction(g.edges.find((e) => e.id === 'g:g2>p:p1')!, g.nodes, groups)).toBeNull()
+    const member = g.edges.find((e) => e.id === 'g:g1>u:u1')!
+    expect(removeAction(member, g.nodes, groups)).toMatchObject({ kind: 'userGroup', userId: 'u1', groupId: 'g1', add: false })
+    expect(removeAction(g.edges.find((e) => e.id === 'p:p1>g:g1')!, g.nodes, groups)).toMatchObject({ kind: 'groupPlant', groupId: 'g1', plantId: 'p1', add: false })
+    expect(removeAction(g.edges.find((e) => e.id === 'c:c1>g:g2')!, g.nodes, groups)).toBeNull()
   })
 })
