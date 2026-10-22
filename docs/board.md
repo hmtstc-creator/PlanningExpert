@@ -104,6 +104,30 @@ aynı adlı iki plant, bölümsüz plant, masraf yeri olmayan bölüm, bölüms�
 masraf yeri. Kural kodu: `src/lib/orgTree.ts` (+ test), sunucu:
 `convex/platform.ts`.
 
+### Organization map (2026-10-22)
+
+Administration → **Organization map** (`/admin/map`, yalnızca General): aynı
+ağaç sonsuz bir tuvalde, soldan sağa (Holding → … → Work center); ikinci
+görünümde seçilen şirketin **Plant ← Group ← User** bağları. Kaydırılır,
+yakınlaştırılır, düğüm açılıp kapanır (work center'lar başta kapalı), ad /
+kodla aranır; eksiği olan düğüm kırmızı çerçeveli ve sağdaki "To fix"
+listesinde (tıklayınca oraya gider).
+
+Sürükle-bırak (her biri onay sorar, Platform history'ye yazılır; aynı
+mutation'lar, yetki sunucuda):
+
+| Sürüklenen → bırakılan | İşlem |
+|---|---|
+| Company → Holding | `platform.setCompanyHolding` (yalnızca General) |
+| Cost center → aynı plant'in Department'ı | `platform.updatePlant` (masraf yerinin bölümü) |
+| User → Group | `users.update` (grup eklenir) |
+| Group → Plant | `users.saveGroup` (plant eklenir; "all plants" grubu değişmez) |
+
+Kullanıcı / grup görünümünde bir çizgiye tıklamak o üyeliği ya da plant'i
+kaldırır. Ad değiştirme, ekleme, silme eski sayfalarda kalır; harita
+netleşince eski sayfalar kaldırılacak (todolist). Kural kodu:
+`src/lib/orgMap.ts` (+ test), ekran `src/components/org/OrgMap.tsx`.
+
 ## Sonra konuşulacak
 
 - Board Dashboard ve KPI kırılımında bölüm seviyesi (plant → bölüm → masraf

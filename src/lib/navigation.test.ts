@@ -6,7 +6,10 @@ import { BOARD_AREA, MODULE_AREAS, RELATED_PAGE_MAP, areaFor, areaLinks, nodeHas
 
 const depth = (n: NavNode): number => 1 + Math.max(0, ...(n.children ?? []).map(depth))
 const routeFile = (to: string) =>
-  ['.tsx', '/index.tsx'].some((ext) => existsSync(`src/routes${to}${ext}`)) || existsSync(`src/routes${to.replace(/\/$/, '')}.tsx`)
+  ['.tsx', '/index.tsx'].some((ext) => existsSync(`src/routes${to}${ext}`)) ||
+  existsSync(`src/routes${to.replace(/\/$/, '')}.tsx`) ||
+  // Düz dosya adı, üst sayfanın içine girmeyen yol: /admin/map → admin_.map.tsx
+  existsSync(`src/routes/${to.replace(/^\/|\/$/g, '').replace(/\//g, '_.')}.tsx`)
 
 describe('menü ağacı', () => {
   const areas = [...MODULE_AREAS, BOARD_AREA]

@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { CompanyUsers } from '../components/CompanyAdmin'
@@ -57,7 +57,14 @@ function AdminPage() {
         <Tabs tabs={tabs} value={tab} onChange={setTab} />
       </div>
       <div className="mt-4">
-        {tab === 'organization' && <OrgAdmin scope="admin" />}
+        {tab === 'organization' && (
+          <>
+            <Link to="/admin/map" className="inline-flex rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+              Open the organization map (visual, drag & drop) →
+            </Link>
+            <OrgAdmin scope="admin" />
+          </>
+        )}
         {tab === 'generals' && owner && (
           <section>
             <p className="text-xs text-muted-foreground">Generals see and manage every holding and company. Only the site owner adds or removes them.</p>

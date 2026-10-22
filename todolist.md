@@ -48,6 +48,20 @@ Holding → Company → Plant → Department → Cost center → Work center
   seç. Bağsız olanlar sayfanın üstünde ve ağaçta uyarı verir. OEE verisi
   başka bir masraf yeri gösteriyorsa satırda "OEE data: … · use" çıkar.
 - [ ] **[S]** "Things to finish" listesi boşalana kadar devam et.
+  En kolayı: Administration → **Organization map** (`/admin/map`) — kırmızı
+  çerçeveli düğümler ve sağdaki "To fix" listesi; şirketi holding'e, masraf
+  yerini bölüme sürükle.
+
+### Organization map — sonraki adımlar (2026-10-22)
+
+- [ ] **[S]** Haritayı kullan; eksik / yanlış görünen yeri yaz.
+- [ ] **[G]** Haritada ad değiştirme, ekleme (holding, şirket, plant, bölüm,
+  masraf yeri, grup, kullanıcı) ve silme — eski sayfaların işlerini taşımak.
+- [ ] **[G]** Work center'ı masraf yerine sürükleme (bugün Work Center
+  Definitions'ta; `presses.upsert` aktif plant ve tam kayıt istiyor).
+- [ ] **[G]** Haritayı creator'lara da açmak (Company settings, tek şirket).
+- [ ] **[G]** Harita yeterli olunca eski sayfaları (Holdings & companies
+  ağacı, Users & permissions) kaldırmak — kullanıcının onayıyla.
 
 ### Organizasyon teyidi (2026-10-03)
 
@@ -415,7 +429,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 ## OEE — Aksiyonlar sunumu (2026-10-14)
 
 - [x] ✅ 8 slaytın hepsi uygulandı; ayrıntı ve slayt × yapılan tablosu: docs/oeedashboard.md → "Aksiyonlar sunumu".
-- [ ] **[S]** Yayından sonra OEE veri yetkisiyle bir OEE sayfasını bir kez aç: eski duruşların süre histogramı kurulur (MTTR & MTBF'in yıl / 10 hafta tabloları bununla dolar).
+- [x] ✅ (2026-10-22, kullanıcı her gün açıyor) **[S]** Yayından sonra OEE veri yetkisiyle bir OEE sayfasını bir kez aç: eski duruşların süre histogramı kurulur (MTTR & MTBF'in yıl / 10 hafta tabloları bununla dolar).
 - [x] ✅ Bütün çıktılar "Save PDF" (2026-10-16): Chrome / Edge'de kayıt penceresi Masaüstünde, ad dolu açılır (docs/pdf.md). Firefox / Safari'de indirme klasörüne iner.
 - [ ] **[K]** Loss Bridge → "Pay Attention" bloğunun içeriği (şimdilik boş).
 

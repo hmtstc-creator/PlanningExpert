@@ -52,6 +52,7 @@ Hetzner VPS. Dış barındırma yok (Vercel / Convex Cloud kaldırıldı, 2026-1
 | Bağımsız doğrulama | `src/lib/planValidator.ts` (motorla kod paylaşmaz) |
 | Plan müdahaleleri | `convex/planOverrides.ts`, `convex/planJobLocks.ts` |
 | Yetki | `convex/guarded.ts`, `convex/tenancy.ts` |
+| Organizasyon ağacı ve haritası (`/admin`, `/admin/map`) | `src/lib/orgTree.ts`, `src/lib/orgMap.ts`, `convex/platform.ts`, `convex/users.ts` |
 | İstemci taşıma (WebSocket / HTTPS) | `src/lib/convexTransport.tsx` |
 | Yayın | `scripts/deploy.sh`, `scripts/release.sh`, `deploy/systemd/` |
 
