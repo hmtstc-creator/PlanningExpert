@@ -2,7 +2,7 @@
 
 > Son güncelleme: 2026-10-22 · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
 
-Yeni bir sohbet açılmadığı için bu sayfa her oturumun **ilk okuyacağı yerdir**.
+Hafıza wiki'de olduğu için her iş yeni bir oturumda başlayabilir; bu sayfa her oturumun **ilk okuyacağı yerdir**.
 
 ## Yeni talimat geldiğinde — uygulamadan ÖNCE (zorunlu)
 
@@ -35,9 +35,12 @@ Bir madde "hayır" ise **uygulama**; nedenini ve alternatifi kullanıcıya yaz. 
 - **Onay beklemeden ilerle** (planlamacı): proje için emin olunan iş yayına alınır; silinmesi gereken şeyleri kullanıcıya söyle.
   Yayın otomatiktir; birleştirmeden önce CI yeşil olmalı. Dışarıya dönük / geri alınamaz işlerde (silme, harici hizmet) yine dikkatli ol.
 - **Dil:** kullanıcıya Türkçe, kısa, madde madde; commit ve PR metinleri Türkçe.
-- **Token tasarrufu** (2026-10-22): basit / mekanik işler için küçük model ve düşük çaba; karmaşık işte (motor, mimari) güçlü model ve yüksek çaba.
-  Model değiştirmeyi oturum yapamaz; kullanıcı `/model` ile yapar. Gereksiz dosya okuma, tekrar özet ve uzun yanıt yok.
-- **Her şey yazılı:** yeni bir bilgi, karar ya da öğrenilen ders aynı gün wiki'ye girer (yeni sohbet olmayacak).
+- **Token tasarrufu** (2026-10-22, güncellendi): tek uzun sohbet 500k+ token'a çıktı (her tur bütün geçmiş yeniden
+  okunur). Kural artık: **bir iş = bir oturum**; iş bitince ya da bağlam ~%40'ı geçince `/devir` skill'i ile wiki
+  güncellenir ve yeni oturum açılır. Büyük dosyalar `grep` + parça parça okunur, test / build çıktısı `tail` ile
+  kısaltılır, geniş tarama `Explore` ajanına verilir. Ayrıntı ve büyük dosya listesi: `CLAUDE.md` → *Token tasarrufu*.
+  Basit / mekanik iş küçük model, motor ve mimari güçlü model (kullanıcı `/model` ile seçer).
+- **Her şey yazılı:** yeni bir bilgi, karar ya da öğrenilen ders aynı gün wiki'ye girer (sonraki oturum yalnız wiki'yi bilir).
 - Gizli değer yazılmaz; sunucuya doğrudan erişim yok (bulut oturumu sunucu oturumuna mesaj gönderemez).
 
 ## PR akışı

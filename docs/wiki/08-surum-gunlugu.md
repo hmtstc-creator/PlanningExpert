@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #23 | 2026-10-22 | **Token tasarrufu:** bir iş = bir oturum, `/yeni-is` ve `/devir` skill'leri, büyük dosya listesi, `.claude/settings.json` ile üretilmiş / ağır dosyaları okuma yasağı | Tek sohbet 563k / 1M token'a çıkmıştı → [07](07-calisma-sozlesmesi.md) |
 | #21 | 2026-10-22 | Geç iş: gereken adedin teslim anındaki payı (x% zamanında, kalanı gecikmeli; ortalama + son parça); *Why late*: "teslime kadar yeterli üretim süresi yok"; `CLAUDE.md` + CI denetimi: Planning Logic zorunlu güncelleme | Eskiden teslimde yarısı hazır olsa da tamamı "late" yazılıyordu; "Needed qty" birden çok lotun toplamıydı. Bağımsız doğrulayıcıyla aynı sayı → [03](03-gec-is-tanimi.md) |
 | #20 | 2026-10-22 | Bağlantı: yavaş WebSocket kalıcı yedek moda düşürmesin; Diagnostics çelişmesin | Deneme sorgusu 8 sn'de cevaplanmayınca oturum sonuna kadar HTTPS'te kalıyordu → [06](06-baglanti-ve-istemci.md) |
 | #19 | 2026-10-22 | Senaryo aramasında **lot bölme** (tam rulo; geç lot araya girer) | 100 senaryoda böyle bir deneme yoktu → [02](02-planlama-motoru.md) |

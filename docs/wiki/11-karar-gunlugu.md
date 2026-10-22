@@ -25,7 +25,8 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 - **Kilit betiğin içinde** — servis sarmalayıcısı elle çalıştırmayı korumuyordu.
 - **Birleşen PR dalı otomatik silinir (GitHub iş akışı)** — bulut oturumundan dal silinemiyor (izin sistemi).
 - **Her şey VPS'te** (2026-10-16) — Vercel / Convex Cloud kaldırıldı; veri ve yayın tek yerde.
-- **Wiki + CLAUDE.md + CI denetimleri** (2026-10-22) — yeni sohbet açılmayacağı için bilgi depoda kalıcı; mantık değişince sayfa güncellemesi ve mimari kural ihlali CI'da yakalanır.
+- **Bir iş = bir oturum** (2026-10-22) — tek uzun sohbet bağlamı 560k token'a çıkardı ve kullanım hızla doluyordu; bilgi zaten wiki'de olduğu için her iş yeni oturumda başlar, kapanışta `/devir` skill'i wiki'yi günceller.
+- **Wiki + CLAUDE.md + CI denetimleri** (2026-10-22) — oturumlar arası bilgi depoda kalıcı; mantık değişince sayfa güncellemesi ve mimari kural ihlali CI'da yakalanır.
 
 ## Arayüz
 

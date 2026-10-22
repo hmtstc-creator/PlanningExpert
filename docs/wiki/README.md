@@ -1,6 +1,6 @@
 # PlanningExpert Wiki
 
-Programın **kalıcı hafızası**. Yeni bir sohbet açılmaz; bir iş sürerken ya da yeni bir talimat
+Programın **kalıcı hafızası**. Her iş yeni bir oturumda başlar (token tasarrufu); bir iş sürerken ya da yeni bir talimat
 gelince ilk bakılan yer burasıdır. Burası dağınık belgelerin (`docs/*.md`, `deploy/README.md`,
 sitedeki *Planning Logic*) yerine geçmez; hepsine **yön gösterir** ve konuşmalarda alınan
 kararları, öğrenilenleri ve sürüm geçmişini tek yerde toplar.
