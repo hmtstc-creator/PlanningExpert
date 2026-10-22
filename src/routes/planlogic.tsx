@@ -601,8 +601,35 @@ function PlanLogicPage() {
         </p>
         <p className="mt-2 text-sm text-amber-900">
           Whatever is still late is listed on the Overview in red, <b>once per
-          material</b> (its first late lot): when it is needed, how many pieces,
-          when they are ready and how many hours late.
+          material</b> (its first late lot). <b>Late is a share, not a whole
+          order.</b> The ZPP daily need is the guide: every need day is a delivery
+          point, due at the delivery time ({current.cutoff}) with everything needed
+          up to that day (ZPP_DAILY on its own date; beyond it the weekly ZPP spread over
+          the working days; backlog and today's need are due the next day). At that moment
+          the engine counts what has already been pressed:
+        </p>
+        <ul className="mt-1 ml-5 list-disc space-y-1 text-sm text-amber-900">
+          <li>
+            <b>Needed qty</b> — what the customer needs by the first missed delivery point
+            (cumulative ZPP need, not the lot size: a 40 000 pcs lot that covers 8 days owes
+            only the first day's need at the first point).
+          </li>
+          <li>
+            <b>On time</b> — the share of it already ready at the delivery time. Pieces come
+            out evenly while the press runs (setup and approval give none), so a job that
+            started before the deadline has delivered part of the need.
+          </li>
+          <li>
+            <b>Late share</b> — the rest, with the <b>average</b> and the <b>last piece's</b>{' '}
+            delay: "15% (900 pcs) · avg 0.8 h, last 1.5 h". The last piece's delay is{' '}
+            <i>ready − delivery time</i>: if production starts 6 h after the delivery time and
+            takes j h, the whole need is complete 6 + j h late. The customer is fed from the
+            first pieces, so the average is closer to how long the line really waits.
+          </li>
+        </ul>
+        <p className="mt-2 text-sm text-amber-900">
+          The independent plan check (below) replays the same ZPP need hour by hour and reports
+          the same shortfall and recovery time, so the two always agree.
         </p>
         <p className="mt-2 text-sm text-amber-900">
           <b>Why late</b> gives the reasons found in the plan itself, the
@@ -626,9 +653,11 @@ function PlanLogicPage() {
         <p className="mt-2 text-sm text-amber-900">
           <b>How the hours are calculated</b> (tap the row): setup start → setup +
           quality approval + production of the needed pieces at the part's speed
-          (pieces per hour from SPM × cavities × performance) → hours the press is
-          off → ready time. Late = ready − needed by (delivery time on the need
-          day). Next to it are the inputs that decide it — demand and finished
+          (pieces per hour from SPM × cavities × performance) → pieces ready at the
+          delivery time (on time share) → ready time of the last needed piece. Last
+          piece late = ready − needed by (delivery time on the need day). When the press
+          cannot make it, <i>Why late</i> compares the production time the press has between
+          the setup start and the deadline with the time the needed pieces take. Next to it are the inputs that decide it — demand and finished
           stock, speed, setup and approval minutes, the shifts and delivery time —
           with links to where they are set. If one of them is wrong (e.g. a setup
           of 600 min instead of 60, a missing shift), the part only <i>looks</i> late:
