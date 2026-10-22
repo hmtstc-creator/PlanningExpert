@@ -18,6 +18,35 @@ describe('raw material MRP (plan independent)', () => {
     expect(plan.items[0].stockKg).toBe(1000)
   })
 
+  it('breaks the coil down per finished product: whose stock covers which weeks', () => {
+    const plan = buildRawRequirements({
+      products: [
+        { code: 'A', rawMaterialCode: 'R1', grossWeight: 1 },
+        { code: 'B', rawMaterialCode: 'R1', grossWeight: 2 },
+        { code: 'C', rawMaterialCode: 'R1', grossWeight: 1 },
+      ],
+      weeklyDemand: [
+        // A: stok 3 haftayı karşılıyor, ihtiyaç 4. haftada.
+        { material: 'A', periods: weeks.map((w) => ({ label: w.label, qty: -1000 })) },
+        // B: stok yok, ihtiyaç bu hafta.
+        { material: 'B', periods: [{ label: 'W39', qty: -100 }] },
+        // C: stok bütün talebi karşılıyor.
+        { material: 'C', periods: [{ label: 'W39', qty: -50 }] },
+      ],
+      finishedStock: new Map([['A', 3000], ['C', 500]]),
+      rawStock: new Map(),
+      weeks,
+    })
+    const item = plan.items[0]
+    // Bu haftanın 200 kg'ı B'den gelir, A'dan değil.
+    expect(item.needKg).toEqual([200, 0, 0, 1000])
+    expect(item.byProduct).toEqual([
+      { material: 'B', finishedStock: 0, firstNeedWeek: 0, firstNeedKg: 200, totalNeedKg: 200 },
+      { material: 'A', finishedStock: 3000, firstNeedWeek: 3, firstNeedKg: 1000, totalNeedKg: 1000 },
+      { material: 'C', finishedStock: 500, firstNeedWeek: -1, firstNeedKg: 0, totalNeedKg: 0 },
+    ])
+  })
+
   it('co-products: the pair is pressed once, steel counted on the primary part only', () => {
     const plan = buildRawRequirements({
       products: [
@@ -165,5 +194,51 @@ describe('raw material MRP in the plan output', () => {
     // Plan 6 000'lik rulo basar; MRP ise talep − stok: 1 100 − 600 = 500, sonra 2 000.
     expect(r1.needKg).toEqual([500, 2000])
     expect(r1.stockKg).toBe(1700)
+  })
+  it('finished stock covering 3 weeks: a job pulled forward is not urgent raw material', async () => {
+    const { computePlan } = await import('./planPipeline')
+    // Perşembe 22 Ekim 2026; acil hammadde sınırı 3 iş günü → Pazartesi 26 Ekim.
+    const run = computePlan(
+      {
+        products: [{ code: 'A', moldCavities: 1, spm: 20, setupMinutes: 30, mainMachine: '104', rawMaterialCode: 'R1', grossWeight: 1, coilWeight: 2000 }],
+        weeklyDemand: [{ material: 'A', overdue: 0, periods: Array.from({ length: 8 }, (_, i) => ({ label: `W${43 + i}`, qty: -1000 })) }],
+        stock: [
+          { material: 'A', storageLocation: '2009', unrestricted: 3000 },
+          { material: 'R1', storageLocation: '1009', unrestricted: 200 },
+        ],
+        locations: [
+          { code: '2009', countFinished: true },
+          { code: '1009', countRaw: true },
+        ],
+        presses: [{ name: '104', hall: 'H1' }],
+        templates: [{ press: '104', workingDays: 5, shiftsPerDay: 1, overtimeShifts: 0 }],
+        settings: { timeZone: 'Europe/Bucharest', shiftMinutes: 480, shiftStartMinute: 420, planningHorizonWeeks: 4, maxScenarios: 2 },
+        workCalendar: null,
+        officialHolidays: [],
+        latestSnapshot: null,
+        plannedStops: [],
+        overrides: [],
+        moldMaintenance: [],
+        readiness: [],
+        pressMaintenance: [],
+        alarms: [],
+        truncatedInputs: [],
+      },
+      Date.UTC(2026, 9, 22, 7, 0),
+    )
+    // Stok 9 Kasım'da biter; iş boş pres yüzünden 26 Ekim'e çekildi.
+    const job = run.jobs.find((j) => j.material === 'A')!
+    expect(job.pulledForward).toBe(true)
+    expect(job.date).toBe('2026-10-26')
+    expect(job.pulledFrom).toBe('2026-11-05')
+    const r1 = run.rawNeeds.find((r) => r.rawMaterial === 'R1')!
+    // Sac eksik ama 5 Kasım'da gerekiyor: acil değil.
+    expect(r1.shortFrom).toMatchObject({ date: '2026-10-26', needDate: '2026-11-05' })
+    expect(run.rawUrgentUntil).toBe('2026-10-26')
+    expect(run.warnings.some((w) => w.includes('raw material(s) run out'))).toBe(false)
+    // MRP: ilk 3 hafta mamul stoğundan, sac 4. haftadan.
+    const item = run.rawRequirements!.items[0]
+    expect(item.needKg.slice(0, 4)).toEqual([0, 0, 0, 1000])
+    expect(item.byProduct?.[0]).toMatchObject({ material: 'A', finishedStock: 3000, firstNeedWeek: 3 })
   })
 })

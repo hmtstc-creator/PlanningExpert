@@ -44,6 +44,31 @@ export interface RawRequirement {
   inTransitKg?: number[]
   /** Yoldaki kalemler (listeden) — ufuk dışında varanlar dahil. */
   inTransit?: InTransitLine[]
+  /**
+   * Mamul bazında döküm: her talepli mamulün stoğu, stoğun hangi haftaya
+   * kadar yettiği ve kendi sac ihtiyacı. Satırın toplamı (`needKg`) bunların
+   * toplamıdır; aynı ruloyu kullanan başka bir mamulün ihtiyacı burada ayrı
+   * görünür. Haftalık dizi tutulmaz: plan özeti tek dokümandır.
+   */
+  byProduct?: RawProductNeed[]
+}
+
+export interface RawProductNeed {
+  /** Sacı sayılan mamul (eş üründe asıl ürün). */
+  material: string
+  /** Aynı vuruştan çıkan eş ürün, varsa. */
+  coProduct?: string
+  /** Sayılan depolardaki mamul stoğu (adet; eş üründe asıl ürününki). */
+  finishedStock: number
+  /**
+   * Net ihtiyacın başladığı hafta (`weeks` indeksi); mamul stoğu ondan
+   * önceki haftaları karşılar. ZPP boyunca yetiyorsa -1.
+   */
+  firstNeedWeek: number
+  /** İlk ihtiyaç haftasının sacı (kg). */
+  firstNeedKg: number
+  /** ZPP'nin son haftasına kadar sac ihtiyacı (kg). */
+  totalNeedKg: number
 }
 
 export interface InTransitLine {
@@ -152,11 +177,11 @@ export function buildRawRequirements(input: {
     carrierOf.set(co, p)
   }
 
-  const byRaw = new Map<string, { materials: Set<string>; kg: number[] }>()
+  const byRaw = new Map<string, { materials: Set<string>; kg: number[]; byProduct: RawProductNeed[] }>()
   const rawEntry = (raw: string) => {
     let e = byRaw.get(raw)
     if (!e) {
-      e = { materials: new Set(), kg: Array.from({ length: n }, () => 0) }
+      e = { materials: new Set(), kg: Array.from({ length: n }, () => 0), byProduct: [] }
       byRaw.set(raw, e)
     }
     return e
@@ -191,9 +216,23 @@ export function buildRawRequirements(input: {
       return strokes * cavities(carrier)
     })
     const total = primaryPieces.reduce((a, b) => a + b, 0)
-    if (total <= 0) continue
     const raw = carrier?.rawMaterialCode?.trim()
     const gross = carrier?.grossWeight ?? 0
+    if (total <= 0) {
+      // Mamul stoğu ZPP boyunca yetiyor: sac ihtiyacı yok. Dökümde yine
+      // görünür ki satırdaki ihtiyacın bu mamulden gelmediği okunsun.
+      if (raw && gross > 0) {
+        rawEntry(raw).byProduct.push({
+          material: carrierCode,
+          ...(partnerCode ? { coProduct: partnerCode } : {}),
+          finishedStock: round(input.finishedStock.get(carrierCode) ?? 0),
+          firstNeedWeek: -1,
+          firstNeedKg: 0,
+          totalNeedKg: 0,
+        })
+      }
+      continue
+    }
     if (!carrier || !raw || gross <= 0) {
       missing.set(carrierCode, {
         pieces: total,
@@ -205,6 +244,15 @@ export function buildRawRequirements(input: {
     e.materials.add(carrierCode)
     primaryPieces.forEach((pieces, w) => {
       e.kg[w] += pieces * gross
+    })
+    const firstNeedWeek = primaryPieces.findIndex((pieces) => pieces > 0)
+    e.byProduct.push({
+      material: carrierCode,
+      ...(partnerCode ? { coProduct: partnerCode } : {}),
+      finishedStock: round(input.finishedStock.get(carrierCode) ?? 0),
+      firstNeedWeek,
+      firstNeedKg: round(primaryPieces[firstNeedWeek] * gross),
+      totalNeedKg: round(total * gross),
     })
   }
 
@@ -243,6 +291,15 @@ export function buildRawRequirements(input: {
           stockKg: round(input.rawStock.get(rawMaterial) ?? 0),
           needKg: e.kg.map(round),
           ...(own.length > 0 ? { inTransitKg, inTransit: own } : {}),
+          ...(e.byProduct.length > 0
+            ? {
+                byProduct: e.byProduct.sort(
+                  (a, b) =>
+                    (a.firstNeedWeek < 0 ? n : a.firstNeedWeek) - (b.firstNeedWeek < 0 ? n : b.firstNeedWeek) ||
+                    a.material.localeCompare(b.material),
+                ),
+              }
+            : {}),
         }
       })
       .sort((a, b) => a.rawMaterial.localeCompare(b.rawMaterial)),

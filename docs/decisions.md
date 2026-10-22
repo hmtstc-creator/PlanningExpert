@@ -127,6 +127,13 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Sipariş maili: Outlook taslağı (.eml); şifre saklanmaz.
 - Acil hammadde süresi (şu an 3 iş günü) Work Calendar'da ayarlanabilir
   olacak. → uygulanacak
+- Acil hammadde sacın GEREKTİĞİ güne göre ölçülür: pres boş kalmasın diye
+  öne çekilmiş işte bu, planlanan gün değil lotun başlayabileceği gündür
+  (stok bitişi − emniyet günleri). Mamul stoğu yeterken öne çekme "acil
+  hammadde" çıkarmaz (2026-10-22).
+- Raw Material Coverage satırı rulo bazındadır; satır açılınca mamul bazında
+  döküm (mamul stoğu, karşıladığı haftalar, sacın ilk gerektiği hafta) ve
+  ilk siparişin nedeni görünür (2026-10-22).
 
 ### Arayüz
 - Uzun açıklamalar sayfada durmaz: mavi "i" notunda, üzerine gelince açılır.

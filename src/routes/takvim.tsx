@@ -1203,8 +1203,9 @@ function PressCalendarSection() {
               that time.
             </li>
             <li>
-              <b>Urgent raw material:</b> coils that stop a job within the next {rawUrgentDays}{' '}
-              working day(s) are listed on the Production Plan.
+              <b>Urgent raw material:</b> coils whose steel is needed within the next {rawUrgentDays}{' '}
+              working day(s) are listed on Overview. A job pulled forward only to keep its work center
+              busy counts from the day it is really needed.
             </li>
             <li>
               <b>Scenarios:</b> up to {maxScenarios} plan variants; stops as soon as the work centers are{' '}

@@ -514,6 +514,20 @@ describe('buildRawMaterialPlan', () => {
     expect(needs[0].requiredKg).toBe(2000)
   })
 
+  it('öne çekilmiş işin sacı ihtiyaç gününde gerekir; önce gerçekten gereken iş sıraya girer', () => {
+    const needs = buildRawMaterialPlan(
+      [
+        // Pres boş kalmasın diye 26 Ekim'e çekildi; mamul stoğu 5 Kasım'a kadar yetiyor.
+        { material: 'A', quantity: 500, date: '2026-10-26', press: 'P1', pulledFrom: '2026-11-05' },
+        { material: 'B', quantity: 500, date: '2026-10-28', press: 'P2' },
+      ],
+      products,
+      new Map([['SAC-1', 600]]),
+    )
+    // B'nin 500 kg'ı önce ayrılır; A'nın 1 000 kg'ı yetmez ama 5 Kasım'da gerekir.
+    expect(needs[0].shortFrom).toEqual({ date: '2026-10-26', press: 'P1', material: 'A', needDate: '2026-11-05' })
+  })
+
   it('eş ürünün hammadde kodu eksik diye uyarmaz', () => {
     const paired = new Map<string, ProductSpec>([
       ['A', { code: 'A', coProduct: 'B', rawMaterialCode: 'SAC-1', grossWeight: 2 }],

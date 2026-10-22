@@ -3,7 +3,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { useMutation, useQuery } from '../lib/convexTransport'
-import { rawMrp, type RawMrpResult, type RawRequirementPlan } from '../lib/rawMrp'
+import { rawMrp, type MrpWeek, type RawMrpResult, type RawProductNeed, type RawRequirementPlan } from '../lib/rawMrp'
 import { buildDraftEml, buildOrderWorkbook, parseAddresses, workbookBytes, XLSX_TYPE } from '../lib/rawOrderExport'
 import { formatPlantTime } from '../lib/sapUploads'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
@@ -157,7 +157,8 @@ function RawMaterialCoveragePage() {
           <>
             <p>
               <b>Requirement:</b> demand minus finished stock (first weeks first) × gross weight per
-              piece, co-products once.
+              piece, co-products once. A row is a coil: open it to see each finished product's stock, the
+              weeks it covers and the week its steel is first needed.
             </p>
             <p>
               <b>Supply:</b> coil stock on hand in the locations ticked <em>Raw material</em> on{' '}
@@ -382,6 +383,8 @@ function RawMaterialCoveragePage() {
                         <DetailRow label="In transit arriving" values={r.rows.map((x) => x.inTransitKg)} />
                         <DetailRow label={`Safety (${coverageDays} working days)`} values={r.rows.map((x) => x.safetyKg)} />
                         <DetailRow label="Stock at week end" values={r.rows.map((x) => x.stockEndKg)} />
+                        <OrderReasonRow result={r} weeks={weeks} coverageDays={coverageDays} />
+                        <ProductBreakdownRow products={itemByRaw.get(r.rawMaterial)?.byProduct} weeks={weeks} />
                         <tr className="bg-muted/20">
                           <td colSpan={weeks.length + 6} className="px-3 py-1.5 text-left text-muted-foreground">
                             Used by {r.materials.join(', ') || '—'} · need up to the last ZPP week {fmt(r.totalNeedKg)} kg
@@ -546,6 +549,63 @@ function RecipientsPanel({
         </div>
       )}
     </div>
+  )
+}
+
+/** İlk siparişin nedeni: o haftanın arzı, tüketim + emniyete yetmiyor. */
+function OrderReasonRow({ result, weeks, coverageDays }: { result: RawMrpResult; weeks: MrpWeek[]; coverageDays: number }) {
+  const w = result.rows.findIndex((row) => row.orderKg > 0)
+  if (w < 0) return null
+  const row = result.rows[w]
+  return (
+    <tr className="bg-muted/20">
+      <td colSpan={weeks.length + 6} className="px-3 py-1.5 pl-7 text-left text-muted-foreground">
+        <span className="font-medium text-foreground">First order {weeks[w]?.label}:</span> coil at week start{' '}
+        {fmt(row.stockStartKg)} kg{row.inTransitKg > 0 ? ` + arriving ${fmt(row.inTransitKg)} kg` : ''} does not cover
+        this week's use {fmt(row.needKg)} kg + the next {coverageDays} working days' use {fmt(row.safetyKg)} kg (safety).
+        {row.needKg === 0 && ' Nothing is pressed from this coil this week — the order is for the safety window only.'}
+      </td>
+    </tr>
+  )
+}
+
+/**
+ * Rulonun ihtiyacı mamul bazında: her mamulün stoğu hangi haftaya kadar
+ * yetiyor, sacı hangi haftadan itibaren gerekiyor. Satırdaki ihtiyacın hangi
+ * mamulden geldiği (aynı ruloyu kullanan başka bir parça, eş ürün) buradan
+ * okunur.
+ */
+function ProductBreakdownRow({ products, weeks }: { products?: RawProductNeed[]; weeks: MrpWeek[] }) {
+  if (!products || products.length === 0) return null
+  const last = weeks[weeks.length - 1]?.label ?? ''
+  return (
+    <tr className="bg-muted/20">
+      <td colSpan={weeks.length + 6} className="px-3 py-1.5 pl-7 text-left text-muted-foreground">
+        <span className="font-medium text-foreground">By finished product</span> (finished stock is deducted first):
+        <ul className="mt-1 space-y-0.5">
+          {products.map((p) => (
+            <li key={p.material}>
+              <span className="font-medium text-foreground">{p.material}</span>
+              {p.coProduct && ` + co-product ${p.coProduct}`} · stock {fmt(p.finishedStock)} pcs ·{' '}
+              {p.firstNeedWeek < 0 ? (
+                <>covers every week to {last} — no steel needed</>
+              ) : (
+                <>
+                  {p.firstNeedWeek === 0
+                    ? 'does not cover this week'
+                    : `covers ${weeks[0]?.label} – ${weeks[p.firstNeedWeek - 1]?.label}`}
+                  {' · '}
+                  <span className="text-foreground">
+                    steel from {weeks[p.firstNeedWeek]?.label}: {fmt(p.firstNeedKg)} kg
+                  </span>{' '}
+                  ({fmt(p.totalNeedKg)} kg to {last})
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      </td>
+    </tr>
   )
 }
 

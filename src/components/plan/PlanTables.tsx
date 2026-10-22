@@ -270,8 +270,11 @@ export function UrgentRawPanel({ run }: { run: PlanRun }) {
   const until = run.rawUrgentUntil ?? run.todayIso ?? ''
   const days = run.rawUrgentDays ?? RAW_URGENT_DAYS
   // Toplamda yetse de yoldaki rulo geç geliyorsa iş durur: ilk eksik iş esas.
+  // Aciliyet sacın gerçekten gerektiği güne göre: öne çekilmiş iş, mamul
+  // stoğu yettiği sürece bekleyebilir (eski planlarda planlanan gün).
   const short = (run.rawNeeds ?? []).filter((r) => r.shortFrom)
-  const urgent = short.filter((r) => r.shortFrom!.date <= until)
+  const needOf = (r: (typeof short)[number]) => r.shortFrom!.needDate ?? r.shortFrom!.date
+  const urgent = short.filter((r) => needOf(r) <= until)
   const later = short.length - urgent.length
   return (
     <section className={`rounded-xl border p-4 ${urgent.length > 0 ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-card'}`}>
@@ -282,7 +285,9 @@ export function UrgentRawPanel({ run }: { run: PlanRun }) {
         info={
           <>
             Coil stock that runs out within the next {days} working days: planned quantity × gross weight per piece,
-            walked in plan order against MB52 raw material stock plus coils in transit. The full requirement is on{' '}
+            walked in the order the steel is needed against MB52 raw material stock plus coils in transit. A job
+            pulled forward only to keep the work center busy needs its steel on its need day, not earlier — while
+            finished stock still covers the demand it can wait for the coil. The full requirement is on{' '}
             <Link to="/hammadde">Raw Material Coverage</Link>.
           </>
         }
@@ -319,6 +324,9 @@ export function UrgentRawPanel({ run }: { run: PlanRun }) {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs">
                       {r.shortFrom ? `${dayMonth(r.shortFrom.date)} · ${r.shortFrom.press} · ${r.shortFrom.material}` : '—'}
+                      {r.shortFrom && needOf(r) > r.shortFrom.date && (
+                        <span className="block text-muted-foreground">steel needed {dayMonth(needOf(r))}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{r.materials.join(', ')}</td>
                   </tr>

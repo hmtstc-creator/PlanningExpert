@@ -365,6 +365,12 @@ export interface ScheduledJob {
   lateHours?: number
   /** İhtiyaç haftasından önce, pres boş kalmasın diye öne çekildi. */
   pulledForward?: boolean
+  /**
+   * Öne çekilmiş işin asıl başlayabileceği gün (stok bitişi − emniyet
+   * günleri). `earliestDate` öne çekmeyle izin verilen gündür; mamul stoğu bu
+   * güne kadar yeter, işin sacı da bu gün gerekir.
+   */
+  pulledFrom?: string
   /** Aynı kalıbın önceki işinin devamı olarak (setup'sız) yerleşti. */
   continued?: boolean
   /** Takılı kalıbın dolgu işi, acil işin önünde (acil iş yine zamanında). */
@@ -2146,6 +2152,7 @@ function placeRun(
     neededQuantity: entry.noStockout ? 0 : Math.round(delivery.fraction * run.quantity),
     urgentSetup: !!best.urgent && !sameMaterial,
     pulledForward,
+    ...(pulledForward ? { pulledFrom: entry.earliestDate } : {}),
     continued: bestIsContinuation,
     decision,
   }

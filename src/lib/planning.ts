@@ -1112,10 +1112,21 @@ export interface RawMaterialNeed {
   /** Eksik kilo — 0 ise hammadde yeterli (stok + yoldakiler). */
   shortageKg: number
   /**
-   * Stoğun yetmediği İLK iş: gün, pres ve parça. Planda sırayla yürünür;
-   * bu işten itibaren rulo tedarik edilmelidir.
+   * Stoğun yetmediği İLK iş: planlanan gün, pres ve parça. İşler sacın
+   * gerçekten gerektiği güne göre sırayla yürünür; bu işten itibaren rulo
+   * tedarik edilmelidir.
    */
-  shortFrom?: { date: string; press: string; material: string }
+  shortFrom?: {
+    date: string
+    press: string
+    material: string
+    /**
+     * Sacın gerçekten gerektiği gün. Pres boş kalmasın diye öne çekilmiş
+     * işte planlanan günden sonradır: mamul stoğu o güne kadar yeter, iş
+     * rulo gelene kadar bekleyebilir. Aciliyet bu güne göre ölçülür.
+     */
+    needDate: string
+  }
 }
 
 /**
@@ -1125,7 +1136,18 @@ export interface RawMaterialNeed {
  * atlanır (uyarı olarak ayrıca listelenir).
  */
 export function buildRawMaterialPlan(
-  jobs: { material: string; quantity: number; date?: string; press?: string; setupStartMinute?: number }[],
+  jobs: {
+    material: string
+    quantity: number
+    date?: string
+    press?: string
+    setupStartMinute?: number
+    /**
+     * Pres boş kalmasın diye öne çekilmiş işin asıl günü (stok bitişi −
+     * emniyet günleri): sacı bu gün gerekir.
+     */
+    pulledFrom?: string
+  }[],
   products: Map<string, ProductSpec>,
   rawStockKg: Map<string, number>,
   /** Yoldaki rulolar: varış günü (ISO; yoksa bugün gelmiş sayılır) ve kg. */
@@ -1133,7 +1155,11 @@ export function buildRawMaterialPlan(
 ): RawMaterialNeed[] {
   const byRaw = new Map<
     string,
-    { kg: number; materials: Set<string>; uses: { date: string; minute: number; press: string; material: string; kg: number }[] }
+    {
+      kg: number
+      materials: Set<string>
+      uses: { date: string; needDate: string; minute: number; press: string; material: string; kg: number }[]
+    }
   >()
 
   // Eş ürün aynı gramajın içinden çıkar: asıl ürünün tükettiği sacın içinde
@@ -1155,8 +1181,14 @@ export function buildRawMaterialPlan(
     // Brüt ağırlık parça başına.
     entry.kg += job.quantity * grossWeight
     entry.materials.add(job.material)
+    const date = job.date ?? ''
+    // Öne çekilmiş işin sacı, mamul stoğu bitmeden gerekmez: iş ihtiyaç
+    // gününe kadar bekleyebilir. Elde mamul stoğu varken öne çekme yüzünden
+    // "acil hammadde" çıkmasın.
+    const needDate = job.pulledFrom && job.pulledFrom > date ? job.pulledFrom : date
     entry.uses.push({
-      date: job.date ?? '',
+      date,
+      needDate,
       minute: job.setupStartMinute ?? 0,
       press: job.press ?? '',
       material: job.material,
@@ -1174,13 +1206,18 @@ export function buildRawMaterialPlan(
       const inTransitKg = arrivals.reduce((a, b) => a + b.kg, 0)
       const arrivedBy = (date: string) =>
         arrivals.reduce((a, b) => a + (!b.eta || b.eta <= date ? b.kg : 0), 0)
-      // Zaman sırasıyla: stoğun (ve o güne kadar gelenin) yetmediği ilk iş.
+      // İhtiyaç sırasıyla: stoğun (ve o güne kadar gelenin) yetmediği ilk
+      // iş. Öne çekilmiş iş kendi ihtiyaç gününde sıraya girer; sacı önce
+      // gerçekten gereken işlere ayrılır.
       let used = 0
       let shortFrom: RawMaterialNeed['shortFrom']
-      for (const use of [...entry.uses].sort((a, b) => a.date.localeCompare(b.date) || a.minute - b.minute)) {
+      const ordered = [...entry.uses].sort(
+        (a, b) => a.needDate.localeCompare(b.needDate) || a.date.localeCompare(b.date) || a.minute - b.minute,
+      )
+      for (const use of ordered) {
         used += use.kg
-        if (used > availableKg + arrivedBy(use.date) + 1e-6) {
-          shortFrom = { date: use.date, press: use.press, material: use.material }
+        if (used > availableKg + arrivedBy(use.needDate) + 1e-6) {
+          shortFrom = { date: use.date, press: use.press, material: use.material, needDate: use.needDate }
           break
         }
       }

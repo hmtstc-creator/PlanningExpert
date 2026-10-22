@@ -23,7 +23,8 @@ export const Route = createFileRoute('/planlogic')({
 /** Hammadde MRP'sinin FMEA'sı: hata türü, etkisi, S, O, D, yöntemdeki önlem. */
 const FMEA_ROWS: [string, string, number, number, number, string][] = [
   ['Plan and demand both counted', 'Same steel ordered twice', 8, 8, 3, 'Plan-independent: demand only; the safety stock absorbs plan timing and coil surplus'],
-  ['Finished stock not deducted', 'Over-ordering', 7, 5, 4, 'Locations ticked “Finished goods” on Storage Locations deducted first-in-first-out, the same as the plan'],
+  ['Finished stock not deducted', 'Over-ordering', 7, 5, 4, 'Locations ticked “Finished goods” on Storage Locations deducted first-in-first-out, the same as the plan; the row breaks the need down per finished product'],
+  ['Need of a part with stock read from its coil row', 'Steel seems needed while the part’s stock still covers', 5, 6, 6, 'Per-product breakdown: weeks covered by finished stock and the week steel is first needed, per part on the coil'],
   ['Coil stock on hand not deducted', 'Steel already in the plant is ordered again', 8, 6, 5, 'Coil stock in the locations ticked “Raw material” is the opening stock'],
   ['Co-product counted twice', 'Over-ordering on pairs', 6, 6, 5, 'Pair pressed once: strokes = larger need, steel on the primary part only'],
   ['Part without raw code / gross weight', 'Its steel silently missing → line stops', 10, 5, 8, 'Listed in red on the page with pieces; never silently dropped'],
@@ -536,10 +537,17 @@ function PlanLogicPage() {
           </li>
           <li>
             <b>Urgent raw material</b>: planned quantity × gross weight, walked in
-            plan order against coil stock plus coils in transit from their arrival
-            day. Coils that stop a job within the next {current.rawUrgent} working
-            day(s) are listed at the top of the Production Plan. Co-products are
-            not counted twice. The weekly requirement is separate — see{' '}
+            the order the steel is <b>needed</b> against coil stock plus coils in
+            transit from their arrival day. A coil is urgent when the steel is
+            needed within the next {current.rawUrgent} working day(s); those are
+            listed on Overview. The need day of a job is its planned day — except a
+            job <b>pulled forward</b> only so its work center is not idle: while the
+            finished stock still covers the demand, its steel is needed on the day
+            the lot may start (stock runs out − safety stock days), not on the
+            pulled-forward day. Such a job can wait for the coil, so it shows as
+            &ldquo;runs short later&rdquo;, with the planned day and the day the steel is
+            needed. Co-products are not counted twice. The weekly requirement is
+            separate — see{' '}
             <a href="#raw-mrp" className="underline">
               Raw material requirement
             </a>
@@ -699,8 +707,9 @@ function PlanLogicPage() {
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
           <li>Demand: ZPP up to its last week; backlog goes into this week.</li>
           <li>
-            Finished stock (locations ticked <i>Finished goods</i> on Storage Locations) is deducted,
-            earliest weeks first. What is left must be pressed.
+            Finished stock (locations ticked <i>Finished goods</i> on Storage Locations) is deducted
+            per part, earliest weeks first. What is left must be pressed: a part whose stock covers 3
+            weeks needs no steel in those 3 weeks.
           </li>
           <li>
             Steel: pieces × gross weight per piece. A co-product pair is pressed once — strokes are the
@@ -722,6 +731,13 @@ function PlanLogicPage() {
             standard extra (500 kg by default).
           </li>
           <li>No demand, no order: after the last ZPP week the need is zero; nothing is forecast (kanban comes later).</li>
+          <li>
+            One row is one <b>coil</b>, not one part: every part pressed from it adds its need, and a
+            co-product pair needs steel when either side does. Open a row to see it <b>by finished
+            product</b> — each part's finished stock, the weeks it covers and the week its steel is first
+            needed — and why the first order falls in its week. An order in a week with no use of its own
+            is the safety window: the use of the next N working days (a holiday week reaches further).
+          </li>
           <li>
             Now: N = {current.rawCoverage} working days, extra = {current.rawExtra.toLocaleString('en-GB')} kg. Working
             days are the plant's working days (not a holiday, at least one work center with normal shifts).
