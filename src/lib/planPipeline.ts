@@ -297,7 +297,48 @@ export interface LateItem {
   ready: string
   neededQuantity: number
   lateHours: number
+  /** @deprecated Eski planlar için; ekran `why` ve `calc` gösterir. */
   suggestion: string
+  /** Neden geç: hesaptan çıkan nedenler, en belirleyici önce. */
+  why?: string[]
+  /** Gecikme saatinin hesabı (ilk geç lot). */
+  calc?: LateCalc
+}
+
+/**
+ * "71.4 h nereden geliyor": ilk geç lotun zaman çizgisi ve kullandığı
+ * girdiler. Planlamacı kendi kriterlerini (talep, setup, SPM, vardiya)
+ * buradan kontrol eder.
+ */
+export interface LateCalc {
+  press: string
+  /** Setup başlangıcı ("Wed 21 Oct 14:30"). */
+  setupStart: string
+  ready: string
+  deadline: string
+  /** Hesap anı. */
+  now: string
+  /** Bu lotun gecikmesi = hazır − teslim (saat). Kalemin `lateHours`'u lotların en büyüğüdür. */
+  lateHours: number
+  setupMinutes: number
+  qualityMinutes: number
+  /** Teslim anına kadar gereken adedin üretim süresi (dk). */
+  runMinutes: number
+  neededQuantity: number
+  lotQuantity: number
+  /** Üretim hızı (adet/saat) — lot adedi ÷ üretim süresi. */
+  piecesPerHour: number
+  spm?: number
+  cavities?: number
+  performanceFactor?: number
+  /** Setup başlangıcından hazır olmaya kadar presin çalışmadığı saat (vardiya yok, hafta sonu, mola). */
+  pressOffHours: number
+  /** Hesap anından teslim anına kalan saat (takvim). */
+  hoursToDeadline: number
+  /** Bu işten önce aynı preste kalan iş (saat) ve en büyükleri. */
+  beforeHours: number
+  before: { material: string; hours: number; due: string; kind: 'frozen' | 'earlier' | 'later'; override?: boolean }[]
+  capacityFactor: number
 }
 
 /** Hesaplanmış plan — ekranın ihtiyacı olan her şey, düz veri olarak. */
@@ -1298,10 +1339,117 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     list.push(job)
     lateByMaterial.set(job.material, list)
   }
+  const pressDayOf = (press: string, date: string) => {
+    const shape = dayShapeByPressDate.get(`${press}|${date}`) ?? { shifts: 3 }
+    return buildDayTimeline(shiftStartMinute, shiftMinutes, shape.shifts > 0 || shape.overtime?.length ? shape : { shifts: 1 }, plannedStops)
+  }
+  const setupTs = (j: ScheduledJob) => clockTs(j.date, netToClock(j.setupStartMinute, pressDayOf(j.press, j.date)))
+  const dueTs = (j: ScheduledJob) =>
+    j.deadlineDate && j.deadlineMinute !== undefined
+      ? clockTs(j.deadlineDate, netToClock(j.deadlineMinute, fullDay))
+      : clockTs(j.dueDate, cutoffMinute)
+  const nowTs = clockTs(todayIso, nowClockMinute)
+  const tsLabel = (ts: number) => {
+    const d = new Date(ts)
+    return `${d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+  }
+  const h1 = (minutes: number) => Math.round(minutes / 6) / 10
+  /** İşin bugünden sonra kalan pres süresi (dk), segmentlerden. */
+  const remainingMinutes = (j: ScheduledJob) =>
+    (j.segments ?? []).reduce((a, seg) => {
+      if (seg.date < todayIso) return a
+      return a + Math.max(0, seg.end - (seg.date === todayIso ? Math.max(seg.start, nowNet) : seg.start))
+    }, 0)
+
+  // Planlamacının öne aldığı ya da prese sabitlediği malzemeler (Plan overrides).
+  const overridden = new Set(inputs.overrides.filter((o) => o.kind === 'priority' || o.kind === 'pin').map((o) => o.material))
+  const explainLate = (job: ScheduledJob): { why: string[]; calc: LateCalc } | undefined => {
+    if (!job.readyDate || job.readyMinute === undefined) return undefined
+    const product = productByCode.get(job.material)
+    const needed = job.neededQuantity ?? job.quantity
+    const runNeeded = job.quantity > 0 ? (job.runMinutes * Math.min(needed, job.quantity)) / job.quantity : job.runMinutes
+    const ownMinutes = job.setupMinutes + job.qualityApprovalMinutes + runNeeded
+    const start = setupTs(job)
+    const ready = clockTs(job.readyDate, netToClock(job.readyMinute, pressDayOf(job.press, job.readyDate)))
+    const deadline = dueTs(job)
+    const off = Math.max(0, (ready - start) / 60_000 - ownMinutes)
+    const toDeadline = (deadline - nowTs) / 3_600_000
+    // Aynı preste bu işten önce başlayan ve henüz bitmemiş işler.
+    const before = jobs
+      .filter((j) => j !== job && j.press === job.press && setupTs(j) < start)
+      .map((j) => ({ j, minutes: remainingMinutes(j) }))
+      .filter((x) => x.minutes > 0)
+      .map(({ j, minutes }) => ({
+        pinned: !(j as PlanJob).frozen && (j.pinned || overridden.has(j.material)),
+        material: j.material,
+        hours: h1(minutes),
+        due: (j as PlanJob).frozen ? '' : tsLabel(dueTs(j)),
+        kind: ((j as PlanJob).frozen ? 'frozen' : dueTs(j) <= deadline ? 'earlier' : 'later') as 'frozen' | 'earlier' | 'later',
+      }))
+    const beforeHours = Math.round(before.reduce((a, b) => a + b.hours, 0) * 10) / 10
+    const sumOf = (kind: string) => before.filter((b) => b.kind === kind)
+    const hoursOf = (list: typeof before) => Math.round(list.reduce((a, b) => a + b.hours, 0) * 10) / 10
+
+    const why: string[] = []
+    if (deadline <= nowTs) {
+      why.push(`Already due when the plan was calculated (${tsLabel(nowTs)}): the stock did not cover ${tsLabel(deadline)} — backlog or a need before today.`)
+    } else if (ownMinutes / 60 > toDeadline) {
+      why.push(
+        `Cannot be ready in time even if started now: setup + approval + production of ${needed.toLocaleString('en-GB')} pcs need ${h1(ownMinutes)} h of press time, only ${Math.round(toDeadline * 10) / 10} h are left until the deadline.`,
+      )
+    }
+    if (beforeHours > 0) {
+      const parts = [
+        sumOf('earlier').length > 0 ? `${sumOf('earlier').length} needed earlier or at the same time (${hoursOf(sumOf('earlier'))} h)` : '',
+        sumOf('frozen').length > 0 ? `${sumOf('frozen').length} frozen / approved (${hoursOf(sumOf('frozen'))} h)` : '',
+        sumOf('later').length > 0 ? `${sumOf('later').length} needed later (${hoursOf(sumOf('later'))} h)` : '',
+      ].filter(Boolean)
+      why.push(`${job.press} is busy with ${before.length} other job(s) for ${beforeHours} h before this one can start: ${parts.join(', ')}.`)
+      const pinned = before.filter((b) => b.pinned)
+      if (pinned.length > 0) {
+        why.push(`${pinned.map((b) => b.material).slice(0, 4).join(', ')} placed first by a plan override (${hoursOf(pinned)} h).`)
+      }
+    }
+    if (job.waitReason) why.push(`The press waited before the setup: ${job.waitReason}.`)
+    if (off >= 1) why.push(`${h1(off)} h between setup start and ready the press is not working (no shift, weekend, breaks — Work Calendar).`)
+    if (capacityFactor < 1) why.push(`Capacity factor ${Math.round(capacityFactor * 100)}%: every day is planned with less time than the shifts give.`)
+    if (why.length === 0) why.push(`Setup starts ${tsLabel(start)}; production needs ${h1(ownMinutes)} h, so the needed quantity is ready ${tsLabel(ready)}.`)
+
+    return {
+      why,
+      calc: {
+        press: job.press,
+        setupStart: tsLabel(start),
+        ready: tsLabel(ready),
+        deadline: tsLabel(deadline),
+        now: tsLabel(nowTs),
+        lateHours: Math.round(((ready - deadline) / 3_600_000) * 10) / 10,
+        setupMinutes: Math.round(job.setupMinutes),
+        qualityMinutes: Math.round(job.qualityApprovalMinutes),
+        runMinutes: Math.round(runNeeded),
+        neededQuantity: needed,
+        lotQuantity: job.quantity,
+        piecesPerHour: job.runMinutes > 0 ? Math.round((job.quantity / job.runMinutes) * 60) : 0,
+        ...(product?.spm ? { spm: product.spm } : {}),
+        ...(product?.moldCavities ? { cavities: product.moldCavities } : {}),
+        ...(product?.performanceFactor ? { performanceFactor: product.performanceFactor } : {}),
+        pressOffHours: h1(off),
+        hoursToDeadline: Math.round(toDeadline * 10) / 10,
+        beforeHours,
+        before: before
+          .sort((a, b) => b.hours - a.hours)
+          .slice(0, 6)
+          .map(({ pinned, ...b }) => ({ ...b, ...(pinned ? { override: true } : {}) })),
+        capacityFactor,
+      },
+    }
+  }
+
   const lateItems = Array.from(lateByMaterial.entries())
     .map(([material, list]) => {
       const sorted = [...list].sort((a, b) => (a.deadlineDate ?? a.dueDate).localeCompare(b.deadlineDate ?? b.dueDate))
       const first = sorted[0]
+      const explained = explainLate(first)
       const maxLate = Math.max(...list.map((j) => j.lateHours ?? 0))
       const presses = Array.from(new Set(list.map((j) => j.press)))
       const shiftsNeeded = Math.max(1, Math.ceil(maxLate / Math.max(1, shiftNetHours)))
@@ -1319,6 +1467,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
           `≈${Math.round(maxLate * 10) / 10} h more on ${presses.join('/')} before ${first.deadlineLabel ?? first.dueDate}: ` +
           `${shiftsNeeded} overtime shift${shiftsNeeded > 1 ? 's' : ''} (${Math.round(shiftNetHours * 10) / 10} h net each)` +
           (canFlex ? ', or tick Flexible work center so it may use its alternative work centers' : ''),
+        ...(explained ?? {}),
       }
     })
     .sort((a, b) => b.lateHours - a.lateHours)

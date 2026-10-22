@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
-import { type LateItem, type PlanRun } from '../../lib/planPipeline'
+import { Fragment, useState } from 'react'
+import { type LateCalc, type LateItem, type PlanRun } from '../../lib/planPipeline'
 import type { PlacementDecision } from '../../lib/scheduler'
 import { InfoTip } from '../PageHeader'
 import { formatClock } from './format'
@@ -97,9 +97,12 @@ function lateText(hours: number): string {
 
 /**
  * Malzeme bazında geç liste: ihtiyaç günü sabah 08:00'e kadar gereken adet
- * hazır olmuyorsa geçtir. Bir malzeme bir kez yazılır (ilk geç lotu).
+ * hazır olmuyorsa geçtir. Bir malzeme bir kez yazılır (ilk geç lotu). Her
+ * satır NEDEN geç olduğunu ve gecikme saatinin hesabını gösterir; öneri
+ * yazılmaz — planlamacı kendi kriterlerini hesaptan kontrol eder.
  */
 function LateItemsBody({ items, repair }: { items: LateItem[]; repair: PlanRun['lateRepair'] }) {
+  const [openRow, setOpenRow] = useState<string | null>(null)
   return (
     <>
       <p className="mt-1 text-xs text-muted-foreground">
@@ -107,15 +110,63 @@ function LateItemsBody({ items, repair }: { items: LateItem[]; repair: PlanRun['
           A material is late when the quantity the customer needs is not ready by the delivery time
           on the requirement day (Work Calendar, default 08:00; public holidays included). Backlog
           and today's need are due the next day at that time. Stock counts in the locations ticked
-          Finished goods on <Link to="/depolar">Storage Locations</Link>.
+          Finished goods on <Link to="/depolar">Storage Locations</Link>.{' '}
+          <Link to="/planlogic" hash="late">
+            How it is calculated
+          </Link>
         </InfoTip>
         {repair.rounds > 0 &&
           ` The engine re-planned ${repair.rounds} time(s)${
             repair.boosted.length > 0 ? ` and moved ${repair.boosted.length} part(s) forward` : ''
-          }; coils are never cut short.`}
+          }; coils are never cut short.`}{' '}
+        Tap a material to see how its late hours are calculated.
       </p>
       {items.length > 0 && (
-        <div className="mt-3 overflow-x-auto rounded-md border border-destructive/30 bg-background">
+        // Telefonda kart: tablo yana kaydığında "Why late" görünmüyordu.
+        <ul className="mt-3 space-y-2 md:hidden">
+          {items.map((item) => {
+            const isOpen = openRow === item.material
+            return (
+              <li key={item.material} className="rounded-md border border-destructive/30 bg-background p-3 text-sm">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-medium text-foreground">{item.material}</span>
+                  <span className="whitespace-nowrap font-medium text-destructive">{lateText(item.lateHours)}</span>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {item.presses.join(', ')}
+                  {item.lots > 1 && ` · ${item.lots} late lots`} · {item.neededQuantity.toLocaleString('en-GB')} pcs needed by{' '}
+                  {item.deadline} · ready {item.calc?.ready ?? item.ready}
+                </p>
+                {item.why && (
+                  <ul className="mt-2 list-disc space-y-0.5 pl-4 text-xs text-foreground">
+                    {item.why.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                )}
+                {item.calc && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setOpenRow(isOpen ? null : item.material)}
+                      className="mt-2 text-xs font-medium text-foreground underline"
+                    >
+                      {isOpen ? 'Hide the calculation ▴' : 'How is it calculated? ▾'}
+                    </button>
+                    {isOpen && (
+                      <div className="mt-2 border-t border-border pt-2">
+                        <LateCalcView item={item} calc={item.calc} />
+                      </div>
+                    )}
+                  </>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      {items.length > 0 && (
+        <div className="mt-3 hidden overflow-x-auto rounded-md border border-destructive/30 bg-background md:block">
           <table className="w-full min-w-[48rem] text-left text-sm">
             <thead className="bg-destructive/10 text-destructive">
               <tr>
@@ -124,44 +175,138 @@ function LateItemsBody({ items, repair }: { items: LateItem[]; repair: PlanRun['
                 <th className="px-3 py-2 text-right font-medium">Needed qty</th>
                 <th className="px-3 py-2 font-medium">Ready</th>
                 <th className="px-3 py-2 font-medium">Late</th>
-                <th className="px-3 py-2 font-medium">Suggestion</th>
+                <th className="px-3 py-2 font-medium">Why late</th>
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
-                <tr key={item.material} className="border-t border-border align-top">
-                  <td className="px-3 py-2 font-medium text-foreground">
-                    {item.material}
-                    <span className="block text-xs font-normal text-muted-foreground">
-                      {item.presses.join(', ')}
-                      {item.lots > 1 && ` · ${item.lots} late lots`}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.deadline}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                    {item.neededQuantity.toLocaleString('en-GB')}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.ready}</td>
-                  <td className="whitespace-nowrap px-3 py-2 font-medium text-destructive">
-                    {lateText(item.lateHours)}
-                  </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {item.suggestion}{' '}
-                    <Link to="/takvim" className="underline">
-                      Work Calendar
-                    </Link>{' '}
-                    ·{' '}
-                    <Link to="/referanslar" className="underline">
-                      master data
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {items.map((item) => {
+                const isOpen = openRow === item.material
+                return (
+                  <Fragment key={item.material}>
+                    <tr
+                      onClick={() => setOpenRow(isOpen ? null : item.material)}
+                      className={`cursor-pointer border-t border-border align-top hover:bg-muted/40 ${isOpen ? 'bg-muted/30' : ''}`}
+                    >
+                      <td className="px-3 py-2 font-medium text-foreground">
+                        {isOpen ? '▾ ' : '▸ '}
+                        {item.material}
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          {item.presses.join(', ')}
+                          {item.lots > 1 && ` · ${item.lots} late lots`}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.deadline}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {item.neededQuantity.toLocaleString('en-GB')}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{item.calc?.ready ?? item.ready}</td>
+                      <td className="whitespace-nowrap px-3 py-2 font-medium text-destructive">
+                        {lateText(item.lateHours)}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-foreground">
+                        {item.why ? (
+                          <ul className="list-disc space-y-0.5 pl-4">
+                            {item.why.map((w) => (
+                              <li key={w}>{w}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-muted-foreground">Recalculate the plan to see the reason.</span>
+                        )}
+                      </td>
+                    </tr>
+                    {isOpen && item.calc && (
+                      <tr className="bg-muted/20">
+                        <td colSpan={6} className="px-3 py-3">
+                          <LateCalcView item={item} calc={item.calc} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
       )}
     </>
+  )
+}
+
+/** Gecikme saatinin adım adım hesabı ve kontrol edilecek girdiler. */
+function LateCalcView({ item, calc }: { item: LateItem; calc: LateCalc }) {
+  const hours = (min: number) => `${Math.round(min / 6) / 10} h`
+  const pressMinutes = calc.setupMinutes + calc.qualityMinutes + calc.runMinutes
+  return (
+    <div className="grid gap-4 text-xs text-muted-foreground lg:grid-cols-2">
+      <div>
+        <p className="font-semibold text-foreground">How {lateText(calc.lateHours)} is calculated (first late lot)</p>
+        <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+          <li>
+            Setup starts on <b className="text-foreground">{calc.press}</b> at <b className="text-foreground">{calc.setupStart}</b>
+            {calc.beforeHours > 0 && ` — after ${calc.beforeHours} h of other jobs on this press`}.
+          </li>
+          <li>
+            Setup {calc.setupMinutes} min + quality approval {calc.qualityMinutes} min + production of{' '}
+            {calc.neededQuantity.toLocaleString('en-GB')} pcs at {calc.piecesPerHour.toLocaleString('en-GB')} pcs/h{' '}
+            {calc.runMinutes} min = <b className="text-foreground">{hours(pressMinutes)} press time</b>.
+          </li>
+          {calc.pressOffHours > 0 && <li>+ {calc.pressOffHours} h with the press not working (no shift, weekend, breaks).</li>}
+          <li>
+            Needed quantity ready: <b className="text-foreground">{calc.ready}</b>.
+          </li>
+          <li>
+            Needed by: <b className="text-foreground">{calc.deadline}</b>.
+          </li>
+          <li>
+            Late = ready − needed by = <b className="text-destructive">{lateText(calc.lateHours)}</b>.
+            {item.lots > 1 && item.lateHours > calc.lateHours && ` The worst of its ${item.lots} late lots is ${lateText(item.lateHours)}.`}
+          </li>
+        </ol>
+        <p className="mt-2">
+          Plan calculated {calc.now}; {calc.hoursToDeadline > 0 ? `${calc.hoursToDeadline} h were left until the deadline.` : 'the deadline had already passed.'}
+        </p>
+        {calc.before.length > 0 && (
+          <>
+            <p className="mt-2 font-semibold text-foreground">Before it on {calc.press}</p>
+            <ul className="mt-1 space-y-0.5">
+              {calc.before.map((b, i) => (
+                <li key={`${b.material}-${i}`}>
+                  {b.material} · {b.hours} h ·{' '}
+                  {b.kind === 'frozen' ? 'frozen / approved' : b.kind === 'earlier' ? `needed ${b.due} (earlier)` : <span className="text-amber-700">needed {b.due} (later)</span>}
+                  {b.override && <span className="text-amber-700"> · plan override</span>}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+      <div>
+        <p className="font-semibold text-foreground">Check the inputs — a wrong value here makes it look late</p>
+        <ul className="mt-1 space-y-0.5">
+          <li>
+            Need: {calc.neededQuantity.toLocaleString('en-GB')} pcs by {calc.deadline} (lot {calc.lotQuantity.toLocaleString('en-GB')} pcs) — ZPP demand minus
+            finished stock. Check the demand on <Link to="/sapdata" className="underline">SAP Data</Link> and the stock locations on{' '}
+            <Link to="/depolar" className="underline">Storage Locations</Link>.
+          </li>
+          <li>
+            Speed: {calc.piecesPerHour.toLocaleString('en-GB')} pcs/h
+            {calc.spm ? ` from SPM ${calc.spm}` : ''}
+            {calc.cavities ? ` × ${calc.cavities} cavities` : ''}
+            {calc.performanceFactor ? ` × performance ${Math.round(calc.performanceFactor * 100)}%` : ''}; setup {calc.setupMinutes} min, quality approval{' '}
+            {calc.qualityMinutes} min — <Link to="/referanslar" className="underline">Master Data</Link>.
+          </li>
+          <li>
+            Shifts of {calc.press} and the delivery time (needed by) — <Link to="/takvim" className="underline">Work Calendar</Link>
+            {calc.capacityFactor < 1 && `; capacity factor ${Math.round(calc.capacityFactor * 100)}%`}.
+          </li>
+          <li>
+            Order of the jobs before it: frozen or approved jobs stay where they are (
+            <Link to="/planlama" className="underline">Production Plan</Link>).
+          </li>
+        </ul>
+      </div>
+    </div>
   )
 }
 

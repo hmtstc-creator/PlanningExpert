@@ -600,12 +600,39 @@ function PlanLogicPage() {
           late and is reported.
         </p>
         <p className="mt-2 text-sm text-amber-900">
-          Whatever is still late is listed at the top of the Production Plan in
-          red, <b>once per material</b>: when it is needed, how many pieces, when
-          they are ready, how many hours late, and a suggestion — how many hours
-          are missing on its work center before the deadline, i.e. how many overtime
-          shifts would cover it, or ticking Flexible work center so it may use its
-          alternative work centers.
+          Whatever is still late is listed on the Overview in red, <b>once per
+          material</b> (its first late lot): when it is needed, how many pieces,
+          when they are ready and how many hours late.
+        </p>
+        <p className="mt-2 text-sm text-amber-900">
+          <b>Why late</b> gives the reasons found in the plan itself, the
+          strongest first:
+        </p>
+        <ul className="mt-1 ml-5 list-disc space-y-1 text-sm text-amber-900">
+          <li>already due when the plan was calculated (backlog, or the stock did not cover today);</li>
+          <li>
+            cannot be ready even if started now — the job alone needs more press time
+            (setup + approval + production) than is left until the deadline;
+          </li>
+          <li>
+            the work center is busy before it: how many jobs and hours, split into needed
+            earlier, frozen / approved and needed later, and which were placed first by a
+            plan override;
+          </li>
+          <li>the press waited before the setup (setup crew, mould on another press…);</li>
+          <li>hours between setup start and ready when the press does not work (no shift, weekend, breaks);</li>
+          <li>a capacity factor below 100%.</li>
+        </ul>
+        <p className="mt-2 text-sm text-amber-900">
+          <b>How the hours are calculated</b> (tap the row): setup start → setup +
+          quality approval + production of the needed pieces at the part's speed
+          (pieces per hour from SPM × cavities × performance) → hours the press is
+          off → ready time. Late = ready − needed by (delivery time on the need
+          day). Next to it are the inputs that decide it — demand and finished
+          stock, speed, setup and approval minutes, the shifts and delivery time —
+          with links to where they are set. If one of them is wrong (e.g. a setup
+          of 600 min instead of 60, a missing shift), the part only <i>looks</i> late:
+          correct it there and recalculate.
         </p>
       </section>
 

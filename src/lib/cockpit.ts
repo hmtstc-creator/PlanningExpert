@@ -61,7 +61,7 @@ export interface CockpitInput {
   /** Planlama modülü yoksa null (sinyaller yalnızca izinli modüllerden). */
   plan: {
     computedAt: number
-    lateItems: { material: string; presses: string[]; lateHours: number; deadline: string; suggestion: string }[]
+    lateItems: { material: string; presses: string[]; lateHours: number; deadline: string; suggestion: string; why?: string[] }[]
     lateLowerBound?: number
     brokenRules: { label: string; broken: number }[]
     capacity?: { weeks: { label: string }[]; presses: { press: string; capacity: number[]; demand: number[] }[] } | null
@@ -135,7 +135,7 @@ export function buildCockpit(input: CockpitInput, t: TodayThresholds): Signal[] 
           unavoidable > 0
             ? `${unavoidable} of them no plan can save with today's capacity — decide overtime or another work center. The rest is sequencing.`
             : 'Each could be on time with a different sequence — see the suggestions.',
-        items: late.slice(0, 3).map((l) => ({ text: `${l.material} on ${l.presses.join(', ') || '—'} — ${fmt(l.lateHours)} h late (due ${l.deadline})`, sub: l.suggestion })),
+        items: late.slice(0, 3).map((l) => ({ text: `${l.material} on ${l.presses.join(', ') || '—'} — ${fmt(l.lateHours)} h late (due ${l.deadline})`, sub: l.why?.[0] ?? l.suggestion })),
         to: '/planlama',
       })
     } else {

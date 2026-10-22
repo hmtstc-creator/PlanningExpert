@@ -78,6 +78,15 @@ describe('lateness is judged at 08:00 on the need day', () => {
     expect(item.neededQuantity).toBe(200)
     expect(item.lateHours).toBeGreaterThan(0)
     expect(item.suggestion).toContain('104')
+    // Neden geç: Y aynı preste önce; hesap: hazır − teslim = gecikme.
+    expect(item.why!.join(' ')).toContain('busy with 1 other job')
+    expect(item.why!.join(' ')).toContain('Y placed first by a plan override')
+    const calc = item.calc!
+    expect(calc.before[0]).toMatchObject({ material: 'Y', kind: 'earlier', override: true })
+    expect(calc.deadline).toContain('08:00')
+    expect(calc.lateHours).toBe(item.lateHours)
+    expect(calc.neededQuantity).toBe(200)
+    expect(calc.setupMinutes + calc.qualityMinutes + calc.runMinutes).toBeGreaterThan(0)
   })
 })
 

@@ -8,12 +8,39 @@
 # yalnızca main ileri sarılır (ff-only), Karabasan'a dokunulmaz, gizli değerler
 # çıktıya yazılmaz.
 #
-#   scripts/deploy.sh          main'de yeni commit yoksa hiçbir şey yapmaz
+#   scripts/deploy.sh          yayındaki commit main'in ucuysa hiçbir şey yapmaz
 #   scripts/deploy.sh --force  yeni commit olmasa da yeniden yayınlar
+#
+# Otomatik yayın: planningexpert-autodeploy.timer bu betiği 5 dakikada bir
+# çalıştırır. Yayındaki commit $STATE/deployed-commit'te tutulur; bir commit
+# başarısız olursa $STATE/failed-commit'e yazılır ve yeni bir commit gelene
+# (ya da --force) kadar yeniden denenmez — her 5 dakikada yedek alınmasın.
 #
 # Betik git pull ile kendini değiştirebilir; bash bir işlevi çalıştırmadan önce
 # bütünüyle okuduğu için gövde main() içinde.
 set -euo pipefail
+
+# deploy/systemd'deki zamanlayıcıları sisteme kurar ya da günceller (değiştiyse):
+# otomatik yayın ve gece yedeği. Böylece yeni bir birim için ayrıca izin gerekmez.
+install_units() {
+  command -v systemctl >/dev/null 2>&1 || return 0
+  local changed=0 f name
+  for f in deploy/systemd/planningexpert-*.service deploy/systemd/planningexpert-*.timer; do
+    [ -f "$f" ] || continue
+    name=$(basename "$f")
+    if ! cmp -s "$f" "/etc/systemd/system/${name}"; then
+      install -m 644 "$f" "/etc/systemd/system/${name}"
+      changed=1
+      echo "systemd: ${name} installed"
+    fi
+  done
+  [ "$changed" = 1 ] && systemctl daemon-reload
+  for f in deploy/systemd/planningexpert-*.timer; do
+    name=$(basename "$f")
+    systemctl is-enabled -q "$name" 2>/dev/null || { systemctl enable --now -q "$name" && echo "systemd: ${name} enabled"; }
+  done
+  return 0
+}
 
 main() {
   local force=0
@@ -28,17 +55,30 @@ main() {
     exit 2
   fi
 
-  local before after
+  local state=/var/lib/planningexpert
+  mkdir -p "$state"
+  local before after deployed failed
   before=$(git rev-parse --short HEAD)
   git fetch -q origin main
   git merge --ff-only -q origin/main
   after=$(git rev-parse --short HEAD)
-  if [ "$before" = "$after" ] && [ "$force" = 0 ]; then
-    echo "HEAD ${after}: already up to date — nothing to deploy (use --force to redeploy)."
-    exit 0
+  # Kayıt yoksa (ilk otomatik yayın) yayındaki sürüm bilinmiyor: bir kez yayınlanır.
+  deployed=$(cat "$state/deployed-commit" 2>/dev/null || echo "unknown")
+  failed=$(cat "$state/failed-commit" 2>/dev/null || true)
+  if [ "$force" = 0 ]; then
+    if [ "$deployed" = "$after" ]; then
+      install_units
+      echo "HEAD ${after}: already live — nothing to deploy (use --force to redeploy)."
+      exit 0
+    fi
+    if [ "$failed" = "$after" ]; then
+      echo "HEAD ${after}: the last deploy of this commit failed — not retrying (fix it on main or use --force)."
+      exit 0
+    fi
   fi
-  echo "HEAD ${before} -> ${after}"
-  git log --oneline "${before}..${after}" | head -20
+  install_units
+  echo "live ${deployed} -> ${after}"
+  if [ "$deployed" != unknown ]; then git log --oneline "${deployed}..${after}" 2>/dev/null | head -20 || true; fi
 
   set -a
   # shellcheck disable=SC1091
@@ -65,6 +105,7 @@ main() {
   echo "release.sh: exit ${rc}, $(($(date +%s) - t0)) s"
   chmod 600 backups/*.zip 2>/dev/null || true
   if [ "$rc" != 0 ]; then
+    echo "$after" >"$state/failed-commit"
     echo "STOP: release failed — the site was NOT restarted."
     exit "$rc"
   fi
@@ -84,7 +125,14 @@ main() {
   docker inspect planningexpert-backend-1 --format 'backend: restart={{.RestartCount}} oom={{.State.OOMKilled}}' 2>/dev/null || true
   free -m | sed -n '2,3p'
   echo "karabasan: $(docker ps --filter name=kb- --format '{{.Names}}' | wc -l) containers up (not touched)"
-  [ "$code" = 200 ] || { echo "WARNING: the site did not answer 200 locally."; exit 3; }
+  if [ "$code" != 200 ]; then
+    echo "$after" >"$state/failed-commit"
+    echo "WARNING: the site did not answer 200 locally."
+    exit 3
+  fi
+  echo "$after" >"$state/deployed-commit"
+  rm -f "$state/failed-commit"
+  echo "live: ${after}"
 }
 
 main "$@"
