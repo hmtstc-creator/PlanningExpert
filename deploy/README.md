@@ -58,8 +58,12 @@ sunucuda: `deploy/.env` ve `/etc/planningexpert/portal.env` (ikisi de `chmod 600
 içinde yayındadır. Yayındaki commit `/var/lib/planningexpert/deployed-commit`'te
 tutulur; yayını başarısız olan commit `failed-commit`'e yazılır ve `main`'e yeni bir
 commit gelene (ya da `--force`) kadar yeniden denenmez. Elle çalıştırmayla çakışmaz
-(`flock`). `deploy.sh` `deploy/systemd/` birimlerini kendisi kurar / günceller, yani
+(`deploy.sh` içinde `flock`, `/run/planningexpert-deploy.lock`; ikinci çalıştırma hiçbir şey yapmadan çıkar). `deploy.sh` `deploy/systemd/` birimlerini kendisi kurar / günceller, yani
 zamanlayıcı ilk elle yayında kendiliğinden açılır.
+
+**Güvenlik:** `deploy.sh` `deploy/systemd/planningexpert-*` birimlerini **root** olarak
+kurar ve `main`'deki her commit otomatik yayınlanır. Bu yüzden `main`'e yazma yetkisi
+sınırlı tutulmalı ve GitHub'da branch protection açık olmalı (PR + `verify` zorunlu).
 
 ```bash
 systemctl list-timers planningexpert-autodeploy.timer   # sonraki kontrol

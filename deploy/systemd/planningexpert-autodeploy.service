@@ -12,6 +12,6 @@ User=root
 WorkingDirectory=/opt/planningexpert
 # Yedekler veri içerir: dosyalar 600 oluşsun.
 UMask=0077
-# Elle çalıştırılan deploy.sh ile çakışmasın.
-ExecStart=/usr/bin/flock -n /run/planningexpert-deploy.lock /opt/planningexpert/scripts/deploy.sh
+# Kilit deploy.sh'ın içinde: elle çalıştırmayla çakışmaz.
+ExecStart=/opt/planningexpert/scripts/deploy.sh
 TimeoutStartSec=30min
