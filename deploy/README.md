@@ -81,6 +81,9 @@ alınamazsa durur, (3) `npx convex deploy` — Convex mevcut veriye uymayan şem
 reddeder, (4) site derlemesi (`VITE_CONVEX_URL` = `CONVEX_PUBLIC_URL`).
 
 Kontrol: sitede giriş; System → Connection diagnostics yeşil; değişen sayfa açılıyor.
+Aynı sayfada **Version on this site**: yayındaki commit, mesajı ve yayın zamanı (UTC ve
+Türkiye) — `release.sh` derlemeden önce `VITE_BUILD_*` olarak gömer; GitHub'daki `main`'in
+en üstüyle aynıysa site günceldir.
 
 ## Yedek
 
