@@ -10,6 +10,7 @@ import {
   type ShiftSettings,
   computeRunPlan,
   eligiblePressesOf,
+  shotsPerCoil,
   splitByMoldLimit,
 } from './planning'
 import { addDays, isoDate } from './dates'
@@ -162,6 +163,51 @@ function runShareOf(entry: DemandEntry, before: number, quantity: number): Deman
     needFraction: need > a ? map(need) : 0,
     noStockout: entry.noStockout || noNeed,
   }
+}
+
+/**
+ * Bir lotu `parts` parçaya böler (yerel arama): parçalar tam rulo sınırındadır
+ * (bağlanan rulo yarıda bırakılmaz), her parçanın ihtiyacı ve eş ürünü
+ * `runShareOf` ile paylaştırılır. Böylece 30.000'lik bir lot 15.000 + 15.000
+ * olur ve parçaların arasına başka bir malzeme girebilir; ikinci parça yeni bir
+ * setup ister. Bölünemiyorsa (rulo sayısı yetmiyor, parça Min. lotun altında)
+ * null döner.
+ */
+export function splitLot(
+  entry: DemandEntry,
+  product: ProductSpec | undefined,
+  parts: number,
+  /** 'need': 2 parçada ilk parça lotun hemen gereken kısmını (ilk teslim noktasını) karşılar. */
+  mode: 'even' | 'need' = 'even',
+): DemandEntry[] | null {
+  if (!product || parts < 2) return null
+  const cavities = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
+  const unit = shotsPerCoil(product) * cavities
+  if (!(unit > 0)) return null
+  const coils = Math.floor(entry.qty / unit + 1e-9)
+  if (coils < parts) return null
+  let coilsPer: number[]
+  if (mode === 'need') {
+    if (parts !== 2) return null
+    // Hemen gereken pay tam rulo katına yukarı yuvarlanır; kalan sonraya.
+    const first = entry.checkpoints?.[0]?.fraction ?? entry.needFraction ?? 1
+    const firstCoils = Math.min(coils - 1, Math.max(1, Math.ceil(first * (entry.qty / unit) - 1e-9)))
+    coilsPer = [firstCoils, coils - firstCoils]
+  } else {
+    const base = Math.floor(coils / parts)
+    const extra = coils - base * parts
+    coilsPer = Array.from({ length: parts }, (_, i) => base + (i < extra ? 1 : 0))
+  }
+  const sizes = coilsPer.map((c) => c * unit)
+  // Rulo katına oturmayan artık son parçaya gider: toplam değişmez.
+  sizes[parts - 1] += entry.qty - coils * unit
+  if (product.minLotQty && sizes.some((q) => q < product.minLotQty!)) return null
+  let before = 0
+  return sizes.map((quantity, i) => {
+    const share = runShareOf(entry, before, quantity)
+    before += quantity
+    return { ...share, bucketLabel: `${entry.bucketLabel} (${i + 1}/${parts})`, splitPart: { index: i + 1, of: parts, label: entry.bucketLabel } }
+  })
 }
 
 export interface PressSpec {

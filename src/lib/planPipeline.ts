@@ -57,6 +57,7 @@ import {
 } from './planAlarms'
 import {
   schedule,
+  splitLot,
   type PlanOverride,
   type ScheduledJob,
   type ScheduleVariant,
@@ -266,7 +267,12 @@ export interface PlanOptimisation {
   stoppedBecause: 'target' | 'noImprovement' | 'limit' | 'time'
   windowDays: number
   /** Geç kalemlere hedefli hamleler: kaç hamle denendi, kaçı tutuldu. */
-  localSearch?: { evaluations: number; improvements: number }
+  localSearch?: {
+    evaluations: number
+    improvements: number
+    /** Kalıcı olarak bölünen lotlar (ör. 30.000 → 15.000 + 15.000). */
+    lotSplits?: { material: string; bucketLabel: string; parts: number }[]
+  }
   searchMs: number
   perPress: { press: string; capacityHours: number; busyHours: number; utilisation: number }[]
   scenarios: ScenarioSummary[]
@@ -835,6 +841,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // En az plansız, sonra en az geç iş, sonra en az geç gün, sonra en az
   // değişiklik yapan plan seçilir. Hiçbir deneme daha iyi değilse durulur.
   const lotKey = (e: { material: string; bucketLabel: string }) => `${e.material}|${e.bucketLabel}`
+  type LotSplit = { parts: number; delay: number; mode?: 'even' | 'need' }
   // ---- Teslim anı -----------------------------------------------------------
   // İhtiyaç gününün sabahı (varsayılan 08:00) kadar gereken adet hazırsa lot
   // zamanındadır. Bakiye ve bugüne düşen ihtiyaç zaten bugün sabah
@@ -879,8 +886,10 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     boost: Set<string>,
     variant: ScheduleVariant = {},
     shifts: Map<string, number> = new Map(),
+    splits: Map<string, LotSplit> = new Map(),
   ) => {
-    const demand = buildDemandSchedule(demandRows, productByCode, demandOptions)
+    const built = buildDemandSchedule(demandRows, productByCode, demandOptions)
+    const demand = built
     for (const entry of demand) {
       if (boost.has(lotKey(entry))) entry.boost = true
       const shift = shifts.get(lotKey(entry))
@@ -897,15 +906,40 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         cp.deadlineLabel = d.label
       }
     }
+    // Lot bölme (yerel arama): lot tam rulo sınırında parçalara ayrılır; ilk
+    // parça lotun yerinde kalır, sonrakiler `delay` gün arkaya sıralanır ki
+    // araya başka bir lot girebilsin.
+    const final =
+      splits.size === 0
+        ? demand
+        : demand.flatMap((entry) => {
+            const split = splits.get(lotKey(entry))
+            const parts = split ? splitLot(entry, productByCode.get(entry.material), split.parts, split.mode) : null
+            if (!split || !parts) return [entry]
+            return parts.map((part, i) => {
+              if (i > 0) {
+                part.boost = false
+                part.orderShift = (part.orderShift ?? 0) + split.delay * i
+                // Ihtiyacı olmayan parça yalnızca rulo fazlasıdır: bakiye / acil
+                // önceliği taşımaz, dolgu olarak sıralanır.
+                if (part.noStockout) part.phase = 'fill'
+              }
+              const key = lotKey(part)
+              if (boost.has(key)) part.boost = true
+              const shift = shifts.get(key)
+              if (shift) part.orderShift = (part.orderShift ?? 0) + shift
+              return part
+            })
+          })
     const scheduled = schedule(
-      demand,
+      final,
       productByCode,
       presses,
       buckets,
       { shiftMinutes, overtimeShiftMinutes },
       { ...scheduleOptions, ...variant },
     )
-    return { ...scheduled, demand }
+    return { ...scheduled, demand: final }
   }
   const dayMs = 86_400_000
   // Gecikme (yaklaşık dakika): gereken payın hazır olduğu an − teslim anı.
@@ -1077,6 +1111,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     variant: {} as ScheduleVariant,
     boost: best.boost,
     shifts: new Map<string, number>(),
+    splits: new Map<string, LotSplit>(),
     result: best.result,
     util: standardUtil,
     score: optScore(best.result, standardUtil.productive),
@@ -1120,7 +1155,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       const sc = optScore(r, util.productive)
       tried.push(summaryOf(label, r, util.overall))
       if (better(sc, chosen.score)) {
-        chosen = { label, variant, boost: rBoost, shifts: new Map(), result: r, util, score: sc }
+        chosen = { label, variant, boost: rBoost, shifts: new Map(), splits: new Map(), result: r, util, score: sc }
         sinceImprovement = 0
         if (reached(r, util.overall)) {
           stoppedBecause = 'target'
@@ -1144,9 +1179,13 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const localStarted = Date.now()
   let localEvaluations = 0
   let localImprovements = 0
-  const tryMove = (boost: Set<string>, shifts: Map<string, number>): boolean => {
+  const tryMove = (
+    boost: Set<string>,
+    shifts: Map<string, number>,
+    splits: Map<string, LotSplit> = chosen.splits,
+  ): boolean => {
     localEvaluations += 1
-    const r = planOnce(boost, chosen.variant, shifts)
+    const r = planOnce(boost, chosen.variant, shifts, splits)
     const util = utilisationOf(r)
     const sc = optScore(r, util.productive)
     if (!better(sc, chosen.score)) return false
@@ -1155,6 +1194,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       variant: chosen.variant,
       boost,
       shifts,
+      splits,
       result: r,
       util,
       score: sc,
@@ -1174,7 +1214,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     for (const lj of lateJobs) {
       if (!budgetLeft()) break
       const key = lotKey(lj)
-      const moves: (() => { boost: Set<string>; shifts: Map<string, number> })[] = []
+      const moves: (() => { boost: Set<string>; shifts: Map<string, number>; splits?: Map<string, LotSplit> })[] = []
       for (const days of [-1, -2, -4]) {
         moves.push(() => {
           const shifts = new Map(chosen.shifts)
@@ -1207,13 +1247,41 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
           return { boost: chosen.boost, shifts }
         })
       }
+      // Lot bölme: aynı preste ondan önce çalışan en uzun iki lot (30.000'lik
+      // lot gibi) 2 ya da 3 parçaya bölünür; parçalar arasına geç lot girer.
+      // Bölme yalnızca geç işi kurtarıyorsa kabul edilir (skor kuralı aynı:
+      // ek setup ancak müşteriyi kurtarırsa değer).
+      const blockers = chosen.result.jobs
+        .filter(
+          (j) =>
+            j.press === lj.press &&
+            !j.late &&
+            j.material !== lj.material &&
+            (j.date < lj.date || (j.date === lj.date && j.setupStartMinute < lj.setupStartMinute)),
+        )
+        .sort((a, b) => b.runMinutes - a.runMinutes)
+        .slice(0, 2)
+      for (const blocker of blockers) {
+        const blockerKey = lotKey(blocker)
+        if (chosen.splits.has(blockerKey) || /\(\d+\/\d+\)$/.test(blocker.bucketLabel)) continue
+        // İkinci parça, geç lotun ardına sıralanır (aynı faz içinde).
+        const delay = Math.min(30, Math.max(1, Math.ceil((Date.parse(lj.dueDate) - Date.parse(blocker.dueDate)) / dayMs) + 1))
+        // Önce ihtiyaca göre (ilk parça hemen gereken kadar), sonra eşit 2 ve 3 parça.
+        for (const [parts, mode] of [[2, 'need'], [2, 'even'], [3, 'even']] as const) {
+          moves.push(() => ({
+            boost: chosen.boost,
+            shifts: chosen.shifts,
+            splits: new Map(chosen.splits).set(blockerKey, { parts, delay, mode }),
+          }))
+        }
+      }
       for (const [index, make] of moves.entries()) {
         if (!budgetLeft()) break
         const id = `${pass}|${key}|${index}`
         if (triedMoves.has(id)) continue
         triedMoves.add(id)
         const move = make()
-        if (tryMove(move.boost, move.shifts)) {
+        if (tryMove(move.boost, move.shifts, move.splits)) {
           improved = true
           break
         }
@@ -1228,6 +1296,9 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     })
   }
 
+  const lotSplits = Array.from(chosen.splits.entries())
+    .filter(([key]) => chosen.result.demand.some((e) => e.splitPart && `${e.material}|${e.splitPart.label}` === key))
+    .map(([key, v]) => ({ material: key.split('|')[0], bucketLabel: key.split('|').slice(1).join('|'), parts: v.parts }))
   const optimisation = {
     target: utilisationTarget,
     achieved: chosen.util.overall,
@@ -1237,7 +1308,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     stoppedBecause,
     windowDays: UTILISATION_WINDOW_DAYS,
     searchMs: Date.now() - searchStarted,
-    localSearch: { evaluations: localEvaluations, improvements: localImprovements },
+    localSearch: { evaluations: localEvaluations, improvements: localImprovements, lotSplits },
     perPress: chosen.util.perPress,
     // Karşılaştırma tablosu: seçilen + en iyi birkaç deneme.
     scenarios: [...tried]
@@ -1253,6 +1324,16 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   }
   const chosenPressRule = chosen.variant.pressRule ?? 'earliestFinish'
   const result = chosen.result
+  // Bölünen lotun parçaları: işin gerekçesine yazılır, planda görünür.
+  const splitEntries = new Map(
+    result.demand.filter((e) => e.splitPart).map((e) => [lotKey(e), e.splitPart!] as const),
+  )
+  for (const job of result.jobs) {
+    const part = splitEntries.get(lotKey(job))
+    if (part) {
+      job.reason += ` · lot split ${part.index}/${part.of}: another lot runs between the parts so it is ready in time (one more setup)`
+    }
+  }
 
   // Kalıbı tutulduğu için plana alınamayan lotun sebebi "kullanıcı dışladı"
   // değil: kalıp hazır değil ya da ömür alarmı açık. Doğrusu yazılsın.

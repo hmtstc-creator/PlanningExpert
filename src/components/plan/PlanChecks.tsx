@@ -228,6 +228,10 @@ export function OptimisationPanel({ opt }: { opt: PlanOptimisation }) {
         <strong className="text-foreground">{opt.chosen}</strong> (standard plan {pct(opt.standard)}).
         {opt.localSearch && opt.localSearch.evaluations > 0 &&
           `Local search on the late parts: ${opt.localSearch.evaluations} moves tried, ${opt.localSearch.improvements} kept. `}
+        {(opt.localSearch?.lotSplits?.length ?? 0) > 0 &&
+          `Lots split in parts so a late lot runs between them: ${opt.localSearch!.lotSplits!
+            .map((l) => `${l.material} ${l.bucketLabel} (${l.parts} parts)`)
+            .join(', ')}. `}
         Fewest late items always wins over higher utilisation.
       </p>
       {open && (

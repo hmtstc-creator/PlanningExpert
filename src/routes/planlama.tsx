@@ -13,6 +13,9 @@ import { PlanDataLine } from '../components/plan/PlanPanels'
 import { PressStartPanel } from '../components/plan/PressStartPanel'
 import { JobDialog, type JobDraft } from '../components/plan/JobDialog'
 import { dayMonth, minutesAgo, usePlanState } from '../components/plan/usePlanState'
+/** Planın böldüğü lotun parça son eki: "W38 (1/2)". */
+const SPLIT_SUFFIX = / \(\d+\/\d+\)$/
+
 export const Route = createFileRoute('/planlama')({
   component: PlanlamaPage,
 })
@@ -407,17 +410,20 @@ function PlanlamaPage() {
                 const key = `${job.material}|${job.press}|${job.date}|${Math.round(job.setupStartMinute)}`
                 const lock = job.locked ? lockByKey.get(key) : undefined
                 if (job.locked && !lock) return
-                // Lot: aynı malzeme + kova; kalıp ömrüyle bölünmüşse birden çok iş.
-                const lot = engineJobs.filter((j) => j.material === job.material && j.bucketLabel === job.bucketLabel)
+                // Lot: aynı malzeme + kova; kalıp ömrüyle ya da plan bölmesiyle
+                // ("W38 (1/2)") bölünmüşse birden çok iş. Adet değişikliği lotun
+                // tamamına uygulanır; motor bölmeyi yeniden dener.
+                const lotLabel = job.bucketLabel.replace(SPLIT_SUFFIX, '')
+                const lot = engineJobs.filter((j) => j.material === job.material && j.bucketLabel.replace(SPLIT_SUFFIX, '') === lotLabel)
                 const lotQuantity = lot.reduce((sum, j) => sum + j.quantity, 0)
                 const coils = lot.reduce((sum, j) => sum + (j.coilsNeeded ?? 0), 0)
                 setJobDraft({
                   job,
-                  bucket: job.bucketLabel,
+                  bucket: lotLabel,
                   lotQuantity: lotQuantity || job.quantity,
                   lotJobCount: Math.max(1, lot.length),
                   piecesPerCoil: coils > 0 ? lotQuantity / coils : undefined,
-                  override: quantityRules.get(`${job.material}|${job.bucketLabel}`),
+                  override: quantityRules.get(`${job.material}|${lotLabel}`),
                   lock: lock && { id: lock._id, approvedBy: lock.approvedBy, createdAt: lock.createdAt },
                 })
               }}
