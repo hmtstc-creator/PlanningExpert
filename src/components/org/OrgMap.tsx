@@ -128,17 +128,21 @@ export function OrgMap() {
   )
 }
 
+// Yüklenirken / 'skip' iken useQuery undefined döner; `?? []` her çizimde yeni dizi üretip
+// graph → setNodes → yeniden çizim döngüsüne (React #185) yol açıyordu. Sabit boş dizi kullanılır.
+const NONE: never[] = []
+
 function OrgMapInner() {
   const { isPlatform, ctx } = usePlant()
   const flow = useReactFlow()
-  const companies = (useQuery(api.platform.companies) ?? []) as CompanyRow[]
-  const holdings = (useQuery(api.platform.holdings, isPlatform ? {} : 'skip') ?? []) as OrgHolding[]
+  const companies = (useQuery(api.platform.companies) ?? NONE) as CompanyRow[]
+  const holdings = (useQuery(api.platform.holdings, isPlatform ? {} : 'skip') ?? NONE) as OrgHolding[]
   const [view, setView] = useState<View>('structure')
   const [companyId, setCompanyId] = useState<string | null>(null)
   const company = companies.find((c) => c._id === companyId) ?? companies.find((c) => c._id === ctx?.active?.companyId) ?? companies[0]
   const people = view === 'people' && company
-  const users = (useQuery(api.users.list, people ? { companyId: company._id } : 'skip') ?? []) as UserRow[]
-  const groups = (useQuery(api.users.listGroups, people ? { companyId: company._id } : 'skip') ?? []) as (GroupRow & { companyId: string })[]
+  const users = (useQuery(api.users.list, people ? { companyId: company._id } : 'skip') ?? NONE) as UserRow[]
+  const groups = (useQuery(api.users.listGroups, people ? { companyId: company._id } : 'skip') ?? NONE) as (GroupRow & { companyId: string })[]
 
   // Varsayılan: work center'lar kapalı (masraf yeri satırında sayı). Tıklanan düğüm varsayılanı tersine çevirir.
   const [showWc, setShowWc] = useState(false)
