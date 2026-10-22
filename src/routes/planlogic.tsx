@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
 import { DEFAULT_PLANT_TIME_ZONE } from '../lib/dates'
+import { leadTimeLookup, type LeadTimeRow } from '../lib/rawLeadTime'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
@@ -55,6 +56,7 @@ function hhmm(minute: number): string {
 }
 
 function PlanLogicPage() {
+  const leadRows = useQuery(api.rawLeadTimes.list) as LeadTimeRow[] | undefined
   const settings = useQuery(api.pressCalendar.getGlobalSettings) as
     | {
         shiftMinutes: number
@@ -103,6 +105,8 @@ function PlanLogicPage() {
     rawCoverage: settings?.rawCoverageDays ?? SETTINGS_DEFAULTS.rawCoverageDays,
     rawExtra: settings?.rawOrderExtraKg ?? SETTINGS_DEFAULTS.rawOrderExtraKg,
     rawUrgent: settings?.rawUrgentDays ?? SETTINGS_DEFAULTS.rawUrgentDays,
+    rawLeadDefault: leadTimeLookup(leadRows ?? []).defaultDays,
+    rawLeadEntered: (leadRows ?? []).filter((r) => r.rawMaterialCode !== '*').length,
     predictionOee: Math.round((settings?.acceptedPerformanceRate ?? SETTINGS_DEFAULTS.acceptedPerformanceRate) * 1000) / 10,
   }
 
@@ -739,7 +743,17 @@ function PlanLogicPage() {
             is the safety window: the use of the next N working days (a holiday week reaches further).
           </li>
           <li>
-            Now: N = {current.rawCoverage} working days, extra = {current.rawExtra.toLocaleString('en-GB')} kg. Working
+            <b>Order by</b>: an order must be in by the Monday of its delivery week, so it is placed at
+            the latest on that Monday − the coil's <b>lead time in calendar days</b> (weekends and
+            holidays count — the supplier quotes calendar days). Each coil has its own lead time on Raw
+            Material Coverage → Lead times; a coil without one uses the default and is marked{' '}
+            <i>not entered</i>. A date already passed is <b>late</b> (red), a date in this week is
+            amber. The lead time only dates the order: it does not move the delivery week, the safety
+            stock or the production plan.
+          </li>
+          <li>
+            Now: N = {current.rawCoverage} working days, extra = {current.rawExtra.toLocaleString('en-GB')} kg, default
+            lead time {current.rawLeadDefault} calendar days ({current.rawLeadEntered} coil(s) with their own). Working
             days are the plant's working days (not a holiday, at least one work center with normal shifts).
           </li>
         </ol>

@@ -170,6 +170,18 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   Calculate plan, Approve plan (yanında kısa plan denetimi özeti), Gantt ve iş
   penceresi, Plan overrides.
 
+### Hammadde tedarik süresi (2026-10-22)
+
+- Sac kodu başına tedarik süresi yeni `rawLeadTimes` tablosunda; mevcut
+  tablolara dokunulmadı. Varsayılan `rawMaterialCode: '*'` satırı, o da yoksa
+  `SETTINGS_DEFAULTS.rawLeadTimeDays` (14). Kendi satırı olmayan sac
+  "not entered" görünür.
+- Süre **takvim günü**: tedarikçi süreyi takvimle verir, tatil fabrikanın
+  takvimidir. En geç sipariş günü = teslim haftasının Pazartesi'si − süre.
+  Bugünden önceyse geç (kırmızı), bu hafta içindeyse turuncu.
+- Süre yalnızca siparişi tarihler: teslim haftası, emniyet ve üretim planı
+  değişmez (`affectsPlan: false`). Hesap `src/lib/rawLeadTime.ts`.
+
 ## Aksiyon listesi
 
 Uygulandı (2026-09-26, "programı düzelt"):

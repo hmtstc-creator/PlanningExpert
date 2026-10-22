@@ -6,35 +6,87 @@
 
 import * as XLSX from 'xlsx'
 
+import { orderDeadlines, type LeadTime, type OrderDeadline } from './rawLeadTime'
 import type { MrpWeek, RawMrpResult } from './rawMrp'
 
 export interface OrderExportMeta {
   computedAt: string
   coverageDays: number
   extraKg: number
+  /** Verilirse her siparişin en geç sipariş günü yazılır ("Order by" sayfası). */
+  leadTime?: (rawMaterial: string) => LeadTime
+  todayIso?: string
 }
 
-/** Sipariş tablosu (hammadde × teslim haftası) ve haftalık ayrıntı: iki sayfalık çalışma kitabı. */
+const STATUS_TEXT: Record<OrderDeadline['status'], string> = { late: 'LATE', thisWeek: 'this week', later: '' }
+
+/**
+ * Sipariş tablosu (hammadde × teslim haftası), tedarik süresi verilmişse en geç
+ * sipariş günleri, ve haftalık ayrıntı.
+ */
 export function buildOrderWorkbook(results: RawMrpResult[], weeks: MrpWeek[], meta: OrderExportMeta): XLSX.WorkBook {
   const withOrders = results.filter((r) => r.totalOrderKg > 0)
   const totals = weeks.map((_, w) => withOrders.reduce((a, r) => a + r.rows[w].orderKg, 0))
+  const { leadTime, todayIso } = meta
+  const deadlines = new Map<string, OrderDeadline[]>(
+    leadTime && todayIso ? withOrders.map((r) => [r.rawMaterial, orderDeadlines(r, weeks, leadTime(r.rawMaterial), todayIso)]) : [],
+  )
+  const leadCols = leadTime && todayIso ? ['Lead time (calendar days)', 'First order by'] : []
   const orders: (string | number | null)[][] = [
     ['Raw material orders by delivery week (kg)'],
     [`Calculated ${meta.computedAt} · safety stock ${meta.coverageDays} working days · +${meta.extraKg} kg per order`],
     [],
-    ['Raw material', 'Finished product', 'Stock (kg)', 'In transit (kg)', ...weeks.map((w) => `${w.label} (${w.start})`), 'Total (kg)'],
-    ...withOrders.map((r) => [
-      r.rawMaterial,
-      r.materials.join(', '),
-      r.stockKg,
-      r.totalInTransitKg > 0 ? r.totalInTransitKg : null,
-      ...r.rows.map((row) => (row.orderKg > 0 ? row.orderKg : null)),
-      r.totalOrderKg,
-    ]),
+    ['Raw material', 'Finished product', 'Stock (kg)', 'In transit (kg)', ...weeks.map((w) => `${w.label} (${w.start})`), 'Total (kg)', ...leadCols],
+    ...withOrders.map((r) => {
+      const first = deadlines.get(r.rawMaterial)?.[0]
+      return [
+        r.rawMaterial,
+        r.materials.join(', '),
+        r.stockKg,
+        r.totalInTransitKg > 0 ? r.totalInTransitKg : null,
+        ...r.rows.map((row) => (row.orderKg > 0 ? row.orderKg : null)),
+        r.totalOrderKg,
+        ...(leadCols.length > 0 && first
+          ? [
+              `${first.leadTimeDays}${first.leadTimeEntered ? '' : ' (default)'}`,
+              `${first.orderBy}${first.status === 'later' ? '' : ` ${STATUS_TEXT[first.status]}`}`,
+            ]
+          : []),
+      ]
+    }),
     ['Total', '', null, null, ...totals.map((t) => (t > 0 ? t : null)), totals.reduce((a, b) => a + b, 0)],
   ]
   const sheet = XLSX.utils.aoa_to_sheet(orders)
-  sheet['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 11 }, { wch: 14 }, ...weeks.map(() => ({ wch: 20 })), { wch: 12 }]
+  sheet['!cols'] = [
+    { wch: 18 },
+    { wch: 28 },
+    { wch: 11 },
+    { wch: 14 },
+    ...weeks.map(() => ({ wch: 20 })),
+    { wch: 12 },
+    ...leadCols.map(() => ({ wch: 24 })),
+  ]
+
+  // Her sipariş satırı: teslim haftası ve en geç sipariş günü, en acil önce.
+  const orderBy: (string | number)[][] = [
+    ['Raw material', 'Supplier', 'Delivery week', 'Delivery week start', 'Order (kg)', 'Lead time (calendar days)', 'Lead time', 'Order by', 'Status'],
+    ...Array.from(deadlines.values())
+      .flat()
+      .sort((a, b) => a.orderBy.localeCompare(b.orderBy) || a.rawMaterial.localeCompare(b.rawMaterial))
+      .map((d) => [
+        d.rawMaterial,
+        leadTime?.(d.rawMaterial).supplier ?? '',
+        weeks[d.week].label,
+        d.deliveryWeekStart,
+        d.orderKg,
+        d.leadTimeDays,
+        d.leadTimeEntered ? 'entered' : 'default',
+        d.orderBy,
+        STATUS_TEXT[d.status],
+      ]),
+  ]
+  const orderBySheet = XLSX.utils.aoa_to_sheet(orderBy)
+  orderBySheet['!cols'] = [{ wch: 18 }, { wch: 18 }, { wch: 13 }, { wch: 18 }, { wch: 11 }, { wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 10 }]
 
   const detail: (string | number)[][] = [
     ['Raw material', 'Week', 'Week start', 'Need (kg)', 'Stock at start (kg)', 'In transit arriving (kg)', 'Safety (kg)', 'Order (kg)', 'Stock at end (kg)'],
@@ -49,6 +101,7 @@ export function buildOrderWorkbook(results: RawMrpResult[], weeks: MrpWeek[], me
 
   const book = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(book, sheet, 'Orders')
+  if (deadlines.size > 0) XLSX.utils.book_append_sheet(book, orderBySheet, 'Order by')
   XLSX.utils.book_append_sheet(book, detailSheet, 'Weekly detail')
   return book
 }

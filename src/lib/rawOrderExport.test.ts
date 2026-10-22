@@ -27,6 +27,22 @@ describe('raw material order export', () => {
     expect(rows[5][0]).toBe('Total')
   })
 
+  it('adds the order-by date of each order when lead times are given', () => {
+    const book = buildOrderWorkbook(results, weeks, {
+      computedAt: '26 Sep 2026',
+      coverageDays: 10,
+      extraKg: 500,
+      todayIso: '2026-09-15',
+      leadTime: (raw) => (raw === 'R1' ? { days: 7, entered: true, supplier: 'Erdemir' } : { days: 14, entered: false }),
+    })
+    const back = XLSX.read(workbookBytes(book), { type: 'array' })
+    expect(back.SheetNames).toEqual(['Orders', 'Order by', 'Weekly detail'])
+    const orders = XLSX.utils.sheet_to_json<(string | number)[]>(back.Sheets.Orders, { header: 1 })
+    expect(orders[4].slice(-2)).toEqual(['7', '2026-09-14 LATE'])
+    const lines = XLSX.utils.sheet_to_json<(string | number)[]>(back.Sheets['Order by'], { header: 1 })
+    expect(lines[1]).toEqual(['R1', 'Erdemir', '2026-W39', '2026-09-21', 14500, 7, 'entered', '2026-09-14', 'LATE'])
+  })
+
   it('builds an unsent Outlook draft with To, Cc, subject and the Excel attached', () => {
     const eml = buildDraftEml({
       to: ['buyer@plant.com'],
