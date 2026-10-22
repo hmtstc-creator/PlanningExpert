@@ -12,7 +12,7 @@ import { useTransport } from '../lib/convexTransport'
  *   sanılmasın diye açıkça yazılır.
  */
 export function ConnectionBanner() {
-  const { mode } = useTransport()
+  const { mode, ws } = useTransport()
 
   if (mode === 'websocket' || mode === 'connecting') return null
 
@@ -20,8 +20,10 @@ export function ConnectionBanner() {
     <div className="border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm text-amber-900 sm:px-6">
       <div className="flex w-full flex-wrap items-center gap-2">
         <span>
-          <strong>Fallback connection mode.</strong> The live connection (WebSocket) could not
-          be established, so data is fetched over HTTPS at regular intervals.
+          <strong>Fallback connection mode.</strong>{' '}
+          {ws.state === 'silent'
+            ? 'The live connection (WebSocket) is open but did not answer in time (slow network?), so data is fetched over HTTPS at regular intervals; it switches back by itself when the live connection answers.'
+            : 'The live connection (WebSocket) could not be established, so data is fetched over HTTPS at regular intervals.'}{' '}
           Saving works; changes appear on other devices after a short delay.
         </span>
         <Link to="/tani" className="font-medium underline">
