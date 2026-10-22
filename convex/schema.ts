@@ -838,6 +838,21 @@ export default defineSchema({
   }).index('by_plant', ['plantId'])
     .index('by_material', ['plantId', 'material']),
 
+  // Hammadde (sac) kodu başına tedarik süresi, TAKVİM günü. Planlamacı
+  // doldurur; satırı olmayan sac için `rawMaterialCode: '*'` satırı (yoksa
+  // SETTINGS_DEFAULTS.rawLeadTimeDays) kullanılır. Raw Material Coverage'da
+  // "siparişi en geç şu tarihte ver" = teslim haftasının başı − bu süre.
+  rawLeadTimes: defineTable({
+    ...plantField,
+    rawMaterialCode: v.string(),
+    leadTimeDays: v.number(),
+    supplier: v.optional(v.string()),
+    note: v.optional(v.string()),
+    updatedBy: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index('by_plant', ['plantId'])
+    .index('by_raw', ['plantId', 'rawMaterialCode']),
+
   // MB51'den yüklenen gerçekleşen üretim hareketleri. Plan/gerçek
   // karşılaştırması ve performans faktörü buradan beslenir.
   // Yoldaki hammadde (rulo) — kullanıcının Excel listesi; MRP'de planlı giriş.

@@ -3741,6 +3741,51 @@
       "optional": false
     }
   },
+  "rawLeadTimes": {
+    "leadTimeDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "note": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "rawMaterialCode": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "supplier": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "updatedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "updatedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    }
+  },
   "sapUploads": {
     "coversFrom": {
       "fieldType": {

@@ -30,6 +30,7 @@ const TABLES = [
   'moldMaintenance',
   'planOverrides',
   'planJobLocks',
+  'rawLeadTimes',
   'officialHolidays',
   // Kullanımdan kaldırılan tablolar — içlerinde veri kalmışsa burada
   // görünür, böylece taşınıp taşınmayacağına karar verilebilir.

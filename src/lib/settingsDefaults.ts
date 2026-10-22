@@ -32,6 +32,8 @@ export const SETTINGS_DEFAULTS = {
   rawCoverageDays: 10,
   rawOrderExtraKg: 500,
   rawUrgentDays: 3,
+  /** Tedarik süresi girilmemiş sac için (takvim günü); rawLeadTimes '*' satırı bunu geçersiz kılar. */
+  rawLeadTimeDays: 14,
   acceptedPerformanceRate: 1,
 } as const
 

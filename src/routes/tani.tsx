@@ -43,6 +43,7 @@ const TABLE_LABELS: Record<string, string> = {
   moldMaintenance: 'Mold maintenance',
   planOverrides: 'Plan overrides',
   planJobLocks: 'Approved jobs (locked)',
+  rawLeadTimes: 'Raw material lead times',
   officialHolidays: 'Public holidays',
   machines: 'Machines (deprecated)',
   machinePriorities: 'Machine priorities (deprecated)',

@@ -3,12 +3,14 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { useMutation, useQuery } from '../lib/convexTransport'
+import { leadTimeLookup, orderDeadlines, shortDate, weekEndIso, type LeadTimeRow, type OrderDeadline } from '../lib/rawLeadTime'
 import { rawMrp, type MrpWeek, type RawMrpResult, type RawProductNeed, type RawRequirementPlan } from '../lib/rawMrp'
 import { buildDraftEml, buildOrderWorkbook, parseAddresses, workbookBytes, XLSX_TYPE } from '../lib/rawOrderExport'
 import { formatPlantTime } from '../lib/sapUploads'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { friendlyError } from '../lib/mutationErrors'
 import { InfoTip, PageHeader } from '../components/PageHeader'
+import { LeadTimePanel } from '../components/raw/LeadTimePanel'
 import { relatedPages } from '../lib/navigation'
 
 export const Route = createFileRoute('/hammadde')({
@@ -44,6 +46,8 @@ function RawMaterialCoveragePage() {
     | null
     | undefined
   const saveSettings = useMutation(api.pressCalendar.saveRawCoverageSettings)
+  const leadRows = useQuery(api.rawLeadTimes.list) as LeadTimeRow[] | undefined
+  const leadTimes = useMemo(() => leadTimeLookup(leadRows ?? []), [leadRows])
 
   const savedDays = settings?.rawCoverageDays ?? DEFAULT_DAYS
   const savedExtra = settings?.rawOrderExtraKg ?? DEFAULT_EXTRA
@@ -85,7 +89,17 @@ function RawMaterialCoveragePage() {
   const weekNeed = weeks.map((_, w) => results.reduce((a, r) => a + r.rows[w].needKg, 0))
   const totalNeed = weekNeed.reduce((a, b) => a + b, 0)
   const totalStock = results.reduce((a, r) => a + r.stockKg, 0)
-  const thisWeek = results.filter((r) => (r.rows[0]?.orderKg ?? 0) > 0)
+  // En geç sipariş günü: teslim haftasının başı − tedarik süresi (takvim günü).
+  const todayIso = data?.todayIso ?? new Date().toISOString().slice(0, 10)
+  const deadlines = useMemo(
+    () => new Map(results.map((r) => [r.rawMaterial, orderDeadlines(r, weeks, leadTimes.of(r.rawMaterial), todayIso)])),
+    [results, weeks, leadTimes, todayIso],
+  )
+  const allDeadlines = Array.from(deadlines.values()).flat()
+  const late = allDeadlines.filter((d) => d.status === 'late')
+  const orderThisWeek = allDeadlines.filter((d) => d.status === 'thisWeek')
+  const kgOf = (list: OrderDeadline[]) => list.reduce((a, d) => a + d.orderKg, 0)
+  const rawsOf = (list: OrderDeadline[]) => new Set(list.map((d) => d.rawMaterial)).size
   const lowCover = results.filter((r) => r.coversWeeks !== null && r.coversWeeks * workingDaysPerWeek < coverageDays)
   const transitTotal = results.reduce((a, r) => a + r.totalInTransitKg, 0)
 
@@ -110,6 +124,8 @@ function RawMaterialCoveragePage() {
         computedAt: data ? formatPlantTime(data.computedAt) : '',
         coverageDays,
         extraKg,
+        leadTime: leadTimes.of,
+        todayIso,
       }),
     )
   const download = (bytes: BlobPart, name: string, type: string) => {
@@ -131,6 +147,7 @@ function RawMaterialCoveragePage() {
       '',
       `Attached are the raw material orders by delivery week, calculated ${data ? formatPlantTime(data.computedAt) : ''}.`,
       `Safety stock ${coverageDays} working days of use after each week, +${fmt(extraKg)} kg per order. Stock on hand and material in transit are already deducted. Total ${fmt(total)} kg.`,
+      `The "Order by" sheet gives the latest order date of each order (delivery week start minus lead time in calendar days)${late.length > 0 ? `; ${late.length} order(s) are already late` : ''}.`,
       '',
       'Totals by delivery week:',
       ...lines,
@@ -172,6 +189,10 @@ function RawMaterialCoveragePage() {
               </b>
               ; each order gets <b>{fmt(extraKg)} kg</b> extra. No demand, no order: nothing is
               brought in beyond the last ZPP week.
+            </p>
+            <p>
+              <b>Order by:</b> Monday of the delivery week minus the coil's lead time in calendar days
+              (Lead times, below). Red: already late; amber: place it this week.
             </p>
             <p>
               <Link to="/planlogic" hash="raw-mrp">
@@ -218,6 +239,8 @@ function RawMaterialCoveragePage() {
         <span className="ml-auto text-xs text-muted-foreground">{data ? `Calculated ${formatPlantTime(data.computedAt)}` : ''}</span>
       </div>
 
+      <LeadTimePanel rows={leadRows} raws={results.map((r) => ({ rawMaterial: r.rawMaterial, materials: r.materials }))} />
+
       <RecipientsPanel
         to={mailTo}
         cc={mailCc}
@@ -256,14 +279,19 @@ function RawMaterialCoveragePage() {
             </p>
           )}
 
-          <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <Card label="Raw materials" value={fmt(results.length)} />
             <Card label="In transit" value={transitTotal > 0 ? `${fmt(transitTotal)} kg` : '—'} />
             <Card label={`Stock + transit covers < ${coverageDays} working days`} value={fmt(lowCover.length)} warn={lowCover.length > 0} />
             <Card
-              label={`Due this week (${weeks[0]?.label ?? ''})`}
-              value={thisWeek.length > 0 ? `${thisWeek.length} · ${fmt(weekTotals[0] ?? 0)} kg` : '—'}
-              warn={thisWeek.length > 0}
+              label="Order late (order-by date passed)"
+              value={late.length > 0 ? `${rawsOf(late)} · ${fmt(kgOf(late))} kg` : '—'}
+              warn={late.length > 0}
+            />
+            <Card
+              label={`Order this week (by ${shortDate(weekEndIso(todayIso))})`}
+              value={orderThisWeek.length > 0 ? `${rawsOf(orderThisWeek)} · ${fmt(kgOf(orderThisWeek))} kg` : '—'}
+              amber={orderThisWeek.length > 0}
             />
             <Card
               label={`To order up to ${weeks[weeks.length - 1]?.label ?? ''}`}
@@ -300,7 +328,8 @@ function RawMaterialCoveragePage() {
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             The first two rows are all raw materials together, in tonnes per week. Click a raw material
-            to see need, stock, arrivals and safety per week (kg).
+            to see need, stock, arrivals, safety and the order-by date of each order (kg). Order by is the
+            first order's latest order date; * = default lead time, not entered for that coil.
           </p>
           <div className="mt-2 overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-right text-xs tabular-nums">
@@ -311,6 +340,9 @@ function RawMaterialCoveragePage() {
                   <th className="px-2 py-2 font-medium">Stock</th>
                   <th className="px-2 py-2 font-medium">In transit</th>
                   <th className="px-2 py-2 font-medium">Covers</th>
+                  <th className="whitespace-nowrap px-2 py-2 font-medium" title="First order: delivery week start − lead time (calendar days)">
+                    Order by
+                  </th>
                   {weeks.map((w) => (
                     <th key={w.start} className="whitespace-nowrap px-2 py-2 font-medium" title={`Week from ${w.start}`}>
                       {w.label.slice(-3)}
@@ -327,6 +359,7 @@ function RawMaterialCoveragePage() {
                   <td className="px-2 py-1.5 font-normal text-muted-foreground">{tons(totalStock)}</td>
                   <td className="px-2 py-1.5 font-normal text-muted-foreground">{transitTotal > 0 ? tons(transitTotal) : '·'}</td>
                   <td />
+                  <td />
                   {weekNeed.map((kg, w) => (
                     <td key={weeks[w].start} className="px-2 py-1.5">
                       {kg > 0 ? tons(kg) : '·'}
@@ -338,6 +371,7 @@ function RawMaterialCoveragePage() {
                   <td colSpan={2} className="sticky left-0 z-10 bg-sky-50 px-3 py-1.5 text-left font-medium">
                     Orders, all raw materials (t)
                   </td>
+                  <td />
                   <td />
                   <td />
                   <td />
@@ -369,6 +403,7 @@ function RawMaterialCoveragePage() {
                       <td className={`whitespace-nowrap px-2 py-1.5 ${r.coversWeeks !== null && r.coversWeeks * workingDaysPerWeek < coverageDays ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
                         {r.coversWeeks === null ? (r.totalNeedKg > 0 ? 'horizon' : '—') : `${r.coversWeeks} wk`}
                       </td>
+                      <OrderByCell deadline={deadlines.get(r.rawMaterial)?.[0]} />
                       {r.rows.map((row, w) => (
                         <td key={weeks[w].start} className={`px-2 py-1.5 ${row.orderKg > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground/40'}`}>
                           {row.orderKg > 0 ? fmt(row.orderKg) : '·'}
@@ -383,10 +418,15 @@ function RawMaterialCoveragePage() {
                         <DetailRow label="In transit arriving" values={r.rows.map((x) => x.inTransitKg)} />
                         <DetailRow label={`Safety (${coverageDays} working days)`} values={r.rows.map((x) => x.safetyKg)} />
                         <DetailRow label="Stock at week end" values={r.rows.map((x) => x.stockEndKg)} />
+                        <OrderByRow
+                          deadlines={deadlines.get(r.rawMaterial) ?? []}
+                          weeks={weeks}
+                          lead={leadTimes.of(r.rawMaterial)}
+                        />
                         <OrderReasonRow result={r} weeks={weeks} coverageDays={coverageDays} />
                         <ProductBreakdownRow products={itemByRaw.get(r.rawMaterial)?.byProduct} weeks={weeks} />
                         <tr className="bg-muted/20">
-                          <td colSpan={weeks.length + 6} className="px-3 py-1.5 text-left text-muted-foreground">
+                          <td colSpan={weeks.length + 7} className="px-3 py-1.5 text-left text-muted-foreground">
                             Used by {r.materials.join(', ') || '—'} · need up to the last ZPP week {fmt(r.totalNeedKg)} kg
                             {(itemByRaw.get(r.rawMaterial)?.inTransit ?? []).length > 0 && (
                               <>
@@ -410,6 +450,7 @@ function RawMaterialCoveragePage() {
                 ))}
                 <tr className="border-t-2 border-border bg-muted/40 font-semibold text-foreground">
                   <td colSpan={2} className="sticky left-0 z-10 bg-muted px-3 py-1.5 text-left">Total (kg)</td>
+                  <td />
                   <td />
                   <td />
                   <td />
@@ -559,7 +600,7 @@ function OrderReasonRow({ result, weeks, coverageDays }: { result: RawMrpResult;
   const row = result.rows[w]
   return (
     <tr className="bg-muted/20">
-      <td colSpan={weeks.length + 6} className="px-3 py-1.5 pl-7 text-left text-muted-foreground">
+      <td colSpan={weeks.length + 7} className="px-3 py-1.5 pl-7 text-left text-muted-foreground">
         <span className="font-medium text-foreground">First order {weeks[w]?.label}:</span> coil at week start{' '}
         {fmt(row.stockStartKg)} kg{row.inTransitKg > 0 ? ` + arriving ${fmt(row.inTransitKg)} kg` : ''} does not cover
         this week's use {fmt(row.needKg)} kg + the next {coverageDays} working days' use {fmt(row.safetyKg)} kg (safety).
@@ -580,7 +621,7 @@ function ProductBreakdownRow({ products, weeks }: { products?: RawProductNeed[];
   const last = weeks[weeks.length - 1]?.label ?? ''
   return (
     <tr className="bg-muted/20">
-      <td colSpan={weeks.length + 6} className="px-3 py-1.5 pl-7 text-left text-muted-foreground">
+      <td colSpan={weeks.length + 7} className="px-3 py-1.5 pl-7 text-left text-muted-foreground">
         <span className="font-medium text-foreground">By finished product</span> (finished stock is deducted first):
         <ul className="mt-1 space-y-0.5">
           {products.map((p) => (
@@ -616,6 +657,7 @@ function DetailRow({ label, values }: { label: string; values: number[] }) {
       <td />
       <td />
       <td />
+      <td />
       {values.map((v, i) => (
         <td key={i} className="px-2 py-1">
           {fmt(v)}
@@ -626,11 +668,58 @@ function DetailRow({ label, values }: { label: string; values: number[] }) {
   )
 }
 
-function Card({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+const DEADLINE_TEXT: Record<OrderDeadline['status'], string> = {
+  late: 'text-destructive font-semibold',
+  thisWeek: 'text-amber-700 font-semibold',
+  later: 'text-foreground',
+}
+
+/** İlk siparişin en geç sipariş günü. */
+function OrderByCell({ deadline }: { deadline?: OrderDeadline }) {
+  if (!deadline) return <td className="px-2 py-1.5 text-muted-foreground/40">·</td>
+  return (
+    <td
+      className={`whitespace-nowrap px-2 py-1.5 ${DEADLINE_TEXT[deadline.status]}`}
+      title={`Delivery ${deadline.deliveryWeekStart} − ${deadline.leadTimeDays} calendar days${deadline.leadTimeEntered ? '' : ' (default lead time — not entered)'}`}
+    >
+      {deadline.status === 'late' ? 'late · ' : ''}
+      {shortDate(deadline.orderBy)}
+      {!deadline.leadTimeEntered && <span className="text-muted-foreground">*</span>}
+    </td>
+  )
+}
+
+/** Açık satırda her siparişin en geç sipariş günü, teslim haftasının altında. */
+function OrderByRow({ deadlines, weeks, lead }: { deadlines: OrderDeadline[]; weeks: MrpWeek[]; lead: { days: number; entered: boolean; supplier?: string } }) {
+  const byWeek = new Map(deadlines.map((d) => [d.week, d]))
+  return (
+    <tr className="bg-muted/20 text-muted-foreground">
+      <td colSpan={2} className="sticky left-0 z-10 bg-muted/60 px-3 py-1 pl-7 text-left">
+        Order by ({lead.days} cal. days{lead.entered ? '' : ', default'}
+        {lead.supplier ? ` · ${lead.supplier}` : ''})
+      </td>
+      <td />
+      <td />
+      <td />
+      <td />
+      {weeks.map((w, i) => {
+        const d = byWeek.get(i)
+        return (
+          <td key={w.start} className={`whitespace-nowrap px-2 py-1 ${d ? DEADLINE_TEXT[d.status] : ''}`}>
+            {d ? shortDate(d.orderBy) : ''}
+          </td>
+        )
+      })}
+      <td />
+    </tr>
+  )
+}
+
+function Card({ label, value, warn, amber }: { label: string; value: string; warn?: boolean; amber?: boolean }) {
   return (
     <div className="rounded-lg border border-border p-3">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className={`mt-1 text-xl font-semibold tabular-nums ${warn ? 'text-destructive' : 'text-foreground'}`}>{value}</dd>
+      <dd className={`mt-1 text-xl font-semibold tabular-nums ${warn ? 'text-destructive' : amber ? 'text-amber-700' : 'text-foreground'}`}>{value}</dd>
     </div>
   )
 }
