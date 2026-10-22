@@ -170,6 +170,14 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   Calculate plan, Approve plan (yanında kısa plan denetimi özeti), Gantt ve iş
   penceresi, Plan overrides.
 
+### Wiki, mimari etki kontrolü ve geç iş payı (2026-10-22)
+
+- `docs/wiki/` programın kalıcı hafızasıdır (yeni sohbet açılmaz); yeni talimattan önce mimari etki kontrolü
+  (`docs/wiki/07-calisma-sozlesmesi.md`). Katman yönü ve bağımsız doğrulayıcı `src/lib/architecture.test.ts` ile denetlenir.
+- Geç iş bütün sipariş değil **paydır**: teslim anında hazır pay, geç gelen pay, ortalama ve son parça gecikmesi
+  (`docs/wiki/03-gec-is-tanimi.md`).
+- Senaryo aramasında **lot bölme**: yalnızca geç işi kurtarıyorsa (`docs/wiki/02-planlama-motoru.md`).
+
 ### Hammadde tedarik süresi (2026-10-22)
 
 - Sac kodu başına tedarik süresi yeni `rawLeadTimes` tablosunda; mevcut

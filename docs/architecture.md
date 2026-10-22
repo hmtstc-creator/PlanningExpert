@@ -7,7 +7,7 @@ kararlar tek listede: `todolist.md` (kök dizin). Çok şirket / çok fabrika: `
 Kullanıcıya dönük açıklama
 sitedeki **Planning Logic** sayfasıdır (`src/routes/planlogic.tsx`).
 
-Üçü birlikte güncel tutulur: bir kural değişirse kod + `decisions.md` +
+Genel bakış ve sürüm geçmişi: `docs/wiki/` (dizin: `docs/wiki/README.md`). Üçü birlikte güncel tutulur: bir kural değişirse kod + `decisions.md` +
 Planning Logic sayfası aynı commit'te değişir.
 
 ---

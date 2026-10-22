@@ -2,6 +2,21 @@
 
 Bu dosya depoda çalışan her Claude oturumu (bulut ya da sunucu) için geçerlidir.
 
+## Her talimattan önce: mimari etki kontrolü (zorunlu)
+
+Yeni bir talimata **başlamadan önce** `docs/wiki/07-calisma-sozlesmesi.md` → *Yeni talimat geldiğinde* listesi
+uygulanır: hangi katman, tek kaynak, motorun değişmezleri, canlı veri / şema, Planning Logic, wiki, etkilenen
+yerler, geri alınabilirlik. Genel mimariye zarar veren bir değişiklik **yapılmaz**; nedeni ve alternatifi
+kullanıcıya yazılır. Otomatik korumalar: `src/lib/architecture.test.ts` (katman yönü, saf hesap dosyaları,
+bağımsız doğrulayıcı), `scripts/check-logic-docs.sh`, şema ve yetki testleri.
+
+## Wiki programın kalıcı hafızasıdır (zorunlu)
+
+Yeni sohbet açılmaz; bilgi `docs/wiki/` içindedir (dizin: `docs/wiki/README.md`). İşe başlarken ilgili sayfa okunur.
+Mimariyi, bir akışı, bir kuralı ya da bir kararı değiştiren her PR ilgili wiki sayfasını (başındaki *Son güncelleme*
+dahil) ve `docs/wiki/08-surum-gunlugu.md`'ye bir satırı **aynı PR'da** günceller. Yeni sayfa dizine eklenir
+(`src/lib/wiki.test.ts` denetler). Wiki ile kod çelişirse kod doğrudur; çelişki aynı gün düzeltilir.
+
 ## Planning Logic her değişiklikte güncellenir (zorunlu)
 
 `src/routes/planlogic.tsx` (Planning Logic sayfası) planlamacının programın mantığını
