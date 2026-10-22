@@ -7,7 +7,7 @@
  *
  * İki görünüm:
  * - Yapı: Holding → Company → Plant → Department → Cost center → Work center.
- * - Kişiler (tek şirket): Plant ← Group ← User. Grup hangi plant'leri
+ * - Kişiler (tek şirket): Company → Plant → Group → User. Grup hangi plant'leri
  *   görüyor, kullanıcı hangi grupta.
  */
 
@@ -267,15 +267,20 @@ export interface MapGroup {
 }
 
 /**
- * Şirketin kişileri: plant'ler solda, gruplar ortada, kullanıcılar sağda.
- * Grup → plant kenarı "görür" (her plant'i gören grupta bütün plant'lere),
- * kullanıcı → grup kenarı "üyedir". Creator gruptan bağımsız her plant'i görür.
+ * Şirketin kişileri, soldan sağa ağaç gibi: Company → Plant → Group → User.
+ * Plant → grup kenarı "bu grup plant'i görür" (her plant'i gören grup doğrudan
+ * şirkete bağlanır), grup → kullanıcı kenarı "kullanıcı bu grupta".
+ * Kenar her zaman soldaki düğümden sağdakine gider (geri dönen çizgi yok).
+ * Creator gruptan bağımsız her plant'i görür.
  */
 export function peopleGraph(company: OrgCompany, users: MapUser[], groups: MapGroup[]): MapGraph {
   const nodes: MapNode[] = []
   const edges: MapEdge[] = []
   const plants = [...company.plants].sort((a, b) => a.name.localeCompare(b.name))
-  const gs = [...groups].sort((a, b) => a.name.localeCompare(b.name))
+  const pIndex = new Map(plants.map((p, i) => [p._id, i]))
+  // Gruplar gördükleri ilk plant'in hizasında (bütün plant'leri görenler en üstte): kenarlar daha az kesişir.
+  const firstPlant = (g: MapGroup) => (g.allPlants ? -1 : Math.min(...g.plantIds.map((p) => pIndex.get(p) ?? Infinity), Infinity))
+  const gs = [...groups].sort((a, b) => firstPlant(a) - firstPlant(b) || a.name.localeCompare(b.name))
   const gIndex = new Map(gs.map((g, i) => [g._id, i]))
   // Kullanıcılar ilk grubunun yanında: kenarlar daha az kesişir.
   const firstGroup = (u: MapUser) => (u.isCreator ? -1 : Math.min(...u.groupIds.map((g) => gIndex.get(g) ?? Infinity), Infinity))
@@ -330,7 +335,8 @@ export function peopleGraph(company: OrgCompany, users: MapUser[], groups: MapGr
       collapsed: false,
       warnings,
     })
-    for (const p of seen) edges.push({ id: `g:${g._id}>p:${p._id}`, source: `g:${g._id}`, target: `p:${p._id}`, kind: 'access' })
+    if (g.allPlants) edges.push({ id: `c:${company._id}>g:${g._id}`, source: `c:${company._id}`, target: `g:${g._id}`, kind: 'access' })
+    else for (const p of seen) edges.push({ id: `p:${p._id}>g:${g._id}`, source: `p:${p._id}`, target: `g:${g._id}`, kind: 'access' })
   })
   us.forEach((u, i) => {
     const mine = u.groupIds.filter((g) => gIndex.has(g))
@@ -347,7 +353,7 @@ export function peopleGraph(company: OrgCompany, users: MapUser[], groups: MapGr
       collapsed: false,
       warnings,
     })
-    for (const g of mine) edges.push({ id: `u:${u._id}>g:${g}`, source: `u:${u._id}`, target: `g:${g}`, kind: 'member' })
+    for (const g of mine) edges.push({ id: `g:${g}>u:${u._id}`, source: `g:${g}`, target: `u:${u._id}`, kind: 'member' })
   })
   return { nodes, edges }
 }
@@ -393,18 +399,18 @@ export function dropAction(
   return null
 }
 
-/** Kenar kaldırılabilir mi (üyelik, grup → plant)? Ağaç kenarı sürükleyerek değişir. */
+/** Kenar kaldırılabilir mi (plant → grup, grup → kullanıcı)? Ağaç kenarı sürükleyerek değişir. */
 export function removeAction(edge: MapEdge, nodes: MapNode[], groups: MapGroup[]): MapAction | null {
   const s = nodes.find((n) => n.id === edge.source)
   const t = nodes.find((n) => n.id === edge.target)
   if (!s || !t) return null
-  if (edge.kind === 'member' && s.ref.kind === 'user' && t.ref.kind === 'group') {
-    return { kind: 'userGroup', userId: s.ref.id, groupId: t.ref.id, add: false, text: `Remove ${s.label} from ${t.label}` }
+  if (edge.kind === 'member' && s.ref.kind === 'group' && t.ref.kind === 'user') {
+    return { kind: 'userGroup', userId: t.ref.id, groupId: s.ref.id, add: false, text: `Remove ${t.label} from ${s.label}` }
   }
-  if (edge.kind === 'access' && s.ref.kind === 'group' && t.ref.kind === 'plant') {
-    const g = groups.find((x) => x._id === (s.ref as { id: string }).id)
+  if (edge.kind === 'access' && s.ref.kind === 'plant' && t.ref.kind === 'group') {
+    const g = groups.find((x) => x._id === (t.ref as { id: string }).id)
     if (!g || g.allPlants) return null
-    return { kind: 'groupPlant', groupId: g._id, plantId: t.ref.id, add: false, text: `${s.label} no longer sees ${t.label}` }
+    return { kind: 'groupPlant', groupId: g._id, plantId: s.ref.id, add: false, text: `${t.label} no longer sees ${s.label}` }
   }
   return null
 }
