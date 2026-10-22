@@ -64,6 +64,7 @@ export const PAGE_KEYWORDS: Record<string, string> = {
   '/settings': 'şirket ayar fabrika plant bölüm masraf yeri cost center liste',
   '/users': 'kullanıcı yetki izin grup rol permission',
   '/admin': 'yönetim holding şirket general güvenlik security',
+  '/admin/map': 'organizasyon harita şema görsel sürükle bırak holding şirket kullanıcı grup map',
   '/account': 'hesabım parola şifre cihaz oturum',
   '/compare': 'fabrika karşılaştır plant compare',
   '/tani': 'bağlantı teşhis internet diagnostics',

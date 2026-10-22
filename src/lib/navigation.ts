@@ -228,6 +228,7 @@ export const ACCOUNT_LINKS: (NavItem & { need?: 'manage' | 'platform' })[] = [
   { to: '/settings', label: 'Company settings', hint: 'Plants, departments, cost centers, lists', icon: 'building', need: 'manage' },
   { to: '/users', label: 'Users & permissions', hint: 'Groups, users, permission matrix', icon: 'users', need: 'manage' },
   { to: '/admin', label: 'Administration', hint: 'Holdings, companies, Generals, security', icon: 'shield', need: 'platform' },
+  { to: '/admin/map', label: 'Organization map', hint: 'Holdings, companies, users and groups on one canvas', icon: 'shield', need: 'platform' },
   { to: '/compare', label: 'Compare plants', hint: 'Plants side by side', icon: 'compare' },
   { to: '/tani', label: 'Connection diagnostics', hint: 'Is this device connected?', icon: 'wifi' },
 ]

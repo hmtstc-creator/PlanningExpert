@@ -38,6 +38,7 @@ import { Route as TakvimRouteImport } from './routes/takvim'
 import { Route as TaniRouteImport } from './routes/tani'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as YonetimRouteImport } from './routes/yonetim'
+import { Route as AdminMapRouteImport } from './routes/admin_.map'
 import { Route as DieFollowupIndexRouteImport } from './routes/die-followup/index'
 import { Route as DieFollowupMaintenanceRouteImport } from './routes/die-followup/maintenance'
 import { Route as DieFollowupProblemsRouteImport } from './routes/die-followup/problems'
@@ -207,6 +208,11 @@ const YonetimRoute = YonetimRouteImport.update({
   path: '/yonetim',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminMapRoute = AdminMapRouteImport.update({
+  id: '/admin_/map',
+  path: '/admin/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DieFollowupIndexRoute = DieFollowupIndexRouteImport.update({
   id: '/die-followup/',
   path: '/die-followup/',
@@ -355,6 +361,7 @@ export interface FileRoutesByFullPath {
   '/tani': typeof TaniRoute
   '/users': typeof UsersRoute
   '/yonetim': typeof YonetimRoute
+  '/admin/map': typeof AdminMapRoute
   '/die-followup/maintenance': typeof DieFollowupMaintenanceRoute
   '/die-followup/problems': typeof DieFollowupProblemsRoute
   '/die-followup/reports': typeof DieFollowupReportsRoute
@@ -409,6 +416,7 @@ export interface FileRoutesByTo {
   '/tani': typeof TaniRoute
   '/users': typeof UsersRoute
   '/yonetim': typeof YonetimRoute
+  '/admin/map': typeof AdminMapRoute
   '/die-followup/maintenance': typeof DieFollowupMaintenanceRoute
   '/die-followup/problems': typeof DieFollowupProblemsRoute
   '/die-followup/reports': typeof DieFollowupReportsRoute
@@ -464,6 +472,7 @@ export interface FileRoutesById {
   '/tani': typeof TaniRoute
   '/users': typeof UsersRoute
   '/yonetim': typeof YonetimRoute
+  '/admin_/map': typeof AdminMapRoute
   '/die-followup/maintenance': typeof DieFollowupMaintenanceRoute
   '/die-followup/problems': typeof DieFollowupProblemsRoute
   '/die-followup/reports': typeof DieFollowupReportsRoute
@@ -520,6 +529,7 @@ export interface FileRouteTypes {
     | '/tani'
     | '/users'
     | '/yonetim'
+    | '/admin/map'
     | '/die-followup/maintenance'
     | '/die-followup/problems'
     | '/die-followup/reports'
@@ -574,6 +584,7 @@ export interface FileRouteTypes {
     | '/tani'
     | '/users'
     | '/yonetim'
+    | '/admin/map'
     | '/die-followup/maintenance'
     | '/die-followup/problems'
     | '/die-followup/reports'
@@ -628,6 +639,7 @@ export interface FileRouteTypes {
     | '/tani'
     | '/users'
     | '/yonetim'
+    | '/admin_/map'
     | '/die-followup/maintenance'
     | '/die-followup/problems'
     | '/die-followup/reports'
@@ -683,6 +695,7 @@ export interface RootRouteChildren {
   TaniRoute: typeof TaniRoute
   UsersRoute: typeof UsersRoute
   YonetimRoute: typeof YonetimRoute
+  AdminMapRoute: typeof AdminMapRoute
   DieFollowupMaintenanceRoute: typeof DieFollowupMaintenanceRoute
   DieFollowupProblemsRoute: typeof DieFollowupProblemsRoute
   DieFollowupReportsRoute: typeof DieFollowupReportsRoute
@@ -913,6 +926,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof YonetimRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin_/map': {
+      id: '/admin_/map'
+      path: '/admin/map'
+      fullPath: '/admin/map'
+      preLoaderRoute: typeof AdminMapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/die-followup/': {
       id: '/die-followup/'
       path: '/die-followup'
@@ -1107,6 +1127,7 @@ const rootRouteChildren: RootRouteChildren = {
   TaniRoute: TaniRoute,
   UsersRoute: UsersRoute,
   YonetimRoute: YonetimRoute,
+  AdminMapRoute: AdminMapRoute,
   DieFollowupMaintenanceRoute: DieFollowupMaintenanceRoute,
   DieFollowupProblemsRoute: DieFollowupProblemsRoute,
   DieFollowupReportsRoute: DieFollowupReportsRoute,
