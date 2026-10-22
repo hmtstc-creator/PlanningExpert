@@ -30,6 +30,12 @@ rm -rf convex/_generated
 npx convex codegen
 # Önce işlevler, sonra site — sitenin adresi VITE_CONVEX_URL (Funnel).
 npx convex deploy
+# Yayındaki sürüm (Connection diagnostics → "Version on this site"): siteye gömülür.
+export VITE_BUILD_COMMIT="$(git rev-parse --short HEAD)"
+export VITE_BUILD_MESSAGE="$(git log -1 --format=%s)"
+export VITE_BUILD_COMMITTED_AT="$(git log -1 --format=%cI)"
+export VITE_BUILD_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+export VITE_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=1536}" npm run build
 
 echo "Done (${CONVEX_TARGET}). Backup: backups/before-release-${STAMP}.zip — restart the site: docker compose -f deploy/compose.yml restart web"

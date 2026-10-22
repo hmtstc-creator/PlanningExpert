@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { QueryCatcher } from '../components/QueryCatcher'
+import { BUILD, REPO_URL, formatBuildTime } from '../lib/buildInfo'
 
 export const Route = createFileRoute('/tani')({
   component: TaniPage,
@@ -215,6 +216,8 @@ function TaniPage() {
         <div className="mt-2 text-sm">{verdict.body}</div>
       </div>
 
+      <BuildPanel />
+
       <div className="mt-6 rounded-lg border border-border p-4">
         <h2 className="text-sm font-semibold text-foreground">Connection steps</h2>
         <dl className="mt-3 space-y-2 text-sm">
@@ -382,6 +385,60 @@ function DuplicateList() {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/**
+ * Yayındaki sürüm: derlemede gömülen commit ve yayın zamanı. GitHub'daki en son
+ * main ile karşılaştırmak için bağlantı (depo tarayıcıdan sorgulanmaz).
+ */
+function BuildPanel() {
+  const ageDays = BUILD.builtAt ? Math.floor((Date.now() - Date.parse(BUILD.builtAt)) / 86_400_000) : null
+  return (
+    <div className="mt-6 rounded-lg border border-border p-4">
+      <h2 className="text-sm font-semibold text-foreground">Version on this site</h2>
+      {!BUILD.commit ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          No version recorded — this build was not made with <code>scripts/release.sh</code> (local development, or a
+          build from before 22 Oct 2026).
+        </p>
+      ) : (
+        <>
+          <dl className="mt-3 space-y-2 text-sm">
+            <Row label="Commit">
+              <a
+                href={`${REPO_URL}/commit/${BUILD.commit}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-base font-semibold text-foreground underline hover:no-underline"
+              >
+                {BUILD.commit}
+              </a>
+              {BUILD.branch && <span className="ml-2 text-xs text-muted-foreground">on {BUILD.branch}</span>}
+            </Row>
+            <Row label="Change">
+              <span className="text-foreground">{BUILD.message || '—'}</span>
+            </Row>
+            <Row label="Committed">
+              <span className="text-muted-foreground">{formatBuildTime(BUILD.committedAt)}</span>
+            </Row>
+            <Row label="Published">
+              <span className="font-medium text-foreground">{formatBuildTime(BUILD.builtAt)}</span>
+              {ageDays !== null && ageDays > 0 && (
+                <span className="ml-2 text-xs text-muted-foreground">({ageDays} day{ageDays === 1 ? '' : 's'} ago)</span>
+              )}
+            </Row>
+          </dl>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Is it the latest? Compare the commit above with the top of{' '}
+            <a href={`${REPO_URL}/commits/main`} target="_blank" rel="noreferrer" className="underline hover:no-underline">
+              main on GitHub
+            </a>
+            . A browser refresh (Ctrl+F5) is needed after a release to load it.
+          </p>
+        </>
+      )}
     </div>
   )
 }
