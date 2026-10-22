@@ -13,8 +13,13 @@ Dashboard. Tek sistem, tek adres; her plant'in verisi ayrıdır.
 
 ## Belgeler
 
+**Önce wiki:** `docs/wiki/README.md` — programın kalıcı hafızası (sistem haritası, planlama motoru, geç iş tanımı,
+hammadde, yayın, bağlantı, çalışma sözleşmesi, sürüm günlüğü, açık konular, sözlük, karar günlüğü).
+Yeni talimattan önce `docs/wiki/07-calisma-sozlesmesi.md` → *mimari etki kontrolü*.
+
 | Dosya | İçerik |
 |---|---|
+| `docs/wiki/` | **Wiki:** mimari, motor, yayın, kararlar, sürüm günlüğü, sözlük (kalıcı hafıza) |
 | `todolist.md` | **Bütün açık işler ve kararlar** — tek liste |
 | `docs/architecture.md` | Katmanlar, tek kaynak haritası, geliştirme kuralları |
 | `docs/decisions.md` | Planlama kararları (takvim, kapasite, setup, hammadde) |
