@@ -42,6 +42,17 @@ import { getSessionToken, subscribeSessionToken } from './sessionToken'
 
 export type TransportMode = 'connecting' | 'websocket' | 'http'
 
+/**
+ * WebSocket'in sağlığı (Connection diagnostics): `open` bağlantı açıldı ama
+ * henüz cevap gelmedi, `silent` açık ama deneme sorgusu süresinde cevaplanmadı
+ * (yavaş hat ya da mesajları tutan güvenlik duvarı), `verified` veri taşıyor.
+ * `answerMs`: bağlantı açıldıktan sonra ilk cevabın geldiği süre.
+ */
+export interface WsHealth {
+  state: 'closed' | 'open' | 'silent' | 'verified'
+  answerMs: number | null
+}
+
 /** WebSocket bu süre içinde kurulamazsa HTTP'ye düşülür. */
 const WS_GRACE_MS = 7000
 /**
@@ -61,6 +72,7 @@ interface TransportValue {
   /** Mutation sonrası HTTP modundaki sorguları tazelemek için sayaç. */
   revision: number
   bumpRevision: () => void
+  ws: WsHealth
   /**
    * Oturum jetonu. Her çağrıya buradan ekleniyor — yüz küsur çağrı
    * noktasının tek tek taşıması gerekseydi biri mutlaka unutulur ve o işlev
@@ -75,6 +87,7 @@ export const TransportContext = createContext<TransportValue>({
   http: null,
   revision: 0,
   bumpRevision: () => {},
+  ws: { state: 'closed', answerMs: null },
   token: null,
 })
 
@@ -82,6 +95,7 @@ export function TransportProvider({ children }: { children: ReactNode }) {
   const convex = useConvex()
   const [mode, setMode] = useState<TransportMode>('connecting')
   const [revision, setRevision] = useState(0)
+  const [ws, setWs] = useState<WsHealth>({ state: 'closed', answerMs: null })
 
   const http = useMemo(
     () =>
@@ -95,10 +109,14 @@ export function TransportProvider({ children }: { children: ReactNode }) {
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null
     // WebSocket bu sayfada bir kere gerçekten veri taşıdı mı?
     let verified = false
-    // Taşımadığı anlaşıldıysa sayfa kapanana kadar HTTPS'te kalınır; gidip
-    // gelmek (bağlandı-kesildi) her seferinde sorguları askıda bırakırdı.
-    let stickyHttp = false
+    // Deneme sorgusu süresinde cevaplanmadı: sayfa HTTPS'e geçer. Eskiden bu
+    // sayfa kapanana kadar kalıcıydı; yavaş bir mobil hatta ilk cevabın 8 sn'yi
+    // geçmesi bütün oturumu "yedek mod"da bırakıyordu. Şimdi deneme sorgusu
+    // dinlenmeye devam eder: cevap sonradan gelirse canlı moda dönülür (yalnızca
+    // bir kez; sürekli gidip gelmek sorguları askıda bırakırdı).
+    let silent = false
     let canary: { stop: () => void } | null = null
+    let canaryStartedAt = 0
 
     const stopCanary = () => {
       canary?.stop()
@@ -108,12 +126,12 @@ export function TransportProvider({ children }: { children: ReactNode }) {
     // Açık (girişsiz) bir sorguyu WebSocket üzerinden ister; cevap gelirse
     // bağlantı gerçekten çalışıyordur.
     const startCanary = () => {
-      if (canary || verified || stickyHttp) return
-      let done = false
+      if (canary || verified) return
+      canaryStartedAt = Date.now()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const watch = (convex as any).watchQuery(CANARY_QUERY, {})
       const check = () => {
-        if (done) return
+        if (verified) return
         let answered = false
         try {
           answered = watch.localQueryResult() !== undefined
@@ -122,18 +140,18 @@ export function TransportProvider({ children }: { children: ReactNode }) {
           answered = true
         }
         if (answered) {
-          done = true
           verified = true
+          silent = false
           stopCanary()
+          setWs({ state: 'verified', answerMs: Date.now() - canaryStartedAt })
           read()
         }
       }
       const unsubscribe = watch.onUpdate(check)
       const timer = setTimeout(() => {
-        if (done) return
-        done = true
-        stickyHttp = true
-        stopCanary()
+        if (verified) return
+        silent = true
+        setWs({ state: 'silent', answerMs: null })
         setMode('http')
       }, WS_VERIFY_MS)
       canary = {
@@ -146,10 +164,6 @@ export function TransportProvider({ children }: { children: ReactNode }) {
     }
 
     const read = () => {
-      if (stickyHttp) {
-        setMode('http')
-        return
-      }
       const connected = convex.connectionState().isWebSocketConnected
       if (connected) {
         if (fallbackTimer) {
@@ -157,13 +171,16 @@ export function TransportProvider({ children }: { children: ReactNode }) {
           fallbackTimer = null
         }
         if (verified) setMode('websocket')
+        else if (silent) setMode('http')
         else {
           // Bağlı ama henüz doğrulanmadı: sorgular WebSocket'i bekler,
           // yazma ve action'lar HTTPS'ten gider.
           setMode((current) => (current === 'http' ? 'http' : 'connecting'))
-          startCanary()
+          setWs((current) => (current.state === 'closed' ? { state: 'open', answerMs: null } : current))
         }
+        startCanary()
       } else {
+        setWs((current) => (current.state === 'verified' || current.state === 'silent' ? current : { state: 'closed', answerMs: null }))
         // WebSocket düştüyse hemen HTTP'ye geçme — kısa kopmalar olur.
         setMode((current) => (current === 'http' ? 'http' : 'connecting'))
         if (fallbackTimer === null) {
@@ -193,8 +210,8 @@ export function TransportProvider({ children }: { children: ReactNode }) {
   useEffect(() => subscribeSessionToken(setToken), [])
 
   const value = useMemo(
-    () => ({ mode, http, revision, bumpRevision, token }),
-    [mode, http, revision, bumpRevision, token],
+    () => ({ mode, http, revision, bumpRevision, ws, token }),
+    [mode, http, revision, bumpRevision, ws, token],
   )
 
   return <TransportContext.Provider value={value}>{children}</TransportContext.Provider>

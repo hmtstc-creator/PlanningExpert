@@ -62,7 +62,7 @@ interface WsState {
 
 function TaniPage() {
   const convex = useConvex()
-  const { mode } = useTransport()
+  const { mode, ws: wsHealth } = useTransport()
   const [https, setHttps] = useState<HttpsState>(CONVEX_URL ? 'checking' : 'no-url')
   const [ws, setWs] = useState<WsState | null>(null)
 
@@ -125,6 +125,29 @@ function TaniPage() {
           but a missing build setting (docs/deployment.md). Build on the server
           with <code className="break-all">./scripts/release.sh</code> (it sets the
           address from <code>CONVEX_PUBLIC_URL</code>).
+        </>
+      ),
+    }
+  } else if (ws?.isWebSocketConnected && mode === 'http') {
+    // Bağlantı açık ama veri taşımadı (ya da çok geç taşıdı): uygulama HTTPS'te.
+    // Eskiden bu durumda "healthy" yazıyor, üstteki sarı uyarıyla çelişiyordu.
+    verdict = {
+      tone: 'wait',
+      title: 'Live connection is open but slow — using HTTPS for now',
+      body: (
+        <>
+          <p>
+            The WebSocket opened, but the first answer did not arrive within 8 seconds, so the
+            app reads over plain HTTPS (<strong>reading and saving work</strong>, data refreshes
+            about every 20 seconds). If the answer arrives later the app switches back to live
+            by itself.
+          </p>
+          <p className="mt-2">
+            Typical causes: a weak mobile signal, a security gateway that holds WebSocket
+            messages, or the server busy right after an update. Reload the page on a better
+            connection; if it repeats on the office network, ask IT to allow{' '}
+            <strong>WebSocket (wss://)</strong> to <code>{deployment}</code>.
+          </p>
         </>
       ),
     }
@@ -254,13 +277,26 @@ function TaniPage() {
             {ws === null ? (
               <span className="text-muted-foreground">checking…</span>
             ) : ws.isWebSocketConnected ? (
-              <span className="text-emerald-600">connected ✓</span>
+              <span className={wsHealth.state === 'silent' ? 'text-amber-700' : 'text-emerald-600'}>
+                connected {wsHealth.state === 'silent' ? '— but no answer yet' : '✓'}
+              </span>
             ) : (
               <span className="text-destructive">
                 cannot connect ✗
                 {ws.connectionRetries > 0 && ` (${ws.connectionRetries} attempts)`}
               </span>
             )}
+          </Row>
+          <Row label="Live data check">
+            <span className="text-muted-foreground">
+              {wsHealth.state === 'verified'
+                ? `answered in ${((wsHealth.answerMs ?? 0) / 1000).toFixed(1)} s ✓`
+                : wsHealth.state === 'silent'
+                  ? 'no answer within 8 s (still waiting)'
+                  : wsHealth.state === 'open'
+                    ? 'waiting for the first answer…'
+                    : '—'}
+            </span>
           </Row>
           <Row label="Ever connected">
             <span className="text-muted-foreground">

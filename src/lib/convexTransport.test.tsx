@@ -35,7 +35,7 @@ describe('useHttpQuery', () => {
       seen.push(data)
       return null
     }
-    const value = { mode: 'http' as const, http: http as never, revision: 0, bumpRevision: () => {}, token: null }
+    const value = { mode: 'http' as const, http: http as never, revision: 0, bumpRevision: () => {}, ws: { state: 'closed' as const, answerMs: null }, token: null }
     const view = render(
       <TransportContext.Provider value={value}>
         <Probe />
@@ -65,7 +65,7 @@ import { vi } from 'vitest'
 
 import { TransportProvider, useTransport } from './convexTransport'
 
-function fakeConvex({ connected, answers }: { connected: boolean; answers: boolean }) {
+function fakeConvex({ connected, answers, answerAfter = 100 }: { connected: boolean; answers: boolean; answerAfter?: number }) {
   const listeners = new Set<() => void>()
   return {
     connectionState: () => ({ isWebSocketConnected: connected }),
@@ -81,7 +81,7 @@ function fakeConvex({ connected, answers }: { connected: boolean; answers: boole
         setTimeout(() => {
           ready = true
           update?.()
-        }, 100)
+        }, answerAfter)
       return {
         onUpdate: (cb: () => void) => {
           update = cb
@@ -123,10 +123,42 @@ describe('transport choice', () => {
     }
   })
 
-  it('switches to HTTPS 8 s after a silent WebSocket, and stays there', () => {
+  it('switches to HTTPS 8 s after a silent WebSocket', () => {
     vi.useFakeTimers()
     try {
       expect(modeAfter(fakeConvex({ connected: true, answers: false }), 9000)).toBe('http')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('goes back to the WebSocket when a slow answer finally arrives (not stuck in fallback)', () => {
+    vi.useFakeTimers()
+    try {
+      // Cevap 12 sn'de gelir: 8. sn'de yedek mod, 12. sn'de yine canlı.
+      const convex = fakeConvex({ connected: true, answers: true, answerAfter: 12_000 })
+      let seen: { mode: string; ws: string } = { mode: '', ws: '' }
+      function Show() {
+        const t = useTransport()
+        seen = { mode: t.mode, ws: t.ws.state }
+        return null
+      }
+      render(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        <ConvexProvider client={convex as any}>
+          <TransportProvider>
+            <Show />
+          </TransportProvider>
+        </ConvexProvider>,
+      )
+      act(() => {
+        vi.advanceTimersByTime(9000)
+      })
+      expect(seen).toEqual({ mode: 'http', ws: 'silent' })
+      act(() => {
+        vi.advanceTimersByTime(4000)
+      })
+      expect(seen).toEqual({ mode: 'websocket', ws: 'verified' })
     } finally {
       vi.useRealTimers()
     }
