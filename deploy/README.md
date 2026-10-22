@@ -53,6 +53,20 @@ sunucuda: `deploy/.env` ve `/etc/planningexpert/portal.env` (ikisi de `chmod 600
 
 Önce GitHub'da o commit'in CI'ı (`verify`: tip + test + build) **yeşil** olmalı.
 
+**Otomatik (2026-10-22'den beri):** `planningexpert-autodeploy.timer` 5 dakikada bir
+`deploy.sh`'yi çalıştırır; `main`'e giren her commit en geç ~5 dakika + derleme süresi
+içinde yayındadır. Yayındaki commit `/var/lib/planningexpert/deployed-commit`'te
+tutulur; yayını başarısız olan commit `failed-commit`'e yazılır ve `main`'e yeni bir
+commit gelene (ya da `--force`) kadar yeniden denenmez. Elle çalıştırmayla çakışmaz
+(`flock`). `deploy.sh` `deploy/systemd/` birimlerini kendisi kurar / günceller, yani
+zamanlayıcı ilk elle yayında kendiliğinden açılır.
+
+```bash
+systemctl list-timers planningexpert-autodeploy.timer   # sonraki kontrol
+journalctl -u planningexpert-autodeploy -n 50            # son yayınların çıktısı
+systemctl disable --now planningexpert-autodeploy.timer  # otomatiği kapat
+```
+
 Tek komut (2026-10-20'den beri; sunucudaki Claude oturumunda bu betiğe kalıcı izin
 verilir, her adım için onay istenmez):
 

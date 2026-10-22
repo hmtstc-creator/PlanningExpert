@@ -1,0 +1,17 @@
+# Otomatik yayın (planningexpert-autodeploy.timer tetikler): main'de yeni commit
+# varsa scripts/deploy.sh yayınlar, yoksa hiçbir şey yapmaz. Çıktı:
+#   journalctl -u planningexpert-autodeploy -n 50
+[Unit]
+Description=PlanningExpert — deploy new commits on main
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/planningexpert
+# Yedekler veri içerir: dosyalar 600 oluşsun.
+UMask=0077
+# Elle çalıştırılan deploy.sh ile çakışmasın.
+ExecStart=/usr/bin/flock -n /run/planningexpert-deploy.lock /opt/planningexpert/scripts/deploy.sh
+TimeoutStartSec=30min
