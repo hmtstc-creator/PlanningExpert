@@ -11,6 +11,13 @@
 | Gerçek veride geç iş payı | Overview → Late materials → *On time / Late share* ve *Why late* sayılarını bir örnekte elle doğrula | Yeni tanım ([03](03-gec-is-tanimi.md)) |
 | Tedarik süreleri | Raw Material Coverage → *Lead times* tablosunu doldur (varsayılan 14 gün tahmindir) | Girilmeyen sac varsayılanı kullanır, "not entered" görünür |
 
+## Devam
+
+- **Yarım iş yok.** main `fef0b72`, açık PR yok, açık dal yok (yalnız `main`).
+- **Sıradaki adım:** yukarıdaki kullanıcı doğrulamaları (branch protection, gerçek veride lot bölme ve geç iş payı, tedarik süreleri). Sonuç / sorun gelirse yeni oturumda ele alınır.
+- **Dikkat edilecek yerler:** lot bölme `src/lib/planPipeline.ts` `planOnce` (satır ~899) ve yerel arama "Lot bölme" bloğu (~1264), `splitLot` `src/lib/scheduler.ts` (~176);
+  geç iş payı `lateShare` (~1465), `explainLate` (~1511), `lateItems` (~1622). Satır numaraları kayabilir; `grep` ile bul.
+
 ## Bilinen sınırlar / riskler
 
 - **Müşteri duruş süresi tahmindir:** müşterinin tüketim saatleri bilinmiyor; *son parça* ve *ortalama* gecikme gösterilir.

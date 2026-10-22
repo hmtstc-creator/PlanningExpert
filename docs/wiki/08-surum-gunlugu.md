@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #24 | 2026-10-22 | Wiki: #22 sürüm günlüğüne işlendi; otomatik dal silme açık konulardan çıktı | Devir adımı (docs PR) → [09](09-acik-konular.md) |
 | #23 | 2026-10-22 | **Token tasarrufu:** bir iş = bir oturum, `/yeni-is` ve `/devir` skill'leri, büyük dosya listesi, `.claude/settings.json` ile üretilmiş / ağır dosyaları okuma yasağı | Tek sohbet 563k / 1M token'a çıkmıştı → [07](07-calisma-sozlesmesi.md) |
 | #22 | 2026-10-22 | **Wiki** (`docs/wiki`), mimari etki kontrolü, `architecture.test.ts` ve `wiki.test.ts` | Yeni sohbet açılmayacağı için kalıcı hafıza; **birleşen PR dalının otomatik silinmesi ilk kez gerçek PR'da doğrulandı** (`claude/wiki` birleşmeden hemen sonra silindi) → [07](07-calisma-sozlesmesi.md) |
 | #21 | 2026-10-22 | Geç iş: gereken adedin teslim anındaki payı (x% zamanında, kalanı gecikmeli; ortalama + son parça); *Why late*: "teslime kadar yeterli üretim süresi yok"; `CLAUDE.md` + CI denetimi: Planning Logic zorunlu güncelleme | Eskiden teslimde yarısı hazır olsa da tamamı "late" yazılıyordu; "Needed qty" birden çok lotun toplamıydı. Bağımsız doğrulayıcıyla aynı sayı → [03](03-gec-is-tanimi.md) |
@@ -34,4 +35,6 @@
 - **Kilit betiğin içinde olmalı:** servis sarmalayıcısındaki kilit elle çalıştırmayı korumaz.
 - **Faz sırası fazları aşmaz:** lot bölmede ihtiyacı olmayan parça dolguya geçirilmeden araya geç lot giremedi.
 - **"healthy" yalnızca soket açık demekti:** sağlık göstergesi gerçek veri akışına bakmalı.
+- **Bildirim olayları kısa karşılanır:** PR izleme bildirimleri (abonelik, CI, birleşme) yalnızca durum kontrolü ve tek satır yanıttır; her biri için ayrıntılı özet yazmak token harcar.
+- **Dal silme GitHub'a bırakıldı:** bulut oturumunun izin sistemi dal silmeyi engelliyor; birleşme olayında çalışan iş akışı bunu kendisi yapıyor (ilk gerçek PR'da doğrulandı).
 - **Sunucuya erişim yok:** nedeni sunucu tarafında doğrulanamayan sorunlarda kod düzeyinde kök neden + ölçüm satırı eklenir (ör. *Live data check*).

@@ -28,6 +28,9 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 - **Bir iş = bir oturum** (2026-10-22) — tek uzun sohbet bağlamı 560k token'a çıkardı ve kullanım hızla doluyordu; bilgi zaten wiki'de olduğu için her iş yeni oturumda başlar, kapanışta `/devir` skill'i wiki'yi günceller.
 - **Wiki + CLAUDE.md + CI denetimleri** (2026-10-22) — oturumlar arası bilgi depoda kalıcı; mantık değişince sayfa güncellemesi ve mimari kural ihlali CI'da yakalanır.
 
+- **Devir = docs PR'ı** (2026-10-22) — iş bitince `/devir`: sürüm günlüğü satırı, kararlar ve dersler, "Devam" maddesi tek docs PR'ında; CI yeşilse birleşir.
+  Yeni oturum yalnız depoyu okuyarak başlar. *Alt.: sohbet özeti* (oturum bitince kaybolur).
+
 ## Arayüz
 
 - **Geç listede öneri yerine neden** — planlamacı hafta içi çözüm bulamaz; ne yüzden geç olduğunu ve hesabın nereden geldiğini görmeli.
