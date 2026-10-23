@@ -197,6 +197,8 @@ export interface OeeConfig {
     family?: 'availability' | 'performance'
     /** Agent Report'taki rolü (src/lib/oeeAgent.ts); yoksa adından tahmin, 'none' = rolü yok. */
     agent?: 'die' | 'machine' | 'none'
+    /** Kodun anlamı (ör. "KLP = die breakdown"); Agent Insights yapay zekâya verir (src/lib/oeeInsights.ts). */
+    meaning?: string
   }[]
   /** Setup sayılan duruş metinleri (Reason Code Definition EN). */
   setupTexts: { text: string; kind: 'planned' | 'unplanned' }[]

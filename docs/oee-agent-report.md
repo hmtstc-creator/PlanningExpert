@@ -136,3 +136,46 @@ masraf yeri bazında. Agent Report günü her açılışta yeniden hesaplar; bu 
   Gönderilen yalnızca masraf yeri / iş yeri / kayıp grubu adları ve dakikalardır.
   Ücretsiz katmanlarda servis veriyi kendi geliştirmesi için kullanabilir.
 - Eşikler şimdilik koddadır (`TOPIC_DEFAULTS`); OEE Settings'e taşınması açık iş.
+
+## Agent Insights (2026-10-23, Ahmet — Karabasan oturumu üzerinden)
+
+**OEE → Agent Insights** (`/oee/insights`): masraf yeri, iş yeri (ya da tümü) ve
+tarih aralığı (varsayılan son 4 tam hafta; hazır 1 / 4 / 12 hafta, en çok 13 hafta)
+seçilir, **Agent report** 3–5 tespit yazar: "standart OEE Pareto'sunda görünmeyen".
+
+- **Eğitim = önce sinyal, sonra yorum.** Yapay zekâya ham toplam gitmez. Kod
+  (`src/lib/oeeInsights.ts`, saf, her tür için test) şu sinyalleri hesaplar; her
+  birinin kanıtı, kazancı (dk / hafta ve gerçekleşen hızla adet / hafta) ve güveni
+  sayıyla yazılır:
+  1. **Gizli yoğunlaşma** — bir kayıp grubunun ≥ %50'si tek parçada ve kayıp payı
+     ÷ yükleme payı ≥ 1,5.
+  2. **Parça × iş yeri** — aynı parça bir iş yerinde yükleme saati başına ≥ 2 kat
+     kayıp (iki iş yerinde de ≥ 240 dk yükleme).
+  3. **Sipariş değişimi** — günlük sipariş sayısı ile availability korelasyonu ≤ −0,5
+     (≥ 8 gün).
+  4. **Vardiya** — bir vardiyanın OEE'si diğerlerinden ≥ 8 puan düşük, haftaların
+     ≥ %60'ında.
+  5. **Haftanın günü** — bir günün yükleme saati başına kaybı günlerin ortalamasının
+     ≥ 1,6 katı.
+  6. **Mikro duruş** — ≥ 20 duruş, duruş başına ≤ 2 dk.
+  7. **Rejim değişimi** — kayıp bir günden sonra ≥ 2 kat (her iki yanda ≥ 5 yüklü gün).
+  8. **Performans anomalisi** — parça × iş yerinde performans > %105 ya da < %50
+     (ideal çevrim süresi master verisi).
+  9. **Veri kalitesi** — kaybın ≥ %10'u sebepsiz ("#"); binlerce adette hiç ıskarta /
+     red yok.
+  Plan bağlantısı (geciken malzeme × kayıp) henüz yok — açık iş.
+- **Puan** = kazanç (dk / hafta) × sürpriz (tür ağırlığı; yoğunlaşmada lift) × güven
+  (yüksek 1 / orta 0,7 / düşük 0,4). En iyi 20 sinyal yapay zekâya gider
+  (`INSIGHT_SYSTEM`, İngilizce; istek ≤ 24 000 karakter).
+- **Yapay zekâ** yalnız verilen sinyal kimliklerine dayanan tespit yazabilir; kazanç
+  dayandığı sinyallerin toplamını aşamaz; eksik alan sinyalden doldurulur. Anahtar
+  yoksa / cevap kullanılamazsa **en güçlü 3 sinyal** gösterilir ve sayfa bunu yazar.
+- **Kayıp kodlarının anlamı:** OEE Settings → Loss groups → *Meaning* (yeni,
+  isteğe bağlı alan `lossGroups[].meaning`); boşsa sayfa uyarır.
+- **Kişisel veri yok:** `responsible` alanı okunurken atılır; giden yalnız masraf yeri
+  / iş yeri / parça / kod adları ve sayılar.
+- **Kayıt:** `oeeInsightReports` (filtre, aralık, gün, kaynak, model, tespitler, sinyal
+  sayısı). Aynı filtre aynı gün yeniden istenirse kayıttan gelir; *Regenerate* yenisini
+  yapar. Uzun iş sunucu işlemidir (`oeeInsights.build`), sayfa ilerlemeyi gösterir.
+  Rapor yapmak `oee.data` izni ister; okumak OEE izni.
+- Yapay zekâ istemcisi ortak: `convex/aiClient.ts` (açık konular ajanı da kullanır).

@@ -54,6 +54,7 @@ import { Route as OeeBridgeRouteImport } from './routes/oee/bridge'
 import { Route as OeeDataRouteImport } from './routes/oee/data'
 import { Route as OeeDiesRouteImport } from './routes/oee/dies'
 import { Route as OeeGuideRouteImport } from './routes/oee/guide'
+import { Route as OeeInsightsRouteImport } from './routes/oee/insights'
 import { Route as OeeLossesRouteImport } from './routes/oee/losses'
 import { Route as OeeMttrRouteImport } from './routes/oee/mttr'
 import { Route as OeeReportRouteImport } from './routes/oee/report'
@@ -291,6 +292,11 @@ const OeeGuideRoute = OeeGuideRouteImport.update({
   path: '/oee/guide',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OeeInsightsRoute = OeeInsightsRouteImport.update({
+  id: '/oee/insights',
+  path: '/oee/insights',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OeeLossesRoute = OeeLossesRouteImport.update({
   id: '/oee/losses',
   path: '/oee/losses',
@@ -379,6 +385,7 @@ export interface FileRoutesByFullPath {
   '/oee/data': typeof OeeDataRoute
   '/oee/dies': typeof OeeDiesRoute
   '/oee/guide': typeof OeeGuideRoute
+  '/oee/insights': typeof OeeInsightsRoute
   '/oee/losses': typeof OeeLossesRoute
   '/oee/mttr': typeof OeeMttrRoute
   '/oee/report': typeof OeeReportRoute
@@ -435,6 +442,7 @@ export interface FileRoutesByTo {
   '/oee/data': typeof OeeDataRoute
   '/oee/dies': typeof OeeDiesRoute
   '/oee/guide': typeof OeeGuideRoute
+  '/oee/insights': typeof OeeInsightsRoute
   '/oee/losses': typeof OeeLossesRoute
   '/oee/mttr': typeof OeeMttrRoute
   '/oee/report': typeof OeeReportRoute
@@ -492,6 +500,7 @@ export interface FileRoutesById {
   '/oee/data': typeof OeeDataRoute
   '/oee/dies': typeof OeeDiesRoute
   '/oee/guide': typeof OeeGuideRoute
+  '/oee/insights': typeof OeeInsightsRoute
   '/oee/losses': typeof OeeLossesRoute
   '/oee/mttr': typeof OeeMttrRoute
   '/oee/report': typeof OeeReportRoute
@@ -550,6 +559,7 @@ export interface FileRouteTypes {
     | '/oee/data'
     | '/oee/dies'
     | '/oee/guide'
+    | '/oee/insights'
     | '/oee/losses'
     | '/oee/mttr'
     | '/oee/report'
@@ -606,6 +616,7 @@ export interface FileRouteTypes {
     | '/oee/data'
     | '/oee/dies'
     | '/oee/guide'
+    | '/oee/insights'
     | '/oee/losses'
     | '/oee/mttr'
     | '/oee/report'
@@ -662,6 +673,7 @@ export interface FileRouteTypes {
     | '/oee/data'
     | '/oee/dies'
     | '/oee/guide'
+    | '/oee/insights'
     | '/oee/losses'
     | '/oee/mttr'
     | '/oee/report'
@@ -719,6 +731,7 @@ export interface RootRouteChildren {
   OeeDataRoute: typeof OeeDataRoute
   OeeDiesRoute: typeof OeeDiesRoute
   OeeGuideRoute: typeof OeeGuideRoute
+  OeeInsightsRoute: typeof OeeInsightsRoute
   OeeLossesRoute: typeof OeeLossesRoute
   OeeMttrRoute: typeof OeeMttrRoute
   OeeReportRoute: typeof OeeReportRoute
@@ -1051,6 +1064,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OeeGuideRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oee/insights': {
+      id: '/oee/insights'
+      path: '/oee/insights'
+      fullPath: '/oee/insights'
+      preLoaderRoute: typeof OeeInsightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/oee/losses': {
       id: '/oee/losses'
       path: '/oee/losses'
@@ -1159,6 +1179,7 @@ const rootRouteChildren: RootRouteChildren = {
   OeeDataRoute: OeeDataRoute,
   OeeDiesRoute: OeeDiesRoute,
   OeeGuideRoute: OeeGuideRoute,
+  OeeInsightsRoute: OeeInsightsRoute,
   OeeLossesRoute: OeeLossesRoute,
   OeeMttrRoute: OeeMttrRoute,
   OeeReportRoute: OeeReportRoute,

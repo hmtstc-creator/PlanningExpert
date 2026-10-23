@@ -17,6 +17,7 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 - **Yarım iş yok.** `main` ruleset ile korunuyor (bkz. [05](05-yayin-ve-isletim.md)); açık PR / dal yok.
 - **Gantt müdahaleleri tamam:** sürükle-bırak (#34), elle iş (#35), silme (#36) — `todolist.md` §1 *Gantt: elle iş*. Kullanıcı geri bildirimi bekleniyor (doğru süre / yer, sonraki lotlar küçülüyor mu). Açık: elle iş dondurulmuş (tam plan onaylı) işi itemez.
+- **OEE Agent Insights (#41):** gerçek veriyle ilk raporlar okunur (Karabasan oturumu üretip Ahmet'e özetleyecek); kayıp kodu anlamları OEE Settings'te doldurulmalı. Dosyalar: sinyaller `src/lib/oeeInsights.ts`, ajan `convex/oeeInsights.ts`, sayfa `src/routes/oee/insights.tsx`.
 - **OEE açık konular ajanı (#37) tamam:** ilk gerçek yüklemeden sonra `/oee/topics` kullanıcıda denenir (adaylar doğru mu, eşikler çok mu sıkı / gevşek). Sonraki adım `todolist.md` OEE bölümü: eşikleri OEE Settings'e taşı, listeyi Agent Report'a bağla. Dosyalar: kurallar `src/lib/oeeTopics.ts`, ajan `convex/oeeTopics.ts` (`analyse`), sayfa `src/routes/oee/topics.tsx`.
 - **Sıradaki adım:** Organization map (`/admin/map`) kullanıcıda denenir; sonraki adımlar `todolist.md` §1 *Organization map*. Kararlar (§0) bekler; iyileştirmeler todolist'ten tek tek yapılır.
 - **Organization map:** #29 açılış çökmesini (React #185) düzeltti; kullanıcı geri bildirimi bekleniyor. Dikkat: `useQuery(...) ?? []` bir `useMemo`/`useEffect` bağımlılığına giriyorsa sabit boş dizi kullan.

@@ -275,13 +275,29 @@ function OeeSettingsPage() {
 
       <Card
         title="Loss groups"
-        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. Bridge family: where the group sits in the Loss Bridge — Availability as the MES counts it (default), or Performance (e.g. short stops in the TPM way). It changes the availability / performance split there, never the OEE. Agent role: whether the Agent Report reads the group as a die loss (Die Follow-up) or a machine loss (Machine Follow-up); Auto guesses it from the chart column and the name."
+        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. Bridge family: where the group sits in the Loss Bridge — Availability as the MES counts it (default), or Performance (e.g. short stops in the TPM way). It changes the availability / performance split there, never the OEE. Agent role: whether the Agent Report reads the group as a die loss (Die Follow-up) or a machine loss (Machine Follow-up); Auto guesses it from the chart column and the name. Meaning: what the code stands for, in plain words — Agent Insights gives it to the AI, which otherwise only sees the abbreviation."
       >
         <Rows
-          head={['Reason Code 2', 'Name', 'Chart column', 'In charts', 'Breakdown', 'Bridge family', 'Agent role', '']}
+          head={['Reason Code 2', 'Name', 'Meaning (for the AI)', 'Chart column', 'In charts', 'Breakdown', 'Bridge family', 'Agent role', '']}
           rows={c.lossGroups.map((g, i) => [
             g.code,
             <input key="l" className={input} value={g.label} onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />,
+            <input
+              key="m"
+              className={input}
+              placeholder="e.g. die breakdown, waiting for crane"
+              value={g.meaning ?? ''}
+              onChange={(e) => {
+                const meaning = e.target.value
+                set({
+                  lossGroups: c.lossGroups.map((x, j) => {
+                    if (j !== i) return x
+                    const { meaning: _m, ...rest } = x
+                    return meaning.trim() ? { ...rest, meaning } : rest
+                  }),
+                })
+              }}
+            />,
             <input key="c" className={input} value={g.chart} onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, chart: e.target.value } : x)) })} />,
             <input
               key="h"
