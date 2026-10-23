@@ -1506,6 +1506,35 @@
       },
       "optional": false
     },
+    "undefinedCodes": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "code": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "min": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "count": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": true
+    },
     "workCenter": {
       "fieldType": {
         "type": "string"

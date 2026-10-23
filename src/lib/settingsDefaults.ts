@@ -80,3 +80,26 @@ export const TODAY_DEFAULTS = {
   bottleneckWeeks: 2,
 } as const
 
+
+/**
+ * Kayıp kodlarının (Reason Code 2; gerekirse "Reason Code 1 Reason Code 2")
+ * VARSAYILAN anlamı — planlamacının verdiği sözlük (2026-10-23). OEE Settings →
+ * Loss groups → Meaning boşsa bu kullanılır ve orada placeholder olarak görünür;
+ * kullanıcının yazdığı her zaman önce gelir. Agent Insights yapay zekâya verir.
+ * Arama: src/lib/oeeInsights.ts → lossMeaning.
+ */
+export const LOSS_CODE_MEANINGS: Readonly<Record<string, string>> = {
+  '#': 'no reason entered (data quality)',
+  'SCHED_DOWN YNT': 'planned stop / no work / try-out',
+  'SCHED_DOWN UTS': 'planned break (lunch 20 min, tea 5 min)',
+  STP: 'set-up / adjustment (die, coil, electrode "REGLAJ ELECTROT", sensor, destacker, gripper; some texts are Romanian)',
+  'UNSCD_DOWN YNT': 'organisation / people (5S, personal, residual stop after a break, training, autonomous maintenance, trial, operator shortage)',
+  KLP: 'die / part quality (dimension, burr, broken die part, thinning, wrong stamping)',
+  ARZ: 'breakdown (nut feeder mechanical / electrical, welding machine, conveyor, press electrical / pneumatic / mechanical, destacker)',
+  KSD: 'short stops',
+  KON: 'inspection / quality approval (part check, first-off approval)',
+  OFC: 'logistics / waiting for material (transport, empty boxes, missing raw material, crane)',
+  MLZ: 'material shortage',
+  CLR: 'TPM level 1',
+  DEV: 'new operator training',
+}
