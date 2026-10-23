@@ -19,7 +19,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 ## OEE analizi
 
-- **Kısa duruş (< 2 dk) performans, uzun availability; A / P MES'te kalır** (2026-10-23, Ahmet, #44) — MES Production zaten yalnız ≥ 2 dk duruşları düşüyor (fixture'da 7/7 vardiya, 0,1 dk); kayıp ekranları aynı kodu olay süresine göre böler (`oeeShortStops.ts`). Eşik ayarda (`shortStopMin`, 2); 2'den farklıysa yalnız bölünme değişir.
+- **Kısa duruş (< 2 dk) performans, uzun availability; A / P MES'te kalır** (2026-10-23, Ahmet, #46) — MES Production zaten yalnız ≥ 2 dk duruşları düşüyor (fixture'da 7/7 vardiya, 0,1 dk); kayıp ekranları aynı kodu olay süresine göre böler (`oeeShortStops.ts`). Eşik ayarda (`shortStopMin`, 2); 2'den farklıysa yalnız bölünme değişir.
   *Alt.: A' = (Production + kısa) ÷ Loading* (kısa duruşları iki kez sayardı); *eşik ≠ 2 iken A / P'yi kaydırmak* (vardiya ve MES haftalık / aylık satırlarında süre yok, sayfalar arası tutarsız olurdu); *kod başına aile ayarı* (aynı kodun kısa ve uzun olayları farklı kayıptır → kaldırıldı).
 - **Kayıp kodu anlamları: varsayılan kodda, kullanıcınınki önce** (2026-10-23, #42) — sözlük `LOSS_CODE_MEANINGS` (`settingsDefaults.ts`), Meaning boşsa kullanılır ve Settings'te placeholder olur; ayara kopyalanmaz (varsayılan değişince eskimesin). Metin İngilizce: sayfa ve yapay zekâ isteği İngilizce. *Alt.: ayara yazmak* (kullanıcı değeriyle karışırdı).
 - **Mola sonrası / 5S sinyali duruş metninden** (#42) — kayıp özetinde olay zamanı yok, yalnız metin; kalıplar `AFTER_BREAK`, `FIVE_S` (`oeeInsights.ts`). Gerçek metinler farklıysa kalıp genişletilir.
