@@ -172,6 +172,8 @@ export const configFields = {
       family: v.optional(v.union(v.literal('availability'), v.literal('performance'))),
       // Agent Report rolü (src/lib/oeeAgent.ts); yoksa adından tahmin.
       agent: v.optional(v.union(v.literal('die'), v.literal('machine'), v.literal('none'))),
+      // Kodun anlamı (ör. KLP = kalıp arızası): Agent Insights'ta yapay zekâya gider.
+      meaning: v.optional(v.string()),
     }),
   ),
   setupTexts: v.array(v.object({ text: v.string(), kind: v.union(v.literal('planned'), v.literal('unplanned')) })),

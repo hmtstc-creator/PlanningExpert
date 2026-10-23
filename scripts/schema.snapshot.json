@@ -1414,6 +1414,105 @@
       "optional": true
     }
   },
+  "oeeInsightReports": {
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "createdBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "day": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "findings": {
+      "fieldType": {
+        "type": "any"
+      },
+      "optional": true
+    },
+    "finishedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "from": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "model": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "note": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "progress": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "signalCount": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "source": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "to": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
   "oeeLossDays": {
     "codes": {
       "fieldType": {
@@ -2042,6 +2141,12 @@
                     "value": "none"
                   }
                 ]
+              },
+              "optional": true
+            },
+            "meaning": {
+              "fieldType": {
+                "type": "string"
               },
               "optional": true
             }

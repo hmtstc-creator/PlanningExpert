@@ -158,6 +158,7 @@ export const MODULE_AREAS: Area[] = [
     link('/oee/bridge', 'Loss Bridge', 'From calendar time to OEE, loss by loss — priorities', 'chartDown'),
     link('/oee/report', 'Daily Report', 'One page: OEE, top 3 losses with materials, speed loss per work center', 'sheet'),
     link('/oee/agent', 'Agent Report', 'The day in short notes for management: dies, presses, shifts, repeats, open topics', 'clipboard'),
+    link('/oee/insights', 'Agent Insights', 'Cost center, work center and period: 3 to 5 findings a standard Pareto does not show', 'zap'),
     link('/oee/topics', 'Open Topics', 'Chronic and critical losses the agent found after each upload, by cost center', 'alert'),
     link('/oee/mttr', 'MTTR & MTBF', 'ARZ, KLP and setups: repair time and time between stops — year, 10 weeks, week', 'wrench'),
     {
@@ -294,6 +295,7 @@ const RELATED_PAGES: Record<string, string[]> = {
   '/oee/bridge': ['/oee', '/oee/losses', '/oee/report', '/die-followup/problems', '/machine-followup/breakdowns', '/oee/settings'],
   '/oee/report': ['/oee/agent', '/oee/bridge', '/oee', '/oee/losses', '/die-followup/problems', '/machine-followup/breakdowns'],
   '/oee/agent': ['/oee/topics', '/oee/report', '/oee/bridge', '/die-followup/problems', '/machine-followup/breakdowns', '/oee/settings'],
+  '/oee/insights': ['/oee/agent', '/oee/topics', '/oee/bridge', '/oee/settings'],
   '/oee/topics': ['/oee/agent', '/oee/losses', '/die-followup/problems', '/machine-followup/breakdowns'],
   '/oee/data': ['/oee', '/oee/settings', '/oee/guide'],
   '/oee/settings': ['/settings', '/oee/data', '/oee/guide', '/makineler'],
@@ -331,6 +333,7 @@ const LABELS: Record<string, string> = {
   '/oee/report': 'OEE Daily Report',
   '/oee/agent': 'OEE Agent Report',
   '/oee/topics': 'OEE Open Topics',
+  '/oee/insights': 'OEE Agent Insights',
   '/oee/mttr': 'OEE MTTR & MTBF',
   '/oee/dies': 'Dies OEE Trend',
   '/oee/data': 'OEE Data',

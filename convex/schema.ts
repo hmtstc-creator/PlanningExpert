@@ -959,6 +959,33 @@ export default defineSchema({
     .index('by_key', ['plantId', 'key'])
     .index('by_status', ['plantId', 'status'])
     .index('by_plant', ['plantId']),
+  // OEE Agent Insights raporları (src/lib/oeeInsights.ts, convex/oeeInsights.ts):
+  // filtre + aralık başına; aynı gün aynı filtre önbellekten gelir.
+  oeeInsightReports: defineTable({
+    ...plantField,
+    costCenter: v.string(),
+    // '' = masraf yerinin bütün iş yerleri
+    workCenter: v.string(),
+    from: v.string(),
+    to: v.string(),
+    // Oluşturulduğu gün (fabrika saati): önbellek anahtarı
+    day: v.string(),
+    // 'running' | 'done' | 'failed'
+    status: v.string(),
+    progress: v.optional(v.string()),
+    // 'ai' | 'rules'
+    source: v.optional(v.string()),
+    model: v.optional(v.string()),
+    note: v.optional(v.string()),
+    findings: v.optional(v.any()),
+    signalCount: v.optional(v.number()),
+    createdAt: v.number(),
+    createdBy: v.optional(v.string()),
+    finishedAt: v.optional(v.number()),
+  })
+    .index('by_filter', ['plantId', 'costCenter', 'workCenter', 'from', 'to', 'day'])
+    .index('by_created', ['plantId', 'createdAt'])
+    .index('by_plant', ['plantId']),
   // Ajanın işlediği günler: bir gün bir kez (status 'failed' ise sonraki yüklemede yeniden).
   oeeTopicRuns: defineTable({
     ...plantField,

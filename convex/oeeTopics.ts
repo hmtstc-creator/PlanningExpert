@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 
 import { internal } from './_generated/api'
 import { internalAction } from './_generated/server'
+import { aiConfigured, askJson } from './aiClient'
 import { OEE, guardedMutation, guardedQuery, plantInternalMutation, plantInternalQuery } from './guarded'
 import { definedOnly } from './oee'
 import { localNow } from '../src/lib/digest'
@@ -18,7 +19,6 @@ import {
   topicCandidates,
   weekWindow,
   type GroupDay,
-  type TopicCandidate,
 } from '../src/lib/oeeTopics'
 
 /**
@@ -29,14 +29,7 @@ import {
  * (src/lib/oeeTopics.ts). Gün kapanmadan başlamış çalışma sayılmaz. Açık konu
  * yeniden yazılmaz; yalnızca lastDay / seenDays güncellenir.
  *
- * Yapay zekâ: OpenAI uyumlu herhangi bir sohbet API'si (ücretsiz katman, ör.
- * Google Gemini ya da Groq). Ayar kendi sunucumuzdaki (self-hosted) Convex'in
- * ortam değişkenleridir (docs/deployment.md → OEE açık konular) — kodda ve
- * veritabanında değil:
- *
- *   AI_API_KEY   anahtar (yoksa kurallar karar verir)
- *   AI_API_URL   (isteğe bağlı) …/chat/completions; varsayılan Gemini
- *   AI_MODEL     (isteğe bağlı) model adı; varsayılan gemini-flash-latest
+ * Yapay zekâ: convex/aiClient.ts (AI_API_KEY; yoksa kurallar karar verir).
  *
  * Gönderilen: masraf yeri / iş yeri / kayıp grubu adları ve dakikalar; kişi verisi yok.
  */
@@ -44,8 +37,6 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Ctx = any
 
-const AI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
-const AI_MODEL = 'gemini-flash-latest'
 const AI_TIMEOUT_MS = 45_000
 
 const strip = ({ _id, _creationTime, ...rest }: Ctx) => rest
@@ -68,7 +59,7 @@ export const runs = guardedQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await (ctx.db as Ctx).query('oeeTopicRuns').withIndex('by_day').order('desc').take(10)
-    return { runs: rows.map(strip), aiConfigured: !!process.env.AI_API_KEY }
+    return { runs: rows.map(strip), aiConfigured: aiConfigured() }
   },
 })
 
@@ -183,34 +174,6 @@ export const record = plantInternalMutation({
   },
 })
 
-async function askAi(day: string, xs: TopicCandidate[]): Promise<{ answer: string | null; note: string }> {
-  const key = process.env.AI_API_KEY
-  if (!key) return { answer: null, note: 'AI not set up (AI_API_KEY) — the rules decided' }
-  const model = process.env.AI_MODEL || AI_MODEL
-  try {
-    const res = await fetch(process.env.AI_API_URL || AI_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: AI_SYSTEM },
-          { role: 'user', content: aiUserMessage(day, xs) },
-        ],
-      }),
-    })
-    if (!res.ok) return { answer: null, note: `AI answered ${res.status} — the rules decided: ${(await res.text()).slice(0, 120)}` }
-    const json: Ctx = await res.json()
-    const answer = json?.choices?.[0]?.message?.content
-    return typeof answer === 'string' ? { answer, note: `AI (${model})` } : { answer: null, note: 'AI gave no answer — the rules decided' }
-  } catch (e) {
-    return { answer: null, note: `AI failed — the rules decided: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200) }
-  }
-}
-
 /** Yükleme sonrası (oee.finishImport) ya da elle (runNow). */
 export const analyse = internalAction({
   args: { plantId: v.id('plants') },
@@ -226,7 +189,7 @@ export const analyse = internalAction({
       }
       const candidates = topicCandidates(day, rows, config, new Set(openKeys))
       const fresh = candidates.filter((x) => !x.open).slice(0, TOPIC_DEFAULTS.maxCandidates)
-      const ai = fresh.length ? await askAi(day, fresh) : { answer: null, note: 'No new candidate' }
+      const ai = fresh.length ? await askJson(AI_SYSTEM, aiUserMessage(day, fresh), AI_TIMEOUT_MS) : { answer: null, note: 'No new candidate' }
       const verdicts = ai.answer === null ? null : parseAiAnswer(ai.answer, fresh.map((x) => x.key))
       const adds = decideTopics(fresh, verdicts).map((d) => ({
         key: d.candidate.key,
