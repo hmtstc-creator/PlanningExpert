@@ -27,7 +27,8 @@ import {
  * yeniden yazılmaz; yalnızca lastDay / seenDays güncellenir.
  *
  * Yapay zekâ: OpenAI uyumlu herhangi bir sohbet API'si (ücretsiz katman, ör.
- * Google Gemini ya da Groq). Ayar Convex ortam değişkenleridir — kodda ve
+ * Google Gemini ya da Groq). Ayar kendi sunucumuzdaki (self-hosted) Convex'in
+ * ortam değişkenleridir (docs/deployment.md → OEE açık konular) — kodda ve
  * veritabanında değil:
  *
  *   AI_API_KEY   anahtar (yoksa kurallar karar verir)

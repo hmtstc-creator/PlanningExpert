@@ -155,7 +155,7 @@ sonra girilen veri kaybolur; bu yüzden kesinti saati 🔑 Ahmet'le seçilir.
 Convex sunucumuzun ortam değişkenleri `npx convex env set <AD> <değer>` ile
 (`portal.env` yüklüyken) ya da Convex panelinden (`docker compose -f deploy/compose.yml
 --profile tools up -d dashboard`, yalnızca tailnet / SSH tüneliyle). Liste:
-docs/deployment.md → Günlük özet e-postası. Paneli iş bitince kapat:
+docs/deployment.md → Günlük özet e-postası ve OEE açık konular — yapay zekâ (`AI_API_KEY`). Paneli iş bitince kapat:
 `docker compose -f deploy/compose.yml stop dashboard`.
 
 ## Parola sıfırlama (site sahibi parolasını unutursa)

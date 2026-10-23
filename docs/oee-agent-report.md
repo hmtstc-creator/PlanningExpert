@@ -125,7 +125,8 @@ masraf yeri bazında. Agent Report günü her açılışta yeniden hesaplar; bu 
 - **Tekrar yok:** anahtar = masraf yeri | iş yeri | kayıp grubu. Açık konu ertesi gün
   yine aday olursa yeniden yazılmaz; yalnızca *last seen* ve *days seen* güncellenir.
   Kapatılmış konu tekrar ederse yeni konu açılır. Kapatma not ister (`oee.data` izni).
-- **Yapay zekâ ayarı** (Convex ortam değişkenleri; kodda / veritabanında değil):
+- **Yapay zekâ ayarı** (kendi sunucumuzdaki — self-hosted — Convex'in ortam değişkenleri;
+  kodda / veritabanında değil; adımlar `docs/deployment.md` → *OEE açık konular — yapay zekâ*):
   `AI_API_KEY` (zorunlu), `AI_API_URL` (varsayılan Google Gemini'nin OpenAI uyumlu
   adresi), `AI_MODEL` (varsayılan `gemini-flash-latest`). OpenAI uyumlu her ücretsiz
   servis olur (ör. Groq: `https://api.groq.com/openai/v1/chat/completions`).
