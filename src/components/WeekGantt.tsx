@@ -176,7 +176,39 @@ interface Props {
    * onayından dondurulmuş işler tıklanamaz; tek tek onaylanan işler tıklanır.
    */
   onJobClick?: (job: WeekGanttJob) => void
+  /**
+   * İş sürüklenip bırakılınca: hedef pres, gün ve işin başlayacağı saat
+   * (5 dakikaya yuvarlı). Verilmezse sürükleme kapalıdır. Bakım ve tam plan
+   * onayından dondurulmuş işler taşınmaz; tek tek onaylanan işler taşınır.
+   */
+  onJobMove?: (job: WeekGanttJob, target: GanttMoveTarget) => void
 }
+
+export interface GanttMoveTarget {
+  press: string
+  date: string
+  /** Gece yarısından dakika (gece vardiyasında 1440'ı aşabilir). */
+  clockMinute: number
+}
+
+/** Sürüklenen iş: fare hemen, dokunmatik basılı tutunca (kaydırmayla karışmasın) başlar. */
+interface DragState {
+  job: WeekGanttJob
+  pointerId: number
+  startX: number
+  startY: number
+  /** İmlecin çubuğun sol kenarına uzaklığı (px): iş çubuğun sol kenarının bırakıldığı yerde başlar. */
+  grab: number
+  width: number
+  touch: boolean
+  active: boolean
+  timer?: ReturnType<typeof setTimeout>
+  x: number
+  y: number
+  target: GanttMoveTarget | null
+}
+
+const LONG_PRESS_MS = 350
 
 interface PlacedBlock extends Segment {
   kind: BlockKind
@@ -260,12 +292,75 @@ export function WeekGantt({
   shiftMinutes,
   now,
   onJobClick,
+  onJobMove,
 }: Props) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [dayFilter, setDayFilter] = useState<string | null>(null)
   const [weekFilter, setWeekFilter] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [matchIndex, setMatchIndex] = useState(0)
+
+  const [drag, setDrag] = useState<DragState | null>(null)
+  const dragRef = useRef<DragState | null>(null)
+  dragRef.current = drag
+  const onJobMoveRef = useRef(onJobMove)
+  onJobMoveRef.current = onJobMove
+  // Bırakma noktası → pres / gün / saat; ölçüler aşağıda (her çizimde) bağlanır.
+  const dropAtRef = useRef<(x: number, y: number, grab: number) => GanttMoveTarget | null>(() => null)
+  // Sürüklemenin sonunda gelen tıklama iş penceresini açmasın.
+  const suppressClick = useRef(false)
+  const dragging = drag !== null
+  useEffect(() => {
+    if (!dragging) return
+    const move = (e: PointerEvent) => {
+      const d = dragRef.current
+      if (!d || e.pointerId !== d.pointerId) return
+      const moved = Math.hypot(e.clientX - d.startX, e.clientY - d.startY)
+      if (!d.active) {
+        // Dokunmatikte basılı tutmadan kaydırılırsa sayfa kayar, iş değil.
+        if (d.touch) {
+          if (moved > 8) {
+            clearTimeout(d.timer)
+            setDrag(null)
+          }
+          return
+        }
+        if (moved < 5) return
+      }
+      setDrag({ ...d, active: true, x: e.clientX, y: e.clientY, target: dropAtRef.current(e.clientX, e.clientY, d.grab) })
+    }
+    const up = (e: PointerEvent) => {
+      const d = dragRef.current
+      if (!d || e.pointerId !== d.pointerId) return
+      clearTimeout(d.timer)
+      setDrag(null)
+      if (!d.active) return
+      suppressClick.current = true
+      setTimeout(() => (suppressClick.current = false), 0)
+      const target = dropAtRef.current(e.clientX, e.clientY, d.grab)
+      if (target) onJobMoveRef.current?.(d.job, target)
+    }
+    const cancel = (e: PointerEvent) => {
+      const d = dragRef.current
+      if (!d || e.pointerId !== d.pointerId) return
+      clearTimeout(d.timer)
+      setDrag(null)
+    }
+    // Sürükleme başladıysa dokunmatik kaydırma durur.
+    const block = (e: TouchEvent) => {
+      if (dragRef.current?.active) e.preventDefault()
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', cancel)
+    window.addEventListener('touchmove', block, { passive: false })
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', cancel)
+      window.removeEventListener('touchmove', block)
+    }
+  }, [dragging])
   const needle = normalizeRef(search)
   const isMatch = (job: WeekGanttJob) => needle !== '' && normalizeRef(job.material).includes(needle)
 
@@ -604,6 +699,46 @@ export function WeekGantt({
   const totalPx = Math.max(240, totalMinutes * pxPerMinute)
   const px = (minute: number) => minute * pxPerMinute
 
+  dropAtRef.current = (x, y, grab) => {
+    const row = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-gantt-row]')
+    const press = row?.dataset.ganttRow
+    if (!row || !press) return null
+    const minute = Math.max(0, (x - grab - row.getBoundingClientRect().left) / pxPerMinute)
+    const index = Math.min(visibleDates.length - 1, Math.floor(minute / dayWidthMinutes))
+    const clockMinute = Math.round((minute - index * dayWidthMinutes + shiftStartMinute) / 5) * 5
+    return { press, date: visibleDates[index], clockMinute }
+  }
+  const startDrag = (e: React.PointerEvent<HTMLElement>, job: WeekGanttJob) => {
+    if (e.button !== 0) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const touch = e.pointerType === 'touch'
+    const d: DragState = {
+      job,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      grab: e.clientX - rect.left,
+      width: rect.width,
+      touch,
+      active: false,
+      x: e.clientX,
+      y: e.clientY,
+      target: null,
+    }
+    if (touch) {
+      d.timer = setTimeout(
+        () =>
+          setDrag((cur) =>
+            cur && cur.pointerId === d.pointerId
+              ? { ...cur, active: true, target: dropAtRef.current(cur.startX, cur.startY, cur.grab) }
+              : cur,
+          ),
+        LONG_PRESS_MS,
+      )
+    }
+    setDrag(d)
+  }
+
   // Hour ticks only once they are far enough apart to read.
   const tickHours = pxPerHour >= 40 ? 1 : pxPerHour >= 20 ? 2 : pxPerHour >= 10 ? 4 : 0
 
@@ -611,6 +746,18 @@ export function WeekGantt({
 
   return (
     <div className="rounded-lg border border-border bg-card">
+      {drag?.active && (
+        <div className="pointer-events-none fixed z-[90]" style={{ left: drag.x - drag.grab, top: drag.y - 14 }}>
+          <div
+            className="rounded-md opacity-75 shadow-lg ring-2 ring-foreground"
+            style={{ width: Math.max(24, drag.width), height: ROW_HEIGHT - 12, backgroundColor: COLORS.run.fill }}
+          />
+          <div className="mt-1 whitespace-nowrap rounded bg-foreground px-1.5 py-0.5 text-[11px] font-medium text-background shadow">
+            {drag.job.material} →{' '}
+            {drag.target ? `${drag.target.press} · ${dayLabel(drag.target.date)} ${clockLabel(drag.target.clockMinute)}` : 'drop on a work center row'}
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border px-3 py-2.5">
         <LegendItem swatch={<span className="inline-block h-3 w-4 rounded-sm" style={{ backgroundColor: COLORS.setup.fill }} />} label="Mould setup" />
         <LegendItem swatch={<span className="inline-block h-3 w-1.5 rounded-sm" style={{ backgroundColor: COLORS.quality.fill }} />} label="Quality approval" />
@@ -938,7 +1085,7 @@ export function WeekGantt({
                     className="flex items-center"
                     style={{ height: ROW_HEIGHT }}
                   >
-                    <div className="relative rounded-md bg-muted/25" style={{ height: ROW_HEIGHT - 4, width: totalPx }}>
+                    <div data-gantt-row={press.name} className="relative rounded-md bg-muted/25" style={{ height: ROW_HEIGHT - 4, width: totalPx }}>
                       {visibleDates.map((date, i) => (
                         <span
                           key={date}
@@ -985,14 +1132,22 @@ export function WeekGantt({
                         const focused = current?.bar === bar
                         const editable =
                           !!onJobClick && !bar.maintenance && (bar.job.locked || (!bar.job.frozen && !!bar.job.bucketLabel))
+                        const movable = !!onJobMove && !bar.maintenance && (bar.job.locked || !bar.job.frozen)
+                        const beingDragged = drag?.active && drag.job === bar.job
                         return (
                           <div
                             key={`bar-${idx}`}
-                            title={editable ? `${bar.title} · click to change the quantity` : bar.title}
+                            title={
+                              (editable ? `${bar.title} · click to change the quantity` : bar.title) +
+                              (movable ? ' · drag to move (hold on touch)' : '')
+                            }
+                            {...(movable && { onPointerDown: (e: React.PointerEvent<HTMLElement>) => startDrag(e, bar.job) })}
                             {...(editable && {
                               role: 'button',
                               tabIndex: 0,
-                              onClick: () => onJobClick(bar.job),
+                              onClick: () => {
+                                if (!suppressClick.current) onJobClick(bar.job)
+                              },
                               onKeyDown: (e: React.KeyboardEvent) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
                                   e.preventDefault()
@@ -1001,6 +1156,8 @@ export function WeekGantt({
                               },
                             })}
                             className={`absolute top-1 overflow-hidden rounded-md shadow-sm transition-opacity ${
+                              movable ? 'cursor-grab select-none [-webkit-touch-callout:none]' : ''
+                            } ${
                               editable ? 'cursor-pointer hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-foreground' : ''
                             } ${
                               focused
@@ -1013,7 +1170,7 @@ export function WeekGantt({
                               left: px(bar.start),
                               width,
                               height: ROW_HEIGHT - 12,
-                              opacity: needle && !hit ? 0.25 : 1,
+                              opacity: beingDragged ? 0.4 : needle && !hit ? 0.25 : 1,
                               backgroundColor: hit
                                 ? SEARCH_FILL
                                 : bar.maintenance

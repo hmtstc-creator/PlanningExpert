@@ -352,6 +352,18 @@ function PlanLogicPage() {
             from demand. The engine plans only the free time around them.
           </li>
           <li>
+            <b>Approved and moved jobs</b>: a job approved on its own (click it → Approve this job), or
+            dragged on the Gantt to another work center, day or time (on a phone: hold, then drag; or
+            click it → Move…), is locked there the same way — kept in place, its quantity deducted from
+            that part's demand, the other jobs planned around it. A move keeps the job's setup,
+            approval, production and frequency-stop minutes in order and pours them into the target
+            work center's working minutes from the drop point; when a day is full it carries on the
+            next working day (e.g. 120 min setup + 600 min production dropped at minute 1200 of a
+            1350-minute day: setup 1200–1320, 30 min production that day, the other 570 min the next
+            working day). It cannot start before now, must fit before the end of the plan, and cannot
+            overlap another approved or frozen job or maintenance on that work center.
+          </li>
+          <li>
             <b>Work center maintenance</b> takes those clock hours out of that
             work center's day; jobs flow around it.
           </li>

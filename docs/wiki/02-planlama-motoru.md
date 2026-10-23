@@ -1,6 +1,6 @@
 # 02 · Planlama motoru
 
-> Son güncelleme: 2026-10-22 · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
+> Son güncelleme: 2026-10-23 · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
 > Kullanıcıya dönük anlatım: sitede **Planning Logic**
 
 Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Aynı girdi aynı planı verir
@@ -21,6 +21,7 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
    - Her lot **teslim kontrol noktaları** taşır: karşıladığı her ihtiyaç günü ve o güne kadar gereken **birikimli pay** ([03](03-gec-is-tanimi.md)).
    - Eş ürün çiftleri **tek vuruştan** çıkar; sac yalnızca asıl ürünün gramajıyla sayılır.
 3. **Dondurulmuş ufuk:** onaylı plandaki işler (ve tek tek kilitlenen işler, `planJobLocks`) yerinde kalır; motor etrafına planlar.
+   **Taşınan iş** (Gantt'ta sürükle-bırak ya da iş penceresi → *Move…*, 2026-10-23) da kilittir: `src/lib/jobMove.ts` işin parçalarını (setup, onay, üretim, rulo değişimi) sırası ve net süresiyle hedef presin günlerine döker (`reflowSegments`), geçmişe / ufuk dışına / başka kilitli, dondurulmuş işe ya da bakıma bindirmez (`planMove`); `convex/planJobLocks.ts` `move` eski kilidi kaldırıp yenisini tek işlemde yazar. Süre pres değişince aynı kalır (motor süreyi parçadan okur).
 4. **Yerleştirme** (`schedule`, `scheduler.ts`): lotlar sırayla preslere konur.
    - **Sıra:** öne alınanlar (priority) → faz (bakiye → acil → dolgu) → boost → faz içinde stok bitişi / aciliyet / az alternatifli önce.
    - Her lot **bütün uygun presleri** dener (ana pres; alternatifler yalnızca *Flexible work center* işaretliyse). Varsayılan seçim *en erken biten* pres.
