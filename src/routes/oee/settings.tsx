@@ -7,7 +7,7 @@ import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
 import { agentThresholds, groupRole, type AgentThresholds } from '../../lib/oeeAgent'
-import { addDaysIso, configProblems, dataCostCenters, lossDayOf, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
+import { MES_SHORT_STOP_MIN, addDaysIso, configProblems, shortStopMinOf, dataCostCenters, lossDayOf, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
 import { defaultLossMeaning, undefinedLossCodes } from '../../lib/oeeInsights'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
@@ -278,7 +278,7 @@ function OeeSettingsPage() {
 
       <Card
         title="Loss groups"
-        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. Bridge family: where the group sits in the Loss Bridge — Availability as the MES counts it (default), or Performance (e.g. short stops in the TPM way). It changes the availability / performance split there, never the OEE. Agent role: whether the Agent Report reads the group as a die loss (Die Follow-up) or a machine loss (Machine Follow-up); Auto guesses it from the chart column and the name. Meaning: what the code stands for, in plain words — Agent Insights gives it to the AI, which otherwise only sees the abbreviation. An empty Meaning uses the default shown in grey; what you write always wins."
+        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. The availability / performance split is not set per group: every unplanned stop shorter than the short-stop limit (Numbers below) is a performance loss, longer ones are availability — the same code is split by duration. Agent role: whether the Agent Report reads the group as a die loss (Die Follow-up) or a machine loss (Machine Follow-up); Auto guesses it from the chart column and the name. Meaning: what the code stands for, in plain words — Agent Insights gives it to the AI, which otherwise only sees the abbreviation. An empty Meaning uses the default shown in grey; what you write always wins."
       >
         {undefinedCodes.length > 0 && (
           <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -295,7 +295,7 @@ function OeeSettingsPage() {
           </p>
         )}
         <Rows
-          head={['Reason Code 2', 'Name', 'Meaning (for the AI)', 'Chart column', 'In charts', 'Breakdown', 'Bridge family', 'Agent role', '']}
+          head={['Reason Code 2', 'Name', 'Meaning (for the AI)', 'Chart column', 'In charts', 'Breakdown', 'Agent role', '']}
           rows={c.lossGroups.map((g, i) => [
             g.code,
             <input key="l" className={input} value={g.label} onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />,
@@ -329,21 +329,6 @@ function OeeSettingsPage() {
               checked={g.breakdown}
               onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, breakdown: e.target.checked } : x)) })}
             />,
-            <select
-              key="f"
-              className={input}
-              value={g.family ?? 'availability'}
-              onChange={(e) =>
-                set({
-                  lossGroups: c.lossGroups.map((x, j) =>
-                    j === i ? { ...x, family: e.target.value === 'performance' ? ('performance' as const) : ('availability' as const) } : x,
-                  ),
-                })
-              }
-            >
-              <option value="availability">Availability</option>
-              <option value="performance">Performance</option>
-            </select>,
             <select
               key="a"
               className={input}
@@ -429,7 +414,19 @@ function OeeSettingsPage() {
           <NumberField label="Production after a setup for OK (min, areas without their own)" value={c.startupRunMin} onChange={(v) => set({ startupRunMin: v })} />
           <NumberField label="Weeks in the trends" value={c.trendWeeks} onChange={(v) => set({ trendWeeks: v })} />
           <NumberField label="Rows in the top lists" value={c.topN} onChange={(v) => set({ topN: v })} />
+          <NumberField
+            label={`Short-stop limit (min): shorter unplanned stops = performance (MES: ${MES_SHORT_STOP_MIN})`}
+            step={1}
+            value={shortStopMinOf(c)}
+            onChange={(v) => set({ shortStopMin: v >= 1 ? Math.round(v) : undefined })}
+          />
         </div>
+        {shortStopMinOf(c) !== MES_SHORT_STOP_MIN && (
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+            The MES deducts stops of {MES_SHORT_STOP_MIN} min and longer from the production time, so Availability and Performance stay as in the MES. With
+            another limit only the loss split (Loss Bridge, Losses Trend, MTTR / MTBF, agents) follows it, and the Loss Bridge shows the difference.
+          </p>
+        )}
       </Card>
     </div>
   )
@@ -499,11 +496,11 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function NumberField({ label, value, onChange, step }: { label: string; value: number; onChange: (v: number) => void; step?: number }) {
   return (
     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
       {label}
-      <input type="number" min={1} step="any" className={`${input} w-28`} value={value || ''} onChange={(e) => onChange(Number(e.target.value))} />
+      <input type="number" min={1} step={step ?? 'any'} className={`${input} w-28`} value={value || ''} onChange={(e) => onChange(Number(e.target.value))} />
     </label>
   )
 }

@@ -122,14 +122,12 @@ describe('OEE köprüsü', () => {
     expect(b.notExplained).toBeCloseTo(0, 9)
   })
 
-  it('kayıp grubu performans ailesine alınınca OEE değişmez, A ve P payı değişir', () => {
+  it('family ayarı artık köprüyü değiştirmez (aile süreden gelir, oeeShortStops.test.ts)', () => {
     const moved = { ...plant, lossGroups: plant.lossGroups.map((g) => (g.code === 'KSD' ? { ...g, family: 'performance' as const } : g)) }
     const a = buildBridge(pDays, pLoss, plant)
     const b = buildBridge(pDays, pLoss, moved)
-    expectCloses(b)
-    expect(b.oee).toBeCloseTo(a.oee!, 9)
-    expect(b.level1!.performance).toBeGreaterThan(a.level1!.performance)
-    expect(b.items.find((i) => i.label === 'Short')?.family).toBe('performance')
+    expect(b.steps).toEqual(a.steps)
+    expect(b.items.find((i) => i.label === 'Short')?.family).toBe('availability')
   })
 
   it('performans %100 üstü: hız kaybı negatif adım, kırpılmaz', () => {

@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
 import { DEFAULT_PLANT_TIME_ZONE } from '../lib/dates'
+import { MES_SHORT_STOP_MIN } from '../lib/oee'
+import { SHORT_STOP_DATA_FROM } from '../lib/oeeShortStops'
 import { leadTimeLookup, type LeadTimeRow } from '../lib/rawLeadTime'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { PageHeader } from '../components/PageHeader'
@@ -54,6 +56,8 @@ function hhmm(minute: number): string {
   const m = minute % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
+
+const dmy = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`
 
 function PlanLogicPage() {
   const leadRows = useQuery(api.rawLeadTimes.list) as LeadTimeRow[] | undefined
@@ -799,6 +803,40 @@ function PlanLogicPage() {
             Both use the same method: available hours as they are, production time = ideal time ÷
             OEE. The <b>capacity factor</b> (Performance page) is a third, separate number: the
             measured attainment against the approved plan, applied to the plan's capacity.
+          </li>
+        </ul>
+      </section>
+
+      <section id="oee-short-stops" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold text-foreground">OEE — availability and performance, short stops</h2>
+        <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
+          <li>
+            Times are added first, then divided — never an average of percentages. <b>Availability</b> = Production ÷ Loading,{' '}
+            <b>Performance</b> = Operation ÷ Production, <b>Quality</b> = Good ÷ (Good + Scrap + Reject), <b>OEE</b> = A × P × Q.
+            Loading already leaves out the planned stops (breaks, no work, try-out: Reason Code 1 set as a break in OEE Settings).
+          </li>
+          <li>
+            <b>Short stops</b>: an unplanned stop shorter than {MES_SHORT_STOP_MIN} min is a <b>performance</b> (speed) loss; one of{' '}
+            {MES_SHORT_STOP_MIN} min or longer is an <b>availability</b> loss. The MES already works this way: its production time only
+            deducts the stops of {MES_SHORT_STOP_MIN} min and longer, so A and P are the MES values on every OEE page (Dashboard, trends,
+            weekly / monthly, Daily Report, Board, KPI).
+          </li>
+          <li>
+            The loss pages split the same reason code by the length of each stop: Loss Bridge (e.g. “Machine” for the long stops,
+            “Machine &lt; {MES_SHORT_STOP_MIN} min” under performance), Losses Trend (“Short stops” column). Speed loss = Production −
+            Operation − short stops, so the totals and the OEE never change.
+          </li>
+          <li>
+            The limit is set in OEE Settings → Numbers (default {MES_SHORT_STOP_MIN} min, whole minutes). Another value changes only the
+            loss split; A and P stay as in the MES and the bridge shows the difference.
+          </li>
+          <li>
+            Stop durations are stored from {dmy(SHORT_STOP_DATA_FROM)}; before that the stops are not split (all availability) and the
+            page says “duration split not available before {dmy(SHORT_STOP_DATA_FROM)}”.
+          </li>
+          <li>
+            Example (test): on 21.09 at PRS-105 shift 3, Loading − Production is 140.6 min = the stops of 2 min and longer; the 21.6
+            min of shorter stops are inside Production − Operation.
           </li>
         </ul>
       </section>

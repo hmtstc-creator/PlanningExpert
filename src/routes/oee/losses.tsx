@@ -31,6 +31,8 @@ import {
   type WeeklyRow,
 } from '../../lib/oee'
 import { fromStoredLosses, type StoredLossDay } from '../../lib/oeeStore'
+import { fromStoredStops, type StoredStopDay } from '../../lib/oeeReliability'
+import { shortStopNote, splitShortStops } from '../../lib/oeeShortStops'
 import { relatedPages } from '../../lib/navigation'
 
 export const Route = createFileRoute('/oee/losses')({
@@ -73,7 +75,10 @@ function LossesPage() {
   const dayRows = (useQuery(api.oee.days, { from: trendFrom, to: sel.sunday }) ?? []) as DayRow[]
   const periods = useQuery(api.oee.periods) as { weekly: WeeklyRow[] } | undefined
   const lossRaw = (useQuery(api.oee.lossDays, { from: trendFrom, to: sel.sunday }) ?? []) as StoredLossDay[]
-  const lossDays = useMemo(() => fromStoredLosses(lossRaw), [lossRaw])
+  // Kısa duruşlar (< eşik) "Short stops" sütununa, hız kaybından ayrı (src/lib/oeeShortStops.ts).
+  const stopRaw = (useQuery(api.oee.stopDays, { from: trendFrom, to: sel.sunday }) ?? []) as StoredStopDay[]
+  const split = useMemo(() => splitShortStops(fromStoredLosses(lossRaw), fromStoredStops(stopRaw), config), [lossRaw, stopRaw, config])
+  const lossDays = split.lossDays
   const scope = effectiveScope(sel.scope, areaNames(dayRows, config))
   const label = scopeLabel(scope, config)
   const columns = useMemo(() => chartGroups(config, lossDays), [config, lossDays])
@@ -93,8 +98,10 @@ function LossesPage() {
     const out: string[] = []
     if (cov.noDowntimes.length) out.push(`No downtimes uploaded for ${cov.noDowntimes.map(d2).join(', ')} — losses of these days are missing from the percentages.`)
     if (cov.noShifts.length) out.push(`Downtimes without shift data for ${cov.noShifts.map(d2).join(', ')} — no loading time, so no loss percentage for these days.`)
+    const note = shortStopNote(split, config)
+    if (note) out.push(note)
     return out
-  }, [dayRows, lossDays, scope, config, sel.monday, sel.sunday])
+  }, [dayRows, lossDays, split, scope, config, sel.monday, sel.sunday])
 
   // Haftalar: süreler OEE Dashboard ile aynı kaynaktan (günler ya da yüklenen hafta).
   const perWeek = useMemo(() => weekTimes(dayRows, periods?.weekly ?? []), [dayRows, periods])

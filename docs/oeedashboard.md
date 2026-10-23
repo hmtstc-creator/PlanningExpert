@@ -679,3 +679,38 @@ Hesap ve veri:
 - Duruş satırı çok (ayda ~30 000): yılın MTTR / MTBF'i için yüklemede gün × iş merkezi başına **süre histogramı** saklanır (`oeeStopDays`: Reason Code 1, 2, metin, tam dakika dilimi → adet, dakika; `src/lib/oeeReliability.ts`). Eşik tam dakikayla: 9.7 dk, 10 dk eşiğinin altındadır; kovalar < 2, 2–< 10, ≥ 10.
 - Önceden yüklenmiş veri için histogram, herhangi bir OEE sayfası OEE veri yetkisiyle açılınca bir kez kurulur (yalnızca ekler, hiçbir şey silmez — gün toplamları ve kayıp özetleriyle aynı yol).
 - Parça / vardiya ayrıntısı (Daily Report paneli, Bridge vardiya sütunu, kovaların parça ve vardiyası) ham duruşlardan okunur: en çok 8 gün.
+
+## Kısa duruşlar: < 2 dk performans, ≥ 2 dk availability (2026-10-23, Ahmet)
+
+Karar: "2 dk altı duruşları availability değil performans kısmında görüyoruz; hız kayıplarını analiz etmek
+için 2 dk altı duruşları, availability etkileri için 2 dk üstünü kullan. Bütün OEE hesaplarında bu
+formülasyon olsun."
+
+Doğrulama (fixture, `src/lib/oeeShortStops.test.ts`): **MES bunu zaten yapıyor.** Net Production Time
+yalnızca ≥ 2 dk plansız duruşları (UNSCD_DOWN ve "#") düşer: bütün plansız duruşu kayıtlı ve planlı
+duruşla çakışmayan 7 vardiyanın hepsinde Loading − Production = ≥ 2 dk duruşların toplamı (0,1 dk
+hassasiyetle; örn. PRS-105 3. vardiya 140,6 dk, kısa duruşlar 21,6 dk). Eşik 0, 1 ya da 3 alınınca tutmuyor.
+Bu yüzden önerilen A' = (Production + kısa) ÷ Loading mikro duruşları iki kez sayardı → **uygulanmadı.**
+
+Uygulama:
+- `ratios()` değişmez: A = Production ÷ Loading, P = Operation ÷ Production MES değerleridir (Dashboard,
+  trendler, haftalık / aylık, Daily Report, Board, KPI). Kısa duruşlar zaten P'nin içinde.
+- Kayıp ekranları aynı kodu **olay süresine göre** böler (`src/lib/oeeShortStops.ts`): kayıp özeti
+  (`oeeLossDays`) süre histogramıyla (`oeeStopDays`, dilim = tam dakika) ikiye ayrılır; kısa duruşlar
+  `ARZ<` gibi ayrı Reason Code 2 olur. Loss Bridge: uzunlar availability kalemi, kısalar "Machine < 2 min"
+  performans kalemi; hız kaybı = Production − Operation − kısa duruşlar; Availability = MES A. Losses
+  Trend: "Short stops" sütunu, Speed = Production − Operation − kısa duruşlar. Toplam ve OEE değişmez.
+- Eşik tek yerde: OEE Settings → Numbers → *Short-stop limit* (`shortStopMin`, varsayılan
+  `MES_SHORT_STOP_MIN` = 2, tam dakika). 2'den farklıysa A / P yine MES'tir (vardiya ve MES haftalık /
+  aylık satırlarında süre dağılımı yok, tutarlı kaydırılamaz); yalnız kayıp bölünmesi eşiği izler, ayar ve
+  köprü uyarı yazar.
+- `lossGroups[].family` ayarı kaldırıldı (alan eski kayıtlar için duruyor, okunmaz): aile süreden gelir.
+- Süre histogramı 01.09.2026'dan beri var; öncesindeki gün × iş merkezi bölünmez (eski hesap) ve sayfa
+  "Duration split not available before 01.09.2026" yazar.
+- Ölçek (01.09–23.10, plansız): < 2 dk 41.454 olay / 18.161 dk; ≥ 2 dk 16.293 olay / 185.880 dk. ARZ
+  olaylarının %96'sı mikro duruş, dakikasının üçte biri.
+- Sıradaki adım (ayrı PR): MTTR / MTBF (≥ eşik olaylar), Agent Report, Agent Insights ve Open Topics
+  sinyalleri (hız analizi < eşik, availability analizi ≥ eşik).
+- Planlı duruşlar (Reason Code 1 = mola: `breakReasonCodes`, ör. SCHED_DOWN — mola, iş yok, try-out,
+  SCHED_DOWN YNT) bu ayrıma girmez. Kayıp sayılması Reason Code 1'e bağlı: SCHED_DOWN `lossReasonCodes`'ta
+  değilse SCHED_DOWN YNT kayıp değildir (öneri: `#` ve UN… kayıp, diğerleri mola).

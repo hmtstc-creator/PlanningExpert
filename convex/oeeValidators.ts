@@ -168,7 +168,7 @@ export const configFields = {
       chart: v.string(),
       breakdown: v.boolean(),
       hidden: v.optional(v.boolean()),
-      // Loss Bridge ailesi (docs/oee-bridge.md); yoksa availability.
+      // Kullanılmıyor (2026-10-23): aile olay süresinden gelir (shortStopMin). Eski kayıtlar için duruyor.
       family: v.optional(v.union(v.literal('availability'), v.literal('performance'))),
       // Agent Report rolü (src/lib/oeeAgent.ts); yoksa adından tahmin.
       agent: v.optional(v.union(v.literal('die'), v.literal('machine'), v.literal('none'))),
@@ -180,6 +180,8 @@ export const configFields = {
   startupRunMin: v.number(),
   trendWeeks: v.number(),
   topN: v.number(),
+  // Kısa duruş eşiği (dk): plansız duruş < eşik performans, ≥ eşik availability; yoksa 2 (MES).
+  shortStopMin: v.optional(v.number()),
   // Loss Bridge'in OEE tabanı; yoksa 'loading' (MES).
   bridgeBase: v.optional(v.union(v.literal('loading'), v.literal('shift'))),
   // Agent Report eşikleri (src/lib/oeeAgent.ts → AGENT_DEFAULTS); yoksa varsayılanlar.

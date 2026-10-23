@@ -2256,6 +2256,12 @@
       },
       "optional": false
     },
+    "shortStopMin": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
     "startupRunMin": {
       "fieldType": {
         "type": "number"

@@ -29,7 +29,8 @@ import {
   type LossItem,
 } from '../../lib/oeeBridge'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
-import { reasonShiftParts, type ReasonPartRow } from '../../lib/oeeReliability'
+import { fromStoredStops, reasonShiftParts, stopDayOf, type ReasonPartRow, type StoredStopDay } from '../../lib/oeeReliability'
+import { splitShortStops, withShortStopNote } from '../../lib/oeeShortStops'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { pdfFileName } from '../../lib/pdfFile'
 import { sheetToPdf } from '../../lib/pdfSheet'
@@ -71,6 +72,9 @@ function BridgePage() {
   const lossRaw = (useQuery(api.oee.lossDays, q) ?? []) as StoredLossDay[]
   const orders = (useQuery(api.oee.orders, q) ?? []) as OrderRow[]
   const lossDays = useMemo(() => fromStoredLosses(lossRaw), [lossRaw])
+  // Süre histogramı: kısa duruşlar (< eşik) performans ailesine (src/lib/oeeShortStops.ts).
+  const stopRaw = (useQuery(api.oee.stopDays, q) ?? []) as StoredStopDay[]
+  const stopDays = useMemo(() => fromStoredStops(stopRaw), [stopRaw])
 
   // Vardiya filtresi ham duruşlarla: en çok 8 günlük dönem. Duruşların parça
   // kırılımı kayıp özetinden (her dönem); eski özetlerde ham duruşlardan.
@@ -124,7 +128,13 @@ function BridgePage() {
         })
       : null
     const days = (slice ? slice.days : dayRows).filter((d) => inRange(d) && inSel(d))
-    const scoped = (slice ? slice.lossDays : lossDays).filter((l) => inRange(l) && inSel(l))
+    // Tek vardiyada süreler o vardiyanın ham duruşlarından.
+    const split = splitShortStops(
+      (slice ? slice.lossDays : lossDays).filter((l) => inRange(l) && inSel(l)),
+      slice ? fromStoredStops(slice.events.map(stopDayOf)) : stopDays,
+      config,
+    )
+    const scoped = split.lossDays
     // Level 3 köprüyle aynı tabanı kullanır: yalnızca vardiyası olan gün × makine.
     const losses = matchedLossDays(days, scoped)
     const keys = new Set(losses.map((l) => `${l.date}|${l.workCenter}`))
@@ -134,10 +144,10 @@ function BridgePage() {
       lossDays: losses,
       orders: slice ? slice.orders : ordsIn,
       events: evs,
-      bridge: buildBridge(days, scoped, config),
+      bridge: withShortStopNote(buildBridge(days, scoped, config), split, config),
     }
   }
-  const deps = [dayRows, lossDays, orders, config, scope.area, scope.key, machine, shiftOn, shift, shiftRows]
+  const deps = [dayRows, lossDays, stopDays, orders, config, scope.area, scope.key, machine, shiftOn, shift, shiftRows]
   const now = useMemo(() => part(cur, curEvents), [...deps, curEvents, cur?.from, cur?.to]) // eslint-disable-line react-hooks/exhaustive-deps
   const before = useMemo(() => part(prev, prevEvents), [...deps, prevEvents, prev?.from, prev?.to]) // eslint-disable-line react-hooks/exhaustive-deps
   const b = now?.bridge
@@ -322,7 +332,7 @@ function BridgePage() {
                   strong
                 />
                 <GaugeTile
-                  label={`Availability${config.lossGroups.some((g) => g.family === 'performance') ? ' (bridge)' : ''}`}
+                  label="Availability"
                   value={b!.availability}
                   delta={delta(b!.availability, pb?.availability)}
                   color={FAMILY_SWATCH.availability}

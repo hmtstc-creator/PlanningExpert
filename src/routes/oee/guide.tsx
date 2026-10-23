@@ -6,6 +6,7 @@ import { OeeRebuildNotice } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
+import { MES_SHORT_STOP_MIN } from '../../lib/oee'
 
 export const Route = createFileRoute('/oee/guide')({
   component: OeeGuidePage,
@@ -163,6 +164,11 @@ function OeeGuidePage() {
         <ul>
           <li>OEE = Availability × Performance × Quality; Availability = Production ÷ Loading, Performance = Operation ÷ Production.</li>
           <li>Times are always added first and divided once — a week is never the average of its days.</li>
+          <li>
+            Short stops: an unplanned stop shorter than {MES_SHORT_STOP_MIN} min (OEE Settings → Numbers) is a performance loss, a longer one an
+            availability loss. The MES production time already deducts only the longer stops, so A and P are the MES values; the Loss Bridge and
+            Losses Trend split each reason code by stop length (stop durations exist from 01.09.2026 — earlier days are not split).
+          </li>
           <li>
             A day is the sum of its shifts; a week or month is the sum of its days (Weekly / Monthly KPI rows uploaded earlier are
             kept and used where they cover more loading time).

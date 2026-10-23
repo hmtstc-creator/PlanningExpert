@@ -22,7 +22,7 @@ kavram, sonra program, test, açık konuların çözümü.
 | Konu | Görsel (TPM) | Bu şirketin verisi (MES) | Karar |
 |---|---|---|---|
 | OEE tabanı B | Planlı süre (molalar, setup, planlı bakım kayıp) | **Loading** = vardiya − planlı duruş; molalar OEE dışında | Şirket seçer (OEE Settings → Loss bridge): **Loading (MES, varsayılan)** ya da **Shift time (TPM)**. Varsayılanda köprünün OEE'si OEE Dashboard ile birebir aynı (test). TPM tabanında tile "OEE (shift-time base)" olur, MES OEE yanında yazar. **İkinci turda kaldırıldı: taban her zaman Loading.** |
-| Kısa duruşlar | Performans kaybı | KSD duruş olarak kayıtlı → Loading − Production içinde (availability) | Her kayıp grubunun **köprü ailesi** ayarda: availability (varsayılan, MES gibi) ya da performance. Aile değişince OEE değişmez, yalnızca A/P payı. |
+| Kısa duruşlar | Performans kaybı | MES Production'dan yalnızca ≥ 2 dk duruşları düşer; kısalar Production − Operation içinde | **Süreye göre** (2026-10-23): plansız duruş < eşik (OEE Settings, 2 dk) performans kalemi ("Machine < 2 min"), ≥ eşik availability; aynı kod ikiye bölünür. Eski "köprü ailesi" ayarı kaldırıldı. → `docs/oeedashboard.md` son bölüm |
 | Kalite | Proses hatası, verim kaybı (süre) | Adet: Good / Scrap / Reject; dosyada şimdiye kadar hep %100. KON ("quality") bir **duruş** grubudur | Kalite süresi = Operation × (Scrap+Reject) ÷ (Good+Scrap+Reject), Scrap ve Reject adede göre ayrılır. KON availability'de kalır (çift sayılmaz). |
 | Planlanmamış süre | Yasal, felaket, kapasite fazlası, deneme | Bu nedenler veride yok | Takvim − vardiya süresi: **resmi tatil günleri** (plant ülkesinin tatil listesi), **vardiyasız günler** (hafta sonu, talep yok, makine kullanılmadı), **vardiya dışı saatler**. Eksik yükleme de "vardiyasız" görünür → veri notu. **İkinci turda kaldırıldı** (köprü Loading'den başlar). |
 | Performans > %100 | — | 57 vardiyada (en çok %134,5); planlamacı "olduğu gibi" dedi | Hız kaybı işaretli: negatifse "Speed above standard" adımı, 0'a kırpılmaz. |
@@ -45,7 +45,7 @@ Bu yüzden ilk turun takvim (A, TEEP, tatil, vardiyasız gün) ve TPM tabanı
 | − Plansız duruş grupları | grafik sütunu başına kayıtlı dakika ÷ Loading, büyükten küçüğe |
 | − Fark | (Loading − Production) − kayıtlı duruşlar: "Not explained" ya da "Over-recorded downtime"; gri, gruplara dağıtılmaz |
 | = Availability | Production ÷ Loading (Dashboard'daki A) |
-| − Speed loss (+ performans ailesindeki gruplar) | (Production − Operation) ÷ Loading = A × (1 − P) |
+| − Kısa duruşlar (< 2 dk, kod başına) ve Speed loss | kısa duruş dakikası ÷ Loading; Speed = (Production − Operation − kısa duruşlar) ÷ Loading; toplamları A × (1 − P) |
 | = A × P | Operation ÷ Loading |
 | − Scrap / Reject | Operation × (1 − Q) ÷ Loading, adede göre ayrılır |
 | = OEE | Effective ÷ Loading = A × P × Q (Dashboard'daki OEE) |
