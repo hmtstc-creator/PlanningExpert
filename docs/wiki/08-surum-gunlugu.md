@@ -1,9 +1,10 @@
 # 08 · Sürüm günlüğü
 
-> Son güncelleme: 2026-10-22 · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
+> Son güncelleme: 2026-10-23 · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #37 | 2026-10-23 | **OEE açık konular ajanı** (`/oee/topics`): OEE yüklemesi bitince son gün bir kez incelenir; masraf yeri × iş yeri × kayıp grubu adayları 6 haftalık geçmişle tartılır, kronik ve kritik olanlar kalıcı listeye eklenir. Karar ücretsiz yapay zekâ (OpenAI uyumlu, `AI_API_KEY`) ya da kurallar; açık konu yeniden yazılmaz, işlenen gün tekrar yapılmaz. Yeni tablolar `oeeTopics`, `oeeTopicRuns` | Kullanıcı isteği; plan mantığı değişmedi → `docs/oee-agent-report.md` |
 | #36 | 2026-10-23 | **Gantt'ta silme:** elle eklenen iş → *Delete job* (kilit kalkar); onaylı / taşınmış iş → *Remove approval* (motora döner); motor işi → *Delete this lot* (lot 0 adet, talep sonraki lotlara). Onay sorulur; Platform history "Job deleted" | Kullanıcı kararı 4 (2026-10-23): yalnız o iş çıkar, talep varsa motor başka yere planlar |
 | #35 | 2026-10-23 | **Gantt'ta elle iş ekleme** (Plan → *+ Add job*): parça, adet, pres, gün, saat, "kalıp takılı"; süre motorun hesabıyla. O saatte kilitlenir, adedi talepten düşer, presin diğer işleri arkasına kayar | Kullanıcı örneği: PRS104'ün önüne stok amaçlı iş → [02](02-planlama-motoru.md) |
 | #34 | 2026-10-23 | **Gantt'ta sürükle-bırak:** iş başka pres / gün / saate sürüklenir (telefonda basılı tut + sürükle) ya da iş penceresi → *Move…*; bırakılan yerde kilitlenir, motor adedini talepten düşer ve diğer işleri etrafına dizer. Geçmişe, ufuk dışına ve kilitli / dondurulmuş işe ya da bakıma bindirilemez | Kullanıcı kararı 2026-10-23 (todolist §1 *Gantt: elle iş*, sıralama: önce sürükle-bırak) → [02](02-planlama-motoru.md) |

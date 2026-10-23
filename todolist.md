@@ -460,6 +460,8 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 - [x] ✅ (2026-10-22, kullanıcı her gün açıyor) **[S]** Yayından sonra OEE veri yetkisiyle bir OEE sayfasını bir kez aç: eski duruşların süre histogramı kurulur (MTTR & MTBF'in yıl / 10 hafta tabloları bununla dolar).
 - [x] ✅ Bütün çıktılar "Save PDF" (2026-10-16): Chrome / Edge'de kayıt penceresi Masaüstünde, ad dolu açılır (docs/pdf.md). Firefox / Safari'de indirme klasörüne iner.
 - [ ] **[K]** Loss Bridge → "Pay Attention" bloğunun içeriği (şimdilik boş).
+- [ ] **[S]** OEE açık konular ajanı (2026-10-23): Convex ortamına `AI_API_KEY` (ücretsiz Gemini ya da Groq anahtarı; isteğe bağlı `AI_API_URL`, `AI_MODEL`) eklenmeli — yoksa kurallar karar verir (docs/oee-agent-report.md → OEE open topics).
+- [ ] **[K]** OEE açık konular: eşikler (`TOPIC_DEFAULTS`: 60 dk / 120 dk / 6 hafta / 3 hafta / 12 aday) OEE Settings → Agent Report'a taşınsın; Agent Report'ta açık konular bölümüne bu liste de girsin.
 
 ## 5. Yönetici gözüyle değerlendirme — CEO ve üretim direktörü (2026-10-05)
 

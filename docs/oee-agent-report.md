@@ -103,3 +103,32 @@ OEE Settings → **Agent Report** (her biri > 0; "Back to the defaults"):
 
 Ayar `oeeSettings.agent` ve `lossGroups[].agent` (isteğe bağlı alanlar; şema yalnızca
 genişledi, `scripts/schema.snapshot.json`).
+
+## OEE open topics — ajan (2026-10-23, planlamacı)
+
+**OEE → Open Topics** (`/oee/topics`): ajanın kronik ve kritik bulduğu kayıplar,
+masraf yeri bazında. Agent Report günü her açılışta yeniden hesaplar; bu liste ise
+**kalıcıdır** (`oeeTopics` tablosu).
+
+- **Ne zaman:** OEE yüklemesi bitince (`oee.finishImport` → `oeeTopics.analyse`) son
+  yüklü gün **bir kez** incelenir; işlenen gün `oeeTopicRuns`'a yazılır, ikinci
+  yükleme aynı günü yeniden yapmaz (yalnızca başarısız ya da 15 dk'dan uzun yarım
+  kalmış gün yeniden denenir). Sayfadaki *Analyse the last day* de aynı kurala uyar.
+- **Aday** (kurallar, `src/lib/oeeTopics.ts`): iş yeri × kayıp grubu (Reason Code 1
+  kayıp, Reason Code 2 ≠ "#") o gün ≥ 60 dk kayıp ve geriye bakılan 6 haftanın
+  (7'şer gün) en az birinde ≥ 120 dk. En çok 12 yeni aday, bu haftanın kaybına göre.
+- **Karar:** yapay zekâ adayın gerçekten kronik ve kritik olup olmadığına karar verir,
+  başlık / kısa analiz / ilk aksiyon yazar. Yapay zekâ yoksa ya da cevap bozuksa
+  **kurallar**: geçmiş haftaların ≥ 3'ü kayıplı, son 7 gün ≥ 120 dk ve geçmiş
+  ortalamadan az değil. Her konuda kanıt (bugün, son 7 gün, haftalık dakikalar) sayıyla
+  yazılır; kararı kimin verdiği (AI / rules) görünür.
+- **Tekrar yok:** anahtar = masraf yeri | iş yeri | kayıp grubu. Açık konu ertesi gün
+  yine aday olursa yeniden yazılmaz; yalnızca *last seen* ve *days seen* güncellenir.
+  Kapatılmış konu tekrar ederse yeni konu açılır. Kapatma not ister (`oee.data` izni).
+- **Yapay zekâ ayarı** (Convex ortam değişkenleri; kodda / veritabanında değil):
+  `AI_API_KEY` (zorunlu), `AI_API_URL` (varsayılan Google Gemini'nin OpenAI uyumlu
+  adresi), `AI_MODEL` (varsayılan `gemini-flash-latest`). OpenAI uyumlu her ücretsiz
+  servis olur (ör. Groq: `https://api.groq.com/openai/v1/chat/completions`).
+  Gönderilen yalnızca masraf yeri / iş yeri / kayıp grubu adları ve dakikalardır.
+  Ücretsiz katmanlarda servis veriyi kendi geliştirmesi için kullanabilir.
+- Eşikler şimdilik koddadır (`TOPIC_DEFAULTS`); OEE Settings'e taşınması açık iş.

@@ -930,6 +930,51 @@ export default defineSchema({
     ranges: v.array(v.array(v.string())),
   }).index('by_uploadedAt', ['plantId', 'uploadedAt'])
     .index('by_plant', ['plantId']),
+  // OEE açık konular ajanı (src/lib/oeeTopics.ts, convex/oeeTopics.ts): kronik ve
+  // kritik kayıp konuları. Anahtar = masraf yeri | iş yeri | kayıp grubu; açıkken
+  // aynı anahtar yeniden yazılmaz, yalnızca lastDay / seenDays güncellenir.
+  oeeTopics: defineTable({
+    ...plantField,
+    key: v.string(),
+    costCenter: v.string(),
+    workCenter: v.string(),
+    group: v.string(),
+    groupLabel: v.string(),
+    title: v.string(),
+    analysis: v.optional(v.string()),
+    action: v.optional(v.string()),
+    evidence: v.string(),
+    // 'ai' | 'rules': kararı kim verdi
+    source: v.string(),
+    firstDay: v.string(),
+    lastDay: v.string(),
+    seenDays: v.number(),
+    // 'open' | 'closed'
+    status: v.string(),
+    createdAt: v.number(),
+    closedAt: v.optional(v.number()),
+    closedBy: v.optional(v.string()),
+    closeNote: v.optional(v.string()),
+  })
+    .index('by_key', ['plantId', 'key'])
+    .index('by_status', ['plantId', 'status'])
+    .index('by_plant', ['plantId']),
+  // Ajanın işlediği günler: bir gün bir kez (status 'failed' ise sonraki yüklemede yeniden).
+  oeeTopicRuns: defineTable({
+    ...plantField,
+    day: v.string(),
+    // 'running' | 'done' | 'failed'
+    status: v.string(),
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    candidates: v.optional(v.number()),
+    added: v.optional(v.number()),
+    updated: v.optional(v.number()),
+    /** Yapay zekânın durumu ya da hata: kısa metin. */
+    note: v.optional(v.string()),
+  })
+    .index('by_day', ['plantId', 'day'])
+    .index('by_plant', ['plantId']),
 
   // ---- KPI (docs/kpi.md): masraf yeri × ay ya da ISO hafta, plan ve gerçekleşen ----
   kpiEntries: defineTable({

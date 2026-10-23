@@ -2323,6 +2323,180 @@
       "optional": false
     }
   },
+  "oeeTopicRuns": {
+    "added": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "candidates": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "day": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "finishedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "note": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "startedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "updated": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    }
+  },
+  "oeeTopics": {
+    "action": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "analysis": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "closedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "closedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "closeNote": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "evidence": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "firstDay": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "group": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "groupLabel": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "key": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "lastDay": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "seenDays": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "source": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "title": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "workCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
   "oeeWeekly": {
     "availability": {
       "fieldType": {

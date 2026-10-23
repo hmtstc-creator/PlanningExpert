@@ -1,5 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
+import { internal } from './_generated/api'
 import { OEE, guardedMutation, guardedQuery } from './guarded'
 import {
   configFields,
@@ -311,6 +312,8 @@ export const finishImport = guardedMutation({
   affectsPlan: false,
   handler: async (ctx, args) => {
     await ctx.db.insert('oeeImports', { ...args, uploadedAt: Date.now(), uploadedBy: ctx.sessionUser?.name })
+    // Açık konular ajanı: son yüklü gün bir kez (convex/oeeTopics.ts).
+    await ctx.scheduler.runAfter(0, internal.oeeTopics.analyse, { plantId: ctx.plantId })
     return null
   },
 })
@@ -382,7 +385,7 @@ async function oeeWorkCenters(ctx: Ctx): Promise<Set<string> | null> {
   return names.length ? new Set(names) : null
 }
 
-async function definedOnly<T extends { workCenter: string }>(ctx: Ctx, rows: T[]): Promise<T[]> {
+export async function definedOnly<T extends { workCenter: string }>(ctx: Ctx, rows: T[]): Promise<T[]> {
   const wcs = await oeeWorkCenters(ctx)
   return wcs ? rows.filter((r) => wcs.has(r.workCenter)) : rows
 }
