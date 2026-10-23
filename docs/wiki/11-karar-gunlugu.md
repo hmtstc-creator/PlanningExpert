@@ -20,7 +20,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 ## OEE analizi
 
 - **Kayıp kodu anlamları: varsayılan kodda, kullanıcınınki önce** (2026-10-23, #42) — sözlük `LOSS_CODE_MEANINGS` (`settingsDefaults.ts`), Meaning boşsa kullanılır ve Settings'te placeholder olur; ayara kopyalanmaz (varsayılan değişince eskimesin). Metin İngilizce: sayfa ve yapay zekâ isteği İngilizce. *Alt.: ayara yazmak* (kullanıcı değeriyle karışırdı).
-- **Mola sonrası / 5S sinyali duruş metninden** (#42) — kayıp özetinde olay zamanı yok, yalnız metin; kalıplar `AFTER_BREAK`, `FIVE_S` (`oeeInsights.ts`). Gerçek metinler farklıysa kalıp genişletilir.
+- **Mola sonrası / 5S sinyali duruş metninden** (#42) — kayıp özetinde olay zamanı yok, yalnız metin; kalıplar `AFTER_BREAK`, `FIVE_S` (`oeeInsights.ts`). Gerçek metinler farklıysa kalıp genişletilir; #44 bilinen yazımları ekledi. Tuzak: "BREAK" tek başına aranmaz ("AFTER BREAKDOWN" arızadır); yeni yazım önce testteki eşleşmeli / eşleşmemeli listeye eklenir.
 - **OEE açık konular ayrı, kalıcı bir liste** (2026-10-23, #37) — masraf yeri × iş yeri × kayıp grubu anahtarıyla; Die / Machine Problems'a yazılmaz.
   *Alt.: makine arızası kaydı açmak* (pres duruyor bayrağıyla planı etkileyebilirdi); *Decision Log → Open Issue* (masraf yeri / kapanış takibi yok).
 - **Kararı ücretsiz yapay zekâ verir, kurallar adayı seçer ve yedektir** (2026-10-23, kullanıcı) — OpenAI uyumlu API (`AI_API_KEY`); anahtar yoksa / cevap bozuksa kurallar.
