@@ -20,7 +20,7 @@ export interface JobDraft {
   /** Bu lot için kayıtlı adet kuralı. */
   override?: { id: string; qty: number }
   /** İş tek tek onaylanmış (kilitli). */
-  lock?: { id: string; approvedBy?: string; createdAt: number }
+  lock?: { id: string; approvedBy?: string; createdAt: number; manual?: boolean }
 }
 
 const pcs = (n: number) => Math.round(n).toLocaleString('en-GB')
@@ -104,7 +104,7 @@ export function JobDialog({ draft, onClose, onMove }: { draft: JobDraft; onClose
         {draft.lock ? (
           <>
             <p className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">
-              Locked in the plan
+              {draft.lock.manual ? 'Added by hand and locked' : 'Locked in the plan'}
               {draft.lock.approvedBy ? ` by ${draft.lock.approvedBy}` : ''} on{' '}
               {new Date(draft.lock.createdAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}. A
               recalculation keeps it on this work center at this time.
@@ -121,10 +121,18 @@ export function JobDialog({ draft, onClose, onMove }: { draft: JobDraft; onClose
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => void thenRecalc(unlock.run({ id: draft.lock!.id }))}
+                title={
+                  draft.lock.manual
+                    ? 'The job leaves the plan; its quantity is no longer deducted from demand'
+                    : 'The job goes back to the engine, which plans it again'
+                }
+                onClick={() => {
+                  if (draft.lock!.manual && !window.confirm(`Delete this job (${job.material}, ${pcs(job.quantity)} pcs) from the plan?`)) return
+                  void thenRecalc(unlock.run({ id: draft.lock!.id }))
+                }}
                 className="rounded-md border border-destructive px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
               >
-                {pending ? 'Saving…' : 'Remove approval'}
+                {pending ? 'Saving…' : draft.lock.manual ? 'Delete job' : 'Remove approval'}
               </button>
             </div>
           </>
@@ -207,6 +215,25 @@ export function JobDialog({ draft, onClose, onMove }: { draft: JobDraft; onClose
                   {pending ? 'Saving…' : 'Save & recalculate'}
                 </button>
               </div>
+            </div>
+
+            {/* Sil: lot 0 adet — talebi sonraki lotlara kayar (kullanıcı kararı 2026-10-23). */}
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+              <p className="text-xs text-muted-foreground">
+                Delete this lot{draft.lotJobCount > 1 ? ` (${draft.lotJobCount} jobs)` : ''} from the plan; its demand moves to the
+                next lots of this part.
+              </p>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  if (!window.confirm(`Delete lot ${draft.bucket} of ${job.material} (${pcs(draft.lotQuantity)} pcs) from the plan?`)) return
+                  void thenRecalc(saveQty.run({ material: job.material, bucket: draft.bucket, qty: 0, previousQty: draft.lotQuantity }))
+                }}
+                className="shrink-0 rounded-md border border-destructive px-3 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              >
+                Delete this lot
+              </button>
             </div>
 
             {/* Hariç tut */}

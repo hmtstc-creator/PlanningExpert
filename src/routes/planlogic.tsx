@@ -375,6 +375,12 @@ function PlanLogicPage() {
             allowed with a warning.
           </li>
           <li>
+            <b>Deleting</b> (click a job): a job added by hand → <i>Delete job</i>, it leaves the plan and its
+            quantity is no longer deducted from demand; an approved or moved job → <i>Remove approval</i>, it goes
+            back to the engine, which plans it again; an engine job → <i>Delete this lot</i>, the lot is set to 0
+            pieces and its demand moves to the next lots of that part (the same as typing 0 as the lot quantity).
+          </li>
+          <li>
             <b>Work center maintenance</b> takes those clock hours out of that
             work center's day; jobs flow around it.
           </li>

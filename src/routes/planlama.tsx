@@ -5,7 +5,7 @@ import { api } from '../../convex/_generated/api'
 import { plantClock } from '../lib/dates'
 import { WeekGantt, type WeekGanttJob, type WeekGanttPress } from '../components/WeekGantt'
 import { buildDayTimeline, netToClock, productionDayOf } from '../lib/shiftTimeline'
-import { planMove, type MoveSegment, type MoveTarget } from '../lib/jobMove'
+import { isManualJob, planMove, type MoveSegment, type MoveTarget } from '../lib/jobMove'
 import type { PlanJob } from '../lib/planPipeline'
 import { useCurrentUser } from '../lib/currentUser'
 import { type PlanDataSources } from '../lib/sapUploads'
@@ -53,6 +53,7 @@ function PlanlamaPage() {
     press: string
     date: string
     setupStartMinute: number
+    reason?: string
     approvedBy?: string
     createdAt: number
   }[]
@@ -484,7 +485,12 @@ function PlanlamaPage() {
                   lotJobCount: Math.max(1, lot.length),
                   piecesPerCoil: coils > 0 ? lotQuantity / coils : undefined,
                   override: quantityRules.get(`${job.material}|${lotLabel}`),
-                  lock: lock && { id: lock._id, approvedBy: lock.approvedBy, createdAt: lock.createdAt },
+                  lock: lock && {
+                    id: lock._id,
+                    approvedBy: lock.approvedBy,
+                    createdAt: lock.createdAt,
+                    manual: isManualJob(lock.reason),
+                  },
                 })
               }}
             />

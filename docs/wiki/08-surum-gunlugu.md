@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #36 | 2026-10-23 | **Gantt'ta silme:** elle eklenen iş → *Delete job* (kilit kalkar); onaylı / taşınmış iş → *Remove approval* (motora döner); motor işi → *Delete this lot* (lot 0 adet, talep sonraki lotlara). Onay sorulur; Platform history "Job deleted" | Kullanıcı kararı 4 (2026-10-23): yalnız o iş çıkar, talep varsa motor başka yere planlar |
 | #35 | 2026-10-23 | **Gantt'ta elle iş ekleme** (Plan → *+ Add job*): parça, adet, pres, gün, saat, "kalıp takılı"; süre motorun hesabıyla. O saatte kilitlenir, adedi talepten düşer, presin diğer işleri arkasına kayar | Kullanıcı örneği: PRS104'ün önüne stok amaçlı iş → [02](02-planlama-motoru.md) |
 | #34 | 2026-10-23 | **Gantt'ta sürükle-bırak:** iş başka pres / gün / saate sürüklenir (telefonda basılı tut + sürükle) ya da iş penceresi → *Move…*; bırakılan yerde kilitlenir, motor adedini talepten düşer ve diğer işleri etrafına dizer. Geçmişe, ufuk dışına ve kilitli / dondurulmuş işe ya da bakıma bindirilemez | Kullanıcı kararı 2026-10-23 (todolist §1 *Gantt: elle iş*, sıralama: önce sürükle-bırak) → [02](02-planlama-motoru.md) |
 | #32 | 2026-10-23 | **Demand** sayfasına malzeme filtresi (kod içinde arama, büyük/küçük harf fark etmez; filtre yazılınca 200'ün ötesindeki satırlar da yüklenir) | Kullanıcı isteği; yalnız arayüz, plan mantığı değişmedi |
