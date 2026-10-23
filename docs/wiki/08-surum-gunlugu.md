@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #32 | 2026-10-23 | **Demand** sayfasına malzeme filtresi (kod içinde arama, büyük/küçük harf fark etmez; filtre yazılınca 200'ün ötesindeki satırlar da yüklenir) | Kullanıcı isteği; yalnız arayüz, plan mantığı değişmedi |
 | #30 | 2026-10-22 | Organization map → Users & groups: çizgiler soldan sağa **Plant → Group → User** (kullanıcı grubun altında); bütün plant'leri gören grup doğrudan şirkete bağlı | Kenarlar ters yönde (kullanıcı → grup → plant) çizildiği için geri kıvrılıyor, yapı yanlış görünüyordu. Veri / yetki değişmedi → `docs/board.md` |
 | #29 | 2026-10-22 | Organization map açılınca "Something went wrong" (React #185) düzeltildi: boş sorgu sonuçları için sabit dizi; `OrgMap.test.tsx` | `useQuery(...) ?? []` her çizimde yeni dizi üretiyordu → graph → `setNodes` → sonsuz döngü (Structure görünümünde users/groups hep `skip`) |
 | #27 | 2026-10-22 | **Organization map** (`/admin/map`, yalnız General): yapı (holding → … → work center) ve bir şirketin kullanıcı / grupları sonsuz tuvalde; sürükle-bırakla şirket → holding, masraf yeri → bölüm, kullanıcı → grup, grup → plant; kırmızı çerçeve + "To fix" listesi. Yeni bağımlılık `@xyflow/react` 12.10.0 | Eski ağaç sayfasında aynı adlı plant'ler ve bağsız kayıtlar gözden kaçıyordu. Şema değişmedi, eski mutation'lar kullanılır; eski sayfalar harita netleşince silinecek → `docs/board.md` |

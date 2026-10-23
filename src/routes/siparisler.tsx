@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { countedLocations, isFinishedStockRow, type LocationFlags } from '../lib/stockLocations'
@@ -12,12 +12,12 @@ export const Route = createFileRoute('/siparisler')({
 })
 
 function SiparislerPage() {
-  const { results: weekly, status: weeklyStatus } = usePaginatedQuery(
+  const { results: weekly, status: weeklyStatus, loadMore: loadMoreWeekly } = usePaginatedQuery(
     api.demand.listWeekly,
     {},
     { initialNumItems: 200 },
   )
-  const { results: daily, status: dailyStatus } = usePaginatedQuery(
+  const { results: daily, status: dailyStatus, loadMore: loadMoreDaily } = usePaginatedQuery(
     api.demand.listDaily,
     {},
     { initialNumItems: 200 },
@@ -26,7 +26,18 @@ function SiparislerPage() {
   const [view, setView] = useState<'weekly' | 'daily'>('weekly')
   const [highRunnerThreshold, setHighRunnerThreshold] = useState('1500')
 
-  const rows = view === 'weekly' ? weekly : daily
+  const [search, setSearch] = useState('')
+  const term = search.trim().toLowerCase()
+  // Sayfa ilk 200 satırı yükler; filtre yazılınca kalan sayfalar da yüklenir ki eşleşme kaçmasın.
+  const status = view === 'weekly' ? weeklyStatus : dailyStatus
+  useEffect(() => {
+    if (!term || status !== 'CanLoadMore') return
+    if (view === 'weekly') loadMoreWeekly(200)
+    else loadMoreDaily(200)
+  }, [term, status, view, loadMoreWeekly, loadMoreDaily])
+
+  const allRows = view === 'weekly' ? weekly : daily
+  const rows = term ? allRows.filter((r) => r.material.toLowerCase().includes(term)) : allRows
   // Stok sütunu planın kullandığı stok: MB52, Storage Locations'ta "Finished
   // goods" tikli depolar. ZPP'nin kendi "Stock in storage" değeri farklı bir
   // kaynaktır ve planda kullanılmaz; iki ayrı sayı göstermemek için burada da yok.
@@ -43,9 +54,9 @@ function SiparislerPage() {
   const loading = view === 'weekly' ? weeklyStatus === 'LoadingFirstPage' : dailyStatus === 'LoadingFirstPage'
 
   const periodLabels = useMemo(() => {
-    const first = rows.find((r) => r.periods.length > 0)
+    const first = allRows.find((r) => r.periods.length > 0)
     return first ? first.periods.map((p) => p.label) : []
-  }, [rows])
+  }, [allRows])
 
   const threshold = Number(highRunnerThreshold) || 0
 
@@ -89,6 +100,13 @@ function SiparislerPage() {
             onChange={(e) => setHighRunnerThreshold(e.target.value)}
           />
         </div>
+        <input
+          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+          placeholder="Filter material…"
+          aria-label="Filter material"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
       <div className="mt-4 overflow-x-auto rounded-lg border border-border">
@@ -117,7 +135,7 @@ function SiparislerPage() {
             {!loading && rows.length === 0 && (
               <tr>
                 <td className="px-3 py-3 text-muted-foreground" colSpan={4 + periodLabels.length}>
-                  No data uploaded yet.
+                  {allRows.length > 0 ? 'No material matches the filter.' : 'No data uploaded yet.'}
                 </td>
               </tr>
             )}
