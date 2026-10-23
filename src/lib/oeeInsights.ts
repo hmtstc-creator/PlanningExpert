@@ -290,10 +290,14 @@ export function undefinedLossCodes(losses: LossDay[], c: OeeConfig): UndefinedCo
 const SETUP_WORDS = /REGLAJ|SETUP|SET-UP|ADJUST|AYAR|SCHIMB/
 const isSetupReason = (group: string, text: string, c: OeeConfig) =>
   /set-?up|adjust/i.test(lossMeaning(group, c)) || c.setupTexts.some((t) => t.text.trim().toUpperCase() === text) || SETUP_WORDS.test(text)
-/** Mola sonrası artık duruş (metin; Türkçe, İngilizce, Rumence). */
-export const AFTER_BREAK = /AFTER\s*(THE\s*)?BREAK|POST[- ]?BREAK|DUP[AĂ]\s*PAUZ|MOLA\s*SONRA/
-/** 5S (metin). */
-export const FIVE_S = /(^|[^0-9A-Z])5\s?S([^A-Z]|$)/
+/**
+ * Mola sonrası artık duruş (metin büyük harf; Türkçe, İngilizce, Rumence, aksanlı ya da aksansız).
+ * "AFTER BREAKDOWN" arıza sonrasıdır, sayılmaz.
+ */
+export const AFTER_BREAK =
+  /(AFTER|POST)[\s-]*(THE\s*)?((COFFEE|LUNCH|TEA)\s*)?BREAK(?!DOWN|AGE)|AFTER\s*LUNCH|DUP[AĂÂ]\s*(PAUZ|MAS[AĂ])|MOLA(DAN|SI|SINDAN)?\s*(SONRA|D[OÖ]N[UÜ][SŞ]|SONU)|YEMEK(TEN)?\s*SONRA/
+/** 5S (metin): "5S", "5 S", "5-S"; "P15SX" gibi parça numaraları sayılmaz. */
+export const FIVE_S = /(^|[^0-9A-Z])5[\s-]?S([^A-Z]|$)/
 
 // ---- sinyaller -----------------------------------------------------------------------
 
