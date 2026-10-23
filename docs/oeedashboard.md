@@ -709,8 +709,13 @@ Uygulama:
   "Duration split not available before 01.09.2026" yazar.
 - Ölçek (01.09–23.10, plansız): < 2 dk 41.454 olay / 18.161 dk; ≥ 2 dk 16.293 olay / 185.880 dk. ARZ
   olaylarının %96'sı mikro duruş, dakikasının üçte biri.
-- Sıradaki adım (ayrı PR): MTTR / MTBF (≥ eşik olaylar), Agent Report, Agent Insights ve Open Topics
-  sinyalleri (hız analizi < eşik, availability analizi ≥ eşik).
+- MTTR / MTBF (2026-10-23, ikinci PR): **≥ eşik olaylar** — arıza ve setup kullanılabilirlik kaybıdır;
+  kısa duruşlar sayılsaydı MTTR'yi küçültüp MTBF'i kısaltırdı (ARZ olaylarının %96'sı mikro duruş). Sayfanın
+  "Min. duration" alanı varsayılan olarak eşiktir (tarayıcı ayarı `oee-mttr-v2`; elle değiştirilebilir).
+  Süre kovaları < eşik / eşik–10 / ≥ 10 dk (`bucketsOf`); kısa duruşlar ilk kovada sayı ve dakikayla görünür.
+  MTBF'in payı MES Net Production Time (Loading − ≥ 2 dk duruşlar).
+- Agent Report: kalıp ve makine notları ≥ eşik olaylarla; "short stops" notu < eşik. Agent Insights:
+  mikro duruş sinyali < eşik olaylar, diğer sinyaller ≥ eşik. Open Topics: aynı kod iki konu (`ARZ`, `ARZ<`).
 - Planlı duruşlar (Reason Code 1 = mola: `breakReasonCodes`, ör. SCHED_DOWN — mola, iş yok, try-out,
   SCHED_DOWN YNT) bu ayrıma girmez. Kayıp sayılması Reason Code 1'e bağlı: SCHED_DOWN `lossReasonCodes`'ta
   değilse SCHED_DOWN YNT kayıp değildir (öneri: `#` ve UN… kayıp, diğerleri mola).

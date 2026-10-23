@@ -5,7 +5,9 @@
 // ya da kurallar. Aynı konu açıkken yeniden yazılmaz, yalnızca "son görüldü"
 // güncellenir. Kararlar: docs/oee-agent-report.md → OEE open topics.
 
-import { addDaysIso, costCenterName, groupLabel, type DayRow, type LossDay, type OeeConfig } from './oee'
+import { addDaysIso, baseCode, costCenterName, groupLabel, type DayRow, type LossDay, type OeeConfig } from './oee'
+import type { StopDay } from './oeeReliability'
+import { splitShortStops } from './oeeShortStops'
 
 export interface TopicThresholds {
   /** O gün bu kadar dakika kayıp → aday. */
@@ -40,8 +42,11 @@ export interface GroupDay {
 /**
  * Gün ve kayıp özetini sıkıştırır: yalnızca kayıp sayılan (Reason Code 1
  * kayıp listesinde) ve sebebi girilmiş (Reason Code 2 ≠ "#") duruşlar.
+ * Süre histogramı (`stops`) verilirse aynı kod ikiye bölünür (oeeShortStops.ts):
+ * < eşik duruşlar `ARZ<` ayrı konudur (hız kaybı), ≥ eşik `ARZ` kullanılabilirlik.
  */
-export function compactDays(days: DayRow[], losses: LossDay[], c: OeeConfig): GroupDay[] {
+export function compactDays(days: DayRow[], rawLosses: LossDay[], c: OeeConfig, stops?: StopDay[]): GroupDay[] {
+  const losses = stops ? splitShortStops(rawLosses, stops, c).lossDays : rawLosses
   const map = new Map<string, GroupDay>()
   const at = (date: string, costCenter: string, workCenter: string) => {
     const key = `${date}|${workCenter}`
@@ -55,7 +60,7 @@ export function compactDays(days: DayRow[], losses: LossDay[], c: OeeConfig): Gr
     const row = at(l.date, l.costCenter, l.workCenter)
     for (const [k, [min]] of Object.entries(l.codes)) {
       const [rc1, rc2] = k.split('|')
-      if (!rc2 || rc2 === '#' || !c.lossReasonCodes.includes(rc1)) continue
+      if (!rc2 || baseCode(rc2) === '#' || !c.lossReasonCodes.includes(rc1)) continue
       row.groups[rc2] = (row.groups[rc2] ?? 0) + min
     }
   }

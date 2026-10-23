@@ -17,7 +17,8 @@ import {
   type SheetRows,
 } from './oee'
 import { NOT_EXPLAINED, SHORT_STOPS_ROW, buildBridge, level3, type Bridge } from './oeeBridge'
-import { fromStoredStops, stopDayOf } from './oeeReliability'
+import { bucketsOf, fromStoredStops, stopDayOf } from './oeeReliability'
+import { compactDays } from './oeeTopics'
 import { shortStopNote, shortStopTotals, splitShortStops } from './oeeShortStops'
 
 // Gerçek kesit (ASAKAI dosyası): Progressive 21 Eylül vardiyaları ve duruşları.
@@ -210,5 +211,26 @@ describe('Losses Trend: "Short stops" sütunu, Speed kalan', () => {
     expect(b.chart[SPEED]).toBeCloseTo(Math.max(0, t.productionMin - t.operatingMin - short), 6)
     const total = (x: typeof a) => sum(Object.entries(x.chart).filter(([k]) => k !== SPEED && k !== SHORT_STOPS).map(([, v]) => v))
     expect(total(b) + b.chart[SHORT_STOPS]).toBeCloseTo(total(a), 6)
+  })
+})
+
+describe('MTTR / MTBF kovaları ve açık konular eşiği izler', () => {
+  it('kovalar: < eşik (performans), eşik – 10, ≥ 10', () => {
+    expect(bucketsOf({}).map((b) => b.label)).toEqual(['< 2 min', '2 – 10 min', '≥ 10 min'])
+    expect(bucketsOf({ shortStopMin: 5 }).map((b) => [b.range.lo, b.range.hi])).toEqual([
+      [0, 5],
+      [5, 10],
+      [10, Infinity],
+    ])
+    expect(bucketsOf({ shortStopMin: 12 }).map((b) => b.label)).toEqual(['< 12 min', '≥ 12 min'])
+  })
+
+  it('açık konular: aynı kod ikiye bölünür (ARZ ≥ eşik, ARZ< kısa), toplam aynı', () => {
+    const a = compactDays(pDays, pLoss, plant)
+    const b = compactDays(pDays, pLoss, plant, allStops)
+    const total = (xs: typeof a) => sum(xs.flatMap((r) => Object.values(r.groups)))
+    expect(total(b)).toBeCloseTo(total(a), 1)
+    expect(b.some((r) => Object.keys(r.groups).some((g) => g.endsWith('<')))).toBe(true)
+    expect(b.some((r) => Object.keys(r.groups).some((g) => g.startsWith('#')))).toBe(false)
   })
 })

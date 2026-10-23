@@ -9,6 +9,7 @@ import { localNow } from '../src/lib/digest'
 import { EMPTY_CONFIG, addDaysIso, costCenterName, type DayRow, type OeeConfig, type OrderRow, type ShiftRow } from '../src/lib/oee'
 import { INSIGHT_SYSTEM, insightSignals, insightUserMessage, lossCodeMeanings, parseInsightAnswer, rangeDays, ruleFindings, undefinedLossCodes } from '../src/lib/oeeInsights'
 import { fromStoredLosses, type StoredLossDay } from '../src/lib/oeeStore'
+import { fromStoredStops, type StoredStopDay } from '../src/lib/oeeReliability'
 
 /**
  * OEE Agent Insights (docs/oee-agent-report.md → Agent Insights): masraf yeri /
@@ -111,7 +112,9 @@ export const slice = plantInternalQuery({
     const shifts: ShiftRow[] = (await definedOnly(scoped, await range('oeeShifts'))).filter(inSel).map(clean)
     // Siparişte masraf yeri yok: seçimin iş yerleri (gün verisinden).
     const orders: OrderRow[] = (await range('oeeOrders')).filter((o: Ctx) => wcs.has(o.workCenter)).map(clean)
-    return { days, losses, shifts, orders }
+    // Süre histogramı: kısa duruşlar (< eşik) yalnız mikro duruş sinyaline (src/lib/oeeShortStops.ts).
+    const stops: StoredStopDay[] = (await definedOnly(scoped, await range('oeeStopDays'))).filter(inSel).map(clean)
+    return { days, losses, shifts, orders, stops }
   },
 })
 
@@ -132,7 +135,7 @@ export const build = internalAction({
       const head: Ctx = await ctx.runQuery(internal.oeeInsights.reportHead, { plantId, id })
       if (!head) return null
       const config: OeeConfig = head.config
-      const data = { days: [] as DayRow[], losses: [] as StoredLossDay[], shifts: [] as ShiftRow[], orders: [] as OrderRow[] }
+      const data = { days: [] as DayRow[], losses: [] as StoredLossDay[], shifts: [] as ShiftRow[], orders: [] as OrderRow[], stops: [] as StoredStopDay[] }
       const weeks = Math.ceil(rangeDays(head.from, head.to) / 7)
       for (let w = 0; w < weeks; w++) {
         const from = addDaysIso(head.from, 7 * w)
@@ -143,6 +146,7 @@ export const build = internalAction({
         data.losses.push(...part.losses)
         data.shifts.push(...part.shifts)
         data.orders.push(...part.orders)
+        data.stops.push(...part.stops)
       }
       if (!data.days.length) {
         await ctx.runMutation(internal.oeeInsights.save, {
@@ -154,7 +158,7 @@ export const build = internalAction({
       }
       await progress('Computing the signals…')
       const losses = fromStoredLosses(data.losses)
-      const signals = insightSignals({ from: head.from, to: head.to, config, ...data, losses })
+      const signals = insightSignals({ from: head.from, to: head.to, config, ...data, losses, stops: fromStoredStops(data.stops) })
       // Veride geçip Loss groups'ta tanımlı olmayan kodlar: sayfa uyarır, yapay zekâ işaretli görür.
       const undefinedCodes = undefinedLossCodes(losses, config)
       let findings = ruleFindings(signals)

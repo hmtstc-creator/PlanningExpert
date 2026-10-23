@@ -61,7 +61,8 @@ neyin tekrar ettiğini ve hangi açık konunun hâlâ kaybettirdiğini bir bakı
   kayıp grubuyla); ≥ 10 puan yüksek → Good news. Yüklemesi 120 dk'dan az olan gün
   karşılaştırılmaz.
 - Duruş başına süre son 7 günün ≥ 1,5 katı (≥ 3 duruş) → Watch.
-- 2 dk'dan kısa duruşlar ≥ 10 ve günlük ortalamanın ≥ 2 katı → Watch.
+- Kısa duruşlar (< eşik, OEE Settings → Short-stop limit, varsayılan 2 dk; hız kaybı) ≥ 10 ve günlük ortalamanın ≥ 2 katı → Watch.
+- Kalıp ve makine notları (yeni kayıp, tekrar, MTTR artışı) kullanılabilirlik analizidir: yalnız ≥ eşik duruşlar sayılır (2026-10-23).
 
 **Shifts**
 - Günün en kötü vardiyası (iş yeri × vardiya, yükleme ≥ 120 dk): OEE, aynı
@@ -137,6 +138,8 @@ masraf yeri bazında. Agent Report günü her açılışta yeniden hesaplar; bu 
   Ücretsiz katmanlarda servis veriyi kendi geliştirmesi için kullanabilir.
 - Eşikler şimdilik koddadır (`TOPIC_DEFAULTS`); OEE Settings'e taşınması açık iş.
 
+- Kısa duruşlar ayrı konudur (2026-10-23): süre histogramı varsa aynı kod ikiye bölünür, `ARZ` ≥ eşik (kullanılabilirlik), `ARZ<` < eşik ("Machine breakdown < 2 min", hız kaybı). Eski açık konular `ARZ` anahtarıyla kalır; dakikaları artık yalnız uzun duruşlardır.
+
 ## Agent Insights (2026-10-23, Ahmet — Karabasan oturumu üzerinden)
 
 **OEE → Agent Insights** (`/oee/insights`): masraf yeri, iş yeri (ya da tümü) ve
@@ -157,7 +160,7 @@ seçilir, **Agent report** 3–5 tespit yazar: "standart OEE Pareto'sunda görü
      ≥ %60'ında.
   5. **Haftanın günü** — bir günün yükleme saati başına kaybı günlerin ortalamasının
      ≥ 1,6 katı.
-  6. **Mikro duruş** — ≥ 20 duruş, duruş başına ≤ 2 dk.
+  6. **Mikro duruş** — ≥ 20 duruş; süre verisi varsa (01.09.2026'dan beri) yalnız < eşik olaylar (hız kaybı), yoksa duruş başına ≤ 2 dk. Diğer sinyaller kayıp kodlarının ≥ eşik olaylarıyla çalışır (kısa duruşlar availability analizine girmez).
   7. **Rejim değişimi** — kayıp bir günden sonra ≥ 2 kat (her iki yanda ≥ 5 yüklü gün).
   8. **Performans anomalisi** — parça × iş yerinde performans > %105 ya da < %50
      (ideal çevrim süresi master verisi).

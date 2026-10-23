@@ -11,6 +11,7 @@
  */
 import {
   inScope,
+  shortStopMinOf,
   shiftNumber,
   type DayRow,
   type DowntimeDay,
@@ -152,11 +153,27 @@ export interface DurationRange {
 
 const inRange = (bin: number, r: DurationRange) => bin >= r.lo && bin < r.hi
 
-export const BUCKETS: { key: string; label: string; range: DurationRange }[] = [
-  { key: 'short', label: '< 2 min', range: { lo: 0, hi: 2 } },
-  { key: 'mid', label: '2 – 10 min', range: { lo: 2, hi: 10 } },
-  { key: 'long', label: '≥ 10 min', range: { lo: 10, hi: Infinity } },
-]
+export type Bucket = { key: string; label: string; range: DurationRange }
+
+/**
+ * Süre kovaları: ilk kova kısa duruşlar (< eşik, performans kaybı; OEE
+ * Settings), sonra eşik – 10 dk ve ≥ 10 dk (kullanılabilirlik kaybı).
+ */
+export function bucketsOf(c: { shortStopMin?: number }): Bucket[] {
+  const t = shortStopMinOf(c)
+  if (t >= 10) return [
+    { key: 'short', label: `< ${t} min`, range: { lo: 0, hi: t } },
+    { key: 'long', label: `≥ ${t} min`, range: { lo: t, hi: Infinity } },
+  ]
+  return [
+    { key: 'short', label: `< ${t} min`, range: { lo: 0, hi: t } },
+    { key: 'mid', label: `${t} – 10 min`, range: { lo: t, hi: 10 } },
+    { key: 'long', label: '≥ 10 min', range: { lo: 10, hi: Infinity } },
+  ]
+}
+
+/** Varsayılan eşikle kovalar (< 2, 2–10, ≥ 10 dk). */
+export const BUCKETS: Bucket[] = bucketsOf({})
 
 export interface RelPeriod {
   key: string
@@ -230,12 +247,12 @@ export interface BucketRow {
   byPress: { workCenter: string; count: number; minutes: number }[]
 }
 
-/** Süre kovaları (< 2, 2–10, ≥ 10 dk): toplam dakika, adet, MTTR, MTBF ve preslere dağılımı. */
+/** Süre kovaları (< eşik, eşik–10, ≥ 10 dk; bucketsOf): toplam dakika, adet, MTTR, MTBF ve preslere dağılımı. */
 export function bucketRows(stops: StopDay[], days: DayRow[], from: string, to: string, cat: RelCategory, scope: Scope, c: OeeConfig): BucketRow[] {
   const sc = (r: { date: string; workCenter: string; costCenter: string }) => r.date >= from && r.date <= to && inScope(r, scope, c)
   const covered = stopDates(stops)
   const production = days.filter((d) => sc(d) && covered.has(d.date)).reduce((a, d) => a + d.productionMin, 0)
-  return BUCKETS.map((bk) => {
+  return bucketsOf(c).map((bk) => {
     const press = new Map<string, { count: number; minutes: number }>()
     let count = 0
     let minutes = 0

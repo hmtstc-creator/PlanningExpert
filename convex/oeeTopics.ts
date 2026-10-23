@@ -8,6 +8,7 @@ import { definedOnly } from './oee'
 import { localNow } from '../src/lib/digest'
 import { EMPTY_CONFIG, type DayRow, type OeeConfig } from '../src/lib/oee'
 import { fromStoredLosses, type StoredLossDay } from '../src/lib/oeeStore'
+import { fromStoredStops, type StoredStopDay } from '../src/lib/oeeReliability'
 import {
   AI_SYSTEM,
   TOPIC_DEFAULTS,
@@ -144,7 +145,9 @@ export const weekRows = plantInternalQuery({
     const range = (table: string) => ctx.db.query(table).withIndex('by_date', (q: Ctx) => q.gte('date', from).lte('date', to)).collect()
     const days: DayRow[] = await definedOnly(scoped, await range('oeeDays'))
     const losses: StoredLossDay[] = await definedOnly(scoped, await range('oeeLossDays'))
-    return compactDays(days, fromStoredLosses(losses), config)
+    // Süre histogramı: < eşik duruşlar ayrı konu (hız), ≥ eşik kullanılabilirlik (src/lib/oeeShortStops.ts).
+    const stops: StoredStopDay[] = await definedOnly(scoped, await range('oeeStopDays'))
+    return compactDays(days, fromStoredLosses(losses), config, fromStoredStops(stops))
   },
 })
 

@@ -7,9 +7,9 @@ import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelecti
 import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import { addDaysIso, areaNames, inScope, isoWeek, scopeLabel, type DayRow } from '../../lib/oee'
+import { MES_SHORT_STOP_MIN, addDaysIso, areaNames, inScope, isoWeek, scopeLabel, shortStopMinOf, type DayRow } from '../../lib/oee'
 import {
-  BUCKETS,
+  bucketsOf,
   bucketDetail,
   bucketRows,
   defaultSetupTexts,
@@ -37,10 +37,15 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 /** Süre: 90 dk'ya kadar dakika, üstü saat. */
 const dur = (m: number | null) => (m === null ? '—' : m < 90 ? `${m < 10 ? m.toFixed(1) : Math.round(m)} min` : `${(m / 60).toFixed(1)} h`)
 
-/** Sayfanın kendi ayarı (tarayıcıda): en az dakika, kategori, STP metinleri. */
-const PREF_KEY = 'oee-mttr'
+/**
+ * Sayfanın kendi ayarı (tarayıcıda): en az dakika, kategori, STP metinleri.
+ * En az dakika boşsa (null) OEE Settings'teki kısa duruş eşiği: MTTR / MTBF
+ * kullanılabilirlik kaybıdır, < eşik duruşlar performanstır (2026-10-23).
+ * Anahtar v2: eski kayıtlı 0 yeni varsayılanı gölgelemesin.
+ */
+const PREF_KEY = 'oee-mttr-v2'
 interface Prefs {
-  minMinutes: number
+  minMinutes: number | null
   category: string
   setupTexts: string[] | null
 }
@@ -49,14 +54,14 @@ function readPrefs(): Prefs {
     const v = JSON.parse(window.localStorage.getItem(PREF_KEY) ?? 'null')
     if (v && typeof v === 'object')
       return {
-        minMinutes: typeof v.minMinutes === 'number' && v.minMinutes >= 0 ? v.minMinutes : 0,
+        minMinutes: typeof v.minMinutes === 'number' && v.minMinutes >= 0 ? v.minMinutes : null,
         category: typeof v.category === 'string' ? v.category : '',
         setupTexts: Array.isArray(v.setupTexts) ? v.setupTexts.filter((t: unknown) => typeof t === 'string') : null,
       }
   } catch {
     // Saklanamıyorsa varsayılan.
   }
-  return { minMinutes: 0, category: '', setupTexts: null }
+  return { minMinutes: null, category: '', setupTexts: null }
 }
 
 /**
@@ -71,7 +76,8 @@ function readPrefs(): Prefs {
 function MttrPage() {
   const sel = useOeeSelection()
   const { config } = useOeeConfig()
-  const [prefs, setPrefsState] = useState<Prefs>(() => (typeof window === 'undefined' ? { minMinutes: 0, category: '', setupTexts: null } : readPrefs()))
+  const [prefs, setPrefsState] = useState<Prefs>(() => (typeof window === 'undefined' ? { minMinutes: null, category: '', setupTexts: null } : readPrefs()))
+  const minMinutes = prefs.minMinutes ?? shortStopMinOf(config)
   const setPrefs = (p: Partial<Prefs>) =>
     setPrefsState((cur) => {
       const next = { ...cur, ...p }
@@ -103,7 +109,7 @@ function MttrPage() {
   const setupTexts = prefs.setupTexts ? prefs.setupTexts.filter((t) => allSetupTexts.includes(t)) : defaultSetupTexts(config)
   const categories = useMemo(() => relCategories(config, setupTexts), [config, setupTexts.join('|')]) // eslint-disable-line react-hooks/exhaustive-deps
   const cat = categories.find((c) => c.key === prefs.category) ?? categories[0]
-  const range: DurationRange = { lo: prefs.minMinutes, hi: Infinity }
+  const range: DurationRange = { lo: minMinutes, hi: Infinity }
 
   const periods = useMemo(() => {
     const lastMonth = Number(sel.date.slice(5, 7))
@@ -151,7 +157,7 @@ function MttrPage() {
       categories.map((c) => ({
         cat: c,
         rows: bucketRows(stops, days, span.from, span.to, c, scope, config),
-        detail: BUCKETS.map((b) => bucketDetail(weekEvents, c, b.range, scope, config)),
+        detail: bucketsOf(config).map((b) => bucketDetail(weekEvents, c, b.range, scope, config)),
       })),
     [categories, stops, days, span.from, span.to, weekEvents, scope, config],
   )
@@ -207,21 +213,24 @@ function MttrPage() {
         rows={days}
         config={config}
         extra={
-          <label className="flex flex-col gap-1" title="Stops shorter than this are left out of MTTR and MTBF">
+          <label
+            className="flex flex-col gap-1"
+            title={`Stops shorter than this are left out of MTTR and MTBF. Default: the short-stop limit of OEE Settings (${shortStopMinOf(config)} min) — shorter stops are performance, not availability.`}
+          >
             Min. duration (min)
             <input
               type="number"
               min={0}
               max={240}
               step={1}
-              value={prefs.minMinutes}
+              value={minMinutes}
               onChange={(e) => setPrefs({ minMinutes: Math.max(0, Math.min(240, Math.floor(Number(e.target.value) || 0))) })}
               className="w-24 rounded-md border bg-amber-50 px-2 py-1.5 text-sm text-foreground dark:bg-amber-950/30"
             />
           </label>
         }
       />
-      <FormulaNote data={weekByMachine} minMinutes={prefs.minMinutes} />
+      <FormulaNote data={weekByMachine} minMinutes={minMinutes} shortStopMin={shortStopMinOf(config)} />
       <OeeDataNotice items={notes} />
 
       {/* Haftanın makine tablosu (Losses Trend'den taşındı). */}
@@ -230,7 +239,7 @@ function MttrPage() {
           Week W{sel.week.week} by machine — all categories
           <span className="text-xs font-normal text-muted-foreground">
             {dm(sel.monday)} – {dm(sel.sunday)} · {label}
-            {prefs.minMinutes > 0 && ` · stops ≥ ${prefs.minMinutes} min`}
+            {minMinutes > 0 && ` · stops ≥ ${prefs.minMinutes} min`}
           </span>
         </h2>
         <WeekMachineTable data={weekByMachine} />
@@ -272,7 +281,7 @@ function MttrPage() {
             )}
             <span className="text-xs text-muted-foreground">
               {label}
-              {prefs.minMinutes > 0 ? ` · only stops ≥ ${prefs.minMinutes} min` : ' · every stop'}
+              {minMinutes > 0 ? ` · only stops ≥ ${prefs.minMinutes} min` : ' · every stop'}
             </span>
           </div>
 
@@ -392,7 +401,7 @@ function WeekMachineTable({ data }: { data: { cat: RelCategory; grid: RelGrid }[
  * Filtrenin altında sabit bilgi bloğu: MTTR / MTBF formülleri ve haftanın
  * tablosundan canlı bir örnek (en çok duruşu olan makine × kategori).
  */
-function FormulaNote({ data, minMinutes }: { data: { cat: RelCategory; grid: RelGrid }[]; minMinutes: number }) {
+function FormulaNote({ data, minMinutes, shortStopMin }: { data: { cat: RelCategory; grid: RelGrid }[]; minMinutes: number; shortStopMin: number }) {
   let ex: { wc: string; cat: string; c: RelCell } | null = null
   for (const d of data)
     for (const r of d.grid.rows) {
@@ -409,8 +418,9 @@ function FormulaNote({ data, minMinutes }: { data: { cat: RelCategory; grid: Rel
         </li>
         <li>
           <b>MTBF</b> <span className={code}>= production time ÷ number of stops</span> — average running time between two stops of that
-          category. Production time is the <i>net production time</i> of the Shiftly KPI (loading time minus every unplanned stop), for the same
-          machines and days, counted only on days whose downtimes are uploaded.
+          category. Production time is the <i>net production time</i> of the Shiftly KPI (loading time minus the unplanned stops of{' '}
+          {MES_SHORT_STOP_MIN} min and longer — the MES leaves shorter ones in), for the same machines and days, counted only on days whose
+          downtimes are uploaded.
         </li>
         <li>
           Each category is counted on its own: ARZ MTBF counts only ARZ stops, even though the machine also stops for KLP and STP in between.
@@ -420,6 +430,9 @@ function FormulaNote({ data, minMinutes }: { data: { cat: RelCategory; grid: Rel
           {minMinutes > 0 ? (
             <>
               Only stops of <b>{minMinutes} min</b> and longer are counted (shorter ones are left out of the count, MTTR and MTBF).
+              {minMinutes === shortStopMin
+                ? ' This is the short-stop limit (OEE Settings): shorter stops are a performance loss, analysed in the buckets below and in the Loss Bridge.'
+                : ` The short-stop limit (OEE Settings) is ${shortStopMin} min.`}
             </>
           ) : (
             <>Every stop is counted (min. duration 0).</>

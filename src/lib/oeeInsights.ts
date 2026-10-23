@@ -10,7 +10,9 @@
 // yapay zekâ yoksa en güçlü 3 sinyal kurallarla gösterilir.
 // Kararlar: docs/oee-agent-report.md → Agent Insights.
 
-import { groupLabel, ratios, shiftNumber, type DayRow, type LossDay, type OeeConfig, type OeeTimes, type OrderRow, type ShiftRow } from './oee'
+import { baseCode, groupLabel, isShortCode, ratios, shiftNumber, shortStopMinOf, type DayRow, type LossDay, type OeeConfig, type OeeTimes, type OrderRow, type ShiftRow } from './oee'
+import type { StopDay } from './oeeReliability'
+import { splitShortStops } from './oeeShortStops'
 import { LOSS_CODE_MEANINGS } from './settingsDefaults'
 
 export interface InsightThresholds {
@@ -104,6 +106,12 @@ export interface InsightInput {
   losses: LossDay[]
   shifts: ShiftRow[]
   orders: OrderRow[]
+  /**
+   * Süre histogramı (oeeStopDays). Varsa duruşlar bölünür (oeeShortStops.ts):
+   * < eşik olaylar yalnız mikro duruş (hız) sinyaline, ≥ eşik olaylar diğer
+   * (kullanılabilirlik) sinyallerine girer. Yoksa eski hesap.
+   */
+  stops?: StopDay[]
 }
 
 // ---- yardımcılar -------------------------------------------------------------------
@@ -314,7 +322,16 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
   const losses = input.losses.filter((d) => d.date >= from && d.date <= to)
   const shifts = input.shifts.filter((d) => d.date >= from && d.date <= to)
   const orders = input.orders.filter((d) => d.date >= from && d.date <= to)
-  const { codes, parts, reasons } = lossEntries(losses, c)
+  // Kısa duruşlar (< eşik) hız kaybıdır: yalnız mikro duruş sinyaline girer (2026-10-23).
+  const entries = lossEntries(input.stops ? splitShortStops(losses, input.stops, c).lossDays : losses, c)
+  const long = <T extends { group: string }>(xs: T[]) => xs.filter((x) => !isShortCode(x.group))
+  const short = <T extends { group: string }>(xs: T[]) => xs.filter((x) => isShortCode(x.group)).map((x) => ({ ...x, group: baseCode(x.group) }))
+  const codes = long(entries.codes)
+  const parts = long(entries.parts)
+  const reasons = long(entries.reasons)
+  const shortCodes = short(entries.codes)
+  const shortReasons = short(entries.reasons)
+  const shortMin = shortStopMinOf(c)
   const label = (g: string) => (g === '#' ? 'unclassified (#)' : groupLabel(g, c))
   const minTotal = t.minWeeklyMin * weeks
   const out: Signal[] = []
@@ -537,24 +554,29 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
     })
   }
 
-  // 6. Mikro duruş: çok sayıda kısa duruş.
+  // 6. Mikro duruş: çok sayıda kısa duruş. Süreler varsa < eşik olaylar
+  // (bölünmüş özet); yoksa eski kural (ortalama ≤ microMaxMin).
+  const split = shortCodes.length > 0
   for (const [key, list] of groupBy(
-    codes.filter((x) => x.group !== '#'),
+    (split ? shortCodes : codes).filter((x) => x.group !== '#'),
     (x) => `${x.workCenter}|${x.group}`,
   )) {
     const total = sumMin(list)
     const count = list.reduce((a, x) => a + x.count, 0)
-    if (total < minTotal || count < 20 || total / count > t.microMaxMin) continue
+    if (total < minTotal || count < 20 || (!split && total / count > t.microMaxMin)) continue
     const [wc, group] = key.split('|')
+    const microReasons = split ? shortReasons : reasons
     push(
       {
         id: `micro|${wc}|${group}`,
         kind: 'micro',
         title: `${wc}: ${count} short ${label(group)} stops of ${(total / count).toFixed(1)} min each`,
-        finding: `${count} stops, ${dur(total)} in total, ${(total / count).toFixed(1)} min per stop — a micro-stop signature.`,
+        finding: `${count} stops, ${dur(total)} in total, ${(total / count).toFixed(1)} min per stop — a micro-stop signature${
+          split ? ` (stops under ${shortMin} min: a speed loss, inside Production − Operation)` : ''
+        }.`,
         evidence: withReasons(
           `${(count / weeks).toFixed(0)} stops a week on ${wc}.`,
-          reasons.filter((x) => x.workCenter === wc && x.group === group),
+          microReasons.filter((x) => x.workCenter === wc && x.group === group),
         ),
         whyNonObvious: 'Short stops are small one by one and drown in a minutes Pareto; their count shows a sensor, feeding or recording issue rather than breakdowns.',
         firstCheck: `Watch ${wc} for one hour: are these real stops, a sensor that trips, or how the stops are recorded?`,
