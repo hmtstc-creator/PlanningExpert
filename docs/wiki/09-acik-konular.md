@@ -9,7 +9,7 @@
 | Organizasyonu düzelt | Administration → **Organization map**: kırmızı çerçeveli düğümler / "To fix" listesi (aynı adlı plant, holding'siz şirket, bölümsüz masraf yeri, masraf yerisiz work center) | `todolist.md` §1 |
 | Yedek ve izleme | Storage Box (`BACKUP_REMOTE`), ilk geri yükleme provası, UptimeRobot | `todolist.md` §4.1 |
 | E-posta özeti | Resend anahtarı — **sonra** (listede bekliyor) | `todolist.md` §5.3 |
-| OEE açık konular yapay zekâsı | Convex ortamına `AI_API_KEY` (ücretsiz Gemini; Groq ise `AI_API_URL` + `AI_MODEL` de). Yoksa kurallar karar verir | `docs/oee-agent-report.md` → *OEE open topics* |
+| OEE açık konular yapay zekâsı | Sunucudaki (self-hosted) Convex'e `AI_API_KEY` (ücretsiz Gemini; Groq ise `AI_API_URL` + `AI_MODEL` de). Yoksa kurallar karar verir | `docs/deployment.md` → *OEE açık konular — yapay zekâ* |
 
 Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mesajları görüldü; tedarik süreleri varsayılan (14 gün) kalır; OEE sayfaları her gün açılıyor (histogram kurulmuş).
 

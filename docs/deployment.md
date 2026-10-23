@@ -115,3 +115,39 @@ paneli → Settings → Environment Variables; deploy/README.md → Ortam deği�
 
 Alıcılar, gün, saat ve içerik Company settings → Today & daily digest'te.
 Ayarlanmamışsa özet gönderilmez ve sayfa nedenini söyler.
+
+## OEE açık konular — yapay zekâ (OEE → Open Topics)
+
+Ajan (`convex/oeeTopics.ts`) OpenAI uyumlu herhangi bir sohbet API'sini kullanır.
+Anahtar da e-postadaki gibi Convex sunucumuzun ortam değişkenidir (bulut değil;
+Convex 2026-10-16'dan beri bu VPS'te). Anahtar yoksa kurallar karar verir; sayfa
+"AI not set up" yazar.
+
+| Değişken | Ne | Örnek |
+|---|---|---|
+| `AI_API_KEY` | Servisin API anahtarı (zorunlu) | Gemini `AIza…`, Groq `gsk_…` |
+| `AI_API_URL` | İsteğe bağlı; yoksa Gemini | `https://api.groq.com/openai/v1/chat/completions` |
+| `AI_MODEL` | İsteğe bağlı; yoksa `gemini-flash-latest` | `llama-3.3-70b-versatile` (Groq) |
+
+Ücretsiz anahtar:
+- **Google Gemini** (varsayılan): https://aistudio.google.com → Google hesabıyla gir →
+  *Get API key* → *Create API key* → kopyala. Kart gerekmez.
+- **Groq** (alternatif): https://console.groq.com → kaydol → *API Keys* → *Create API Key*.
+
+Sunucuya yazma (anahtar sohbete, git'e, mesaja yazılmaz):
+
+```bash
+ssh <sunucu>
+cd /opt/planningexpert
+set -a; . /etc/planningexpert/portal.env; set +a
+npx convex env set AI_API_KEY '<anahtar>'
+# yalnız Groq için:
+npx convex env set AI_API_URL 'https://api.groq.com/openai/v1/chat/completions'
+npx convex env set AI_MODEL 'llama-3.3-70b-versatile'
+npx convex env list    # adlar görünür; değeri ekrana dökme
+```
+
+Yeniden yayın gerekmez. Deneme: OEE → Open Topics → *Analyse the last day* (o gün daha
+önce işlendiyse bir sonraki yüklemede çalışır). Satırda "AI (model)" görünmeli.
+Ücretsiz katmanda servis gönderilen veriyi (masraf yeri / iş yeri / kayıp grubu adları
+ve dakikalar) kendi geliştirmesi için kullanabilir.
