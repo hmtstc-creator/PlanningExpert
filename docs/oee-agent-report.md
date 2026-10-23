@@ -168,9 +168,10 @@ seçilir, **Agent report** 3–5 tespit yazar: "standart OEE Pareto'sunda görü
       olay başına ≤ 5 dk. Ayar sayılır: grubun anlamı set-up / adjustment diyorsa, metin
       Setup texts'teyse ya da REGLAJ / SETUP / ADJUST / AYAR / SCHIMB geçiyorsa. Kazanç
       kaybın yarısı.
-  11. **Mola sonrası artık duruş** — metinde "after break" / "după pauză" / "mola sonrası";
-      kazanç kaybın tamamı.
-  12. **Plansız 5S** — kayıp kodunda (üretim süresi içinde) yazılmış 5S; kazanç yarısı.
+  11. **Mola sonrası artık duruş** — metinde "after (lunch/coffee) break" / "after lunch" / "post-break" /
+      "după pauză" / "după masă" / "mola sonrası" / "moladan sonra" / "mola dönüşü" / "yemekten sonra"
+      (aksanlı ya da aksansız; "after breakdown" arızadır, sayılmaz); kazanç kaybın tamamı.
+  12. **Plansız 5S** — kayıp kodunda (üretim süresi içinde) yazılmış 5S ("5S", "5 S", "5-S"); kazanç yarısı.
 - **Alt nedenler (2026-10-23):** her kayıp sinyalinin kanıtına o kayıptaki en büyük 3
   duruş metni (`oeeLossDays.reasons`, `rc1|rc2|metin`) dk ve olay sayısıyla eklenir
   ("Top reasons: …"); yapay zekâ da görür.

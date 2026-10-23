@@ -236,6 +236,19 @@ describe('Agent Insights: sub-reasons and new signals', () => {
     expect([FIVE_S.test('5 S CLEANING'), FIVE_S.test('P15SX')]).toEqual([true, false])
   })
 
+  it('after-break and 5S patterns cover common spellings', () => {
+    const yes = [
+      'LATE START AFTER BREAK', 'POST-BREAK RESTART', 'AFTER LUNCH BREAK', 'AFTER LUNCH', 'START AFTER COFFEE BREAK',
+      'DUPA PAUZA', 'PORNIRE DUPĂ PAUZA DE MASA', 'DUPA MASA',
+      'MOLA SONRASI', 'MOLADAN SONRA', 'MOLA DÖNÜŞÜ', 'MOLA DONUSU', 'ÇAY MOLASI SONRASI', 'YEMEKTEN SONRA',
+    ]
+    const no = ['AFTER BREAKDOWN', 'TOOL BREAKAGE', 'MOLA', 'PAUZA', 'BREAK']
+    expect(yes.filter((t) => !AFTER_BREAK.test(t))).toEqual([])
+    expect(no.filter((t) => AFTER_BREAK.test(t))).toEqual([])
+    expect(['5S', 'CURATENIE 5S', '5-S AUDIT', '5S.'].every((t) => FIVE_S.test(t))).toBe(true)
+    expect(['15S', 'P5SX', '5SEC'].some((t) => FIVE_S.test(t))).toBe(false)
+  })
+
   it('"#" stops far longer than coded stops → big stops stay unexplained', () => {
     const ds = dates(20)
     const xs = insightSignals(input({ days: ds.map((d) => day(d)), losses: ds.map((d) => loss(d, { 'L|#': [90, 1], 'L|ARZ': [10, 2] })) }))
