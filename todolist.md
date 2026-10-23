@@ -63,6 +63,30 @@ Holding → Company → Plant → Department → Cost center → Work center
 - [ ] **[G]** Harita yeterli olunca eski sayfaları (Holdings & companies
   ağacı, Users & permissions) kaldırmak — kullanıcının onayıyla.
 
+### Gantt: elle iş, sürükle-bırak, silme (2026-10-23, kararlar verildi)
+
+Kullanıcı: "PRS104 çalışıyor; 3 saat öteleyip önüne stok amaçlı X parçasından
+N adet koymak ve plana işletmek istiyorum." Öteleme bugün var (Production Plan →
+*Plan settings — work center start & delays*). Eksik olan aşağıdakiler; hepsi
+mevcut **kilitli iş** (`planJobLocks`) üzerine kurulur — motor kilitli işi yerinde
+tutar, adedini talepten düşer (`committedByMaterial`), diğer işleri etrafına dizer.
+
+Kullanıcı kararları (2026-10-23):
+1. Elle eklenen stok amaçlı işin adedi o malzemenin **ileriki talebinden düşer**.
+2. Elle iş **seçilen saatte** (varsayılan: şimdi) kilitli durur; presin diğer
+   işleri arkasına kayar.
+3. Gantt'ta sürüklenip bırakılan iş **bırakılan pres + saatte kilitlenir**.
+4. Silme **yalnız o işi** kaldırır (elle / kilitli iş); talep varsa motor yeniden
+   hesapta başka yere planlar. Malzemeyi plandan çıkarmak = mevcut `exclude`.
+
+- [ ] **[G]** 1. PR — Elle iş ekleme: pres, malzeme, adet, başlangıç; süre ve
+  segmentler vardiya takvimi + çevrim / setup süresinden `src/lib`'de hesaplanır,
+  `planJobLocks`'a `source: 'manual'` (opsiyonel alan) ile yazılır. Doğrulayıcı,
+  Planning Logic, test.
+- [ ] **[G]** 2. PR — Silme: Gantt'ta kilitli / elle işte "Remove".
+- [ ] **[G]** 3. PR — Sürükle-bırak: `WeekGantt` işini başka pres / saate taşı →
+  kilit yeniden hesaplanır (aynı pres grubu / kalıp uygunluğu kontrolü).
+
 ### Organizasyon teyidi (2026-10-03)
 
 | Bağ | Durum | Nasıl korunuyor |
