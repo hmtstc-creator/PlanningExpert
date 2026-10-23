@@ -5,7 +5,7 @@ import { api } from '../../convex/_generated/api'
 import { plantClock } from '../lib/dates'
 import { WeekGantt, type WeekGanttJob, type WeekGanttPress } from '../components/WeekGantt'
 import { buildDayTimeline, netToClock, productionDayOf } from '../lib/shiftTimeline'
-import { planMove, type MoveTarget } from '../lib/jobMove'
+import { planMove, type MoveSegment, type MoveTarget } from '../lib/jobMove'
 import type { PlanJob } from '../lib/planPipeline'
 import { useCurrentUser } from '../lib/currentUser'
 import { type PlanDataSources } from '../lib/sapUploads'
@@ -15,6 +15,8 @@ import { PlanDataLine } from '../components/plan/PlanPanels'
 import { PressStartPanel } from '../components/plan/PressStartPanel'
 import { JobDialog, type JobDraft } from '../components/plan/JobDialog'
 import { MoveDialog, type MoveDraft } from '../components/plan/MoveDialog'
+import { AddJobDialog } from '../components/plan/AddJobDialog'
+import type { ProductSpec } from '../lib/planning'
 import { dayMonth, minutesAgo, usePlanState } from '../components/plan/usePlanState'
 /** Planın böldüğü lotun parça son eki: "W38 (1/2)". */
 const SPLIT_SUFFIX = / \(\d+\/\d+\)$/
@@ -62,6 +64,9 @@ function PlanlamaPage() {
   const [jobDraft, setJobDraft] = useState<JobDraft | null>(null)
   // Sürükle-bırak ya da "Move…": işi başka pres / saate taşıyıp kilitlemek.
   const [moveDraft, setMoveDraft] = useState<MoveDraft | null>(null)
+  // Elle iş (stok amaçlı): pencere açıkken parça listesi yüklenir.
+  const [addingJob, setAddingJob] = useState(false)
+  const products = (useQuery(api.products.listAll, addingJob ? {} : 'skip')?.rows ?? []) as ProductSpec[]
   const quantityRules = useMemo(
     () =>
       new Map(
@@ -153,9 +158,9 @@ function PlanlamaPage() {
     shifts: shiftsByPressDate.get(`${press}|${date}`) ?? 0,
     overtime: overtimeByPressDate.get(`${press}|${date}`),
   })
-  const checkMove = (job: PlanJob, target: MoveTarget) =>
+  const checkMove = (job: PlanJob | null, segments: MoveSegment[], target: MoveTarget) =>
     planMove({
-      segments: job.segments,
+      segments,
       target,
       days: allDates.map((d) => ({ date: d, capacityMinutes: capacityByPressDate.get(`${target.press}|${d}`) ?? 0 })),
       dayShape: dayShapeOf(target.press, target.date),
@@ -393,13 +398,23 @@ function PlanlamaPage() {
 
       {weeks.length > 0 && (
         <div className="mt-8">
-          <h2 className="text-sm font-semibold text-foreground">
-            Plan{' '}
-            <span className="font-normal text-muted-foreground">
-              · {dayMonth(allDates[0])} – {dayMonth(allDates[allDates.length - 1])} ·{' '}
-              {allJobs.length} jobs
-            </span>
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-foreground">
+              Plan{' '}
+              <span className="font-normal text-muted-foreground">
+                · {dayMonth(allDates[0])} – {dayMonth(allDates[allDates.length - 1])} ·{' '}
+                {allJobs.length} jobs
+              </span>
+            </h2>
+            <button
+              type="button"
+              onClick={() => setAddingJob(true)}
+              title="Add a job by hand (e.g. a part run for stock) — locked at the time you pick"
+              className="rounded-md border border-sky-600 px-3 py-1.5 text-sm font-semibold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-950"
+            >
+              + Add job
+            </button>
+          </div>
 
           <div className="mt-2">
             <WeekGantt
@@ -484,13 +499,25 @@ function PlanlamaPage() {
                 }}
               />
             )}
+            {addingJob && (
+              <AddJobDialog
+                presses={presses.map((p) => ({ name: p.name, hall: p.hall, feedsCoil: p.feedsCoil }))}
+                dates={allDates.filter((d) => d >= todayIso)}
+                products={products}
+                initial={{ press: presses[0]?.name ?? '', date: todayIso, clockMinute: Math.ceil(nowClockMinute / 5) * 5 }}
+                shiftStartMinute={shiftStartMinute}
+                check={(segments, target) => checkMove(null, segments, target)}
+                currentUser={currentUser ?? undefined}
+                onClose={() => setAddingJob(false)}
+              />
+            )}
             {moveDraft && (
               <MoveDialog
                 draft={moveDraft}
                 presses={presses.map((p) => ({ name: p.name, hall: p.hall }))}
                 dates={allDates}
                 shiftStartMinute={shiftStartMinute}
-                check={(target) => checkMove(moveDraft.job, target)}
+                check={(target) => checkMove(moveDraft.job, moveDraft.job.segments, target)}
                 currentUser={currentUser ?? undefined}
                 onClose={() => setMoveDraft(null)}
               />

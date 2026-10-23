@@ -364,6 +364,17 @@ function PlanLogicPage() {
             overlap another approved or frozen job or maintenance on that work center.
           </li>
           <li>
+            <b>Jobs added by hand</b> (Plan → + Add job, e.g. a part run for stock): part, quantity, work
+            center, day and start time. The duration is the engine's own calculation for that part and
+            quantity, in the engine's order — setup (none if the die is already mounted), quality
+            approval, production per coil with a coil change between coils on a coil-fed work center
+            (e.g. 90 min setup + 15 min approval + coils of 200 and 150 min with a 20-min coil change =
+            475 min). The job is locked at that time like a moved job: its quantity comes off the part's
+            future demand, so later lots of that part shrink or disappear, and the work center's other
+            jobs move behind it. Same limits as a move; a part not defined for that work center is
+            allowed with a warning.
+          </li>
+          <li>
             <b>Work center maintenance</b> takes those clock hours out of that
             work center's day; jobs flow around it.
           </li>

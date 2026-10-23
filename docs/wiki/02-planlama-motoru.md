@@ -22,6 +22,7 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
    - Eş ürün çiftleri **tek vuruştan** çıkar; sac yalnızca asıl ürünün gramajıyla sayılır.
 3. **Dondurulmuş ufuk:** onaylı plandaki işler (ve tek tek kilitlenen işler, `planJobLocks`) yerinde kalır; motor etrafına planlar.
    **Taşınan iş** (Gantt'ta sürükle-bırak ya da iş penceresi → *Move…*, 2026-10-23) da kilittir: `src/lib/jobMove.ts` işin parçalarını (setup, onay, üretim, rulo değişimi) sırası ve net süresiyle hedef presin günlerine döker (`reflowSegments`), geçmişe / ufuk dışına / başka kilitli, dondurulmuş işe ya da bakıma bindirmez (`planMove`); `convex/planJobLocks.ts` `move` eski kilidi kaldırıp yenisini tek işlemde yazar. Süre pres değişince aynı kalır (motor süreyi parçadan okur).
+   **Elle eklenen iş** (Plan → *+ Add job*, stok amaçlı): süre `computeRunPlan` (motorla aynı), parça sırası `manualJobSegments` (setup → onay → rulo başına üretim, aralarda rulo değişimi; kalıp takılıysa setup yok, `feedsCoil` false ise rulo değişimi yok). Aynı `planMove` + `planJobLocks.move` yoluyla `phase: 'fill'` kilit olarak yazılır; adedi talepten düşer. Plan çıktısındaki `presses[]` artık `feedsCoil` taşır.
 4. **Yerleştirme** (`schedule`, `scheduler.ts`): lotlar sırayla preslere konur.
    - **Sıra:** öne alınanlar (priority) → faz (bakiye → acil → dolgu) → boost → faz içinde stok bitişi / aciliyet / az alternatifli önce.
    - Her lot **bütün uygun presleri** dener (ana pres; alternatifler yalnızca *Flexible work center* işaretliyse). Varsayılan seçim *en erken biten* pres.

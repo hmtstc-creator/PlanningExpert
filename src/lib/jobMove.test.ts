@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { planMove, reflowSegments, segmentsOverlap } from './jobMove'
+import { manualJobSegments, planMove, reflowSegments, segmentsOverlap } from './jobMove'
 
 const days = [
   { date: '2026-10-22', capacityMinutes: 1350 },
@@ -87,5 +87,31 @@ describe('planMove', () => {
       fixedOnTarget: [[{ kind: 'run', date: '2026-10-22', start: 400, end: 500 }]],
     })
     expect('error' in r && r.error).toMatch(/Overlaps/)
+  })
+})
+
+describe('manualJobSegments', () => {
+  const run = { setupMinutes: 90, qualityApprovalMinutes: 15, coilRunMinutes: [200, 150], coilChangeMinutes: 20, runMinutes: 350 }
+
+  it('motorun sırası: setup → onay → üretim, rulolar arasında rulo değişimi (toplam 475 dk)', () => {
+    const segs = manualJobSegments(run, { dieMounted: false, feedsCoil: true })
+    expect(segs.map((s) => [s.kind, s.end - s.start])).toEqual([
+      ['setup', 90],
+      ['quality', 15],
+      ['run', 200],
+      ['coil', 20],
+      ['run', 150],
+    ])
+    expect(segs[segs.length - 1].end).toBe(475)
+  })
+
+  it('kalıp takılıysa setup yok; rulo beslemeyen preste rulo değişimi yok', () => {
+    const segs = manualJobSegments(run, { dieMounted: true, feedsCoil: false })
+    expect(segs.map((s) => s.kind)).toEqual(['quality', 'run', 'run'])
+  })
+
+  it('rulo bilgisi yoksa tek üretim parçası', () => {
+    const segs = manualJobSegments({ ...run, coilRunMinutes: [] }, { dieMounted: false, feedsCoil: true })
+    expect(segs.map((s) => [s.kind, s.end - s.start])).toEqual([['setup', 90], ['quality', 15], ['run', 350]])
   })
 })
