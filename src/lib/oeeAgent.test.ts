@@ -150,6 +150,15 @@ describe('Agent Report: kalıp', () => {
     expect(byKey(agentReport(input({ events: [downtime(DAY, 'PRS-104', three)] })).sections.dies, 'die-new|')).toHaveLength(1)
   })
 
+  it('kalıp notu kullanılabilirlik analizidir: kısa duruşlar (< eşik) sayılmaz', () => {
+    // 3 × 1,5 dk: duruş sayısı eşiğini (3) tutar ama hepsi < 2 dk → performans, kalıp notu yok.
+    const short = [1, 2, 3].map(() => ev({ rc2: 'KLP', minutes: 1.5 }))
+    expect(agentReport(input({ events: [downtime(DAY, 'PRS-104', short)] })).sections.dies).toHaveLength(0)
+    // Eşik 1 dk olunca aynı duruşlar uzundur → not.
+    const c1 = { ...config, shortStopMin: 1 }
+    expect(byKey(agentReport(input({ events: [downtime(DAY, 'PRS-104', short)], config: c1 })).sections.dies, 'die-new|')).toHaveLength(1)
+  })
+
   it('konusu yok ve 7 günün 3ünde tekrar → kritik', () => {
     const events = [0, 2, 4].map((i) => downtime(addDaysIso(DAY, -i), 'PRS-104', [ev({ rc2: 'KLP', minutes: 40 })]))
     const [n] = byKey(agentReport(input({ events })).sections.dies, 'die-new|')

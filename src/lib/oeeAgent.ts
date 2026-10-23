@@ -12,6 +12,7 @@ import {
   groupLabel,
   ratios,
   shiftNumber,
+  shortStopMinOf,
   sumTimes,
   type DayRow,
   type DowntimeDay,
@@ -263,8 +264,12 @@ export function agentReport(input: AgentInput): AgentReport {
   const lossToday = losses.filter((x) => x.date === day)
   if (!input.events.some((d) => d.date === day) && today.length) notices.push(`No downtime rows for ${dmShort(day)} — die, machine and repeat notes need them.`)
   const role = (x: Ev) => groupRole(x.e.rc2, c)
-  const dieToday = lossToday.filter((x) => role(x) === 'die')
-  const machineToday = lossToday.filter((x) => role(x) === 'machine')
+  // Kalıp ve makine notları kullanılabilirlik analizidir: yalnız ≥ eşik duruşlar.
+  // Kısa duruşlar (< eşik, OEE Settings) performans kaybıdır: "short stops" notu (2026-10-23).
+  const shortMin = shortStopMinOf(c)
+  const isShort = (x: Ev) => x.e.minutes < shortMin
+  const dieToday = lossToday.filter((x) => role(x) === 'die' && !isShort(x))
+  const machineToday = lossToday.filter((x) => role(x) === 'machine' && !isShort(x))
   if (!c.lossGroups.some((g) => groupRole(g.code, c) === 'die'))
     notices.push('No loss group is marked as a die loss — set it on OEE Settings → Loss groups (Agent role).')
   if (!c.lossGroups.some((g) => groupRole(g.code, c) === 'machine'))
@@ -285,7 +290,7 @@ export function agentReport(input: AgentInput): AgentReport {
     const k = `${m}|${x.workCenter}`
     byPart.set(k, [...(byPart.get(k) ?? []), x])
   }
-  const dieWeek = losses.filter((x) => role(x) === 'die')
+  const dieWeek = losses.filter((x) => role(x) === 'die' && !isShort(x))
   for (const [k, evs] of byPart) {
     const [material, wc] = k.split('|')
     const minutes = sumMin(evs)
@@ -387,7 +392,7 @@ export function agentReport(input: AgentInput): AgentReport {
 
   // ---- makineler ----
   const wcs = [...new Set(today.map((d) => d.workCenter))].sort()
-  const machineWeek = losses.filter((x) => role(x) === 'machine')
+  const machineWeek = losses.filter((x) => role(x) === 'machine' && !isShort(x))
   for (const wc of new Set(machineToday.map((x) => x.workCenter))) {
     const evs = machineToday.filter((x) => x.workCenter === wc)
     const minutes = sumMin(evs)
@@ -476,20 +481,20 @@ export function agentReport(input: AgentInput): AgentReport {
       link: { to: '/oee/mttr', label: 'MTTR & MTBF' },
     })
   }
-  // Kısa duruşlar arttı (2 dakikadan kısa kayıp duruşları).
+  // Kısa duruşlar arttı (eşikten kısa kayıp duruşları: hız kaybı).
   for (const wc of wcs) {
-    const shortNow = lossToday.filter((x) => x.workCenter === wc && x.e.minutes < 2).length
+    const shortNow = lossToday.filter((x) => x.workCenter === wc && isShort(x)).length
     const otherDays = new Set(losses.filter((x) => x.workCenter === wc && x.date !== day).map((x) => x.date)).size
     if (shortNow < 10 || !otherDays) continue
-    const avg = losses.filter((x) => x.workCenter === wc && x.date !== day && x.e.minutes < 2).length / otherDays
+    const avg = losses.filter((x) => x.workCenter === wc && x.date !== day && isShort(x)).length / otherDays
     if (shortNow < avg * 2) continue
     add({
       key: `short|${wc}`,
       subject: `wc|${wc}`,
       level: 'watch',
       section: 'machines',
-      title: `${wc}: ${shortNow} short stops (under 2 min) — ${avg ? `${(shortNow / avg).toFixed(1)}× the daily average` : 'none on the other days'}.`,
-      evidence: `Short stops rarely get a breakdown record but add up: ${duration(lossToday.filter((x) => x.workCenter === wc && x.e.minutes < 2).reduce((a, x) => a + x.e.minutes, 0))} today.`,
+      title: `${wc}: ${shortNow} short stops (under ${shortMin} min, speed loss) — ${avg ? `${(shortNow / avg).toFixed(1)}× the daily average` : 'none on the other days'}.`,
+      evidence: `Short stops rarely get a breakdown record but add up: ${duration(lossToday.filter((x) => x.workCenter === wc && isShort(x)).reduce((a, x) => a + x.e.minutes, 0))} today.`,
       owner: 'Production',
       impactMin: 0,
     })

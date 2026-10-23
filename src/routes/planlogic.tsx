@@ -835,6 +835,11 @@ function PlanLogicPage() {
             page says “duration split not available before {dmy(SHORT_STOP_DATA_FROM)}”.
           </li>
           <li>
+            <b>MTTR / MTBF</b> count only the stops of the limit and longer by default (breakdowns and setups are availability losses);
+            the short stops are the first duration bucket. Agent Report, Agent Insights and Open Topics read the long stops for die and
+            machine (availability) notes and the short stops for the micro-stop / speed notes.
+          </li>
+          <li>
             Example (test): on 21.09 at PRS-105 shift 3, Loading − Production is 140.6 min = the stops of 2 min and longer; the 21.6
             min of shorter stops are inside Production − Operation.
           </li>
