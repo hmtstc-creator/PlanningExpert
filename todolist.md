@@ -83,7 +83,10 @@ Kullanıcı kararları (2026-10-23):
   segmentler vardiya takvimi + çevrim / setup süresinden `src/lib`'de hesaplanır,
   `planJobLocks`'a `source: 'manual'` (opsiyonel alan) ile yazılır. Doğrulayıcı,
   Planning Logic, test.
-- [ ] **[G]** 2. PR — Silme: Gantt'ta kilitli / elle işte "Remove".
+- [x] **[G]** (#36) Silme: elle iş → *Delete job*; onaylı iş → *Remove approval*;
+  motor işi → *Delete this lot* (lot 0 adet).
+- [ ] **[S]** Dene ve yaz: elle iş doğru süre / yerde mi, sonraki lotlar küçülüyor mu?
+  Elle iş dondurulmuş (tam plan onaylı) işi de itebilmeli mi?
 - [x] **[G]** Sürükle-bırak (öne alındı, #34): `WeekGantt` işini başka pres / gün /
   saate taşı (telefonda basılı tut), ya da iş penceresi → *Move…*; orada kilitlenir.
   Kalıp / pres uygunluğu kontrol edilmez — sabitleme (`pin`) gibi planlamacının kararı.

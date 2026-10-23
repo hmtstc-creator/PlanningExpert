@@ -2,7 +2,7 @@ import { X } from 'lucide-react'
 import { useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { manualJobSegments, type MovedJob, type MoveSegment, type MoveTarget } from '../../lib/jobMove'
+import { MANUAL_JOB_REASON, manualJobSegments, type MovedJob, type MoveSegment, type MoveTarget } from '../../lib/jobMove'
 import { computeRunPlan, eligiblePressesOf, type ProductSpec } from '../../lib/planning'
 import { useSafeMutation } from '../../lib/useSafeMutation'
 import { ErrorBanner } from '../ErrorBanner'
@@ -90,7 +90,7 @@ export function AddJobDialog({
       endMinute: moved.endMinute,
       endDate: moved.endDate,
       segments: moved.segments,
-      reason: 'Added by hand on the Gantt (stock)',
+      reason: MANUAL_JOB_REASON,
       added: true,
       createdBy: currentUser,
     })

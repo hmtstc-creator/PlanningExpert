@@ -1,5 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
+import { isManualJob } from '../src/lib/jobMove'
 import { guardedMutation, guardedQuery } from './guarded'
 
 const segmentValidator = v.object({ kind: v.string(), date: v.string(), start: v.number(), end: v.number() })
@@ -109,9 +110,10 @@ export const unlock = guardedMutation({
     const row = await ctx.db.get(id)
     if (!row) return null
     await ctx.db.delete(id)
+    const manual = isManualJob(row.reason)
     await ctx.db.insert('changeLog', {
-      title: `Job approval removed — ${row.material}`,
-      detail: `${row.press} · ${row.date} — back to the engine`,
+      title: `${manual ? 'Job deleted' : 'Job approval removed'} — ${row.material}`,
+      detail: `${row.press} · ${row.date} — ${manual ? 'job added by hand removed from the plan' : 'back to the engine'}`,
       category: 'decision',
       author: updatedBy,
       createdAt: Date.now(),

@@ -153,3 +153,7 @@ export function manualJobSegments(
   })
   return out
 }
+
+/** Elle eklenen işin kilit nedeni; silme düğmesi ve Platform history bununla tanır. */
+export const MANUAL_JOB_REASON = 'Added by hand on the Gantt (stock)'
+export const isManualJob = (reason: string | undefined) => reason === MANUAL_JOB_REASON
