@@ -1,6 +1,6 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-22 · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-23 · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
@@ -16,6 +16,14 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 - **Hammadde plandan bağımsız** — plan eklemek mükerrer sipariş doğurur.
 - **Tedarik süresi takvim günü, yalnızca siparişi tarihler** — tedarikçi takvimle verir; teslim haftasını kaydırmak emniyet mantığını bozardı.
 - **Plan elle hesaplanır** (2026-10-07) — otomatik / saatlik hesap Convex kotasını dolduruyordu.
+
+## OEE analizi
+
+- **OEE açık konular ayrı, kalıcı bir liste** (2026-10-23, #37) — masraf yeri × iş yeri × kayıp grubu anahtarıyla; Die / Machine Problems'a yazılmaz.
+  *Alt.: makine arızası kaydı açmak* (pres duruyor bayrağıyla planı etkileyebilirdi); *Decision Log → Open Issue* (masraf yeri / kapanış takibi yok).
+- **Kararı ücretsiz yapay zekâ verir, kurallar adayı seçer ve yedektir** (2026-10-23, kullanıcı) — OpenAI uyumlu API (`AI_API_KEY`); anahtar yoksa / cevap bozuksa kurallar.
+  Yapay zekâ yalnız kuralların seçtiği adaylar arasında karar verir, kanıt her zaman koddan sayıyla yazılır.
+- **Gün bir kez, açık konu yeniden yazılmaz** — `oeeTopicRuns` işlenen günü tutar; açık konu ertesi gün yalnızca *last seen* günceller.
 
 ## Yayın ve işletim
 

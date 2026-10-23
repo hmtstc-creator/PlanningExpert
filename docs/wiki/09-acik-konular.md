@@ -9,6 +9,7 @@
 | Organizasyonu düzelt | Administration → **Organization map**: kırmızı çerçeveli düğümler / "To fix" listesi (aynı adlı plant, holding'siz şirket, bölümsüz masraf yeri, masraf yerisiz work center) | `todolist.md` §1 |
 | Yedek ve izleme | Storage Box (`BACKUP_REMOTE`), ilk geri yükleme provası, UptimeRobot | `todolist.md` §4.1 |
 | E-posta özeti | Resend anahtarı — **sonra** (listede bekliyor) | `todolist.md` §5.3 |
+| OEE açık konular yapay zekâsı | Convex ortamına `AI_API_KEY` (ücretsiz Gemini; Groq ise `AI_API_URL` + `AI_MODEL` de). Yoksa kurallar karar verir | `docs/oee-agent-report.md` → *OEE open topics* |
 
 Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mesajları görüldü; tedarik süreleri varsayılan (14 gün) kalır; OEE sayfaları her gün açılıyor (histogram kurulmuş).
 
@@ -16,6 +17,7 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 - **Yarım iş yok.** `main` ruleset ile korunuyor (bkz. [05](05-yayin-ve-isletim.md)); açık PR / dal yok.
 - **Gantt müdahaleleri tamam:** sürükle-bırak (#34), elle iş (#35), silme (#36) — `todolist.md` §1 *Gantt: elle iş*. Kullanıcı geri bildirimi bekleniyor (doğru süre / yer, sonraki lotlar küçülüyor mu). Açık: elle iş dondurulmuş (tam plan onaylı) işi itemez.
+- **OEE açık konular ajanı (#37) tamam:** ilk gerçek yüklemeden sonra `/oee/topics` kullanıcıda denenir (adaylar doğru mu, eşikler çok mu sıkı / gevşek). Sonraki adım `todolist.md` OEE bölümü: eşikleri OEE Settings'e taşı, listeyi Agent Report'a bağla. Dosyalar: kurallar `src/lib/oeeTopics.ts`, ajan `convex/oeeTopics.ts` (`analyse`), sayfa `src/routes/oee/topics.tsx`.
 - **Sıradaki adım:** Organization map (`/admin/map`) kullanıcıda denenir; sonraki adımlar `todolist.md` §1 *Organization map*. Kararlar (§0) bekler; iyileştirmeler todolist'ten tek tek yapılır.
 - **Organization map:** #29 açılış çökmesini (React #185) düzeltti; kullanıcı geri bildirimi bekleniyor. Dikkat: `useQuery(...) ?? []` bir `useMemo`/`useEffect` bağımlılığına giriyorsa sabit boş dizi kullan.
 - **Organization map dosyaları:** kurallar ve yerleşim `src/lib/orgMap.ts` (`structureGraph`, `peopleGraph`, `dropAction`, `removeAction`), ekran `src/components/org/OrgMap.tsx` (`apply` = sunucu çağrıları), sayfa `src/routes/admin_.map.tsx`. Yol `admin_.map` düz dosya: `admin.tsx` Outlet çizmediği için iç içe olmamalı.
