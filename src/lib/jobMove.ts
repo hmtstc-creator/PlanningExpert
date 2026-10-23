@@ -121,3 +121,35 @@ export function planMove(input: MoveInput): { moved: MovedJob } | { error: strin
   }
   return { moved }
 }
+
+/**
+ * Elle eklenen iş (stok amaçlı, kullanıcı kararı 2026-10-23): motorun parçadan
+ * hesapladığı süreler (`computeRunPlan`) motorla aynı sırada dizilir —
+ * setup → kalite onayı → rulo başına üretim, rulolar arasında rulo değişimi
+ * (pres rulo besliyorsa). Kalıp zaten takılıysa setup yoktur. Tarih boştur;
+ * `reflowSegments` / `planMove` hedef güne döker.
+ *
+ * Örnek: 90 dk setup, 15 dk onay, iki rulo 200 + 150 dk, rulo değişimi 20 dk →
+ * setup 90 · onay 15 · üretim 200 · rulo 20 · üretim 150 (toplam 475 dk).
+ */
+export function manualJobSegments(
+  run: { setupMinutes: number; qualityApprovalMinutes: number; coilRunMinutes: number[]; coilChangeMinutes: number; runMinutes: number },
+  options: { dieMounted: boolean; feedsCoil: boolean },
+): MoveSegment[] {
+  const out: MoveSegment[] = []
+  let at = 0
+  const push = (kind: string, minutes: number) => {
+    if (!(minutes > 0)) return
+    out.push({ kind, date: '', start: at, end: at + minutes })
+    at += minutes
+  }
+  if (!options.dieMounted) push('setup', run.setupMinutes)
+  push('quality', run.qualityApprovalMinutes)
+  const coils = run.coilRunMinutes.filter((m) => m > 0)
+  if (coils.length === 0) push('run', run.runMinutes)
+  coils.forEach((minutes, i) => {
+    if (i > 0 && options.feedsCoil) push('coil', run.coilChangeMinutes)
+    push('run', minutes)
+  })
+  return out
+}

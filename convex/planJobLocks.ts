@@ -66,16 +66,16 @@ export const approve = guardedMutation({
 })
 
 /**
- * Gantt'ta taşınan iş (sürükle-bırak ya da "Move"): yeni pres + saatte
+ * Gantt'ta taşınan (sürükle-bırak ya da "Move") ya da elle eklenen (`added`) iş: pres + saatte
  * kilitlenir. İş zaten kilitliyse eski kilit aynı işlemde kalkar. Aynı preste
  * başka bir kilitli işle çakışırsa yazılmaz. Segmentleri istemci
  * `src/lib/jobMove.ts` ile hesaplar.
  */
 export const move = guardedMutation({
   areas: ['planning.plan'],
-  args: { ...jobFields, fromLockId: v.optional(v.id('planJobLocks')), from: v.optional(v.string()), createdBy: v.optional(v.string()) },
+  args: { ...jobFields, fromLockId: v.optional(v.id('planJobLocks')), from: v.optional(v.string()), added: v.optional(v.boolean()), createdBy: v.optional(v.string()) },
   returns: v.id('planJobLocks'),
-  handler: async (ctx, { fromLockId, from, createdBy, ...job }) => {
+  handler: async (ctx, { fromLockId, from, added, createdBy, ...job }) => {
     if (job.segments.length === 0) throw new ConvexError('This job has no time slots to lock')
     if (fromLockId) {
       const old = await ctx.db.get(fromLockId)
@@ -90,7 +90,7 @@ export const move = guardedMutation({
     if (clash) throw new ConvexError(`Overlaps the approved job ${clash.material} on ${clash.press} (${clash.date}) — pick another time`)
     const id = await ctx.db.insert('planJobLocks', { ...job, approvedBy: createdBy, createdAt: Date.now() })
     await ctx.db.insert('changeLog', {
-      title: `Job moved — ${job.material}`,
+      title: `${added ? 'Job added by hand' : 'Job moved'} — ${job.material}`,
       detail: `${from ? `${from} → ` : ''}${job.press} · ${job.date} · ${Math.round(job.quantity).toLocaleString('en-GB')} pcs — locked in the plan`,
       category: 'decision',
       author: createdBy,

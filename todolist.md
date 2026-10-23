@@ -79,7 +79,7 @@ Kullanıcı kararları (2026-10-23):
 4. Silme **yalnız o işi** kaldırır (elle / kilitli iş); talep varsa motor yeniden
    hesapta başka yere planlar. Malzemeyi plandan çıkarmak = mevcut `exclude`.
 
-- [ ] **[G]** 1. PR — Elle iş ekleme: pres, malzeme, adet, başlangıç; süre ve
+- [x] **[G]** (#35) Elle iş ekleme: pres, malzeme, adet, başlangıç; süre ve
   segmentler vardiya takvimi + çevrim / setup süresinden `src/lib`'de hesaplanır,
   `planJobLocks`'a `source: 'manual'` (opsiyonel alan) ile yazılır. Doğrulayıcı,
   Planning Logic, test.

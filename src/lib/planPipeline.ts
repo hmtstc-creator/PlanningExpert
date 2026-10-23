@@ -386,7 +386,7 @@ export interface PlanRun {
   dailyUntil: string | null
   /** Son stok yüklemesinden beri üretilmiş sayılan onaylı iş. */
   producedSinceStock: { quantity: number; jobs: number; stockDay: string }
-  presses: { name: string; hall: string; category?: string; frequencyStop?: string }[]
+  presses: { name: string; hall: string; category?: string; frequencyStop?: string; feedsCoil?: boolean }[]
   plannedStops: PlannedStop[]
   days: PlanDay[]
   /** Ekranda gösterilen işler: dondurulmuşlar + motorun yeni planı. */
@@ -1977,7 +1977,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     dailyUntil: daily.until,
     lateRepair,
     alarms,
-    presses: presses.map((p) => ({ name: p.name, hall: p.hall, category: p.category, frequencyStop: p.frequencyStop })),
+    // feedsCoil: elle eklenen işin rulo değişimleri için (Gantt → Add job).
+    presses: presses.map((p) => ({ name: p.name, hall: p.hall, category: p.category, frequencyStop: p.frequencyStop, feedsCoil: p.feedsCoil })),
     plannedStops: plannedStops.map((p) => ({
       shiftIndex: p.shiftIndex,
       name: p.name,
