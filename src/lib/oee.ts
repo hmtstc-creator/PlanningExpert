@@ -193,7 +193,10 @@ export interface OeeConfig {
     chart: string
     breakdown: boolean
     hidden?: boolean
-    /** Loss Bridge'de ailesi (docs/oee-bridge.md); yoksa availability (MES gibi). */
+    /**
+     * Kullanılmıyor (2026-10-23): aile olay süresinden gelir (< shortStopMin →
+     * performans). Kayıtlı ayarlar bozulmasın diye alan duruyor.
+     */
     family?: 'availability' | 'performance'
     /** Agent Report'taki rolü (src/lib/oeeAgent.ts); yoksa adından tahmin, 'none' = rolü yok. */
     agent?: 'die' | 'machine' | 'none'
@@ -217,6 +220,11 @@ export interface OeeConfig {
   bridgeBase?: 'loading' | 'shift'
   /** Agent Report eşikleri (src/lib/oeeAgent.ts → AGENT_DEFAULTS); yoksa varsayılanlar. */
   agent?: Partial<import('./oeeAgent').AgentThresholds>
+  /**
+   * Kısa duruş eşiği (tam dakika; yoksa MES_SHORT_STOP_MIN). Plansız duruş
+   * < eşik → performans kaybı, ≥ eşik → kullanılabilirlik (Ahmet, 2026-10-23).
+   */
+  shortStopMin?: number
 }
 
 export const EMPTY_CONFIG: OeeConfig = {
@@ -292,6 +300,29 @@ export function configProblems(c: OeeConfig): string[] {
 export const UNASSIGNED = 'Unassigned'
 
 export const SPEED = 'Speed'
+
+// ---- kısa duruşlar (< eşik → performans) --------------------------------------
+//
+// MES'in Net Production Time'ı yalnızca ≥ 2 dk plansız duruşları düşer; daha
+// kısa duruşlar Production − Operation'ın (hız kaybı) içindedir (fixture'da
+// Loading − Production = ≥ 2 dk duruşların toplamı, 0,1 dk hassasiyetle —
+// oeeShortStops.test.ts). Bu yüzden A ve P dosyadaki gibi kalır; kayıp
+// ekranları duruşları süreye göre iki aileye böler (src/lib/oeeShortStops.ts).
+
+/** MES'in kısa duruş sınırı (dk): bunun altındaki duruşlar Production'dan düşülmez. */
+export const MES_SHORT_STOP_MIN = 2
+
+/** Kısa duruş eşiği (dk, tam sayı): ayar (OEE Settings) ya da MES'inki. */
+export const shortStopMinOf = (c: { shortStopMin?: number }): number =>
+  c.shortStopMin && c.shortStopMin >= 1 ? Math.round(c.shortStopMin) : MES_SHORT_STOP_MIN
+
+/** Kısa duruşlar kayıp özetinde ayrı Reason Code 2 olarak durur: `ARZ` → `ARZ<`. */
+export const SHORT_MARK = '<'
+export const isShortCode = (rc2: string) => rc2.endsWith(SHORT_MARK)
+export const baseCode = (rc2: string) => (isShortCode(rc2) ? rc2.slice(0, -SHORT_MARK.length) : rc2)
+
+/** Losses Trend'de kısa duruşların tek sütunu (hız kaybından ayrı). */
+export const SHORT_STOPS = 'Short stops'
 
 // ---- oranlar -----------------------------------------------------------------
 
@@ -646,18 +677,18 @@ export function lossDayOf(day: DowntimeDay): LossDay {
   return { date: day.date, costCenter: day.costCenter, workCenter: day.workCenter, codes, reasons, parts }
 }
 
-/** Grafik sütunları: ayardaki sıra; tanımsız grup "Unassigned"; en sonda Speed. */
+/**
+ * Grafik sütunları: ayardaki sıra; tanımsız grup "Unassigned"; kısa duruşlar
+ * (bölünmüş özette) "Short stops"; en sonda Speed.
+ */
 export function chartGroups(c: OeeConfig, lossDays: LossDay[] = []): string[] {
   const out: string[] = []
   for (const g of c.lossGroups) if (g.chart && !out.includes(g.chart)) out.push(g.chart)
   const known = new Set(c.lossGroups.map((g) => g.code))
-  const hasUnknown = lossDays.some((d) =>
-    Object.keys(d.codes).some((k) => {
-      const [rc1, rc2] = k.split('|')
-      return c.lossReasonCodes.includes(rc1) && !known.has(rc2)
-    }),
-  )
+  const lossKeys = lossDays.flatMap((d) => Object.keys(d.codes).map((k) => k.split('|'))).filter(([rc1]) => c.lossReasonCodes.includes(rc1))
+  const hasUnknown = lossKeys.some(([, rc2]) => !isShortCode(rc2) && !known.has(rc2))
   if (hasUnknown && !out.includes(UNASSIGNED)) out.push(UNASSIGNED)
+  if (lossKeys.some(([, rc2]) => isShortCode(rc2)) && !out.includes(SHORT_STOPS)) out.push(SHORT_STOPS)
   out.push(SPEED)
   return out
 }
@@ -670,7 +701,8 @@ export function visibleChartGroups(columns: string[], c: OeeConfig): string[] {
   })
 }
 
-export const groupLabel = (code: string, c: OeeConfig) => c.lossGroups.find((g) => g.code === code)?.label || code
+export const groupLabel = (code: string, c: OeeConfig): string =>
+  isShortCode(code) ? `${groupLabel(baseCode(code), c)} < ${shortStopMinOf(c)} min` : c.lossGroups.find((g) => g.code === code)?.label || code
 
 export interface LossBreakdown {
   loadingMin: number
@@ -693,16 +725,18 @@ export function lossBreakdown(times: OeeTimes, lossDays: LossDay[], c: OeeConfig
       if (!c.lossReasonCodes.includes(rc1)) continue
       groups[rc2] = (groups[rc2] ?? 0) + m
       counts[rc2] = (counts[rc2] ?? 0) + n
-      const col = c.lossGroups.find((g) => g.code === rc2)?.chart || UNASSIGNED
+      const col = lossColumnOf(rc2, c)
       chart[col] = (chart[col] ?? 0) + m
     }
   }
-  chart[SPEED] = Math.max(0, times.productionMin - times.operatingMin)
+  // Kısa duruşlar MES'te Production − Operation'ın içindedir: hız kaybı kalan kısımdır.
+  chart[SPEED] = Math.max(0, times.productionMin - times.operatingMin - (chart[SHORT_STOPS] ?? 0))
   return { loadingMin: times.loadingMin, groups, counts, chart, oee: oeeOf(times) }
 }
 
-/** Kayıp grubunun (Reason Code 2) grafik sütunu; ayarda yoksa "Unassigned". */
-export const lossColumnOf = (rc2: string, c: OeeConfig) => c.lossGroups.find((g) => g.code === rc2)?.chart || UNASSIGNED
+/** Kayıp grubunun (Reason Code 2) grafik sütunu; ayarda yoksa "Unassigned"; kısa duruş "Short stops". */
+export const lossColumnOf = (rc2: string, c: OeeConfig) =>
+  isShortCode(rc2) ? SHORT_STOPS : c.lossGroups.find((g) => g.code === rc2)?.chart || UNASSIGNED
 
 /**
  * Bir kayıp sütununun alt kayıpları: kayıp sayılan duruşların metni (ör. STP →

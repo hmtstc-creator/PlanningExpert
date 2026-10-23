@@ -16,9 +16,12 @@
 // - Plansız duruş grupları kayıtlı süreleriyle gösterilir; Loading −
 //   Production ile kayıtların farkı ayrı küçük adımdır ("Not explained" ya
 //   da "Over-recorded downtime") — gruplara dağıtılmaz, köprü kapanır.
-// - Kayıp grubunun ailesi (availability / performance) ayardan; varsayılan
-//   MES gibi availability. Ailesi değişen grup OEE'yi değiştirmez, yalnızca
-//   A ve P payını.
+// - Aile süreden gelir (Ahmet, 2026-10-23): plansız duruş < eşik (OEE
+//   Settings, varsayılan 2 dk = MES) performans, ≥ eşik availability. MES
+//   Production'dan yalnızca ≥ 2 dk duruşları düşer; kısa duruşlar Production −
+//   Operation'ın içindedir. Köprü bölünmüş özeti alır (oeeShortStops.ts):
+//   aynı kodun kısaları performans kalemidir, hız kaybı = Production −
+//   Operation − kısa duruşlar. A ve P MES'teki gibi kalır.
 // - Hız kaybı işaretlidir: üretim standardın üstündeyse (P > %100) negatif
 //   adım ("Speed above standard") — 0'a kırpılmaz.
 // - Oranların ortalaması alınmaz: süreler ve adetler toplanır, sonra bölünür.
@@ -26,8 +29,13 @@
 //   kazancı ve planlı duruşlar öncelik olamaz.
 
 import {
+  MES_SHORT_STOP_MIN,
+  SHORT_MARK,
   UNASSIGNED,
   addDaysIso,
+  baseCode,
+  isShortCode,
+  shortStopMinOf,
   daysFromShifts,
   lossDayOf,
   mondayOfWeek,
@@ -104,11 +112,15 @@ export interface Bridge {
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
-/** Kayıp grubunun köprüdeki ailesi (ayar; varsayılan availability = MES). */
-export const familyOf = (code: string, c: OeeConfig): LossFamily => c.lossGroups.find((g) => g.code === code)?.family ?? 'availability'
+/** Kayıp grubunun köprüdeki ailesi: kısa duruş kodu (`ARZ<`) performans, diğerleri availability. */
+export const familyOf = (code: string): LossFamily => (isShortCode(code) ? 'performance' : 'availability')
 
-const chartOf = (code: string, c: OeeConfig) => c.lossGroups.find((g) => g.code === code)?.chart || UNASSIGNED
-const hiddenGroup = (code: string, c: OeeConfig) => !!c.lossGroups.find((g) => g.code === code)?.hidden
+/** Köprü kalemi: grafik sütunu; kısa duruşlar "<sütun> < 2 min" (aynı kod iki aileye bölünür). */
+const chartOf = (code: string, c: OeeConfig) => {
+  const col = c.lossGroups.find((g) => g.code === baseCode(code))?.chart || UNASSIGNED
+  return isShortCode(code) ? `${col} < ${shortStopMinOf(c)} min` : col
+}
+const hiddenGroup = (code: string, c: OeeConfig) => !!c.lossGroups.find((g) => g.code === baseCode(code))?.hidden
 
 /**
  * Tanımsız duruş: Reason Code 1 ya da 2 "#" (planlamacı, 2026-10-07: köprünün
@@ -116,7 +128,7 @@ const hiddenGroup = (code: string, c: OeeConfig) => !!c.lossGroups.find((g) => g
  * girmez; Loading − Production'ın parçası olduğundan "Not explained" farkında
  * kalır (köprü yine kapanır, OEE değişmez).
  */
-export const isUndefinedCode = (rc1: string, rc2: string) => rc1 === '#' || rc2 === '#'
+export const isUndefinedCode = (rc1: string, rc2: string) => rc1 === '#' || baseCode(rc2) === '#'
 
 const withoutUndefined = (l: LossDay): LossDay => {
   const keep = (rec: Record<string, [number, number]>) =>
@@ -276,13 +288,13 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
   const availCols = columns(
     losses,
     c,
-    (code) => familyOf(code, c) === 'availability',
+    (code) => familyOf(code) === 'availability',
     (code) => chartOf(code, c),
   )
   const perfCols = columns(
     losses,
     c,
-    (code) => familyOf(code, c) === 'performance',
+    (code) => familyOf(code) === 'performance',
     (code) => chartOf(code, c),
   )
   // Köprüde büyükten küçüğe (Pareto gibi okunur).
@@ -291,9 +303,10 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
   const recAvail = sum(availCols.map((x) => x.minutes))
   const recPerf = sum(perfCols.map((x) => x.minutes))
   // Kayıtların Loading − Production ile farkı (az kayıt: açıklanmayan; fazla kayıt: eksi).
-  const notExplained = L - P - recAvail - recPerf
-  const C = P + recPerf
-  const speed = P - Op
+  // Kısa duruşlar Production'dan düşülmemiştir (MES): farka girmez, Production − Operation'dan çıkar.
+  const notExplained = L - P - recAvail
+  const C = P
+  const speed = P - Op - recPerf
   const qualityMin = Op - E
   const scrapMin = pieces > 0 ? (qualityMin * scrap) / Math.max(1, scrap + reject) : 0
   const rejectMin = qualityMin - scrapMin
@@ -349,7 +362,7 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
     kind: 'loss',
     family: 'performance',
     minutes: speed,
-    note: `Production − Operation time: ${pct(speed, C)} of the production time = ${pct(speed, L)} of the loading time`,
+    note: `Production − Operation time${recPerf ? ' − short stops' : ''}: ${pct(speed, C)} of the production time = ${pct(speed, L)} of the loading time`,
   })
   steps.push({
     key: 'D',
@@ -450,6 +463,10 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
       `${Math.round((notExplained / (L - P)) * 100)}% of the availability loss has no downtime reason (${Math.round(notExplained)} min) — record the reasons, or the priorities below are incomplete.`,
     )
   }
+  if (shortStopMinOf(c) !== MES_SHORT_STOP_MIN)
+    warnings.push(
+      `Short-stop limit is ${shortStopMinOf(c)} min (OEE Settings) but the MES deducts stops of ${MES_SHORT_STOP_MIN} min and longer from the production time — Availability and Performance stay as in the MES; the difference shows in “${NOT_EXPLAINED}” / speed loss.`,
+    )
   if (speed < 0)
     warnings.push(
       `Operation time is ${Math.round(-speed)} min above production time (performance over 100%) — shown as a gain, as recorded.`,
@@ -547,6 +564,8 @@ function qualityMinutes(days: DayRow[], scrap: boolean): { minutes: number; coun
 }
 
 export const NOT_IN_ORDERS = 'Not in order data'
+/** Hız kaybının parça kırılımında: kısa duruşlar ayrı kalem olduğu için düşülür. */
+export const SHORT_STOPS_ROW = 'Short stops (own items)'
 
 /**
  * Level 3 kırılımı. `cur` ve `prev`: bu ve önceki dönemin (kapsama süzülmüş,
@@ -574,6 +593,14 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
 
   if (item.key === 'pf:speed') {
     for (const [set, isPrev] of sets) {
+      // Kısa duruşlar kendi kalemleridir: makine başına düşülür (köprüyle aynı kural).
+      const short = new Map<string, number>()
+      for (const l of set.lossDays)
+        for (const [k, [m]] of Object.entries(l.codes)) {
+          const [rc1, rc2] = k.split('|')
+          if (c.lossReasonCodes.includes(rc1) && isShortCode(rc2)) short.set(l.workCenter, (short.get(l.workCenter) ?? 0) + m)
+        }
+      const shortTotal = sum([...short.values()])
       if (by === 'part') {
         let covered = 0
         for (const o of set.orders) {
@@ -583,7 +610,11 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
         }
         const total = sum(set.days.map((d) => d.productionMin - d.operatingMin))
         if (Math.abs(total - covered) >= 0.05) addRow(map, '__noorders', NOT_IN_ORDERS, total - covered, 0, isPrev)
-      } else for (const d of set.days) addRow(map, d.workCenter, d.workCenter, d.productionMin - d.operatingMin, 0, isPrev)
+        if (shortTotal >= 0.05) addRow(map, '__short', SHORT_STOPS_ROW, -shortTotal, 0, isPrev)
+      } else {
+        for (const d of set.days) addRow(map, d.workCenter, d.workCenter, d.productionMin - d.operatingMin, 0, isPrev)
+        for (const [wc, m] of short) addRow(map, wc, wc, -m, 0, isPrev)
+      }
     }
     return finish(map, false)
   }
@@ -629,7 +660,9 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
           continue
         }
         for (const [k, [m]] of Object.entries(l.codes)) {
-          if (c.lossReasonCodes.includes(k.split('|')[0])) gap.set(l.workCenter, (gap.get(l.workCenter) ?? 0) - m)
+          const [rc1, rc2] = k.split('|')
+          // Kısa duruşlar Loading − Production'da değildir (MES): farktan düşülmez.
+          if (c.lossReasonCodes.includes(rc1) && !isShortCode(rc2)) gap.set(l.workCenter, (gap.get(l.workCenter) ?? 0) - m)
         }
       }
       for (const [wc, m] of gap) addRow(map, wc, wc, m, 0, isPrev)
@@ -665,9 +698,13 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
           }
         continue
       }
+      // Ham duruşlar bölünmemiştir: özet bölünmüşse < eşik olay kısa kodu (`ARZ<`) alır.
+      const splitSet = set.lossDays.some((l) => Object.keys(l.codes).some((k) => isShortCode(k.split('|')[1] ?? '')))
+      const t = shortStopMinOf(c)
       for (const d of set.events ?? [])
         for (const e of d.events) {
-          if (!c.lossReasonCodes.includes(e.rc1) || !groups.has(e.rc2)) continue
+          const code = splitSet && e.minutes < t ? e.rc2 + SHORT_MARK : e.rc2
+          if (!c.lossReasonCodes.includes(e.rc1) || !groups.has(code)) continue
           addRow(map, `${d.workCenter}|${e.material}`, partLabel(e.material), e.minutes, 1, isPrev, d.workCenter)
         }
     }

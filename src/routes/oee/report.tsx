@@ -13,7 +13,8 @@ import { relatedPages } from '../../lib/navigation'
 import { areaNames, costCentersOf, groupLabel, inScope, scopeLabel, type DayRow, type DowntimeDay, type OeeConfig, type OrderRow, type ShiftRow } from '../../lib/oee'
 import { MAX_EVENT_DAYS, NOT_IN_ORDERS, NO_PART, hasParts, matchedLossDays, parsePeriodLink, shiftSlice } from '../../lib/oeeBridge'
 import { dailyReport, type ReportLoss, type ReportRow } from '../../lib/oeeDailyReport'
-import { partOrders, partStops, type DetailRow } from '../../lib/oeeReliability'
+import { fromStoredStops, partOrders, partStops, stopDayOf, type DetailRow, type StoredStopDay } from '../../lib/oeeReliability'
+import { shortStopNote, splitShortStops } from '../../lib/oeeShortStops'
 import { fromStoredDay, fromStoredLosses, type StoredDowntimeDay, type StoredLossDay } from '../../lib/oeeStore'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { pdfFileName } from '../../lib/pdfFile'
@@ -49,6 +50,9 @@ function ReportPage() {
   const lossRaw = (useQuery(api.oee.lossDays, q) ?? []) as StoredLossDay[]
   const orders = (useQuery(api.oee.orders, q) ?? []) as OrderRow[]
   const lossDays = useMemo(() => fromStoredLosses(lossRaw), [lossRaw])
+  // Süre histogramı: kısa duruşlar (< eşik) performans (src/lib/oeeShortStops.ts).
+  const stopRaw = (useQuery(api.oee.stopDays, q) ?? []) as StoredStopDay[]
+  const stopDays = useMemo(() => fromStoredStops(stopRaw), [stopRaw])
 
   // Vardiya filtresi ham duruşlarla (en çok 8 gün); malzemeler kayıp özetinden,
   // eski özetlerde ham duruşlardan.
@@ -68,22 +72,28 @@ function ReportPage() {
   const shiftOptions = useShiftOptions(config)
   const wcCostCenter = useMemo(() => costCentersOf(dayRows), [dayRows])
 
-  const { report, detailSet } = useMemo(() => {
+  const { report, detailSet, splitNote } = useMemo(() => {
     const inSel = (r: { workCenter: string; costCenter: string }) => inScope(r, scope, config) && (!machine || r.workCenter === machine)
     const ords = orders.filter((o) => inSel({ workCenter: o.workCenter, costCenter: wcCostCenter.get(o.workCenter) ?? '' }))
     const slice = shiftOn ? shiftSlice(shift, config, { shifts: shiftRows, events, orders: ords }) : null
     const days = (slice ? slice.days : dayRows).filter(inSel)
     // Köprüdeki taban: yalnızca vardiyası olan gün × makinenin duruşları.
-    const losses = matchedLossDays(days, (slice ? slice.lossDays : lossDays).filter(inSel))
+    const split = splitShortStops(
+      (slice ? slice.lossDays : lossDays).filter(inSel),
+      slice ? fromStoredStops(slice.events.map(stopDayOf)) : stopDays,
+      config,
+    )
+    const losses = matchedLossDays(days, split.lossDays)
     const keys = new Set(losses.map((l) => `${l.date}|${l.workCenter}`))
     const evs = (slice ? slice.events : events).filter((d) => keys.has(`${d.date}|${d.workCenter}`))
     const set = { days, lossDays: losses, orders: slice ? slice.orders : ords, events: evs }
-    return { report: dailyReport(set, config, TOP_LOSSES), detailSet: set }
-  }, [dayRows, lossDays, orders, events, shiftRows, shiftOn, shift, scope, machine, config, wcCostCenter])
+    return { report: dailyReport(set, config, TOP_LOSSES), detailSet: set, splitNote: shortStopNote(split, config) }
+  }, [dayRows, lossDays, stopDays, orders, events, shiftRows, shiftOn, shift, scope, machine, config, wcCostCenter])
 
   const label = `${scopeLabel(scope, config)}${machine ? ` · ${machine}` : ''}${shiftOn ? ` · ${shiftOptions.find((o) => o.number === shift)?.label ?? `Shift ${shift}`}` : ''}`
   const partsMissing = !storedParts && !eventsOk
   const notes = [
+    ...(splitNote ? [splitNote] : []),
     ...(cur?.clipped ? [`The data ends on ${dm(cur.to)} — the period is shown up to that day.`] : []),
     ...(lastDay && wanted.from > lastDay ? [`No OEE data uploaded for ${rangeText(wanted)} yet (data ends on ${dm(lastDay)}).`] : []),
     ...(shift > 0 && !eventsOk ? [`The shift filter works for periods of up to ${MAX_EVENT_DAYS} days — all shifts are shown.`] : []),
