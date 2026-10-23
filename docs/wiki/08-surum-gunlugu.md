@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #40 | 2026-10-23 | **OEE açık konular: yalnız kapanmış gün** — bugünkü yarım yükleme incelenmez; gün kapanmadan başlamış çalışma (23.10) tam veriyle yeniden yapılır (`shouldRun`) | Karabasan oturumu bildirdi: yarım gün "done" sayılıp tam veri atlanıyordu → `docs/oee-agent-report.md` |
 | #37 | 2026-10-23 | **OEE açık konular ajanı** (`/oee/topics`): OEE yüklemesi bitince son gün bir kez incelenir; masraf yeri × iş yeri × kayıp grubu adayları 6 haftalık geçmişle tartılır, kronik ve kritik olanlar kalıcı listeye eklenir. Karar ücretsiz yapay zekâ (OpenAI uyumlu, `AI_API_KEY`) ya da kurallar; açık konu yeniden yazılmaz, işlenen gün tekrar yapılmaz. Yeni tablolar `oeeTopics`, `oeeTopicRuns` | Kullanıcı isteği; plan mantığı değişmedi → `docs/oee-agent-report.md` |
 | #36 | 2026-10-23 | **Gantt'ta silme:** elle eklenen iş → *Delete job* (kilit kalkar); onaylı / taşınmış iş → *Remove approval* (motora döner); motor işi → *Delete this lot* (lot 0 adet, talep sonraki lotlara). Onay sorulur; Platform history "Job deleted" | Kullanıcı kararı 4 (2026-10-23): yalnız o iş çıkar, talep varsa motor başka yere planlar |
 | #35 | 2026-10-23 | **Gantt'ta elle iş ekleme** (Plan → *+ Add job*): parça, adet, pres, gün, saat, "kalıp takılı"; süre motorun hesabıyla. O saatte kilitlenir, adedi talepten düşer, presin diğer işleri arkasına kayar | Kullanıcı örneği: PRS104'ün önüne stok amaçlı iş → [02](02-planlama-motoru.md) |

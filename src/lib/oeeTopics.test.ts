@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { EMPTY_CONFIG, addDaysIso, type DayRow, type LossDay, type OeeConfig } from './oee'
-import { compactDays, decideTopics, parseAiAnswer, topicCandidates, topicKey, type GroupDay } from './oeeTopics'
+import { compactDays, decideTopics, parseAiAnswer, shouldRun, topicCandidates, topicKey, type GroupDay } from './oeeTopics'
 
 const config: OeeConfig = {
   ...EMPTY_CONFIG,
@@ -89,5 +89,25 @@ describe('OEE open topics: AI answer', () => {
     expect(d.source).toBe('rules')
     expect(d.title).toBe('PRS-1 · Die: chronic loss in 4 of the last 6 weeks')
     expect(d.evidence).toContain('Today 2.3 h (16% of loading)')
+  })
+})
+
+describe('OEE open topics: which day runs', () => {
+  const NOW = Date.parse('2026-10-24T08:00:00Z')
+  it('today is never analysed (half a day of data)', () => {
+    expect(shouldRun('2026-10-24', '2026-10-24', null, NOW)).toBe(false)
+    expect(shouldRun('2026-10-23', '2026-10-24', null, NOW)).toBe(true)
+  })
+  it('a run started while the day was still open is redone once the day is closed', () => {
+    const early = { status: 'done', startedAt: Date.parse('2026-10-23T20:00:00Z'), startedDate: '2026-10-23' }
+    expect(shouldRun('2026-10-23', '2026-10-24', early, NOW)).toBe(true)
+    const closed = { status: 'done', startedAt: Date.parse('2026-10-24T06:00:00Z'), startedDate: '2026-10-24' }
+    expect(shouldRun('2026-10-23', '2026-10-24', closed, NOW)).toBe(false)
+  })
+  it('failed or stuck runs are retried, a fresh running one is not', () => {
+    const base = { startedDate: '2026-10-24' }
+    expect(shouldRun('2026-10-23', '2026-10-24', { ...base, status: 'failed', startedAt: NOW - 1000 }, NOW)).toBe(true)
+    expect(shouldRun('2026-10-23', '2026-10-24', { ...base, status: 'running', startedAt: NOW - 1000 }, NOW)).toBe(false)
+    expect(shouldRun('2026-10-23', '2026-10-24', { ...base, status: 'running', startedAt: NOW - 20 * 60_000 }, NOW)).toBe(true)
   })
 })
