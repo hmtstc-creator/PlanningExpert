@@ -1,6 +1,6 @@
 # 05 · Yayın ve işletim
 
-> Son güncelleme: 2026-10-22 · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
+> Son güncelleme: 2026-10-23 · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
 
 ## Çalışma şekli (özet)
 
@@ -15,6 +15,7 @@ dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
 - **`main`'e doğrudan push yok.** Her değişiklik PR'dır; birleştirmeden önce CI `verify` (tip + test + build + `npm audit` kritik) yeşil olmalıdır.
 - **Planning Logic denetimi:** PR'da mantık dosyası değişip `src/routes/planlogic.tsx` değişmediyse CI kırmızı olur (`scripts/check-logic-docs.sh`;
   gerçekten mantık değişmediyse `[logic-docs: n/a] <neden>`).
+- **CI başlamadıysa çakışmaya bak** (2026-10-23, #46): main'le çakışan PR'da (`mergeable_state: dirty`) `verify` hiç çalışmaz; main dala birleştirilir (aynı gün birden çok oturum main'e yazıyor, en sık `08-surum-gunlugu.md` tablosunun ilk satırı çakışır — iki satır da kalır).
 - **Birleşen PR'ın dalı otomatik silinir** (`.github/workflows/delete-merged-branches.yml`; `workflow_dispatch` ile eskiler tek seferde temizlenir).
 - **Yayın otomatiktir** (2026-10-22): `planningexpert-autodeploy.timer` → `scripts/deploy.sh`. Elle çalıştırmak gerekmez.
 
