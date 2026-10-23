@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { plantClock } from '../lib/dates'
 import { WeekGantt, type WeekGanttJob, type WeekGanttPress } from '../components/WeekGantt'
-import { productionDayOf } from '../lib/shiftTimeline'
+import { buildDayTimeline, netToClock, productionDayOf } from '../lib/shiftTimeline'
+import { planMove, type MoveTarget } from '../lib/jobMove'
+import type { PlanJob } from '../lib/planPipeline'
 import { useCurrentUser } from '../lib/currentUser'
 import { type PlanDataSources } from '../lib/sapUploads'
 import { InfoTip, PageHeader } from '../components/PageHeader'
@@ -12,6 +14,7 @@ import { relatedPages } from '../lib/navigation'
 import { PlanDataLine } from '../components/plan/PlanPanels'
 import { PressStartPanel } from '../components/plan/PressStartPanel'
 import { JobDialog, type JobDraft } from '../components/plan/JobDialog'
+import { MoveDialog, type MoveDraft } from '../components/plan/MoveDialog'
 import { dayMonth, minutesAgo, usePlanState } from '../components/plan/usePlanState'
 /** Planın böldüğü lotun parça son eki: "W38 (1/2)". */
 const SPLIT_SUFFIX = / \(\d+\/\d+\)$/
@@ -57,6 +60,8 @@ function PlanlamaPage() {
   )
   // Grafikte işe tıklanınca açılan pencere: adet, tek iş onayı, hariç tut.
   const [jobDraft, setJobDraft] = useState<JobDraft | null>(null)
+  // Sürükle-bırak ya da "Move…": işi başka pres / saate taşıyıp kilitlemek.
+  const [moveDraft, setMoveDraft] = useState<MoveDraft | null>(null)
   const quantityRules = useMemo(
     () =>
       new Map(
@@ -129,6 +134,49 @@ function PlanlamaPage() {
       })),
     [run],
   )
+
+  /** Grafikteki çubuğun plandaki işi ve (kilitliyse) kilidi. */
+  const jobOf = (clicked: Pick<WeekGanttJob, 'material' | 'press' | 'date' | 'setupStartMinute'>) => {
+    const job = allJobs.find(
+      (j) =>
+        j.material === clicked.material &&
+        j.press === clicked.press &&
+        j.date === clicked.date &&
+        j.setupStartMinute === clicked.setupStartMinute,
+    )
+    if (!job) return null
+    const lock = job.locked ? lockByKey.get(`${job.material}|${job.press}|${job.date}|${Math.round(job.setupStartMinute)}`) : undefined
+    if (job.locked && !lock) return null
+    return { job, lock }
+  }
+  const dayShapeOf = (press: string, date: string) => ({
+    shifts: shiftsByPressDate.get(`${press}|${date}`) ?? 0,
+    overtime: overtimeByPressDate.get(`${press}|${date}`),
+  })
+  const checkMove = (job: PlanJob, target: MoveTarget) =>
+    planMove({
+      segments: job.segments,
+      target,
+      days: allDates.map((d) => ({ date: d, capacityMinutes: capacityByPressDate.get(`${target.press}|${d}`) ?? 0 })),
+      dayShape: dayShapeOf(target.press, target.date),
+      shiftStartMinute,
+      shiftMinutes,
+      stops: plannedStops,
+      now: { date: todayIso, clockMinute: nowClockMinute },
+      // Yerinde kalanlar: kilitli / dondurulmuş işler ve bakım. Diğerleri yeniden hesapta kayar.
+      fixedOnTarget: [
+        ...allJobs.filter((j) => j !== job && j.press === target.press && (j.frozen || j.locked)).map((j) => j.segments),
+        ...ganttMaintenance.filter((m) => m.press === target.press).map((m) => m.segments),
+      ],
+    })
+  /** "Move…" penceresinin ilk değeri: işin şimdiki başlangıcı (geçmişteyse şu an). */
+  const currentStart = (job: PlanJob): MoveTarget => {
+    const clock = netToClock(job.setupStartMinute, buildDayTimeline(shiftStartMinute, shiftMinutes, dayShapeOf(job.press, job.date), plannedStops))
+    const past = job.date < todayIso || (job.date === todayIso && clock < nowClockMinute)
+    return past
+      ? { press: job.press, date: todayIso, clockMinute: Math.ceil(nowClockMinute / 5) * 5 }
+      : { press: job.press, date: job.date, clockMinute: Math.round(clock / 5) * 5 }
+  }
 
   async function handleApprove() {
     if (!run) return
@@ -398,18 +446,15 @@ function PlanlamaPage() {
                 ),
                 ...ganttMaintenance,
               ]}
+              onJobMove={(clicked, target) => {
+                const found = jobOf(clicked)
+                if (!found || (found.job.frozen && !found.job.locked)) return
+                setMoveDraft({ job: found.job, lockId: found.lock?._id, target })
+              }}
               onJobClick={(clicked) => {
-                const job = allJobs.find(
-                  (j) =>
-                    j.material === clicked.material &&
-                    j.press === clicked.press &&
-                    j.date === clicked.date &&
-                    j.setupStartMinute === clicked.setupStartMinute,
-                )
-                if (!job) return
-                const key = `${job.material}|${job.press}|${job.date}|${Math.round(job.setupStartMinute)}`
-                const lock = job.locked ? lockByKey.get(key) : undefined
-                if (job.locked && !lock) return
+                const found = jobOf(clicked)
+                if (!found) return
+                const { job, lock } = found
                 // Lot: aynı malzeme + kova; kalıp ömrüyle ya da plan bölmesiyle
                 // ("W38 (1/2)") bölünmüşse birden çok iş. Adet değişikliği lotun
                 // tamamına uygulanır; motor bölmeyi yeniden dener.
@@ -428,7 +473,28 @@ function PlanlamaPage() {
                 })
               }}
             />
-            {jobDraft && <JobDialog draft={jobDraft} onClose={() => setJobDraft(null)} />}
+            {jobDraft && (
+              <JobDialog
+                draft={jobDraft}
+                onClose={() => setJobDraft(null)}
+                onMove={() => {
+                  const job = jobDraft.job
+                  setJobDraft(null)
+                  setMoveDraft({ job, lockId: jobDraft.lock?.id, target: currentStart(job) })
+                }}
+              />
+            )}
+            {moveDraft && (
+              <MoveDialog
+                draft={moveDraft}
+                presses={presses.map((p) => ({ name: p.name, hall: p.hall }))}
+                dates={allDates}
+                shiftStartMinute={shiftStartMinute}
+                check={(target) => checkMove(moveDraft.job, target)}
+                currentUser={currentUser ?? undefined}
+                onClose={() => setMoveDraft(null)}
+              />
+            )}
           </div>
         </div>
       )}

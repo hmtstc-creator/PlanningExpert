@@ -32,7 +32,7 @@ const dayLabel = (iso: string) =>
  * değiştirmek, işi tek başına onaylamak (kilit) ya da parçayı plandan hariç
  * tutmak. Her değişiklikten sonra plan yeniden hesaplanır.
  */
-export function JobDialog({ draft, onClose }: { draft: JobDraft; onClose: () => void }) {
+export function JobDialog({ draft, onClose, onMove }: { draft: JobDraft; onClose: () => void; onMove?: () => void }) {
   const { job } = draft
   const [value, setValue] = useState(String(draft.override?.qty ?? Math.round(draft.lotQuantity)))
   const [excluding, setExcluding] = useState(false)
@@ -113,6 +113,11 @@ export function JobDialog({ draft, onClose }: { draft: JobDraft; onClose: () => 
               <button type="button" onClick={onClose} className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted">
                 Close
               </button>
+              {onMove && (
+                <button type="button" disabled={pending} onClick={onMove} className="rounded-md border border-sky-600 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-950">
+                  Move…
+                </button>
+              )}
               <button
                 type="button"
                 disabled={pending}
@@ -125,6 +130,21 @@ export function JobDialog({ draft, onClose }: { draft: JobDraft; onClose: () => 
           </>
         ) : (
           <>
+            {/* Taşı: başka pres / gün / saat, orada kilitlenir. */}
+            {onMove && !job.frozen && (
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">Move it to another work center, day or time — it is locked there. You can also drag the bar.</p>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={onMove}
+                  className="shrink-0 rounded-md border border-sky-600 px-3 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-950"
+                >
+                  Move…
+                </button>
+              </div>
+            )}
+
             {/* Onay: iş olduğu gibi kilitlenir. */}
             <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-border p-3">
               <p className="text-xs text-muted-foreground">

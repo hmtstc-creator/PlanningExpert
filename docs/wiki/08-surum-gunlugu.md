@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #34 | 2026-10-23 | **Gantt'ta sürükle-bırak:** iş başka pres / gün / saate sürüklenir (telefonda basılı tut + sürükle) ya da iş penceresi → *Move…*; bırakılan yerde kilitlenir, motor adedini talepten düşer ve diğer işleri etrafına dizer. Geçmişe, ufuk dışına ve kilitli / dondurulmuş işe ya da bakıma bindirilemez | Kullanıcı kararı 2026-10-23 (todolist §1 *Gantt: elle iş*, sıralama: önce sürükle-bırak) → [02](02-planlama-motoru.md) |
 | #32 | 2026-10-23 | **Demand** sayfasına malzeme filtresi (kod içinde arama, büyük/küçük harf fark etmez; filtre yazılınca 200'ün ötesindeki satırlar da yüklenir) | Kullanıcı isteği; yalnız arayüz, plan mantığı değişmedi |
 | #30 | 2026-10-22 | Organization map → Users & groups: çizgiler soldan sağa **Plant → Group → User** (kullanıcı grubun altında); bütün plant'leri gören grup doğrudan şirkete bağlı | Kenarlar ters yönde (kullanıcı → grup → plant) çizildiği için geri kıvrılıyor, yapı yanlış görünüyordu. Veri / yetki değişmedi → `docs/board.md` |
 | #29 | 2026-10-22 | Organization map açılınca "Something went wrong" (React #185) düzeltildi: boş sorgu sonuçları için sabit dizi; `OrgMap.test.tsx` | `useQuery(...) ?? []` her çizimde yeni dizi üretiyordu → graph → `setNodes` → sonsuz döngü (Structure görünümünde users/groups hep `skip`) |
