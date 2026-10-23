@@ -4,6 +4,7 @@ import { internal } from './_generated/api'
 import { internalAction } from './_generated/server'
 import { OEE, guardedMutation, guardedQuery, plantInternalMutation, plantInternalQuery } from './guarded'
 import { definedOnly } from './oee'
+import { localNow } from '../src/lib/digest'
 import { EMPTY_CONFIG, type DayRow, type OeeConfig } from '../src/lib/oee'
 import { fromStoredLosses, type StoredLossDay } from '../src/lib/oeeStore'
 import {
@@ -13,6 +14,7 @@ import {
   compactDays,
   decideTopics,
   parseAiAnswer,
+  shouldRun,
   topicCandidates,
   weekWindow,
   type GroupDay,
@@ -22,8 +24,9 @@ import {
 /**
  * OEE açık konular ajanı (docs/oee-agent-report.md → OEE open topics).
  *
- * OEE yüklemesi bitince (oee.finishImport) son yüklü gün BİR KEZ incelenir:
- * oeeTopicRuns'ta o gün varsa (başarısız değilse) yeniden yapılmaz. Açık konu
+ * OEE yüklemesi bitince (oee.finishImport) son KAPANMIŞ gün (bugünden önceki
+ * son yüklü gün, fabrika saati) BİR KEZ incelenir; kural: shouldRun
+ * (src/lib/oeeTopics.ts). Gün kapanmadan başlamış çalışma sayılmaz. Açık konu
  * yeniden yazılmaz; yalnızca lastDay / seenDays güncellenir.
  *
  * Yapay zekâ: OpenAI uyumlu herhangi bir sohbet API'si (ücretsiz katman, ör.
@@ -44,8 +47,6 @@ type Ctx = any
 const AI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
 const AI_MODEL = 'gemini-flash-latest'
 const AI_TIMEOUT_MS = 45_000
-/** 'running' bu kadar eskiyse yarıda kalmış sayılır (yeniden denenir). */
-const STALE_RUN_MS = 15 * 60_000
 
 const strip = ({ _id, _creationTime, ...rest }: Ctx) => rest
 
@@ -123,12 +124,17 @@ export const runNow = guardedMutation({
 export const claimDay = plantInternalMutation({
   args: {},
   handler: async (ctx: Ctx) => {
-    const last = await ctx.db.query('oeeDays').withIndex('by_date').order('desc').first()
+    // Yalnızca kapanmış gün: bugünden (fabrika saati) önceki son yüklü gün.
+    const now = Date.now()
+    const plant = await ctx.db.get(ctx.plantId)
+    const tz = plant?.timeZone ?? 'UTC'
+    const today = localNow(now, tz).date
+    const last = await ctx.db.query('oeeDays').withIndex('by_date', (q: Ctx) => q.lt('date', today)).order('desc').first()
     if (!last) return null
     const day: string = last.date
     const run = await ctx.db.query('oeeTopicRuns').withIndex('by_day', (q: Ctx) => q.eq('day', day)).first()
-    const now = Date.now()
-    if (run && !(run.status === 'failed' || (run.status === 'running' && now - run.startedAt > STALE_RUN_MS))) return null
+    const state = run && { status: run.status, startedAt: run.startedAt, startedDate: localNow(run.startedAt, tz).date }
+    if (!shouldRun(day, today, state ?? null, now)) return null
     if (run) await ctx.db.patch(run._id, { status: 'running', startedAt: now, finishedAt: undefined, note: undefined })
     else await ctx.db.insert('oeeTopicRuns', { day, status: 'running', startedAt: now })
     const settings = await ctx.db.query('oeeSettings').withIndex('by_key', (q: Ctx) => q.eq('key', 'default')).first()

@@ -77,7 +77,8 @@ function OpenTopicsPage() {
         info={
           <>
             <p>
-              After an OEE upload the agent looks at the last uploaded day once. A loss group of a work center is a candidate when it lost at
+              After an OEE upload the agent looks once at the last closed day (the last uploaded day before today; a half day is not
+              analysed). A loss group of a work center is a candidate when it lost at
               least {TOPIC_DEFAULTS.dayMin} min that day and also lost time in earlier weeks. It looks back {TOPIC_DEFAULTS.lookbackWeeks} weeks
               (7 days each); a week counts when the loss was at least {TOPIC_DEFAULTS.weekMin} min.
             </p>

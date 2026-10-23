@@ -260,3 +260,29 @@ export function decideTopics(candidates: TopicCandidate[], ai: Map<string, AiVer
 
 /** Bir haftanın ilk günü (gün − 7k − 6) ve son günü: veri haftalık parçalarla okunur. */
 export const weekWindow = (day: string, k: number) => ({ from: addDaysIso(day, -7 * k - 6), to: addDaysIso(day, -7 * k) })
+
+// ---- hangi gün, ne zaman --------------------------------------------------------------
+
+export interface TopicRunState {
+  status: string
+  startedAt: number
+  /** Çalışmanın başladığı an fabrika saatiyle tarih (YYYY-MM-DD). */
+  startedDate: string
+}
+
+/** 'running' bu kadar eskiyse yarıda kalmış sayılır (yeniden denenir). */
+export const STALE_RUN_MS = 15 * 60_000
+
+/**
+ * Gün incelenmeli mi? Yalnızca kapanmış gün (bugünden önce, fabrika saati)
+ * incelenir: gün içindeki yarım yükleme günü "yapıldı" saydırmaz. Önceki
+ * çalışma gün kapanmadan başladıysa (yarım veriyle), başarısızsa ya da
+ * yarıda kaldıysa gün yeniden incelenir; aksi hâlde bir kez.
+ */
+export function shouldRun(day: string, today: string, run: TopicRunState | null, now: number): boolean {
+  if (day >= today) return false
+  if (!run) return true
+  if (run.status === 'failed') return true
+  if (run.status === 'running') return now - run.startedAt > STALE_RUN_MS
+  return run.startedDate <= day
+}

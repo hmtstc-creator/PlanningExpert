@@ -111,9 +111,12 @@ masraf yeri bazında. Agent Report günü her açılışta yeniden hesaplar; bu 
 **kalıcıdır** (`oeeTopics` tablosu).
 
 - **Ne zaman:** OEE yüklemesi bitince (`oee.finishImport` → `oeeTopics.analyse`) son
-  yüklü gün **bir kez** incelenir; işlenen gün `oeeTopicRuns`'a yazılır, ikinci
-  yükleme aynı günü yeniden yapmaz (yalnızca başarısız ya da 15 dk'dan uzun yarım
-  kalmış gün yeniden denenir). Sayfadaki *Analyse the last day* de aynı kurala uyar.
+  **kapanmış** gün (bugünden önceki son yüklü gün, fabrika saati) **bir kez**
+  incelenir; gün içindeki yarım yükleme incelenmez (2026-10-23: yarım gün "yapıldı"
+  sayılıp tam veri gelince atlanıyordu). İşlenen gün `oeeTopicRuns`'a yazılır; ikinci
+  yükleme aynı günü yeniden yapmaz. Yeniden denenen: başarısız, 15 dk'dan uzun yarım
+  kalmış ya da gün kapanmadan başlamış çalışma (`shouldRun`). Sayfadaki *Analyse the
+  last day* de aynı kurala uyar.
 - **Aday** (kurallar, `src/lib/oeeTopics.ts`): iş yeri × kayıp grubu (Reason Code 1
   kayıp, Reason Code 2 ≠ "#") o gün ≥ 60 dk kayıp ve geriye bakılan 6 haftanın
   (7'şer gün) en az birinde ≥ 120 dk. En çok 12 yeni aday, bu haftanın kaybına göre.
