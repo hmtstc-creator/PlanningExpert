@@ -4,12 +4,14 @@
 // Eğitimin özü: yapay zekâya ham toplam verilmez. Burada istatistiksel SİNYALLER
 // hesaplanır (gizli yoğunlaşma, parça × makine etkisi, sipariş değişimi etkisi,
 // vardiya / gün deseni, mikro duruş, rejim değişimi, performans ve veri kalitesi
-// hataları); her sinyalin kanıtı, kazancı (dk / hafta, adet) ve güveni koddan
+// hataları, sık ve kısa ayar, mola sonrası artık duruş, plansız 5S); kanıta o
+// kayıptaki en büyük 3 alt neden (duruş metni) eklenir; her sinyalin kanıtı, kazancı (dk / hafta, adet) ve güveni koddan
 // sayıyla yazılır. Model yalnızca bu sinyallerden en güçlü 3–5'ini seçip yorumlar;
 // yapay zekâ yoksa en güçlü 3 sinyal kurallarla gösterilir.
 // Kararlar: docs/oee-agent-report.md → Agent Insights.
 
 import { groupLabel, ratios, shiftNumber, type DayRow, type LossDay, type OeeConfig, type OeeTimes, type OrderRow, type ShiftRow } from './oee'
+import { LOSS_CODE_MEANINGS } from './settingsDefaults'
 
 export interface InsightThresholds {
   /** Bir sinyalin sayılması için en az kayıp (dk / hafta). */
@@ -34,6 +36,12 @@ export interface InsightThresholds {
   changeoverR: number
   /** Veri kalitesi: sebebi girilmemiş ("#") kaybın payı en az. */
   unclassifiedShare: number
+  /** Sık ve kısa ayar: aynı ayar metni haftada en az bu kadar kez … */
+  repeatPerWeek: number
+  /** … ve olay başına en çok bu kadar dk. */
+  repeatMaxMin: number
+  /** Sebepsiz ("#") duruş olay başına en az bu kadar dk (ve kodlulara göre ≥ 2 kat) → büyük duruşlar nedensiz. */
+  longUnclassifiedMin: number
   /** Yapay zekâya giden en çok sinyal. */
   maxSignals: number
 }
@@ -50,6 +58,9 @@ export const INSIGHT_DEFAULTS: InsightThresholds = {
   regimeFactor: 2,
   changeoverR: -0.5,
   unclassifiedShare: 0.1,
+  repeatPerWeek: 50,
+  repeatMaxMin: 5,
+  longUnclassifiedMin: 20,
   maxSignals: 20,
 }
 
@@ -63,6 +74,9 @@ export type SignalKind =
   | 'regime'
   | 'performance'
   | 'dataQuality'
+  | 'setupRepeat'
+  | 'afterBreak'
+  | 'unplanned5S'
 
 export type Confidence = 'high' | 'medium' | 'low'
 
@@ -155,12 +169,22 @@ interface LossEntry {
 interface PartEntry extends LossEntry {
   part: string
 }
+interface ReasonEntry extends LossEntry {
+  /** Duruş metni (büyük harf); boşsa "(no text)". */
+  text: string
+}
 
 /** Kayıp sayılan duruşlar (Reason Code 1 kayıp listesinde), "#" dahil. */
-function lossEntries(losses: LossDay[], c: OeeConfig): { codes: LossEntry[]; parts: PartEntry[] } {
+function lossEntries(losses: LossDay[], c: OeeConfig): { codes: LossEntry[]; parts: PartEntry[]; reasons: ReasonEntry[] } {
   const codes: LossEntry[] = []
   const parts: PartEntry[] = []
+  const reasons: ReasonEntry[] = []
   for (const l of losses) {
+    for (const [k, [min, count]] of Object.entries(l.reasons ?? {})) {
+      const [rc1, rc2, ...rest] = k.split('|')
+      if (!c.lossReasonCodes.includes(rc1)) continue
+      reasons.push({ date: l.date, workCenter: l.workCenter, group: rc2 || '#', text: rest.join('|').trim().toUpperCase() || '(no text)', min, count })
+    }
     for (const [k, [min, count]] of Object.entries(l.codes)) {
       const [rc1, rc2] = k.split('|')
       if (!c.lossReasonCodes.includes(rc1)) continue
@@ -172,7 +196,7 @@ function lossEntries(losses: LossDay[], c: OeeConfig): { codes: LossEntry[]; par
       parts.push({ date: l.date, workCenter: l.workCenter, group: rc2 || '#', part, min, count })
     }
   }
-  return { codes, parts }
+  return { codes, parts, reasons }
 }
 
 const sumMin = (xs: { min: number }[]) => xs.reduce((a, x) => a + x.min, 0)
@@ -186,6 +210,90 @@ function weekly(entries: { date: string; min: number }[], from: string, weeks: n
   }
   return out.map(r0)
 }
+
+/** Bir kayıptaki en büyük 3 alt neden (duruş metni): dk ve olay. */
+export function topReasons(list: { text: string; min: number; count: number }[], n = 3): { text: string; min: number; count: number }[] {
+  const by = new Map<string, { text: string; min: number; count: number }>()
+  for (const x of list) {
+    const r = by.get(x.text) ?? { text: x.text, min: 0, count: 0 }
+    r.min += x.min
+    r.count += x.count
+    by.set(x.text, r)
+  }
+  return [...by.values()]
+    .sort((a, b) => b.min - a.min || a.text.localeCompare(b.text))
+    .slice(0, n)
+    .map((r) => ({ ...r, min: r0(r.min) }))
+}
+
+/** Kanıta alt nedenler eklenir: "… Top reasons: REGLAJ ELECTROT 5.2 h / 160 stops; …". */
+function withReasons(evidence: string, list: ReasonEntry[]): string {
+  const top = topReasons(list)
+  return top.length ? `${evidence} Top reasons: ${top.map((r) => `${r.text} ${dur(r.min)} / ${r.count} stops`).join('; ')}.` : evidence
+}
+
+// ---- kayıp kodlarının anlamı ------------------------------------------------------------
+
+/** Varsayılan anlam (src/lib/settingsDefaults.ts → LOSS_CODE_MEANINGS): önce "RC1 RC2", sonra RC2. */
+export function defaultLossMeaning(code: string, c: OeeConfig): string {
+  const k = code || '#'
+  for (const rc1 of c.lossReasonCodes) {
+    const m = LOSS_CODE_MEANINGS[`${rc1} ${k}`]
+    if (m) return m
+  }
+  return LOSS_CODE_MEANINGS[k] ?? ''
+}
+
+/** Kodun anlamı: kullanıcının yazdığı (OEE Settings → Loss groups → Meaning) her zaman önce. */
+export const lossMeaning = (code: string, c: OeeConfig): string =>
+  c.lossGroups.find((g) => g.code === (code || '#'))?.meaning?.trim() || defaultLossMeaning(code, c)
+
+/** Yapay zekâya giden kod sözlüğü: ayardaki gruplar + veride geçen tanımsız kodlar. */
+export function lossCodeMeanings(c: OeeConfig, undefinedCodes: string[] = []): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const g of c.lossGroups) {
+    const m = lossMeaning(g.code, c)
+    out[g.code] = m ? `${g.label}: ${m}` : g.label
+  }
+  for (const code of undefinedCodes) {
+    const m = defaultLossMeaning(code, c)
+    out[code] = `not defined in OEE Settings${m ? `; ${m}` : ''}`
+  }
+  return out
+}
+
+export interface UndefinedCode {
+  code: string
+  min: number
+  count: number
+}
+
+/** Veride kayıp olarak geçen ama Loss groups'ta tanımlı olmayan Reason Code 2'ler (dk'ya göre). */
+export function undefinedLossCodes(losses: LossDay[], c: OeeConfig): UndefinedCode[] {
+  const known = new Set(c.lossGroups.map((g) => g.code))
+  const by = new Map<string, UndefinedCode>()
+  for (const l of losses) {
+    for (const [k, [min, count]] of Object.entries(l.codes)) {
+      const [rc1, rc2] = k.split('|')
+      const code = rc2 || '#'
+      if (!c.lossReasonCodes.includes(rc1) || known.has(code)) continue
+      const x = by.get(code) ?? { code, min: 0, count: 0 }
+      x.min += min
+      x.count += count
+      by.set(code, x)
+    }
+  }
+  return [...by.values()].sort((a, b) => b.min - a.min || a.code.localeCompare(b.code)).map((x) => ({ ...x, min: r0(x.min) }))
+}
+
+/** Ayar / setup sayılan alt neden: grubun anlamı ayar diyorsa, metin Setup texts'te ya da ayar kelimesi geçiyorsa. */
+const SETUP_WORDS = /REGLAJ|SETUP|SET-UP|ADJUST|AYAR|SCHIMB/
+const isSetupReason = (group: string, text: string, c: OeeConfig) =>
+  /set-?up|adjust/i.test(lossMeaning(group, c)) || c.setupTexts.some((t) => t.text.trim().toUpperCase() === text) || SETUP_WORDS.test(text)
+/** Mola sonrası artık duruş (metin; Türkçe, İngilizce, Rumence). */
+export const AFTER_BREAK = /AFTER\s*(THE\s*)?BREAK|POST[- ]?BREAK|DUP[AĂ]\s*PAUZ|MOLA\s*SONRA/
+/** 5S (metin). */
+export const FIVE_S = /(^|[^0-9A-Z])5\s?S([^A-Z]|$)/
 
 // ---- sinyaller -----------------------------------------------------------------------
 
@@ -202,7 +310,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
   const losses = input.losses.filter((d) => d.date >= from && d.date <= to)
   const shifts = input.shifts.filter((d) => d.date >= from && d.date <= to)
   const orders = input.orders.filter((d) => d.date >= from && d.date <= to)
-  const { codes, parts } = lossEntries(losses, c)
+  const { codes, parts, reasons } = lossEntries(losses, c)
   const label = (g: string) => (g === '#' ? 'unclassified (#)' : groupLabel(g, c))
   const minTotal = t.minWeeklyMin * weeks
   const out: Signal[] = []
@@ -241,7 +349,10 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         kind: 'concentration',
         title: `${pct(share)} of ${label(group)} loss is on one part: ${top.part}`,
         finding: `${top.part} causes ${dur(top.min)} of ${dur(total)} ${label(group)} loss (${pct(share)}), but takes only ${pct(loadShare)} of the loading.`,
-        evidence: `${top.count} stops on ${wcs.join(', ')}; next part ${byPart[1] ? `${byPart[1].part} ${dur(byPart[1].min)}` : '—'}. Loss share ÷ loading share = ${lift.toFixed(1)}×.`,
+        evidence: withReasons(
+          `${top.count} stops on ${wcs.join(', ')}; next part ${byPart[1] ? `${byPart[1].part} ${dur(byPart[1].min)}` : '—'}. Loss share ÷ loading share = ${lift.toFixed(1)}×.`,
+          reasons.filter((r) => r.group === group && wcs.includes(r.workCenter)),
+        ),
         whyNonObvious: `A loss-group Pareto shows ${label(group)} as one bar; it does not show that one part drives it far beyond its share of the run time.`,
         firstCheck: `Check the die / fixture of ${top.part} and the last stop texts of ${label(group)} on it.`,
         gainMinPerWeek: excess / weeks,
@@ -278,7 +389,10 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         kind: 'interaction',
         title: `${part} loses ${(hi.perHour / Math.max(lo.perHour, 0.1)).toFixed(1)}× more time on ${hi.wc} than on ${lo.wc}`,
         finding: `On ${hi.wc} ${part} loses ${hi.perHour.toFixed(1)} min per loading hour, on ${lo.wc} only ${lo.perHour.toFixed(1)}.`,
-        evidence: rows.map((r) => `${r.wc}: ${dur(r.load)} loading, ${dur(r.min)} loss`).join('; '),
+        evidence: withReasons(
+          rows.map((r) => `${r.wc}: ${dur(r.load)} loading, ${dur(r.min)} loss`).join('; ') + '.',
+          reasons.filter((r) => r.workCenter === hi.wc && r.group !== '#'),
+        ),
         whyNonObvious: 'Machine and part Paretos are read separately; the same part behaving differently on two machines points at the machine set-up, not at the part.',
         firstCheck: `Compare the set-up (shut height, feed, sensors) of ${hi.wc} with ${lo.wc} for ${part}.`,
         gainMinPerWeek: excess / weeks,
@@ -319,7 +433,10 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         kind: 'changeover',
         title: `${wc}: availability falls with every extra order change`,
         finding: `On days with ${avg(many, (p) => p.n).toFixed(1)} orders availability is ${pct(avg(many, (p) => p.avail))}, with ${avg(few, (p) => p.n).toFixed(1)} orders ${pct(avg(few, (p) => p.avail))} (r = ${r.toFixed(2)}, ${pts.length} days).`,
-        evidence: `Correlation of orders per day and availability over ${pts.length} days: ${r.toFixed(2)}.`,
+        evidence: withReasons(
+          `Correlation of orders per day and availability over ${pts.length} days: ${r.toFixed(2)}.`,
+          reasons.filter((x) => x.workCenter === wc && x.group !== '#'),
+        ),
         whyNonObvious: 'Changeover loss is spread over many small stops and reasons; only the day-by-day link to the number of orders shows that lot size, not a breakdown, is the lever.',
         firstCheck: `Check the set-up times of ${wc} and whether small lots could be combined in the plan.`,
         gainMinPerWeek: gain,
@@ -360,7 +477,10 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
           kind: 'shift',
           title: `${wc}: shift ${n} runs ${gapPts.toFixed(0)} OEE points below the other shifts`,
           finding: `Shift ${n} OEE ${pct(a)} against ${pct(b)} for the other shifts on ${wc}; worse in ${Math.round(share * worseWeeks.length)} of ${worseWeeks.length} weeks.`,
-          evidence: `Shift ${n}: ${dur(me.loadingMin)} loading, availability ${pct(ratios(me).availability ?? 0)}, performance ${pct(ratios(me).performance ?? 0)}.`,
+          evidence: withReasons(
+            `Shift ${n}: ${dur(me.loadingMin)} loading, availability ${pct(ratios(me).availability ?? 0)}, performance ${pct(ratios(me).performance ?? 0)}.`,
+            reasons.filter((x) => x.workCenter === wc && x.group !== '#'),
+          ),
           whyNonObvious: 'Daily and weekly OEE average the shifts; a steady gap of one shift on one machine disappears in the totals.',
           firstCheck: `Walk shift ${n} on ${wc}: start-up, staffing and the first hour after the handover.`,
           gainMinPerWeek: gain,
@@ -397,7 +517,10 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
           kind: 'weekday',
           title: `${wc} loses ${(rt / Math.max(base, 0.001)).toFixed(1)}× more time on ${WEEKDAYS[i]}s`,
           finding: `On ${WEEKDAYS[i]}s ${wc} loses ${(rt * 60).toFixed(1)} min per loading hour, on the other days ${(base * 60).toFixed(1)}.`,
-          evidence: WEEKDAYS.map((w, j) => `${w} ${rates[j] === null ? '—' : ((rates[j] as number) * 60).toFixed(1)}`).join(' · ') + ' min / loading h',
+          evidence: withReasons(
+            WEEKDAYS.map((w, j) => `${w} ${rates[j] === null ? '—' : ((rates[j] as number) * 60).toFixed(1)}`).join(' · ') + ' min / loading h.',
+            reasons.filter((x) => x.workCenter === wc && x.group !== '#' && weekday(x.date) === i),
+          ),
           whyNonObvious: 'Weekly reports add the days together; a weekday pattern points at planning, staffing or the start of the week rather than at a machine fault.',
           firstCheck: `Look at what is different on ${WEEKDAYS[i]}s on ${wc}: first shift start, material supply, maintenance slot or the part mix.`,
           gainMinPerWeek: excess / weeks,
@@ -425,7 +548,10 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         kind: 'micro',
         title: `${wc}: ${count} short ${label(group)} stops of ${(total / count).toFixed(1)} min each`,
         finding: `${count} stops, ${dur(total)} in total, ${(total / count).toFixed(1)} min per stop — a micro-stop signature.`,
-        evidence: `${(count / weeks).toFixed(0)} stops a week on ${wc}.`,
+        evidence: withReasons(
+          `${(count / weeks).toFixed(0)} stops a week on ${wc}.`,
+          reasons.filter((x) => x.workCenter === wc && x.group === group),
+        ),
         whyNonObvious: 'Short stops are small one by one and drown in a minutes Pareto; their count shows a sensor, feeding or recording issue rather than breakdowns.',
         firstCheck: `Watch ${wc} for one hour: are these real stops, a sensor that trips, or how the stops are recorded?`,
         gainMinPerWeek: total / 2 / weeks,
@@ -465,7 +591,10 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         kind: 'regime',
         title: `${wc}: ${label(group)} loss jumped from ${loaded[best.k]}`,
         finding: `Since ${loaded[best.k]} ${wc} loses ${dur(best.after)} a day to ${label(group)}, before ${dur(best.before)}.`,
-        evidence: `${best.k} loaded days before, ${daysAfter} after; ${(best.after / Math.max(best.before, 1)).toFixed(1)}× higher.`,
+        evidence: withReasons(
+          `${best.k} loaded days before, ${daysAfter} after; ${(best.after / Math.max(best.before, 1)).toFixed(1)}× higher.`,
+          reasons.filter((x) => x.workCenter === wc && x.group === group && x.date >= loaded[best!.k]),
+        ),
         whyNonObvious: 'A period total hides when a loss started; a clear start date points at a change on that day (new part, die repair, programme, operator).',
         firstCheck: `Find what changed on ${wc} around ${loaded[best.k]}: new part or die, repair, settings, staffing.`,
         gainMinPerWeek: gain,
@@ -517,10 +646,13 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         kind: 'dataQuality',
         title: `${pct(un / allLoss)} of the loss has no reason code`,
         finding: `${dur(un)} of ${dur(allLoss)} loss is recorded with "#" (no reason).`,
-        evidence: byWc
-          .slice(0, 3)
-          .map((x) => `${x.wc} ${dur(x.min)}`)
-          .join(', '),
+        evidence: withReasons(
+          byWc
+            .slice(0, 3)
+            .map((x) => `${x.wc} ${dur(x.min)}`)
+            .join(', ') + '.',
+          reasons.filter((x) => x.group === '#'),
+        ),
         whyNonObvious: 'Every loss Pareto is built only on the coded part; an uncoded share this large can change which loss looks biggest.',
         firstCheck: `Ask the operators of ${byWc[0]?.wc ?? 'the line'} why stops are left without a reason, and make the reason mandatory.`,
         gainMinPerWeek: un / weeks,
@@ -546,6 +678,118 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         confidence: 'medium',
       },
       1,
+    )
+  }
+
+  // 10. Sebepsiz büyük duruş: "#" olay başına çok uzun — büyük duruşlar nedensiz kalıyor.
+  for (const [wc, list] of groupBy(codes, (x) => x.workCenter)) {
+    const un = list.filter((x) => x.group === '#')
+    const coded = list.filter((x) => x.group !== '#')
+    const unMin = sumMin(un)
+    const unCount = un.reduce((a, x) => a + x.count, 0)
+    const codedCount = coded.reduce((a, x) => a + x.count, 0)
+    if (unCount < 3 || unMin < minTotal) continue
+    const unAvg = unMin / unCount
+    const codedAvg = codedCount ? sumMin(coded) / codedCount : 0
+    if (unAvg < t.longUnclassifiedMin || (codedAvg > 0 && unAvg < 2 * codedAvg)) continue
+    push(
+      {
+        id: `dataQuality|longUnclassified|${wc}`,
+        kind: 'dataQuality',
+        title: `${wc}: stops without a reason last ${dur(unAvg)} each — the big stops stay unexplained`,
+        finding: `${unCount} stops with "#" average ${dur(unAvg)}, coded stops ${codedCount ? dur(codedAvg) : '—'}; ${dur(unMin)} in total.`,
+        evidence: withReasons(
+          `${(unCount / weeks).toFixed(1)} uncoded stops a week on ${wc}.`,
+          reasons.filter((x) => x.workCenter === wc && x.group === '#'),
+        ),
+        whyNonObvious: 'The uncoded share looks like a small count of stops; it is the longest stops that are left without a reason, so the biggest losses never reach the Pareto.',
+        firstCheck: `Go through the longest "#" stops on ${wc} with the shift leaders and give each a reason; check whether the terminal lets a long stop close without one.`,
+        gainMinPerWeek: unMin / weeks,
+        gainPiecesPerWeek: null,
+        confidence: confidenceOf(unCount, 20, 8),
+        spark: weekly(un, from, nWeeks),
+      },
+      1.2,
+    )
+  }
+
+  // 11. Sık ve kısa ayar: aynı ayar metni çok sık, her biri birkaç dakika (ör. elektrot ayarı).
+  for (const [key, list] of groupBy(
+    reasons.filter((x) => x.group !== '#' && isSetupReason(x.group, x.text, c)),
+    (x) => `${x.workCenter}|${x.group}|${x.text}`,
+  )) {
+    const total = sumMin(list)
+    const count = list.reduce((a, x) => a + x.count, 0)
+    if (total < minTotal || count / weeks < t.repeatPerWeek || total / count > t.repeatMaxMin) continue
+    const [wc, group] = key.split('|')
+    const text = list[0].text
+    push(
+      {
+        id: `setupRepeat|${wc}|${group}|${text}`,
+        kind: 'setupRepeat',
+        title: `${wc}: "${text}" ${count} times, ${(total / count).toFixed(1)} min each`,
+        finding: `${count} ${label(group)} stops "${text}" (${(count / weeks).toFixed(0)} a week), ${dur(total)} in total — a short adjustment repeated all the time.`,
+        evidence: `${(total / count).toFixed(1)} min per stop, ${dur(total / weeks)} a week on ${wc}.`,
+        whyNonObvious: 'Each adjustment takes only a couple of minutes and never tops a Pareto; repeated this often it is a capacity loss and points at a root cause (wear, tool life, missing standard setting), not at set-up time.',
+        firstCheck: `Find why "${text}" is needed so often on ${wc}: tip / tool wear, dressing interval, standard settings after a change.`,
+        gainMinPerWeek: total / 2 / weeks,
+        gainPiecesPerWeek: pieces(total / 2 / weeks, wc),
+        confidence: confidenceOf(count, 500, 150),
+        spark: weekly(list, from, nWeeks),
+      },
+      1.4,
+    )
+  }
+
+  // 12. Mola sonrası artık duruş: moladan sonra hat geç başlıyor, kayıp olarak yazılıyor.
+  for (const [wc, list] of groupBy(
+    reasons.filter((x) => x.group !== '#' && AFTER_BREAK.test(x.text)),
+    (x) => x.workCenter,
+  )) {
+    const total = sumMin(list)
+    const count = list.reduce((a, x) => a + x.count, 0)
+    if (total < minTotal) continue
+    push(
+      {
+        id: `afterBreak|${wc}`,
+        kind: 'afterBreak',
+        title: `${wc}: ${dur(total / weeks)} a week lost after breaks`,
+        finding: `${count} stops after a break, ${(total / count).toFixed(1)} min each, ${dur(total)} in total: the line restarts late after the planned break.`,
+        evidence: withReasons(`${(count / weeks).toFixed(1)} a week on ${wc}.`, list),
+        whyNonObvious: 'The break itself is planned and left out of the loading; the minutes until the line runs again are booked under an organisational code and look like scattered small stops.',
+        firstCheck: `Watch the restart after a break on ${wc}: who starts the line, is the material and the first-off check ready before the break ends?`,
+        gainMinPerWeek: total / weeks,
+        gainPiecesPerWeek: pieces(total / weeks, wc),
+        confidence: confidenceOf(count, 40, 15),
+        spark: weekly(list, from, nWeeks),
+      },
+      1.3,
+    )
+  }
+
+  // 13. Plansız 5S: 5S üretim süresi içinde plansız kayıp olarak yazılıyor.
+  for (const [wc, list] of groupBy(
+    reasons.filter((x) => FIVE_S.test(x.text)),
+    (x) => x.workCenter,
+  )) {
+    const total = sumMin(list)
+    const count = list.reduce((a, x) => a + x.count, 0)
+    if (total < minTotal) continue
+    push(
+      {
+        id: `unplanned5S|${wc}`,
+        kind: 'unplanned5S',
+        title: `${wc}: ${dur(total / weeks)} a week of 5S booked as an unplanned loss`,
+        finding: `${count} 5S stops, ${(total / count).toFixed(1)} min each, ${dur(total)} in total, recorded inside production time under a loss code.`,
+        evidence: withReasons(`${(count / weeks).toFixed(1)} a week on ${wc}.`, list),
+        whyNonObvious: '5S is a planned activity; booked as an unplanned stop it lowers availability and hides among organisational losses instead of being planned and kept to a standard time.',
+        firstCheck: `Agree a fixed 5S slot and length for ${wc} (planned stop), and check whether the recorded 5S time matches it.`,
+        gainMinPerWeek: total / 2 / weeks,
+        gainPiecesPerWeek: pieces(total / 2 / weeks, wc),
+        confidence: confidenceOf(count, 20, 8),
+        spark: weekly(list, from, nWeeks),
+      },
+      1.1,
     )
   }
 
@@ -591,6 +835,8 @@ export const INSIGHT_SYSTEM = [
   'data-quality problems that distort OEE, and the business value of fixing them. You may combine signals that tell one story.',
   "Reject generic statements (e.g. 'reduce downtime', 'improve maintenance'). Use only the numbers given and quote them;",
   'never invent causes. Say what to verify first on the shop floor. Write in English.',
+  'lossCodes explains the loss codes; codes marked "not defined in OEE Settings" are missing from the settings — mention it if they matter.',
+  'Each evidence may end with the top sub-reasons (stop texts, some in Romanian, minutes / stops) — use them to be specific.',
   'Answer with JSON only: {"findings":[{"signal_ids":["…"],"title":"…","finding":"…","evidence":"…","why_non_obvious":"…",',
   '"first_check":"…","estimated_gain_min_per_week":0,"confidence":"high|medium|low"}]}. Use signal ids exactly as given.',
 ].join(' ')
@@ -600,12 +846,23 @@ export interface InsightContext {
   workCenter: string
   from: string
   to: string
-  /** Kayıp kodu → anlamı (OEE Settings → Loss groups → Meaning). */
+  /** Kayıp kodu → anlamı (lossCodeMeanings: Meaning, yoksa varsayılan; tanımsız kodlar işaretli). */
   codes: Record<string, string>
 }
 
 /** Yapay zekâya giden istek (kişi verisi yok; boyut sınırlı). */
 export function insightUserMessage(ctx: InsightContext, signals: Signal[], max = INSIGHT_DEFAULTS.maxSignals): string {
+  // Sınır aşılırsa en zayıf sinyaller düşer (JSON bozulmaz).
+  let n = Math.min(max, signals.length)
+  let text = insightMessageOf(ctx, signals, n)
+  while (text.length > INSIGHT_MAX_CHARS && n > 1) text = insightMessageOf(ctx, signals, --n)
+  return text.slice(0, INSIGHT_MAX_CHARS)
+}
+
+/** Yapay zekâya giden isteğin en çok uzunluğu (karakter). */
+export const INSIGHT_MAX_CHARS = 24_000
+
+function insightMessageOf(ctx: InsightContext, signals: Signal[], max: number): string {
   return JSON.stringify({
     scope: { costCentre: ctx.costCenter, workCentre: ctx.workCenter || 'all', from: ctx.from, to: ctx.to },
     lossCodes: ctx.codes,
@@ -620,7 +877,7 @@ export function insightUserMessage(ctx: InsightContext, signals: Signal[], max =
       confidence: s.confidence,
       ...(s.spark ? { series: s.spark } : {}),
     })),
-  }).slice(0, 24_000)
+  })
 }
 
 const clip = (s: unknown, n: number) => (typeof s === 'string' ? s.trim().slice(0, n) : '')

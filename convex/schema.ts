@@ -979,6 +979,8 @@ export default defineSchema({
     note: v.optional(v.string()),
     findings: v.optional(v.any()),
     signalCount: v.optional(v.number()),
+    // Veride geçip OEE Settings → Loss groups'ta tanımlı olmayan kayıp kodları
+    undefinedCodes: v.optional(v.array(v.object({ code: v.string(), min: v.number(), count: v.number() }))),
     createdAt: v.number(),
     createdBy: v.optional(v.string()),
     finishedAt: v.optional(v.number()),

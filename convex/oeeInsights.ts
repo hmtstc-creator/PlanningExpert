@@ -7,7 +7,7 @@ import { OEE, guardedMutation, guardedQuery, plantInternalMutation, plantInterna
 import { definedOnly } from './oee'
 import { localNow } from '../src/lib/digest'
 import { EMPTY_CONFIG, addDaysIso, costCenterName, type DayRow, type OeeConfig, type OrderRow, type ShiftRow } from '../src/lib/oee'
-import { INSIGHT_SYSTEM, insightSignals, insightUserMessage, parseInsightAnswer, rangeDays, ruleFindings } from '../src/lib/oeeInsights'
+import { INSIGHT_SYSTEM, insightSignals, insightUserMessage, lossCodeMeanings, parseInsightAnswer, rangeDays, ruleFindings, undefinedLossCodes } from '../src/lib/oeeInsights'
 import { fromStoredLosses, type StoredLossDay } from '../src/lib/oeeStore'
 
 /**
@@ -153,13 +153,19 @@ export const build = internalAction({
         return null
       }
       await progress('Computing the signals…')
-      const signals = insightSignals({ from: head.from, to: head.to, config, ...data, losses: fromStoredLosses(data.losses) })
+      const losses = fromStoredLosses(data.losses)
+      const signals = insightSignals({ from: head.from, to: head.to, config, ...data, losses })
+      // Veride geçip Loss groups'ta tanımlı olmayan kodlar: sayfa uyarır, yapay zekâ işaretli görür.
+      const undefinedCodes = undefinedLossCodes(losses, config)
       let findings = ruleFindings(signals)
       let source = 'rules'
       let note = signals.length ? '' : 'No signal strong enough in this range'
       if (signals.length) {
         await progress(`Asking the AI about ${Math.min(signals.length, 20)} signals…`)
-        const codes = Object.fromEntries(config.lossGroups.filter((g) => g.meaning?.trim()).map((g) => [g.code, `${g.label}: ${g.meaning}`]))
+        const codes = lossCodeMeanings(
+          config,
+          undefinedCodes.map((x) => x.code),
+        )
         const ai = await askJson(
           INSIGHT_SYSTEM,
           insightUserMessage({ costCenter: costCenterName(head.costCenter, config), workCenter: head.workCenter, from: head.from, to: head.to, codes }, signals),
@@ -175,7 +181,7 @@ export const build = internalAction({
       await ctx.runMutation(internal.oeeInsights.save, {
         plantId,
         id,
-        patch: { status: 'done', source, model: source === 'ai' ? aiModel() : undefined, findings, signalCount: signals.length, note, progress: undefined, finishedAt: Date.now() },
+        patch: { status: 'done', source, model: source === 'ai' ? aiModel() : undefined, findings, signalCount: signals.length, undefinedCodes, note, progress: undefined, finishedAt: Date.now() },
       })
     } catch (e) {
       await ctx.runMutation(internal.oeeInsights.save, {

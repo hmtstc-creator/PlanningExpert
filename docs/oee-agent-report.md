@@ -162,16 +162,38 @@ seçilir, **Agent report** 3–5 tespit yazar: "standart OEE Pareto'sunda görü
   8. **Performans anomalisi** — parça × iş yerinde performans > %105 ya da < %50
      (ideal çevrim süresi master verisi).
   9. **Veri kalitesi** — kaybın ≥ %10'u sebepsiz ("#"); binlerce adette hiç ıskarta /
-     red yok.
+     red yok; bir iş yerinde "#" duruş olay başına ≥ 20 dk ve kodlu duruşların ≥ 2 katı
+     (büyük duruşlar nedensiz kalıyor).
+  10. **Sık ve kısa ayar** — aynı ayar metni (ör. "REGLAJ ELECTROT") haftada ≥ 50 kez,
+      olay başına ≤ 5 dk. Ayar sayılır: grubun anlamı set-up / adjustment diyorsa, metin
+      Setup texts'teyse ya da REGLAJ / SETUP / ADJUST / AYAR / SCHIMB geçiyorsa. Kazanç
+      kaybın yarısı.
+  11. **Mola sonrası artık duruş** — metinde "after break" / "după pauză" / "mola sonrası";
+      kazanç kaybın tamamı.
+  12. **Plansız 5S** — kayıp kodunda (üretim süresi içinde) yazılmış 5S; kazanç yarısı.
+- **Alt nedenler (2026-10-23):** her kayıp sinyalinin kanıtına o kayıptaki en büyük 3
+  duruş metni (`oeeLossDays.reasons`, `rc1|rc2|metin`) dk ve olay sayısıyla eklenir
+  ("Top reasons: …"); yapay zekâ da görür.
   Plan bağlantısı (geciken malzeme × kayıp) henüz yok — açık iş.
 - **Puan** = kazanç (dk / hafta) × sürpriz (tür ağırlığı; yoğunlaşmada lift) × güven
   (yüksek 1 / orta 0,7 / düşük 0,4). En iyi 20 sinyal yapay zekâya gider
-  (`INSIGHT_SYSTEM`, İngilizce; istek ≤ 24 000 karakter).
+  (`INSIGHT_SYSTEM`, İngilizce; istek ≤ 24 000 karakter, `INSIGHT_MAX_CHARS`).
 - **Yapay zekâ** yalnız verilen sinyal kimliklerine dayanan tespit yazabilir; kazanç
   dayandığı sinyallerin toplamını aşamaz; eksik alan sinyalden doldurulur. Anahtar
   yoksa / cevap kullanılamazsa **en güçlü 3 sinyal** gösterilir ve sayfa bunu yazar.
-- **Kayıp kodlarının anlamı:** OEE Settings → Loss groups → *Meaning* (yeni,
-  isteğe bağlı alan `lossGroups[].meaning`); boşsa sayfa uyarır.
+- **Kayıp kodlarının anlamı:** OEE Settings → Loss groups → *Meaning*
+  (`lossGroups[].meaning`). Kullanıcının yazdığı her zaman önce gelir; boşsa varsayılan
+  sözlük (`src/lib/settingsDefaults.ts` → `LOSS_CODE_MEANINGS`, planlamacının verdiği:
+  #, SCHED_DOWN YNT / UTS, STP, UNSCD_DOWN YNT, KLP, ARZ, KSD, KON, OFC, MLZ, CLR, DEV)
+  kullanılır ve Settings'te gri placeholder olarak görünür. "RC1 RC2" anahtarı (ör.
+  `UNSCD_DOWN YNT`) kayıp sayılan Reason Code 1 ile eşleşirse önce o, sonra yalnız RC2.
+  Ne ayarda ne varsayılanda anlamı olan grup varsa sayfa uyarır.
+- **Tanımsız kod (undefined code):** veride kayıp olarak geçip Loss groups'ta olmayan
+  Reason Code 2. Rapor bunları kaydeder (`oeeInsightReports.undefinedCodes`) ve sayfa
+  uyarır; yapay zekâ "not defined in OEE Settings" işaretiyle görür. OEE Settings son
+  7 günün duruşlarından aynı uyarıyı ve *Add* düğmesini gösterir.
+- **İstek sınırı:** 24 000 karakteri aşarsa en zayıf sinyaller çıkarılır (JSON
+  bozulmaz).
 - **Kişisel veri yok:** `responsible` alanı okunurken atılır; giden yalnız masraf yeri
   / iş yeri / parça / kod adları ve sayılar.
 - **Kayıt:** `oeeInsightReports` (filtre, aralık, gün, kaynak, model, tespitler, sinyal

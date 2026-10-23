@@ -8,7 +8,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
 import { costCenterName, type DayRow } from '../../lib/oee'
-import { fullWeeks, type Finding } from '../../lib/oeeInsights'
+import { fullWeeks, lossMeaning, type Finding, type UndefinedCode } from '../../lib/oeeInsights'
 import { usePlant } from '../../lib/plantContext'
 
 export const Route = createFileRoute('/oee/insights')({
@@ -29,6 +29,7 @@ interface Report {
   note?: string
   findings?: Finding[]
   signalCount?: number
+  undefinedCodes?: UndefinedCode[]
   createdAt: number
   createdBy?: string
 }
@@ -68,7 +69,8 @@ function InsightsPage() {
   const cc = costCenter || costCenters[0] || ''
   const workCenters = useMemo(() => [...new Set((daysRaw ?? []).filter((d) => d.costCenter === cc).map((d) => d.workCenter))].sort(), [daysRaw, cc])
   const wc = workCenters.includes(workCenter) ? workCenter : ''
-  const noMeanings = config.lossGroups.length > 0 && !config.lossGroups.some((g) => g.meaning?.trim())
+  // Anlamı ne ayarda ne varsayılanda olan gruplar (src/lib/settingsDefaults.ts → LOSS_CODE_MEANINGS).
+  const noMeaning = config.lossGroups.filter((g) => !lossMeaning(g.code, config)).map((g) => g.code)
 
   async function ask(force = false) {
     setError('')
@@ -93,8 +95,9 @@ function InsightsPage() {
             <p>
               The program first computes statistical signals from the uploaded OEE data: a loss hidden in one part, the same part behaving
               differently on two machines, availability falling with the number of order changes, a weak shift or weekday, micro-stops, a loss
-              that jumped from one date on, cycle-time master data that cannot be right (performance above 100 %) and data-quality gaps.
-              Every signal carries its numbers, an estimated gain and a confidence.
+              that jumped from one date on, cycle-time master data that cannot be right (performance above 100 %), the same short adjustment repeated all the time, residual
+              stops after breaks, 5S booked as an unplanned loss and data-quality gaps (such as long stops left without a reason). Every signal
+              carries its numbers, the top 3 stop texts of its loss, an estimated gain and a confidence.
             </p>
             <p>
               The AI chooses the 3 to 5 strongest and explains them; it only sees these signals and the names of the cost center, work
@@ -155,10 +158,10 @@ function InsightsPage() {
         </button>
       </div>
 
-      {noMeanings && (
+      {noMeaning.length > 0 && (
         <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          The loss codes have no meaning yet, so the AI only sees abbreviations. Fill them in <Link to="/oee/settings">OEE Settings</Link> →
-          Loss groups → Meaning.
+          {noMeaning.join(', ')} {noMeaning.length === 1 ? 'has' : 'have'} no meaning, so the AI only sees the abbreviation. Fill it in{' '}
+          <Link to="/oee/settings">OEE Settings</Link> → Loss groups → Meaning.
         </p>
       )}
       {history && !history.aiConfigured && (
@@ -210,6 +213,13 @@ function ReportView({ report: r, config, onRegenerate }: { report: Report; confi
         )}
       </div>
       {r.status === 'running' && <p className="text-sm text-muted-foreground">{r.progress ?? 'Working…'}</p>}
+      {!!r.undefinedCodes?.length && (
+        <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Undefined code{r.undefinedCodes.length > 1 ? 's' : ''}: {r.undefinedCodes.map((x) => `${x.code} (${x.min} min, ${x.count} stops)`).join(', ')} — in the data
+          as a loss but not in <Link to="/oee/settings">OEE Settings</Link> → Loss groups, so the charts show {r.undefinedCodes.length > 1 ? 'them' : 'it'} as
+          Unassigned.
+        </p>
+      )}
       {r.status === 'failed' && <p className="text-sm text-red-700">{r.note}</p>}
       {r.status === 'done' && (
         <>

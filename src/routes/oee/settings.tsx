@@ -7,7 +7,8 @@ import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
 import { agentThresholds, groupRole, type AgentThresholds } from '../../lib/oeeAgent'
-import { addDaysIso, configProblems, dataCostCenters, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
+import { addDaysIso, configProblems, dataCostCenters, lossDayOf, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
+import { defaultLossMeaning, undefinedLossCodes } from '../../lib/oeeInsights'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
 import { OEE_SUGGESTED } from '../../lib/settingsDefaults'
@@ -62,6 +63,8 @@ function OeeSettingsPage() {
   const rc1Values = [...new Set([...events.map((e) => e.rc1), ...c.lossReasonCodes, ...c.breakReasonCodes])].filter(Boolean).sort()
   const texts = [...new Set([...events.map((e) => e.textEn.trim().toUpperCase()), ...c.setupTexts.map((t) => t.text)])].filter(Boolean).sort()
   const [textFilter, setTextFilter] = useState('')
+  // Son 7 günün duruşlarında kayıp olarak geçip Loss groups'ta olmayan kodlar.
+  const undefinedCodes = useMemo(() => undefinedLossCodes(downtimes.map(lossDayOf), c), [downtimes, c])
 
   // Öneri yalnızca alanları ve kodları doldurur; masraf yerleri fabrikanınkiler kalır.
   const suggest = () => set(withPlantCostCenters(suggestConfig({ days, shifts, downtimes }, c, OEE_SUGGESTED), plantList, departments))
@@ -275,8 +278,22 @@ function OeeSettingsPage() {
 
       <Card
         title="Loss groups"
-        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. Bridge family: where the group sits in the Loss Bridge — Availability as the MES counts it (default), or Performance (e.g. short stops in the TPM way). It changes the availability / performance split there, never the OEE. Agent role: whether the Agent Report reads the group as a die loss (Die Follow-up) or a machine loss (Machine Follow-up); Auto guesses it from the chart column and the name. Meaning: what the code stands for, in plain words — Agent Insights gives it to the AI, which otherwise only sees the abbreviation."
+        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. Bridge family: where the group sits in the Loss Bridge — Availability as the MES counts it (default), or Performance (e.g. short stops in the TPM way). It changes the availability / performance split there, never the OEE. Agent role: whether the Agent Report reads the group as a die loss (Die Follow-up) or a machine loss (Machine Follow-up); Auto guesses it from the chart column and the name. Meaning: what the code stands for, in plain words — Agent Insights gives it to the AI, which otherwise only sees the abbreviation. An empty Meaning uses the default shown in grey; what you write always wins."
       >
+        {undefinedCodes.length > 0 && (
+          <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Undefined code{undefinedCodes.length > 1 ? 's' : ''} in the last 7 days of downtimes:{' '}
+            {undefinedCodes.map((x) => `${x.code} (${x.min} min, ${x.count} stops)`).join(', ')} — counted as a loss but not in this table, so the charts show
+            them as Unassigned.{' '}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => set({ lossGroups: [...c.lossGroups, ...undefinedCodes.map((x) => ({ code: x.code, label: x.code, chart: x.code, breakdown: false, hidden: x.code === '#' }))] })}
+            >
+              Add {undefinedCodes.length > 1 ? 'them' : 'it'}
+            </button>
+          </p>
+        )}
         <Rows
           head={['Reason Code 2', 'Name', 'Meaning (for the AI)', 'Chart column', 'In charts', 'Breakdown', 'Bridge family', 'Agent role', '']}
           rows={c.lossGroups.map((g, i) => [
@@ -285,7 +302,8 @@ function OeeSettingsPage() {
             <input
               key="m"
               className={input}
-              placeholder="e.g. die breakdown, waiting for crane"
+              placeholder={defaultLossMeaning(g.code, c) || 'e.g. die breakdown, waiting for crane'}
+              title={g.meaning ? undefined : defaultLossMeaning(g.code, c) ? 'Empty: the default meaning shown here is used' : undefined}
               value={g.meaning ?? ''}
               onChange={(e) => {
                 const meaning = e.target.value
