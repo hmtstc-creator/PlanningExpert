@@ -4,10 +4,12 @@ import { EMPTY_CONFIG, addDaysIso, type DayRow, type LossDay, type OeeConfig, ty
 import {
   AFTER_BREAK,
   FIVE_S,
+  INSIGHT_STALE_MS,
   defaultLossMeaning,
   fullWeeks,
   insightSignals,
   insightUserMessage,
+  isStaleInsight,
   lossCodeMeanings,
   lossMeaning,
   parseInsightAnswer,
@@ -307,5 +309,14 @@ describe('Agent Insights: date range', () => {
   it('last 4 full weeks before a Friday', () => {
     expect(fullWeeks('2026-10-23', 4)).toEqual({ from: '2026-09-21', to: '2026-10-18' })
     expect(fullWeeks('2026-10-26', 1)).toEqual({ from: '2026-10-19', to: '2026-10-25' })
+  })
+})
+
+describe('isStaleInsight', () => {
+  it('15 dakikadan uzun running kalan rapor takılmıştır', () => {
+    expect(INSIGHT_STALE_MS).toBe(15 * 60_000)
+    expect(isStaleInsight({ status: 'running', createdAt: 0 }, 14 * 60_000)).toBe(false)
+    expect(isStaleInsight({ status: 'running', createdAt: 0 }, 16 * 60_000)).toBe(true)
+    expect(isStaleInsight({ status: 'done', createdAt: 0 }, 60 * 60_000)).toBe(false)
   })
 })

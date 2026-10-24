@@ -7,7 +7,7 @@ import { OEE, guardedMutation, guardedQuery, plantInternalMutation, plantInterna
 import { definedOnly } from './oee'
 import { localNow } from '../src/lib/digest'
 import { EMPTY_CONFIG, addDaysIso, costCenterName, type DayRow, type OeeConfig, type OrderRow, type ShiftRow } from '../src/lib/oee'
-import { INSIGHT_SYSTEM, insightSignals, insightUserMessage, lossCodeMeanings, parseInsightAnswer, rangeDays, ruleFindings, undefinedLossCodes } from '../src/lib/oeeInsights'
+import { INSIGHT_STALE_MS, INSIGHT_SYSTEM, insightSignals, isStaleInsight, insightUserMessage, lossCodeMeanings, parseInsightAnswer, rangeDays, ruleFindings, undefinedLossCodes } from '../src/lib/oeeInsights'
 import { fromStoredLosses, type StoredLossDay } from '../src/lib/oeeStore'
 import { fromStoredStops, type StoredStopDay } from '../src/lib/oeeReliability'
 
@@ -65,7 +65,12 @@ export const request = guardedMutation({
       .query('oeeInsightReports')
       .withIndex('by_filter', (q: Ctx) => q.eq('costCenter', a.costCenter).eq('workCenter', a.workCenter).eq('from', a.from).eq('to', a.to).eq('day', today))
       .collect()
-    const live = same.find((r: Ctx) => r.status === 'running')
+    // Takılı kalan (iş yarıda ölmüş) rapor başarısız sayılır; yoksa gün boyu hep o dönerdi.
+    const now = Date.now()
+    for (const r of same.filter((r: Ctx) => isStaleInsight(r, now))) {
+      await ctx.db.patch(r._id, { status: 'failed', note: `Stopped: no result after ${INSIGHT_STALE_MS / 60_000} minutes`, progress: undefined, finishedAt: now })
+    }
+    const live = same.find((r: Ctx) => r.status === 'running' && !isStaleInsight(r, now))
     if (live) return live._id
     const done = same.filter((r: Ctx) => r.status === 'done').sort((x: Ctx, y: Ctx) => y.createdAt - x.createdAt)[0]
     if (done && !a.force) return done._id

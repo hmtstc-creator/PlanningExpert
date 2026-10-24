@@ -203,5 +203,8 @@ seçilir, **Agent report** 3–5 tespit yazar: "standart OEE Pareto'sunda görü
 - **Kayıt:** `oeeInsightReports` (filtre, aralık, gün, kaynak, model, tespitler, sinyal
   sayısı). Aynı filtre aynı gün yeniden istenirse kayıttan gelir; *Regenerate* yenisini
   yapar. Uzun iş sunucu işlemidir (`oeeInsights.build`), sayfa ilerlemeyi gösterir.
+  İş yarıda ölürse (sunucu yeniden başladı, yayın) kayıt 'running'de kalır: 15 dk'dan
+  (`INSIGHT_STALE_MS`) eskisi takılı sayılır, sayfa *Regenerate* gösterir, yeni istek onu
+  başarısız yapıp yeniden başlatır (2026-10-24).
   Rapor yapmak `oee.data` izni ister; okumak OEE izni.
 - Yapay zekâ istemcisi ortak: `convex/aiClient.ts` (açık konular ajanı da kullanır).

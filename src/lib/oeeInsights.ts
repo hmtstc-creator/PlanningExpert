@@ -119,6 +119,13 @@ export interface InsightInput {
 const DAY_MS = 86_400_000
 const dayIndex = (from: string, d: string) => Math.round((Date.parse(`${d}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS)
 export const rangeDays = (from: string, to: string) => dayIndex(from, to) + 1
+
+/**
+ * Bu süreden uzun 'running' kalan rapor takılmıştır: iş yarıda ölmüş (sunucu yeniden
+ * başladı, yayın, Convex iş sınırı) ve sonucunu yazamamıştır. Normal rapor 1–2 dakikadır.
+ */
+export const INSIGHT_STALE_MS = 15 * 60_000
+export const isStaleInsight = (r: { status: string; createdAt: number }, now: number) => r.status === 'running' && now - r.createdAt > INSIGHT_STALE_MS
 const r0 = (x: number) => Math.round(x)
 const pct = (x: number) => `${Math.round(x * 100)}%`
 const dur = (min: number) => (Math.abs(min) < 60 ? `${Math.round(min)} min` : `${(min / 60).toFixed(1)} h`)
