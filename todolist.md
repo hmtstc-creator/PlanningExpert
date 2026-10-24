@@ -463,6 +463,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 - [ ] **[S]** OEE açık konular ajanı (2026-10-23): sunucudaki Convex'e (`npx convex env set`, adımlar docs/deployment.md) `AI_API_KEY` (ücretsiz Gemini ya da Groq anahtarı; isteğe bağlı `AI_API_URL`, `AI_MODEL`) eklenmeli — yoksa kurallar karar verir (docs/oee-agent-report.md → OEE open topics).
 - [ ] **[K]** OEE Agent Insights (2026-10-23): plan bağlantısı sinyali (geciken malzeme × o malzemenin OEE kaybı) ve kalıp değişimi sonrası ilk saatler (ham duruşlar 8 gün okunuyor); eşikler (`INSIGHT_DEFAULTS`) ayara. Önce gerçek veride ilk raporlar Ahmet'le okunsun.
 - [ ] **[K]** OEE açık konular: eşikler (`TOPIC_DEFAULTS`: 60 dk / 120 dk / 6 hafta / 3 hafta / 12 aday) OEE Settings → Agent Report'a taşınsın; Agent Report'ta açık konular bölümüne bu liste de girsin.
+- [ ] **[S]** OEE kısa duruşlar (#46, #47, 2026-10-23) — sunucuda elle doğrulama (Karabasan oturumu): bir gün × iş yeri için Loading − Production = ≥ 2 dk plansız duruş toplamı mı; Loss Bridge A / P / OEE = Dashboard mı; "Machine < 2 min" ve MTTR makul mü; OEE Settings'te SCHED_DOWN `breakReasonCodes`'ta mı (YNT kayıp sayılmasın). Ayrıntı: docs/wiki/09-acik-konular.md.
 
 ## 5. Yönetici gözüyle değerlendirme — CEO ve üretim direktörü (2026-10-05)
 
