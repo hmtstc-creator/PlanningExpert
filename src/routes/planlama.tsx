@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { plantClock } from '../lib/dates'
-import { WeekGantt, type WeekGanttJob, type WeekGanttPress } from '../components/WeekGantt'
+import { WeekGantt, type GanttMoveTarget, type WeekGanttJob, type WeekGanttPress } from '../components/WeekGantt'
 import { buildDayTimeline, netToClock, productionDayOf } from '../lib/shiftTimeline'
 import { isManualJob, planMove, type MoveSegment, type MoveTarget } from '../lib/jobMove'
 import type { PlanJob } from '../lib/planPipeline'
@@ -66,8 +66,9 @@ function PlanlamaPage() {
   // Sürükle-bırak ya da "Move…": işi başka pres / saate taşıyıp kilitlemek.
   const [moveDraft, setMoveDraft] = useState<MoveDraft | null>(null)
   // Elle iş (stok amaçlı): pencere açıkken parça listesi yüklenir.
-  const [addingJob, setAddingJob] = useState(false)
-  const products = (useQuery(api.products.listAll, addingJob ? {} : 'skip')?.rows ?? []) as ProductSpec[]
+  // Elle iş penceresi: kapalıysa null; boşluğa tıklanınca pres / gün / saat dolu gelir.
+  const [addingJob, setAddingJob] = useState<GanttMoveTarget | true | null>(null)
+  const products = (useQuery(api.products.listAll, addingJob !== null ? {} : 'skip')?.rows ?? []) as ProductSpec[]
   const quantityRules = useMemo(
     () =>
       new Map(
@@ -462,6 +463,7 @@ function PlanlamaPage() {
                 ),
                 ...ganttMaintenance,
               ]}
+              onGapClick={(target) => setAddingJob(target)}
               onJobMove={(clicked, target) => {
                 const found = jobOf(clicked)
                 if (!found || (found.job.frozen && !found.job.locked)) return
@@ -510,11 +512,15 @@ function PlanlamaPage() {
                 presses={presses.map((p) => ({ name: p.name, hall: p.hall, feedsCoil: p.feedsCoil }))}
                 dates={allDates.filter((d) => d >= todayIso)}
                 products={products}
-                initial={{ press: presses[0]?.name ?? '', date: todayIso, clockMinute: Math.ceil(nowClockMinute / 5) * 5 }}
+                initial={
+                  addingJob === true
+                    ? { press: presses[0]?.name ?? '', date: todayIso, clockMinute: Math.ceil(nowClockMinute / 5) * 5 }
+                    : addingJob
+                }
                 shiftStartMinute={shiftStartMinute}
                 check={(segments, target) => checkMove(null, segments, target)}
                 currentUser={currentUser ?? undefined}
-                onClose={() => setAddingJob(false)}
+                onClose={() => setAddingJob(null)}
               />
             )}
             {moveDraft && (

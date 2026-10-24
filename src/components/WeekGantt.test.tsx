@@ -69,3 +69,32 @@ describe('WeekGantt — drag and drop', () => {
     expect(onJobMove).not.toHaveBeenCalled()
   })
 })
+
+describe('WeekGantt — gap click', () => {
+  it('iki iş arasındaki boşluğa tıklanınca boşluğun başladığı pres, gün ve saat gelir', () => {
+    const later: WeekGanttJob = {
+      ...job,
+      material: 'B-200',
+      setupStartMinute: 400,
+      endMinute: 500,
+      segments: [{ kind: 'run', date: '2026-10-22', start: 400, end: 500 }],
+    }
+    const onGapClick = vi.fn()
+    const view = render(
+      <WeekGantt
+        dates={['2026-10-22']}
+        presses={presses}
+        jobs={[job, later]}
+        stops={[]}
+        shiftStartMinute={420}
+        shiftMinutes={480}
+        onGapClick={onGapClick}
+      />,
+    )
+    const gap = view.container.querySelector<HTMLElement>('[title*="click to add a job here"]')!
+    expect(gap.title).toContain('Idle 100 min before B-200')
+    fireEvent.click(gap)
+    // Boşluk ilk işin bitişinde (07:00 + 300 dk = 12:00) başlar.
+    expect(onGapClick).toHaveBeenCalledWith({ press: 'PRS104', date: '2026-10-22', clockMinute: 720 })
+  })
+})

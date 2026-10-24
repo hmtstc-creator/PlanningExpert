@@ -87,6 +87,8 @@ Kullanıcı kararları (2026-10-23):
   motor işi → *Delete this lot* (lot 0 adet).
 - [ ] **[S]** Dene ve yaz: elle iş doğru süre / yerde mi, sonraki lotlar küçülüyor mu?
   Elle iş dondurulmuş (tam plan onaylı) işi de itebilmeli mi?
+- [x] **[G]** Gantt'ta boş araya (kesikli çizgi) tıklayınca *Add job* o pres / gün / saatle
+  dolu açılır (2026-10-24).
 - [x] **[G]** Sürükle-bırak (öne alındı, #34): `WeekGantt` işini başka pres / gün /
   saate taşı (telefonda basılı tut), ya da iş penceresi → *Move…*; orada kilitlenir.
   Kalıp / pres uygunluğu kontrol edilmez — sabitleme (`pin`) gibi planlamacının kararı.
