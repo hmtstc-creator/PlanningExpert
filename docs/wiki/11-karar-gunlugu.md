@@ -1,11 +1,12 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-23 (#47) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-24 (#54) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 ## Plan ve hesap
 
+- **Stok cost center'a göre sayılır** (2026-10-24, #54) — holdingde aynı kod bir cost center'da mamul, diğerinde hammadde; parça ana makinesinin cost center'ının depolarıyla (WIP + mamul / hammadde) sayılır, WIP mamul stoğuna dahil. Ayrı tablo `costCenterStorage`, tanım yoksa depo tikleri. *Alt.: depo tiklerine cost center listesi eklemek* (aynı depo farklı CC'de farklı rol alamazdı); *plants.costCenters içine yazmak* (org yönetimi yetkisi ile ana veri yetkisi karışırdı).
 - **Müşteri önce, doluluk sonra** — geç bir parça müşteriyi durdurur; doluluk / setup kazancı bunun yerini tutmaz. *Alt.: doluluğu önce* (reddedildi).
 - **Geç iş = pay, bütün sipariş değil** (2026-10-22) — ZPP günlük ihtiyaç rehber; teslimde yarısı hazırsa yarısı zamanında. *Alt.: yalnızca son parçanın gecikmesi* (müşteri etkisini abartıyordu).
 - **Müşteri duruş süresi hesaplanmaz, tahmin gösterilir** — tüketim saatleri bilinmiyor; *ortalama* ve *son parça* verilir.
