@@ -8,7 +8,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
 import { costCenterName, type DayRow } from '../../lib/oee'
-import { fullWeeks, lossMeaning, type Finding, type UndefinedCode } from '../../lib/oeeInsights'
+import { fullWeeks, isStaleInsight, lossMeaning, type Finding, type UndefinedCode } from '../../lib/oeeInsights'
 import { usePlant } from '../../lib/plantContext'
 
 export const Route = createFileRoute('/oee/insights')({
@@ -206,13 +206,16 @@ function ReportView({ report: r, config, onRegenerate }: { report: Report; confi
         <h2 className="text-base font-semibold">
           {costCenterName(r.costCenter, config)} · {r.workCenter || 'all work centers'} · {dm(r.from)}–{dm(r.to)}
         </h2>
-        {r.status === 'done' && onRegenerate && (
+        {(r.status === 'done' || r.status === 'failed' || isStaleInsight(r, Date.now())) && onRegenerate && (
           <button type="button" onClick={onRegenerate} className="ml-auto rounded-md border border-input px-3 py-1 text-sm">
             Regenerate
           </button>
         )}
       </div>
-      {r.status === 'running' && <p className="text-sm text-muted-foreground">{r.progress ?? 'Working…'}</p>}
+      {r.status === 'running' && !isStaleInsight(r, Date.now()) && <p className="text-sm text-muted-foreground">{r.progress ?? 'Working…'}</p>}
+      {isStaleInsight(r, Date.now()) && (
+        <p className="text-sm text-red-700">This report stopped without a result ({r.progress ?? 'no progress'}). Press Regenerate to start it again.</p>
+      )}
       {!!r.undefinedCodes?.length && (
         <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           Undefined code{r.undefinedCodes.length > 1 ? 's' : ''}: {r.undefinedCodes.map((x) => `${x.code} (${x.min} min, ${x.count} stops)`).join(', ')} — in the data
