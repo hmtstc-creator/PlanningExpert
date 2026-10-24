@@ -1,6 +1,6 @@
 /**
- * Board Dashboard (docs/board.md): holding → şirket → plant → masraf yeri
- * kapsamında özet sonuçlar ve trendler. Hesap KPI ile aynı (src/lib/kpi.ts):
+ * Board Dashboard (docs/board.md): holding → şirket → plant → bölüm → masraf
+ * yeri kapsamında özet sonuçlar ve trendler. Hesap KPI ile aynı (src/lib/kpi.ts):
  * saat ve adetler toplanır, oranlar toplamdan; grup toplamında her şirketin
  * kendi planlarının toplamı kullanılır.
  */
@@ -13,16 +13,22 @@ export interface BoardPlant {
   companyName: string
   holdingId: string | null
   holdingName: string | null
-  costCenters: { code: string; name: string }[]
+  /** Plant'in bölümleri, sıralı (plants.departments). */
+  departments?: string[]
+  costCenters: { code: string; name: string; department?: string }[]
   entries: KpiEntry[]
   oee: (OeeSum & { slot: string })[]
 }
 
-/** Seçili kapsam: boş = bütün grup; şirket; plant. */
+/** Seçili kapsam: boş = bütün grup; şirket; plant; bölüm ('' = bölümsüz masraf yerleri). */
 export interface BoardScope {
   companyId?: string
   plantId?: string
+  department?: string
 }
+
+/** Bölümü olmayan masraf yerlerinin düğümü (Organization map'teki gibi). */
+export const NO_DEPARTMENT_LABEL = 'Without a department'
 
 export interface BoardNode {
   key: string
@@ -41,13 +47,16 @@ export const measureOf = (key: keyof KpiMetrics) => KPI_ROWS.find((r) => r.key =
 /** Başlık kartlarındaki sabit ölçüler (ölçü her dönem aynı). */
 export const BOARD_CARDS: (keyof KpiMetrics)[] = ['oee', 'efficiency', 'volume', 'productivity', 'overtimePct', 'absenteeismPct']
 
-const tagged = (p: BoardPlant, ccFilter?: string) => ({
-  entries: p.entries.filter((e) => !ccFilter || e.costCenter === ccFilter).map((e) => ({ ...e, costCenter: `${p.plantId}|${e.costCenter}` })),
-  oee: p.oee.filter((o) => !ccFilter || o.costCenter === ccFilter).map((o) => ({ ...o, costCenter: `${p.plantId}|${o.costCenter}` })),
+type CcFilter = string | ReadonlySet<string>
+const keep = (f: CcFilter | undefined, cc: string) => f === undefined || (typeof f === 'string' ? cc === f : f.has(cc))
+
+const tagged = (p: BoardPlant, ccFilter?: CcFilter) => ({
+  entries: p.entries.filter((e) => keep(ccFilter, e.costCenter)).map((e) => ({ ...e, costCenter: `${p.plantId}|${e.costCenter}` })),
+  oee: p.oee.filter((o) => keep(ccFilter, o.costCenter)).map((o) => ({ ...o, costCenter: `${p.plantId}|${o.costCenter}` })),
 })
 
-/** Plantler (isteğe bağlı tek masraf yeri) için dilim başına sonuç. */
-export function seriesFor(plants: BoardPlant[], slots: KpiSlot[], ccFilter?: string): KpiResult[] {
+/** Plantler (isteğe bağlı tek masraf yeri ya da masraf yeri kümesi) için dilim başına sonuç. */
+export function seriesFor(plants: BoardPlant[], slots: KpiSlot[], ccFilter?: CcFilter): KpiResult[] {
   const parts = plants.map((p) => tagged(p, ccFilter))
   const entries = parts.flatMap((x) => x.entries)
   const oee = parts.flatMap((x) => x.oee)
@@ -64,16 +73,54 @@ export function plantsInScope(plants: BoardPlant[], scope: BoardScope): BoardPla
   return plants.filter((p) => (!scope.companyId || p.companyId === scope.companyId) && (!scope.plantId || p.plantId === scope.plantId))
 }
 
+/** Plant bölümlere ayrılmış mı (en az bir masraf yerinin bölümü var). Yoksa plant doğrudan masraf yerlerine iner. */
+export const hasDepartments = (p: BoardPlant) => p.costCenters.some((cc) => !!cc.department)
+
+/**
+ * Plant'in bölümleri: sıralı liste, sonra listede olmayıp masraf yerinde geçenler,
+ * en sonda bölümsüz masraf yeri varsa '' (Without a department). Masraf yeri
+ * olmayan bölüm gösterilmez (verisi olamaz).
+ */
+export function departmentsOf(p: Pick<BoardPlant, 'departments' | 'costCenters'>): string[] {
+  const used = new Set(p.costCenters.map((cc) => cc.department ?? ''))
+  const order = [...(p.departments ?? []), ...[...used].filter((d) => d && !(p.departments ?? []).includes(d)).sort()]
+  return [...order.filter((d) => used.has(d)), ...(used.has('') ? [''] : [])]
+}
+
+/** Kapsamdaki bölümün masraf yerleri (bölüm seçili değilse undefined = hepsi). */
+function departmentCcs(p: BoardPlant, department: string | undefined): Set<string> | undefined {
+  if (department === undefined) return undefined
+  return new Set(p.costCenters.filter((cc) => (cc.department ?? '') === department).map((cc) => cc.code))
+}
+
+/** Seçili kapsamın toplamı (kartlar): bölüm seçiliyse yalnız onun masraf yerleri. */
+export function scopeSeries(plants: BoardPlant[], scope: BoardScope, slots: KpiSlot[]): KpiResult[] {
+  const inScope = plantsInScope(plants, scope)
+  if (scope.plantId && scope.department !== undefined && inScope[0]) return seriesFor(inScope, slots, departmentCcs(inScope[0], scope.department))
+  return seriesFor(inScope, slots)
+}
+
 /**
  * Kapsamın bir alt kırılımı: bütün grup → şirketler, şirket → plantler,
- * plant → masraf yerleri.
+ * plant → bölümler (bölümü yoksa masraf yerleri), bölüm → masraf yerleri.
  */
 export function childrenOf(plants: BoardPlant[], scope: BoardScope, slots: KpiSlot[]): BoardNode[] {
   const inScope = plantsInScope(plants, scope)
   if (scope.plantId) {
     const p = inScope[0]
     if (!p) return []
-    return p.costCenters.map((cc) => ({ key: `${p.plantId}|${cc.code}`, label: cc.name, drill: null, bySlot: seriesFor([p], slots, cc.code) }))
+    if (scope.department === undefined && hasDepartments(p)) {
+      return departmentsOf(p).map((d) => ({
+        key: `${p.plantId}|dept|${d}`,
+        label: d || NO_DEPARTMENT_LABEL,
+        drill: { companyId: p.companyId, plantId: p.plantId, department: d },
+        bySlot: seriesFor([p], slots, departmentCcs(p, d)),
+      }))
+    }
+    const ccs = departmentCcs(p, scope.department)
+    return p.costCenters
+      .filter((cc) => !ccs || ccs.has(cc.code))
+      .map((cc) => ({ key: `${p.plantId}|${cc.code}`, label: cc.name, drill: null, bySlot: seriesFor([p], slots, cc.code) }))
   }
   if (scope.companyId) {
     return inScope.map((p) => ({ key: p.plantId, label: p.plantName, drill: { companyId: p.companyId, plantId: p.plantId }, bySlot: seriesFor([p], slots) }))
@@ -116,7 +163,8 @@ export function declining(series: KpiResult[], current: number, key: keyof KpiMe
 }
 
 /**
- * Dikkat listesi: kapsamın en alt seviyesinde (plant ya da masraf yeri) plana
+ * Dikkat listesi: kapsamın en alt seviyesinde (plant ya da masraf yeri; bölüm
+ * seçiliyse yalnız onun masraf yerleri) plana
  * en uzak kalanlar ve son üç dilimde kötüleşenler.
  */
 export function attention(
@@ -130,7 +178,10 @@ export function attention(
   const inScope = plantsInScope(plants, scope)
   const multiCompany = new Set(inScope.map((p) => p.companyId)).size > 1
   const units = scope.plantId
-    ? inScope.flatMap((p) => p.costCenters.map((cc) => ({ label: cc.name, series: seriesFor([p], slots, cc.code) })))
+    ? inScope.flatMap((p) => {
+        const ccs = departmentCcs(p, scope.department)
+        return p.costCenters.filter((cc) => !ccs || ccs.has(cc.code)).map((cc) => ({ label: cc.name, series: seriesFor([p], slots, cc.code) }))
+      })
     : inScope.map((p) => ({ label: multiCompany ? `${p.companyName} · ${p.plantName}` : p.plantName, series: seriesFor([p], slots) }))
   return units
     .map((u) => ({ label: u.label, rel: relativeGap(u.series[current], key), declining: declining(u.series, current, key), result: u.series[current] }))

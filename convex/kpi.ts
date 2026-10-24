@@ -321,5 +321,5 @@ export const plants = userQuery({
   handler: async (ctx) =>
     (await visiblePlants(ctx.db, ctx.sessionUser))
       .filter((p) => p.access.kpi !== 'none')
-      .map((p) => ({ plantId: p.plant._id, plantName: p.plant.name, companyName: p.company.name, costCenters: p.plant.costCenters ?? [] })),
+      .map((p) => ({ plantId: p.plant._id, plantName: p.plant.name, companyName: p.company.name, departments: p.plant.departments ?? [], costCenters: p.plant.costCenters ?? [] })),
 })
