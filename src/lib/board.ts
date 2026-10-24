@@ -15,6 +15,8 @@ export interface BoardPlant {
   holdingName: string | null
   /** Plant'in bölümleri, sıralı (plants.departments). */
   departments?: string[]
+  /** Bölüm sorumluları (K7), adıyla. */
+  departmentOwners?: { department: string; name: string }[]
   costCenters: { code: string; name: string; department?: string }[]
   entries: KpiEntry[]
   oee: (OeeSum & { slot: string })[]
@@ -37,6 +39,13 @@ export interface BoardNode {
   drill: BoardScope | null
   /** Dilim başına sonuç (trend). */
   bySlot: KpiResult[]
+  /** Bölüm satırında bölüm sorumlusu (K7). */
+  owner?: string
+}
+
+/** Bölümün sorumlusunun adı (yoksa undefined). */
+export function departmentOwner(p: Pick<BoardPlant, 'departmentOwners'>, department: string | undefined): string | undefined {
+  return department ? p.departmentOwners?.find((o) => o.department === department)?.name : undefined
 }
 
 /** Seçilebilir ölçüler (yönü belli olanlar). */
@@ -115,6 +124,7 @@ export function childrenOf(plants: BoardPlant[], scope: BoardScope, slots: KpiSl
         label: d || NO_DEPARTMENT_LABEL,
         drill: { companyId: p.companyId, plantId: p.plantId, department: d },
         bySlot: seriesFor([p], slots, departmentCcs(p, d)),
+        ...(departmentOwner(p, d) ? { owner: departmentOwner(p, d) } : {}),
       }))
     }
     const ccs = departmentCcs(p, scope.department)

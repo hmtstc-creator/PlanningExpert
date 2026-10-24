@@ -3473,6 +3473,30 @@
       },
       "optional": false
     },
+    "departmentOwners": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "department": {
+              "fieldType": {
+                "type": "string"
+              },
+              "optional": false
+            },
+            "userId": {
+              "fieldType": {
+                "type": "id",
+                "tableName": "users"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": true
+    },
     "departments": {
       "fieldType": {
         "type": "array",

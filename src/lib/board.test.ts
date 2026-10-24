@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { attention, childrenOf, declining, departmentsOf, scopeSeries, seriesFor, type BoardPlant } from './board'
+import { attention, childrenOf, declining, departmentOwner, departmentsOf, scopeSeries, seriesFor, type BoardPlant } from './board'
 import { isBoardUser, accessFor } from './tenancy'
 import { trendSlots, type KpiEntry } from './kpi'
 
@@ -57,6 +57,11 @@ describe('Board Dashboard', () => {
     expect(childrenOf([d], scope, slots).map((n) => n.label)).toEqual(['Press A', 'Press B'])
     expect(scopeSeries([d], scope, slots)[2].actual.efficiency).toBeCloseTo(0.75)
     expect(attention([d], scope, slots, 2, 'efficiency').map((x) => x.label)).toEqual(['Press A'])
+    // Bölüm sorumlusu (K7): satırda ve kapsam başlığında; bölümsüz düğümde yok.
+    const owned = { ...d, departmentOwners: [{ department: 'Stamping', name: 'Ana Pop' }] }
+    expect(childrenOf([owned], { companyId: 'C9', plantId: 'P9' }, slots).map((n) => n.owner)).toEqual(['Ana Pop', undefined])
+    expect(departmentOwner(owned, 'Stamping')).toBe('Ana Pop')
+    expect(departmentOwner(owned, '')).toBeUndefined()
     // Bölümü olmayan plant bugünkü gibi doğrudan masraf yerlerine iner.
     expect(childrenOf([p1], { companyId: 'C1', plantId: 'P1' }, slots).map((n) => n.label)).toEqual(['Press A', 'Press B'])
   })

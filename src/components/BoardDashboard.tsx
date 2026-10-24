@@ -11,6 +11,7 @@ import {
   NO_DEPARTMENT_LABEL,
   attention,
   childrenOf,
+  departmentOwner,
   hasDepartments,
   measureOf,
   scopeSeries,
@@ -156,6 +157,7 @@ export function BoardDashboardPage() {
           <>
             <span className="text-muted-foreground">▸</span>
             <span className="font-semibold">{scope.department || NO_DEPARTMENT_LABEL}</span>
+            {departmentOwner(plant, scope.department) && <span className="text-xs text-muted-foreground">· responsible {departmentOwner(plant, scope.department)}</span>}
           </>
         )}
         <span className="ml-2 text-xs text-muted-foreground">· {periodTitle(view.period, slot.year, slot.num)}</span>
@@ -274,7 +276,10 @@ function BreakdownTable({
             const { gap, good } = verdict(r, measure)
             return (
               <tr key={n.key}>
-                <td style={{ textAlign: 'left' }}>{n.label}</td>
+                <td style={{ textAlign: 'left' }}>
+                  {n.label}
+                  {n.owner && <span className="block text-[11px] text-muted-foreground">{n.owner}</span>}
+                </td>
                 <td>{formatKpi(r.actual[measure], row.unit)}</td>
                 <td>{formatKpi(r.plan[measure], row.unit)}</td>
                 <td className={good === null ? '' : good ? 'kpi-good' : 'kpi-bad'}>

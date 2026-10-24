@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   addCostCenter,
+  carryDepartmentOwners,
   countsOf,
   departmentsOf,
   editCostCenter,
   orphanCompanies,
+  ownerOf,
   plantAccessRows,
   removeDepartment,
   renameDepartment,
@@ -68,6 +70,18 @@ describe('organizasyon ağacı', () => {
     expect(editCostCenter(plant, 'OLD', { department: 'Welding' }).costCenters.find((c) => c.code === 'OLD')?.department).toBe('Welding')
     expect(removeDepartment(plant, 'Welding').departments).toEqual(['Stamping'])
     expect(addCostCenter(plant, { code: ' C ', name: '', department: 'Welding' }).costCenters.at(-1)).toEqual({ code: 'C', name: 'C', department: 'Welding' })
+  })
+
+  it('bölüm sorumlusu: yeniden adlandırmada yeni ada geçer, silinen bölümle düşer, sıra değişince kalır', () => {
+    const owners = [{ department: 'Stamping', userId: 'u1' }, { department: 'Welding', userId: 'u2' }]
+    expect(ownerOf({ departmentOwners: owners }, 'Welding')?.userId).toBe('u2')
+    expect(ownerOf({}, 'Welding')).toBeUndefined()
+    const renamed = renameDepartment(plant, 'Stamping', 'Press shop').departments
+    expect(carryDepartmentOwners(plant.departments!, renamed, owners)).toEqual([{ department: 'Press shop', userId: 'u1' }, { department: 'Welding', userId: 'u2' }])
+    expect(carryDepartmentOwners(plant.departments!, removeDepartment(plant, 'Welding').departments, owners)).toEqual([{ department: 'Stamping', userId: 'u1' }])
+    expect(carryDepartmentOwners(plant.departments!, ['Welding', 'Stamping'], owners)).toEqual(owners)
+    // Bir bölüm eklenirken diğeri silinmez: ad eşleşmesi korunur.
+    expect(carryDepartmentOwners(plant.departments!, ['Stamping', 'Welding', 'Paint'], owners)).toEqual(owners)
   })
 
   it('plant’i gören kullanıcılar: creator her şeyi, grup üyesi grubunun izniyle; kapsamayan grup görünmez', () => {

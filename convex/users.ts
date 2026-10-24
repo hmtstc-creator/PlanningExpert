@@ -291,6 +291,16 @@ export const remove = userMutation({
     // Açık oturumlar da kapanır; eski kayıtlarda adı kalır.
     await signOut(ctx.db, id)
     await ctx.db.delete(id)
+    // Sorumlu olduğu bölümler sorumsuz kalır (K7).
+    if (user.companyId) {
+      const plants = await ctx.db
+        .query('plants')
+        .withIndex('by_company', (q) => q.eq('companyId', user.companyId!))
+        .collect()
+      for (const p of plants) {
+        if ((p.departmentOwners ?? []).some((o) => o.userId === id)) await ctx.db.patch(p._id, { departmentOwners: (p.departmentOwners ?? []).filter((o) => o.userId !== id) })
+      }
+    }
     await audit(ctx.db, { actor: me.name, action: 'user.remove', target: user.name, companyId: user.companyId, holdingId: user.holdingId })
     return null
   },

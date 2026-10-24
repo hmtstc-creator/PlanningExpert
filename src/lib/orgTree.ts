@@ -31,6 +31,14 @@ export interface OrgPlant {
   departments?: string[]
   costCenters?: OrgCostCenter[]
   workCenters?: OrgWorkCenter[]
+  /** Bölüm sorumluları (K7); `name` sunucuda kullanıcıdan okunur. */
+  departmentOwners?: DepartmentOwner[]
+}
+
+export interface DepartmentOwner {
+  department: string
+  userId: string
+  name?: string
 }
 
 export interface OrgCompany {
@@ -211,6 +219,25 @@ export function editCostCenter(p: OrgPlant, code: string, patch: Partial<Omit<Or
 export function removeCostCenter(p: OrgPlant, code: string): PlantStructure {
   const s = structureOf(p)
   return { ...s, costCenters: s.costCenters.filter((c) => c.code !== code) }
+}
+
+/** Bölümün sorumlusu (yoksa undefined). */
+export function ownerOf(p: Pick<OrgPlant, 'departmentOwners'>, department: string): DepartmentOwner | undefined {
+  return (p.departmentOwners ?? []).find((o) => o.department === department)
+}
+
+/**
+ * Bölüm listesi değişince sorumlular: aynı adla kalan bölüm sorumlusunu
+ * korur; tam olarak bir bölüm gidip bir bölüm geldiyse (yeniden adlandırma,
+ * `renameDepartment`) sorumlu yeni ada geçer; silinen bölümün sorumlusu düşer.
+ */
+export function carryDepartmentOwners<T extends { department: string }>(before: string[], after: string[], owners: T[]): T[] {
+  const gone = before.filter((d) => !after.includes(d))
+  const added = after.filter((d) => !before.includes(d))
+  const renamed = gone.length === 1 && added.length === 1 && before.length === after.length ? { from: gone[0], to: added[0] } : null
+  return owners
+    .map((o) => (renamed && o.department === renamed.from ? { ...o, department: renamed.to } : o))
+    .filter((o) => after.includes(o.department))
 }
 
 export interface PlantAccessRow {

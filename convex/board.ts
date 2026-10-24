@@ -14,6 +14,15 @@ import { slotKey, trendSlots } from '../src/lib/kpi'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
 
+async function ownerNames(db: Any, owners: { department: string; userId: string }[]) {
+  const out: { department: string; name: string }[] = []
+  for (const o of owners) {
+    const u = await db.get(o.userId)
+    if (u) out.push({ department: o.department, name: u.name })
+  }
+  return out
+}
+
 export const overview = userQuery({
   args: { period: v.union(v.literal('month'), v.literal('week')), year: v.number(), num: v.number() },
   returns: v.any(),
@@ -48,6 +57,8 @@ export const overview = userQuery({
         holdingId: p.company.holdingId ?? null,
         holdingName: p.company.holdingId ? holdings.get(p.company.holdingId) : null,
         departments: p.plant.departments ?? [],
+        // Bölüm sorumlusunun adı (K7); silinmiş kullanıcı gösterilmez.
+        departmentOwners: await ownerNames(ctx.db, p.plant.departmentOwners ?? []),
         costCenters: p.plant.costCenters ?? [],
         access: { kpi: p.access.kpi, oee: p.access.oee },
         entries,

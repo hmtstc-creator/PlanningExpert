@@ -119,7 +119,7 @@ Kullanıcı kararları (2026-10-23):
   masraf yeri) — yapıldı (K7, 2026-10-24). *(docs/board.md)*
 - [x] ✅ Bölüm ile OEE **Area** birleşir (K3, 2026-10-03). Önceden iki ayrı gruplama
   var (bkz. 4.2). *(docs/board.md)*
-- [ ] **[G]** Bölüme sorumlu kullanıcı atanır. ✅ K7 evet (2026-10-24). *(docs/board.md)*
+- [x] ✅ Bölüme sorumlu kullanıcı atanır — yapıldı (K7, 2026-10-24; Department paneli → Responsible, Board'da görünür). *(docs/board.md)*
 - [ ] **[G]** Holding'e kendi hedefi (ör. grup OEE hedefi) girilir; girilmezse
   şirket planlarının toplamı. ✅ K7 evet (2026-10-24). *(docs/board.md)*
 - [ ] **[G]** Board Dashboard'un A3 / PDF çıktısı (KPI dashboard'undaki
