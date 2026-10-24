@@ -16,7 +16,7 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
-- **Cost center depoları (#54) — çift sayım kararlandı (2026-10-24):** kullanıcı: 171'in 172'den çektiği miktar 172'nin ZPP'sinde zaten var. Ara mamul (fabrikada üretilen hammadde kodu) yalnız mamul tarafında sayılır, hammadde MRP'sine girmez (`04-hammadde.md`). Açık değil; ileride ZPP bunu içermezse ara mamul talebi 171'in planından türetilmelidir.
+- **Cost center depoları (#54) — çift sayım kararlandı (2026-10-24, #56):** kullanıcı: 171'in 172'den çektiği miktar 172'nin ZPP'sinde zaten var. Ara mamul (fabrikada üretilen hammadde kodu) yalnız mamul tarafında sayılır, hammadde MRP'sine girmez (`04-hammadde.md`). Açık değil; ileride ZPP bunu içermezse ara mamul talebi 171'in planından türetilmelidir.
 - **OEE kısa duruşlar (#46, #47) — sunucuda elle doğrulama bekliyor (Karabasan oturumu):** bir gün × iş yeri için (a) Loading − Production = o günün ≥ 2 dk plansız duruş toplamı mı (fixture'da 7/7 vardiya tuttu; tutmazsa `MES_SHORT_STOP_MIN` varsayımı ve köprünün "Not explained" adımı yeniden ele alınır), (b) Loss Bridge'in A / P / OEE'si Dashboard'la aynı mı, (c) "Machine < 2 min" kalemleri ve MTTR'nin yeni değerleri makul mü. Kod: `src/lib/oeeShortStops.ts`, `oeeBridge.ts` `buildBridge`. Sunucudaki OEE Settings'te SCHED_DOWN'ın `breakReasonCodes`'ta olduğu da bakılmalı (SCHED_DOWN YNT kayıp sayılmasın).
 - **Yarım iş yok.** `main` ruleset ile korunuyor (bkz. [05](05-yayin-ve-isletim.md)); açık PR / dal yok.
 - **Gantt müdahaleleri tamam:** sürükle-bırak (#34), elle iş (#35), silme (#36) — `todolist.md` §1 *Gantt: elle iş*. Kullanıcı geri bildirimi bekleniyor (doğru süre / yer, sonraki lotlar küçülüyor mu). Açık: elle iş dondurulmuş (tam plan onaylı) işi itemez.
