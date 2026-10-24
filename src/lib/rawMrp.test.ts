@@ -242,3 +242,26 @@ describe('raw material MRP in the plan output', () => {
     expect(item.byProduct?.[0]).toMatchObject({ material: 'A', finishedStock: 3000, firstNeedWeek: 3 })
   })
 })
+
+describe('intermediate parts between cost centers', () => {
+  it('a code made in the plant is not bought: no coil need, no raw stock line', () => {
+    // 172 STAMP-1'i COIL-1'den üretir; 171 ASSY-1'i STAMP-1'den. 171'in
+    // çektiği miktar 172'nin ZPP talebinde zaten var (karar 2026-10-24).
+    const plan = buildRawRequirements({
+      products: [
+        { code: 'STAMP-1', rawMaterialCode: 'COIL-1', grossWeight: 2 },
+        { code: 'ASSY-1', rawMaterialCode: 'STAMP-1', grossWeight: 1 },
+      ],
+      weeklyDemand: [
+        { material: 'STAMP-1', periods: [{ label: 'W39', qty: -500 }] },
+        { material: 'ASSY-1', periods: [{ label: 'W39', qty: -300 }] },
+      ],
+      finishedStock: new Map([['STAMP-1', 200]]),
+      rawStock: new Map(),
+      weeks,
+    })
+    // Yalnız rulo: (500 − 200) × 2 kg = 600 kg. STAMP-1 satın alma satırı yok.
+    expect(plan.items.map((i) => i.rawMaterial)).toEqual(['COIL-1'])
+    expect(plan.items[0].needKg).toEqual([600, 0, 0, 0])
+  })
+})

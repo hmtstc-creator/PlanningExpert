@@ -49,5 +49,10 @@ verilir (tablo `costCenterStorage`, kural `src/lib/stockLocations.ts` → `stock
 - Parçanın cost center'ı = **ana makinesinin** (work center) cost center'ı; eş ürün aynı cost center'dadır.
 - Hammadde kodu, onu tüketen parçaların cost center'larının hammadde depolarından sayılır (birleşim).
 - Örnek: 171 ve 173 → WIP 2009, hammadde + bitmiş 1009; 172 → WIP 2010, hammadde + bitmiş 1009. 172 parçasının
-  2009'daki stoğu sayılmaz; 172 parçası 171'in hammaddesiyse 171 için 1009'dan sayılır.
+  2009'daki stoğu sayılmaz.
+- **Ara mamul** (karar 2026-10-24): hammadde kodu, fabrikada üretilen bir kodsa (başka bir ürün kartı ya da eş
+  ürün; ör. 172 üretir, 171 tüketir) stoğu **yalnız üreticinin mamul stoğunda** sayılır; hammadde stoğuna,
+  sac ihtiyacına ve satın alma önerisine girmez (`intermediateCodes`, `stockLocations.ts`). Gerekçe: 171'in
+  çektiği miktar zaten 172'nin ZPP talebinde. Böylece 1009 iki tarafta tikli olsa da çift sayım olmaz.
+  Kartın kendi kodunu hammadde göstermesi veri hatasıdır, ara mamul sayılmaz.
 - Tanımı olmayan cost center ya da cost center'ı olmayan parça **depo tikleriyle** sayılır (eski davranış).

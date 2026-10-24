@@ -197,6 +197,8 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - WIP deposu üretim girişidir (MB51) ve o cost center'ın mamul stoğuna sayılır.
 - Parçanın cost center'ı ana makinesinin work center'ından gelir. Tanım yoksa depo tikleri geçerli.
 - Örnek: 171, 173 → WIP 2009, ham + mamul 1009; 172 → WIP 2010, ham + mamul 1009.
+- Ara mamul (172 üretir, 171 tüketir): 171'in çektiği miktar 172'nin ZPP talebindedir; stok yalnız 172'nin mamul
+  stoğunda sayılır, hammadde MRP'sine (stok, ihtiyaç, satın alma) girmez. Çift sayım yok.
 
 ## Aksiyon listesi
 

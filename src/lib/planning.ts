@@ -1,6 +1,7 @@
 import { addDays, isoDate } from './dates'
 import { splitWeek } from './dailyDemand'
 import { DEFAULT_WORKING_DAYS } from './settingsDefaults'
+import { intermediateCodes } from './stockLocations'
 import { buildDayTimeline, type OvertimeWindow, type PlannedStop } from './shiftTimeline'
 
 // Planlama motorunun saf hesaplama katmanı.
@@ -1175,12 +1176,16 @@ export function buildRawMaterialPlan(
     if (co && co !== product.code) secondary.add(co)
   }
 
+  // Ara mamul (fabrikada üretilen kod) satın alınan sac değildir: talebi
+  // üreten cost center'ın ZPP'sindedir (stockLocations → intermediateCodes).
+  const intermediates = intermediateCodes([...products.values()])
+
   for (const job of jobs) {
     if (secondary.has(job.material)) continue
     const product = products.get(job.material)
     const raw = product?.rawMaterialCode?.trim()
     const grossWeight = product?.grossWeight ?? 0
-    if (!raw || grossWeight <= 0) continue
+    if (!raw || grossWeight <= 0 || intermediates.has(raw)) continue
 
     const entry = byRaw.get(raw) ?? { kg: 0, materials: new Set<string>(), uses: [] }
     // Brüt ağırlık parça başına.

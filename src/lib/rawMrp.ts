@@ -23,6 +23,7 @@
 //     eklenmez (kanban ileride ayrı bir kural olarak gelir).
 
 import type { ProductSpec } from './planning'
+import { intermediateCodes } from './stockLocations'
 
 export interface MrpWeek {
   /** Pazartesi (ISO). */
@@ -186,9 +187,11 @@ export function buildRawRequirements(input: {
     }
     return e
   }
+  // Ara mamul (fabrikada üretilen kod) satın alınmaz; talebi ZPP'dedir.
+  const intermediates = intermediateCodes(input.products)
   for (const p of input.products) {
     const raw = p.rawMaterialCode?.trim()
-    if (raw && !carrierOf.has(p.code.trim())) rawEntry(raw).materials.add(p.code.trim())
+    if (raw && !intermediates.has(raw) && !carrierOf.has(p.code.trim())) rawEntry(raw).materials.add(p.code.trim())
   }
 
   const missing = new Map<string, { pieces: number; reason: string }>()
@@ -218,6 +221,9 @@ export function buildRawRequirements(input: {
     const total = primaryPieces.reduce((a, b) => a + b, 0)
     const raw = carrier?.rawMaterialCode?.trim()
     const gross = carrier?.grossWeight ?? 0
+    // Hammaddesi ara mamulse sac ihtiyacı burada doğmaz: üreten cost
+    // center'ın ZPP talebinde zaten vardır.
+    if (raw && intermediates.has(raw)) continue
     if (total <= 0) {
       // Mamul stoğu ZPP boyunca yetiyor: sac ihtiyacı yok. Dökümde yine
       // görünür ki satırdaki ihtiyacın bu mamulden gelmediği okunsun.

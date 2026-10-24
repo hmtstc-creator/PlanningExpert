@@ -7,6 +7,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 ## Plan ve hesap
 
 - **Stok cost center'a göre sayılır** (2026-10-24, #54) — holdingde aynı kod bir cost center'da mamul, diğerinde hammadde; parça ana makinesinin cost center'ının depolarıyla (WIP + mamul / hammadde) sayılır, WIP mamul stoğuna dahil. Ayrı tablo `costCenterStorage`, tanım yoksa depo tikleri. *Alt.: depo tiklerine cost center listesi eklemek* (aynı depo farklı CC'de farklı rol alamazdı); *plants.costCenters içine yazmak* (org yönetimi yetkisi ile ana veri yetkisi karışırdı).
+- **Ara mamul yalnız mamul tarafında sayılır** (2026-10-24) — fabrikada üretilen bir kod başka parçanın hammaddesiyse hammadde stoğu / ihtiyacı / satın almaya girmez; tüketen CC'nin çektiği miktar üreticinin ZPP'sinde var (kullanıcı). *Alt.: ara mamul talebini tüketen CC'nin planından türetmek* (motorda büyük değişiklik, ZPP ile çift talep riski); *ayrı depo + uyarı* (SAP düzeni değişmeli).
 - **Müşteri önce, doluluk sonra** — geç bir parça müşteriyi durdurur; doluluk / setup kazancı bunun yerini tutmaz. *Alt.: doluluğu önce* (reddedildi).
 - **Geç iş = pay, bütün sipariş değil** (2026-10-22) — ZPP günlük ihtiyaç rehber; teslimde yarısı hazırsa yarısı zamanında. *Alt.: yalnızca son parçanın gecikmesi* (müşteri etkisini abartıyordu).
 - **Müşteri duruş süresi hesaplanmaz, tahmin gösterilir** — tüketim saatleri bilinmiyor; *ortalama* ve *son parça* verilir.

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   countedLocations,
+  intermediateCodes,
   isFinishedStockRow,
   isFinishedStockRowFor,
   isRawStockRow,
@@ -86,9 +87,12 @@ describe('locations per cost center', () => {
     expect(isFinishedStockRowFor(scope, 'ASSY-1', '2010')).toBe(false)
   })
 
-  it('the same code is raw material for the consuming cost center', () => {
-    expect(isRawStockRowFor(scope, 'STAMP-1', '1009')).toBe(true)
-    expect(isRawStockRowFor(scope, 'STAMP-1', '2010')).toBe(false)
+  it('an intermediate (made by 172, consumed by 171) counts once: finished only, never raw', () => {
+    // Karar 2026-10-24: 171'in çektiği miktar 172'nin ZPP talebinde zaten var.
+    expect(scope.intermediates).toEqual(new Set(['STAMP-1']))
+    expect(isFinishedStockRowFor(scope, 'STAMP-1', '1009')).toBe(true)
+    expect(isRawStockRowFor(scope, 'STAMP-1', '1009')).toBe(false)
+    expect(isRawStockRowFor(scope, 'STAMP-1', undefined)).toBe(false)
     expect(isRawStockRowFor(scope, 'COIL-1', '1009')).toBe(true)
   })
 
@@ -110,5 +114,18 @@ describe('locations per cost center', () => {
       ['ASSY-1', 30],
       ['ASSY-1', -5],
     ])
+  })
+})
+
+describe('intermediateCodes', () => {
+  it('a raw code made by another card (or its co-product) is an intermediate; a self reference is not', () => {
+    expect(
+      intermediateCodes([
+        { code: 'A', rawMaterialCode: 'B' },
+        { code: 'B', coProduct: 'C', rawMaterialCode: 'COIL' },
+        { code: 'D', rawMaterialCode: 'C' },
+        { code: 'E', rawMaterialCode: 'E' },
+      ]),
+    ).toEqual(new Set(['B', 'C']))
   })
 })
