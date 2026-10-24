@@ -87,6 +87,15 @@ Kararlar:
    gerekirse planlamacı söyler.
 5. Yetki seviyesi değişmedi: erişim plant × modül (gruplar). Bölüm ve masraf
    yeri seviyesinde ayrı yetki yok.
+   **Bölüm sorumlusu (K7, 2026-10-24):** her bölüme en çok bir sorumlu
+   kullanıcı atanır (Department paneli → *Responsible*; şirketin etkin
+   kullanıcıları). Yetki vermez, yalnız gösterilir: plant panelindeki bölüm
+   kartında, Board'da bölüm satırının altında ve bölüm seçiliyken başlıkta.
+   Kayıt `plants.departmentOwners` (bölüm adı → kullanıcı); bölüm yeniden
+   adlandırılınca sorumlu yeni ada geçer, bölüm silinince düşer, kullanıcı
+   silinince bölüm sorumsuz kalır (`carryDepartmentOwners`,
+   `src/lib/orgTree.ts`; sunucu `platform.setDepartmentOwner`, denetim
+   kaydına yazılır).
 6. **Her work center bir masraf yerine bağlıdır** (2026-10-03, planlamacı;
    `presses.costCenter`). Bağ Work Center Definitions'ta seçilir. Yeni work
    center masraf yerisiz açılmaz, bağ boşaltılamaz, plant'in olmayan kodu
@@ -140,7 +149,7 @@ netleşince eski sayfalar kaldırılacak (todolist). Kural kodu:
 
 - ~~Board Dashboard ve KPI kırılımında bölüm seviyesi~~ → yapıldı (K7, 2026-10-24).
 - Bölüm = OEE Area birleştirmesi.
-- Bölüm sorumlusu (kullanıcıyı bölüme atama) gerekir mi?
+- ~~Bölüm sorumlusu (kullanıcıyı bölüme atama) gerekir mi?~~ → yapıldı (K7, 2026-10-24).
 
 - Board Dashboard'un A3 / PDF çıktısı (KPI dashboard'undaki gibi).
 - Holding'e plan / hedef (ör. grup OEE hedefi) girilsin mi, yoksa yalnızca

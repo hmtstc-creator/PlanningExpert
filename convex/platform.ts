@@ -7,6 +7,7 @@ import { audit, diff } from './audit'
 import { TABLES, userMutation, userQuery } from './guarded'
 import { isPlantTable } from './plantDb'
 import { MODULES, canManageCompany, isPlatform } from '../src/lib/tenancy'
+import { carryDepartmentOwners } from '../src/lib/orgTree'
 import { securityOverview as buildSecurityOverview, type SecurityUser } from '../src/lib/securityOverview'
 import { SIGNIN_BUCKET_MS } from '../src/lib/signinGuard'
 import { effectiveShifts, normalizeShifts, shiftLabel, shiftProblems, type ShiftDef } from '../src/lib/shifts'
@@ -143,11 +144,16 @@ export const companies = userQuery({
         .collect()
       // Work center'lar ağacın en alt seviyesi: masraf yerine bağlı (organizasyon teyidi).
       const plants: Any[] = []
-      for (const p of plantDocs) plants.push({ ...p, workCenters: await workCentersOf(ctx.db, p._id) })
       const users = await ctx.db
         .query('users')
         .withIndex('by_company', (q: Any) => q.eq('companyId', c._id))
         .collect()
+      const nameOf = new Map(users.map((u: Any) => [u._id, u.name]))
+      for (const p of plantDocs) {
+        // Bölüm sorumlusunun adı kullanıcıdan okunur (ad değişirse ekranda da değişir).
+        const departmentOwners = (p.departmentOwners ?? []).filter((o: Any) => nameOf.has(o.userId)).map((o: Any) => ({ ...o, name: nameOf.get(o.userId) }))
+        plants.push({ ...p, departmentOwners, workCenters: await workCentersOf(ctx.db, p._id) })
+      }
       const holding = c.holdingId ? await ctx.db.get(c.holdingId as Id<'holdings'>) : null
       out.push({
         ...c,
@@ -268,7 +274,11 @@ export const updatePlant = userMutation({
         : {}),
     }
     const departments = args.departments !== undefined ? checkDepartments(args.departments) : (plant.departments ?? [])
-    if (args.departments !== undefined) patch.departments = departments
+    if (args.departments !== undefined) {
+      patch.departments = departments
+      // Bölüm yeniden adlandırılınca sorumlu yeni ada geçer; silinen bölümün sorumlusu düşer.
+      if (plant.departmentOwners?.length) patch.departmentOwners = carryDepartmentOwners(plant.departments ?? [], departments, plant.departmentOwners)
+    }
     // Bölüm listesi değişince masraf yerleri de yeniden denetlenir (silinen bölümde masraf yeri kalmasın).
     const costCenters = args.costCenters ?? (args.departments !== undefined ? plant.costCenters : undefined)
     if (costCenters !== undefined) {
@@ -307,6 +317,38 @@ export const updatePlant = userMutation({
     await ctx.db.patch(args.id, patch)
     const detail = diff(plantSummary(plant), plantSummary({ ...plant, ...patch }))
     if (detail) await audit(ctx.db, { actor: me.name, action: 'plant.update', target: patch.name, detail, companyId: plant.companyId })
+    return null
+  },
+})
+
+/**
+ * Bölüm sorumlusu (K7): şirketin etkin bir kullanıcısı; bölüm başına en çok
+ * bir. `userId` verilmezse sorumlu kaldırılır. Yetki değişmez (erişim plant ×
+ * modül, gruplardan); sorumlu Board ve organizasyon ekranlarında görünür.
+ */
+export const setDepartmentOwner = userMutation({
+  args: { plantId: v.id('plants'), department: v.string(), userId: v.optional(v.id('users')) },
+  returns: v.null(),
+  handler: async (ctx, { plantId, department, userId }) => {
+    const me = ctx.sessionUser
+    const plant = await ctx.db.get(plantId)
+    if (!plant) throw new ConvexError('Plant not found')
+    if (!canManageCompany(me, plant.companyId)) throw new ConvexError('Only a creator of this company can change the plant')
+    if (!(plant.departments ?? []).includes(department)) throw new ConvexError(`${department} is not a department of this plant`)
+    const owners = (plant.departmentOwners ?? []).filter((o) => o.department !== department)
+    const before = (plant.departmentOwners ?? []).find((o) => o.department === department)
+    let name: string | null = null
+    if (userId) {
+      const user = await ctx.db.get(userId)
+      if (!user || user.companyId !== plant.companyId || user.platformRole) throw new ConvexError('Choose a user of this company')
+      if (user.active === false) throw new ConvexError(`${user.name} is inactive`)
+      owners.push({ department, userId })
+      name = user.name
+    }
+    if ((before?.userId ?? null) === (userId ?? null)) return null
+    const previous = before ? ((await ctx.db.get(before.userId))?.name ?? '—') : '—'
+    await ctx.db.patch(plantId, { departmentOwners: owners })
+    await audit(ctx.db, { actor: me.name, action: 'plant.update', target: plant.name, detail: `${department} responsible: ${previous} → ${name ?? '—'}`, companyId: plant.companyId })
     return null
   },
 })

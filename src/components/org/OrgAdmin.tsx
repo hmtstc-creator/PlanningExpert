@@ -17,6 +17,7 @@ import {
   countsOf,
   departmentsOf,
   editCostCenter,
+  ownerOf,
   plantAccessRows,
   removeCostCenter,
   removeDepartment,
@@ -836,6 +837,7 @@ function PlantPanel({ plant: p, company: c, onSelect }: { plant: OrgPlant; compa
                 <LevelChip level="department" /> {d.name}
                 <span className="ml-auto text-xs font-normal text-muted-foreground">{d.costCenters.length} CC ›</span>
               </span>
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">Responsible: {ownerOf(p, d.name)?.name ?? '—'}</span>
               <span className="mt-1.5 flex flex-wrap gap-1">
                 {d.costCenters.slice(0, 6).map((cc) => (
                   <span key={cc.code} className="rounded bg-muted px-1 font-mono text-[10px] text-muted-foreground" title={cc.name}>
@@ -914,6 +916,36 @@ function PlantPanel({ plant: p, company: c, onSelect }: { plant: OrgPlant; compa
 
 // ---- Department -------------------------------------------------------------------
 
+/** Bölüm sorumlusu (K7): şirketin etkin kullanıcılarından biri; yetki vermez. */
+function DepartmentOwner({ plant: p, department }: { plant: OrgPlant; department: string }) {
+  const { orgUsers } = useCompanyPeople(p.companyId)
+  const { run, error, clearError, pending } = useSafeMutation(api.platform.setDepartmentOwner)
+  const owner = ownerOf(p, department)
+  const choices = orgUsers.filter((u) => u.active || u._id === owner?.userId).sort((a, b) => a.name.localeCompare(b.name))
+  return (
+    <div className="mt-3">
+      <ErrorBanner message={error} onDismiss={clearError} />
+      <label className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium">Responsible</span>
+        <select
+          className={`w-56 ${input}`}
+          value={owner?.userId ?? ''}
+          disabled={pending}
+          onChange={(e) => void run({ plantId: p._id, department, ...(e.target.value ? { userId: e.target.value } : {}) })}
+        >
+          <option value="">— nobody —</option>
+          {choices.map((u) => (
+            <option key={u._id} value={u._id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-muted-foreground">Shown on the Board for {department}; access still comes from groups.</span>
+      </label>
+    </div>
+  )
+}
+
 function DepartmentPanel({ plant: p, department, onSelect }: { plant: OrgPlant; department: string | null; onSelect: (n: OrgNode) => void }) {
   const structure = useSaveStructure(p)
   const [code, setCode] = useState('')
@@ -980,6 +1012,8 @@ function DepartmentPanel({ plant: p, department, onSelect }: { plant: OrgPlant; 
           ? 'These cost centers were defined before departments. Choose a department for each one — the code and all its data stay.'
           : `Cost centers of ${department} in ${p.name}. The code is the SAP cost center; OEE uploads and KPI entries are matched by it.`}
       </p>
+
+      {department !== null && <DepartmentOwner plant={p} department={department} />}
 
       <div className="mt-3">
         <Table head={[<LevelChip key="c" level="costCenter" />, 'Code', 'Name', 'Department', 'Work centers', '']} empty={!list.length && (department === null ? 'Nothing left here.' : 'No cost center yet — add the first one below.')}>

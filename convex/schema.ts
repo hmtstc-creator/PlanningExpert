@@ -56,6 +56,11 @@ export default defineSchema({
      */
     departments: v.optional(v.array(v.string())),
     /**
+     * Bölüm sorumluları (K7): bölüm adı → şirketin kullanıcısı; bölüm başına
+     * en çok bir. Bölümün adı değişince taşınır, bölüm silinince düşer.
+     */
+    departmentOwners: v.optional(v.array(v.object({ department: v.string(), userId: v.id('users') }))),
+    /**
      * Fabrikanın masraf yerleri (SAP cost center kodu + adı + bölümü). Tek
      * kaynak: OEE ve diğer modüller adı buradan okur. Bölümsüz olanlar eski
      * kayıtlar (ekranda "Unassigned").

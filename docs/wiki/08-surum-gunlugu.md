@@ -1,9 +1,10 @@
 # 08 · Sürüm günlüğü
 
-> Son güncelleme: 2026-10-24 (K5) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
+> Son güncelleme: 2026-10-24 (K7 bölüm sorumlusu) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| — | 2026-10-24 | **Bölüm sorumlusu (K7)** — Department panelinde *Responsible* (şirketin etkin kullanıcısı, bölüm başına bir); plant bölüm kartında ve Board'da bölüm satırı / başlığında görünür. Yetki vermez. Kayıt `plants.departmentOwners`; yeniden adlandırmada taşınır, silinen bölüm / kullanıcıyla düşer (`carryDepartmentOwners`, `platform.setDepartmentOwner`) | K7 kararı (Ahmet) → `docs/board.md` |
 | — | 2026-10-24 | **Board: bölüm seviyesi (K7)** — Board Dashboard plant → bölüm → masraf yeri iner (bölümü olmayan plant doğrudan masraf yerine; bölümsüzler "Without a department"); bölüm seçiliyken kartlar ve dikkat listesi o bölümün. KPI dashboard'unda masraf yeri seçiminin üstünde bölüm kutuları (`src/lib/board.ts` → `departmentsOf`, `scopeSeries`) | K7 kararı (Ahmet) → `docs/board.md` |
 | #59 | 2026-10-24 | **K5: kod değişince OEE geçmişi taşınır** — Work Center Definitions → *Change code* artık OEE geçmişini (vardiya, gün, sipariş, hafta, ay, duruş, kayıp, MTTR, açık konular) arka planda sayfa sayfa yeni koda taşır; aynı anahtarda yeni kodlu satır varsa eskisi silinir. `workCenterAliases` eşlemesi eski kodla gelen SAP satırını yüklemede yeni koda yazar (`convex/workCenterHistory.ts`, `src/lib/workCenterAlias.ts`). Ayrıca K7 (dördü evet → [G]) ve K8 (bugünkü ağırlıklar varsayılan) kaydedildi | Ahmet kararı; geçmiş iki koda bölünüyordu. Plan arşivi eski kodla kalır |
 | — | 2026-10-24 | **OEE kısa duruşlar: kontrol betiği** — `scripts/oee-shortstop-check.sh` (salt okunur): en yeni günlük yedekte (a) gün × iş yeri Loading − Production ile ≥ eşik plansız duruş toplamını, (b) haftalık Dashboard A / P / Q / OEE'yi, (c) kod başına kısa duruşları ve MTTR eski → yeniyi yazar; SCHED_DOWN'ın molada olduğunu denetler | #46 / #47'nin gerçek veriyle doğrulaması yalnız sunucuda yapılabiliyor → `09-acik-konular.md` |
