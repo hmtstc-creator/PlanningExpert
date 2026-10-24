@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-24 · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-24 (#59) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -16,6 +16,9 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
+- **K7 — dört geliştirme işi (karar 2026-10-24, #59):** Board / KPI kırılımına bölüm seviyesi, bölüm sorumlusu, holding hedefi (girilmezse şirket planlarının toplamı), Board A3 / PDF çıktısı. Her biri ayrı oturum; önce `docs/board.md` ve `todolist.md` §2 *Organizasyon ve Board*. Sıradaki adım: bölüm seviyesi (Board kırılımı).
+- **K5 (#59) — canlıda ilk kod değişikliğinde bak:** *Change code* sonrası OEE sayfalarında eski kod kaybolmalı, geçmiş yeni kodda görünmeli; taşıma arka planda (`convex/workCenterHistory.ts` → `move`, tablo başına sayfa). Eski kodla yüklenen dosya yeni koda yazılır (`workCenterAliases`).
+- **Ders:** PR açmadan hemen önce `main` başka bir PR ile ilerlediyse ve ikisi de 08'in üst satırını değiştirdiyse PR çakışır; GitHub çakışmalı PR'da CI çalıştırmaz (check yok). Çözüm: `git merge origin/main`, iki satırı da tut.
 - **Cost center depoları (#54) — çift sayım kararlandı (2026-10-24, #56):** kullanıcı: 171'in 172'den çektiği miktar 172'nin ZPP'sinde zaten var. Ara mamul (fabrikada üretilen hammadde kodu) yalnız mamul tarafında sayılır, hammadde MRP'sine girmez (`04-hammadde.md`). Açık değil; ileride ZPP bunu içermezse ara mamul talebi 171'in planından türetilmelidir.
 - **OEE kısa duruşlar (#46, #47) — sunucuda elle doğrulama bekliyor (Karabasan oturumu):** bir gün × iş yeri için (a) Loading − Production = o günün ≥ 2 dk plansız duruş toplamı mı (fixture'da 7/7 vardiya tuttu; tutmazsa `MES_SHORT_STOP_MIN` varsayımı ve köprünün "Not explained" adımı yeniden ele alınır), (b) Loss Bridge'in A / P / OEE'si Dashboard'la aynı mı, (c) "Machine < 2 min" kalemleri ve MTTR'nin yeni değerleri makul mü. Kod: `src/lib/oeeShortStops.ts`, `oeeBridge.ts` `buildBridge`. Sunucudaki OEE Settings'te SCHED_DOWN'ın `breakReasonCodes`'ta olduğu da bakılmalı (SCHED_DOWN YNT kayıp sayılmasın). **Kontrol betiği:** sunucu oturumunda `bash /opt/planningexpert/scripts/oee-shortstop-check.sh` (salt okunur, en yeni günlük yedek, koddan bağımsız hesap): (a) ortalama |fark| ≥ 2 dk ile en küçükse varsayım tutuyor, "bütün plansızla" daha küçükse MES < 2 dk'yı da düşüyor demektir; (b) yazdığı haftalık A / P / Q / OEE Loss Bridge'te aynı hafta ile karşılaştırılır; (c) kısa dk / adet ve MTTR eski → yeni; SCHED_DOWN satırı "UYARI" ise ayar düzeltilir. Çıktı bulut oturumuna getirilir.
 - **Yarım iş yok.** `main` ruleset ile korunuyor (bkz. [05](05-yayin-ve-isletim.md)); açık PR / dal yok.
