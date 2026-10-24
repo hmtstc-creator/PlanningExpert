@@ -1,6 +1,6 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-24 (K5, K7, K8) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-24 (K5, K7, K8, #62) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
@@ -55,6 +55,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 ## Yönetim ekranları
 
+- **Bölüm sorumlusu bölüm adına bağlı, ayrı tablo yok** (2026-10-24, #62) — `plants.departmentOwners` (bölüm adı → kullanıcı); yeniden adlandırmada `carryDepartmentOwners` taşır (tam bir ad gidip bir ad geldiyse), silinen bölüm / kullanıcıyla düşer. Sorumlu yetki vermez, yalnız gösterilir. *Alt.: bölümleri ID'li ayrı tabloya taşımak* (todolist P1 *Bölümler ad listesi*; masraf yeri, OEE, KPI, Board adla bağlı — büyük göç; bölüme hedef ya da yetki eklenirse yeniden ele alınır).
 - **Board / KPI'da bölüm seviyesi, bölüm sorumlusu, holding hedefi, Board PDF** (2026-10-24, Ahmet, K7) — dördü de yapılacak (todolist 2 → [G]); holding hedefi girilmezse şirket planlarının toplamı.
 - **KPI ağırlıkları bugünkü gibi** (2026-10-24, K8, varsayılan) — Absenteeism % normal mevcudiyetle, Productivity (adet/saat sayılır) toplam mevcudiyetle; saati boş satır: hiçbirinde yoksa eşit, varsa 0 (`src/lib/kpi.ts`, `weighted`). Ahmet sitede yanlış görürse değişir. *Alt.: operatör sayısıyla* (Productivity adet/kişi olsaydı doğru olurdu; birim bilinmiyor).
 - **Organization map ayrı sayfa, eski sayfalar kalır** (2026-10-22) — kullanıcı istedi; harita yeterli olunca eski ağaç / Users & permissions onayla kaldırılır. *Alt.: eski sayfayı hemen değiştirmek* (geri dönüşsüz, riskli).
