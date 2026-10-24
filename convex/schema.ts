@@ -222,6 +222,18 @@ export default defineSchema({
   })
     .index('by_plant', ['plantId']),
 
+  // Work center kod eşlemesi (eski kod → yeni kod; K5): kod değişince OEE
+  // geçmişi taşınır, eski kodla gelen SAP satırı yüklemede yeni koda yazılır
+  // (src/lib/workCenterAlias.ts, convex/workCenterHistory.ts).
+  workCenterAliases: defineTable({
+    ...plantField,
+    from: v.string(),
+    to: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_from', ['plantId', 'from'])
+    .index('by_plant', ['plantId']),
+
   // Pres tanımları: hangi pres hangi holde. Aynı holdeki presler aynı anda
   // setup yapamaz (vinç kısıtı) — planlama motoru bunu buradan okur.
   presses: defineTable({

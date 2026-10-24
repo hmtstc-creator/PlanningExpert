@@ -6,8 +6,8 @@
  * kayıtlara birlikte yazılır. `db` fabrikaya kilitli veritabanıdır
  * (convex/plantDb.ts) — yalnızca seçili plant'in kayıtları.
  *
- * Kapsam dışı (geçmiş, değişmez): yüklenen OEE verisi (SAP dosyasındaki kod
- * olduğu gibi kalır) ve plan arşivi (planSnapshots).
+ * OEE geçmişi ayrı ve arka planda taşınır (workCenterHistory.ts). Kapsam dışı
+ * (geçmiş, değişmez): plan arşivi (planSnapshots).
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

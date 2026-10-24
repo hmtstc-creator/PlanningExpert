@@ -18,10 +18,10 @@ Ayrıntı ve gerekçe ilgili maddede; karar verilince madde güncellenir.
 | K2 | Yedek hedefi: kabul edilen veri kaybı (RPO) ve geri dönüş süresi (RTO) | 4.1 |
 | ~~K3~~ | ✅ Evet: bölümün OEE'si olur, ayrı OEE alanı yok | 2, 4.2 |
 | ~~K4~~ | ✅ Hayır, gerek yok | 4.2 |
-| K5 | Work center kodu değişince OEE geçmişi de taşınsın mı? | 4.2 |
+| ~~K5~~ | ✅ Evet (2026-10-24): geçmiş arka planda taşınır, eski kodla gelen satır yeni koda yazılır | 4.2 |
 | ~~K6~~ | ✅ Hayır | 4.3 |
-| K7 | Board / KPI kırılımına bölüm seviyesi; bölüm sorumlusu; holding hedefi; Board PDF | 2 |
-| K8 | KPI ağırlıkları (Absenteeism, Productivity birimi, saati boş satır) | 2 |
+| ~~K7~~ | ✅ Dördü de evet (2026-10-24) → geliştirme işi [G] | 2 |
+| ~~K8~~ | ✅ Varsayılan kabul (2026-10-24): bugünkü ağırlıklar kalır; Ahmet sitede düzeltecek | 2 |
 | K9 | OEE: Avg setup'a ara süreler; kayıp grubu adları | 2 |
 | K10 | Koddaki sabit sayılar: programda mı, kullanıcıda mı (P/K) | 2 |
 | K11 | Fabrika karşılaştırma ekranının içeriği | 2 |
@@ -40,6 +40,9 @@ Holding → Company → Plant → Department → Cost center → Work center
 
 - [ ] **[S]** Bir holding aç; holding'siz şirketleri (Metal Stamping, Hala5)
   şirket panelinde holding'e bağla.
+  Ad (Ahmet, 2026-10-24): holding **Ahmet**, gereken yeni adlar sırayla **Ahmet 2,
+  Ahmet 3 …**; doğru adlar sonra sitede düzeltilir. Canlı veri yalnız sitede
+  (bulut oturumunun Convex erişimi yok) — Organization map'ten yapılır.
 - [ ] **[S]** Aynı şirkette iki "Stamping" plant'i var: biri fazlaysa sil
   (verisi olanı tut), değilse adını değiştir.
 - [ ] **[S]** Her plant'e bölümleri ekle; "Without a department" altındaki
@@ -112,25 +115,25 @@ Kullanıcı kararları (2026-10-23):
 ## 2. Açık kararlar (konuşulacak)
 
 ### Organizasyon ve Board
-- [ ] **[K]** Board Dashboard ve KPI kırılımına bölüm seviyesi (plant →
-  bölüm → masraf yeri) eklensin mi? *(docs/board.md)*
+- [ ] **[G]** Board Dashboard ve KPI kırılımına bölüm seviyesi (plant →
+  bölüm → masraf yeri). ✅ K7 evet (2026-10-24). *(docs/board.md)*
 - [x] ✅ Bölüm ile OEE **Area** birleşir (K3, 2026-10-03). Önceden iki ayrı gruplama
   var (bkz. 4.2). *(docs/board.md)*
-- [ ] **[K]** Bölüme sorumlu kullanıcı atansın mı? *(docs/board.md)*
-- [ ] **[K]** Holding'e kendi hedefi (ör. grup OEE hedefi) girilsin mi,
-  yoksa yalnızca şirket planlarının toplamı mı kullanılsın? *(docs/board.md)*
-- [ ] **[K]** Board Dashboard'un A3 / PDF çıktısı (KPI dashboard'undaki
-  gibi). *(docs/board.md)*
+- [ ] **[G]** Bölüme sorumlu kullanıcı atanır. ✅ K7 evet (2026-10-24). *(docs/board.md)*
+- [ ] **[G]** Holding'e kendi hedefi (ör. grup OEE hedefi) girilir; girilmezse
+  şirket planlarının toplamı. ✅ K7 evet (2026-10-24). *(docs/board.md)*
+- [ ] **[G]** Board Dashboard'un A3 / PDF çıktısı (KPI dashboard'undaki
+  gibi). ✅ K7 evet (2026-10-24). *(docs/board.md)*
 - [ ] **[K]** Fabrika karşılaştırma ekranının içeriği (ilk sürüm yalnızca
   OEE). *(docs/plant-genisletme.md — aşama 7)*
 
 ### KPI
-- [ ] **[K]** Absenteeism % ağırlığı: normal mevcudiyet saati mi, operatör
-  sayısı mı? *(docs/kpi.md → Açık notlar)*
-- [ ] **[K]** Productivity'nin birimi (adet/saat, adet/kişi …): birime göre
-  doğru ağırlık değişir. *(docs/kpi.md)*
-- [ ] **[K]** Saati boş satırın ağırlığı (bugün: hiçbirinde saat yoksa
-  eşit, bazılarında varsa 0). *(docs/kpi.md)*
+- [x] ✅ K8 (2026-10-24, varsayılan): Absenteeism % normal mevcudiyet saatiyle
+  ağırlıklı (bugünkü gibi). *(docs/kpi.md)*
+- [x] ✅ K8 (varsayılan): Productivity adet/saat sayılır → toplam mevcudiyet
+  saatiyle ağırlıklı. Birim farklıysa Ahmet sitede bildirir. *(docs/kpi.md)*
+- [x] ✅ K8 (varsayılan): saati boş satır — hiçbirinde saat yoksa eşit,
+  bazılarında varsa 0 (bugünkü gibi). *(docs/kpi.md)*
 
 ### OEE
 - [ ] **[K]** Avg setup'a, birleşen setup kayıtları arasındaki süre de
@@ -247,8 +250,9 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
     koduyla kalır (geçmiş değişmez).
   - KPI girişi olan cost center kaldırılamaz (geçmişi sessizce hesaptan
     düşerdi); work center'ı bağlı cost center kaldırılamaz.
-  - [ ] **[K]** OEE geçmişi de kod değişikliğiyle yeni koda taşınsın mı?
-    (Bugün taşınmaz; SAP dosyası eski kodu taşır.)
+  - [x] ✅ K5 (2026-10-24): kod değişince OEE geçmişi arka planda yeni koda
+    taşınır (aynı anahtarda yeni kodlu satır varsa eskisi silinir); eşleme
+    tablosu (`workCenterAliases`) eski kodla gelen SAP satırını yeni koda yazar.
   - [x] ✅ Parça (malzeme kodu) için aynı bütünlük: kalıp bakım /
     problem / hazırlık / alarm kaydı, plan müdahalesi ya da eş ürün bağı
     olan parça silinmez, kodu değiştirilmez. Master data'da makine alanına

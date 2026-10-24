@@ -4754,5 +4754,32 @@
       },
       "optional": false
     }
+  },
+  "workCenterAliases": {
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "from": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "to": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
   }
 }
