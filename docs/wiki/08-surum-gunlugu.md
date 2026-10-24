@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| — | 2026-10-24 | **Ara mamul çift sayılmaz** — hammadde kodu fabrikada üretilen bir kodsa (172 üretir, 171 tüketir) stoğu yalnız mamulde sayılır; hammadde stoğu, sac ihtiyacı ve satın alma önerisi yok (`intermediateCodes`; `stockScope`, `rawMrp`, `buildRawMaterialPlan`) | Ahmet kararı: 171'in çektiği 172'nin ZPP'sinde zaten var → `04-hammadde.md` |
 | #54 | 2026-10-24 | **Cost center başına depolar** — Storage Locations'ta her cost center'a Production (WIP), Finished goods, Raw material depoları (`costCenterStorage`); parça ana makinesinin cost center'ının depolarıyla sayılır (plan, doğrulayıcı, Demand, Capacity, MRP, MB51 üretimi, kalıp vuruşu). Tanım yoksa tikler (geri uyumlu) | Ahmet: aynı kod bir CC'de mamul, diğerinde hammadde (171/173 → WIP 2009, 172 → WIP 2010, 1009 ortak) → `04-hammadde.md` |
 | #52 | 2026-10-24 | **Gantt: boşluğa tıkla → elle iş** — turuncu kesikli boşluk (pres boş) tıklanabilir; *Add job* penceresi o pres, gün ve boşluğun başlangıç saatiyle (5 dk yukarı yuvarlı) dolu açılır. Yalnız ekran; motor değişmedi | Ahmet: öteleyip açtığı araya tıklayıp üretim ekleyemiyordu |
 | — | 2026-10-24 | **OEE Agent Insights: takılı rapor** — iş yarıda ölen rapor (sonucu yazılamayan) 'running'de kalıyor, aynı filtre gün boyu hep onu döndürüyordu; 15 dk'dan eski 'running' takılı sayılır (`isStaleInsight`), sayfa uyarı + *Regenerate* gösterir, yeni istek onu başarısız yapıp yeniden başlatır | Ahmet: rapor 1 saattir "running" → `docs/oee-agent-report.md` |

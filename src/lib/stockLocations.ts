@@ -112,6 +112,35 @@ export type CostCenterLocations = {
   raw?: readonly string[]
 }
 
+/**
+ * Ara mamul: bir parçanın hammadde kodu olarak geçen ama fabrikada üretilen
+ * (ürün kartı ya da eş ürün olarak tanımlı) kod. Ör. 172'nin ürettiği,
+ * 171'in tükettiği parça. Karar (2026-10-24): 171'in çektiği miktar zaten
+ * 172'nin ZPP talebindedir; bu yüzden ara mamulün stoğu yalnız bitmiş ürün
+ * tarafında sayılır, hammadde stoğuna, ihtiyacına ve satın alma önerisine
+ * girmez. Aynı depo (ör. 1009) iki tarafta da tikli olsa çift sayım olmaz.
+ */
+export function intermediateCodes(
+  products: readonly { code: string; coProduct?: string | null; rawMaterialCode?: string | null }[],
+): Set<string> {
+  // Kodu üreten kartlar (kendisi ya da eş ürün olarak taşıyanı).
+  const makers = new Map<string, Set<string>>()
+  const add = (code: string, by: string) => makers.set(code, (makers.get(code) ?? new Set()).add(by))
+  for (const p of products) {
+    const code = p.code.trim()
+    add(code, code)
+    const co = p.coProduct?.trim()
+    if (co) add(co, code)
+  }
+  const out = new Set<string>()
+  for (const p of products) {
+    const raw = p.rawMaterialCode?.trim()
+    // Kartın kendi kodunu hammadde göstermesi veri hatasıdır, ara mamul değil.
+    if (raw && [...(makers.get(raw) ?? [])].some((by) => by !== p.code.trim())) out.add(raw)
+  }
+  return out
+}
+
 const clean = (codes: readonly string[] | undefined) => (codes ?? []).map((c) => c.trim()).filter(Boolean)
 
 /** Bir cost center tanımının sayım kümeleri; WIP bitmiş ürüne de sayılır. */
@@ -131,6 +160,8 @@ export type StockScope = {
   costCenterOf: (material: string) => string | undefined
   /** Malzemenin bitmiş ürün / üretim girişi için geçerli kümeler. */
   countedFor: (material: string) => CountedLocations
+  /** Ara mamuller: hammadde stoğuna sayılmaz (yalnız bitmiş ürün). */
+  intermediates: Set<string>
   /** Bir hammadde kodunun eldeki stoğu hangi depolardan sayılır. */
   rawLocationsFor: (rawCode: string) => Set<string>
   /** Tanımı olan cost center'lar (boş: bugünkü depo tikleri geçerli). */
@@ -150,7 +181,9 @@ export type StockScope = {
  *
  * Hammadde kodu, onu tüketen parçaların cost center'larının hammadde
  * depolarından sayılır (birkaç cost center tüketiyorsa birleşimi; biri
- * tanımsızsa tiklerin hammadde depoları da eklenir).
+ * tanımsızsa tiklerin hammadde depoları da eklenir). Ara mamulün
+ * (fabrikada üretilen kod) hammadde deposu yoktur: stoğu yalnız bitmiş
+ * üründe sayılır (`intermediateCodes`).
  */
 export function stockScope(input: {
   locations: readonly LocationFlags[]
@@ -190,12 +223,17 @@ export function stockScope(input: {
     const cc = costCenterOf(material)
     return (cc && byCc.get(cc)) || global
   }
+  const intermediates = intermediateCodes(input.products ?? [])
   const rawCache = new Map<string, Set<string>>()
   const rawLocationsFor = (rawCode: string) => {
     const code = rawCode.trim()
     const hit = rawCache.get(code)
     if (hit) return hit
     const out = new Set<string>()
+    if (intermediates.has(code)) {
+      rawCache.set(code, out)
+      return out
+    }
     const users = rawUsers.get(code) ?? new Set<string | undefined>([undefined])
     for (const cc of users) for (const l of (cc ? byCc.get(cc)! : global).raw) out.add(l)
     rawCache.set(code, out)
@@ -205,6 +243,7 @@ export function stockScope(input: {
     global,
     costCenterOf,
     countedFor,
+    intermediates,
     rawLocationsFor,
     defined: new Set(byCc.keys()),
     countedForCostCenter: (cc) => byCc.get(cc.trim()) ?? global,
@@ -219,6 +258,7 @@ export function isFinishedStockRowFor(scope: StockScope, material: string, stora
 
 /** MB52 satırı, hammadde kodunu tüketen cost center'ların eldeki stoğuna sayılır mı. */
 export function isRawStockRowFor(scope: StockScope, rawCode: string, storageLocation: string | undefined): boolean {
+  if (scope.intermediates.has(rawCode.trim())) return false
   const loc = storageLocation?.trim()
   return !loc || scope.rawLocationsFor(rawCode).has(loc)
 }

@@ -467,6 +467,19 @@ describe('buildRawMaterialPlan', () => {
     expect(needs.find((n) => n.rawMaterial === 'SAC-2')!.requiredKg).toBe(300)
   })
 
+  it('ara mamul (fabrikada üretilen kod) satın alınan sac sayılmaz', () => {
+    const needs = buildRawMaterialPlan(
+      [
+        { material: 'A', quantity: 100 },
+        { material: 'ASSY', quantity: 50 },
+      ],
+      new Map<string, ProductSpec>([...products, ['ASSY', { code: 'ASSY', rawMaterialCode: 'A', grossWeight: 1 }]]),
+      new Map(),
+    )
+    expect(needs.map((n) => n.rawMaterial)).toEqual(['SAC-1'])
+    expect(needs[0].requiredKg).toBe(200)
+  })
+
   it('stokla karşılaştırıp eksiği hesaplar', () => {
     const needs = buildRawMaterialPlan(
       [{ material: 'A', quantity: 1000 }],
