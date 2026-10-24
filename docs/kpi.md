@@ -92,7 +92,9 @@ alınıyor (`src/lib/kpi.ts`, `weighted`):
   ağırlığı 0 olur (sonuca etkisi olmaz).
 - Örnek: Transfer Direct %3 (1000 h), Transfer Indirect %10 (100 h) →
   (3 × 1000 + 10 × 100) ÷ 1100 = **%3,6** (düz ortalama %6,5 olurdu).
-- Değerlendirilecek: (a) Absenteeism için ağırlık operatör sayısı mı olsun,
+- **Karar K8 (2026-10-24, varsayılan):** yukarıdaki tablo olduğu gibi kalır
+  (Productivity adet/saat sayılır). Sitede yanlış görülürse değişir.
+- Önceden değerlendirilen: (a) Absenteeism için ağırlık operatör sayısı mı olsun,
   (b) Productivity'nin birimi ne (adet/saat, adet/kişi …) — birimine göre
   doğru ağırlık değişir; adet/saat ise ağırlık toplam mevcudiyet doğru,
   adet/kişi ise operatör sayısı olmalı, (c) saati boş satırın ağırlığı.

@@ -1,9 +1,10 @@
 # 08 · Sürüm günlüğü
 
-> Son güncelleme: 2026-10-24 · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
+> Son güncelleme: 2026-10-24 (K5) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #59 | 2026-10-24 | **K5: kod değişince OEE geçmişi taşınır** — Work Center Definitions → *Change code* artık OEE geçmişini (vardiya, gün, sipariş, hafta, ay, duruş, kayıp, MTTR, açık konular) arka planda sayfa sayfa yeni koda taşır; aynı anahtarda yeni kodlu satır varsa eskisi silinir. `workCenterAliases` eşlemesi eski kodla gelen SAP satırını yüklemede yeni koda yazar (`convex/workCenterHistory.ts`, `src/lib/workCenterAlias.ts`). Ayrıca K7 (dördü evet → [G]) ve K8 (bugünkü ağırlıklar varsayılan) kaydedildi | Ahmet kararı; geçmiş iki koda bölünüyordu. Plan arşivi eski kodla kalır |
 | — | 2026-10-24 | **OEE kısa duruşlar: kontrol betiği** — `scripts/oee-shortstop-check.sh` (salt okunur): en yeni günlük yedekte (a) gün × iş yeri Loading − Production ile ≥ eşik plansız duruş toplamını, (b) haftalık Dashboard A / P / Q / OEE'yi, (c) kod başına kısa duruşları ve MTTR eski → yeniyi yazar; SCHED_DOWN'ın molada olduğunu denetler | #46 / #47'nin gerçek veriyle doğrulaması yalnız sunucuda yapılabiliyor → `09-acik-konular.md` |
 | #56 | 2026-10-24 | **Ara mamul çift sayılmaz** — hammadde kodu fabrikada üretilen bir kodsa (172 üretir, 171 tüketir) stoğu yalnız mamulde sayılır; hammadde stoğu, sac ihtiyacı ve satın alma önerisi yok (`intermediateCodes`; `stockScope`, `rawMrp`, `buildRawMaterialPlan`) | Ahmet kararı: 171'in çektiği 172'nin ZPP'sinde zaten var → `04-hammadde.md` |
 | #54 | 2026-10-24 | **Cost center başına depolar** — Storage Locations'ta her cost center'a Production (WIP), Finished goods, Raw material depoları (`costCenterStorage`); parça ana makinesinin cost center'ının depolarıyla sayılır (plan, doğrulayıcı, Demand, Capacity, MRP, MB51 üretimi, kalıp vuruşu). Tanım yoksa tikler (geri uyumlu) | Ahmet: aynı kod bir CC'de mamul, diğerinde hammadde (171/173 → WIP 2009, 172 → WIP 2010, 1009 ortak) → `04-hammadde.md` |

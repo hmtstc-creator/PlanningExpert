@@ -452,7 +452,7 @@ function MakinelerPage() {
             onPrefillUsed={() => setPrefillName(null)}
             onRenameCode={(p) => {
               const to = window.prompt(
-                `New code for ${p.name}. Every linked record changes with it; uploaded OEE data and plan archives keep the old code.`,
+                `New code for ${p.name}. Every linked record changes with it; OEE history moves to the new code in the background and later uploads with the old code are saved under the new one. Plan archives keep the old code.`,
                 p.name,
               )
               if (to !== null && to.trim() && to.trim() !== p.name) {

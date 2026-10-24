@@ -14,6 +14,7 @@ import {
 import { daysFromShifts, lossDayOf } from '../src/lib/oee'
 import { fromStoredDay, mergeEvents, sameStored, toStoredDay, toStoredLoss } from '../src/lib/oeeStore'
 import { stopDayOf } from '../src/lib/oeeReliability'
+import { mapAliases } from './workCenterHistory'
 
 /**
  * OEE Trend and Losses — veri.
@@ -27,6 +28,7 @@ import { stopDayOf } from '../src/lib/oeeReliability'
  *   hafta     yıl + hafta + iş merkezi
  *   ay        yıl + ay + iş merkezi
  * Böylece son iki haftayı tekrar tekrar yüklemek mükerrer kayıt yapmaz.
+ * Kodu değişmiş work center'ın eski kodu yeni koda çevrilir (workCenterHistory.ts).
  * Plan bu veriyi okumaz: `affectsPlan: false`.
  */
 
@@ -86,7 +88,8 @@ export const upsertShifts = guardedMutation({
   args: { rows: v.array(v.object(shiftFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx, { rows }) => {
+  handler: async (ctx, { rows: raw }) => {
+    const rows = await mapAliases(ctx.db, raw)
     plantCostCentersOnly(ctx, rows)
     const touched = new Map<string, { date: string; workCenter: string }>()
     for (const r of rows) {
@@ -120,7 +123,8 @@ export const upsertDaily = guardedMutation({
   args: { rows: v.array(v.object(dailyFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx, { rows }) => {
+  handler: async (ctx, { rows: raw }) => {
+    const rows = await mapAliases(ctx.db, raw)
     plantCostCentersOnly(ctx, rows)
     let n = 0
     for (const r of rows) {
@@ -142,7 +146,8 @@ export const upsertOrders = guardedMutation({
   args: { rows: v.array(v.object(orderFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx, { rows }) => {
+  handler: async (ctx, { rows: raw }) => {
+    const rows = await mapAliases(ctx.db, raw)
     for (const r of rows) {
       // Bir vardiyada bir siparişin tek satırı vardır. Kalıp anahtara girmez: eski
       // dosyada "Equipment" sütununda malzeme kodu vardı; yeni dosya (Var_Equipment =
@@ -165,7 +170,8 @@ export const upsertWeekly = guardedMutation({
   args: { rows: v.array(v.object(weeklyFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx, { rows }) => {
+  handler: async (ctx, { rows: raw }) => {
+    const rows = await mapAliases(ctx.db, raw)
     plantCostCentersOnly(ctx, rows)
     for (const r of rows) {
       const hit = await ctx.db
@@ -185,7 +191,8 @@ export const upsertMonthly = guardedMutation({
   args: { rows: v.array(v.object({ ...monthlyFields, year: v.number() })) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx, { rows }) => {
+  handler: async (ctx, { rows: raw }) => {
+    const rows = await mapAliases(ctx.db, raw)
     plantCostCentersOnly(ctx, rows)
     for (const r of rows) {
       const same = await ctx.db
@@ -212,7 +219,8 @@ export const upsertDowntimeDays = guardedMutation({
   args: { days: v.array(v.object(downtimeDayFields)) },
   returns: v.number(),
   affectsPlan: false,
-  handler: async (ctx, { days }) => {
+  handler: async (ctx, { days: raw }) => {
+    const days = await mapAliases(ctx.db, raw)
     plantCostCentersOnly(ctx, days)
     for (const incoming of days) {
       const hit = await ctx.db

@@ -1,6 +1,6 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-24 (#54) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-24 (K5, K7, K8) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
@@ -21,6 +21,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 ## OEE analizi
 
+- **Kod değişince OEE geçmişi yeni koda taşınır** (2026-10-24, Ahmet, K5) — aynı work center'ın geçmişi iki koda bölünmesin; taşıma arka planda sayfa sayfa (mutasyon sınırı), çakışmada yeni kodlu satır kalır (daha yenidir, aynı gün iki kez sayılmaz). SAP bir süre eski kodu getirir: `workCenterAliases` yüklemede çevirir, zincir kısaltılır (A → B → C ise A → C). *Alt.: geçmiş eski kodla kalsın* (önceki kural; trend kesiliyordu); *istemci imleçle taşısın* (`rebuildStored` gibi; Master Data yetkilisinde OEE yetkisi olmayabilir, sayfa kapanınca yarım kalırdı).
 - **Kısa duruş (< 2 dk) performans, uzun availability; A / P MES'te kalır** (2026-10-23, Ahmet, #46) — MES Production zaten yalnız ≥ 2 dk duruşları düşüyor (fixture'da 7/7 vardiya, 0,1 dk); kayıp ekranları aynı kodu olay süresine göre böler (`oeeShortStops.ts`). Eşik ayarda (`shortStopMin`, 2); 2'den farklıysa yalnız bölünme değişir.
   MTTR / MTBF ≥ eşik olaylarla (#47): arıza ve setup kullanılabilirlik kaybıdır; mikro duruşlar (ARZ'nin %96'sı) MTTR'yi küçültüp MTBF'i kısaltırdı. Kısa duruşlar ilk süre kovasında görünür.
   *Alt.: A' = (Production + kısa) ÷ Loading* (kısa duruşları iki kez sayardı); *eşik ≠ 2 iken A / P'yi kaydırmak* (vardiya ve MES haftalık / aylık satırlarında süre yok, sayfalar arası tutarsız olurdu); *kod başına aile ayarı* (aynı kodun kısa ve uzun olayları farklı kayıptır → kaldırıldı).
@@ -54,6 +55,8 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 ## Yönetim ekranları
 
+- **Board / KPI'da bölüm seviyesi, bölüm sorumlusu, holding hedefi, Board PDF** (2026-10-24, Ahmet, K7) — dördü de yapılacak (todolist 2 → [G]); holding hedefi girilmezse şirket planlarının toplamı.
+- **KPI ağırlıkları bugünkü gibi** (2026-10-24, K8, varsayılan) — Absenteeism % normal mevcudiyetle, Productivity (adet/saat sayılır) toplam mevcudiyetle; saati boş satır: hiçbirinde yoksa eşit, varsa 0 (`src/lib/kpi.ts`, `weighted`). Ahmet sitede yanlış görürse değişir. *Alt.: operatör sayısıyla* (Productivity adet/kişi olsaydı doğru olurdu; birim bilinmiyor).
 - **Organization map ayrı sayfa, eski sayfalar kalır** (2026-10-22) — kullanıcı istedi; harita yeterli olunca eski ağaç / Users & permissions onayla kaldırılır. *Alt.: eski sayfayı hemen değiştirmek* (geri dönüşsüz, riskli).
 - **Harita yeni sunucu kodu yazmaz** (2026-10-22) — sürükle-bırak mevcut mutation'ları çağırır (`setCompanyHolding`, `updatePlant`, `users.update`, `saveGroup`); yetki ve denetim kaydı tek yerde kalır. Work center sürükleme yok: `presses.upsert` aktif plant ve tam kayıt ister. *Alt.: harita için yeni mutation* (kural kopyası).
 - **Tuval kütüphanesi `@xyflow/react` (sürüm sabit)** — kaydırma, yakınlaştırma, mini harita, çarpışma (`getIntersectingNodes`) hazır; yerleşim kendi saf fonksiyonumuz (test edilir). *Alt.: elle SVG tuval* (çok kod).

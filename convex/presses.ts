@@ -1,7 +1,9 @@
 import { ConvexError, v } from 'convex/values'
 
+import { internal } from './_generated/api'
 import { ALL_MODULES, guardedMutation, guardedQuery, type GuardedMutationCtx, type GuardedQueryCtx } from './guarded'
 import { renameEverywhere, usageText, whereUsed } from './workCenterRefs'
+import { recordAlias } from './workCenterHistory'
 
 const pressValidator = v.object({
   _id: v.id('presses'),
@@ -135,8 +137,9 @@ export const usage = guardedQuery({
 /**
  * Work center kodunu değiştirir (ör. yazım hatası, SAP'de yeni kod): kayıt ve
  * bağlı bütün kayıtlar (master data, takvim, mesai, bakım, arıza, plan
- * müdahaleleri, vinç grupları) birlikte. Yüklenen OEE verisi ve plan arşivi
- * eski koduyla kalır (geçmiş değişmez).
+ * müdahaleleri, vinç grupları) birlikte. OEE geçmişi arka planda yeni koda
+ * taşınır ve eski kodla gelen SAP satırı yeni koda yazılır (K5,
+ * workCenterHistory.ts). Plan arşivi eski koduyla kalır.
  */
 export const rename = guardedMutation({
   areas: ['planning.masterData'],
@@ -155,9 +158,11 @@ export const rename = guardedMutation({
     if (clash) throw new ConvexError(`${name} already exists`)
     const changed = await renameEverywhere(ctx.db, press.name, name)
     await ctx.db.patch(id, { name })
+    await recordAlias(ctx.db, press.name, name)
+    await ctx.scheduler.runAfter(0, internal.workCenterHistory.move, { plantId: ctx.plantId, from: press.name, to: name, step: 0, cursor: null })
     await ctx.db.insert('changeLog', {
       title: `Work center code changed — ${press.name} → ${name}`,
-      detail: `${changed} linked record(s) updated. Uploaded OEE data and plan archives keep the old code.`,
+      detail: `${changed} linked record(s) updated. OEE history moves to the new code in the background; uploads with the old code are saved under the new one. Plan archives keep the old code.`,
       category: 'system',
       author: (ctx as { sessionUser?: { name?: string } }).sessionUser?.name,
       createdAt: Date.now(),
