@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { countedLocations, isFinishedStockRow, isRawStockRow, productionRows } from './stockLocations'
+import {
+  countedLocations,
+  isFinishedStockRow,
+  isFinishedStockRowFor,
+  isRawStockRow,
+  isRawStockRowFor,
+  productionRows,
+  productionRowsFor,
+  stockScope,
+} from './stockLocations'
 
 describe('storage location matrix', () => {
   it('no plant defaults: an unticked location counts for nothing; old Raw Material category counts for raw', () => {
@@ -40,5 +49,66 @@ describe('storage location matrix', () => {
     expect(rows.map((r) => r.quantity)).toEqual([100, -30])
     const ticked = countedLocations([{ code: '1009', countProduction: true }])
     expect(productionRows(ticked, [{ quantity: 70, movementType: '101', storageLocation: '1009' }])).toHaveLength(1)
+  })
+})
+
+describe('locations per cost center', () => {
+  // 171 ve 173: WIP 2009, hammadde + bitmiş 1009; 172: WIP 2010, hammadde + bitmiş 1009.
+  const scope = stockScope({
+    locations: [
+      { code: '1009', countFinished: true, countRaw: true },
+      { code: '2009', countFinished: true, countProduction: true },
+      { code: '2010', countFinished: true, countProduction: true },
+    ],
+    costCenterLocations: [
+      { costCenter: '171', production: ['2009'], finished: ['1009'], raw: ['1009'] },
+      { costCenter: '173', production: ['2009'], finished: ['1009'], raw: ['1009'] },
+      { costCenter: '172', production: ['2010'], finished: ['1009'], raw: ['1009'] },
+    ],
+    presses: [
+      { name: 'PRS-171', costCenter: '171' },
+      { name: 'PRS-172', costCenter: '172' },
+      { name: 'PRS-9', costCenter: '999' },
+    ],
+    products: [
+      // 172'nin bitmiş parçası STAMP-1, 171'in parçası ASSY-1'in hammaddesi.
+      { code: 'STAMP-1', mainMachine: 'PRS-172', rawMaterialCode: 'COIL-1' },
+      { code: 'ASSY-1', mainMachine: 'PRS-171', rawMaterialCode: 'STAMP-1' },
+      { code: 'OTHER', mainMachine: 'PRS-9' },
+    ],
+  })
+
+  it('a part counts its own cost center: WIP + finished; another WIP does not count', () => {
+    expect(isFinishedStockRowFor(scope, 'STAMP-1', '2010')).toBe(true)
+    expect(isFinishedStockRowFor(scope, 'STAMP-1', '1009')).toBe(true)
+    expect(isFinishedStockRowFor(scope, 'STAMP-1', '2009')).toBe(false)
+    expect(isFinishedStockRowFor(scope, 'ASSY-1', '2009')).toBe(true)
+    expect(isFinishedStockRowFor(scope, 'ASSY-1', '2010')).toBe(false)
+  })
+
+  it('the same code is raw material for the consuming cost center', () => {
+    expect(isRawStockRowFor(scope, 'STAMP-1', '1009')).toBe(true)
+    expect(isRawStockRowFor(scope, 'STAMP-1', '2010')).toBe(false)
+    expect(isRawStockRowFor(scope, 'COIL-1', '1009')).toBe(true)
+  })
+
+  it('a cost center without a definition uses the location ticks', () => {
+    expect(scope.costCenterOf('OTHER')).toBe('999')
+    expect(isFinishedStockRowFor(scope, 'OTHER', '2010')).toBe(true)
+    expect(isFinishedStockRowFor(scope, 'UNKNOWN', '2009')).toBe(true)
+  })
+
+  it('MB51 production is a receipt into the WIP location of the part cost center', () => {
+    const rows = productionRowsFor(scope, [
+      { material: 'STAMP-1', quantity: 100, movementType: '101', storageLocation: '2010' },
+      { material: 'STAMP-1', quantity: 40, movementType: '101', storageLocation: '2009' },
+      { material: 'ASSY-1', quantity: 30, movementType: '101', storageLocation: '2009' },
+      { material: 'ASSY-1', quantity: 5, movementType: '102', storageLocation: '2009' },
+    ])
+    expect(rows.map((r) => [r.material, r.quantity])).toEqual([
+      ['STAMP-1', 100],
+      ['ASSY-1', 30],
+      ['ASSY-1', -5],
+    ])
   })
 })

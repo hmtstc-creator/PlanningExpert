@@ -6,6 +6,8 @@ import { v } from 'convex/values'
 
 import { guardedQuery } from './guarded'
 import { liveRows } from './sapLive'
+import { isFinishedStockRowFor } from '../src/lib/stockLocations'
+import { loadStockScope } from './stockScope'
 
 const stockValidator = v.object({
   _id: v.id('stock'),
@@ -43,6 +45,31 @@ export const listAll = guardedQuery({
     const rows = await (await liveRows(ctx, 'stock')).take(PLANNING_ROW_LIMIT + 1)
     return {
       rows: rows.slice(0, PLANNING_ROW_LIMIT),
+      complete: rows.length <= PLANNING_ROW_LIMIT,
+    }
+  },
+})
+
+/**
+ * Planın saydığı bitmiş ürün stoğu, malzeme başına: her parça kendi cost
+ * center'ının depolarıyla (WIP + bitmiş), tanımı yoksa depo tikleriyle.
+ * Demand sayfasının stok sütunu bunu gösterir.
+ */
+export const planStock = guardedQuery({
+  args: {},
+  returns: v.object({
+    rows: v.array(v.object({ material: v.string(), quantity: v.number() })),
+    complete: v.boolean(),
+  }),
+  handler: async (ctx) => {
+    const rows = await (await liveRows(ctx, 'stock')).take(PLANNING_ROW_LIMIT + 1)
+    const scope = await loadStockScope(ctx)
+    const map = new Map<string, number>()
+    for (const r of rows.slice(0, PLANNING_ROW_LIMIT)) {
+      if (isFinishedStockRowFor(scope, r.material, r.storageLocation)) map.set(r.material, (map.get(r.material) ?? 0) + (r.unrestricted ?? 0))
+    }
+    return {
+      rows: [...map].map(([material, quantity]) => ({ material, quantity })),
       complete: rows.length <= PLANNING_ROW_LIMIT,
     }
   },

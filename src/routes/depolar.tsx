@@ -3,6 +3,7 @@ import { usePaginatedQuery } from '../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { CostCenterLocations } from '../components/CostCenterLocations'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { SaveStatus } from '../components/SaveStatus'
 import { UnsavedBar } from '../components/UnsavedBar'
@@ -171,6 +172,12 @@ function DepolarPage() {
                 are the actual production (plan versus actual, performance, mould shot counters).
               </li>
             </ul>
+            <p>
+              <b>Locations per cost center:</b> one material can be the finished part of one cost
+              center and the raw material of another. A part is counted with the locations of its
+              main work center's cost center — its production (WIP) location receives MB51 and also
+              counts as its finished stock. A cost center without a definition uses the ticks.
+            </p>
             <p>
               A location without a tick counts for nothing — there are no built-in locations. Stock
               in an unticked location is shown but never netted; with no "Finished goods" tick at
@@ -346,6 +353,16 @@ function DepolarPage() {
         </div>
       )}
 
+      {allCodes.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-base font-semibold text-foreground">Locations per cost center</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            E.g. 171 and 173: WIP 2009, raw and finished 1009 · 172: WIP 2010, raw and finished 1009. A
+            part of 172 then never counts stock lying in 2009. Click a code to toggle it, then Save.
+          </p>
+          <CostCenterLocations locationCodes={allCodes} />
+        </section>
+      )}
 
       <UnsavedBar
         count={rows.dirtyKeys.length}

@@ -233,6 +233,48 @@
       "optional": true
     }
   },
+  "costCenterStorage": {
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "finished": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "production": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": false
+    },
+    "raw": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "string"
+        }
+      },
+      "optional": false
+    }
+  },
   "craneGroups": {
     "groupName": {
       "fieldType": {

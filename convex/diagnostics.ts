@@ -18,6 +18,7 @@ const TABLES = [
   'globalShiftSettings',
   'workCalendar',
   'storageLocations',
+  'costCenterStorage',
   'demandWeekly',
   'demandDaily',
   'stock',

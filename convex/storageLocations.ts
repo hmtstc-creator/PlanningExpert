@@ -76,3 +76,61 @@ export const remove = guardedMutation({
     return null
   },
 })
+
+// ---- Cost center başına depolar ---------------------------------------------
+
+const ccValidator = v.object({
+  _id: v.id('costCenterStorage'),
+  _creationTime: v.number(),
+  costCenter: v.string(),
+  production: v.array(v.string()),
+  finished: v.array(v.string()),
+  raw: v.array(v.string()),
+})
+
+/** Her cost center'ın WIP, bitmiş ürün ve hammadde depoları. */
+export const listCostCenters = guardedQuery({
+  args: {},
+  returns: v.array(ccValidator),
+  handler: async (ctx) => ctx.db.query('costCenterStorage').collect(),
+})
+
+const codes = (list: string[]) => [...new Set(list.map((c) => c.trim()).filter(Boolean))].sort()
+
+/**
+ * Bir cost center'ın depolarını yazar. Üç liste de boşsa tanım silinir ve o
+ * cost center'ın malzemeleri yine depo tikleriyle sayılır. Kod, fabrikanın
+ * organizasyon yapısındaki bir cost center olmalı; depolar Storage Locations
+ * listesinde tanımlı olmalı (tanımsız depodaki stok yüklenmez).
+ */
+export const upsertCostCenter = guardedMutation({
+  areas: ['planning.masterData'],
+  args: {
+    costCenter: v.string(),
+    production: v.array(v.string()),
+    finished: v.array(v.string()),
+    raw: v.array(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const costCenter = args.costCenter.trim()
+    if (!costCenter) throw new ConvexError('Cost center code is required')
+    const known = (ctx.plant.costCenters ?? []).map((c) => c.code)
+    if (!known.includes(costCenter)) throw new ConvexError(`${costCenter} is not a cost center of this plant`)
+    const production = codes(args.production)
+    const finished = codes(args.finished)
+    const raw = codes(args.raw)
+    const defined = new Set((await ctx.db.query('storageLocations').collect()).map((l) => l.code.trim()))
+    const unknown = [...production, ...finished, ...raw].filter((c) => !defined.has(c))
+    if (unknown.length) throw new ConvexError(`Define storage location ${[...new Set(unknown)].join(', ')} first`)
+    const existing = await ctx.db
+      .query('costCenterStorage')
+      .withIndex('by_cost_center', (q) => q.eq('costCenter', costCenter))
+      .first()
+    const empty = !production.length && !finished.length && !raw.length
+    if (existing && empty) await ctx.db.delete(existing._id)
+    else if (existing) await ctx.db.patch(existing._id, { production, finished, raw })
+    else if (!empty) await ctx.db.insert('costCenterStorage', { costCenter, production, finished, raw })
+    return null
+  },
+})

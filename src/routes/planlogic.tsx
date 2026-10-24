@@ -203,7 +203,7 @@ function PlanLogicPage() {
             ['Sales days', 'ZPP_DAILY: one column per day — the day each quantity is sold', '/sapdata'],
             [
               'Stock',
-              'MB52 unrestricted stock, counted only in the locations ticked on Storage Locations: Finished goods for the plan and the Capacity Dashboard, Raw material for the coil check',
+              'MB52 unrestricted stock, counted per cost center: a part counts the locations of its main work center\'s cost center (Storage Locations → Locations per cost center) — its production (WIP) location and its finished goods locations for the plan, the validator, Demand and the Capacity Dashboard; a raw material code counts the raw material locations of the cost centers that consume it. Example: 171 and 173 have WIP 2009, raw and finished 1009; 172 has WIP 2010, raw and finished 1009 — stock of a 172 part lying in 2009 is not counted, and a 172 part used as raw material by 171 counts in 1009 for 171. MB51 production of a part is a 101/102 into its cost center\'s WIP location. A cost center without a definition (or a part without a cost center) uses the location ticks: Finished goods, Raw material, Production receipt',
               '/depolar',
             ],
             ['Coils in transit', 'In-transit Excel list: each quantity arrives in its ETA week (no ETA = this week)', '/sapdata'],

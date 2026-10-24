@@ -190,6 +190,14 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Süre yalnızca siparişi tarihler: teslim haftası, emniyet ve üretim planı
   değişmez (`affectsPlan: false`). Hesap `src/lib/rawLeadTime.ts`.
 
+### Cost center başına depolar (2026-10-24)
+
+- Holdingde aynı malzeme bir cost center'ın mamulü, diğerinin hammaddesi olabilir. Her cost center'a
+  Production (WIP), Finished goods ve Raw material depoları tanımlanır (Storage Locations sayfası).
+- WIP deposu üretim girişidir (MB51) ve o cost center'ın mamul stoğuna sayılır.
+- Parçanın cost center'ı ana makinesinin work center'ından gelir. Tanım yoksa depo tikleri geçerli.
+- Örnek: 171, 173 → WIP 2009, ham + mamul 1009; 172 → WIP 2010, ham + mamul 1009.
+
 ## Aksiyon listesi
 
 Uygulandı (2026-09-26, "programı düzelt"):

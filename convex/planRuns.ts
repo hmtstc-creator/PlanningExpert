@@ -80,6 +80,7 @@ export const smallInputs = plantInternalQuery({
         .withIndex('by_status', (q: Ctx) => q.eq('status', 'open'))
         .collect(),
       locations: await ctx.db.query('storageLocations').collect(),
+      costCenterLocations: await ctx.db.query('costCenterStorage').collect(),
       // Mesai tanımları ve tarihli mesailer (pres takvimi).
       overtimeDefinitions: (await ctx.db.query('overtimeDefinitions').collect()).map((d: Ctx) => ({
         id: d._id,

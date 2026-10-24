@@ -48,7 +48,7 @@ import { buildRawRequirements, type RawRequirementPlan } from './rawMrp'
 import { readDailyDemand } from './dailyDemand'
 import { buildCapacityForecast, type CapacityForecast } from './capacityForecast'
 import { capacityModel } from './capacityModel'
-import { countedLocations, isFinishedStockRow, isRawStockRow } from './stockLocations'
+import { isFinishedStockRowFor, isRawStockRowFor, stockScope, type CostCenterLocations } from './stockLocations'
 import {
   buildPlanAlarms,
   type DieUnavailability,
@@ -81,6 +81,8 @@ export interface PlanPress {
   /** Frekansiyel duruşun adı (ekran için; motor feedsCoil'e bakar). */
   frequencyStop?: string
   frozenDays?: number
+  /** Work center'ın cost center'ı — parçanın stoğu o cost center'ın depolarıyla sayılır. */
+  costCenter?: string
 }
 
 export interface SnapshotJob {
@@ -152,6 +154,8 @@ export interface PlanInputs {
     uploadedAt?: number
   }[]
   locations: { code: string; category?: string; countFinished?: boolean; countRaw?: boolean }[]
+  /** Cost center başına depolar; tanımlı cost center'ın malzemeleri onunla sayılır. */
+  costCenterLocations?: CostCenterLocations[]
   /** Yoldaki hammadde (Excel listesi) — MRP'de varış haftasında giriş. */
   inTransit?: { material: string; quantityKg: number; eta?: string; poNumber?: string; supplier?: string }[]
   presses: PlanPress[]
@@ -460,14 +464,20 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const stockByMaterial = new Map<string, number>()
   const rawStockByMaterial = new Map<string, number>()
   const rawCodes = new Set(inputs.products.map((p) => p.rawMaterialCode?.trim() ?? '').filter(Boolean))
-  // Hangi depo neye sayılır Storage Locations matrisinden gelir; tiksiz depo
-  // sayılmaz. Deposu yazılmamış satır (eski/elle veri) sayılır.
-  const counted = countedLocations(inputs.locations)
+  // Hangi depo neye sayılır Storage Locations'tan gelir: parçanın cost
+  // center'ının depoları (WIP + bitmiş), tanımı yoksa depo tikleri; tiksiz
+  // depo sayılmaz. Deposu yazılmamış satır (eski/elle veri) sayılır.
+  const scope = stockScope({
+    locations: inputs.locations,
+    costCenterLocations: inputs.costCenterLocations,
+    presses,
+    products: inputs.products,
+  })
   for (const row of inputs.stock) {
-    if (isFinishedStockRow(counted, row.storageLocation)) sum(stockByMaterial, row.material, row.unrestricted ?? 0)
-    // Rulo stoğu: yalnızca "hammadde" tiki olan depolardan.
+    if (isFinishedStockRowFor(scope, row.material, row.storageLocation)) sum(stockByMaterial, row.material, row.unrestricted ?? 0)
+    // Rulo stoğu: onu tüketen cost center'ların hammadde depolarından.
     const material = row.material.trim()
-    if (rawCodes.has(material) && isRawStockRow(counted, row.storageLocation)) {
+    if (rawCodes.has(material) && isRawStockRowFor(scope, material, row.storageLocation)) {
       sum(rawStockByMaterial, material, row.unrestricted ?? 0)
     }
   }
@@ -1746,7 +1756,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         'the plan uses the weekly ZPP only. Check the file on the SAP Data page.',
     )
   }
-  if (inputs.stock.length > 0 && counted.finished.size === 0) {
+  if (inputs.stock.length > 0 && scope.finishedAnywhere.size === 0) {
     warnings.unshift(
       'No storage location is ticked "Finished goods" on Storage Locations — MB52 stock is not counted and the plan assumes 0 stock.',
     )
@@ -1932,7 +1942,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     weeks: forecastWeekList,
     capacityMinutes,
     capacityFactor,
-    stockLocations: [...counted.finished],
+    stockLocations: [...scope.finishedAnywhere],
+    countsStock: (material, loc) => isFinishedStockRowFor(scope, material, loc),
   })
   capacity.unassigned = capacity.unassigned.slice(0, 100)
 

@@ -40,7 +40,7 @@ Saf hesap kütüphanesi (src/lib/*.ts — React'e de Convex'e de bağlı değil)
   shiftTimeline.ts          net dakika ↔ saat, planlı duruşlar, mesai pencereleri
   capacityForecast.ts       Capacity Dashboard hesabı
   rawMrp.ts                 hammadde MRP (plandan bağımsız)
-  stockLocations.ts         depo matrisi (hangi depo neye sayılır)
+  stockLocations.ts         depo matrisi + cost center başına depolar (stockScope)
   dailyDemand.ts            ZPP_DAILY
   planAudit.ts              kural denetimi (motordan ayrı kod)
   planValidator.ts          BAĞIMSIZ doğrulama (motorla hiçbir kodu paylaşmaz)
@@ -88,7 +88,7 @@ Aynı değer farklı sayfalarda farklı görünmemeli. Her bilgi tek yerden geli
 | Pres takvimi | şablon + istisna hafta + mesai (`pressCalendar.ts`) | motor, doğrulama, Work Calendar, Capacity Dashboard, Performance |
 | Kapasite dakikası | `capacityModel.ts` | aynı liste |
 | Fabrika iş günü | `capacityModel.isPlantWorkingDate` | hammadde, acil hammadde, talep dağıtımı |
-| Hangi depo neye sayılır | `stockLocations.ts` (Storage Locations matrisi) | plan, MRP, Capacity Dashboard, MB51 üretimi |
+| Hangi depo neye sayılır | `stockLocations.ts` → `stockScope` (cost center başına depolar, yoksa Storage Locations tikleri; sunucuda `convex/stockScope.ts`) | plan, MRP, Capacity Dashboard, MB51 üretimi |
 | Üretim adedi (MB51) | üretim girişi deposuna 101 − 102 | Actuals, Performance, kalıp ömrü, kalıp alarmı |
 | Parça OEE'si | master data **Accepted OEE** (`performanceFactor`) | plan, Capacity Dashboard B |
 | Tahmini OEE | ayar **Prediction OEE** (`acceptedPerformanceRate`) | yalnızca Capacity Dashboard A |
