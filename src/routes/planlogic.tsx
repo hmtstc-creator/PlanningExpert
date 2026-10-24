@@ -369,7 +369,8 @@ function PlanLogicPage() {
           </li>
           <li>
             <b>Jobs added by hand</b> (Plan → + Add job, e.g. a part run for stock): part, quantity, work
-            center, day and start time. The duration is the engine's own calculation for that part and
+            center, day and start time. Clicking an idle gap on the chart (the dashed orange line) opens the
+            same form with that work center, day and the gap's start time filled in. The duration is the engine's own calculation for that part and
             quantity, in the engine's order — setup (none if the die is already mounted), quality
             approval, production per coil with a coil change between coils on a coil-fed work center
             (e.g. 90 min setup + 15 min approval + coils of 200 and 150 min with a 20-min coil change =

@@ -182,6 +182,11 @@ interface Props {
    * onayından dondurulmuş işler taşınmaz; tek tek onaylanan işler taşınır.
    */
   onJobMove?: (job: WeekGanttJob, target: GanttMoveTarget) => void
+  /**
+   * Boş pres aralığına (kesikli çizgi) tıklanınca: aralığın başladığı pres,
+   * gün ve saat (5 dakikaya yukarı yuvarlı). Verilmezse aralık yalnız bilgidir.
+   */
+  onGapClick?: (target: GanttMoveTarget) => void
 }
 
 export interface GanttMoveTarget {
@@ -293,6 +298,7 @@ export function WeekGantt({
   now,
   onJobClick,
   onJobMove,
+  onGapClick,
 }: Props) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [dayFilter, setDayFilter] = useState<string | null>(null)
@@ -708,6 +714,12 @@ export function WeekGantt({
     const clockMinute = Math.round((minute - index * dayWidthMinutes + shiftStartMinute) / 5) * 5
     return { press, date: visibleDates[index], clockMinute }
   }
+  // Boşluğun başı → pres / gün / saat (şimdiden önceye düşmesin diye yukarı yuvarlı).
+  const gapTarget = (press: string, minute: number): GanttMoveTarget => {
+    const index = Math.min(visibleDates.length - 1, Math.floor(minute / dayWidthMinutes))
+    const clockMinute = Math.ceil((minute - index * dayWidthMinutes + shiftStartMinute) / 5) * 5
+    return { press, date: visibleDates[index], clockMinute }
+  }
   const startDrag = (e: React.PointerEvent<HTMLElement>, job: WeekGanttJob) => {
     if (e.button !== 0) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -1103,13 +1115,26 @@ export function WeekGantt({
                         />
                       )}
 
-                      {/* Boş pres: ince kesikli alt çizgi; nedeni üzerine gelince. */}
+                      {/* Boş pres: ince kesikli alt çizgi; nedeni üzerine gelince, tıklayınca elle iş. */}
                       {idle.map((b, idx) => (
                         <div
                           key={`idle-${idx}`}
-                          title={b.title}
-                          className="absolute bottom-0 top-0 cursor-help"
-                          style={{ left: px(b.start), width: Math.max(2, px(b.end - b.start)) }}
+                          title={onGapClick ? `${b.title} · click to add a job here` : b.title}
+                          {...(onGapClick && {
+                            role: 'button',
+                            tabIndex: 0,
+                            onClick: () => onGapClick(gapTarget(b.press, b.start)),
+                            onKeyDown: (e: React.KeyboardEvent) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                onGapClick(gapTarget(b.press, b.start))
+                              }
+                            },
+                          })}
+                          className={`absolute bottom-0 top-0 ${
+                            onGapClick ? 'cursor-copy rounded-md hover:bg-sky-500/15' : 'cursor-help'
+                          }`}
+                          style={{ left: px(b.start), width: Math.max(onGapClick ? 12 : 2, px(b.end - b.start)) }}
                         >
                           <span className="absolute inset-x-0 bottom-1 border-b-2 border-dashed border-amber-500/80" />
                         </div>
