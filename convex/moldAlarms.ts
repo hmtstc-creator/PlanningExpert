@@ -2,7 +2,8 @@ import { ConvexError, v } from 'convex/values'
 
 import { DIE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
 import { liveRows } from './sapLive'
-import { countedLocations, productionRows } from '../src/lib/stockLocations'
+import { productionRowsFor } from '../src/lib/stockLocations'
+import { loadStockScope } from './stockScope'
 
 /**
  * Kalıp ömrü alarmları.
@@ -55,8 +56,8 @@ async function shotStates(ctx: Ctx) {
   const maintenance = await ctx.db.query('moldMaintenance').collect()
   // Vuruş sayısı yalnızca üretimden: üretim deposuna 101 − 102 (Actual
   // Production ve kalıp ömrü sayfasıyla aynı süzgeç).
-  const actual = productionRows<Ctx>(
-    countedLocations(await ctx.db.query('storageLocations').collect()),
+  const actual = productionRowsFor<Ctx>(
+    await loadStockScope(ctx),
     await (await liveRows(ctx, 'actuals')).collect(),
   )
 

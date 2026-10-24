@@ -3,7 +3,6 @@ import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
 import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
-import { countedLocations, isFinishedStockRow, type LocationFlags } from '../lib/stockLocations'
 import { PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
 
@@ -38,19 +37,15 @@ function SiparislerPage() {
 
   const allRows = view === 'weekly' ? weekly : daily
   const rows = term ? allRows.filter((r) => r.material.toLowerCase().includes(term)) : allRows
-  // Stok sütunu planın kullandığı stok: MB52, Storage Locations'ta "Finished
-  // goods" tikli depolar. ZPP'nin kendi "Stock in storage" değeri farklı bir
-  // kaynaktır ve planda kullanılmaz; iki ayrı sayı göstermemek için burada da yok.
-  const stockResult = useQuery(api.stock.listAll) as { rows: { material: string; storageLocation?: string; unrestricted?: number }[] } | undefined
-  const locations = (useQuery(api.storageLocations.listAll) ?? []) as LocationFlags[]
-  const planStock = useMemo(() => {
-    const counted = countedLocations(locations)
-    const map = new Map<string, number>()
-    for (const r of stockResult?.rows ?? []) {
-      if (isFinishedStockRow(counted, r.storageLocation)) map.set(r.material, (map.get(r.material) ?? 0) + (r.unrestricted ?? 0))
-    }
-    return map
-  }, [stockResult, locations])
+  // Stok sütunu planın kullandığı stok: MB52, parçanın cost center'ının
+  // depoları (tanımı yoksa "Finished goods" tikli depolar). ZPP'nin kendi
+  // "Stock in storage" değeri farklı bir kaynaktır ve planda kullanılmaz;
+  // iki ayrı sayı göstermemek için burada da yok.
+  const stockResult = useQuery(api.stock.planStock) as { rows: { material: string; quantity: number }[] } | undefined
+  const planStock = useMemo(
+    () => new Map<string, number>((stockResult?.rows ?? []).map((r) => [r.material, r.quantity])),
+    [stockResult],
+  )
   const loading = view === 'weekly' ? weeklyStatus === 'LoadingFirstPage' : dailyStatus === 'LoadingFirstPage'
 
   const periodLabels = useMemo(() => {

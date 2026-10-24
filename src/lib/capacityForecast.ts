@@ -88,6 +88,8 @@ export interface ForecastInput {
   /** Performance sayfasındaki kabul katsayısı (varsayılan 1). */
   capacityFactor?: number
   stockLocations?: string[]
+  /** Satır stoğa sayılır mı (cost center depoları); verilirse stockLocations yerine. */
+  countsStock?: (material: string, storageLocation: string) => boolean
 }
 
 /** Pres adındaki numara: "PRS-106" → "106". */
@@ -131,7 +133,9 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
   // Stok: yalnızca seçili depolar, kısıtsız stok.
   const stock = new Map<string, number>()
   for (const row of input.stock) {
-    if (!row.storageLocation || !locations.has(row.storageLocation.trim())) continue
+    if (!row.storageLocation) continue
+    const loc = row.storageLocation.trim()
+    if (input.countsStock ? !input.countsStock(row.material, loc) : !locations.has(loc)) continue
     stock.set(row.material, (stock.get(row.material) ?? 0) + (row.unrestricted ?? 0))
   }
 

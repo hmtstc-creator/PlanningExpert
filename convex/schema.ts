@@ -331,6 +331,22 @@ export default defineSchema({
   }).index('by_code', ['plantId', 'code'])
     .index('by_plant', ['plantId']),
 
+  /**
+   * Cost center başına depolar (src/lib/stockLocations.ts → stockScope).
+   * Bir malzeme bir cost center'ın bitmiş ürünü, diğerinin hammaddesi
+   * olabilir. `production` WIP (üretim girişi) deposudur ve o cost
+   * center'ın bitmiş ürün stoğuna da sayılır. Tanımı olmayan cost center'da
+   * storageLocations tikleri geçerlidir.
+   */
+  costCenterStorage: defineTable({
+    ...plantField,
+    costCenter: v.string(),
+    production: v.array(v.string()),
+    finished: v.array(v.string()),
+    raw: v.array(v.string()),
+  }).index('by_cost_center', ['plantId', 'costCenter'])
+    .index('by_plant', ['plantId']),
+
   workCalendar: defineTable({
     ...plantField,
     key: v.string(),

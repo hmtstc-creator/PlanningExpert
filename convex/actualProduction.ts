@@ -6,7 +6,8 @@ import { v } from 'convex/values'
 
 import { DIE_OR_PLANNING, guardedQuery } from './guarded'
 import { liveRows } from './sapLive'
-import { countedLocations, productionRows } from '../src/lib/stockLocations'
+import { productionRowsFor } from '../src/lib/stockLocations'
+import { loadStockScope } from './stockScope'
 
 const rowValidator = v.object({
   _id: v.id('actualProduction'),
@@ -49,11 +50,12 @@ export const listAll = guardedQuery({
   }),
   handler: async (ctx) => {
     const rows = await (await liveRows(ctx, 'actuals')).take(PLANNING_ROW_LIMIT + 1)
-    // Üretim = "Production receipt" tikli depoya (varsayılan 2009) 101 − 102.
-    // Performans, kalıp ömrü ve Actual Production aynı süzgeçten okur.
-    const counted = countedLocations(await ctx.db.query('storageLocations').collect())
+    // Üretim = parçanın cost center'ının WIP deposuna (tanımı yoksa
+    // "Production receipt" tikli depoya) 101 − 102. Performans, kalıp ömrü
+    // ve Actual Production aynı süzgeçten okur.
+    const scope = await loadStockScope(ctx)
     return {
-      rows: productionRows(counted, rows.slice(0, PLANNING_ROW_LIMIT)),
+      rows: productionRowsFor(scope, rows.slice(0, PLANNING_ROW_LIMIT)),
       complete: rows.length <= PLANNING_ROW_LIMIT,
     }
   },

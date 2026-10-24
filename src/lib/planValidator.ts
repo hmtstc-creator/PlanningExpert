@@ -25,7 +25,7 @@
 import type { PlanInputs, PlanRun } from './planPipeline'
 import type { ProductSpec } from './planning'
 import type { ScheduledJob } from './scheduler'
-import { countedLocations } from './stockLocations'
+import { stockScope } from './stockLocations'
 import { DEFAULT_WORKING_DAYS, SETTINGS_DEFAULTS } from './settingsDefaults'
 
 // ---------------------------------------------------------------- çıktı tipleri
@@ -875,11 +875,18 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const stock0 = new Map<string, number>()
   const otherStock = new Map<string, Map<string, number>>()
   const stockAge = new Map<string, number>()
-  const counted = countedLocations(inputs.locations ?? [])
-  const countedText = [...counted.finished].sort().join('/') || 'the counted locations'
+  // Her parça kendi cost center'ının depolarıyla (WIP + bitmiş); tanımı
+  // yoksa depo tikleri (src/lib/stockLocations.ts → stockScope).
+  const scope = stockScope({
+    locations: inputs.locations ?? [],
+    costCenterLocations: inputs.costCenterLocations,
+    presses: inputs.presses,
+    products: inputs.products,
+  })
+  const countedTextOf = (m: string) => [...scope.countedFor(m).finished].sort().join('/') || 'the counted locations'
   for (const r of inputs.stock) {
     const loc = r.storageLocation?.trim()
-    if (!loc || counted.finished.has(loc)) stock0.set(r.material, (stock0.get(r.material) ?? 0) + (r.unrestricted ?? 0))
+    if (!loc || scope.countedFor(r.material).finished.has(loc)) stock0.set(r.material, (stock0.get(r.material) ?? 0) + (r.unrestricted ?? 0))
     else {
       const m = otherStock.get(r.material) ?? new Map<string, number>()
       m.set(loc, (m.get(loc) ?? 0) + (r.unrestricted ?? 0))
@@ -1380,7 +1387,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
       if (other) {
         const total = Array.from(other.values()).reduce((a, b) => a + b, 0)
         const where = Array.from(other.entries()).map(([l, q]) => `${l} ${Math.round(q)}`).join(', ')
-        if (total >= firstShort - QTY_TOL && total > 0) flags.push(`${m}: stock in non-counted locations (${where}) would cover the ${Math.round(firstShort)} pcs short — only locations ticked "Finished goods" on Storage Locations count.`)
+        if (total >= firstShort - QTY_TOL && total > 0) flags.push(`${m}: stock in non-counted locations (${where}) would cover the ${Math.round(firstShort)} pcs short — only the locations counted for its cost center on Storage Locations count.`)
         else if (total > 0) flags.push(`${m}: ${Math.round(total)} pcs in non-counted locations (${where}).`)
       }
       const w = weeklyBy.get(m)
@@ -1389,7 +1396,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
         if (pos.length) flags.push(`${m}: ZPP has positive quantities (${pos.slice(0, 3).join(', ')}) — counted as demand.`)
         const backlog = Math.abs(w.overdue ?? 0)
         const st = stock0.get(m) ?? 0
-        if (backlog > 0 && backlog <= st) flags.push(`${m}: backlog ${Math.round(backlog)} ≤ stock ${Math.round(st)} in ${countedText} — check whether it has already shipped.`)
+        if (backlog > 0 && backlog <= st) flags.push(`${m}: backlog ${Math.round(backlog)} ≤ stock ${Math.round(st)} in ${countedTextOf(m)} — check whether it has already shipped.`)
       }
       const daily = inputs.dailyDemand?.find((d) => d.material === m)
       if (daily?.periods.some((p) => Number(p.qty) > 0)) flags.push(`${m}: ZPP_DAILY has positive quantities — counted as demand.`)
