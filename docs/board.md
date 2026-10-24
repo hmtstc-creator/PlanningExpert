@@ -33,8 +33,16 @@ yükleme / veri girişi düğmeleri görünmez. Sunucu da yazmaya izin vermez.
 
 - Dönem: Monthly (seçilen yılın 12 ayı) ya da Weekly (seçilen haftayla biten
   13 hafta); ay / hafta seçimi.
-- Kapsam: `Holding ▸ Şirket ▸ Plant`; tablodaki "open ›" bir alt seviyeye
-  iner (şirket → plant → masraf yeri).
+- Kapsam: `Holding ▸ Şirket ▸ Plant ▸ Bölüm`; tablodaki "open ›" bir alt
+  seviyeye iner (şirket → plant → bölüm → masraf yeri). **Bölüm seviyesi
+  (K7, 2026-10-24):** plant'in masraf yerlerinden en az birinin bölümü varsa
+  plant bölümlere iner (sıra `plants.departments`; masraf yeri olmayan bölüm
+  gösterilmez; bölümsüzler en sonda "Without a department"); hiç bölümü
+  yoksa doğrudan masraf yerlerine. Bölüm seçiliyken kartlar, tablo ve
+  dikkat listesi yalnız o bölümün masraf yerleri (`src/lib/board.ts` →
+  `departmentsOf`, `scopeSeries`).
+- KPI dashboard'larında (aylık / haftalık) masraf yeri seçiminin üstünde
+  bölüm kutuları: bölümü işaretlemek altındaki bütün masraf yerlerini seçer.
 - Kartlar (sabit): OEE, Efficiency, Production volume, Productivity,
   Overtime %, Absenteeism % — seçili kapsamın konsolide değeri, plan, fark,
   trend.
@@ -130,8 +138,7 @@ netleşince eski sayfalar kaldırılacak (todolist). Kural kodu:
 
 ## Sonra konuşulacak
 
-- Board Dashboard ve KPI kırılımında bölüm seviyesi (plant → bölüm → masraf
-  yeri).
+- ~~Board Dashboard ve KPI kırılımında bölüm seviyesi~~ → yapıldı (K7, 2026-10-24).
 - Bölüm = OEE Area birleştirmesi.
 - Bölüm sorumlusu (kullanıcıyı bölüme atama) gerekir mi?
 

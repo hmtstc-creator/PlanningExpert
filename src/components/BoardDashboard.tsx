@@ -8,11 +8,12 @@ import { useQuery } from '../lib/convexTransport'
 import {
   BOARD_CARDS,
   BOARD_MEASURES,
+  NO_DEPARTMENT_LABEL,
   attention,
   childrenOf,
+  hasDepartments,
   measureOf,
-  plantsInScope,
-  seriesFor,
+  scopeSeries,
   verdict,
   type BoardPlant,
   type BoardScope,
@@ -22,7 +23,7 @@ import { usePlant } from '../lib/plantContext'
 import { relatedPages } from '../lib/navigation'
 
 /**
- * Board Dashboard: holding → şirket → plant → masraf yeri; seçili kapsamın
+ * Board Dashboard: holding → şirket → plant → bölüm → masraf yeri; seçili kapsamın
  * özet sonuçları, alt kırılım, ısı haritası ve dikkat listesi. Ölçü
  * (OEE, Efficiency, …) kullanıcı seçer. Salt okunur.
  */
@@ -68,8 +69,7 @@ export function BoardDashboardPage() {
   const slots = data?.slots ?? []
   const current = Math.max(0, slots.findIndex((s) => s.year === slot.year && s.num === slot.num))
   const plants = data?.plants ?? []
-  const inScope = plantsInScope(plants, scope)
-  const total = useMemo(() => (data ? seriesFor(inScope, slots) : []), [data, scope]) // eslint-disable-line react-hooks/exhaustive-deps
+  const total = useMemo(() => (data ? scopeSeries(plants, scope, slots) : []), [data, scope]) // eslint-disable-line react-hooks/exhaustive-deps
   const children = useMemo(() => (data ? childrenOf(plants, scope, slots) : []), [data, scope]) // eslint-disable-line react-hooks/exhaustive-deps
   const focus = useMemo(() => (data ? attention(plants, scope, slots, current, view.measure) : []), [data, scope, current, view.measure]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -77,19 +77,19 @@ export function BoardDashboardPage() {
   const company = plants.find((p) => p.companyId === scope.companyId)
   const plant = plants.find((p) => p.plantId === scope.plantId)
   const rootLabel = holdingName ?? (new Set(plants.map((p) => p.companyId)).size > 1 ? 'All companies' : (plants[0]?.companyName ?? 'All'))
-  const childLevel = scope.plantId ? 'Cost center' : scope.companyId ? 'Plant' : 'Company'
+  const childLevel = scope.plantId ? (scope.department === undefined && plant && hasDepartments(plant) ? 'Department' : 'Cost center') : scope.companyId ? 'Plant' : 'Company'
   const m = measureOf(view.measure)
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
       <PageHeader
         title="Board Dashboard"
-        summary="Results and trends — group, company, plant and cost center at a glance."
+        summary="Results and trends — group, company, plant, department and cost center at a glance."
         links={relatedPages('/board')}
         info={
           <>
             <p>
-              Start at the whole group and click a row to go one level down: company → plant → cost center. The cards show
+              Start at the whole group and click a row to go one level down: company → plant → department → cost center (a plant without departments goes straight to its cost centers). The cards show
               the selected scope; the table, heat map and attention list its next level.
             </p>
             <p>
@@ -143,7 +143,19 @@ export function BoardDashboardPage() {
         {plant && (
           <>
             <span className="text-muted-foreground">▸</span>
-            <span className="font-semibold">{plant.plantName}</span>
+            {scope.department === undefined ? (
+              <span className="font-semibold">{plant.plantName}</span>
+            ) : (
+              <button type="button" className="underline" onClick={() => setScope({ companyId: plant.companyId, plantId: plant.plantId })}>
+                {plant.plantName}
+              </button>
+            )}
+          </>
+        )}
+        {plant && scope.department !== undefined && (
+          <>
+            <span className="text-muted-foreground">▸</span>
+            <span className="font-semibold">{scope.department || NO_DEPARTMENT_LABEL}</span>
           </>
         )}
         <span className="ml-2 text-xs text-muted-foreground">· {periodTitle(view.period, slot.year, slot.num)}</span>

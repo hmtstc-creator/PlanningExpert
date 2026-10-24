@@ -6,7 +6,7 @@ import { slotKey, trendSlots } from '../src/lib/kpi'
 
 /**
  * Board Dashboard (docs/board.md): kullanıcının görebildiği bütün
- * plantlerin özet verisi — holding → şirket → plant → masraf yeri. Her
+ * plantlerin özet verisi — holding → şirket → plant → bölüm → masraf yeri. Her
  * plant kendi plantId'siyle okunur; KPI kayıtları yalnızca KPI izni,
  * OEE kök verisi yalnızca OEE izni olan plantlerde.
  */
@@ -47,6 +47,7 @@ export const overview = userQuery({
         companyName: p.company.name,
         holdingId: p.company.holdingId ?? null,
         holdingName: p.company.holdingId ? holdings.get(p.company.holdingId) : null,
+        departments: p.plant.departments ?? [],
         costCenters: p.plant.costCenters ?? [],
         access: { kpi: p.access.kpi, oee: p.access.oee },
         entries,

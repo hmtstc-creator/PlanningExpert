@@ -18,6 +18,7 @@ import {
   type KpiSlot,
   type OeeSum,
 } from '../lib/kpi'
+import { departmentsOf } from '../lib/board'
 import { usePlant } from '../lib/plantContext'
 import { KpiPeriodPicker, defaultSlot } from './KpiPeriodPicker'
 import { relatedPages } from '../lib/navigation'
@@ -46,7 +47,8 @@ interface PlantOption {
   plantId: string
   plantName: string
   companyName: string
-  costCenters: { code: string; name: string }[]
+  departments?: string[]
+  costCenters: { code: string; name: string; department?: string }[]
 }
 
 /** A3 yatay, 96 dpi'da piksel. */
@@ -74,6 +76,18 @@ export function KpiDashboardPage({ period }: { period: KpiPeriod }) {
   const selectedCcs = allCcs.filter((x) => !excluded.has(x.key))
   const selectedKeys = new Set(selectedCcs.map((x) => x.key))
   const multiPlant = validIds.length > 1
+  // Bölüm kısayolu (K7): bölümün kutusu altındaki bütün masraf yerlerini seçer / bırakır.
+  const deptGroups = options
+    .filter((o) => validIds.includes(o.plantId))
+    .flatMap((o) =>
+      departmentsOf(o)
+        .filter((d) => d)
+        .map((d) => ({
+          key: `${o.plantId}|${d}`,
+          label: multiPlant ? `${o.plantName} · ${d}` : d,
+          keys: o.costCenters.filter((c) => c.department === d).map((c) => ccKey(o.plantId, c.code)),
+        })),
+    )
 
   const view = useMemo(() => {
     if (!data) return null
@@ -163,6 +177,27 @@ export function KpiDashboardPage({ period }: { period: KpiPeriod }) {
               all
             </button>
           </legend>
+          {deptGroups.length > 0 && (
+            <div className="mt-1 flex max-w-2xl flex-wrap gap-x-3 gap-y-1" aria-label="Departments">
+              {deptGroups.map((g) => (
+                <label key={g.key} className="flex items-center gap-1 font-semibold text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={g.keys.every((k) => !excluded.has(k))}
+                    onChange={(e) => {
+                      const next = new Set(excluded)
+                      for (const k of g.keys) {
+                        if (e.target.checked) next.delete(k)
+                        else next.add(k)
+                      }
+                      setExcluded(next)
+                    }}
+                  />
+                  {g.label}
+                </label>
+              ))}
+            </div>
+          )}
           <div className="mt-1 flex max-w-2xl flex-wrap gap-x-3 gap-y-1">
             {allCcs.map((x) => (
               <label key={x.key} className="flex items-center gap-1 text-foreground">

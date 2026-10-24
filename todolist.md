@@ -115,8 +115,8 @@ Kullanıcı kararları (2026-10-23):
 ## 2. Açık kararlar (konuşulacak)
 
 ### Organizasyon ve Board
-- [ ] **[G]** Board Dashboard ve KPI kırılımına bölüm seviyesi (plant →
-  bölüm → masraf yeri). ✅ K7 evet (2026-10-24). *(docs/board.md)*
+- [x] ✅ Board Dashboard ve KPI kırılımına bölüm seviyesi (plant → bölüm →
+  masraf yeri) — yapıldı (K7, 2026-10-24). *(docs/board.md)*
 - [x] ✅ Bölüm ile OEE **Area** birleşir (K3, 2026-10-03). Önceden iki ayrı gruplama
   var (bkz. 4.2). *(docs/board.md)*
 - [ ] **[G]** Bölüme sorumlu kullanıcı atanır. ✅ K7 evet (2026-10-24). *(docs/board.md)*
