@@ -86,8 +86,9 @@ Holding → Company → Plant → Department → Cost center → Work center
     (2026-10-25, `people/UserSignIn.tsx`, `SecurityPanel`). **[S]** dene: *Users &
     groups* → kullanıcıya tıkla → *Reset password* / *Sign out everywhere*; şirkete
     tıkla → *Security check*.
-  - [ ] Kullanıcının e-postası, creator hakkı ve aktif / pasif hâlâ yalnız Users &
-    permissions'ta — silmeden önce haritaya taşınmalı.
+  - [x] Kullanıcının e-postası, creator hakkı ve aktif / pasif (2026-10-25,
+    `people/UserAccount.tsx`). **[S]** dene: *Users & groups* → kullanıcıya tıkla →
+    *Account* → e-posta / Active / Creator → *Save account*.
   - [ ] Hepsi bitince eski sayfaları ve menü bağlantılarını kaldır.
 
 ### Gantt: elle iş, sürükle-bırak, silme (2026-10-23, kararlar verildi)

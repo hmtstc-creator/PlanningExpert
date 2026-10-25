@@ -26,6 +26,7 @@ import { ErrorBanner } from '../ErrorBanner'
 import { LevelChip, TreeRow } from '../OrgTree'
 import { InfoTip } from '../PageHeader'
 import { GroupAccessFields, LEVEL_TEXT, LevelCell } from './GroupAccess'
+import { UserAccountFields } from './UserAccount'
 import { UserSignIn } from './UserSignIn'
 
 /**
@@ -648,7 +649,6 @@ function UserPanel({
       <div className="flex flex-wrap items-center gap-2">
         <Chip kind={d.isCreator ? 'creator' : 'user'} className="h-6 min-w-6 text-xs" />
         <input className={`w-48 font-semibold ${input}`} value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} aria-label="Name" />
-        <input className={`w-56 ${input}`} placeholder="Email (optional)" value={d.email} onChange={(e) => setD({ ...d, email: e.target.value })} aria-label="Email" />
         <button
           className={btn}
           disabled={!dirty || !d.name.trim()}
@@ -675,15 +675,8 @@ function UserPanel({
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-        <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={d.active} disabled={u.name === me} onChange={(e) => setD({ ...d, active: e.target.checked })} /> Active
-          <span className="text-xs text-muted-foreground">(an inactive user cannot sign in)</span>
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={d.isCreator} onChange={(e) => setD({ ...d, isCreator: e.target.checked })} /> Creator
-          <span className="text-xs text-muted-foreground">(every plant, every module, users and groups)</span>
-        </label>
+      <div className="mt-3">
+        <UserAccountFields user={u} value={d} onChange={(a) => setD({ ...d, ...a })} />
       </div>
 
       <div className="mt-3">
