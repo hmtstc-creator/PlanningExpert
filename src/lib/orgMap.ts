@@ -448,7 +448,7 @@ export interface NodeEdits {
   remove: boolean
   /** Bu düğüm haritada düzenlenemiyorsa nerede düzenlenir. */
   elsewhere?: string
-  /** Haritada yapılamayan diğer ayarlar nerede (izin, parola, e-posta). */
+  /** Haritada yapılamayan diğer ayarlar nerede (e-posta, creator, aktif). */
   more?: string
 }
 
@@ -464,7 +464,7 @@ export function nodeEdits(ref: MapRef, isPlatform: boolean, view: 'structure' | 
       case 'group':
         return { rename: true, add: 'user', remove: true }
       case 'user':
-        return { rename: true, add: null, remove: true, more: 'Password, email, creator right and active on Users & permissions.' }
+        return { rename: true, add: null, remove: true, more: 'Email, creator right and active on Users & permissions.' }
       default:
         return NONE_EDITS
     }

@@ -63,7 +63,7 @@ Holding → Company → Plant → Department → Cost center → Work center
 - [x] **[G]** Grup ve kullanıcı ekleme / ad değiştirme / silme haritada
   (2026-10-25; *Users & groups* görünümü). **[S]** dene: şirket → *Add group*,
   grup → *Add user* / Rename / Delete, kullanıcı → Rename / Delete. Parola
-  hâlâ Users & permissions'ta.
+  da artık haritada (kullanıcı düğümü → *Sign-in*).
 - [x] **[G]** Work center'ı masraf yerine sürükleme (2026-10-25;
   `platform.setWorkCenterCostCenter`, yalnız masraf yeri). **[S]** dene: *Show
   work centers* → work center'ı masraf yerine sürükle.
@@ -82,7 +82,12 @@ Holding → Company → Plant → Department → Cost center → Work center
   - [x] Grup izinleri: Board grubu, plant'ler ve modül / alan seviyeleri (2026-10-25,
     `people/GroupAccess.tsx`). **[S]** dene: *Users & groups* → gruba tıkla →
     *Access* → seviye değiştir → *Save access*.
-  - [ ] Kullanıcı: parola ver, her yerden çıkış; güvenlik kontrolü paneli.
+  - [x] Kullanıcı: parola ver, her yerden çıkış; güvenlik kontrolü paneli
+    (2026-10-25, `people/UserSignIn.tsx`, `SecurityPanel`). **[S]** dene: *Users &
+    groups* → kullanıcıya tıkla → *Reset password* / *Sign out everywhere*; şirkete
+    tıkla → *Security check*.
+  - [ ] Kullanıcının e-postası, creator hakkı ve aktif / pasif hâlâ yalnız Users &
+    permissions'ta — silmeden önce haritaya taşınmalı.
   - [ ] Hepsi bitince eski sayfaları ve menü bağlantılarını kaldır.
 
 ### Gantt: elle iş, sürükle-bırak, silme (2026-10-23, kararlar verildi)

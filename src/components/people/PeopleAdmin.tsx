@@ -1,8 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { useAction, useMutation, useQuery } from '../../lib/convexTransport'
-import { validatePassword } from '../../lib/authRules'
+import { useMutation, useQuery } from '../../lib/convexTransport'
 import { useCurrentUser } from '../../lib/currentUser'
 import { friendlyError } from '../../lib/mutationErrors'
 import { usePlant } from '../../lib/plantContext'
@@ -22,12 +21,12 @@ import {
   type PeopleUser,
 } from '../../lib/peopleTree'
 import { AREAS, MODULES, MODULE_LABELS, areasOf, moduleAccessOf, type AreaAccess, type CompanyStatus, type Level, type Module } from '../../lib/tenancy'
-import { formatPlantTime } from '../../lib/sapUploads'
 import { useSafeMutation } from '../../lib/useSafeMutation'
 import { ErrorBanner } from '../ErrorBanner'
 import { LevelChip, TreeRow } from '../OrgTree'
 import { InfoTip } from '../PageHeader'
 import { GroupAccessFields, LEVEL_TEXT, LevelCell } from './GroupAccess'
+import { UserSignIn } from './UserSignIn'
 
 /**
  * Users & permissions (Company settings): şirket → gruplar → kullanıcılar
@@ -632,27 +631,20 @@ function UserPanel({
   groups: PeopleGroup[]
   onSelect: (n: PeopleNode) => void
 }) {
-  const { token, name: me } = useCurrentUser()
+  const { name: me } = useCurrentUser()
   const { run: update, error: updateError, clearError } = useSafeMutation(api.users.update)
   const { run: remove, error: removeError } = useSafeMutation(api.users.remove)
-  const { run: signOutAll, error: signOutError } = useSafeMutation(api.users.signOutEverywhere)
   // Plant'te kapalı modülü buradan açmak: yalnızca General (sunucu da denetler).
   const canSwitchModules = usePlant().isPlatform
   const { run: switchModules, error: switchError } = useSafeMutation(api.platform.updatePlant)
-  const [signedOut, setSignedOut] = useState<number | null>(null)
-  const setPassword = useAction(api.auth.setPasswordAsAdmin)
   const initial = { name: u.name, email: u.email ?? '', active: u.active, isCreator: u.isCreator, groupIds: [...u.groupIds].sort() }
   const [d, setD] = useState(initial)
-  const [pw, setPw] = useState('')
-  const [pwOpen, setPwOpen] = useState(false)
-  const [pwError, setPwError] = useState<string | null>(null)
-  const [pwDone, setPwDone] = useState(false)
   const dirty = JSON.stringify(d) !== JSON.stringify(initial)
   const preview: PeopleUser = { ...u, ...d }
 
   return (
     <div>
-      <ErrorBanner message={updateError ?? removeError ?? signOutError ?? switchError ?? pwError} onDismiss={() => (clearError(), setPwError(null))} />
+      <ErrorBanner message={updateError ?? removeError ?? switchError} onDismiss={clearError} />
       <div className="flex flex-wrap items-center gap-2">
         <Chip kind={d.isCreator ? 'creator' : 'user'} className="h-6 min-w-6 text-xs" />
         <input className={`w-48 font-semibold ${input}`} value={d.name} onChange={(e) => setD({ ...d, name: e.target.value })} aria-label="Name" />
@@ -694,62 +686,8 @@ function UserPanel({
         </label>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <span>
-          <span className="text-xs text-muted-foreground">Last sign-in: </span>
-          {u.lastLoginAt ? formatPlantTime(u.lastLoginAt) : <span className="text-muted-foreground">never (since sign-ins are recorded)</span>}
-        </span>
-        {u.locked && (
-          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900" title="Too many wrong passwords — setting a new password unlocks it">
-            locked after wrong passwords
-          </span>
-        )}
-        <button
-          className="text-xs underline"
-          title="Close every open session of this user — they must sign in again on every device. The password does not change."
-          onClick={() => {
-            if (window.confirm(`Sign ${u.name} out on every device?`)) void signOutAll({ id: u._id }).then((ok) => ok && setSignedOut(1))
-          }}
-        >
-          Sign out everywhere
-        </button>
-        {signedOut !== null && <span className="text-xs text-emerald-700">signed out on every device</span>}
-      </div>
-
-      <div className="mt-3 text-sm">
-        <span className="text-xs text-muted-foreground">Password: </span>
-        {!u.hasPassword ? <span className="text-destructive">not set — cannot sign in</span> : u.mustChangePassword ? <span className="text-amber-700">temporary — changes it at the next sign-in</span> : <span>set</span>}
-        {pwDone && <span className="ml-2 text-emerald-700">temporary password set</span>}
-        {pwOpen ? (
-          <span className="ml-2 inline-flex flex-wrap items-center gap-1">
-            <input type="password" autoComplete="new-password" className={`w-44 ${input}`} placeholder="Temporary password" value={pw} onChange={(e) => setPw(e.target.value)} />
-            <button
-              className={btn}
-              onClick={async () => {
-                const problem = validatePassword(pw, u.name)
-                if (problem) return setPwError(problem)
-                try {
-                  await setPassword({ token: token ?? '', userId: u._id, newPassword: pw })
-                  setPwOpen(false)
-                  setPw('')
-                  setPwError(null)
-                  setPwDone(true)
-                } catch (e) {
-                  setPwError(friendlyError(e).message || 'Could not set the password')
-                }
-              }}
-            >
-              Set
-            </button>
-            <button className="text-xs underline" onClick={() => setPwOpen(false)}>
-              Cancel
-            </button>
-          </span>
-        ) : (
-          <button className="ml-2 text-xs underline" onClick={() => (setPwOpen(true), setPwDone(false))}>
-            {u.hasPassword ? 'Reset password' : 'Set password'}
-          </button>
-        )}
+      <div className="mt-3">
+        <UserSignIn user={u} />
       </div>
 
       {!d.isCreator && (
