@@ -16,7 +16,13 @@ Bu dosya depoda çalışan her Claude oturumu (bulut ya da sunucu) için geçerl
   yalnız sonuç gelir.
 - **Kısa yanıt:** yapılanı özetlemek için dosyayı tekrar okuma; Edit hata vermediyse değişiklik yapılmıştır.
   Kullanıcıya 3–6 madde, kod dökümü yok.
-- Basit / mekanik iş → küçük model (kullanıcı `/model` ile seçer); motor ve mimari → güçlü model.
+- **Model seçimi otomatiktir** (kullanıcı kararı 2026-10-25): oturum varsayılan olarak `sonnet` ile açılır
+  (`.claude/settings.json`). Ana oturum işin derinliğine kendisi karar verir:
+  - basit / tek dosya / metin / küçük hata → kendisi yapar;
+  - mekanik çok dosyalı tarama, yeniden adlandırma → `hizli` ajanı (haiku);
+  - motor, doğrulayıcı, OEE mantığı, mimari karar, iki denemede çözülemeyen hata → `derin` ajanı (opus, yüksek çaba),
+    **dar ve tek paragraflık** bir görevle (ajan bağlamı sıfırdan kurar; gereksiz çağrı tokeni artırır).
+  Kullanıcıdan model değiştirmesi istenmez; yalnız `derin` de çözemezse kullanıcıya söylenir.
 
 ## Her talimattan önce: mimari etki kontrolü (zorunlu)
 
