@@ -67,6 +67,7 @@ export const PAGE_KEYWORDS: Record<string, string> = {
   '/users': 'kullanıcı yetki izin grup rol permission',
   '/admin': 'yönetim holding şirket general güvenlik security',
   '/admin/map': 'organizasyon harita şema görsel sürükle bırak holding şirket kullanıcı grup map',
+  '/settings/map': 'organizasyon harita şema görsel sürükle bırak plant masraf yeri bölüm kullanıcı grup map creator',
   '/account': 'hesabım parola şifre cihaz oturum',
   '/compare': 'fabrika karşılaştır plant compare',
   '/tani': 'bağlantı teşhis internet diagnostics',

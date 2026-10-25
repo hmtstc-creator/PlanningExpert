@@ -67,7 +67,9 @@ Holding → Company → Plant → Department → Cost center → Work center
 - [x] **[G]** Work center'ı masraf yerine sürükleme (2026-10-25;
   `platform.setWorkCenterCostCenter`, yalnız masraf yeri). **[S]** dene: *Show
   work centers* → work center'ı masraf yerine sürükle.
-- [ ] **[G]** Haritayı creator'lara da açmak (Company settings, tek şirket).
+- [x] **[G]** Haritayı creator'lara da açmak (2026-10-25; Company settings →
+  *Organization map*, `/settings/map`, yalnız kendi şirketi, holding yok). **[S]**
+  dene: creator hesabıyla aç, plant / masraf yeri / grup düzenle.
 - [ ] **[G]** Harita yeterli olunca eski sayfaları (Holdings & companies
   ağacı, Users & permissions) kaldırmak — kullanıcının onayıyla.
 
