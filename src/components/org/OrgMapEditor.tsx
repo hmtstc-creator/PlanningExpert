@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { MODULES, type Level, type Module } from '../../lib/tenancy'
 import { ErrorBanner } from '../ErrorBanner'
+import { CompanyDataActions, CompanyStatusModules, type CompanyInfo } from './CompanyControls'
 import { nodeEdits, plantLocaleHint, type MapNode } from '../../lib/orgMap'
 import { addCostCenter, addDepartment, editCostCenter, removeCostCenter, removeDepartment, renameDepartment, type OrgCompany, type OrgPlant } from '../../lib/orgTree'
 import { useSafeMutation } from '../../lib/useSafeMutation'
@@ -178,8 +179,18 @@ export function OrgMapEditor({
     if (ok) onDone(`Deleted ${node.label}`, true)
   }
 
+  // Şirket düğümü: askıya alma, kiralanan modüller (General) ve dışa aktarım
+  // (creator da) — Holdings & companies ile aynı bileşenler.
+  const company = ref.kind === 'company' && view === 'structure' ? (companyOf(ref.id) as CompanyInfo | undefined) : undefined
+  const companySettings = company && (
+    <div className="mt-3 space-y-1 border-t border-border pt-2">
+      {isPlatform && <CompanyStatusModules company={company} />}
+      <CompanyDataActions company={company} isPlatform={isPlatform} />
+    </div>
+  )
+
   if (edits.elsewhere) return <p className="mt-2 text-[11px] text-muted-foreground">Rename, add or delete on {edits.elsewhere}.</p>
-  if (!edits.rename && !edits.add && !edits.remove) return null
+  if (!edits.rename && !edits.add && !edits.remove) return companySettings || null
 
   return (
     <div className="mt-3 space-y-2">
@@ -244,6 +255,7 @@ export function OrgMapEditor({
       )}
       {edits.more && <p className="text-[11px] text-muted-foreground">{edits.more}</p>}
       <ErrorBanner message={error} onDismiss={() => all.forEach((m) => m.clearError())} />
+      {companySettings}
     </div>
   )
 }
