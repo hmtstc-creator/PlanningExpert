@@ -6,6 +6,7 @@ bilgisayarında üretilir (sunucuya yük yok, dışarıya bir şey gitmez).
 | Sayfa | Kâğıt | Nasıl | Dosya adı |
 |---|---|---|---|
 | KPI Dashboard (aylık / haftalık) | A3 yatay, kenarsız, tek sayfa | sayfa görüntüsü | `GGAAYY KPI MONTHLY` / `GGAAYY KPI WEEKLY` (dönemin ilk günü) |
+| Board Dashboard (aylık / haftalık) | A3 yatay, tek sayfa | sayfa görüntüsü; üstte yalnız PDF'te kapsam, dönem, ölçü | `GGAAYY BOARD MONTHLY` / `GGAAYY BOARD WEEKLY` (dönemin ilk günü) |
 | OEE Trend Analysis | A4 yatay, çok sayfa | sayfa görüntüsü | `GGAAYY OEE TREND` (seçili gün) |
 | OEE Losses Trend | A4 yatay, çok sayfa | sayfa görüntüsü | `GGAAYY LOSSES TREND` (seçili gün) |
 | OEE Loss Bridge | A3 yatay, tek sayfa | sayfa görüntüsü | `GGAAYY OEE LOSS BRIDGE` (dönemin son günü) |

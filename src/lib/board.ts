@@ -4,7 +4,7 @@
  * saat ve adetler toplanır, oranlar toplamdan; grup toplamında her şirketin
  * kendi planlarının toplamı kullanılır.
  */
-import { KPI_ROWS, kpiFor, slotKey, type KpiEntry, type KpiMetrics, type KpiResult, type KpiSlot, type OeeSum } from './kpi'
+import { KPI_ROWS, isoWeekMonday, kpiFor, slotKey, type KpiEntry, type KpiMetrics, type KpiResult, type KpiSlot, type OeeSum } from './kpi'
 
 export interface BoardPlant {
   plantId: string
@@ -46,6 +46,14 @@ export interface BoardNode {
 /** Bölümün sorumlusunun adı (yoksa undefined). */
 export function departmentOwner(p: Pick<BoardPlant, 'departmentOwners'>, department: string | undefined): string | undefined {
   return department ? p.departmentOwners?.find((o) => o.department === department)?.name : undefined
+}
+
+/**
+ * Board PDF'inin dosya adındaki tarih: dönemin ilk günü (ay için 1'i, hafta için
+ * Pazartesi) — KPI Dashboard ile aynı kural (docs/pdf.md).
+ */
+export function boardPdfDate(period: 'month' | 'week', year: number, num: number): string {
+  return period === 'month' ? `${year}-${String(num).padStart(2, '0')}-01` : isoWeekMonday(year, num)
 }
 
 /** Seçilebilir ölçüler (yönü belli olanlar). */

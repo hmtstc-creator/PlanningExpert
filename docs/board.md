@@ -28,6 +28,11 @@ trendler önemli — KPI ve OEE. Birden çok şirketi olan kişi için yapı?
    şirket kullanıcısının "grup" görünümü kendi şirketidir. Kayıt
    `holdings.targets` (oran, 0.85 = %85), sunucu `platform.setHoldingTargets`
    (denetim kaydı), hesap `src/lib/board.ts` → `groupTargets`, `withTargets`.
+6. **A3 / PDF (K7, 2026-10-25):** Board Dashboard'da *Save PDF (A3)* — seçili
+   kapsamın kartları, tablosu, ısı haritası ve dikkat listesi tek A3 yatay
+   sayfa; üstte yalnız PDF'te kapsam (grup ▸ şirket ▸ plant ▸ bölüm), dönem ve
+   ölçü. Dosya adı `GGAAYY BOARD MONTHLY` / `WEEKLY` (`boardPdfDate`; ayrıntı
+   `docs/pdf.md`).
 
 ## Kim ne görür
 

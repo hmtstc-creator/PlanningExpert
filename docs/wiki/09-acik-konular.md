@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-25 (K7 holding hedefi) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-25 (K7 Board PDF) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -16,7 +16,7 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
-- **K7 — dört geliştirme işi (karar 2026-10-24, #59):** Board / KPI kırılımına bölüm seviyesi, bölüm sorumlusu, holding hedefi (girilmezse şirket planlarının toplamı), Board A3 / PDF çıktısı. Her biri ayrı oturum; önce `docs/board.md` ve `todolist.md` §2 *Organizasyon ve Board*. Bölüm seviyesi (#61), bölüm sorumlusu (#62) ve holding hedefi (2026-10-25; yalnız oranlar, grup kapsamında) yapıldı. **Devam: K7 Board A3 / PDF** — KPI dashboard'undaki A3 / PDF çıktısının benzeri Board Dashboard için (`docs/pdf.md`, `src/components/BoardDashboard.tsx`; KPI'daki yazdırma kodunu `grep -rn "A3" src` ile bul).
+- **K7 — dört geliştirme işi (karar 2026-10-24, #59):** Board / KPI kırılımına bölüm seviyesi, bölüm sorumlusu, holding hedefi (girilmezse şirket planlarının toplamı), Board A3 / PDF çıktısı. Her biri ayrı oturum; önce `docs/board.md` ve `todolist.md` §2 *Organizasyon ve Board*. Bölüm seviyesi (#61), bölüm sorumlusu (#62) ve holding hedefi (#64; yalnız oranlar, grup kapsamında) yapıldı. Board A3 / PDF da yapıldı (2026-10-25): **K7'nin dört işi tamam.** Kullanıcıda denenecek: Responsible seçimi, Group targets ve Board PDF'inin A3'e sığması (ısı haritası geniş ekranda alınırsa küçülür).
 - **K5 (#59) — canlıda ilk kod değişikliğinde bak:** *Change code* sonrası OEE sayfalarında eski kod kaybolmalı, geçmiş yeni kodda görünmeli; taşıma arka planda (`convex/workCenterHistory.ts` → `move`, tablo başına sayfa). Eski kodla yüklenen dosya yeni koda yazılır (`workCenterAliases`).
 - **Ders:** PR açmadan hemen önce `main` başka bir PR ile ilerlediyse ve ikisi de 08'in üst satırını değiştirdiyse PR çakışır; GitHub çakışmalı PR'da CI çalıştırmaz (check yok). Çözüm: `git merge origin/main`, iki satırı da tut.
 - **Cost center depoları (#54) — çift sayım kararlandı (2026-10-24, #56):** kullanıcı: 171'in 172'den çektiği miktar 172'nin ZPP'sinde zaten var. Ara mamul (fabrikada üretilen hammadde kodu) yalnız mamul tarafında sayılır, hammadde MRP'sine girmez (`04-hammadde.md`). Açık değil; ileride ZPP bunu içermezse ara mamul talebi 171'in planından türetilmelidir.

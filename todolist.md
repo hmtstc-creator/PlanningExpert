@@ -122,8 +122,8 @@ Kullanıcı kararları (2026-10-23):
 - [x] ✅ Bölüme sorumlu kullanıcı atanır — yapıldı (K7, 2026-10-24; Department paneli → Responsible, Board'da görünür). *(docs/board.md)*
 - [x] ✅ Holding'e kendi hedefi girilir; girilmezse şirket planlarının toplamı —
   yapıldı (K7, 2026-10-25; Administration → holding → Group targets; oranlar). *(docs/board.md)*
-- [ ] **[G]** Board Dashboard'un A3 / PDF çıktısı (KPI dashboard'undaki
-  gibi). ✅ K7 evet (2026-10-24). *(docs/board.md)*
+- [x] ✅ Board Dashboard'un A3 / PDF çıktısı — yapıldı (K7, 2026-10-25;
+  Save PDF (A3), seçili kapsam). *(docs/board.md, docs/pdf.md)*
 - [ ] **[K]** Fabrika karşılaştırma ekranının içeriği (ilk sürüm yalnızca
   OEE). *(docs/plant-genisletme.md — aşama 7)*
 

@@ -1,15 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { MiniTrend } from './KpiDashboard'
 import { KpiPeriodPicker, defaultSlot } from './KpiPeriodPicker'
 import { PageHeader } from './PageHeader'
+import { SavePdfButton } from './SavePdfButton'
 import { useQuery } from '../lib/convexTransport'
 import {
   BOARD_CARDS,
   BOARD_MEASURES,
   NO_DEPARTMENT_LABEL,
   attention,
+  boardPdfDate,
   childrenOf,
   departmentOwner,
   groupTargets,
@@ -25,6 +27,8 @@ import {
 import { formatKpi, periodTitle, type KpiMetrics, type KpiPeriod, type KpiResult, type KpiSlot } from '../lib/kpi'
 import { usePlant } from '../lib/plantContext'
 import { relatedPages } from '../lib/navigation'
+import { pdfFileName } from '../lib/pdfFile'
+import { sheetToPdf } from '../lib/pdfSheet'
 
 /**
  * Board Dashboard: holding → şirket → plant → bölüm → masraf yeri; seçili kapsamın
@@ -68,6 +72,7 @@ export function BoardDashboardPage() {
   }
   const [slot, setSlot] = useState(() => defaultSlot(view.period))
   const [scope, setScope] = useState<BoardScope>({})
+  const sheetRef = useRef<HTMLDivElement>(null)
   const data = useQuery(api.board.overview, { period: view.period, year: slot.year, num: slot.num }) as
     | { slots: KpiSlot[]; plants: BoardPlant[]; holdingTargets?: Record<string, HoldingTargets> }
     | undefined
@@ -86,6 +91,10 @@ export function BoardDashboardPage() {
   const rootLabel = holdingName ?? (new Set(plants.map((p) => p.companyId)).size > 1 ? 'All companies' : (plants[0]?.companyName ?? 'All'))
   const childLevel = scope.plantId ? (scope.department === undefined && plant && hasDepartments(plant) ? 'Department' : 'Cost center') : scope.companyId ? 'Plant' : 'Company'
   const m = measureOf(view.measure)
+  // PDF başlığındaki kapsam (ekrandaki gezinti satırı PDF'e girmez).
+  const scopePath = [rootLabel, company?.companyName, plant?.plantName, plant && scope.department !== undefined ? scope.department || NO_DEPARTMENT_LABEL : undefined]
+    .filter(Boolean)
+    .join(' ▸ ')
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
@@ -105,6 +114,7 @@ export function BoardDashboardPage() {
               productivity, overtime %, absenteeism %) — then that target is the group plan. Actual OEE comes from the OEE data.
             </p>
             <p>Green ▲ / red ▼: better / worse than plan in the direction of the measure. Grey: no plan.</p>
+            <p>Save PDF puts the cards, table, heat map and attention list of the selected scope on one A3 landscape page, with the scope and period on top.</p>
           </>
         }
       />
@@ -134,6 +144,16 @@ export function BoardDashboardPage() {
             ))}
           </select>
         </label>
+        <span className="ml-auto">
+          {/* Dosya adı: dönemin ilk günü — KPI Dashboard ile aynı (docs/pdf.md). */}
+          <SavePdfButton
+            variant="plain"
+            label="Save PDF (A3)"
+            disabled={!data || plants.length === 0}
+            fileName={pdfFileName(boardPdfDate(view.period, slot.year, slot.num), view.period === 'month' ? 'BOARD MONTHLY' : 'BOARD WEEKLY')}
+            make={() => sheetToPdf(sheetRef.current!, { size: 'A3', orientation: 'landscape', pages: 'fit' })}
+          />
+        </span>
       </div>
 
       <nav className="mt-4 flex flex-wrap items-center gap-1 text-sm" aria-label="Scope">
@@ -175,7 +195,13 @@ export function BoardDashboardPage() {
       ) : plants.length === 0 ? (
         <p className="mt-6 rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No plant with KPI or OEE permission.</p>
       ) : (
-        <div className="kpi-paper mt-4 space-y-4 rounded-lg p-4">
+        <div ref={sheetRef} className="kpi-paper mt-4 space-y-4 rounded-lg p-4">
+          <header className="hidden print:block">
+            <h1 className="text-lg font-semibold">Board Dashboard</h1>
+            <p className="text-sm">
+              {scopePath} · {periodTitle(view.period, slot.year, slot.num)} · table, heat map and attention: {m.label}
+            </p>
+          </header>
           <section className="board-cards">
             {BOARD_CARDS.map((key) => (
               <BoardCard key={key} measure={key} series={total} slots={slots} current={current} holdingTarget={targets?.[key as HoldingTargetKey] !== undefined} />
