@@ -27,6 +27,7 @@ import { useSafeMutation } from '../../lib/useSafeMutation'
 import { ErrorBanner } from '../ErrorBanner'
 import { LevelChip, TreeRow } from '../OrgTree'
 import { InfoTip } from '../PageHeader'
+import { GroupAccessFields, LEVEL_TEXT, LevelCell } from './GroupAccess'
 
 /**
  * Users & permissions (Company settings): şirket → gruplar → kullanıcılar
@@ -67,26 +68,6 @@ function Chip({ kind, className = '' }: { kind: PeopleKind; className?: string }
 }
 
 const MODULE_SHORT: Record<Module, string> = { planning: 'Plan', oee: 'OEE', die: 'Die', machine: 'Machine', kpi: 'KPI' }
-
-const LEVEL_TEXT: Record<Level, string> = { none: 'No access', view: 'Views', edit: 'Edits' }
-
-/** İzin hücresi: düzenler = dolu, görür = çerçeve, yok = çizgi. */
-function LevelCell({ level, title, text }: { level: Level; title?: string; text?: string }) {
-  if (level === 'none')
-    return (
-      <span title={title ?? LEVEL_TEXT.none} className="text-xs text-muted-foreground/60">
-        —
-      </span>
-    )
-  return (
-    <span
-      title={title ?? LEVEL_TEXT[level]}
-      className={`inline-block rounded px-1.5 py-px text-[10px] font-semibold ${level === 'edit' ? 'bg-emerald-600 text-white' : 'border border-emerald-600 text-emerald-700'}`}
-    >
-      {text ?? (level === 'edit' ? 'Edit' : 'View')}
-    </span>
-  )
-}
 
 function Legend() {
   return (
@@ -509,17 +490,6 @@ function UserList({ title, kind, hint, users, onSelect }: { title: string; kind:
 
 // ---- Grup ---------------------------------------------------------------------
 
-function LevelSelect({ value, onChange, inherit, className = '' }: { value: Level | ''; onChange: (v: Level | '') => void; inherit?: Level; className?: string }) {
-  return (
-    <select className={`${input} py-1 text-xs ${className}`} value={value} onChange={(e) => onChange(e.target.value as Level | '')}>
-      {inherit !== undefined && <option value="">Same as module ({LEVEL_TEXT[inherit].toLowerCase()})</option>}
-      <option value="none">No access</option>
-      <option value="view">Views</option>
-      <option value="edit">Edits</option>
-    </select>
-  )
-}
-
 function GroupPanel({
   companyId,
   company,
@@ -599,61 +569,7 @@ function GroupPanel({
         {group ? `${members.length} member${members.length === 1 ? '' : 's'}` : 'New group'} · changes apply when saved
       </p>
 
-      <label className="mt-3 flex items-start gap-2 text-sm">
-        <input type="checkbox" className="mt-0.5 h-4 w-4" checked={d.board} onChange={(e) => setD({ ...d, board: e.target.checked })} />
-        <span>
-          Board group
-          <span className="block text-xs text-muted-foreground">Members use the board view only: Board Dashboard and the KPI / OEE dashboards, read only.</span>
-        </span>
-      </label>
-
-      <h3 className="mt-5 text-sm font-semibold text-foreground">Plants</h3>
-      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-        <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={d.allPlants} onChange={(e) => setD({ ...d, allPlants: e.target.checked })} />
-          All plants <span className="text-xs text-muted-foreground">(plants added later too)</span>
-        </label>
-        {!d.allPlants &&
-          company.plants.map((p) => (
-            <label key={p._id} className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={d.plantIds.includes(p._id)}
-                onChange={(e) => setD({ ...d, plantIds: e.target.checked ? [...d.plantIds, p._id] : d.plantIds.filter((x) => x !== p._id) })}
-              />
-              <LevelChip level="plant" /> {p.name}
-            </label>
-          ))}
-      </div>
-
-      <h3 className="mt-5 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        Permissions
-        <InfoTip label="Module and area levels">
-          <p>The module level applies to all its areas. Set an area apart only where it differs — e.g. PlanningExpert views, Work calendar edits.</p>
-          <p>“Same as module” follows the module when it changes later.</p>
-        </InfoTip>
-      </h3>
-      <div className="mt-2 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-xs text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Module / area</th>
-              <th className="px-3 py-2 text-left font-medium">Level</th>
-              <th className="px-3 py-2 text-left font-medium">Result</th>
-            </tr>
-          </thead>
-          <tbody>
-            {modules.map((m) => (
-              <ModuleRows key={m} module={m} d={d} setD={setD} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {modules.length < MODULES.length && (
-        <p className="mt-1 text-[11px] text-muted-foreground">
-          Not rented by the company: {MODULES.filter((m) => !modules.includes(m)).map((m) => MODULE_LABELS[m]).join(', ')}.
-        </p>
-      )}
+      <GroupAccessFields d={d} setD={setD} plants={company.plants} modules={modules} />
 
       {group && (
         <>
@@ -696,45 +612,6 @@ function GroupPanel({
         </>
       )}
     </div>
-  )
-}
-
-function ModuleRows({ module: m, d, setD }: { module: Module; d: GroupDraft; setD: (d: GroupDraft) => void }) {
-  return (
-    <>
-      <tr className="border-t border-border bg-muted/40">
-        <td className={`${td} font-semibold text-foreground`}>{MODULE_LABELS[m]}</td>
-        <td className={td}>
-          <LevelSelect value={d.modules[m]} onChange={(v) => setD({ ...d, modules: { ...d.modules, [m]: (v || 'none') as Level } })} />
-        </td>
-        <td className={td}>
-          <LevelCell level={d.modules[m]} />
-        </td>
-      </tr>
-      {areasOf(m).map((a) => {
-        const level = draftAreaLevel(d, a.key)
-        const own = d.areas[a.key]
-        return (
-          <tr key={a.key} className="border-t border-border">
-            <td className={`${td} pl-8`}>
-              <span className="block text-sm">{a.label}</span>
-              <span className="block text-[11px] text-muted-foreground">{a.hint}</span>
-            </td>
-            <td className={td}>
-              <LevelSelect
-                value={own && own !== d.modules[m] ? own : ''}
-                inherit={d.modules[m]}
-                onChange={(v) => setD({ ...d, areas: { ...d.areas, [a.key]: v } })}
-                className={own && own !== d.modules[m] ? 'border-violet-500' : ''}
-              />
-            </td>
-            <td className={td}>
-              <LevelCell level={level} />
-            </td>
-          </tr>
-        )
-      })}
-    </>
   )
 }
 
