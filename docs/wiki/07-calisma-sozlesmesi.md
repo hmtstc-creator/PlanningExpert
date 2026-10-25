@@ -1,6 +1,6 @@
 # 07 · Çalışma sözleşmesi ve mimari etki kontrolü
 
-> Son güncelleme: 2026-10-25 (test tuzakları) · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
+> Son güncelleme: 2026-10-25 (otomatik model seçimi) · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
 
 Hafıza wiki'de olduğu için her iş yeni bir oturumda başlayabilir; bu sayfa her oturumun **ilk okuyacağı yerdir**.
 
@@ -39,7 +39,8 @@ Bir madde "hayır" ise **uygulama**; nedenini ve alternatifi kullanıcıya yaz. 
   okunur). Kural artık: **bir iş = bir oturum**; iş bitince ya da bağlam ~%40'ı geçince `/devir` skill'i ile wiki
   güncellenir ve yeni oturum açılır. Büyük dosyalar `grep` + parça parça okunur, test / build çıktısı `tail` ile
   kısaltılır, geniş tarama `Explore` ajanına verilir. Ayrıntı ve büyük dosya listesi: `CLAUDE.md` → *Token tasarrufu*.
-  Basit / mekanik iş küçük model, motor ve mimari güçlü model (kullanıcı `/model` ile seçer).
+  **Model seçimi otomatik** (2026-10-25): varsayılan `sonnet`; mekanik iş `hizli` (haiku), motor / mimari / inatçı
+  hata `derin` (opus, yüksek çaba) ajanına dar görevle verilir (`.claude/agents/`). Kullanıcı model seçmek zorunda değil.
 - **Her şey yazılı:** yeni bir bilgi, karar ya da öğrenilen ders aynı gün wiki'ye girer (sonraki oturum yalnız wiki'yi bilir).
 - Gizli değer yazılmaz; sunucuya doğrudan erişim yok (bulut oturumu sunucu oturumuna mesaj gönderemez).
 
