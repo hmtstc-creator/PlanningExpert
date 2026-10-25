@@ -390,6 +390,7 @@ function OrgMapInner({ scope }: { scope: 'platform' | 'company' }) {
               <OrgMapEditor
                 node={sel}
                 companies={companies}
+                holdings={holdings}
                 isPlatform={isPlatform}
                 view={view}
                 users={users}

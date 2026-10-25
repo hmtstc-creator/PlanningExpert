@@ -4,8 +4,9 @@ import { api } from '../../../convex/_generated/api'
 import { MODULES, type Level, type Module } from '../../lib/tenancy'
 import { ErrorBanner } from '../ErrorBanner'
 import { CompanyDataActions, CompanyStatusModules, type CompanyInfo } from './CompanyControls'
+import { HOLDING_TARGETS_HINT, HoldingTargetsForm } from './HoldingTargets'
 import { nodeEdits, plantLocaleHint, type MapNode } from '../../lib/orgMap'
-import { addCostCenter, addDepartment, editCostCenter, removeCostCenter, removeDepartment, renameDepartment, type OrgCompany, type OrgPlant } from '../../lib/orgTree'
+import { addCostCenter, addDepartment, editCostCenter, removeCostCenter, removeDepartment, renameDepartment, type OrgCompany, type OrgHolding, type OrgPlant } from '../../lib/orgTree'
 import { useSafeMutation } from '../../lib/useSafeMutation'
 import type { GroupRow, UserRow } from '../CompanyAdmin'
 
@@ -30,6 +31,7 @@ type Mode = 'rename' | 'add' | null
 export function OrgMapEditor({
   node,
   companies,
+  holdings = [],
   isPlatform,
   view = 'structure',
   users = [],
@@ -38,6 +40,7 @@ export function OrgMapEditor({
 }: {
   node: MapNode
   companies: OrgCompany[]
+  holdings?: OrgHolding[]
   isPlatform: boolean
   view?: 'structure' | 'people'
   users?: UserRow[]
@@ -189,8 +192,19 @@ export function OrgMapEditor({
     </div>
   )
 
+  // Holding düğümü (General): grup hedefleri — Holdings & companies ile aynı form.
+  const holding = ref.kind === 'holding' && isPlatform && view === 'structure' ? holdings.find((h) => h._id === ref.id) : undefined
+  const holdingSettings = holding && (
+    <div className="mt-3 space-y-1 border-t border-border pt-2">
+      <p className="text-xs font-semibold">Group targets</p>
+      <p className="text-[11px] text-muted-foreground">{HOLDING_TARGETS_HINT}</p>
+      <HoldingTargetsForm key={holding._id} holding={holding} />
+    </div>
+  )
+  const settings = companySettings || holdingSettings
+
   if (edits.elsewhere) return <p className="mt-2 text-[11px] text-muted-foreground">Rename, add or delete on {edits.elsewhere}.</p>
-  if (!edits.rename && !edits.add && !edits.remove) return companySettings || null
+  if (!edits.rename && !edits.add && !edits.remove) return settings || null
 
   return (
     <div className="mt-3 space-y-2">
@@ -255,7 +269,7 @@ export function OrgMapEditor({
       )}
       {edits.more && <p className="text-[11px] text-muted-foreground">{edits.more}</p>}
       <ErrorBanner message={error} onDismiss={() => all.forEach((m) => m.clearError())} />
-      {companySettings}
+      {settings}
     </div>
   )
 }
