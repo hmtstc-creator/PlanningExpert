@@ -462,7 +462,7 @@ export function nodeEdits(ref: MapRef, isPlatform: boolean, view: 'structure' | 
       case 'plant':
         return { ...NONE_EDITS, elsewhere: 'the Structure view' }
       case 'group':
-        return { rename: true, add: 'user', remove: true, more: 'Permissions on Users & permissions.' }
+        return { rename: true, add: 'user', remove: true }
       case 'user':
         return { rename: true, add: null, remove: true, more: 'Password, email, creator right and active on Users & permissions.' }
       default:

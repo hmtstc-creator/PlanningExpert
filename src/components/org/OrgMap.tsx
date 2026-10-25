@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import type { GroupRow, UserRow } from '../CompanyAdmin'
+import type { PeopleGroup } from '../../lib/peopleTree'
 import { ErrorBanner } from '../ErrorBanner'
 import { OrgMapEditor } from './OrgMapEditor'
 import { LEVEL_INFO } from '../OrgTree'
@@ -155,7 +156,7 @@ function OrgMapInner({ scope }: { scope: 'platform' | 'company' }) {
   const company = companies.find((c) => c._id === companyId) ?? companies.find((c) => c._id === ctx?.active?.companyId) ?? companies[0]
   const people = view === 'people' && company
   const users = (useQuery(api.users.list, people ? { companyId: company._id } : 'skip') ?? NONE) as UserRow[]
-  const groups = (useQuery(api.users.listGroups, people ? { companyId: company._id } : 'skip') ?? NONE) as (GroupRow & { companyId: string })[]
+  const groups = (useQuery(api.users.listGroups, people ? { companyId: company._id } : 'skip') ?? NONE) as (GroupRow & { companyId: string; areas?: PeopleGroup['areas'] })[]
 
   // Varsayılan: work center'lar kapalı (masraf yeri satırında sayı). Tıklanan düğüm varsayılanı tersine çevirir.
   const [showWc, setShowWc] = useState(false)

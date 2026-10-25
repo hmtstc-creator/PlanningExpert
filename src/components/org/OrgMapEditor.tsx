@@ -6,6 +6,8 @@ import { ErrorBanner } from '../ErrorBanner'
 import { CompanyDataActions, CompanyStatusModules, type CompanyInfo } from './CompanyControls'
 import { HOLDING_TARGETS_HINT, HoldingTargetsForm } from './HoldingTargets'
 import { DepartmentOwnerSelect } from './DepartmentOwner'
+import { GroupAccessForm } from '../people/GroupAccess'
+import type { PeopleGroup } from '../../lib/peopleTree'
 import { nodeEdits, plantLocaleHint, type MapNode } from '../../lib/orgMap'
 import { addCostCenter, addDepartment, editCostCenter, removeCostCenter, removeDepartment, renameDepartment, type OrgCompany, type OrgHolding, type OrgPlant } from '../../lib/orgTree'
 import { useSafeMutation } from '../../lib/useSafeMutation'
@@ -16,9 +18,10 @@ import type { GroupRow, UserRow } from '../CompanyAdmin'
  * ekle, sil. Eski sayfaların kullandığı aynı mutation'lar çağrılır; yetki ve
  * korumalar (dolu bölüm, work center'lı masraf yeri, ad onayı) sunucudadır.
  * Hangi düğümde ne yapılabileceği `nodeEdits` (src/lib/orgMap.ts).
- * Kişiler görünümünde yeni grup hiçbir plant'i görmez ve izni yoktur (plant'e
- * sürüklenir, izin Users & permissions'ta verilir); yeni kullanıcının parolası
- * da orada verilir.
+ * Kişiler görünümünde yeni grup hiçbir plant'i görmez ve izni yoktur; grup
+ * düğümünde Board grubu, plant'ler ve izin matrisi düzenlenir (GroupAccessForm,
+ * Users & permissions ile aynı alanlar). Yeni kullanıcının parolası hâlâ
+ * Users & permissions'ta verilir.
  */
 
 const btn = 'rounded-md border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-40'
@@ -45,7 +48,7 @@ export function OrgMapEditor({
   isPlatform: boolean
   view?: 'structure' | 'people'
   users?: UserRow[]
-  groups?: GroupRow[]
+  groups?: (GroupRow & Pick<PeopleGroup, 'areas'>)[]
   onDone: (text: string, removed?: boolean) => void
 }) {
   const edits = nodeEdits(node.ref, isPlatform, view)
@@ -209,7 +212,16 @@ export function OrgMapEditor({
       <DepartmentOwnerSelect key={`${deptPlant._id}:${ref.name}`} plant={deptPlant} department={ref.name} compact />
     </div>
   )
-  const settings = companySettings || holdingSettings || departmentSettings
+  // Grup düğümü: Board grubu, plant'ler, izin matrisi — Users & permissions ile aynı alanlar.
+  const accessGroup = ref.kind === 'group' && view === 'people' ? groups.find((g) => g._id === ref.id) : undefined
+  const accessCompany = ref.kind === 'group' ? companyOf(ref.companyId) : undefined
+  const groupSettings = accessGroup && accessCompany && ref.kind === 'group' && (
+    <div className="mt-3 border-t border-border pt-2">
+      <p className="text-xs font-semibold">Access</p>
+      <GroupAccessForm key={accessGroup._id} group={accessGroup} companyId={ref.companyId} company={accessCompany} />
+    </div>
+  )
+  const settings = companySettings || holdingSettings || departmentSettings || groupSettings
 
   if (edits.elsewhere) return <p className="mt-2 text-[11px] text-muted-foreground">Rename, add or delete on {edits.elsewhere}.</p>
   if (!edits.rename && !edits.add && !edits.remove) return settings || null
@@ -258,7 +270,7 @@ export function OrgMapEditor({
               <input className={input} placeholder="Time zone, e.g. Europe/Bucharest" value={zone} onChange={(e) => setZone(e.target.value)} />
             </div>
           )}
-          {mode === 'add' && edits.add === 'group' && <p className="text-[11px] text-muted-foreground">The new group sees no plant and has no permission: drag it onto a plant, set permissions on Users & permissions.</p>}
+          {mode === 'add' && edits.add === 'group' && <p className="text-[11px] text-muted-foreground">The new group sees no plant and has no permission: drag it onto a plant or select it to set plants and permissions.</p>}
           {mode === 'add' && edits.add === 'user' && <p className="text-[11px] text-muted-foreground">Give a temporary password on Users & permissions (Set password).</p>}
           {mode === 'rename' && ref.kind === 'costCenter' && <p className="text-[11px] text-muted-foreground">The code {ref.code} stays (data is linked to it).</p>}
           <div className="flex gap-1">

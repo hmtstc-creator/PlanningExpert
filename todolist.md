@@ -62,8 +62,8 @@ Holding → Company → Plant → Department → Cost center → Work center
   bölüm, masraf yeri (2026-10-25). **[S]** dene: düğümü seç → Rename / Add / Delete.
 - [x] **[G]** Grup ve kullanıcı ekleme / ad değiştirme / silme haritada
   (2026-10-25; *Users & groups* görünümü). **[S]** dene: şirket → *Add group*,
-  grup → *Add user* / Rename / Delete, kullanıcı → Rename / Delete. Parola ve
-  izinler hâlâ Users & permissions'ta.
+  grup → *Add user* / Rename / Delete, kullanıcı → Rename / Delete. Parola
+  hâlâ Users & permissions'ta.
 - [x] **[G]** Work center'ı masraf yerine sürükleme (2026-10-25;
   `platform.setWorkCenterCostCenter`, yalnız masraf yeri). **[S]** dene: *Show
   work centers* → work center'ı masraf yerine sürükle.
@@ -79,7 +79,9 @@ Holding → Company → Plant → Department → Cost center → Work center
     **[S]** dene: haritada holding'e tıkla → hedef gir → Board'da grup planı.
   - [x] Bölüm sorumlusu (2026-10-25, `DepartmentOwner.tsx`). **[S]** dene:
     haritada bölüme tıkla → *Responsible* seç → Board'da görünür.
-  - [ ] Grup izinleri: plant'ler ve modül / alan seviyeleri (izin matrisi).
+  - [x] Grup izinleri: Board grubu, plant'ler ve modül / alan seviyeleri (2026-10-25,
+    `people/GroupAccess.tsx`). **[S]** dene: *Users & groups* → gruba tıkla →
+    *Access* → seviye değiştir → *Save access*.
   - [ ] Kullanıcı: parola ver, her yerden çıkış; güvenlik kontrolü paneli.
   - [ ] Hepsi bitince eski sayfaları ve menü bağlantılarını kaldır.
 
