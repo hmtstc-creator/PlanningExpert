@@ -121,10 +121,15 @@ const EDGE_STYLE: Record<MapEdge['kind'], Partial<Edge>> = {
   member: { type: 'default', style: { stroke: '#0d9488', strokeWidth: 1.2 } },
 }
 
-export function OrgMap() {
+/**
+ * `platform` (Administration, General): bütün holding ve şirketler.
+ * `company` (Company settings): yalnız seçili şirket; holding işlemleri yok —
+ * General de burada creator gibi çalışır. Yetkiyi sunucu ayrıca denetler.
+ */
+export function OrgMap({ scope = 'platform' }: { scope?: 'platform' | 'company' }) {
   return (
     <ReactFlowProvider>
-      <OrgMapInner />
+      <OrgMapInner scope={scope} />
     </ReactFlowProvider>
   )
 }
@@ -133,10 +138,17 @@ export function OrgMap() {
 // graph → setNodes → yeniden çizim döngüsüne (React #185) yol açıyordu. Sabit boş dizi kullanılır.
 const NONE: never[] = []
 
-function OrgMapInner() {
-  const { isPlatform, ctx } = usePlant()
+function OrgMapInner({ scope }: { scope: 'platform' | 'company' }) {
+  const plant = usePlant()
+  const { ctx } = plant
+  const isPlatform = plant.isPlatform && scope === 'platform'
   const flow = useReactFlow()
-  const companies = (useQuery(api.platform.companies) ?? NONE) as CompanyRow[]
+  const allCompanies = (useQuery(api.platform.companies) ?? NONE) as CompanyRow[]
+  const activeCompanyId = ctx?.active?.companyId
+  const companies = useMemo(
+    () => (scope === 'company' ? allCompanies.filter((c) => c._id === activeCompanyId) : allCompanies),
+    [scope, allCompanies, activeCompanyId],
+  )
   const holdings = (useQuery(api.platform.holdings, isPlatform ? {} : 'skip') ?? NONE) as OrgHolding[]
   const [view, setView] = useState<View>('structure')
   const [companyId, setCompanyId] = useState<string | null>(null)

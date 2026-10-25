@@ -32,11 +32,8 @@ function OrgMapPage() {
               remove that membership or plant.
             </p>
             <p>
-              Scroll to zoom, drag the background to move. Renaming, adding and deleting stay on{' '}
-              <Link to="/admin" className="underline">
-                Holdings & companies
-              </Link>{' '}
-              and Users & permissions.
+              Select a node to rename, add or delete. Scroll to zoom, drag the background to move. Creators have the same map for their
+              own company under Company settings.
             </p>
           </>
         }

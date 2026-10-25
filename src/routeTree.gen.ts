@@ -60,6 +60,7 @@ import { Route as OeeMttrRouteImport } from './routes/oee/mttr'
 import { Route as OeeReportRouteImport } from './routes/oee/report'
 import { Route as OeeSettingsRouteImport } from './routes/oee/settings'
 import { Route as OeeTopicsRouteImport } from './routes/oee/topics'
+import { Route as SettingsMapRouteImport } from './routes/settings_.map'
 import { Route as KpiMonthlyDashboardRouteImport } from './routes/kpi/monthly/dashboard'
 import { Route as KpiMonthlyEntryRouteImport } from './routes/kpi/monthly/entry'
 import { Route as KpiWeeklyDashboardRouteImport } from './routes/kpi/weekly/dashboard'
@@ -322,6 +323,11 @@ const OeeTopicsRoute = OeeTopicsRouteImport.update({
   path: '/oee/topics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsMapRoute = SettingsMapRouteImport.update({
+  id: '/settings_/map',
+  path: '/settings/map',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KpiMonthlyDashboardRoute = KpiMonthlyDashboardRouteImport.update({
   id: '/kpi/monthly/dashboard',
   path: '/kpi/monthly/dashboard',
@@ -391,6 +397,7 @@ export interface FileRoutesByFullPath {
   '/oee/report': typeof OeeReportRoute
   '/oee/settings': typeof OeeSettingsRoute
   '/oee/topics': typeof OeeTopicsRoute
+  '/settings/map': typeof SettingsMapRoute
   '/die-followup/': typeof DieFollowupIndexRoute
   '/kpi/': typeof KpiIndexRoute
   '/machine-followup/': typeof MachineFollowupIndexRoute
@@ -448,6 +455,7 @@ export interface FileRoutesByTo {
   '/oee/report': typeof OeeReportRoute
   '/oee/settings': typeof OeeSettingsRoute
   '/oee/topics': typeof OeeTopicsRoute
+  '/settings/map': typeof SettingsMapRoute
   '/die-followup': typeof DieFollowupIndexRoute
   '/kpi': typeof KpiIndexRoute
   '/machine-followup': typeof MachineFollowupIndexRoute
@@ -506,6 +514,7 @@ export interface FileRoutesById {
   '/oee/report': typeof OeeReportRoute
   '/oee/settings': typeof OeeSettingsRoute
   '/oee/topics': typeof OeeTopicsRoute
+  '/settings_/map': typeof SettingsMapRoute
   '/die-followup/': typeof DieFollowupIndexRoute
   '/kpi/': typeof KpiIndexRoute
   '/machine-followup/': typeof MachineFollowupIndexRoute
@@ -565,6 +574,7 @@ export interface FileRouteTypes {
     | '/oee/report'
     | '/oee/settings'
     | '/oee/topics'
+    | '/settings/map'
     | '/die-followup/'
     | '/kpi/'
     | '/machine-followup/'
@@ -622,6 +632,7 @@ export interface FileRouteTypes {
     | '/oee/report'
     | '/oee/settings'
     | '/oee/topics'
+    | '/settings/map'
     | '/die-followup'
     | '/kpi'
     | '/machine-followup'
@@ -679,6 +690,7 @@ export interface FileRouteTypes {
     | '/oee/report'
     | '/oee/settings'
     | '/oee/topics'
+    | '/settings_/map'
     | '/die-followup/'
     | '/kpi/'
     | '/machine-followup/'
@@ -737,6 +749,7 @@ export interface RootRouteChildren {
   OeeReportRoute: typeof OeeReportRoute
   OeeSettingsRoute: typeof OeeSettingsRoute
   OeeTopicsRoute: typeof OeeTopicsRoute
+  SettingsMapRoute: typeof SettingsMapRoute
   DieFollowupIndexRoute: typeof DieFollowupIndexRoute
   KpiIndexRoute: typeof KpiIndexRoute
   MachineFollowupIndexRoute: typeof MachineFollowupIndexRoute
@@ -1106,6 +1119,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OeeTopicsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings_/map': {
+      id: '/settings_/map'
+      path: '/settings/map'
+      fullPath: '/settings/map'
+      preLoaderRoute: typeof SettingsMapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kpi/monthly/dashboard': {
       id: '/kpi/monthly/dashboard'
       path: '/kpi/monthly/dashboard'
@@ -1185,6 +1205,7 @@ const rootRouteChildren: RootRouteChildren = {
   OeeReportRoute: OeeReportRoute,
   OeeSettingsRoute: OeeSettingsRoute,
   OeeTopicsRoute: OeeTopicsRoute,
+  SettingsMapRoute: SettingsMapRoute,
   DieFollowupIndexRoute: DieFollowupIndexRoute,
   KpiIndexRoute: KpiIndexRoute,
   MachineFollowupIndexRoute: MachineFollowupIndexRoute,
