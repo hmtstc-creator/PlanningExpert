@@ -68,6 +68,9 @@ describe('structureGraph', () => {
     expect(dropAction(node('cc:p1:100'), node('d:p1:Press'), ctx)).toBeNull()
     expect(dropAction(node('cc:p1:200'), node('d:p1:'), ctx)).toBeNull() // sanal kutu hedef değil
     expect(dropAction(node('p:p1'), node('c:c2'), ctx)).toBeNull() // plant taşınmaz
+    expect(dropAction(node('wc:p1:P1'), node('cc:p1:200'), ctx)).toMatchObject({ kind: 'workCenterCostCenter', plantId: 'p1', name: 'P1', costCenter: '200' })
+    expect(dropAction(node('wc:p1:P9'), node('cc:p1:100'), ctx)).toMatchObject({ kind: 'workCenterCostCenter', name: 'P9', costCenter: '100' }) // bağsız → bağlanır
+    expect(dropAction(node('wc:p1:P1'), node('cc:p1:100'), ctx)).toBeNull() // zaten orada
   })
 
   it('finds nodes by name or code', () => {

@@ -22,7 +22,7 @@ export type MapRef =
   | { kind: 'plant'; id: string; companyId: string }
   | { kind: 'department'; plantId: string; name: string }
   | { kind: 'costCenter'; plantId: string; code: string; department?: string }
-  | { kind: 'workCenter'; plantId: string; name: string }
+  | { kind: 'workCenter'; plantId: string; name: string; costCenter?: string }
   | { kind: 'group'; id: string; companyId: string }
   | { kind: 'user'; id: string; companyId: string }
   | { kind: 'virtual' }
@@ -93,7 +93,7 @@ function plantTree(c: OrgCompany, p: OrgPlant, dups: Set<string>): Tree {
   if (dups.has(p._id)) warnings.push(`Another plant of ${c.name} has the same name — delete or rename one`)
   if (!(p.departments ?? []).length) warnings.push('No department yet')
   const wcOf = (code: string) =>
-    workCentersOf(p, code).map((w) => leaf({ id: `wc:${p._id}:${w.name}`, level: 'workCenter', label: w.name, ref: { kind: 'workCenter', plantId: p._id, name: w.name } }))
+    workCentersOf(p, code).map((w) => leaf({ id: `wc:${p._id}:${w.name}`, level: 'workCenter', label: w.name, ref: { kind: 'workCenter', plantId: p._id, name: w.name, costCenter: code } }))
   const ccTree = (cc: { code: string; name: string; department?: string }) => {
     const kids = wcOf(cc.code)
     return leaf(
@@ -363,6 +363,7 @@ export function peopleGraph(company: OrgCompany, users: MapUser[], groups: MapGr
 export type MapAction =
   | { kind: 'companyHolding'; companyId: string; holdingId: string; text: string }
   | { kind: 'costCenterDepartment'; plantId: string; code: string; department: string; text: string }
+  | { kind: 'workCenterCostCenter'; plantId: string; name: string; costCenter: string; text: string }
   | { kind: 'userGroup'; userId: string; groupId: string; add: boolean; text: string }
   | { kind: 'groupPlant'; groupId: string; plantId: string; add: boolean; text: string }
 
@@ -385,6 +386,11 @@ export function dropAction(
   if (d.kind === 'costCenter' && t.kind === 'department') {
     if (d.plantId !== t.plantId || d.department === t.name) return null
     return { kind: 'costCenterDepartment', plantId: d.plantId, code: d.code, department: t.name, text: `Move cost center ${d.code} to ${target.label}` }
+  }
+  if (d.kind === 'workCenter' && t.kind === 'costCenter') {
+    // Yalnız aynı plant'in masraf yeri (work center plant'e bağlı veridir).
+    if (d.plantId !== t.plantId || d.costCenter === t.code) return null
+    return { kind: 'workCenterCostCenter', plantId: d.plantId, name: d.name, costCenter: t.code, text: `Move work center ${d.name} to cost center ${target.label}` }
   }
   if (d.kind === 'user' && t.kind === 'group') {
     const u = ctx.users?.find((x) => x._id === d.id)
@@ -459,6 +465,7 @@ export function nodeEdits(ref: MapRef, isPlatform: boolean): NodeEdits {
       // Kod sabit (veriler kodla bağlı); yalnız ad değişir.
       return { rename: true, add: null, remove: true }
     case 'workCenter':
+      // Masraf yeri haritada sürükleyerek değişir; diğer alanlar tanım sayfasında.
       return { ...NONE_EDITS, elsewhere: 'Work Center Definitions' }
     case 'group':
     case 'user':

@@ -162,7 +162,7 @@ function OrgMapInner() {
   }, [view, company, users, groups, holdings, companies, showWc, flipped])
 
   const canDrag = (n: MapNode) =>
-    (n.ref.kind === 'company' && isPlatform && view === 'structure') || n.ref.kind === 'costCenter' || n.ref.kind === 'user' || n.ref.kind === 'group'
+    (n.ref.kind === 'company' && isPlatform && view === 'structure') || n.ref.kind === 'costCenter' || n.ref.kind === 'workCenter' || n.ref.kind === 'user' || n.ref.kind === 'group'
 
   const [nodes, setNodes] = useState<Node[]>([])
   useEffect(() => {
@@ -205,8 +205,9 @@ function OrgMapInner() {
   const updateUser = useSafeMutation(api.users.update)
   const saveGroup = useSafeMutation(api.users.saveGroup)
   const addHolding = useSafeMutation(api.platform.saveHolding)
-  const error = setHolding.error ?? updatePlant.error ?? updateUser.error ?? saveGroup.error ?? addHolding.error
-  const clearError = () => [setHolding, updatePlant, updateUser, saveGroup, addHolding].forEach((m) => m.clearError())
+  const moveWorkCenter = useSafeMutation(api.platform.setWorkCenterCostCenter)
+  const error = setHolding.error ?? updatePlant.error ?? updateUser.error ?? saveGroup.error ?? addHolding.error ?? moveWorkCenter.error
+  const clearError = () => [setHolding, updatePlant, updateUser, saveGroup, addHolding, moveWorkCenter].forEach((m) => m.clearError())
 
   const newHolding = async () => {
     const name = window.prompt('Name of the new holding')?.trim()
@@ -221,6 +222,7 @@ function OrgMapInner() {
       const plant = companies.flatMap((c) => c.plants).find((p) => p._id === a.plantId)
       if (plant) ok = await updatePlant.run({ id: plant._id, name: plant.name, ...editCostCenter(plant, a.code, { department: a.department }) })
     }
+    if (a.kind === 'workCenterCostCenter') ok = await moveWorkCenter.run({ plantId: a.plantId, name: a.name, costCenter: a.costCenter })
     if (a.kind === 'userGroup') {
       const u = users.find((x) => x._id === a.userId)
       const groupIds = u && (a.add ? [...u.groupIds, a.groupId] : u.groupIds.filter((g) => g !== a.groupId))
@@ -306,7 +308,7 @@ function OrgMapInner() {
         )}
         <span className="ml-auto text-xs text-muted-foreground">
           {view === 'structure'
-            ? `Drag a ${isPlatform ? 'company onto a holding or a ' : ''}cost center onto a department.`
+            ? `Drag a ${isPlatform ? 'company onto a holding, a ' : ''}cost center onto a department${isPlatform ? ',' : ' or'} a work center onto a cost center (tick Work centers).`
             : 'Drag a user onto a group, a group onto a plant. Click a line to remove it.'}
         </span>
       </div>

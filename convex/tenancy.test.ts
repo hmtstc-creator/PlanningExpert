@@ -362,6 +362,18 @@ describe('fabrika ayrımı', () => {
     expect(await wcs()).toEqual(['PRS-107'])
     await t.mutation(api.presses.upsert, { token: boss, name: 'PRS-106', hall: 'H', costCenter: '51010171' })
     expect(await wcs()).toEqual(['PRS-106', 'PRS-107'])
+
+    // Organization map: work center sürüklenip fabrikanın başka masraf yerine bırakılır; yalnız masraf yeri değişir.
+    const plant1 = after.active.plantId
+    await t.mutation(api.platform.updatePlant, { token: boss, id: plant1, name: 'Plant 1', departments: ['Stamping'], costCenters: [{ code: '51010171', name: 'Transfer', department: 'Stamping' }, { code: '51010172', name: 'Tandem', department: 'Stamping' }] })
+    await expect(t.mutation(api.platform.setWorkCenterCostCenter, { token: boss, plantId: plant1, name: 'PRS-106', costCenter: 'X' })).rejects.toThrow(/not a cost center/)
+    await expect(t.mutation(api.platform.setWorkCenterCostCenter, { token: boss, plantId: plant1, name: 'NOPE', costCenter: '51010172' })).rejects.toThrow(/not a work center/)
+    const changedBefore = ((await t.query(api.planRuns.status, { token: boss })) as Any).dataChangedAt
+    vi.setSystemTime(Date.now() + 1000)
+    await t.mutation(api.platform.setWorkCenterCostCenter, { token: boss, plantId: plant1, name: 'PRS-106', costCenter: '51010172' })
+    const moved = ((await t.run((ctx: Any) => ctx.db.query('presses').collect())) as Any[]).find((p) => p.name === 'PRS-106')
+    expect([moved.costCenter, moved.hall]).toEqual(['51010172', 'H'])
+    expect(((await t.query(api.planRuns.status, { token: boss })) as Any).dataChangedAt).toBeGreaterThan(changedBefore)
   })
 
   it('KPI: yalnızca fabrikanın masraf yerleri; dashboard yalnızca KPI izinli fabrikalar; OEE kök verisi', async () => {

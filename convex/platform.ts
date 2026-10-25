@@ -5,7 +5,8 @@ import type { Id } from './_generated/dataModel'
 import { internalMutation } from './_generated/server'
 import { audit, diff } from './audit'
 import { TABLES, userMutation, userQuery } from './guarded'
-import { isPlantTable } from './plantDb'
+import { isPlantTable, plantDb } from './plantDb'
+import { markPlanChanged } from './planQueue'
 import { MODULES, canManageCompany, isPlatform } from '../src/lib/tenancy'
 import { carryDepartmentOwners } from '../src/lib/orgTree'
 import { securityOverview as buildSecurityOverview, type SecurityUser } from '../src/lib/securityOverview'
@@ -349,6 +350,35 @@ export const setDepartmentOwner = userMutation({
     const previous = before ? ((await ctx.db.get(before.userId))?.name ?? '—') : '—'
     await ctx.db.patch(plantId, { departmentOwners: owners })
     await audit(ctx.db, { actor: me.name, action: 'plant.update', target: plant.name, detail: `${department} responsible: ${previous} → ${name ?? '—'}`, companyId: plant.companyId })
+    return null
+  },
+})
+
+/**
+ * Work center'ı fabrikanın başka bir masraf yerine bağlar (Organization map'te
+ * sürükle-bırak). Yalnız `costCenter` alanı değişir; diğer alanlar Work Center
+ * Definitions'ta (`presses.upsert`, aktif plant ve tam kayıt ister).
+ */
+export const setWorkCenterCostCenter = userMutation({
+  args: { plantId: v.id('plants'), name: v.string(), costCenter: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { plantId, name, costCenter }) => {
+    const me = ctx.sessionUser
+    const plant = await ctx.db.get(plantId)
+    if (!plant) throw new ConvexError('Plant not found')
+    if (!canManageCompany(me, plant.companyId)) throw new ConvexError('Only a creator of this company can change the plant')
+    const code = costCenter.trim()
+    if (!(plant.costCenters ?? []).some((c: CostCenter) => c.code === code)) throw new ConvexError(`${code} is not a cost center of this plant`)
+    const wc = await ctx.db
+      .query('presses')
+      .withIndex('by_name', (q) => q.eq('plantId', plantId).eq('name', name))
+      .first()
+    if (!wc) throw new ConvexError(`${name} is not a work center of this plant`)
+    if (wc.costCenter === code) return null
+    await ctx.db.patch(wc._id, { costCenter: code })
+    // Masraf yeri stok kapsamını belirler (Locations per cost center): plan güncel değil.
+    await markPlanChanged({ db: plantDb(ctx.db, plantId, TABLES) })
+    await audit(ctx.db, { actor: me.name, action: 'plant.update', target: plant.name, detail: `${name} cost center: ${wc.costCenter ?? '—'} → ${code}`, companyId: plant.companyId })
     return null
   },
 })

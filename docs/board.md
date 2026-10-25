@@ -154,6 +154,7 @@ mutation'lar, yetki sunucuda):
 |---|---|
 | Company → Holding | `platform.setCompanyHolding` (yalnızca General) |
 | Cost center → aynı plant'in Department'ı | `platform.updatePlant` (masraf yerinin bölümü) |
+| Work center → aynı plant'in Cost center'ı | `platform.setWorkCenterCostCenter` (yalnız masraf yeri; plan "güncel değil" olur). *Work centers* kutusu açık olmalı |
 | User → Group | `users.update` (grup eklenir) |
 | Group → Plant | `users.saveGroup` (plant eklenir; "all plants" grubu değişmez) |
 
