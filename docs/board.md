@@ -16,6 +16,18 @@ trendler önemli — KPI ve OEE. Birden çok şirketi olan kişi için yapı?
 4. Isı haritası ve dikkat listesindeki ölçüyü **kullanıcı seçer** (OEE,
    Efficiency, Productivity, üretim adedi, Overtime %, Absenteeism % …).
 5. Grup toplamında her şirketin **kendi planlarının toplamı** kullanılır.
+   **Holding hedefi (K7, 2026-10-25):** General, Administration → holding →
+   *Group targets*'ta holding'in kendi hedefini girer — yalnız dönemden
+   bağımsız oranlar: OEE, Efficiency, Productivity, Overtime %, Absenteeism %
+   (adet ve saat toplamı dönem uzunluğuna bağlı, şirket planlarının toplamı
+   kalır). Girilen hedef Board'da **grup kapsamının** (şirket seçili değil,
+   bütün plantler tek holding'in) kartlarında planın yerine geçer ve kartta
+   "target" yazar; boş alan = şirket planlarının toplamı. Şirket, plant ve
+   alt seviyeler ile tablodaki şirket satırları kendi planlarıyla kalır.
+   Yalnız bütün grubu görenlere uygulanır (holding board üyesi, General);
+   şirket kullanıcısının "grup" görünümü kendi şirketidir. Kayıt
+   `holdings.targets` (oran, 0.85 = %85), sunucu `platform.setHoldingTargets`
+   (denetim kaydı), hesap `src/lib/board.ts` → `groupTargets`, `withTargets`.
 
 ## Kim ne görür
 

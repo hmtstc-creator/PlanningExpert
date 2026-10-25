@@ -12,12 +12,15 @@ import {
   attention,
   childrenOf,
   departmentOwner,
+  groupTargets,
   hasDepartments,
   measureOf,
   scopeSeries,
   verdict,
   type BoardPlant,
   type BoardScope,
+  type HoldingTargetKey,
+  type HoldingTargets,
 } from '../lib/board'
 import { formatKpi, periodTitle, type KpiMetrics, type KpiPeriod, type KpiResult, type KpiSlot } from '../lib/kpi'
 import { usePlant } from '../lib/plantContext'
@@ -65,12 +68,15 @@ export function BoardDashboardPage() {
   }
   const [slot, setSlot] = useState(() => defaultSlot(view.period))
   const [scope, setScope] = useState<BoardScope>({})
-  const data = useQuery(api.board.overview, { period: view.period, year: slot.year, num: slot.num }) as { slots: KpiSlot[]; plants: BoardPlant[] } | undefined
+  const data = useQuery(api.board.overview, { period: view.period, year: slot.year, num: slot.num }) as
+    | { slots: KpiSlot[]; plants: BoardPlant[]; holdingTargets?: Record<string, HoldingTargets> }
+    | undefined
 
   const slots = data?.slots ?? []
   const current = Math.max(0, slots.findIndex((s) => s.year === slot.year && s.num === slot.num))
   const plants = data?.plants ?? []
-  const total = useMemo(() => (data ? scopeSeries(plants, scope, slots) : []), [data, scope]) // eslint-disable-line react-hooks/exhaustive-deps
+  const targets = useMemo(() => (data ? groupTargets(plants, scope, data.holdingTargets) : null), [data, scope]) // eslint-disable-line react-hooks/exhaustive-deps
+  const total = useMemo(() => (data ? scopeSeries(plants, scope, slots, targets) : []), [data, scope, targets]) // eslint-disable-line react-hooks/exhaustive-deps
   const children = useMemo(() => (data ? childrenOf(plants, scope, slots) : []), [data, scope]) // eslint-disable-line react-hooks/exhaustive-deps
   const focus = useMemo(() => (data ? attention(plants, scope, slots, current, view.measure) : []), [data, scope, current, view.measure]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -95,7 +101,8 @@ export function BoardDashboardPage() {
             </p>
             <p>
               Totals add hours and pieces first and calculate every ratio once — never an average of percentages. A group
-              total uses each company's own plan. Actual OEE comes from the OEE data.
+              total uses each company's own plan, unless the holding has its own target for a ratio (OEE, efficiency,
+              productivity, overtime %, absenteeism %) — then that target is the group plan. Actual OEE comes from the OEE data.
             </p>
             <p>Green ▲ / red ▼: better / worse than plan in the direction of the measure. Grey: no plan.</p>
           </>
@@ -171,7 +178,7 @@ export function BoardDashboardPage() {
         <div className="kpi-paper mt-4 space-y-4 rounded-lg p-4">
           <section className="board-cards">
             {BOARD_CARDS.map((key) => (
-              <BoardCard key={key} measure={key} series={total} slots={slots} current={current} />
+              <BoardCard key={key} measure={key} series={total} slots={slots} current={current} holdingTarget={targets?.[key as HoldingTargetKey] !== undefined} />
             ))}
           </section>
 
@@ -216,7 +223,7 @@ export function BoardDashboardPage() {
   )
 }
 
-function BoardCard({ measure, series, slots, current }: { measure: keyof KpiMetrics; series: KpiResult[]; slots: KpiSlot[]; current: number }) {
+function BoardCard({ measure, series, slots, current, holdingTarget }: { measure: keyof KpiMetrics; series: KpiResult[]; slots: KpiSlot[]; current: number; holdingTarget: boolean }) {
   const row = measureOf(measure)
   const r = series[current]
   if (!r) return null
@@ -227,7 +234,9 @@ function BoardCard({ measure, series, slots, current }: { measure: keyof KpiMetr
       <div className="kpi-card-label">{row.card ?? row.label}</div>
       <div className="kpi-card-main">
         <span className="kpi-card-value">{formatKpi(r.actual[measure], row.unit)}</span>
-        <span className="kpi-card-plan">plan {formatKpi(r.plan[measure], row.unit)}</span>
+        <span className="kpi-card-plan" title={holdingTarget ? 'Plan = the holding’s own target' : undefined}>
+          {holdingTarget ? 'target' : 'plan'} {formatKpi(r.plan[measure], row.unit)}
+        </span>
       </div>
       <div className={`kpi-card-gap ${good === null ? '' : good ? 'kpi-good' : 'kpi-bad'}`}>
         {gapText}

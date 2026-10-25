@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { attention, childrenOf, declining, departmentOwner, departmentsOf, scopeSeries, seriesFor, type BoardPlant } from './board'
+import { attention, childrenOf, declining, departmentOwner, departmentsOf, groupTargets, scopeSeries, seriesFor, type BoardPlant } from './board'
 import { isBoardUser, accessFor } from './tenancy'
 import { trendSlots, type KpiEntry } from './kpi'
 
@@ -21,6 +21,23 @@ describe('Board Dashboard', () => {
     expect(r.plan.efficiency).toBeCloseTo((80 + 240 + 50) / 500)
     expect(r.actual.efficiency).toBeCloseTo((60 + 270 + 50) / 500)
     expect(r.actual.oee).toBeCloseTo((50 + 270) / 400)
+  })
+
+  it('holding hedefi (K7): grup kapsamında girilen ölçünün planı; girilmeyen ölçü şirket planlarının toplamı', () => {
+    const plants = [p1, p2, p3]
+    const t = groupTargets(plants, {}, { h: { efficiency: 0.8 } })
+    expect(t).toEqual({ efficiency: 0.8 })
+    const r = scopeSeries(plants, {}, slots, t)[2]
+    expect(r.plan.efficiency).toBeCloseTo(0.8)
+    expect(r.actual.efficiency).toBeCloseTo((60 + 270 + 50) / 500)
+    // Girilmeyen OEE ve saatler değişmez.
+    expect(r.plan.oee).toEqual(seriesFor(plants, slots)[2].plan.oee)
+    expect(r.plan.productionHours).toBe(80 + 240 + 50)
+    // Şirket seçiliyse, hedef girilmemişse ya da birden çok holding varsa şirket planları.
+    expect(groupTargets(plants, { companyId: 'C1' }, { h: { efficiency: 0.8 } })).toBeNull()
+    expect(scopeSeries(plants, { companyId: 'C1' }, slots, t)[2].plan.efficiency).toBeCloseTo((80 + 240) / 400)
+    expect(groupTargets(plants, {}, { h: {} })).toBeNull()
+    expect(groupTargets([...plants, { ...p3, plantId: 'X', holdingId: 'h2' }], {}, { h: { efficiency: 0.8 } })).toBeNull()
   })
 
   it('kırılım: grup → şirket → plant → masraf yeri', () => {

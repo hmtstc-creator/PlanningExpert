@@ -3,6 +3,7 @@ import { ConvexError, v } from 'convex/values'
 import { userQuery, visiblePlants } from './guarded'
 import { entryOut, oeeSums } from './kpi'
 import { slotKey, trendSlots } from '../src/lib/kpi'
+import { isPlatform } from '../src/lib/tenancy'
 
 /**
  * Board Dashboard (docs/board.md): kullanıcının görebildiği bütün
@@ -33,7 +34,17 @@ export const overview = userQuery({
     const visible = (await visiblePlants(ctx.db, ctx.sessionUser)).filter((p) => p.access.kpi !== 'none' || p.access.oee !== 'none')
     const holdingIds = [...new Set(visible.map((p) => p.company.holdingId).filter((h): h is NonNullable<typeof h> => !!h))]
     const holdings = new Map<string, string>()
-    for (const id of holdingIds) holdings.set(id, (await ctx.db.get(id))?.name ?? '')
+    // Holding hedefleri (K7): grup toplamında planın yerine geçer (src/lib/board.ts → groupTargets).
+    // Yalnız bütün grubu görenlere (holding board üyesi, General); şirket kullanıcısının
+    // "grup" görünümü kendi şirketidir, orada holding hedefi plan olamaz.
+    const me = ctx.sessionUser
+    const seesGroup = isPlatform(me) || (!!me.holdingId && !me.companyId)
+    const holdingTargets: Record<string, Any> = {}
+    for (const id of holdingIds) {
+      const h = await ctx.db.get(id)
+      holdings.set(id, h?.name ?? '')
+      if (seesGroup && h?.targets) holdingTargets[id] = h.targets
+    }
     const plants: Any[] = []
     for (const p of visible) {
       const id = p.plant._id
@@ -65,6 +76,6 @@ export const overview = userQuery({
         oee,
       })
     }
-    return { slots, plants }
+    return { slots, plants, holdingTargets }
   },
 })
