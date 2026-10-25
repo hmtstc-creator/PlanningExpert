@@ -70,8 +70,16 @@ Holding → Company → Plant → Department → Cost center → Work center
 - [x] **[G]** Haritayı creator'lara da açmak (2026-10-25; Company settings →
   *Organization map*, `/settings/map`, yalnız kendi şirketi, holding yok). **[S]**
   dene: creator hesabıyla aç, plant / masraf yeri / grup düzenle.
-- [ ] **[G]** Harita yeterli olunca eski sayfaları (Holdings & companies
-  ağacı, Users & permissions) kaldırmak — kullanıcının onayıyla.
+- [ ] **[G]** Eski sayfaları (Holdings & companies ağacı, Users & permissions)
+  kaldırmak — kullanıcı kararı (2026-10-25): **önce eksikler haritaya taşınır**,
+  her biri ayrı PR, en sonda silme:
+  - [x] Şirket: askıya al / yeniden aç, modüller, dışa aktarım, kalıcı silme
+    (2026-10-25, `CompanyControls.tsx`). **[S]** dene: haritada şirkete tıkla.
+  - [ ] Holding hedefleri (*Group targets*, `platform.setHoldingTargets`).
+  - [ ] Bölüm sorumlusu (`platform.setDepartmentOwner`).
+  - [ ] Grup izinleri: plant'ler ve modül / alan seviyeleri (izin matrisi).
+  - [ ] Kullanıcı: parola ver, her yerden çıkış; güvenlik kontrolü paneli.
+  - [ ] Hepsi bitince eski sayfaları ve menü bağlantılarını kaldır.
 
 ### Gantt: elle iş, sürükle-bırak, silme (2026-10-23, kararlar verildi)
 
