@@ -60,8 +60,10 @@ Holding → Company → Plant → Department → Cost center → Work center
 - [ ] **[S]** Haritayı kullan; eksik / yanlış görünen yeri yaz.
 - [x] **[G]** Haritada ad değiştirme, ekleme ve silme: holding, şirket, plant,
   bölüm, masraf yeri (2026-10-25). **[S]** dene: düğümü seç → Rename / Add / Delete.
-- [ ] **[G]** Grup ve kullanıcı ekleme / ad değiştirme / silme haritada (bugün
-  Users & permissions).
+- [x] **[G]** Grup ve kullanıcı ekleme / ad değiştirme / silme haritada
+  (2026-10-25; *Users & groups* görünümü). **[S]** dene: şirket → *Add group*,
+  grup → *Add user* / Rename / Delete, kullanıcı → Rename / Delete. Parola ve
+  izinler hâlâ Users & permissions'ta.
 - [x] **[G]** Work center'ı masraf yerine sürükleme (2026-10-25;
   `platform.setWorkCenterCostCenter`, yalnız masraf yeri). **[S]** dene: *Show
   work centers* → work center'ı masraf yerine sürükle.

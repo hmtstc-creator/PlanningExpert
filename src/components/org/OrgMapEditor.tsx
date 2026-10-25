@@ -1,23 +1,28 @@
 import { useEffect, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { MODULES } from '../../lib/tenancy'
+import { MODULES, type Level, type Module } from '../../lib/tenancy'
 import { ErrorBanner } from '../ErrorBanner'
 import { nodeEdits, plantLocaleHint, type MapNode } from '../../lib/orgMap'
 import { addCostCenter, addDepartment, editCostCenter, removeCostCenter, removeDepartment, renameDepartment, type OrgCompany, type OrgPlant } from '../../lib/orgTree'
 import { useSafeMutation } from '../../lib/useSafeMutation'
+import type { GroupRow, UserRow } from '../CompanyAdmin'
 
 /**
  * Organization map → seçili düğümün düzenleme kutusu: ad değiştir, alt seviye
  * ekle, sil. Eski sayfaların kullandığı aynı mutation'lar çağrılır; yetki ve
  * korumalar (dolu bölüm, work center'lı masraf yeri, ad onayı) sunucudadır.
  * Hangi düğümde ne yapılabileceği `nodeEdits` (src/lib/orgMap.ts).
+ * Kişiler görünümünde yeni grup hiçbir plant'i görmez ve izni yoktur (plant'e
+ * sürüklenir, izin Users & permissions'ta verilir); yeni kullanıcının parolası
+ * da orada verilir.
  */
 
 const btn = 'rounded-md border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-40'
 const input = 'w-full rounded-md border border-input bg-background px-2 py-1 text-xs'
 
-const ADD_LABEL = { company: 'company', plant: 'plant', department: 'department', costCenter: 'cost center' } as const
+const ADD_LABEL = { company: 'company', plant: 'plant', department: 'department', costCenter: 'cost center', group: 'group', user: 'user' } as const
+const NO_PERMS = Object.fromEntries(MODULES.map((m) => [m, 'none'])) as Record<Module, Level>
 
 type Mode = 'rename' | 'add' | null
 
@@ -25,14 +30,20 @@ export function OrgMapEditor({
   node,
   companies,
   isPlatform,
+  view = 'structure',
+  users = [],
+  groups = [],
   onDone,
 }: {
   node: MapNode
   companies: OrgCompany[]
   isPlatform: boolean
+  view?: 'structure' | 'people'
+  users?: UserRow[]
+  groups?: GroupRow[]
   onDone: (text: string, removed?: boolean) => void
 }) {
-  const edits = nodeEdits(node.ref, isPlatform)
+  const edits = nodeEdits(node.ref, isPlatform, view)
   const [mode, setMode] = useState<Mode>(null)
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
@@ -50,7 +61,12 @@ export function OrgMapEditor({
   const createPlant = useSafeMutation(api.platform.createPlant)
   const updatePlant = useSafeMutation(api.platform.updatePlant)
   const deletePlant = useSafeMutation(api.platform.deletePlant)
-  const all = [saveHolding, removeHolding, createCompany, updateCompany, deleteCompany, createPlant, updatePlant, deletePlant]
+  const saveGroup = useSafeMutation(api.users.saveGroup)
+  const removeGroup = useSafeMutation(api.users.removeGroup)
+  const addUser = useSafeMutation(api.users.add)
+  const updateUser = useSafeMutation(api.users.update)
+  const removeUser = useSafeMutation(api.users.remove)
+  const all = [saveHolding, removeHolding, createCompany, updateCompany, deleteCompany, createPlant, updatePlant, deletePlant, saveGroup, removeGroup, addUser, updateUser, removeUser]
   const error = all.find((m) => m.error)?.error ?? null
   const pending = all.some((m) => m.pending)
 
@@ -91,6 +107,16 @@ export function OrgMapEditor({
       const p = plantOf(ref.plantId)
       if (p) ok = await savePlant(p, editCostCenter(p, ref.code, { name: n }))
     }
+    if (ref.kind === 'group') {
+      const g = groups.find((x) => x._id === ref.id)
+      // areas gönderilmez: sunucu grubun alan izinlerini korur.
+      if (g) ok = await saveGroup.run({ id: g._id, companyId: ref.companyId, name: n, allPlants: g.allPlants, plantIds: g.plantIds, permissions: g.permissions, board: g.board === true })
+    }
+    if (ref.kind === 'user') {
+      const u = users.find((x) => x._id === ref.id)
+      // groupIds / isCreator gönderilmez: sunucu olduğu gibi bırakır.
+      if (u) ok = await updateUser.run({ id: u._id, name: n, email: u.email, active: u.active })
+    }
     if (ok) {
       setMode(null)
       onDone(`Renamed to ${n}`)
@@ -111,6 +137,8 @@ export function OrgMapEditor({
       const p = plantOf(ref.plantId)
       if (p && code.trim()) ok = await savePlant(p, addCostCenter(p, { code: code.trim(), name: n, department: ref.name }))
     }
+    if (ref.kind === 'company' && edits.add === 'group') ok = await saveGroup.run({ companyId: ref.id, name: n, allPlants: false, plantIds: [], permissions: NO_PERMS })
+    if (ref.kind === 'group') ok = await addUser.run({ companyId: ref.companyId, name: n, groupIds: [ref.id] })
     if (ok) {
       setMode(null)
       onDone(`Added ${edits.add ? ADD_LABEL[edits.add] : ''} ${n}`)
@@ -138,6 +166,14 @@ export function OrgMapEditor({
       const p = plantOf(ref.plantId)
       if (!p || !window.confirm(`Remove the cost center ${ref.code}? It must have no work centers and no KPI entries.`)) return
       ok = await savePlant(p, removeCostCenter(p, ref.code))
+    }
+    if (ref.kind === 'group') {
+      if (!window.confirm(`Delete the group ${node.label}? Its members lose its permissions.`)) return
+      ok = await removeGroup.run({ id: ref.id })
+    }
+    if (ref.kind === 'user') {
+      if (!window.confirm(`Delete the user ${node.label}? Their sessions end; their name stays in old records.`)) return
+      ok = await removeUser.run({ id: ref.id })
     }
     if (ok) onDone(`Deleted ${node.label}`, true)
   }
@@ -189,6 +225,8 @@ export function OrgMapEditor({
               <input className={input} placeholder="Time zone, e.g. Europe/Bucharest" value={zone} onChange={(e) => setZone(e.target.value)} />
             </div>
           )}
+          {mode === 'add' && edits.add === 'group' && <p className="text-[11px] text-muted-foreground">The new group sees no plant and has no permission: drag it onto a plant, set permissions on Users & permissions.</p>}
+          {mode === 'add' && edits.add === 'user' && <p className="text-[11px] text-muted-foreground">Give a temporary password on Users & permissions (Set password).</p>}
           {mode === 'rename' && ref.kind === 'costCenter' && <p className="text-[11px] text-muted-foreground">The code {ref.code} stays (data is linked to it).</p>}
           <div className="flex gap-1">
             <button
@@ -204,6 +242,7 @@ export function OrgMapEditor({
           </div>
         </form>
       )}
+      {edits.more && <p className="text-[11px] text-muted-foreground">{edits.more}</p>}
       <ErrorBanner message={error} onDismiss={() => all.forEach((m) => m.clearError())} />
     </div>
   )
