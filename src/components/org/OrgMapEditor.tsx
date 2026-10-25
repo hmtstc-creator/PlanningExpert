@@ -7,6 +7,7 @@ import { CompanyDataActions, CompanyStatusModules, type CompanyInfo } from './Co
 import { HOLDING_TARGETS_HINT, HoldingTargetsForm } from './HoldingTargets'
 import { DepartmentOwnerSelect } from './DepartmentOwner'
 import { GroupAccessForm } from '../people/GroupAccess'
+import { UserAccountForm } from '../people/UserAccount'
 import { UserSignIn } from '../people/UserSignIn'
 import { SecurityPanel } from '../security/SecurityPanel'
 import type { PeopleGroup, PeopleUser } from '../../lib/peopleTree'
@@ -224,11 +225,14 @@ export function OrgMapEditor({
       <GroupAccessForm key={accessGroup._id} group={accessGroup} companyId={ref.companyId} company={accessCompany} />
     </div>
   )
-  // Kullanıcı düğümü: son giriş, her yerden çıkış, geçici parola — Users & permissions ile aynı bileşen.
+  // Kullanıcı düğümü: hesap (e-posta, aktif, creator) ve giriş (son giriş, her yerden çıkış,
+  // geçici parola) — Users & permissions ile aynı bileşenler.
   const signInUser = ref.kind === 'user' && view === 'people' ? (users.find((u) => u._id === ref.id) as PeopleUser | undefined) : undefined
   const userSettings = signInUser && (
     <div className="mt-3 border-t border-border pt-2">
-      <p className="text-xs font-semibold">Sign-in</p>
+      <p className="text-xs font-semibold">Account</p>
+      <UserAccountForm key={`acc:${signInUser._id}`} user={signInUser} compact />
+      <p className="mt-3 text-xs font-semibold">Sign-in</p>
       <UserSignIn key={signInUser._id} user={signInUser} compact />
     </div>
   )
