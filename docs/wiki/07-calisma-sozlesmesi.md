@@ -1,6 +1,6 @@
 # 07 · Çalışma sözleşmesi ve mimari etki kontrolü
 
-> Son güncelleme: 2026-10-22 · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
+> Son güncelleme: 2026-10-25 (test tuzakları) · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
 
 Hafıza wiki'de olduğu için her iş yeni bir oturumda başlayabilir; bu sayfa her oturumun **ilk okuyacağı yerdir**.
 
@@ -47,6 +47,11 @@ Bir madde "hayır" ise **uygulama**; nedenini ve alternatifi kullanıcıya yaz. 
 
 `git checkout -b claude/<konu>` → değişiklik + test + Planning Logic + wiki → `npm run verify` → push → **taslak PR** (Türkçe, ne / neden / test) →
 CI yeşil → squash merge → site ~5 dk içinde güncellenir → Connection diagnostics'te commit doğrulanır. Dal otomatik silinir.
+
+Test tuzakları: yeni bulut oturumunda önce `npm ci`; `convex/*.test.ts` tek başına çalıştırılacaksa önce
+`node scripts/stub-convex.mjs` (yoksa "Could not find the _generated directory"; `npm run verify` bunu kendisi yapar).
+`convex/tenancy.test.ts` sahte saat kullanır (`vi.useFakeTimers`): `setTimeout` beklemesi testi kilitler, zamanı
+`vi.setSystemTime(Date.now() + …)` ile ilerlet.
 
 ## Wiki sayfa şablonu
 
