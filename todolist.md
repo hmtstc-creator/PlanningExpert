@@ -75,7 +75,8 @@ Holding → Company → Plant → Department → Cost center → Work center
   her biri ayrı PR, en sonda silme:
   - [x] Şirket: askıya al / yeniden aç, modüller, dışa aktarım, kalıcı silme
     (2026-10-25, `CompanyControls.tsx`). **[S]** dene: haritada şirkete tıkla.
-  - [ ] Holding hedefleri (*Group targets*, `platform.setHoldingTargets`).
+  - [x] Holding hedefleri (*Group targets*, 2026-10-25, `HoldingTargets.tsx`).
+    **[S]** dene: haritada holding'e tıkla → hedef gir → Board'da grup planı.
   - [ ] Bölüm sorumlusu (`platform.setDepartmentOwner`).
   - [ ] Grup izinleri: plant'ler ve modül / alan seviyeleri (izin matrisi).
   - [ ] Kullanıcı: parola ver, her yerden çıkış; güvenlik kontrolü paneli.
