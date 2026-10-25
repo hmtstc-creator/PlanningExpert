@@ -7,7 +7,9 @@ import { CompanyDataActions, CompanyStatusModules, type CompanyInfo } from './Co
 import { HOLDING_TARGETS_HINT, HoldingTargetsForm } from './HoldingTargets'
 import { DepartmentOwnerSelect } from './DepartmentOwner'
 import { GroupAccessForm } from '../people/GroupAccess'
-import type { PeopleGroup } from '../../lib/peopleTree'
+import { UserSignIn } from '../people/UserSignIn'
+import { SecurityPanel } from '../security/SecurityPanel'
+import type { PeopleGroup, PeopleUser } from '../../lib/peopleTree'
 import { nodeEdits, plantLocaleHint, type MapNode } from '../../lib/orgMap'
 import { addCostCenter, addDepartment, editCostCenter, removeCostCenter, removeDepartment, renameDepartment, type OrgCompany, type OrgHolding, type OrgPlant } from '../../lib/orgTree'
 import { useSafeMutation } from '../../lib/useSafeMutation'
@@ -20,8 +22,9 @@ import type { GroupRow, UserRow } from '../CompanyAdmin'
  * Hangi düğümde ne yapılabileceği `nodeEdits` (src/lib/orgMap.ts).
  * Kişiler görünümünde yeni grup hiçbir plant'i görmez ve izni yoktur; grup
  * düğümünde Board grubu, plant'ler ve izin matrisi düzenlenir (GroupAccessForm,
- * Users & permissions ile aynı alanlar). Yeni kullanıcının parolası hâlâ
- * Users & permissions'ta verilir.
+ * Users & permissions ile aynı alanlar); kullanıcı düğümünde son giriş, her
+ * yerden çıkış ve geçici parola (UserSignIn), şirket düğümünde güvenlik kontrolü
+ * (SecurityPanel) vardır.
  */
 
 const btn = 'rounded-md border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-40'
@@ -221,7 +224,25 @@ export function OrgMapEditor({
       <GroupAccessForm key={accessGroup._id} group={accessGroup} companyId={ref.companyId} company={accessCompany} />
     </div>
   )
-  const settings = companySettings || holdingSettings || departmentSettings || groupSettings
+  // Kullanıcı düğümü: son giriş, her yerden çıkış, geçici parola — Users & permissions ile aynı bileşen.
+  const signInUser = ref.kind === 'user' && view === 'people' ? (users.find((u) => u._id === ref.id) as PeopleUser | undefined) : undefined
+  const userSettings = signInUser && (
+    <div className="mt-3 border-t border-border pt-2">
+      <p className="text-xs font-semibold">Sign-in</p>
+      <UserSignIn key={signInUser._id} user={signInUser} compact />
+    </div>
+  )
+  // Şirket düğümü (kişiler): güvenlik kontrolü — Users & permissions ile aynı panel.
+  const securitySettings = ref.kind === 'company' && view === 'people' && (
+    <details className="mt-3 border-t border-border pt-2">
+      <summary className="cursor-pointer text-xs font-semibold">Security check</summary>
+      <p className="mt-1 text-[11px] text-muted-foreground">Locked accounts, accounts nobody uses, temporary passwords and who has wide rights in this company.</p>
+      <div className="mt-2">
+        <SecurityPanel companyId={ref.id} />
+      </div>
+    </details>
+  )
+  const settings = companySettings || holdingSettings || departmentSettings || groupSettings || userSettings || securitySettings
 
   if (edits.elsewhere) return <p className="mt-2 text-[11px] text-muted-foreground">Rename, add or delete on {edits.elsewhere}.</p>
   if (!edits.rename && !edits.add && !edits.remove) return settings || null
@@ -271,7 +292,7 @@ export function OrgMapEditor({
             </div>
           )}
           {mode === 'add' && edits.add === 'group' && <p className="text-[11px] text-muted-foreground">The new group sees no plant and has no permission: drag it onto a plant or select it to set plants and permissions.</p>}
-          {mode === 'add' && edits.add === 'user' && <p className="text-[11px] text-muted-foreground">Give a temporary password on Users & permissions (Set password).</p>}
+          {mode === 'add' && edits.add === 'user' && <p className="text-[11px] text-muted-foreground">Then select the new user and give a temporary password (Set password).</p>}
           {mode === 'rename' && ref.kind === 'costCenter' && <p className="text-[11px] text-muted-foreground">The code {ref.code} stays (data is linked to it).</p>}
           <div className="flex gap-1">
             <button

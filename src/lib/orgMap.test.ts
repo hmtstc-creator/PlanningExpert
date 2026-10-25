@@ -133,7 +133,7 @@ describe('nodeEdits', () => {
     expect(nodeEdits({ kind: 'company', id: 'c1' }, true, 'people')).toEqual({ rename: false, add: 'group', remove: false })
     expect(nodeEdits({ kind: 'group', id: 'g1', companyId: 'c1' }, false, 'people')).toMatchObject({ rename: true, add: 'user', remove: true })
     expect(nodeEdits({ kind: 'user', id: 'u1', companyId: 'c1' }, false, 'people')).toMatchObject({ rename: true, add: null, remove: true })
-    expect(nodeEdits({ kind: 'user', id: 'u1', companyId: 'c1' }, false, 'people').more).toContain('Password')
+    expect(nodeEdits({ kind: 'user', id: 'u1', companyId: 'c1' }, false, 'people').more).not.toContain('Password')
     // Plant'in bölümleri Kişiler görünümünde düzenlenmez.
     expect(nodeEdits({ kind: 'plant', id: 'p1', companyId: 'c1' }, false, 'people').elsewhere).toBe('the Structure view')
   })

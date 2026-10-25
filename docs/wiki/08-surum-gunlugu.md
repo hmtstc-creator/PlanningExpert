@@ -1,9 +1,10 @@
 # 08 · Sürüm günlüğü
 
-> Son güncelleme: 2026-10-25 (haritada grup izinleri) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
+> Son güncelleme: 2026-10-25 (haritada parola, her yerden çıkış, güvenlik kontrolü) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| #79 | 2026-10-25 | **Organization map: parola, her yerden çıkış, güvenlik kontrolü** — *Users & groups* görünümünde kullanıcı düğümünün panelinde *Sign-in*: son giriş, kilit, *Sign out everywhere*, *Set / Reset password*; şirket düğümünde katlanır *Security check* (`SecurityPanel`). Bileşen tek kaynak: `src/components/people/UserSignIn.tsx`, Users & permissions kullanıcı paneliyle ortak | Eski sayfaları kaldırma öncesi son eksik (kullanıcı kararı 2026-10-25); sunucu (`users.signOutEverywhere`, `auth.setPasswordAsAdmin`, `platform.securityOverview`) ve şema değişmedi |
 | #77 | 2026-10-25 | **Organization map: grup izinleri** — *Users & groups* görünümünde grup düğümünün panelinde *Access*: Board grubu, gördüğü plant'ler ve modül / alan izin matrisi (*Save access*). Alanlar tek kaynak: `src/components/people/GroupAccess.tsx` (`GroupAccessFields`), Users & permissions grup paneliyle ortak | Eski sayfaları kaldırma öncesi eksiklerin haritaya taşınması (kullanıcı kararı 2026-10-25); sunucu (`users.saveGroup`) ve şema değişmedi |
 | — | 2026-10-25 | **Organization map: bölüm sorumlusu** — bölüm düğümünün panelinde *Responsible* seçici (şirketin etkin kullanıcıları; yetki vermez). Seçici tek kaynak: `DepartmentOwner.tsx`, Holdings & companies bölüm paneliyle ortak | Eski sayfaları kaldırmadan önce eksikler haritaya taşınıyor (kullanıcı kararı 2026-10-25) |
 | — | 2026-10-25 | **Organization map: holding hedefleri** — holding düğümünün panelinde *Group targets* (General; Board grup planı, boş = şirket planlarının toplamı). Form tek kaynak: `HoldingTargets.tsx`, Holdings & companies ile ortak | Eski sayfaları kaldırma öncesi eksiklerin haritaya taşınması (kullanıcı kararı 2026-10-25); sunucu ve şema değişmedi |
