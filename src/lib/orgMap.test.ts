@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { dropAction, duplicatePlants, findNodes, peopleGraph, removeAction, structureGraph, warningsOf, type MapGroup, type MapUser } from './orgMap'
+import { dropAction, duplicatePlants, findNodes, nodeEdits, peopleGraph, plantLocaleHint, removeAction, structureGraph, warningsOf, type MapGroup, type MapUser } from './orgMap'
 import type { OrgCompany, OrgHolding } from './orgTree'
 
 const holdings: OrgHolding[] = [{ _id: 'h1', name: 'Group A' }]
@@ -108,5 +108,31 @@ describe('peopleGraph', () => {
     expect(removeAction(member, g.nodes, groups)).toMatchObject({ kind: 'userGroup', userId: 'u1', groupId: 'g1', add: false })
     expect(removeAction(g.edges.find((e) => e.id === 'p:p1>g:g1')!, g.nodes, groups)).toMatchObject({ kind: 'groupPlant', groupId: 'g1', plantId: 'p1', add: false })
     expect(removeAction(g.edges.find((e) => e.id === 'c:c1>g:g2')!, g.nodes, groups)).toBeNull()
+  })
+})
+
+describe('nodeEdits', () => {
+  it('holding and company are edited only by General', () => {
+    expect(nodeEdits({ kind: 'holding', id: 'h1' }, true)).toEqual({ rename: true, add: 'company', remove: true })
+    expect(nodeEdits({ kind: 'holding', id: 'h1' }, false)).toEqual({ rename: false, add: null, remove: false })
+    expect(nodeEdits({ kind: 'company', id: 'c1' }, false)).toEqual({ rename: false, add: 'plant', remove: false })
+  })
+  it('plant, department and cost center can be edited; cost center has no child to add', () => {
+    expect(nodeEdits({ kind: 'plant', id: 'p1', companyId: 'c1' }, false).add).toBe('department')
+    expect(nodeEdits({ kind: 'department', plantId: 'p1', name: 'Press' }, false).add).toBe('costCenter')
+    expect(nodeEdits({ kind: 'costCenter', plantId: 'p1', code: '171' }, false)).toEqual({ rename: true, add: null, remove: true })
+  })
+  it('work centers, groups, users and virtual boxes point elsewhere', () => {
+    expect(nodeEdits({ kind: 'workCenter', plantId: 'p1', name: 'P1' }, true).elsewhere).toBe('Work Center Definitions')
+    expect(nodeEdits({ kind: 'user', id: 'u1', companyId: 'c1' }, true).elsewhere).toBe('Users & permissions')
+    expect(nodeEdits({ kind: 'virtual' }, true)).toEqual({ rename: false, add: null, remove: false })
+  })
+})
+
+describe('plantLocaleHint', () => {
+  it('takes country and time zone from a plant of the company', () => {
+    const c: OrgCompany = { ...companies[0], plants: [{ _id: 'p9', companyId: 'c1', name: 'X', country: 'RO', timeZone: 'Europe/Bucharest' }] }
+    expect(plantLocaleHint(c)).toEqual({ country: 'RO', timeZone: 'Europe/Bucharest' })
+    expect(plantLocaleHint({ ...c, plants: [] })).toEqual({ country: '', timeZone: '' })
   })
 })

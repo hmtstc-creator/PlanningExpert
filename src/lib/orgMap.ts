@@ -426,3 +426,53 @@ export function findNodes(nodes: MapNode[], query: string): MapNode[] {
 export function warningsOf(graph: MapGraph): { node: MapNode; text: string }[] {
   return [...graph.nodes].sort((a, b) => COLUMN[a.level] - COLUMN[b.level] || a.y - b.y).flatMap((n) => n.warnings.map((text) => ({ node: n, text })))
 }
+
+/**
+ * Seçili düğümde haritadan yapılabilen düzenlemeler: ad değiştirme, bir alt
+ * seviye ekleme, silme. Holding ve şirket yalnızca General (platform) içindir;
+ * plant, bölüm, masraf yeri şirketin creator'ı için de açıktır — yetkiyi
+ * sunucu ayrıca denetler (platform.ts). Work center, grup ve kullanıcı
+ * düzenlemesi şimdilik eski sayfalarda (`elsewhere`).
+ */
+export interface NodeEdits {
+  rename: boolean
+  /** Eklenebilecek alt seviye (yoksa null). */
+  add: Extract<MapLevel, 'company' | 'plant' | 'department' | 'costCenter'> | null
+  remove: boolean
+  /** Bu düğüm haritada düzenlenemiyorsa nerede düzenlenir. */
+  elsewhere?: string
+}
+
+const NONE_EDITS: NodeEdits = { rename: false, add: null, remove: false }
+
+export function nodeEdits(ref: MapRef, isPlatform: boolean): NodeEdits {
+  switch (ref.kind) {
+    case 'holding':
+      return isPlatform ? { rename: true, add: 'company', remove: true } : NONE_EDITS
+    case 'company':
+      return isPlatform ? { rename: true, add: 'plant', remove: true } : { ...NONE_EDITS, add: 'plant' }
+    case 'plant':
+      return { rename: true, add: 'department', remove: true }
+    case 'department':
+      return { rename: true, add: 'costCenter', remove: true }
+    case 'costCenter':
+      // Kod sabit (veriler kodla bağlı); yalnız ad değişir.
+      return { rename: true, add: null, remove: true }
+    case 'workCenter':
+      return { ...NONE_EDITS, elsewhere: 'Work Center Definitions' }
+    case 'group':
+    case 'user':
+      return { ...NONE_EDITS, elsewhere: 'Users & permissions' }
+    default:
+      return NONE_EDITS
+  }
+}
+
+/**
+ * Yeni plant'in ülke ve saat dilimi önerisi: şirketin ilk plant'inden
+ * (çoğunlukla aynı ülke). Yoksa boş — kullanıcı yazar; sunucu denetler.
+ */
+export function plantLocaleHint(company: OrgCompany | undefined): { country: string; timeZone: string } {
+  const p = company?.plants.find((x) => x.country && x.timeZone)
+  return { country: p?.country ?? '', timeZone: p?.timeZone ?? '' }
+}

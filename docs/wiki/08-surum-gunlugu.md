@@ -1,9 +1,10 @@
 # 08 · Sürüm günlüğü
 
-> Son güncelleme: 2026-10-25 (K7 Board PDF) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
+> Son güncelleme: 2026-10-25 (harita düzenleme) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| — | 2026-10-25 | **Organization map: ad değiştir / ekle / sil** — seçili düğümün panelinde *Rename*, *Add …* (alt seviye) ve *Delete*: holding ve şirket (General), plant, bölüm, masraf yeri (kod sabit, yalnız ad). Üst çubukta *Add holding*. Kurallar `nodeEdits` (`orgMap.ts`), ekran `OrgMapEditor.tsx` | Sunucu değişmedi: eski sayfaların mutation'ları ve korumaları (dolu bölüm, work center'lı / KPI'lı masraf yeri, ad yazarak silme). Work center, grup, kullanıcı eski sayfalarda kalır |
 | — | 2026-10-25 | **Board A3 / PDF (K7)** — Board Dashboard'da *Save PDF (A3)*: seçili kapsamın kartları, tablo, ısı haritası ve dikkat listesi tek A3 yatay sayfa; üstte yalnız PDF'te kapsam, dönem, ölçü. Dosya `GGAAYY BOARD MONTHLY` / `WEEKLY` (`boardPdfDate`) | K7 kararı (Ahmet) → `docs/board.md`, `docs/pdf.md`. K7'nin dört işi tamam |
 | #64 | 2026-10-25 | **Holding hedefi (K7)** — Administration → holding → *Group targets* (General): OEE, Efficiency, Productivity, Overtime %, Absenteeism % için holding'in kendi hedefi. Board'un grup kapsamında (şirket seçili değil, tek holding) kartlarda planın yerine geçer, kartta "target" yazar; boş = şirket planlarının toplamı. Yalnız holding board üyesi / General'e (`holdings.targets`, `platform.setHoldingTargets`, `groupTargets`, `withTargets`) | K7 kararı (Ahmet) → `docs/board.md`. Adet / saat toplamı dönem uzunluğuna bağlı olduğundan hedefe girmedi |
 | #62 | 2026-10-24 | **Bölüm sorumlusu (K7)** — Department panelinde *Responsible* (şirketin etkin kullanıcısı, bölüm başına bir); plant bölüm kartında ve Board'da bölüm satırı / başlığında görünür. Yetki vermez. Kayıt `plants.departmentOwners`; yeniden adlandırmada taşınır, silinen bölüm / kullanıcıyla düşer (`carryDepartmentOwners`, `platform.setDepartmentOwner`) | K7 kararı (Ahmet) → `docs/board.md` |

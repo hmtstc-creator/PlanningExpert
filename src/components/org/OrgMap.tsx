@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import type { GroupRow, UserRow } from '../CompanyAdmin'
 import { ErrorBanner } from '../ErrorBanner'
+import { OrgMapEditor } from './OrgMapEditor'
 import { LEVEL_INFO } from '../OrgTree'
 import { useQuery } from '../../lib/convexTransport'
 import {
@@ -32,7 +33,7 @@ import { useSafeMutation } from '../../lib/useSafeMutation'
  * yerleri, work center'lar — ve bir şirketin grupları ile kullanıcıları —
  * sonsuz bir tuvalde. Kaydırılır, yakınlaştırılır; düğüm sürüklenip başka
  * bir düğüme bırakılınca bağ değişir (kurallar src/lib/orgMap.ts, yetki
- * sunucuda). Ayrıntılı düzenleme eski sayfalarda kalır.
+ * sunucuda). Seçili düğümde ad değiştirme / ekleme / silme: OrgMapEditor.
  */
 
 interface CompanyRow extends OrgCompany {
@@ -203,8 +204,14 @@ function OrgMapInner() {
   const updatePlant = useSafeMutation(api.platform.updatePlant)
   const updateUser = useSafeMutation(api.users.update)
   const saveGroup = useSafeMutation(api.users.saveGroup)
-  const error = setHolding.error ?? updatePlant.error ?? updateUser.error ?? saveGroup.error
-  const clearError = () => [setHolding, updatePlant, updateUser, saveGroup].forEach((m) => m.clearError())
+  const addHolding = useSafeMutation(api.platform.saveHolding)
+  const error = setHolding.error ?? updatePlant.error ?? updateUser.error ?? saveGroup.error ?? addHolding.error
+  const clearError = () => [setHolding, updatePlant, updateUser, saveGroup, addHolding].forEach((m) => m.clearError())
+
+  const newHolding = async () => {
+    const name = window.prompt('Name of the new holding')?.trim()
+    if (name && (await addHolding.run({ name }))) setNotice(`Done: added holding ${name}`)
+  }
 
   const apply = async (a: MapAction) => {
     if (!window.confirm(`${a.text}?`)) return
@@ -292,6 +299,11 @@ function OrgMapInner() {
         <button className={btn} onClick={() => flow.fitView({ padding: 0.15, duration: 300 })}>
           Fit to screen
         </button>
+        {view === 'structure' && isPlatform && (
+          <button className={btn} disabled={addHolding.pending} onClick={() => void newHolding()}>
+            Add holding
+          </button>
+        )}
         <span className="ml-auto text-xs text-muted-foreground">
           {view === 'structure'
             ? `Drag a ${isPlatform ? 'company onto a holding or a ' : ''}cost center onto a department.`
@@ -361,9 +373,15 @@ function OrgMapInner() {
                   ))}
                 </ul>
               )}
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Rename, add or delete on {sel.level === 'holding' || sel.level === 'company' ? 'Holdings & companies' : sel.level === 'workCenter' ? 'Work Center Definitions' : sel.level === 'user' || sel.level === 'group' ? 'Users & permissions' : 'Holdings & companies or Company settings'}.
-              </p>
+              <OrgMapEditor
+                node={sel}
+                companies={companies}
+                isPlatform={isPlatform}
+                onDone={(text, removed) => {
+                  setNotice(`Done: ${text}`)
+                  if (removed) setSelected(null)
+                }}
+              />
             </section>
           )}
           <section className="rounded-lg border border-border bg-card p-3">

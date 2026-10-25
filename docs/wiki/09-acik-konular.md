@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-25 (K7 Board PDF) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-25 (harita düzenleme) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -25,9 +25,9 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 - **Gantt müdahaleleri tamam:** sürükle-bırak (#34), elle iş (#35), silme (#36) — `todolist.md` §1 *Gantt: elle iş*. Kullanıcı geri bildirimi bekleniyor (doğru süre / yer, sonraki lotlar küçülüyor mu). Açık: elle iş dondurulmuş (tam plan onaylı) işi itemez.
 - **OEE Agent Insights (#41):** gerçek veriyle ilk raporlar okunur (Karabasan oturumu üretip Ahmet'e özetleyecek); kayıp kodu anlamları artık varsayılanla geliyor (#42). Kalıplar #44'te bilinen yazımlarla genişledi (testte liste). Kalan kontrol (sunucu oturumu, gerçek veri): kayıp metinlerinde "mola / pauz / break / 5S" geçip kalıba uymayan var mı; varsa örnek teste eklenip kalıp genişletilir. Sunucu oturumunda `bash /opt/planningexpert/scripts/oee-break-check.sh` çalıştırılır (salt okunur, en yeni günlük yedek; yalnız plansız RC1 — planlı duruşlar sinyallere zaten girmez); "UYMUYOR" satırları bulut oturumuna getirilir (`src/lib/oeeInsights.ts`, sinyaller 12–13). Kullanıcı anlamları Türkçe isterse `LOSS_CODE_MEANINGS` tek yer. Dosyalar: sinyaller `src/lib/oeeInsights.ts`, ajan `convex/oeeInsights.ts`, sayfa `src/routes/oee/insights.tsx`.
 - **OEE açık konular ajanı (#37) tamam:** ilk gerçek yüklemeden sonra `/oee/topics` kullanıcıda denenir (adaylar doğru mu, eşikler çok mu sıkı / gevşek). Sonraki adım `todolist.md` OEE bölümü: eşikleri OEE Settings'e taşı, listeyi Agent Report'a bağla. Dosyalar: kurallar `src/lib/oeeTopics.ts`, ajan `convex/oeeTopics.ts` (`analyse`), sayfa `src/routes/oee/topics.tsx`.
-- **Sıradaki adım:** Organization map (`/admin/map`) kullanıcıda denenir; sonraki adımlar `todolist.md` §1 *Organization map*. Kararlar (§0) bekler; iyileştirmeler todolist'ten tek tek yapılır.
+- **Sıradaki adım:** Organization map (`/admin/map`) kullanıcıda denenir — artık seçili düğümde *Rename / Add / Delete* var (holding, şirket, plant, bölüm, masraf yeri). Sonraki adımlar `todolist.md` §1 *Organization map*: work center'ı masraf yerine sürükleme, grup / kullanıcı düzenleme haritada, haritayı creator'lara açma. Kararlar (§0) bekler; iyileştirmeler todolist'ten tek tek yapılır.
 - **Organization map:** #29 açılış çökmesini (React #185) düzeltti; kullanıcı geri bildirimi bekleniyor. Dikkat: `useQuery(...) ?? []` bir `useMemo`/`useEffect` bağımlılığına giriyorsa sabit boş dizi kullan.
-- **Organization map dosyaları:** kurallar ve yerleşim `src/lib/orgMap.ts` (`structureGraph`, `peopleGraph`, `dropAction`, `removeAction`), ekran `src/components/org/OrgMap.tsx` (`apply` = sunucu çağrıları), sayfa `src/routes/admin_.map.tsx`. Yol `admin_.map` düz dosya: `admin.tsx` Outlet çizmediği için iç içe olmamalı.
+- **Organization map dosyaları:** kurallar ve yerleşim `src/lib/orgMap.ts` (`structureGraph`, `peopleGraph`, `dropAction`, `removeAction`, `nodeEdits`), ekran `src/components/org/OrgMap.tsx` (`apply` = sunucu çağrıları), düzenleme kutusu `OrgMapEditor.tsx`, sayfa `src/routes/admin_.map.tsx`. Yol `admin_.map` düz dosya: `admin.tsx` Outlet çizmediği için iç içe olmamalı.
 - **Dikkat edilecek yerler:** lot bölme `src/lib/planPipeline.ts` `planOnce` (satır ~899) ve yerel arama "Lot bölme" bloğu (~1264), `splitLot` `src/lib/scheduler.ts` (~176);
   geç iş payı `lateShare` (~1465), `explainLate` (~1511), `lateItems` (~1622). Satır numaraları kayabilir; `grep` ile bul.
 
