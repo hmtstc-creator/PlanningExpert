@@ -8,6 +8,7 @@ import { Tabs } from '../Tabs'
 import { LevelChip, LevelLegend, OrgTree, type Level } from '../OrgTree'
 import { SaveStatus } from '../SaveStatus'
 import { UnsavedBar } from '../UnsavedBar'
+import { HOLDING_TARGET_KEYS, measureOf, type HoldingTargetKey, type HoldingTargets } from '../../lib/board'
 import { useQuery, useQueryOnce } from '../../lib/convexTransport'
 import {
   accessSummary,
@@ -450,12 +451,55 @@ function HoldingPanel({ holding: h, companies, isPlatform, onSelect }: { holding
         )}
       </Block>
 
+      {isPlatform && <HoldingTargetsBlock key={h._id} holding={h} />}
+
       {isPlatform && (
         <Block title="Board members of the holding" hint="They see every company and plant of the holding on the Board Dashboard and the KPI / OEE dashboards — read only.">
           <CompanyUsers companyId={null} groups={[]} holdingId={h._id} />
         </Block>
       )}
     </Panel>
+  )
+}
+
+/**
+ * Holding hedefleri (K7): Board grup toplamında o ölçünün planı. Boş = şirket
+ * planlarının toplamı. Yüzdeler ekranda %, kayıtta oran.
+ */
+function HoldingTargetsBlock({ holding: h }: { holding: OrgHolding }) {
+  const { run, error, clearError, pending } = useSafeMutation(api.platform.setHoldingTargets)
+  const shown = (k: HoldingTargetKey) => {
+    const value = h.targets?.[k]
+    if (value === undefined) return ''
+    return measureOf(k).unit === '%' ? String(Math.round(value * 1000) / 10) : String(value)
+  }
+  const initial = () => Object.fromEntries(HOLDING_TARGET_KEYS.map((k) => [k, shown(k)])) as Record<HoldingTargetKey, string>
+  const [form, setForm] = useState(initial)
+  const dirty = HOLDING_TARGET_KEYS.some((k) => form[k] !== shown(k))
+  const save = () => {
+    const targets: HoldingTargets = {}
+    for (const k of HOLDING_TARGET_KEYS) {
+      const text = form[k].trim().replace(',', '.')
+      if (text) targets[k] = measureOf(k).unit === '%' ? Number(text) / 100 : Number(text)
+    }
+    return run({ id: h._id, targets })
+  }
+  return (
+    <Block title="Group targets" hint="The holding's own target is the group plan on the Board Dashboard. Leave a field empty to use the sum of the companies' plans.">
+      <ErrorBanner message={error} onDismiss={clearError} />
+      <div className="flex flex-wrap items-end gap-3">
+        {HOLDING_TARGET_KEYS.map((k) => (
+          <label key={k} className="text-xs text-muted-foreground">
+            {measureOf(k).label}
+            {measureOf(k).unit === '%' ? ' (%)' : ''}
+            <input className={`mt-1 block w-28 ${input}`} inputMode="decimal" value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
+          </label>
+        ))}
+        <button className={btn} disabled={!dirty || pending} onClick={() => void save()}>
+          Save targets
+        </button>
+      </div>
+    </Block>
   )
 }
 

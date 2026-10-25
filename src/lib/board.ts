@@ -102,11 +102,46 @@ function departmentCcs(p: BoardPlant, department: string | undefined): Set<strin
   return new Set(p.costCenters.filter((cc) => (cc.department ?? '') === department).map((cc) => cc.code))
 }
 
-/** Seçili kapsamın toplamı (kartlar): bölüm seçiliyse yalnız onun masraf yerleri. */
-export function scopeSeries(plants: BoardPlant[], scope: BoardScope, slots: KpiSlot[]): KpiResult[] {
+/**
+ * Holding'in kendi hedefi girilebilen ölçüler (K7): dönemden bağımsız oranlar.
+ * Adet ve saat toplamları dönem uzunluğuna bağlı olduğundan şirket planlarının
+ * toplamı kalır.
+ */
+export const HOLDING_TARGET_KEYS = ['oee', 'efficiency', 'productivity', 'overtimePct', 'absenteeismPct'] as const
+export type HoldingTargetKey = (typeof HOLDING_TARGET_KEYS)[number]
+/** Holding hedefleri; yüzdeler oran (0.85 = %85). Girilmeyen ölçü yok sayılır. */
+export type HoldingTargets = Partial<Record<HoldingTargetKey, number>>
+
+/**
+ * Grup kapsamında (şirket seçili değil, bütün plantler tek holding'in) holding
+ * hedefi; yoksa null — plan şirket planlarının toplamı kalır.
+ */
+export function groupTargets(plants: BoardPlant[], scope: BoardScope, targets: Record<string, HoldingTargets> | undefined): HoldingTargets | null {
+  if (scope.companyId || !plants.length || !targets) return null
+  const holdings = new Set(plants.map((p) => p.holdingId))
+  const id = holdings.size === 1 ? [...holdings][0] : null
+  const t = id ? targets[id] : undefined
+  return t && HOLDING_TARGET_KEYS.some((k) => t[k] !== undefined) ? t : null
+}
+
+/** Girilen holding hedefi planın yerine geçer; girilmeyen ölçü şirket planlarının toplamı. */
+export function withTargets(series: KpiResult[], targets: HoldingTargets | null): KpiResult[] {
+  if (!targets) return series
+  return series.map((r) => {
+    const plan = { ...r.plan }
+    for (const k of HOLDING_TARGET_KEYS) if (targets[k] !== undefined) plan[k] = targets[k]!
+    return { ...r, plan }
+  })
+}
+
+/**
+ * Seçili kapsamın toplamı (kartlar): bölüm seçiliyse yalnız onun masraf yerleri.
+ * Grup kapsamında holding hedefi girilmişse o ölçünün planı hedeftir.
+ */
+export function scopeSeries(plants: BoardPlant[], scope: BoardScope, slots: KpiSlot[], targets: HoldingTargets | null = null): KpiResult[] {
   const inScope = plantsInScope(plants, scope)
   if (scope.plantId && scope.department !== undefined && inScope[0]) return seriesFor(inScope, slots, departmentCcs(inScope[0], scope.department))
-  return seriesFor(inScope, slots)
+  return withTargets(seriesFor(inScope, slots), scope.companyId ? null : targets)
 }
 
 /**

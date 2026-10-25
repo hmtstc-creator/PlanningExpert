@@ -580,6 +580,43 @@ export const saveHolding = userMutation({
 })
 
 /**
+ * Holding hedefleri (K7): Board'un grup toplamında o ölçünün planı olur;
+ * girilmeyen ölçüde şirket planlarının toplamı. Yalnızca General.
+ */
+export const setHoldingTargets = userMutation({
+  args: {
+    id: v.id('holdings'),
+    targets: v.object({
+      oee: v.optional(v.number()),
+      efficiency: v.optional(v.number()),
+      productivity: v.optional(v.number()),
+      overtimePct: v.optional(v.number()),
+      absenteeismPct: v.optional(v.number()),
+    }),
+  },
+  returns: v.null(),
+  handler: async (ctx, { id, targets }) => {
+    requirePlatform(ctx.sessionUser)
+    const h = await ctx.db.get(id)
+    if (!h) throw new ConvexError('Holding not found')
+    const clean: Record<string, number> = {}
+    for (const [k, value] of Object.entries(targets)) {
+      if (value === undefined) continue
+      if (!Number.isFinite(value) || value < 0) throw new ConvexError(`${k}: a number ≥ 0`)
+      if (k !== 'productivity' && value > 1) throw new ConvexError(`${k}: at most 100%`)
+      clean[k] = value
+    }
+    await ctx.db.patch(id, { targets: clean })
+    // Kaldırılan hedef de kayda girsin (diff yalnız sonraki anahtarlara bakar).
+    const before: Record<string, number | undefined> = h.targets ?? {}
+    const keys = [...new Set([...Object.keys(before), ...Object.keys(clean)])]
+    const detail = diff(before, Object.fromEntries(keys.map((k) => [k, clean[k]])))
+    if (detail) await audit(ctx.db, { actor: ctx.sessionUser.name, action: 'holding.targets', target: h.name, detail, holdingId: id })
+    return null
+  },
+})
+
+/**
  * Holding'i siler: yalnızca şirketi kalmadıysa (şirketler holding'siz
  * kalmaz); board üyelerinin hesabı kapanır.
  */

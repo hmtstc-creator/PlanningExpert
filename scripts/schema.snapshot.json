@@ -700,6 +700,44 @@
         "type": "string"
       },
       "optional": false
+    },
+    "targets": {
+      "fieldType": {
+        "type": "object",
+        "value": {
+          "oee": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "efficiency": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "productivity": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "overtimePct": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          },
+          "absenteeismPct": {
+            "fieldType": {
+              "type": "number"
+            },
+            "optional": true
+          }
+        }
+      },
+      "optional": true
     }
   },
   "kpiEntries": {

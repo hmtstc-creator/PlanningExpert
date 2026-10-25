@@ -53,6 +53,8 @@ export interface OrgCompany {
 export interface OrgHolding {
   _id: string
   name: string
+  /** Holding'in kendi hedefleri (K7; src/lib/board.ts → HoldingTargets). */
+  targets?: Partial<Record<string, number>>
 }
 
 export interface OrgUser {

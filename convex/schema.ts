@@ -39,6 +39,19 @@ export default defineSchema({
   /** Holding (grup): şirketleri bir araya getirir; board üyeleri özet görür (yalnızca okuma). */
   holdings: defineTable({
     name: v.string(),
+    /**
+     * Holding'in kendi hedefleri (K7; Board grup toplamında plan). Oranlar
+     * (0.85 = %85); girilmeyen ölçüde şirket planlarının toplamı geçerli.
+     */
+    targets: v.optional(
+      v.object({
+        oee: v.optional(v.number()),
+        efficiency: v.optional(v.number()),
+        productivity: v.optional(v.number()),
+        overtimePct: v.optional(v.number()),
+        absenteeismPct: v.optional(v.number()),
+      }),
+    ),
     createdAt: v.number(),
   }),
 
