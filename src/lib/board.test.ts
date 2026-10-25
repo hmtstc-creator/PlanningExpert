@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { attention, childrenOf, declining, departmentOwner, departmentsOf, groupTargets, scopeSeries, seriesFor, type BoardPlant } from './board'
+import { attention, boardPdfDate, childrenOf, declining, departmentOwner, departmentsOf, groupTargets, scopeSeries, seriesFor, type BoardPlant } from './board'
 import { isBoardUser, accessFor } from './tenancy'
 import { trendSlots, type KpiEntry } from './kpi'
 
@@ -89,6 +89,11 @@ describe('Board Dashboard', () => {
     const down = seriesFor([plant('X', 'C', [e(1, 'A', {}, { presenceHours: 100, productionHours: 90 }), e(2, 'A', {}, { presenceHours: 100, productionHours: 80 }), e(3, 'A', {}, { presenceHours: 100, productionHours: 70 })])], slots)
     expect(declining(down, 2, 'efficiency')).toBe(true)
     expect(declining(down, 2, 'overtimePct')).toBe(false)
+  })
+
+  it('PDF dosya adı tarihi: dönemin ilk günü (ay 1\'i, ISO hafta Pazartesisi)', () => {
+    expect(boardPdfDate('month', 2026, 3)).toBe('2026-03-01')
+    expect(boardPdfDate('week', 2026, 1)).toBe('2025-12-29')
   })
 
   it('board görünümü: holding üyesi ya da yalnızca board grubunda', () => {
