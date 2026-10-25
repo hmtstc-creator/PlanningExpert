@@ -436,22 +436,39 @@ export function warningsOf(graph: MapGraph): { node: MapNode; text: string }[] {
 /**
  * Seçili düğümde haritadan yapılabilen düzenlemeler: ad değiştirme, bir alt
  * seviye ekleme, silme. Holding ve şirket yalnızca General (platform) içindir;
- * plant, bölüm, masraf yeri şirketin creator'ı için de açıktır — yetkiyi
- * sunucu ayrıca denetler (platform.ts). Work center, grup ve kullanıcı
- * düzenlemesi şimdilik eski sayfalarda (`elsewhere`).
+ * plant, bölüm, masraf yeri, grup ve kullanıcı şirketin creator'ı için de
+ * açıktır — yetkiyi sunucu ayrıca denetler (platform.ts, users.ts).
+ * Kişiler görünümünde şirkete grup, gruba kullanıcı eklenir; yapı düzenlemesi
+ * orada yapılmaz. Work center tanımı eski sayfada (`elsewhere`).
  */
 export interface NodeEdits {
   rename: boolean
   /** Eklenebilecek alt seviye (yoksa null). */
-  add: Extract<MapLevel, 'company' | 'plant' | 'department' | 'costCenter'> | null
+  add: Extract<MapLevel, 'company' | 'plant' | 'department' | 'costCenter' | 'group' | 'user'> | null
   remove: boolean
   /** Bu düğüm haritada düzenlenemiyorsa nerede düzenlenir. */
   elsewhere?: string
+  /** Haritada yapılamayan diğer ayarlar nerede (izin, parola, e-posta). */
+  more?: string
 }
 
 const NONE_EDITS: NodeEdits = { rename: false, add: null, remove: false }
 
-export function nodeEdits(ref: MapRef, isPlatform: boolean): NodeEdits {
+export function nodeEdits(ref: MapRef, isPlatform: boolean, view: 'structure' | 'people' = 'structure'): NodeEdits {
+  if (view === 'people') {
+    switch (ref.kind) {
+      case 'company':
+        return { ...NONE_EDITS, add: 'group' }
+      case 'plant':
+        return { ...NONE_EDITS, elsewhere: 'the Structure view' }
+      case 'group':
+        return { rename: true, add: 'user', remove: true, more: 'Permissions on Users & permissions.' }
+      case 'user':
+        return { rename: true, add: null, remove: true, more: 'Password, email, creator right and active on Users & permissions.' }
+      default:
+        return NONE_EDITS
+    }
+  }
   switch (ref.kind) {
     case 'holding':
       return isPlatform ? { rename: true, add: 'company', remove: true } : NONE_EDITS
@@ -467,9 +484,6 @@ export function nodeEdits(ref: MapRef, isPlatform: boolean): NodeEdits {
     case 'workCenter':
       // Masraf yeri haritada sürükleyerek değişir; diğer alanlar tanım sayfasında.
       return { ...NONE_EDITS, elsewhere: 'Work Center Definitions' }
-    case 'group':
-    case 'user':
-      return { ...NONE_EDITS, elsewhere: 'Users & permissions' }
     default:
       return NONE_EDITS
   }
