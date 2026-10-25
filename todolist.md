@@ -58,8 +58,10 @@ Holding → Company → Plant → Department → Cost center → Work center
 ### Organization map — sonraki adımlar (2026-10-22)
 
 - [ ] **[S]** Haritayı kullan; eksik / yanlış görünen yeri yaz.
-- [ ] **[G]** Haritada ad değiştirme, ekleme (holding, şirket, plant, bölüm,
-  masraf yeri, grup, kullanıcı) ve silme — eski sayfaların işlerini taşımak.
+- [x] **[G]** Haritada ad değiştirme, ekleme ve silme: holding, şirket, plant,
+  bölüm, masraf yeri (2026-10-25). **[S]** dene: düğümü seç → Rename / Add / Delete.
+- [ ] **[G]** Grup ve kullanıcı ekleme / ad değiştirme / silme haritada (bugün
+  Users & permissions).
 - [ ] **[G]** Work center'ı masraf yerine sürükleme (bugün Work Center
   Definitions'ta; `presses.upsert` aktif plant ve tam kayıt istiyor).
 - [ ] **[G]** Haritayı creator'lara da açmak (Company settings, tek şirket).

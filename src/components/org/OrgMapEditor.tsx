@@ -1,0 +1,210 @@
+import { useEffect, useState } from 'react'
+
+import { api } from '../../../convex/_generated/api'
+import { MODULES } from '../../lib/tenancy'
+import { ErrorBanner } from '../ErrorBanner'
+import { nodeEdits, plantLocaleHint, type MapNode } from '../../lib/orgMap'
+import { addCostCenter, addDepartment, editCostCenter, removeCostCenter, removeDepartment, renameDepartment, type OrgCompany, type OrgPlant } from '../../lib/orgTree'
+import { useSafeMutation } from '../../lib/useSafeMutation'
+
+/**
+ * Organization map → seçili düğümün düzenleme kutusu: ad değiştir, alt seviye
+ * ekle, sil. Eski sayfaların kullandığı aynı mutation'lar çağrılır; yetki ve
+ * korumalar (dolu bölüm, work center'lı masraf yeri, ad onayı) sunucudadır.
+ * Hangi düğümde ne yapılabileceği `nodeEdits` (src/lib/orgMap.ts).
+ */
+
+const btn = 'rounded-md border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-40'
+const input = 'w-full rounded-md border border-input bg-background px-2 py-1 text-xs'
+
+const ADD_LABEL = { company: 'company', plant: 'plant', department: 'department', costCenter: 'cost center' } as const
+
+type Mode = 'rename' | 'add' | null
+
+export function OrgMapEditor({
+  node,
+  companies,
+  isPlatform,
+  onDone,
+}: {
+  node: MapNode
+  companies: OrgCompany[]
+  isPlatform: boolean
+  onDone: (text: string, removed?: boolean) => void
+}) {
+  const edits = nodeEdits(node.ref, isPlatform)
+  const [mode, setMode] = useState<Mode>(null)
+  const [name, setName] = useState('')
+  const [code, setCode] = useState('')
+  const [country, setCountry] = useState('')
+  const [zone, setZone] = useState('')
+
+  // Başka düğüm seçilince açık form kapanır.
+  useEffect(() => setMode(null), [node.id])
+
+  const saveHolding = useSafeMutation(api.platform.saveHolding)
+  const removeHolding = useSafeMutation(api.platform.removeHolding)
+  const createCompany = useSafeMutation(api.platform.createCompany)
+  const updateCompany = useSafeMutation(api.platform.updateCompany)
+  const deleteCompany = useSafeMutation(api.platform.deleteCompany)
+  const createPlant = useSafeMutation(api.platform.createPlant)
+  const updatePlant = useSafeMutation(api.platform.updatePlant)
+  const deletePlant = useSafeMutation(api.platform.deletePlant)
+  const all = [saveHolding, removeHolding, createCompany, updateCompany, deleteCompany, createPlant, updatePlant, deletePlant]
+  const error = all.find((m) => m.error)?.error ?? null
+  const pending = all.some((m) => m.pending)
+
+  const ref = node.ref
+  const plantOf = (id: string): OrgPlant | undefined => companies.flatMap((c) => c.plants).find((p) => p._id === id)
+  const companyOf = (id: string) => companies.find((c) => c._id === id)
+  const savePlant = (p: OrgPlant, s: { departments: string[]; costCenters: OrgPlant['costCenters'] }) =>
+    updatePlant.run({ id: p._id, name: p.name, departments: s.departments, costCenters: s.costCenters ?? [] })
+
+  const open = (m: Mode) => {
+    all.forEach((x) => x.clearError())
+    setMode(m)
+    setCode('')
+    if (m === 'rename') setName(node.label)
+    else setName('')
+    if (m === 'add' && edits.add === 'plant' && ref.kind === 'company') {
+      const hint = plantLocaleHint(companyOf(ref.id))
+      setCountry(hint.country)
+      setZone(hint.timeZone)
+    }
+  }
+
+  const rename = async () => {
+    const n = name.trim()
+    if (!n) return
+    let ok = false
+    if (ref.kind === 'holding') ok = await saveHolding.run({ id: ref.id, name: n })
+    if (ref.kind === 'company') {
+      const c = companyOf(ref.id)
+      if (c) ok = await updateCompany.run({ id: c._id, name: n, modules: c.modules, status: c.status })
+    }
+    if (ref.kind === 'plant') ok = await updatePlant.run({ id: ref.id, name: n })
+    if (ref.kind === 'department') {
+      const p = plantOf(ref.plantId)
+      if (p) ok = await savePlant(p, renameDepartment(p, ref.name, n))
+    }
+    if (ref.kind === 'costCenter') {
+      const p = plantOf(ref.plantId)
+      if (p) ok = await savePlant(p, editCostCenter(p, ref.code, { name: n }))
+    }
+    if (ok) {
+      setMode(null)
+      onDone(`Renamed to ${n}`)
+    }
+  }
+
+  const add = async () => {
+    const n = name.trim()
+    if (!n) return
+    let ok = false
+    if (ref.kind === 'holding') ok = await createCompany.run({ name: n, modules: [...MODULES], holdingId: ref.id })
+    if (ref.kind === 'company') ok = await createPlant.run({ companyId: ref.id, name: n, country: country.trim(), timeZone: zone.trim() })
+    if (ref.kind === 'plant') {
+      const p = plantOf(ref.id)
+      if (p) ok = await savePlant(p, addDepartment(p, n))
+    }
+    if (ref.kind === 'department') {
+      const p = plantOf(ref.plantId)
+      if (p && code.trim()) ok = await savePlant(p, addCostCenter(p, { code: code.trim(), name: n, department: ref.name }))
+    }
+    if (ok) {
+      setMode(null)
+      onDone(`Added ${edits.add ? ADD_LABEL[edits.add] : ''} ${n}`)
+    }
+  }
+
+  const remove = async () => {
+    let ok = false
+    if (ref.kind === 'holding') {
+      if (!window.confirm(`Delete the holding ${node.label}? Its board members' accounts are removed.`)) return
+      ok = await removeHolding.run({ id: ref.id })
+    }
+    if (ref.kind === 'company' || ref.kind === 'plant') {
+      // Aynı onay eski sayfadaki gibi: adı yazmak gerekir (veri kalıcı silinir).
+      const typed = window.prompt(`Delete ${ref.kind === 'company' ? 'the company' : 'the plant'} ${node.label} and all its data? Type its name to confirm.`)
+      if (typed === null) return
+      ok = ref.kind === 'company' ? await deleteCompany.run({ id: ref.id, confirmName: typed }) : await deletePlant.run({ id: ref.id, confirmName: typed })
+    }
+    if (ref.kind === 'department') {
+      const p = plantOf(ref.plantId)
+      if (!p || !window.confirm(`Remove the department ${ref.name}? It must have no cost centers.`)) return
+      ok = await savePlant(p, removeDepartment(p, ref.name))
+    }
+    if (ref.kind === 'costCenter') {
+      const p = plantOf(ref.plantId)
+      if (!p || !window.confirm(`Remove the cost center ${ref.code}? It must have no work centers and no KPI entries.`)) return
+      ok = await savePlant(p, removeCostCenter(p, ref.code))
+    }
+    if (ok) onDone(`Deleted ${node.label}`, true)
+  }
+
+  if (edits.elsewhere) return <p className="mt-2 text-[11px] text-muted-foreground">Rename, add or delete on {edits.elsewhere}.</p>
+  if (!edits.rename && !edits.add && !edits.remove) return null
+
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="flex flex-wrap gap-1">
+        {edits.rename && (
+          <button className={btn} onClick={() => open(mode === 'rename' ? null : 'rename')}>
+            Rename
+          </button>
+        )}
+        {edits.add && (
+          <button className={btn} onClick={() => open(mode === 'add' ? null : 'add')}>
+            Add {ADD_LABEL[edits.add]}
+          </button>
+        )}
+        {edits.remove && (
+          <button className={`${btn} text-destructive`} disabled={pending} onClick={() => void remove()}>
+            Delete
+          </button>
+        )}
+      </div>
+
+      {mode && (
+        <form
+          className="space-y-1.5 rounded-md border border-border p-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void (mode === 'rename' ? rename() : add())
+          }}
+        >
+          {mode === 'add' && edits.add === 'costCenter' && (
+            <input className={input} placeholder="Code (e.g. 171) — cannot change later" value={code} onChange={(e) => setCode(e.target.value)} autoFocus />
+          )}
+          <input
+            className={input}
+            placeholder={mode === 'rename' ? 'New name' : `Name of the new ${edits.add ? ADD_LABEL[edits.add] : ''}`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus={!(mode === 'add' && edits.add === 'costCenter')}
+          />
+          {mode === 'add' && edits.add === 'plant' && (
+            <div className="flex gap-1">
+              <input className={`w-16 ${input}`} placeholder="Country" title="Two-letter code, e.g. RO, TR" value={country} onChange={(e) => setCountry(e.target.value)} />
+              <input className={input} placeholder="Time zone, e.g. Europe/Bucharest" value={zone} onChange={(e) => setZone(e.target.value)} />
+            </div>
+          )}
+          {mode === 'rename' && ref.kind === 'costCenter' && <p className="text-[11px] text-muted-foreground">The code {ref.code} stays (data is linked to it).</p>}
+          <div className="flex gap-1">
+            <button
+              type="submit"
+              className={btn}
+              disabled={pending || !name.trim() || (mode === 'add' && edits.add === 'costCenter' && !code.trim()) || (mode === 'add' && edits.add === 'plant' && (!country.trim() || !zone.trim()))}
+            >
+              Save
+            </button>
+            <button type="button" className={btn} onClick={() => setMode(null)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      <ErrorBanner message={error} onDismiss={() => all.forEach((m) => m.clearError())} />
+    </div>
+  )
+}
