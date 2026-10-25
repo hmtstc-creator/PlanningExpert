@@ -5,6 +5,7 @@ import { MODULES, type Level, type Module } from '../../lib/tenancy'
 import { ErrorBanner } from '../ErrorBanner'
 import { CompanyDataActions, CompanyStatusModules, type CompanyInfo } from './CompanyControls'
 import { HOLDING_TARGETS_HINT, HoldingTargetsForm } from './HoldingTargets'
+import { DepartmentOwnerSelect } from './DepartmentOwner'
 import { nodeEdits, plantLocaleHint, type MapNode } from '../../lib/orgMap'
 import { addCostCenter, addDepartment, editCostCenter, removeCostCenter, removeDepartment, renameDepartment, type OrgCompany, type OrgHolding, type OrgPlant } from '../../lib/orgTree'
 import { useSafeMutation } from '../../lib/useSafeMutation'
@@ -201,7 +202,14 @@ export function OrgMapEditor({
       <HoldingTargetsForm key={holding._id} holding={holding} />
     </div>
   )
-  const settings = companySettings || holdingSettings
+  // Bölüm düğümü: sorumlu — Holdings & companies ile aynı seçici.
+  const deptPlant = ref.kind === 'department' && view === 'structure' ? plantOf(ref.plantId) : undefined
+  const departmentSettings = deptPlant && ref.kind === 'department' && (
+    <div className="mt-3 border-t border-border pt-2">
+      <DepartmentOwnerSelect key={`${deptPlant._id}:${ref.name}`} plant={deptPlant} department={ref.name} compact />
+    </div>
+  )
+  const settings = companySettings || holdingSettings || departmentSettings
 
   if (edits.elsewhere) return <p className="mt-2 text-[11px] text-muted-foreground">Rename, add or delete on {edits.elsewhere}.</p>
   if (!edits.rename && !edits.add && !edits.remove) return settings || null

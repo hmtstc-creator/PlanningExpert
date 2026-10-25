@@ -77,7 +77,8 @@ Holding → Company → Plant → Department → Cost center → Work center
     (2026-10-25, `CompanyControls.tsx`). **[S]** dene: haritada şirkete tıkla.
   - [x] Holding hedefleri (*Group targets*, 2026-10-25, `HoldingTargets.tsx`).
     **[S]** dene: haritada holding'e tıkla → hedef gir → Board'da grup planı.
-  - [ ] Bölüm sorumlusu (`platform.setDepartmentOwner`).
+  - [x] Bölüm sorumlusu (2026-10-25, `DepartmentOwner.tsx`). **[S]** dene:
+    haritada bölüme tıkla → *Responsible* seç → Board'da görünür.
   - [ ] Grup izinleri: plant'ler ve modül / alan seviyeleri (izin matrisi).
   - [ ] Kullanıcı: parola ver, her yerden çıkış; güvenlik kontrolü paneli.
   - [ ] Hepsi bitince eski sayfaları ve menü bağlantılarını kaldır.

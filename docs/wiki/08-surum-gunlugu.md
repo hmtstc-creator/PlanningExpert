@@ -1,9 +1,10 @@
 # 08 · Sürüm günlüğü
 
-> Son güncelleme: 2026-10-25 (haritada holding hedefleri) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
+> Son güncelleme: 2026-10-25 (haritada bölüm sorumlusu) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| — | 2026-10-25 | **Organization map: bölüm sorumlusu** — bölüm düğümünün panelinde *Responsible* seçici (şirketin etkin kullanıcıları; yetki vermez). Seçici tek kaynak: `DepartmentOwner.tsx`, Holdings & companies bölüm paneliyle ortak | Eski sayfaları kaldırmadan önce eksikler haritaya taşınıyor (kullanıcı kararı 2026-10-25) |
 | — | 2026-10-25 | **Organization map: holding hedefleri** — holding düğümünün panelinde *Group targets* (General; Board grup planı, boş = şirket planlarının toplamı). Form tek kaynak: `HoldingTargets.tsx`, Holdings & companies ile ortak | Eski sayfaları kaldırma öncesi eksiklerin haritaya taşınması (kullanıcı kararı 2026-10-25); sunucu ve şema değişmedi |
 | — | 2026-10-25 | **Organization map: şirket ayarları** — şirket düğümünün panelinde *Suspend / Reactivate* ve kiralanan modüller (General), *Export data (JSON)* ve süresi dolunca *Delete permanently* (creator / General). Bileşenler `src/components/org/CompanyControls.tsx`'e taşındı; Holdings & companies paneli de aynılarını kullanır (tek kaynak). | Eski sayfaları kaldırmanın 1. adımı: önce haritada eksik işler tamamlanır (kullanıcı kararı 2026-10-25). Sunucu değişmedi. |
 | #72 | 2026-10-25 | **Organization map creator'lara açıldı** — Company settings → *Organization map* (`/settings/map`): yalnız aktif şirket; holding düğümü, *Add holding* ve şirketi holding'e sürükleme yok, General de burada creator gibi çalışır (`OrgMap scope="company"`). Administration'daki harita (`/admin/map`) aynı kalır | Sunucu değişmedi: `platform.companies` creator'a yalnız kendi şirketini verir; plant / bölüm / masraf yeri / work center / grup / kullanıcı mutation'ları `canManageCompany` ile korunur, holding işlemleri `requirePlatform` |
