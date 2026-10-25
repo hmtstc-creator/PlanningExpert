@@ -379,6 +379,9 @@ function OrgMapInner() {
                 node={sel}
                 companies={companies}
                 isPlatform={isPlatform}
+                view={view}
+                users={users}
+                groups={groups}
                 onDone={(text, removed) => {
                   setNotice(`Done: ${text}`)
                   if (removed) setSelected(null)

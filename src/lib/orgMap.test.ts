@@ -125,10 +125,17 @@ describe('nodeEdits', () => {
     expect(nodeEdits({ kind: 'department', plantId: 'p1', name: 'Press' }, false).add).toBe('costCenter')
     expect(nodeEdits({ kind: 'costCenter', plantId: 'p1', code: '171' }, false)).toEqual({ rename: true, add: null, remove: true })
   })
-  it('work centers, groups, users and virtual boxes point elsewhere', () => {
+  it('work centers point elsewhere; virtual boxes have no edit', () => {
     expect(nodeEdits({ kind: 'workCenter', plantId: 'p1', name: 'P1' }, true).elsewhere).toBe('Work Center Definitions')
-    expect(nodeEdits({ kind: 'user', id: 'u1', companyId: 'c1' }, true).elsewhere).toBe('Users & permissions')
     expect(nodeEdits({ kind: 'virtual' }, true)).toEqual({ rename: false, add: null, remove: false })
+  })
+  it('people view: company adds a group, group adds a user, both can be renamed and deleted', () => {
+    expect(nodeEdits({ kind: 'company', id: 'c1' }, true, 'people')).toEqual({ rename: false, add: 'group', remove: false })
+    expect(nodeEdits({ kind: 'group', id: 'g1', companyId: 'c1' }, false, 'people')).toMatchObject({ rename: true, add: 'user', remove: true })
+    expect(nodeEdits({ kind: 'user', id: 'u1', companyId: 'c1' }, false, 'people')).toMatchObject({ rename: true, add: null, remove: true })
+    expect(nodeEdits({ kind: 'user', id: 'u1', companyId: 'c1' }, false, 'people').more).toContain('Password')
+    // Plant'in bölümleri Kişiler görünümünde düzenlenmez.
+    expect(nodeEdits({ kind: 'plant', id: 'p1', companyId: 'c1' }, false, 'people').elsewhere).toBe('the Structure view')
   })
 })
 
