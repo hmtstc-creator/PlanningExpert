@@ -42,8 +42,8 @@ export function lossColor(col: string, i: number): string {
   return LOSS_COLORS.find(([re]) => re.test(col))?.[1] ?? SPARE[i % SPARE.length]
 }
 
-/** Sütun başlığı: Excel'deki gibi büyük harf; hız kaybı "SPEED_LOSS". */
-export const colTitle = (col: string) => (col === SPEED ? 'SPEED_LOSS' : col.toUpperCase())
+/** Sütun başlığı: Excel'deki gibi büyük harf; hız kaybı "SPEED_LOSS", "#" (tanımsız) "UNDEFINED". */
+export const colTitle = (col: string) => (col === SPEED ? 'SPEED_LOSS' : col === '#' ? 'UNDEFINED' : col.toUpperCase())
 
 export const pct = (v: number | null | undefined) => (v === null || v === undefined ? '' : `${Math.round(v * 100)}%`)
 /** Kayıp payı: hiç kayıp yoksa boş (Excel'deki gibi). */

@@ -9,8 +9,10 @@ import { PageHeader } from '../../components/PageHeader'
 import { SavePdfButton } from '../../components/SavePdfButton'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import { areaNames, chartGroups, lossDayOf, visibleChartGroups, type OrderRow, type ShiftRow } from '../../lib/oee'
-import { ASAKAI_HIGHLIGHT, asakaiDetail, type LossRow } from '../../lib/oeeAsakai'
+import { areaNames, lossDayOf, type OrderRow, type ShiftRow } from '../../lib/oee'
+import { ASAKAI_HIGHLIGHT, asakaiColumns, asakaiDetail, dropEmptyUnassigned, type LossRow } from '../../lib/oeeAsakai'
+import { fromStoredStops, stopDayOf } from '../../lib/oeeReliability'
+import { splitShortStops } from '../../lib/oeeShortStops'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { pdfFileName } from '../../lib/pdfFile'
 import { sheetToPdf } from '../../lib/pdfSheet'
@@ -39,11 +41,12 @@ function AsakaiDetailPage() {
   const scope = effectiveScope(sel.scope, areaNames(shifts, config))
   const { groups, columns } = useMemo(() => {
     const events = (evRaw ?? []).map(fromStoredDay)
-    const columns = visibleChartGroups(chartGroups(config, events.map(lossDayOf)), config)
-    return {
-      columns,
-      groups: asakaiDetail({ shifts, events, orders }, scope, config, columns),
-    }
+    // Sütunlar kısa duruşları ayrılmış özetten ("Short stops"); "#" gibi grafikte gizli olanlar dahil.
+    const split = splitShortStops(events.map(lossDayOf), fromStoredStops(events.map(stopDayOf)), config).lossDays
+    const all = asakaiColumns(config, split)
+    const groups = asakaiDetail({ shifts, events, orders }, scope, config, all)
+    const rows = groups.flatMap((g) => g.machines.flatMap((m) => [m.total, ...m.shifts]))
+    return { groups, columns: dropEmptyUnassigned(all, rows) }
   }, [shifts, evRaw, orders, scope, config])
 
   const sheetRef = useRef<HTMLDivElement>(null)

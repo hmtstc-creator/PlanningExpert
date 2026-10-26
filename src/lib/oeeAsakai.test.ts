@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import fixture from './oee.fixture.json'
 import { chartGroups, daysFromShifts, lossDayOf, oeeOf, parseOeeWorkbook, sumTimes, type OeeConfig, type SheetRows } from './oee'
-import { ASAKAI_WEEKS, asakaiDetail, asakaiWeekly } from './oeeAsakai'
+import { ASAKAI_WEEKS, asakaiColumns, asakaiDetail, asakaiWeekly, dropEmptyUnassigned } from './oeeAsakai'
 
 // Gerçek kesit (ASAKAI dosyası): Progressive ve Transfer, 21 Eylül haftası.
 const parsed = parseOeeWorkbook(fixture as unknown as Record<string, SheetRows>)
@@ -81,5 +81,34 @@ describe('Asakai detail', () => {
       expect(sum).toBeLessThanOrEqual(m.total.loadingMin + 1e-6)
       expect(m.partCells).toHaveLength(3)
     }
+  })
+})
+
+describe('Asakai columns', () => {
+  const c: OeeConfig = {
+    ...plant,
+    lossGroups: [
+      ...plant.lossGroups,
+      { code: 'UTS', label: 'Breaks', chart: 'UTS', breakdown: false },
+      { code: '#', label: 'Undefined', chart: '#', breakdown: false, hidden: true },
+    ],
+  }
+
+  it('"#" grafikte gizli ama tabloda var; UTS sütunu yok', () => {
+    const cols = asakaiColumns(c, [])
+    expect(cols).toContain('#')
+    expect(cols).not.toContain('UTS')
+    expect(cols.at(-1)).toBe('Speed')
+  })
+
+  it('UTS başka gruplarla aynı sütundaysa sütun kalır', () => {
+    const shared = { ...c, lossGroups: c.lossGroups.map((g) => (g.code === 'UTS' ? { ...g, chart: 'Setup' } : g)) }
+    expect(asakaiColumns(shared, [])).toContain('Setup')
+  })
+
+  it('Unassigned yalnız süresi varsa', () => {
+    const row = (v: number) => ({ label: 'x', loadingMin: 100, oee: 0.5, shares: { Unassigned: v } })
+    expect(dropEmptyUnassigned(['Setup', 'Unassigned'], [row(0)])).toEqual(['Setup'])
+    expect(dropEmptyUnassigned(['Setup', 'Unassigned'], [row(0.02)])).toEqual(['Setup', 'Unassigned'])
   })
 })
