@@ -49,6 +49,9 @@ export const pct = (v: number | null | undefined) => (v === null || v === undefi
 /** Kayıp payı: hiç kayıp yoksa boş (Excel'deki gibi). */
 export const share = (r: LossRow, col: string) => (r.loadingMin > 0 && r.shares[col] > 0 ? pct(r.shares[col]) : '')
 
+/** Sayfa sabit genişlikte çizilir; PDF bu genişlikten kâğıda küçülür. */
+export const SHEET_WIDTH = 1400
+
 export const SHEET_FONT: CSSProperties = {
   fontFamily: 'Calibri, Carlito, Arial, sans-serif',
   color: '#000',
@@ -147,10 +150,10 @@ export function AsakaiBars({ title, points }: { title: string; points: { label: 
 /** Yığılı sütun: günün OEE'si altta, kayıpları üstünde (% of Loading). */
 export function AsakaiStacked({ title, rows, columns }: { title: string; rows: (LossRow & { tick: string })[]; columns: string[] }) {
   const W = 470
-  const H = 300
+  const H = 230
   const left = 22
   const top = 20
-  const bottom = 262
+  const bottom = 192
   const step = (W - left - 6) / rows.length
   const scale = (bottom - top) / 1
   const series = ['OEE', ...columns]

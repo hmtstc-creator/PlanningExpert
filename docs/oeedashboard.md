@@ -725,9 +725,11 @@ Uygulama:
 Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **Save PDF**.
 
 - **Asakai weekly** (`/oee/asakai-weekly`): başlık "<ALAN> DAILY FOLLOW UP" + seçili gün. Seçili alanın her
-  masraf yeri bir blok (Excel'de Progressive, Transfer; ada göre sıralı): aylık OEE (1–12, seçili aydan sonrası boş),
-  son 10 hafta, *Detail losses bridge* (makine × gün OEE, haftalık; son satır masraf yeri toplamı), haftanın günlerinin
-  yığılı sütunu (OEE + kayıplar, % of Loading) ve *Losses details* (makine × kayıp sütunu, hafta).
+  masraf yeri **bir blok** (ada göre sıralı): üstte yan yana aylık OEE (1–12, seçili aydan sonrası boş), son 10 hafta
+  ve haftanın günlerinin yığılı sütunu (OEE + kayıplar, % of Loading); altta tek tablo — iş yeri başına bir satır:
+  günlerin OEE'si, haftalık OEE ve haftanın kayıpları; son satır masraf yeri toplamı. Excel'deki yan yana düzen
+  (Progressive | Transfer | Detail losses bridge) 30 iş yerli bir masraf yerinde bozulacağı için böyle düzenlendi
+  (planlamacı, 2026-10-26): iş yeri sayısı yalnız tabloyu uzatır. PDF çok sayfa, blok sayfa arasında bölünmez.
 - **Asakai detail** (`/oee/asakai-detail`): seçili gün, makine başına koyu satır = gün, 1-2-3 = vardiyalar: OEE,
   Loading (dk), kayıp sütunları; sağda günün malzemeleri ve vardiyada "iyi adet - %OEE" (sipariş dosyasından).
   Hücre ≥ %10 ise kırmızı (`ASAKAI_HIGHLIGHT`).

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMemo, useRef } from 'react'
 
 import { api } from '../../../convex/_generated/api'
-import { Cell, SHEET_FONT, X, colTitle, pct, share } from '../../components/AsakaiSheet'
+import { Cell, SHEET_FONT, SHEET_WIDTH, X, colTitle, pct, share } from '../../components/AsakaiSheet'
 import { OeeControls, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { dm } from '../../components/OeePeriodControl'
 import { PageHeader } from '../../components/PageHeader'
@@ -85,6 +85,7 @@ function AsakaiDetailPage() {
                 size: 'A4',
                 orientation: 'landscape',
                 pages: 'flow',
+                widthPx: SHEET_WIDTH,
               })
             }
           />
@@ -97,7 +98,7 @@ function AsakaiDetailPage() {
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto">
-          <div ref={sheetRef} style={{ ...SHEET_FONT, width: 1400, padding: 8, fontSize: 11 }}>
+          <div ref={sheetRef} style={{ ...SHEET_FONT, width: SHEET_WIDTH, padding: 8, fontSize: 11 }}>
             <div
               style={{
                 display: 'inline-block',
