@@ -6,7 +6,7 @@ import { OeeRebuildNotice } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import { MES_SHORT_STOP_MIN } from '../../lib/oee'
+import { MES_SHORT_STOP_MIN, UNASSIGNED, UNDEFINED_RC1 } from '../../lib/oee'
 
 export const Route = createFileRoute('/oee/guide')({
   component: OeeGuidePage,
@@ -114,8 +114,11 @@ function OeeGuidePage() {
           <li>
             shift numbers of the shift codes (UB61 …) — on the Work calendar (Shifts and planning rules), where the shift times and planned stops are,
           </li>
-          <li>which Reason Code 1 is a loss and which is a planned break,</li>
-          <li>names of the loss groups (Reason Code 2), their chart columns and which are breakdowns,</li>
+          <li>
+            which Reason Code 1 is a loss and which is a planned break (Reason Code 1 “{UNDEFINED_RC1}” — not defined by the operator — is
+            always a loss; a stop with Reason Code 1 or 2 “{UNDEFINED_RC1}” shows as {UNASSIGNED}),
+          </li>
+          <li>names of the loss groups (Reason Code 2), their order (↑ ↓ — the column order on every page), chart columns and which are breakdowns,</li>
           <li>which downtime texts are a planned or unplanned setup,</li>
           <li>production time after a setup for OK, weeks in the trends, rows in the top lists.</li>
         </ul>

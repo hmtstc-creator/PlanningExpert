@@ -21,13 +21,13 @@ function history(today: number, weekMin: number[]): GroupDay[] {
 }
 
 describe('OEE open topics: compact days', () => {
-  it('counts only loss codes with a reason, and sums loading', () => {
+  it('counts only loss codes (undefined "#" under Unassigned), and sums loading', () => {
     const days = [{ date: DAY, costCenter: 'CC1', workCenter: 'PRS-1', loadingMin: 480 } as DayRow]
     const losses: LossDay[] = [
       { date: DAY, costCenter: 'CC1', workCenter: 'PRS-1', codes: { 'L|KLP': [70, 3], 'L|#': [40, 1], 'B|KLP': [30, 1] }, reasons: {} },
     ]
     expect(compactDays(days, losses, config)).toEqual([
-      { date: DAY, costCenter: 'CC1', workCenter: 'PRS-1', loadingMin: 480, groups: { KLP: 70 } },
+      { date: DAY, costCenter: 'CC1', workCenter: 'PRS-1', loadingMin: 480, groups: { KLP: 70, Unassigned: 40 } },
     ])
   })
 })

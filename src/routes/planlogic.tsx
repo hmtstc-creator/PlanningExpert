@@ -4,7 +4,8 @@ import type { ReactNode } from 'react'
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
 import { DEFAULT_PLANT_TIME_ZONE } from '../lib/dates'
-import { MES_SHORT_STOP_MIN } from '../lib/oee'
+import { MES_SHORT_STOP_MIN, SHORT_STOPS, SPEED, UNASSIGNED, UNDEFINED_RC1 } from '../lib/oee'
+import { OVER_RECORDED } from '../lib/oeeBridge'
 import { SHORT_STOP_DATA_FROM } from '../lib/oeeShortStops'
 import { leadTimeLookup, type LeadTimeRow } from '../lib/rawLeadTime'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
@@ -845,6 +846,28 @@ function PlanLogicPage() {
           <li>
             Example (test): on 21.09 at PRS-105 shift 3, Loading − Production is 140.6 min = the stops of 2 min and longer; the 21.6
             min of shorter stops are inside Production − Operation.
+          </li>
+          <li>
+            <b>Undefined stops</b>: Reason Code 1 or Reason Code 2 “{UNDEFINED_RC1}” (or an empty Reason Code 2) means the operator did
+            not define the stop. Reason Code 1 “{UNDEFINED_RC1}” is always a <b>loss</b> (even when it is not ticked as a loss in OEE
+            Settings → Reason Code 1) and never a planned break; Reason Code 2 “{UNDEFINED_RC1}” is a loss when its Reason Code 1 is. On
+            every OEE page (Losses Trend, Loss Bridge and Level 3, Asakai, Daily Report, Agent Report, Agent Insights, Open Topics) these
+            stops sit under <b>{UNASSIGNED}</b>; a “{UNDEFINED_RC1}” row in OEE Settings → Loss groups is not used. The short-stop split
+            works the same way: stops shorter than the limit go to Short stops (speed), the longer ones to {UNASSIGNED} (availability).
+            Planned breaks are not affected.
+          </li>
+          <li>
+            Example (test): Reason Code 1 “{UNDEFINED_RC1}”, Reason Code 2 STP (Setup), 30 min → {UNASSIGNED} 30 min, Setup 0 min.
+          </li>
+          <li>
+            <b>Column order</b> is the same on every page: the loss groups in their OEE Settings order (↑ ↓ buttons), then{' '}
+            {SHORT_STOPS} (where shown), then {SPEED}, and last {UNASSIGNED}. Example (test): groups KLP, STP, ARZ → KLP, STP, ARZ,{' '}
+            {SHORT_STOPS}, {SPEED}, {UNASSIGNED}.
+          </li>
+          <li>
+            A loss share can pass 100 % of Loading when the MES Loading of a shift is shorter than shift time − planned stops (e.g.
+            21.09 PRS-104 shift 1: Loading 185.7 + planned 209.3 = 395 of 480 min, recorded unplanned stops 191.5 min = 103 %). The
+            stops are counted as recorded; the Loss Bridge shows the surplus as “{OVER_RECORDED}”.
           </li>
         </ul>
       </section>

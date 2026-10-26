@@ -14,7 +14,7 @@
  * Histogram dilimi tam dakikadır (9.7 dk → 9): eşik T için "< T dk" = dilim < T.
  * Histogramı olmayan gün × iş merkezi bölünmez (eski hesap, hepsi availability).
  */
-import { SHORT_MARK, isShortCode, shortStopMinOf, type LossDay, type OeeConfig } from './oee'
+import { SHORT_MARK, classifyLossKey, isLossRc1, isShortCode, shortStopMinOf, type LossDay, type OeeConfig } from './oee'
 import type { StopDay } from './oeeReliability'
 
 /** Süre histogramının (oeeStopDays) başladığı gün; öncesinde bölünme yok. */
@@ -23,10 +23,11 @@ export const SHORT_STOP_DATA_FROM = '2026-09-01'
 const key = (r: { date: string; workCenter: string }) => `${r.date}|${r.workCenter}`
 const round2 = (v: number) => Math.round(v * 100) / 100
 /**
- * Kayıp sayılan bütün kodlar bölünür, "#" (tanımsız) dahil: MES onun kısalarını da
- * Production'dan düşmez. Köprü "#" ve "#<"i kalemlere almaz (isUndefinedCode).
+ * Kayıp sayılan bütün kodlar bölünür (isLossRc1), "#" dahil: MES onların kısalarını da
+ * Production'dan düşmez. Tanımsızların (RC1 / RC2 "#") kısaları `#|STP<`, `UNSCD_DOWN|#<` olur
+ * → grup `Unassigned<` → Short stops (classifyLoss).
  */
-const splittable = (rc1: string, rc2: string, c: OeeConfig) => c.lossReasonCodes.includes(rc1) && !isShortCode(rc2)
+const splittable = (rc1: string, rc2: string, c: OeeConfig) => isLossRc1(rc1, c) && !isShortCode(rc2)
 
 export interface ShortStopSplit {
   lossDays: LossDay[]
@@ -149,8 +150,8 @@ export function shortStopTotals(lossDays: LossDay[], c: OeeConfig): { minutes: n
   let count = 0
   for (const l of lossDays)
     for (const [k, [m, n]] of Object.entries(l.codes)) {
-      const [rc1, rc2] = k.split('|')
-      if (!c.lossReasonCodes.includes(rc1) || !isShortCode(rc2)) continue
+      const group = classifyLossKey(k, c)?.group
+      if (group === undefined || !isShortCode(group)) continue
       minutes += m
       count += n
     }

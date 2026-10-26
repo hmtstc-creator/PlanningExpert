@@ -10,6 +10,8 @@
  * (en çok 8 gün) gelir.
  */
 import {
+  UNDEFINED_RC1,
+  classifyLoss,
   inScope,
   shortStopMinOf,
   shiftNumber,
@@ -90,7 +92,8 @@ export interface RelCategory {
 }
 
 const norm = (t: string) => t.trim().toUpperCase().replace(/\s+/g, ' ').replace(/[–—]/g, '-')
-const undefinedCode = (rc1: string, rc2: string) => rc1 === '#' || rc2 === '#'
+/** Sebebi girilmemiş duruş: arıza / setup kategorisine girmez (RC1 "#" kaybı Unassigned'dadır, classifyLoss). */
+const undefinedCode = (rc1: string, rc2: string) => rc1 === UNDEFINED_RC1 || rc2 === '#'
 
 /** STP'de varsayılan metinler: kalıp setup'ları (planlı, plansız) ve rulo setup'ı; yoksa bütün setup metinleri. */
 export function defaultSetupTexts(c: OeeConfig): string[] {
@@ -109,7 +112,7 @@ export function relCategories(c: OeeConfig, setupTexts: string[]): RelCategory[]
     .map((g) => ({
       key: g.code,
       label: g.label || g.code,
-      match: (rc1: string, rc2: string) => !undefinedCode(rc1, rc2) && c.lossReasonCodes.includes(rc1) && rc2 === g.code,
+      match: (rc1: string, rc2: string) => !undefinedCode(rc1, rc2) && classifyLoss(rc1, rc2, c)?.group === g.code,
     }))
   const texts = new Set(setupTexts.map(norm))
   if (texts.size) {
@@ -343,10 +346,12 @@ export function partStops(events: DowntimeDay[], workCenter: string | null, mate
   for (const d of events) {
     if (workCenter && d.workCenter !== workCenter) continue
     for (const e of d.events) {
-      if (e.material !== material || undefinedCode(e.rc1, e.rc2) || !c.lossReasonCodes.includes(e.rc1)) continue
+      // Tanımsızlar (RC1 / RC2 "#") → Unassigned (classifyLoss).
+      const group = e.material === material ? classifyLoss(e.rc1, e.rc2, c)?.group : undefined
+      if (group === undefined) continue
       const shift = shiftOf(e, c)
-      const k = `${d.date}|${shift ?? ''}|${e.rc2}|${e.textEn}`
-      const r = map.get(k) ?? { date: d.date, shift, group: e.rc2, text: e.textEn || e.rc2, count: 0, minutes: 0, start: e.startTime.slice(0, 5) }
+      const k = `${d.date}|${shift ?? ''}|${group}|${e.textEn}`
+      const r = map.get(k) ?? { date: d.date, shift, group, text: e.textEn || e.rc2, count: 0, minutes: 0, start: e.startTime.slice(0, 5) }
       r.count += 1
       r.minutes += e.minutes
       if (e.startTime && (!r.start || e.startTime.slice(0, 5) < r.start)) r.start = e.startTime.slice(0, 5)
@@ -399,7 +404,8 @@ export function reasonShiftParts(
   const partMap = new Map<string, Map<string, ReasonPartRow>>()
   for (const d of events) {
     for (const e of d.events as DowntimeEvent[]) {
-      if (undefinedCode(e.rc1, e.rc2) || !c.lossReasonCodes.includes(e.rc1) || !gs.has(e.rc2)) continue
+      const group = classifyLoss(e.rc1, e.rc2, c)?.group
+      if (group === undefined || !gs.has(group)) continue
       const text = e.textEn || e.rc2
       const sh = shiftOf(e, c)
       const byShift = shifts.get(text) ?? new Map<number | null, number>()

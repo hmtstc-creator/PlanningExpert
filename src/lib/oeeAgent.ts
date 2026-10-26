@@ -8,8 +8,12 @@
 // lossGroups[].agent).
 
 import {
+  UNDEFINED_RC1,
   addDaysIso,
+  classifyLoss,
+  classifyLossKey,
   groupLabel,
+  isBreakRc1,
   ratios,
   shiftNumber,
   shortStopMinOf,
@@ -209,8 +213,9 @@ export const dmShort = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000)
 
-const undefinedCode = (e: { rc1: string; rc2: string }) => e.rc1 === '#' || e.rc2 === '#'
-const isLoss = (e: DowntimeEvent, c: OeeConfig) => !undefinedCode(e) && c.lossReasonCodes.includes(e.rc1)
+/** Sebebi girilmemiş duruş (RC1 ya da RC2 "#"): kendi notu var; kalıp / makine / tekrar notlarına girmez. */
+const undefinedCode = (e: { rc1: string; rc2: string }) => e.rc1 === UNDEFINED_RC1 || e.rc2 === '#'
+const isLoss = (e: DowntimeEvent, c: OeeConfig) => !undefinedCode(e) && classifyLoss(e.rc1, e.rc2, c) !== null
 const partOf = (m: string) => (m && m !== '#' ? m : '')
 const textOf = (e: DowntimeEvent) => (e.textEn || e.rc2).trim().toUpperCase()
 const eventShift = (e: DowntimeEvent, c: OeeConfig) => shiftNumber(e.shiftDefinition, c) ?? shiftNumber(e.shiftGroup, c)
@@ -600,7 +605,7 @@ export function agentReport(input: AgentInput): AgentReport {
       link: { to: '/oee/dies', label: 'Dies OEE Trend' },
     })
   // Sebebi girilmemiş duruşlar.
-  const todayAll = all.filter((x) => x.date === day && !(c.breakReasonCodes.includes(x.e.rc1) && !undefinedCode(x.e)))
+  const todayAll = all.filter((x) => x.date === day && !(isBreakRc1(x.e.rc1, c) && !undefinedCode(x.e)))
   const undef = todayAll.filter((x) => undefinedCode(x.e))
   const undefMin = sumMin(undef)
   const allMin = sumMin(todayAll)
@@ -801,9 +806,10 @@ function biggestLoss(lossDays: LossDay[], c: OeeConfig): { label: string; minute
   const m = new Map<string, number>()
   for (const l of lossDays)
     for (const [code, [min]] of Object.entries(l.codes)) {
-      const [rc1, rc2] = code.split('|')
-      if (rc1 === '#' || rc2 === '#' || !c.lossReasonCodes.includes(rc1)) continue
-      m.set(rc2, (m.get(rc2) ?? 0) + min)
+      // Tanımsızlar (RC1 / RC2 "#") → Unassigned (classifyLoss).
+      const group = classifyLossKey(code, c)?.group
+      if (group === undefined) continue
+      m.set(group, (m.get(group) ?? 0) + min)
     }
   const top = [...m].sort((a, b) => b[1] - a[1])[0]
   return top ? { label: groupLabel(top[0], c), minutes: top[1] } : null

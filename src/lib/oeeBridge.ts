@@ -34,6 +34,11 @@ import {
   UNASSIGNED,
   addDaysIso,
   baseCode,
+  classifyLoss,
+  classifyLossKey,
+  isBreakRc1,
+  isLossRc1,
+  lossColumnOf,
   isShortCode,
   shortStopMinOf,
   daysFromShifts,
@@ -119,49 +124,23 @@ export const familyOf = (code: string): LossFamily => (isShortCode(code) ? 'perf
 
 /** Kalem etiketi: grafik sütunu; kısa duruşlar "<sütun> < 2 min" (Level 3 / ayrıntı). */
 const chartOf = (code: string, c: OeeConfig) => {
-  const col = c.lossGroups.find((g) => g.code === baseCode(code))?.chart || UNASSIGNED
+  const col = lossColumnOf(baseCode(code), c)
   return isShortCode(code) ? `${col} < ${shortStopMinOf(c)} min` : col
 }
 const hiddenGroup = (code: string, c: OeeConfig) => !!c.lossGroups.find((g) => g.code === baseCode(code))?.hidden
 
-/**
- * Tanımsız duruş: Reason Code 1 ya da 2 "#" (planlamacı, 2026-10-07: köprünün
- * hesaplarından çıkar). Hiçbir kaleme, Level 3'e, parça / vardiya kırılımına
- * girmez; Loading − Production'ın parçası olduğundan "Not explained" farkında
- * kalır (köprü yine kapanır, OEE değişmez).
- */
-export const isUndefinedCode = (rc1: string, rc2: string) => rc1 === '#' || baseCode(rc2) === '#'
+// Tanımsız duruşlar (Reason Code 1 ya da 2 "#"): kayıptır ve "Unassigned" kalemine girer
+// (classifyLoss, planlamacı 2026-10-26). 2026-10-07'deki "# hesap dışı" kuralı kalktı.
 
-const withoutUndefined = (l: LossDay): LossDay => {
-  const keep = (rec: Record<string, [number, number]>) =>
-    Object.fromEntries(
-      Object.entries(rec).filter(([k]) => {
-        const [rc1, rc2] = k.split('|')
-        return !isUndefinedCode(rc1, rc2)
-      }),
-    )
-  return { ...l, codes: keep(l.codes), reasons: keep(l.reasons), ...(l.parts && { parts: keep(l.parts) }) }
-}
-
-/** "#" duruşlarının dakikası (veri notu için). */
-const undefinedMinutes = (list: LossDay[]) =>
-  sum(
-    list.flatMap((l) =>
-      Object.entries(l.codes)
-        .filter(([k]) => isUndefinedCode(k.split('|')[0], k.split('|')[1]))
-        .map(([, [m]]) => m),
-    ),
-  )
-
-/** Grup → [dakika, adet], Reason Code 1 kümesine göre. */
-function groupMinutes(lossDays: LossDay[], rc1s: string[]): Map<string, [number, number]> {
+/** Kayıp grubu (classifyLoss) → [dakika, adet]. */
+function groupMinutes(lossDays: LossDay[], c: OeeConfig): Map<string, [number, number]> {
   const out = new Map<string, [number, number]>()
   for (const d of lossDays) {
     for (const [k, [m, n]] of Object.entries(d.codes)) {
-      const [rc1, rc2] = k.split('|')
-      if (!rc1s.includes(rc1)) continue
-      const cur = out.get(rc2) ?? [0, 0]
-      out.set(rc2, [cur[0] + m, cur[1] + n])
+      const group = classifyLossKey(k, c)?.group
+      if (group === undefined) continue
+      const cur = out.get(group) ?? [0, 0]
+      out.set(group, [cur[0] + m, cur[1] + n])
     }
   }
   return out
@@ -208,7 +187,7 @@ export function cappedPlanned(l: LossDay, scheduledMin: number, c: OeeConfig): {
   const reasons: PlannedReason[] = []
   for (const [k, [m, n]] of Object.entries(l.reasons)) {
     const [rc1, rc2, ...rest] = k.split('|')
-    if (!c.breakReasonCodes.includes(rc1)) continue
+    if (!isBreakRc1(rc1, c)) continue
     reasons.push({ rc2, text: rest.join('|') || rc2, minutes: m, count: n })
   }
   const total = sum(reasons.map((r) => r.minutes))
@@ -239,15 +218,13 @@ const rankableColumn = (label: string, groups: string[], c: OeeConfig) =>
  * Köprü. `days` ve `lossDays` seçilen kapsam ve döneme süzülmüş olmalı.
  * Taban Loading time (= %100); planlı duruşlar köprüye girmez.
  */
-export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig): Bridge {
-  const allLossDays = rawLossDays.map(withoutUndefined)
+export function buildBridge(days: DayRow[], allLossDays: LossDay[], c: OeeConfig): Bridge {
   // Zaman tabanı gün × makine kayıtlarıdır: duruşlar yalnızca vardiya verisi
   // olan gün × makinede sayılır (vardiyası olmayan günün duruşu — ör. hiç
   // çalışılmamış vardiyanın 480 dk "scheduled downtime" kaydı — tabanı olmadan
   // kayıp sayılmasın). Eşleşmeyenler veri notunda.
   const dayKeys = new Set(days.filter((d) => d.loadingMin + d.scheduledMin > 0).map(key))
   const lossDays = matchedLossDays(days, allLossDays)
-  const undefinedMin = undefinedMinutes(matchedLossDays(days, rawLossDays))
   const lossKeys = new Set(allLossDays.map(key))
   const coverage = {
     dayRows: dayKeys.size,
@@ -286,7 +263,7 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
 
   // Kayıp duruşlar (Reason Code 1 = kayıp): availability ya da performance ailesi.
   // Gizli gruplar (Settings → "In charts" işaretsiz, ör. "#") kendi kalemidir — öncelik olamaz.
-  const losses = groupMinutes(lossDays, c.lossReasonCodes)
+  const losses = groupMinutes(lossDays, c)
   const availCols = columns(
     losses,
     c,
@@ -424,12 +401,8 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
   for (const d of lossDays)
     for (const [k, [m]] of Object.entries(d.codes)) {
       const rc1 = k.split('|')[0]
-      if (!c.lossReasonCodes.includes(rc1) && !c.breakReasonCodes.includes(rc1)) unclassified += m
+      if (!isLossRc1(rc1, c) && !isBreakRc1(rc1, c)) unclassified += m
     }
-  if (undefinedMin >= 0.5)
-    warnings.push(
-      `${Math.round(undefinedMin)} min of downtime with Reason Code “#” (undefined) are left out of the loss items — they are part of “${NOT_EXPLAINED}”.`,
-    )
   if (unclassified >= 0.5)
     warnings.push(
       `${Math.round(unclassified)} min of downtime have a Reason Code 1 that is neither a loss nor a break (OEE Settings) — counted in “${NOT_EXPLAINED}”.`,
@@ -565,15 +538,9 @@ export const NOT_IN_ORDERS = 'Not in order data'
  */
 export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Set, prev: Level3Set): Level3Row[] {
   const map = new Map<string, Level3Row>()
-  // "#" duruşları köprüdeki gibi dışarıda.
-  const clean = (set: Level3Set): Level3Set => ({
-    ...set,
-    lossDays: set.lossDays.map(withoutUndefined),
-    events: set.events?.map((d) => ({ ...d, events: d.events.filter((e) => !isUndefinedCode(e.rc1, e.rc2)) })),
-  })
   const sets = [
-    [clean(cur), false],
-    [clean(prev), true],
+    [cur, false],
+    [prev, true],
   ] as const
 
   if (item.key === 'pf:speed') {
@@ -636,9 +603,9 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
           continue
         }
         for (const [k, [m]] of Object.entries(l.codes)) {
-          const [rc1, rc2] = k.split('|')
+          const group = classifyLossKey(k, c)?.group
           // Kısa duruşlar Loading − Production'da değildir (MES): farktan düşülmez.
-          if (c.lossReasonCodes.includes(rc1) && !isShortCode(rc2)) gap.set(l.workCenter, (gap.get(l.workCenter) ?? 0) - m)
+          if (group !== undefined && !isShortCode(group)) gap.set(l.workCenter, (gap.get(l.workCenter) ?? 0) - m)
         }
       }
       for (const [wc, m] of gap) addRow(map, wc, wc, m, 0, isPrev)
@@ -667,9 +634,9 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
       if (set.lossDays.length && hasParts(set.lossDays)) {
         for (const l of set.lossDays)
           for (const [k, [m, n]] of Object.entries(l.parts ?? {})) {
-            const [rc1, rc2, ...mat] = k.split('|')
-            if (!c.lossReasonCodes.includes(rc1) || !groups.has(rc2)) continue
-            const material = mat.join('|')
+            const cls = classifyLossKey(k, c)
+            if (!cls || !groups.has(cls.group)) continue
+            const material = cls.rest
             addRow(map, `${l.workCenter}|${material}`, partLabel(material), m, n, isPrev, l.workCenter)
           }
         continue
@@ -680,7 +647,8 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
       for (const d of set.events ?? [])
         for (const e of d.events) {
           const code = splitSet && e.minutes < t ? e.rc2 + SHORT_MARK : e.rc2
-          if (!c.lossReasonCodes.includes(e.rc1) || !groups.has(code)) continue
+          const group = classifyLoss(e.rc1, code, c)?.group
+          if (group === undefined || !groups.has(group)) continue
           addRow(map, `${d.workCenter}|${e.material}`, partLabel(e.material), e.minutes, 1, isPrev, d.workCenter)
         }
     }
@@ -690,14 +658,14 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
     for (const l of set.lossDays) {
       if (by === 'machine') {
         for (const [k, [m, n]] of Object.entries(l.codes)) {
-          const [rc1, rc2] = k.split('|')
-          if (c.lossReasonCodes.includes(rc1) && groups.has(rc2)) addRow(map, l.workCenter, l.workCenter, m, n, isPrev)
+          const group = classifyLossKey(k, c)?.group
+          if (group !== undefined && groups.has(group)) addRow(map, l.workCenter, l.workCenter, m, n, isPrev)
         }
       } else {
         for (const [k, [m, n]] of Object.entries(l.reasons)) {
-          const [rc1, rc2, ...rest] = k.split('|')
-          if (!c.lossReasonCodes.includes(rc1) || !groups.has(rc2)) continue
-          const text = rest.join('|') || rc2
+          const cls = classifyLossKey(k, c)
+          if (!cls || !groups.has(cls.group)) continue
+          const text = cls.rest || cls.rc2
           addRow(map, text, text, m, n, isPrev)
         }
       }
