@@ -11,8 +11,9 @@ import {
   shiftFields,
   weeklyFields,
 } from './oeeValidators'
-import { daysFromShifts, lossDayOf } from '../src/lib/oee'
-import { fromStoredDay, mergeEvents, sameStored, toStoredDay, toStoredLoss } from '../src/lib/oeeStore'
+import { addDaysIso, daysFromShifts, lossDayOf, type DowntimeDay } from '../src/lib/oee'
+import { dropKeys, planDowntimeDedup, planShiftDedup } from '../src/lib/oeeDedup'
+import { eventKey, fromStoredDay, mergeEvents, sameStored, toStoredDay, toStoredLoss } from '../src/lib/oeeStore'
 import { stopDayOf } from '../src/lib/oeeReliability'
 import { mapAliases } from './workCenterHistory'
 
@@ -24,10 +25,13 @@ import { mapAliases } from './workCenterHistory'
  *   vardiya   tarih + iş merkezi + vardiya grubu
  *   gün       tarih + iş merkezi (vardiyalardan; yoksa Daily KPI)
  *   sipariş   tarih + iş merkezi + vardiya + sipariş (kalıp güncellenir)
- *   duruş     iş merkezi + başlangıç tarihi/saati + sipariş (gün kaydında birleşir)
+ *   duruş     iş merkezi + başlangıç (tarih/saat) + bitiş (tarih/saat); sipariş
+ *             anahtara girmez, aynı duruş tek satırdır (2026-10-26, src/lib/oeeDedup.ts)
  *   hafta     yıl + hafta + iş merkezi
  *   ay        yıl + ay + iş merkezi
- * Böylece son iki haftayı tekrar tekrar yüklemek mükerrer kayıt yapmaz.
+ * Böylece son iki haftayı tekrar tekrar yüklemek mükerrer kayıt yapmaz. Bir
+ * anahtarda birden çok kayıt bulunursa ilki güncellenir, fazlası silinir;
+ * eskiden kalan tekrarları "Check duplicates" (`duplicates`) temizler.
  * Kodu değişmiş work center'ın eski kodu yeni koda çevrilir (workCenterHistory.ts).
  * Plan bu veriyi okumaz: `affectsPlan: false`.
  */
@@ -53,6 +57,47 @@ async function upsert(ctx: Ctx, existing: Ctx | null, table: string, doc: Ctx) {
   else await ctx.db.insert(table, doc)
 }
 
+/** Gün × iş merkezi anahtarındaki bütün kayıtlar (indeks sırası: ilk yazılan önce). */
+function sameKey(ctx: Ctx, table: string, date: string, workCenter: string): Promise<Ctx[]> {
+  return ctx.db
+    .query(table)
+    .withIndex('by_key', (q: Ctx) => q.eq('date', date).eq('workCenter', workCenter))
+    .collect()
+}
+
+/** Anahtar başına tek kayıt: ilki güncellenir, fazlası silinir (aynı gün iki kez sayılmasın). */
+async function upsertOne(ctx: Ctx, table: string, date: string, workCenter: string, doc: Ctx) {
+  const [hit, ...extra] = await sameKey(ctx, table, date, workCenter)
+  await upsert(ctx, hit ?? null, table, doc)
+  for (const x of extra) await ctx.db.delete(x._id)
+}
+
+/** Saklı duruş kaydının yalnızca veri alanları. */
+const plainDay = (d: Ctx): DowntimeDay => ({
+  date: d.date,
+  plant: d.plant,
+  plantKey: d.plantKey,
+  costCenter: d.costCenter,
+  workCenter: d.workCenter,
+  events: fromStoredDay(d).events,
+})
+
+/**
+ * Gün × iş merkezinin duruşlarını yazar; kayıp özeti (oeeLossDays) ve süre
+ * histogramı (oeeStopDays) yeniden hesaplanır. Liste boşsa üçü de silinir.
+ */
+async function writeDowntimeDay(ctx: Ctx, day: DowntimeDay) {
+  if (!day.events.length) {
+    for (const t of ['oeeDowntimeDays', 'oeeLossDays', 'oeeStopDays']) {
+      for (const x of await sameKey(ctx, t, day.date, day.workCenter)) await ctx.db.delete(x._id)
+    }
+    return
+  }
+  await upsertOne(ctx, 'oeeDowntimeDays', day.date, day.workCenter, toStoredDay(day))
+  await upsertOne(ctx, 'oeeLossDays', day.date, day.workCenter, toStoredLoss(lossDayOf(day)))
+  await upsertOne(ctx, 'oeeStopDays', day.date, day.workCenter, stopDayOf(day))
+}
+
 const dayDoc = (d: Ctx) => ({
   date: d.date,
   plantKey: d.plantKey,
@@ -70,7 +115,6 @@ const dayDoc = (d: Ctx) => ({
   loadingMin: d.loadingMin,
 })
 
-/** Vardiyalar: ekle ya da güncelle; etkilenen günlerin toplamı yeniden hesaplanır. */
 /**
  * Yalnızca seçili fabrikanın masraf yerleri (Plant → Department → Cost center).
  * Ekran zaten süzer; bu sunucu tarafı güvencesi: başka fabrikanın satırı
@@ -93,28 +137,26 @@ export const upsertShifts = guardedMutation({
     plantCostCentersOnly(ctx, rows)
     const touched = new Map<string, { date: string; workCenter: string }>()
     for (const r of rows) {
-      const hit = await ctx.db
+      // Aynı gün + vardiya + makine tek kayıt: en son yüklenen geçerli, fazlası silinir.
+      const [hit, ...extra] = await ctx.db
         .query('oeeShifts')
         .withIndex('by_key', (q: Ctx) => q.eq('date', r.date).eq('workCenter', r.workCenter).eq('shiftGroup', r.shiftGroup))
-        .first()
-      await upsert(ctx, hit, 'oeeShifts', r)
+        .collect()
+      await upsert(ctx, hit ?? null, 'oeeShifts', r)
+      for (const x of extra) await ctx.db.delete(x._id)
       touched.set(`${r.date}|${r.workCenter}`, { date: r.date, workCenter: r.workCenter })
     }
-    for (const { date, workCenter } of touched.values()) {
-      const all = await ctx.db
-        .query('oeeShifts')
-        .withIndex('by_key', (q: Ctx) => q.eq('date', date).eq('workCenter', workCenter))
-        .collect()
-      const [day] = daysFromShifts(all)
-      const hit = await ctx.db
-        .query('oeeDays')
-        .withIndex('by_key', (q: Ctx) => q.eq('date', date).eq('workCenter', workCenter))
-        .first()
-      if (day) await upsert(ctx, hit, 'oeeDays', dayDoc(day))
-    }
+    for (const { date, workCenter } of touched.values()) await refreshDay(ctx, date, workCenter)
     return rows.length
   },
 })
+
+/** Gün toplamı (oeeDays) o günün vardiyalarından yeniden hesaplanır. */
+async function refreshDay(ctx: Ctx, date: string, workCenter: string) {
+  const all = await sameKey(ctx, 'oeeShifts', date, workCenter)
+  const [day] = daysFromShifts(all)
+  if (day) await upsertOne(ctx, 'oeeDays', date, workCenter, dayDoc(day))
+}
 
 /** Daily KPI (geçmiş): o günün vardiya verisi varsa vardiya toplamı geçerlidir. */
 export const upsertDaily = guardedMutation({
@@ -210,8 +252,10 @@ export const upsertMonthly = guardedMutation({
 /**
  * Duruşlar: dosyada bulunan her gün × iş merkezinin duruşları dosyadakiyle
  * tamamen yenilenir (sistemde saati değişen ya da bölünen duruş iki kez
- * sayılmasın — planlamacı, 2026-09-28). Dosyada olmayan günlere dokunulmaz.
- * Kayıp özeti yeniden hesaplanır.
+ * sayılmasın — planlamacı, 2026-09-28). Dosyada olmayan günlere dokunulmaz,
+ * yalnızca aynı duruş (makine + başlangıç + bitiş) önceki / sonraki günün
+ * kaydında da varsa oradan çıkar: yeni yüklenen geçerli (2026-10-26).
+ * Kayıp özeti ve süre histogramı yeniden hesaplanır.
  */
 export const upsertDowntimeDays = guardedMutation({
   areas: ['oee.data'],
@@ -223,34 +267,23 @@ export const upsertDowntimeDays = guardedMutation({
     const days = await mapAliases(ctx.db, raw)
     plantCostCentersOnly(ctx, days)
     for (const incoming of days) {
-      const hit = await ctx.db
-        .query('oeeDowntimeDays')
-        .withIndex('by_key', (q: Ctx) => q.eq('date', incoming.date).eq('workCenter', incoming.workCenter))
-        .first()
       const next = fromStoredDay(incoming)
-      // Dosyanın kendi içindeki aynı satır bir kez sayılır.
+      // Dosyanın kendi içindeki aynı duruş (aynı başlangıç + bitiş) bir kez sayılır: son satır geçerli.
       next.events = mergeEvents([], next.events)
-      const stored = toStoredDay(next)
-      await upsert(ctx, hit, 'oeeDowntimeDays', stored)
-      const lossHit = await ctx.db
-        .query('oeeLossDays')
-        .withIndex('by_key', (q: Ctx) => q.eq('date', incoming.date).eq('workCenter', incoming.workCenter))
-        .first()
-      await upsert(ctx, lossHit, 'oeeLossDays', toStoredLoss(lossDayOf(next)))
-      await upsertStops(ctx, next)
+      // Aynı duruş komşu günün kaydında da varsa (eski dosya başka güne yazmış) yeni yüklenen geçerli.
+      const keys = new Set(next.events.map(eventKey).filter((k): k is string => k !== null))
+      for (const date of [addDaysIso(incoming.date, -1), addDaysIso(incoming.date, 1)]) {
+        const [doc] = await sameKey(ctx, 'oeeDowntimeDays', date, incoming.workCenter)
+        if (!doc) continue
+        const old = plainDay(doc)
+        const kept = dropKeys(old.events, keys)
+        if (kept.length < old.events.length) await writeDowntimeDay(ctx, { ...old, events: kept })
+      }
+      await writeDowntimeDay(ctx, next)
     }
     return days.length
   },
 })
-
-/** Gün × iş merkezinin duruş süresi histogramı (MTTR / MTBF; src/lib/oeeReliability.ts). */
-async function upsertStops(ctx: Ctx, day: ReturnType<typeof fromStoredDay>) {
-  const hit = await ctx.db
-    .query('oeeStopDays')
-    .withIndex('by_key', (q: Ctx) => q.eq('date', day.date).eq('workCenter', day.workCenter))
-    .first()
-  await upsert(ctx, hit, 'oeeStopDays', stopDayOf(day))
-}
 
 /**
  * İlk sürümle yüklenen veride gün toplamları (oeeDays) ve yeni biçim kayıp
@@ -269,18 +302,7 @@ export const rebuildStored = guardedMutation({
       const page = await ctx.db.query('oeeShifts').withIndex('by_date').paginate({ cursor, numItems: 400 })
       const keys = new Map<string, { date: string; workCenter: string }>()
       for (const r of page.page) keys.set(`${r.date}|${r.workCenter}`, { date: r.date, workCenter: r.workCenter })
-      for (const { date, workCenter } of keys.values()) {
-        const all = await ctx.db
-          .query('oeeShifts')
-          .withIndex('by_key', (q: Ctx) => q.eq('date', date).eq('workCenter', workCenter))
-          .collect()
-        const [day] = daysFromShifts(all)
-        const hit = await ctx.db
-          .query('oeeDays')
-          .withIndex('by_key', (q: Ctx) => q.eq('date', date).eq('workCenter', workCenter))
-          .first()
-        if (day) await upsert(ctx, hit, 'oeeDays', dayDoc(day))
-      }
+      for (const { date, workCenter } of keys.values()) await refreshDay(ctx, date, workCenter)
       return { cursor: page.continueCursor, isDone: page.isDone, count: keys.size }
     }
     // Duruş kayıtları büyük: küçük sayfa.
@@ -307,6 +329,72 @@ export const rebuildStored = guardedMutation({
     return { cursor: page.continueCursor, isDone: page.isDone, count: page.page.length }
   },
 })
+
+/**
+ * Check duplicates (OEE Data, planlamacı 2026-10-26): saklı veride tekrar
+ * satırları sayfa sayfa tarar; `apply` ile siler ve etkilenen gün özetlerini
+ * (duruşta kayıp özeti + süre histogramı, vardiyada gün toplamı) yeniden
+ * hesaplar. Kural src/lib/oeeDedup.ts. Yalnızca seçili fabrikanın verisi.
+ * İstemci `isDone` gelene kadar imleçle çağırır; önce `apply: false` ile tarar.
+ */
+const findingV = v.object({ date: v.string(), workCenter: v.string(), shiftGroup: v.optional(v.string()), rows: v.number(), minutes: v.number() })
+
+export const duplicates = guardedMutation({
+  areas: ['oee.data'],
+  modules: OEE,
+  args: { kind: v.union(v.literal('downtimes'), v.literal('shifts')), cursor: v.union(v.string(), v.null()), apply: v.boolean() },
+  returns: v.object({ cursor: v.string(), isDone: v.boolean(), findings: v.array(findingV), records: v.number() }),
+  affectsPlan: false,
+  handler: async (ctx, { kind, cursor, apply }) => (kind === 'shifts' ? shiftDuplicates(ctx, cursor, apply) : downtimeDuplicates(ctx, cursor, apply)),
+})
+
+async function downtimeDuplicates(ctx: Ctx, cursor: string | null, apply: boolean) {
+  // Duruş kayıtları büyük ve her biri önceki günüyle okunur: küçük sayfa.
+  const page = await ctx.db.query('oeeDowntimeDays').withIndex('by_date').paginate({ cursor, numItems: 20 })
+  const findings: Ctx[] = []
+  let records = 0
+  for (const x of page.page) {
+    const cur = await sameKey(ctx, 'oeeDowntimeDays', x.date, x.workCenter)
+    // Aynı gün × makinenin fazla kaydı ilk kayıtla birlikte ele alınır.
+    if (!cur.length || cur[0]._id !== x._id) continue
+    const prev = await sameKey(ctx, 'oeeDowntimeDays', addDaysIso(x.date, -1), x.workCenter)
+    const all = [...prev, ...cur]
+    const plan = planDowntimeDedup(
+      all.map((d) => ({ id: d._id, date: d.date, workCenter: d.workCenter, events: fromStoredDay(d).events })),
+      (date) => date === x.date,
+    )
+    findings.push(...plan.findings)
+    const extraSummaries =
+      Math.max(0, (await sameKey(ctx, 'oeeLossDays', x.date, x.workCenter)).length - 1) +
+      Math.max(0, (await sameKey(ctx, 'oeeStopDays', x.date, x.workCenter)).length - 1)
+    records += extraSummaries
+    if (!apply) continue
+    for (const id of plan.remove) await ctx.db.delete(id)
+    const byId = new Map(all.map((d) => [d._id, d]))
+    for (const r of plan.rewrite) await writeDowntimeDay(ctx, { ...plainDay(byId.get(r.id)), events: r.events })
+    if ((plan.remove.length || extraSummaries) && !plan.rewrite.some((r) => r.id === x._id)) await writeDowntimeDay(ctx, plainDay(x))
+  }
+  return { cursor: page.continueCursor, isDone: page.isDone, findings, records }
+}
+
+async function shiftDuplicates(ctx: Ctx, cursor: string | null, apply: boolean) {
+  const page = await ctx.db.query('oeeShifts').withIndex('by_date').paginate({ cursor, numItems: 150 })
+  const findings: Ctx[] = []
+  let records = 0
+  for (const x of page.page) {
+    // Gün × makine bir kez: o anahtarın indeksteki ilk satırıyla.
+    const all = await sameKey(ctx, 'oeeShifts', x.date, x.workCenter)
+    if (!all.length || all[0]._id !== x._id) continue
+    const plan = planShiftDedup(all.map((r) => ({ id: r._id, date: r.date, workCenter: r.workCenter, shiftGroup: r.shiftGroup, loadingMin: r.loadingMin })))
+    findings.push(...plan.findings)
+    const extraDays = Math.max(0, (await sameKey(ctx, 'oeeDays', x.date, x.workCenter)).length - 1)
+    records += extraDays
+    if (!apply || (!plan.remove.length && !extraDays)) continue
+    for (const id of plan.remove) await ctx.db.delete(id)
+    await refreshDay(ctx, x.date, x.workCenter)
+  }
+  return { cursor: page.continueCursor, isDone: page.isDone, findings, records }
+}
 
 export const finishImport = guardedMutation({
   areas: ['oee.data'],

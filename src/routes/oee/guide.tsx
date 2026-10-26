@@ -141,9 +141,13 @@ function OeeGuidePage() {
               <li>order: date + machine + shift + order (its die and material are updated),</li>
               <li>
                 downtime: all downtimes of a day and machine that is in the file are replaced by the file (a downtime moved or split
-                in the system is not counted twice).
+                in the system is not counted twice). One downtime = same machine + same start (StartDate + StartTime) + same end
+                (EndDate + EndTime): it is kept once, whatever its order number, and the newest upload replaces the older row — also
+                when an older file put it on the day before or after.
               </li>
             </ul>
+            If two stored rows ever share the same key (a shift of the same day, shift and machine; a downtime with the same start and
+            end), the newest upload is kept and the other is removed; the day totals and loss summaries are recalculated.
           </li>
           <li>
             A correction in the system (a reason code changed, a shift completed later) reaches the program the next time that day is
@@ -158,6 +162,11 @@ function OeeGuidePage() {
           <li>
             <Link to="/oee/data">Data</Link> shows the uploaded sheets in the order of the file and the days, weeks and months
             calculated from them.
+          </li>
+          <li>
+            <b>Check duplicates</b> on <Link to="/oee/data">Data</Link> (users who may upload) scans all stored downtime and shift rows,
+            shows how many duplicate rows were found (day × machine, minutes) and removes them only after you confirm; the affected
+            day summaries are recalculated.
           </li>
           <li>If a page says the settings are not complete, open Settings — usually a new code appeared in the data.</li>
         </ul>

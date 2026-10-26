@@ -1,6 +1,6 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-26 (tanımsız duruş = Unassigned, sütun sırası) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-26 (OEE tekrar satır kuralı) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
@@ -21,6 +21,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 ## OEE analizi
 
+- **Aynı duruş tek satır: makine + başlangıç + bitiş; her anahtarda tek kayıt** (2026-10-26, planlamacı; önleme amaçlı) — 23.10 PRS-110 v2 KLP farkı (Excel ≈115, site ≈344 dk) Excel hatası çıktı, site doğruydu; yine de tekrarlı yüklemenin bir satırı iki kez saydırma riski kalmasın diye kural sıkılaştırıldı. Duruş kimliği sipariş değil başlangıç + bitiş anı (saatsiz satır ayıklanmaz); yeni yüklenen geçerli, komşu günde (± 1) kalan eski kopya silinir. Vardiya (gün + vardiya + makine) zaten üzerine yazılıyordu; artık anahtarda birden çok kayıt varsa fazlası da silinir (gün toplamı, kayıp özeti, süre histogramı aynı). Eskiden kalanlar için OEE Data → *Check duplicates*: önce tarar ve gösterir, onayla siler (`src/lib/oeeDedup.ts`, `convex/oee.ts` → `duplicates`, sayfa sayfa). *Alt.: okurken ayıklamak* (her sayfada tekrar hesap, saklı özetler yine çift kalırdı); *sipariş anahtarda kalsın* (aynı duruş birden çok siparişle gelirse iki kez sayılır); *yeni `loadedAt` alanı* (şema değişikliği; aynı dosyanın tekrar yüklenmesi her satırı yeniden yazdırırdı).
 - **Tanımsız duruş (RC1 ya da RC2 "#") = Unassigned; sütun sırası tek kaynak** (2026-10-26, planlamacı) — RC1 "#" her zaman kayıp (ayarda işaretli olmasa da), planlı değil; RC2 "#" kendi RC1'i kayıpsa kayıp; ikisi de her sayfada Unassigned. Kural tek yerde (`classifyLoss`, `src/lib/oee.ts`); kısa duruş bölmesi aynen (`Unassigned<` → Short stops); ayardaki "#" grubu kullanılmaz (silinmez). 2026-10-07 köprü kararı ("#" hesap dışı) kalktı. Sütunlar: ayardaki grup sırası (Settings ↑ ↓), Short stops, Speed, en sonda Unassigned. Özetler ham kodla kalır, veri taşıması yok. *Alt.: yüklemede RC2'yi "Unassigned"a yazmak* (ham veri bozulur, geçmiş yeniden yüklenmeli); *her tüketicide ayrı kontrol* (dağınık, eskir).
 - **Kayıp > %100 of Loading kod hatası değil** (2026-10-26, doğrulama) — MES Loading vardiya − planlıdan kısa olunca (ör. 21.09 PRS-104 v1: 395 / 480 dk) kayıtlı duruş Loading'i aşar (%103); vardiya eşleşmesi doğru, düzeltme yok. Canlı 23.10 PRS-110 v2 %239 aynı örüntü olmalı; Excel paydası (≈ vardiya − planlı) açık soru.
 - **Asakai weekly: masraf yeri başına blok, Excel'in yan yana düzeni değil** (2026-10-26, #83, planlamacı: "30 iş yerli costcenter'da format bozulmasın") — üstte aylık / 10 hafta / günler, altta iş yeri başına tek satır (günlerin OEE'si + haftanın kayıpları; iki Excel tablosu birleşti). İş yeri sayısı yalnız tabloyu uzatır; PDF çok sayfa, blok bölünmez. *Alt.: Excel'in birebir yan yana düzeni* (2'den çok masraf yeri ya da ~10'dan çok iş yerinde sığmıyor). Asakai detail Excel'deki gibi kaldı (aşağı uzar).

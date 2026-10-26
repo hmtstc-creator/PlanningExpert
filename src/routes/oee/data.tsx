@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { OeeControls, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { PageHeader } from '../../components/PageHeader'
-import { useQuery } from '../../lib/convexTransport'
+import { useMutation, useQuery } from '../../lib/convexTransport'
+import { friendlyError } from '../../lib/mutationErrors'
+import { usePlant } from '../../lib/plantContext'
 import {
   addDaysIso,
   areaNames,
@@ -22,6 +24,7 @@ import {
 } from '../../lib/oee'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { relatedPages } from '../../lib/navigation'
+import { summarizeFindings, type DedupFinding } from '../../lib/oeeDedup'
 
 export const Route = createFileRoute('/oee/data')({
   component: OeeDataPage,
@@ -148,6 +151,7 @@ function OeeDataPage() {
         links={relatedPages('/oee/data')}
       />
       <OeeControls selection={sel} rows={dayRows} config={config} upload />
+      <DuplicateCheck />
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {SHEETS.map((s) => (
           <button
@@ -187,6 +191,132 @@ function OeeDataPage() {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+type DupKind = 'downtimes' | 'shifts'
+type DupResult = { downtimes: DedupFinding[]; shifts: DedupFinding[]; records: number }
+type DupState =
+  | { kind: 'idle' }
+  | { kind: 'busy'; text: string }
+  | { kind: 'found' | 'done'; result: DupResult }
+  | { kind: 'error'; text: string }
+
+const DUP_LABEL: Record<DupKind, string> = { downtimes: 'Downtimes', shifts: 'Shiftly KPI' }
+
+/**
+ * Check duplicates (planlamacı, 2026-10-26): önce tarar ve bulunanı gösterir;
+ * onaylanınca siler ve etkilenen gün özetlerini yeniden hesaplar. Sunucu sayfa
+ * sayfa çalışır (convex/oee.ts → duplicates); kural src/lib/oeeDedup.ts.
+ */
+function DuplicateCheck() {
+  const canEdit = usePlant().canArea('oee.data', 'edit')
+  const run = useMutation(api.oee.duplicates)
+  const [state, setState] = useState<DupState>({ kind: 'idle' })
+  if (!canEdit) return null
+
+  const pass = async (apply: boolean) => {
+    const result: DupResult = { downtimes: [], shifts: [], records: 0 }
+    try {
+      for (const kind of ['downtimes', 'shifts'] as const) {
+        let cursor: string | null = null
+        let pages = 0
+        for (;;) {
+          const r = (await run({ kind, cursor, apply })) as { cursor: string; isDone: boolean; findings: DedupFinding[]; records: number }
+          result[kind].push(...r.findings)
+          result.records += r.records
+          pages++
+          setState({ kind: 'busy', text: `${apply ? 'Removing' : 'Checking'} ${DUP_LABEL[kind]}… page ${pages}` })
+          if (r.isDone) break
+          cursor = r.cursor
+        }
+      }
+      setState({ kind: apply ? 'done' : 'found', result })
+    } catch (e) {
+      setState({ kind: 'error', text: friendlyError(e).message })
+    }
+  }
+
+  const busy = state.kind === 'busy'
+  const result = state.kind === 'found' || state.kind === 'done' ? state.result : null
+  const empty = result && !result.downtimes.length && !result.shifts.length && !result.records
+  const list = result ? (['downtimes', 'shifts'] as const).flatMap((k) => result[k].map((f) => ({ k, f }))) : []
+  const LIST_MAX = 50
+
+  return (
+    <div className="mt-4 rounded-lg border border-border p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void pass(false)}
+          className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+        >
+          Check duplicates
+        </button>
+        <span className="text-xs text-muted-foreground">
+          Same work center + same start + same end = one downtime row; same day + shift + work center = one shift row. Nothing is removed before you confirm.
+        </span>
+      </div>
+      {state.kind === 'busy' && <p className="mt-2 text-xs text-muted-foreground">{state.text}</p>}
+      {state.kind === 'error' && <p className="mt-2 text-xs text-destructive">Could not check duplicates: {state.text}</p>}
+      {result && empty && <p className="mt-2 text-xs">✓ {state.kind === 'done' ? 'Nothing left to remove.' : 'No duplicates found.'}</p>}
+      {result && !empty && (
+        <div className="mt-2 space-y-2 text-xs">
+          <p>
+            {state.kind === 'done' ? 'Removed' : 'Found'}:{' '}
+            {(['downtimes', 'shifts'] as const)
+              .map((k) => {
+                const t = summarizeFindings(result[k])
+                return `${DUP_LABEL[k]} ${t.rows.toLocaleString('en-GB')} duplicate rows (${t.minutes.toLocaleString('en-GB')} min) on ${t.places} day × work center`
+              })
+              .join(' · ')}
+            {result.records > 0 && ` · ${result.records} extra summary records`}
+            {state.kind === 'done' && ' — the affected day summaries were recalculated.'}
+          </p>
+          {list.length > 0 && (
+            <div className="max-h-60 overflow-auto rounded-md border border-border">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-muted text-muted-foreground">
+                  <tr>
+                    {['Sheet', 'Date', 'Work Center', 'Shift', 'Rows', 'Minutes'].map((h) => (
+                      <th key={h} className="px-2 py-1 text-left font-medium">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.slice(0, LIST_MAX).map(({ k, f }, i) => (
+                    <tr key={i} className="border-t border-border">
+                      <td className="px-2 py-1">{DUP_LABEL[k]}</td>
+                      <td className="px-2 py-1">{f.date}</td>
+                      <td className="px-2 py-1">{f.workCenter}</td>
+                      <td className="px-2 py-1">{f.shiftGroup ?? ''}</td>
+                      <td className="px-2 py-1 text-right tabular-nums">{f.rows}</td>
+                      <td className="px-2 py-1 text-right tabular-nums">{f2(f.minutes).toLocaleString('en-GB')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {list.length > LIST_MAX && <p className="px-2 py-1 text-muted-foreground">… {list.length - LIST_MAX} more</p>}
+            </div>
+          )}
+          {state.kind === 'found' && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void pass(true)}
+                className="rounded-md bg-foreground px-3 py-1.5 font-medium text-background"
+              >
+                Remove duplicates
+              </button>
+              <button type="button" onClick={() => setState({ kind: 'idle' })} className="rounded-md border border-border px-3 py-1.5 font-medium hover:bg-muted">
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
