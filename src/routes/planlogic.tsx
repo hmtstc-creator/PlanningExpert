@@ -823,9 +823,11 @@ function PlanLogicPage() {
             weekly / monthly, Daily Report, Board, KPI).
           </li>
           <li>
-            The loss pages split the same reason code by the length of each stop: Loss Bridge (e.g. “Machine” for the long stops,
-            “Machine &lt; {MES_SHORT_STOP_MIN} min” under performance), Losses Trend (“Short stops” column). Speed loss = Production −
-            Operation − short stops, so the totals and the OEE never change.
+            The loss pages split the same reason code by the length of each stop. The Loss Bridge shows only the long stops (e.g.
+            “Machine”); the short ones are <b>not a bridge step</b> — they stay inside Speed loss = Production − Operation (the step
+            note gives their minutes) and are analysed in the duration buckets of MTTR &amp; MTBF. They never touch the availability
+            step: A, the availability loss and “Not explained” are the same with or without them. Losses Trend keeps a “Short
+            stops” column (Speed = Production − Operation − short stops). The totals and the OEE never change.
           </li>
           <li>
             The limit is set in OEE Settings → Numbers (default {MES_SHORT_STOP_MIN} min, whole minutes). Another value changes only the
