@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-26 (#83 Asakai sayfaları) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-26 (#87 sonrası açıklar) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -16,7 +16,11 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
-- **Asakai sayfaları (#83) — canlıda kontrol:** OEE → *Asakai weekly* / *Asakai detail* gerçek veriyle açılıp **Save PDF** (A4 yatay) denenmeli; PDF yalnız örnek veriyle HTML olarak kontrol edildi, tarayıcıda üretilmedi. Planlamacıya sorulacak: detail'deki kırmızı hücre kuralı (şimdi ≥ %10, `src/lib/oeeAsakai.ts` → `ASAKAI_HIGHLIGHT`). Excel farkları: hız kaybı eksiye düşmez, gelecek aylar boş, gün etiketi "21.09". Dosyalar: `src/routes/oee/asakai-*.tsx`, `src/components/AsakaiSheet.tsx`.
+- **Asakai / OEE (#83–#87) — canlıda kontrol ve planlamacıya sorular:**
+  1. Planlamacı OEE Settings → Loss groups'ta ↑ ↓ ile sırayı bir kez vermeli: STP, KLP, ARZ, KSD, OFC, KON, YNT (sonra kodda sabit: Short stops, Speed, Unassigned).
+  2. **Payda sorusu:** canlı 23.10 PRS-110 v2'de KLP %239 (Loading 144 dk, ≈344 dk duruş); Excel %80 gösteriyor. Kod hatası yok (#87, fixture 21.09 PRS-104 v1 ile testli): MES Loading vardiya − planlı'dan kısa olunca duruş Loading'i aşıyor. Excel'in %80'i ≈430 dk'ya (vardiya − planlı) bölmeye uyuyor → Excel "die %" formülünün paydası sorulacak; farklıysa Asakai'nin paydası değişir (`src/lib/oeeAsakai.ts` → `lossRow`).
+  3. Onay bekleyen: Unassigned köprüde kalem ama öncelik değil; Agent kalıp/makine notları ve MTTR/MTBF Unassigned'ı almıyor. Detail kırmızı hücre eşiği ≥ %10 (`ASAKAI_HIGHLIGHT`).
+  4. Save PDF (A4) gerçek veriyle tarayıcıda denenmedi.
 - **K7 — dört geliştirme işi (karar 2026-10-24, #59):** Board / KPI kırılımına bölüm seviyesi, bölüm sorumlusu, holding hedefi (girilmezse şirket planlarının toplamı), Board A3 / PDF çıktısı. Her biri ayrı oturum; önce `docs/board.md` ve `todolist.md` §2 *Organizasyon ve Board*. Bölüm seviyesi (#61), bölüm sorumlusu (#62) ve holding hedefi (#64; yalnız oranlar, grup kapsamında) yapıldı. Board A3 / PDF da yapıldı (2026-10-25): **K7'nin dört işi tamam.** Kullanıcıda denenecek: Responsible seçimi, Group targets ve Board PDF'inin A3'e sığması (ısı haritası geniş ekranda alınırsa küçülür).
 - **K5 (#59) — canlıda ilk kod değişikliğinde bak:** *Change code* sonrası OEE sayfalarında eski kod kaybolmalı, geçmiş yeni kodda görünmeli; taşıma arka planda (`convex/workCenterHistory.ts` → `move`, tablo başına sayfa). Eski kodla yüklenen dosya yeni koda yazılır (`workCenterAliases`).
 - **Ders (#72):** yeni bulut oturumunda önce `npm ci`; `npx vite build` tek başına `convex/_generated` olmadığı için kırılır — `npm run verify` (typecheck adımı `scripts/stub-convex.mjs` ile üretir) kullan. Yeni yol eklenince `routeTree.gen.ts` derlemede yenilenir, commit'e girer.
