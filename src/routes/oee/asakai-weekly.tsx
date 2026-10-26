@@ -9,8 +9,8 @@ import { PageHeader } from '../../components/PageHeader'
 import { SavePdfButton } from '../../components/SavePdfButton'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import { addDaysIso, areaNames, chartGroups, visibleChartGroups, type DayRow, type MonthlyRow, type WeeklyRow } from '../../lib/oee'
-import { ASAKAI_DAYS, ASAKAI_WEEKS, asakaiWeekly, type WeeklyGroup } from '../../lib/oeeAsakai'
+import { addDaysIso, areaNames, visibleChartGroups, type DayRow, type MonthlyRow, type WeeklyRow } from '../../lib/oee'
+import { ASAKAI_DAYS, ASAKAI_WEEKS, asakaiColumns, asakaiWeekly, dropEmptyUnassigned, type WeeklyGroup } from '../../lib/oeeAsakai'
 import { fromStoredStops, type StoredStopDay } from '../../lib/oeeReliability'
 import { splitShortStops } from '../../lib/oeeShortStops'
 import { fromStoredLosses, type StoredLossDay } from '../../lib/oeeStore'
@@ -43,13 +43,13 @@ function AsakaiWeeklyPage() {
   const monthly = periods?.monthly ?? []
 
   const scope = effectiveScope(sel.scope, areaNames(days, config))
-  const { groups, columns } = useMemo(() => {
+  const { groups, columns, chartColumns } = useMemo(() => {
     const lossDays = splitShortStops(fromStoredLosses(lossRaw), fromStoredStops(stopRaw), config).lossDays
-    const columns = visibleChartGroups(chartGroups(config, lossDays), config)
-    return {
-      columns,
-      groups: asakaiWeekly({ days, weekly, monthly, lossDays }, scope, config, sel.date, sel.monday, columns),
-    }
+    // Tablo "#" gibi grafikte gizli sütunları da gösterir; yığılı grafik göstermez.
+    const all = asakaiColumns(config, lossDays)
+    const groups = asakaiWeekly({ days, weekly, monthly, lossDays }, scope, config, sel.date, sel.monday, all)
+    const columns = dropEmptyUnassigned(all, groups.flatMap((g) => [...g.losses, g.lossTotal]))
+    return { groups, columns, chartColumns: visibleChartGroups(columns, config) }
   }, [days, weekly, monthly, lossRaw, stopRaw, scope, config, sel.date, sel.monday])
 
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -133,7 +133,7 @@ function AsakaiWeeklyPage() {
                   <AsakaiBars title={`WEEKLY - LAST ${ASAKAI_WEEKS} WEEK`} points={g.weekly} />
                   <AsakaiStacked
                     title={`W${sel.week.week} BY DAY`}
-                    columns={columns}
+                    columns={chartColumns}
                     rows={g.stacked.map((r, i) => ({ ...r, tick: ticks[i] }))}
                   />
                 </div>

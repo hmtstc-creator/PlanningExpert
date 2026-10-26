@@ -7,7 +7,9 @@
  */
 import {
   PLANT_AREA,
+  UNASSIGNED,
   addDaysIso,
+  chartGroups,
   chartShare,
   costCenterName,
   inScope,
@@ -37,6 +39,26 @@ export const ASAKAI_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export const ASAKAI_WEEKS = 10
 /** Ayrıntı sayfasında hücre bu paydan büyükse kırmızı (% of Loading). */
 export const ASAKAI_HIGHLIGHT = 0.1
+/** Asakai'de sütunu olmayan kayıp grupları (planlamacı, 2026-10-26: UTS planlı mola, çay / yemek). */
+export const ASAKAI_DROP = ['UTS']
+
+/**
+ * Asakai tablolarının kayıp sütunları: grafik sütunları, "grafikte gizli"
+ * olanlar dahil — "#" (tanımsız) grafikte yok, tabloda var (2026-09-28).
+ * Bütün grupları ASAKAI_DROP'ta olan sütun yok. `lossDays` kısa duruşları
+ * ayrılmış özet olmalı (yoksa "Short stops" sütunu çıkmaz).
+ */
+export function asakaiColumns(c: OeeConfig, lossDays: LossDay[]): string[] {
+  return chartGroups(c, lossDays).filter((col) => {
+    const groups = c.lossGroups.filter((g) => g.chart === col)
+    return !groups.length || groups.some((g) => !ASAKAI_DROP.includes(g.code))
+  })
+}
+
+/** Unassigned (ayarda tanımsız kod) yalnız sayfada süresi varsa sütun olur. */
+export function dropEmptyUnassigned(columns: string[], rows: LossRow[]): string[] {
+  return columns.filter((col) => col !== UNASSIGNED || rows.some((r) => (r.shares[col] ?? 0) > 0))
+}
 
 /** Bir satırın kayıp payları: grafik sütunu → Loading'e oranı (0–1). */
 export interface LossRow {

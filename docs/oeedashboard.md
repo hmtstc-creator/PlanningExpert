@@ -737,5 +737,9 @@ Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **
   Hücre ≥ %10 ise kırmızı (`ASAKAI_HIGHLIGHT`).
 - Hesap yeni değil (`src/lib/oeeAsakai.ts`): OEE toplam süreden, kayıplar Losses Trend'in `lossBreakdown`'u, vardiya
   kesiti Loss Bridge'in `shiftSlice`'ı, kısa duruşlar ayrılır. Kayıp sütunları OEE Settings'teki grafik sütunları.
+- **Sütunlar** (2026-10-26, planlamacı): tablolar "#" (tanımsız, başlık UNDEFINED) gibi *grafikte gizli* grupları da
+  gösterir — 2026-09-28 kararı "grafikte yok, tabloda var"; yığılı grafik göstermez. **UTS** (planlı mola) Asakai'de
+  sütun değil (`ASAKAI_DROP`; UTS başka gruplarla aynı sütundaysa o sütun kalır). *Unassigned* = ayarda tanımsız kod;
+  yalnız sayfada süresi varsa sütun olur. Detail'de sütunlar kısa duruşları ayrılmış özetten (Short stops görünür).
 - Excel'den farklar: hız kaybı eksiye düşmez (Production − Operation − kısa duruş, en az 0); gün etiketleri "21.09"
   (Excel'de "00/mm" hatası); gelecek aylar 0% yerine boş.
