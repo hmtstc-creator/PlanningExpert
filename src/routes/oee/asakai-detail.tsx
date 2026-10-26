@@ -41,7 +41,7 @@ function AsakaiDetailPage() {
   const scope = effectiveScope(sel.scope, areaNames(shifts, config))
   const { groups, columns } = useMemo(() => {
     const events = (evRaw ?? []).map(fromStoredDay)
-    // Sütunlar kısa duruşları ayrılmış özetten ("Short stops"); "#" gibi grafikte gizli olanlar dahil.
+    // Kısa duruşlar ayrılır (kendi kodunda sayılmaz, hız kaybının içinde); "#" gibi grafikte gizli sütunlar dahil.
     const split = splitShortStops(events.map(lossDayOf), fromStoredStops(events.map(stopDayOf)), config).lossDays
     const all = asakaiColumns(config, split)
     const groups = asakaiDetail({ shifts, events, orders }, scope, config, all)

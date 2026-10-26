@@ -740,6 +740,8 @@ Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **
 - **Sütunlar** (2026-10-26, planlamacı): tablolar "#" (tanımsız, başlık UNDEFINED) gibi *grafikte gizli* grupları da
   gösterir — 2026-09-28 kararı "grafikte yok, tabloda var"; yığılı grafik göstermez. **UTS** (planlı mola) Asakai'de
   sütun değil (`ASAKAI_DROP`; UTS başka gruplarla aynı sütundaysa o sütun kalır). *Unassigned* = ayarda tanımsız kod;
-  yalnız sayfada süresi varsa sütun olur. Detail'de sütunlar kısa duruşları ayrılmış özetten (Short stops görünür).
+  yalnız sayfada süresi varsa sütun olur. **Kısa duruşlar** (< 2 dk, MES'in Production − Operation farkının içinde)
+  sütun değil, **SPEED_LOSS**'un içinde (planlamacı, 2026-10-26; Loss Bridge'deki gibi, #81) — kendi kodunda (KLP, STP …)
+  sayılmaz.
 - Excel'den farklar: hız kaybı eksiye düşmez (Production − Operation − kısa duruş, en az 0); gün etiketleri "21.09"
   (Excel'de "00/mm" hatası); gelecek aylar 0% yerine boş.

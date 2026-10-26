@@ -112,3 +112,15 @@ describe('Asakai columns', () => {
     expect(dropEmptyUnassigned(['Setup', 'Unassigned'], [row(0.02)])).toEqual(['Setup', 'Unassigned'])
   })
 })
+
+describe('Asakai short stops', () => {
+  it('kısa duruş sütun değil; süresi SPEED_LOSS içinde', () => {
+    const lossDays = [{ date: day, costCenter: '51010173', workCenter: 'W', codes: { 'UNSCD_DOWN|STP<': [10, 6] as [number, number], 'UNSCD_DOWN|STP': [30, 1] as [number, number] }, reasons: {} }]
+    expect(asakaiColumns(plant, lossDays)).not.toContain('Short stops')
+    const d = { ...days[0], date: day, costCenter: '51010173', workCenter: 'W', loadingMin: 400, productionMin: 300, operatingMin: 270 }
+    const [g] = asakaiWeekly({ days: [d], weekly: [], monthly: [], lossDays }, scope, plant, day, day, asakaiColumns(plant, lossDays))
+    // Production − Operation = 30 dk = 20 hız + 10 kısa → 30 / 400.
+    expect(g.lossTotal.shares.Speed).toBeCloseTo(30 / 400, 9)
+    expect(g.lossTotal.shares.Setup).toBeCloseTo(30 / 400, 9)
+  })
+})
