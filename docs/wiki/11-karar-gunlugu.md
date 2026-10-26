@@ -1,6 +1,6 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-26 (#81 köprüde kısa duruşlar) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-26 (#83 Asakai düzeni) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
@@ -21,6 +21,8 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 ## OEE analizi
 
+- **Asakai weekly: masraf yeri başına blok, Excel'in yan yana düzeni değil** (2026-10-26, #83, planlamacı: "30 iş yerli costcenter'da format bozulmasın") — üstte aylık / 10 hafta / günler, altta iş yeri başına tek satır (günlerin OEE'si + haftanın kayıpları; iki Excel tablosu birleşti). İş yeri sayısı yalnız tabloyu uzatır; PDF çok sayfa, blok bölünmez. *Alt.: Excel'in birebir yan yana düzeni* (2'den çok masraf yeri ya da ~10'dan çok iş yerinde sığmıyor). Asakai detail Excel'deki gibi kaldı (aşağı uzar).
+- **Asakai detail kırmızı hücre = ≥ %10 of Loading** (2026-10-26, #83) — Excel'deki kural çıkarılamadı; varsayım, planlamacı onaylamadı (`ASAKAI_HIGHLIGHT`, 09'da açık).
 - **Kod değişince OEE geçmişi yeni koda taşınır** (2026-10-24, Ahmet, K5) — aynı work center'ın geçmişi iki koda bölünmesin; taşıma arka planda sayfa sayfa (mutasyon sınırı), çakışmada yeni kodlu satır kalır (daha yenidir, aynı gün iki kez sayılmaz). SAP bir süre eski kodu getirir: `workCenterAliases` yüklemede çevirir, zincir kısaltılır (A → B → C ise A → C). *Alt.: geçmiş eski kodla kalsın* (önceki kural; trend kesiliyordu); *istemci imleçle taşısın* (`rebuildStored` gibi; Master Data yetkilisinde OEE yetkisi olmayabilir, sayfa kapanınca yarım kalırdı).
 - **Kısa duruş (< 2 dk) performans, uzun availability; A / P MES'te kalır** (2026-10-23, Ahmet, #46) — MES Production zaten yalnız ≥ 2 dk duruşları düşüyor (fixture'da 7/7 vardiya, 0,1 dk); kayıp ekranları aynı kodu olay süresine göre böler (`oeeShortStops.ts`). Eşik ayarda (`shortStopMin`, 2); 2'den farklıysa yalnız bölünme değişir.
   MTTR / MTBF ≥ eşik olaylarla (#47): arıza ve setup kullanılabilirlik kaybıdır; mikro duruşlar (ARZ'nin %96'sı) MTTR'yi küçültüp MTBF'i kısaltırdı. Kısa duruşlar ilk süre kovasında görünür.
