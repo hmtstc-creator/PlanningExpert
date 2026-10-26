@@ -1,6 +1,6 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-24 (K5, K7, K8, #62) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-26 (#81 köprüde kısa duruşlar) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
@@ -32,6 +32,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 - **Kararı ücretsiz yapay zekâ verir, kurallar adayı seçer ve yedektir** (2026-10-23, kullanıcı) — OpenAI uyumlu API (`AI_API_KEY`); anahtar yoksa / cevap bozuksa kurallar.
   Yapay zekâ yalnız kuralların seçtiği adaylar arasında karar verir, kanıt her zaman koddan sayıyla yazılır.
 - **Gün bir kez, açık konu yeniden yazılmaz** — `oeeTopicRuns` işlenen günü tutar; açık konu ertesi gün yalnızca *last seen* günceller.
+- **Loss Bridge'de < 2 dk kısa duruşlar kalem değil, Speed loss'un içinde** (#81, 2026-10-26) — *planlamacı: ayrı yerde (MTTR & MTBF süre kovaları) analiz edilecek; MES zaten Production'dan düşmediği için A ve availability kaybı değişmez* — *alternatif: ayrı "< 2 min" adımları* (köprüde gürültü, kullanıcı istemedi).
 
 ## Yayın ve işletim
 
