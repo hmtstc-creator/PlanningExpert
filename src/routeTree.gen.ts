@@ -50,6 +50,8 @@ import { Route as MachineFollowupMaintenanceRouteImport } from './routes/machine
 import { Route as MachineFollowupReportsRouteImport } from './routes/machine-followup/reports'
 import { Route as OeeIndexRouteImport } from './routes/oee/index'
 import { Route as OeeAgentRouteImport } from './routes/oee/agent'
+import { Route as OeeAsakaiDetailRouteImport } from './routes/oee/asakai-detail'
+import { Route as OeeAsakaiWeeklyRouteImport } from './routes/oee/asakai-weekly'
 import { Route as OeeBridgeRouteImport } from './routes/oee/bridge'
 import { Route as OeeDataRouteImport } from './routes/oee/data'
 import { Route as OeeDiesRouteImport } from './routes/oee/dies'
@@ -273,6 +275,16 @@ const OeeAgentRoute = OeeAgentRouteImport.update({
   path: '/oee/agent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OeeAsakaiDetailRoute = OeeAsakaiDetailRouteImport.update({
+  id: '/oee/asakai-detail',
+  path: '/oee/asakai-detail',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OeeAsakaiWeeklyRoute = OeeAsakaiWeeklyRouteImport.update({
+  id: '/oee/asakai-weekly',
+  path: '/oee/asakai-weekly',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OeeBridgeRoute = OeeBridgeRouteImport.update({
   id: '/oee/bridge',
   path: '/oee/bridge',
@@ -387,6 +399,8 @@ export interface FileRoutesByFullPath {
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
   '/oee/agent': typeof OeeAgentRoute
+  '/oee/asakai-detail': typeof OeeAsakaiDetailRoute
+  '/oee/asakai-weekly': typeof OeeAsakaiWeeklyRoute
   '/oee/bridge': typeof OeeBridgeRoute
   '/oee/data': typeof OeeDataRoute
   '/oee/dies': typeof OeeDiesRoute
@@ -445,6 +459,8 @@ export interface FileRoutesByTo {
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
   '/oee/agent': typeof OeeAgentRoute
+  '/oee/asakai-detail': typeof OeeAsakaiDetailRoute
+  '/oee/asakai-weekly': typeof OeeAsakaiWeeklyRoute
   '/oee/bridge': typeof OeeBridgeRoute
   '/oee/data': typeof OeeDataRoute
   '/oee/dies': typeof OeeDiesRoute
@@ -504,6 +520,8 @@ export interface FileRoutesById {
   '/machine-followup/maintenance': typeof MachineFollowupMaintenanceRoute
   '/machine-followup/reports': typeof MachineFollowupReportsRoute
   '/oee/agent': typeof OeeAgentRoute
+  '/oee/asakai-detail': typeof OeeAsakaiDetailRoute
+  '/oee/asakai-weekly': typeof OeeAsakaiWeeklyRoute
   '/oee/bridge': typeof OeeBridgeRoute
   '/oee/data': typeof OeeDataRoute
   '/oee/dies': typeof OeeDiesRoute
@@ -564,6 +582,8 @@ export interface FileRouteTypes {
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
     | '/oee/agent'
+    | '/oee/asakai-detail'
+    | '/oee/asakai-weekly'
     | '/oee/bridge'
     | '/oee/data'
     | '/oee/dies'
@@ -622,6 +642,8 @@ export interface FileRouteTypes {
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
     | '/oee/agent'
+    | '/oee/asakai-detail'
+    | '/oee/asakai-weekly'
     | '/oee/bridge'
     | '/oee/data'
     | '/oee/dies'
@@ -680,6 +702,8 @@ export interface FileRouteTypes {
     | '/machine-followup/maintenance'
     | '/machine-followup/reports'
     | '/oee/agent'
+    | '/oee/asakai-detail'
+    | '/oee/asakai-weekly'
     | '/oee/bridge'
     | '/oee/data'
     | '/oee/dies'
@@ -739,6 +763,8 @@ export interface RootRouteChildren {
   MachineFollowupMaintenanceRoute: typeof MachineFollowupMaintenanceRoute
   MachineFollowupReportsRoute: typeof MachineFollowupReportsRoute
   OeeAgentRoute: typeof OeeAgentRoute
+  OeeAsakaiDetailRoute: typeof OeeAsakaiDetailRoute
+  OeeAsakaiWeeklyRoute: typeof OeeAsakaiWeeklyRoute
   OeeBridgeRoute: typeof OeeBridgeRoute
   OeeDataRoute: typeof OeeDataRoute
   OeeDiesRoute: typeof OeeDiesRoute
@@ -1049,6 +1075,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OeeAgentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oee/asakai-detail': {
+      id: '/oee/asakai-detail'
+      path: '/oee/asakai-detail'
+      fullPath: '/oee/asakai-detail'
+      preLoaderRoute: typeof OeeAsakaiDetailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/oee/asakai-weekly': {
+      id: '/oee/asakai-weekly'
+      path: '/oee/asakai-weekly'
+      fullPath: '/oee/asakai-weekly'
+      preLoaderRoute: typeof OeeAsakaiWeeklyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/oee/bridge': {
       id: '/oee/bridge'
       path: '/oee/bridge'
@@ -1195,6 +1235,8 @@ const rootRouteChildren: RootRouteChildren = {
   MachineFollowupMaintenanceRoute: MachineFollowupMaintenanceRoute,
   MachineFollowupReportsRoute: MachineFollowupReportsRoute,
   OeeAgentRoute: OeeAgentRoute,
+  OeeAsakaiDetailRoute: OeeAsakaiDetailRoute,
+  OeeAsakaiWeeklyRoute: OeeAsakaiWeeklyRoute,
   OeeBridgeRoute: OeeBridgeRoute,
   OeeDataRoute: OeeDataRoute,
   OeeDiesRoute: OeeDiesRoute,

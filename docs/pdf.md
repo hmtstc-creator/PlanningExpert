@@ -11,6 +11,8 @@ bilgisayarında üretilir (sunucuya yük yok, dışarıya bir şey gitmez).
 | OEE Losses Trend | A4 yatay, çok sayfa | sayfa görüntüsü | `GGAAYY LOSSES TREND` (seçili gün) |
 | OEE Loss Bridge | A3 yatay, tek sayfa | sayfa görüntüsü | `GGAAYY OEE LOSS BRIDGE` (dönemin son günü) |
 | OEE Daily Report | A3 yatay, tek sayfa | sayfa görüntüsü | `GGAAYY OEE DAILY REPORT` (dönemin son günü) |
+| OEE Asakai weekly | A4 yatay, çok sayfa (masraf yeri bloğu bölünmez) | sayfa görüntüsü | `GGAAYY ASAKAI WEEKLY` (seçili gün) |
+| OEE Asakai detail | A4 yatay, çok sayfa (makine bloğu bölünmez) | sayfa görüntüsü | `GGAAYY ASAKAI DETAIL` (seçili gün) |
 | OEE Agent Report | A4 dikey, çok sayfa | **metin** (seçilir, aranır) | `GGAAYY AGENT REPORT` |
 
 ## Kayıt
@@ -35,7 +37,7 @@ bilgisayarında üretilir (sunucuya yük yok, dışarıya bir şey gitmez).
   başlıklar (seçili filtreler) yalnızca PDF'te. Kaydırma kutuları PDF'te açılır.
 - **Tek sayfa (fit):** parça ekrandaki genişliğinde alınır ve sayfaya sığdırılır
   (yatayda ortalı). KPI sayfası zaten A3 ölçüsünde, kenarsız.
-- **Çok sayfa (flow):** parça kâğıt genişliğinde alınır; grafikler sığmazsa
+- **Çok sayfa (flow):** parça kâğıt genişliğinde alınır (sabit genişlikte çizilen Asakai sayfaları `widthPx` ile kendi genişliğinde alınıp kâğıda küçülür); grafikler sığmazsa
   orantılı küçülür. `.print-avoid-break` bölümleri sayfa arasında bölünmez
   (`pageSlices`, testli); sayfadan uzun bölüm mecburen bölünür.
 - Grafikler rengi SVG özniteliğinde CSS değişkeniyle verir (`fill="var(--viz-1)"`);

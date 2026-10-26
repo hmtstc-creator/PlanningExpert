@@ -721,3 +721,21 @@ Uygulama:
 - Planlı duruşlar (Reason Code 1 = mola: `breakReasonCodes`, ör. SCHED_DOWN — mola, iş yok, try-out,
   SCHED_DOWN YNT) bu ayrıma girmez. Kayıp sayılması Reason Code 1'e bağlı: SCHED_DOWN `lossReasonCodes`'ta
   değilse SCHED_DOWN YNT kayıp değildir (öneri: `#` ve UN… kayıp, diğerleri mola).
+
+## Asakai weekly ve Asakai detail (2026-10-26, planlamacı)
+
+Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **Save PDF**.
+
+- **Asakai weekly** (`/oee/asakai-weekly`): başlık "<ALAN> DAILY FOLLOW UP" + seçili gün. Seçili alanın her
+  masraf yeri **bir blok** (ada göre sıralı): üstte yan yana aylık OEE (1–12, seçili aydan sonrası boş), son 10 hafta
+  ve haftanın günlerinin yığılı sütunu (OEE + kayıplar, % of Loading); altta tek tablo — iş yeri başına bir satır:
+  günlerin OEE'si, haftalık OEE ve haftanın kayıpları; son satır masraf yeri toplamı. Excel'deki yan yana düzen
+  (Progressive | Transfer | Detail losses bridge) 30 iş yerli bir masraf yerinde bozulacağı için böyle düzenlendi
+  (planlamacı, 2026-10-26): iş yeri sayısı yalnız tabloyu uzatır. PDF çok sayfa, blok sayfa arasında bölünmez.
+- **Asakai detail** (`/oee/asakai-detail`): seçili gün, makine başına koyu satır = gün, 1-2-3 = vardiyalar: OEE,
+  Loading (dk), kayıp sütunları; sağda günün malzemeleri ve vardiyada "iyi adet - %OEE" (sipariş dosyasından).
+  Hücre ≥ %10 ise kırmızı (`ASAKAI_HIGHLIGHT`).
+- Hesap yeni değil (`src/lib/oeeAsakai.ts`): OEE toplam süreden, kayıplar Losses Trend'in `lossBreakdown`'u, vardiya
+  kesiti Loss Bridge'in `shiftSlice`'ı, kısa duruşlar ayrılır. Kayıp sütunları OEE Settings'teki grafik sütunları.
+- Excel'den farklar: hız kaybı eksiye düşmez (Production − Operation − kısa duruş, en az 0); gün etiketleri "21.09"
+  (Excel'de "00/mm" hatası); gelecek aylar 0% yerine boş.

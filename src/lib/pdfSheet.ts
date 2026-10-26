@@ -16,6 +16,11 @@ export interface SheetLayout {
   pages: 'fit' | 'flow'
   /** Kenar boşluğu (mm); yoksa fit 5, flow 8. */
   marginMm?: number
+  /**
+   * Kopyanın genişliği (px); yoksa fit ekrandaki, flow kâğıt genişliği. Sabit
+   * genişlikte çizilen sayfa (Asakai) flow'da kırpılmasın, sayfaya küçülsün diye.
+   */
+  widthPx?: number
 }
 
 const PAPER_MM = { A3: [297, 420], A4: [210, 297] } as const
@@ -55,7 +60,8 @@ export async function sheetToPdf(sheet: HTMLElement, layout: SheetLayout): Promi
   const margin = layout.marginMm ?? (layout.pages === 'flow' ? 8 : 5)
   const contentMm = { w: page.w - 2 * margin, h: page.h - 2 * margin }
   // fit: ekrandaki genişlik (görünüm aynen kalır, sayfaya sığdırılır); flow: kâğıt genişliği.
-  const widthPx = layout.pages === 'fit' && sheet.offsetWidth > 0 ? sheet.offsetWidth : Math.round(contentMm.w * PX_PER_MM)
+  const widthPx =
+    layout.widthPx ?? (layout.pages === 'fit' && sheet.offsetWidth > 0 ? sheet.offsetWidth : Math.round(contentMm.w * PX_PER_MM))
 
   const root = document.documentElement
   const wasDark = root.classList.contains('dark')
