@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-26 (2–10 dk ARZ kaynağı sorusu) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-26 (#83 Asakai sayfaları) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -16,6 +16,7 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
+- **Asakai sayfaları (#83) — canlıda kontrol:** OEE → *Asakai weekly* / *Asakai detail* gerçek veriyle açılıp **Save PDF** (A4 yatay) denenmeli; PDF yalnız örnek veriyle HTML olarak kontrol edildi, tarayıcıda üretilmedi. Planlamacıya sorulacak: detail'deki kırmızı hücre kuralı (şimdi ≥ %10, `src/lib/oeeAsakai.ts` → `ASAKAI_HIGHLIGHT`). Excel farkları: hız kaybı eksiye düşmez, gelecek aylar boş, gün etiketi "21.09". Dosyalar: `src/routes/oee/asakai-*.tsx`, `src/components/AsakaiSheet.tsx`.
 - **K7 — dört geliştirme işi (karar 2026-10-24, #59):** Board / KPI kırılımına bölüm seviyesi, bölüm sorumlusu, holding hedefi (girilmezse şirket planlarının toplamı), Board A3 / PDF çıktısı. Her biri ayrı oturum; önce `docs/board.md` ve `todolist.md` §2 *Organizasyon ve Board*. Bölüm seviyesi (#61), bölüm sorumlusu (#62) ve holding hedefi (#64; yalnız oranlar, grup kapsamında) yapıldı. Board A3 / PDF da yapıldı (2026-10-25): **K7'nin dört işi tamam.** Kullanıcıda denenecek: Responsible seçimi, Group targets ve Board PDF'inin A3'e sığması (ısı haritası geniş ekranda alınırsa küçülür).
 - **K5 (#59) — canlıda ilk kod değişikliğinde bak:** *Change code* sonrası OEE sayfalarında eski kod kaybolmalı, geçmiş yeni kodda görünmeli; taşıma arka planda (`convex/workCenterHistory.ts` → `move`, tablo başına sayfa). Eski kodla yüklenen dosya yeni koda yazılır (`workCenterAliases`).
 - **Ders (#72):** yeni bulut oturumunda önce `npm ci`; `npx vite build` tek başına `convex/_generated` olmadığı için kırılır — `npm run verify` (typecheck adımı `scripts/stub-convex.mjs` ile üretir) kullan. Yeni yol eklenince `routeTree.gen.ts` derlemede yenilenir, commit'e girer.
