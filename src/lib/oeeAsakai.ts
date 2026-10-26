@@ -7,6 +7,8 @@
  */
 import {
   PLANT_AREA,
+  SHORT_STOPS,
+  SPEED,
   UNASSIGNED,
   addDaysIso,
   chartGroups,
@@ -45,11 +47,13 @@ export const ASAKAI_DROP = ['UTS']
 /**
  * Asakai tablolarının kayıp sütunları: grafik sütunları, "grafikte gizli"
  * olanlar dahil — "#" (tanımsız) grafikte yok, tabloda var (2026-09-28).
- * Bütün grupları ASAKAI_DROP'ta olan sütun yok. `lossDays` kısa duruşları
- * ayrılmış özet olmalı (yoksa "Short stops" sütunu çıkmaz).
+ * Bütün grupları ASAKAI_DROP'ta olan sütun yok. Kısa duruşlar (< eşik) sütun
+ * değil, SPEED_LOSS'un içinde (planlamacı, 2026-10-26; Loss Bridge'deki gibi, #81).
+ * `lossDays` kısa duruşları ayrılmış özet olmalı: kısalar kendi kodunda sayılmaz.
  */
 export function asakaiColumns(c: OeeConfig, lossDays: LossDay[]): string[] {
   return chartGroups(c, lossDays).filter((col) => {
+    if (col === SHORT_STOPS) return false
     const groups = c.lossGroups.filter((g) => g.chart === col)
     return !groups.length || groups.some((g) => !ASAKAI_DROP.includes(g.code))
   })
@@ -91,12 +95,14 @@ export function asakaiCostCenters(rows: { workCenter: string; costCenter: string
   return ccs.sort((a, b) => costCenterName(a, c).localeCompare(costCenterName(b, c)))
 }
 
+/** Satırın payları; hız kaybı = MES'in Production − Operation farkı (kısa duruşlar dahil). */
 function lossRow(label: string, b: ReturnType<typeof lossBreakdown>, columns: string[]): LossRow {
+  const share = (col: string) => (col === SPEED ? chartShare(b, SPEED) + chartShare(b, SHORT_STOPS) : chartShare(b, col))
   return {
     label,
     loadingMin: b.loadingMin,
     oee: b.oee,
-    shares: Object.fromEntries(columns.map((col) => [col, chartShare(b, col)])),
+    shares: Object.fromEntries(columns.map((col) => [col, share(col)])),
   }
 }
 
