@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-26 (#87 sonrası açıklar) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-26 (payda = Loading doğrulandı) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -18,7 +18,7 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 - **Asakai / OEE (#83–#87) — canlıda kontrol ve planlamacıya sorular:**
   1. Planlamacı OEE Settings → Loss groups'ta ↑ ↓ ile sırayı bir kez vermeli: STP, KLP, ARZ, KSD, OFC, KON, YNT (sonra kodda sabit: Short stops, Speed, Unassigned).
-  2. **Payda sorusu:** canlı 23.10 PRS-110 v2'de KLP %239 (Loading 144 dk, ≈344 dk duruş); Excel %80 gösteriyor. Kod hatası yok (#87, fixture 21.09 PRS-104 v1 ile testli): MES Loading vardiya − planlı'dan kısa olunca duruş Loading'i aşıyor. Excel'in %80'i ≈430 dk'ya (vardiya − planlı) bölmeye uyuyor → Excel "die %" formülünün paydası sorulacak; farklıysa Asakai'nin paydası değişir (`src/lib/oeeAsakai.ts` → `lossRow`).
+  2. **KLP %239 — pay farkı (payda aynı):** planlamacı doğruladı (2026-10-26): Excel de duruş ÷ **Loading** yapıyor (100 dk / 400 dk). Yani fark duruş dakikasında: 23.10 PRS-110 v2'de Excel ≈115 dk KLP (%80 × 144), site ≈344 dk (≈3 kat); KON site 65 dk, Excel others ≈30 dk. Şüphe: aynı günün duruş satırları birden çok sayılıyor (tekrarlı yükleme / üst üste ekleme) ya da vardiya eşlemesi. Sıradaki adım: planlamacıdan o makine-gün için Excel *Downtimes* satırlarını (RC1, RC2, Shift, min, Start/End) al; site tarafında `api.oee.downtimeDays` / `lossDays` kaydıyla satır satır karşılaştır (`convex/oee.ts` yükleme birleştirme, `src/lib/oeeBridge.ts` → `shiftSlice` / `eventShift`).
   3. Onay bekleyen: Unassigned köprüde kalem ama öncelik değil; Agent kalıp/makine notları ve MTTR/MTBF Unassigned'ı almıyor. Detail kırmızı hücre eşiği ≥ %10 (`ASAKAI_HIGHLIGHT`).
   4. Save PDF (A4) gerçek veriyle tarayıcıda denenmedi.
 - **K7 — dört geliştirme işi (karar 2026-10-24, #59):** Board / KPI kırılımına bölüm seviyesi, bölüm sorumlusu, holding hedefi (girilmezse şirket planlarının toplamı), Board A3 / PDF çıktısı. Her biri ayrı oturum; önce `docs/board.md` ve `todolist.md` §2 *Organizasyon ve Board*. Bölüm seviyesi (#61), bölüm sorumlusu (#62) ve holding hedefi (#64; yalnız oranlar, grup kapsamında) yapıldı. Board A3 / PDF da yapıldı (2026-10-25): **K7'nin dört işi tamam.** Kullanıcıda denenecek: Responsible seçimi, Group targets ve Board PDF'inin A3'e sığması (ısı haritası geniş ekranda alınırsa küçülür).
