@@ -326,17 +326,23 @@ export const SHORT_STOPS = 'Short stops'
 
 // ---- duruşun sınıfı (tek kaynak) ---------------------------------------------
 //
-// Planlamacı, 2026-10-26: Reason Code 1 = "#" ise duruş operatör tarafından
-// tanımlanmamıştır. Reason Code 2 ne olursa olsun kayıp sayılır (ayarda
-// lossReasonCodes içinde "#" olmasa bile) ve her yerde "Unassigned" grubunda
-// görünür. Özetler ham kodla (`${rc1}|${rc2}`) durur; gruplama okurken yapılır.
+// Planlamacı, 2026-10-26: Reason Code 1 ya da 2 = "#" ise duruş operatör
+// tarafından tanımlanmamıştır. RC1 "#" her zaman kayıptır (ayarda
+// lossReasonCodes içinde "#" olmasa bile); kayıp sayılan tanımsız duruş her
+// yerde "Unassigned" grubunda görünür (ayardaki "#" kayıp grubu kullanılmaz). Özetler ham kodla (`${rc1}|${rc2}`) durur; gruplama okurken yapılır.
 // Kayıp ekranlarının hepsi aşağıdaki fonksiyonları kullanır.
 
-/** Operatörün tanımlamadığı duruşun Reason Code 1'i. */
+/** Operatörün tanımlamadığı duruşun Reason Code 1'i (Reason Code 2'de de aynı işaret). */
 export const UNDEFINED_RC1 = '#'
 
+/** Tanımsız Reason Code 2: "#" ya da boş (kısa duruş işaretiyle de: `#<`). */
+export const isUndefinedRc2 = (rc2: string): boolean => {
+  const b = baseCode(rc2)
+  return b === UNDEFINED_RC1 || b === ''
+}
+
 export interface LossClass {
-  /** Kayıp grubu kodu: Reason Code 2 ya da (RC1 "#") Unassigned; kısa duruşsa sonda `<`. */
+  /** Kayıp grubu kodu: Reason Code 2 ya da (RC1 / RC2 "#") Unassigned; kısa duruşsa sonda `<`. */
   group: string
   /** Grafik sütunu: ayardaki Chart column, tanımsız grup Unassigned, kısa duruş Short stops. */
   column: string
@@ -356,12 +362,13 @@ export const lossColumnOf = (group: string, c: OeeConfig): string =>
 
 /**
  * Bir duruşun (Reason Code 1 + 2) sınıfı — TEK KAYNAK. Kayıp değilse null.
- * RC1 "#": grup Unassigned (kısa duruşsa `Unassigned<` → Short stops), RC2'ye bakılmaz.
+ * RC1 "#" ya da RC2 "#" / boş: grup Unassigned (kısa duruşsa `Unassigned<` → Short stops).
  * Ör. RC1 "#" / RC2 "STP" 30 dk → Unassigned 30 dk, Setup (STP) 0.
  */
 export function classifyLoss(rc1: string, rc2: string, c: OeeConfig): LossClass | null {
   if (!isLossRc1(rc1, c)) return null
-  const group = rc1 === UNDEFINED_RC1 ? (isShortCode(rc2) ? UNASSIGNED + SHORT_MARK : UNASSIGNED) : rc2
+  const undefinedStop = rc1 === UNDEFINED_RC1 || isUndefinedRc2(rc2)
+  const group = undefinedStop ? (isShortCode(rc2) ? UNASSIGNED + SHORT_MARK : UNASSIGNED) : rc2
   return { group, column: lossColumnOf(group, c) }
 }
 
@@ -725,17 +732,29 @@ export function lossDayOf(day: DowntimeDay): LossDay {
   return { date: day.date, costCenter: day.costCenter, workCenter: day.workCenter, codes, reasons, parts }
 }
 
+/** Kayıp grubunu ayardaki listede bir sıra yukarı (-1) ya da aşağı (+1) taşır; sınırda aynı liste. */
+export function moveLossGroup<T>(groups: T[], i: number, delta: -1 | 1): T[] {
+  const j = i + delta
+  if (i < 0 || i >= groups.length || j < 0 || j >= groups.length) return groups
+  const out = [...groups]
+  ;[out[i], out[j]] = [out[j], out[i]]
+  return out
+}
+
 /**
- * Grafik sütunları: ayardaki sıra; tanımsız grup "Unassigned"; kısa duruşlar
- * (bölünmüş özette) "Short stops"; en sonda Speed.
+ * Grafik sütunları, her sayfada aynı sıra (planlamacı, 2026-10-26): ayardaki kayıp
+ * grubu sırası (OEE Settings → Loss groups), sonra Short stops (bölünmüş özette),
+ * sonra Speed, en sonda Unassigned (veride varsa). Ayardaki "#" / boş kodlu grup
+ * kullanılmaz (tanımsız duruşlar Unassigned'dadır, classifyLoss).
  */
 export function chartGroups(c: OeeConfig, lossDays: LossDay[] = []): string[] {
   const out: string[] = []
-  for (const g of c.lossGroups) if (g.chart && !out.includes(g.chart)) out.push(g.chart)
+  const fixed = [SHORT_STOPS, SPEED, UNASSIGNED]
+  for (const g of c.lossGroups) if (g.chart && !isUndefinedRc2(g.code) && !fixed.includes(g.chart) && !out.includes(g.chart)) out.push(g.chart)
   const lossCols = new Set(lossDays.flatMap((d) => Object.keys(d.codes).map((k) => classifyLossKey(k, c)?.column ?? '')))
-  if (lossCols.has(UNASSIGNED) && !out.includes(UNASSIGNED)) out.push(UNASSIGNED)
-  if (lossCols.has(SHORT_STOPS) && !out.includes(SHORT_STOPS)) out.push(SHORT_STOPS)
+  if (lossCols.has(SHORT_STOPS)) out.push(SHORT_STOPS)
   out.push(SPEED)
+  if (lossCols.has(UNASSIGNED) || c.lossGroups.some((g) => g.chart === UNASSIGNED && !isUndefinedRc2(g.code))) out.push(UNASSIGNED)
   return out
 }
 
@@ -1224,9 +1243,15 @@ export function suggestConfig(
   const isLoss = (v: string) => v === '#' || /UN/i.test(v)
   const lossReasonCodes = current.lossReasonCodes.length ? current.lossReasonCodes : [...rc1].filter(isLoss).sort()
   const breakReasonCodes = current.breakReasonCodes.length ? current.breakReasonCodes : [...rc1].filter((v) => v && !isLoss(v)).sort()
-  // RC1 "#" duruşları Unassigned'dadır (classifyLoss): kendi RC2 grubunu önermez.
-  const rc2 = new Set(events.filter((e) => e.rc1 !== UNDEFINED_RC1 && lossReasonCodes.includes(e.rc1)).map((e) => e.rc2 || '#'))
-  const lossGroups = [...rc2].sort().map((code) => current.lossGroups.find((g) => g.code === code) ?? { code, label: code, chart: code, breakdown: false, hidden: code === '#' })
+  // Tanımsız duruşlar (RC1 / RC2 "#") Unassigned'dadır (classifyLoss): "#" grubu önerilmez;
+  // ayarda zaten olan "#" satırı silinmez (etkisizdir).
+  const rc2 = new Set(events.filter((e) => e.rc1 !== UNDEFINED_RC1 && !isUndefinedRc2(e.rc2) && lossReasonCodes.includes(e.rc1)).map((e) => e.rc2))
+  // Ayardaki sıra korunur (sütun sırası tek kaynak, OEE Settings → Loss groups); yeni kodlar sona, alfabetik.
+  const known = new Set(current.lossGroups.map((g) => g.code))
+  const lossGroups = [
+    ...current.lossGroups.filter((g) => rc2.has(g.code) || isUndefinedRc2(g.code)),
+    ...[...rc2].filter((code) => !known.has(code)).sort().map((code) => ({ code, label: code, chart: code, breakdown: false })),
+  ]
   const texts = new Set(events.map((e) => e.textEn.trim().toUpperCase()))
   const setupTexts = current.setupTexts.length
     ? current.setupTexts

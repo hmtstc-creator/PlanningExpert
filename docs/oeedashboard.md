@@ -737,7 +737,7 @@ Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **
   Hücre ≥ %10 ise kırmızı (`ASAKAI_HIGHLIGHT`).
 - Hesap yeni değil (`src/lib/oeeAsakai.ts`): OEE toplam süreden, kayıplar Losses Trend'in `lossBreakdown`'u, vardiya
   kesiti Loss Bridge'in `shiftSlice`'ı, kısa duruşlar ayrılır. Kayıp sütunları OEE Settings'teki grafik sütunları.
-- **Sütunlar** (2026-10-26, planlamacı): tablolar "#" (tanımsız, başlık UNDEFINED) gibi *grafikte gizli* grupları da
+- **Sütunlar** (2026-10-26, planlamacı; ~~"#" sütunu~~ → tanımsızlar en sonda UNASSIGNED, aşağıdaki bölüm): tablolar "#" (tanımsız, başlık UNDEFINED) gibi *grafikte gizli* grupları da
   gösterir — 2026-09-28 kararı "grafikte yok, tabloda var"; yığılı grafik göstermez. **UTS** (planlı mola) Asakai'de
   sütun değil (`ASAKAI_DROP`; UTS başka gruplarla aynı sütundaysa o sütun kalır). *Unassigned* = ayarda tanımsız kod;
   yalnız sayfada süresi varsa sütun olur. **Kısa duruşlar** (< 2 dk, MES'in Production − Operation farkının içinde)
@@ -746,18 +746,40 @@ Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **
 - Excel'den farklar: hız kaybı eksiye düşmez (Production − Operation − kısa duruş, en az 0); gün etiketleri "21.09"
   (Excel'de "00/mm" hatası); gelecek aylar 0% yerine boş.
 
-## Reason Code 1 "#" = Unassigned (2026-10-26, planlamacı)
+## Tanımsız duruş = Unassigned, sütun sırası (2026-10-26, planlamacı)
 
-- Reason Code 1 **"#"** = duruşu operatör tanımlamamış. Reason Code 2 ne olursa olsun bu kayıp **her yerde
-  Unassigned** (`UNASSIGNED`) altında görünür ve **kayıp sayılır** — ayarda `lossReasonCodes` içinde "#" olmasa
-  bile; planlı duruş (`breakReasonCodes`) sayılmaz. Ör. RC1 "#" / RC2 "STP" 30 dk → Unassigned 30 dk, Setup 0.
-- Kural **tek yerde**: `src/lib/oee.ts` → `UNDEFINED_RC1`, `isLossRc1`, `isBreakRc1`, `classifyLoss` /
-  `classifyLossKey` (rc1 + rc2 → kayıp mı, grup kodu, grafik sütunu). Losses Trend (`lossBreakdown`, `subLosses`,
-  `chartGroups`), Loss Bridge ve Level 3, kısa duruş bölmesi, Asakai, Daily Report, Agent Report, Agent Insights,
-  Open Topics, MTTR / MTBF parça listeleri bunu kullanır.
-- **Kısa duruş** ayrımı aynen çalışır: `#|STP<` → grup `Unassigned<` → *Short stops* (hız kaybı); ≥ eşik → Unassigned.
+- Reason Code 1 **ya da** Reason Code 2 **"#"** (ya da boş RC2) = duruşu operatör tanımlamamış. Kayıp sayılan böyle
+  her duruş **her yerde Unassigned** (`UNASSIGNED`) altında görünür. RC1 "#" her zaman kayıptır (ayarda
+  `lossReasonCodes` içinde "#" olmasa bile), planlı duruş sayılmaz; RC2 "#" kendi RC1'i kayıpsa kayıptır.
+  Ör. RC1 "#" / RC2 "STP" 30 dk → Unassigned 30 dk, Setup 0.
+- Kural **tek yerde**: `src/lib/oee.ts` → `UNDEFINED_RC1`, `isUndefinedRc2`, `isLossRc1`, `isBreakRc1`,
+  `classifyLoss` / `classifyLossKey` (rc1 + rc2 → kayıp mı, grup kodu, grafik sütunu). Losses Trend (`lossBreakdown`,
+  `subLosses`, `chartGroups`), Loss Bridge ve Level 3, kısa duruş bölmesi, Asakai, Daily Report, Agent Report,
+  Agent Insights, Open Topics, MTTR / MTBF parça listeleri bunu kullanır.
+- **Kısa duruş** ayrımı aynen çalışır: `#|STP<`, `UNSCD_DOWN|#<` → grup `Unassigned<` → *Short stops* (hız kaybı).
 - Özetler ham kodla (`${rc1}|${rc2}`) durur; gruplama okurken yapılır — veri taşıması / şema değişikliği yok.
-- 2026-10-07 köprü kararı ("#" duruşları hesaptan çıkar) artık yalnız **Reason Code 2 "#"** (gerçek bir kayıp
-  koduyla) için geçerli; o dakikalar "Not explained"da kalır. OEE ve A / P / Q değişmez (MES süreleri).
+- 2026-10-07 köprü kararı (~~"#" duruşları hesaptan çıkar~~) **kalktı**: tanımsızlar köprüde *Unassigned* kalemidir
+  (öncelik olmaz); "Not explained" o kadar küçülür. OEE ve A / P / Q değişmez (MES süreleri).
+- Ayardaki **"#" kayıp grubu kullanılmaz** (silinmez; OEE Settings → Loss groups'ta "not used, shown as Unassigned"
+  yazar). Asakai'deki ~~"#" sütunu (UNDEFINED)~~ → **UNASSIGNED** sütunu. "Suggest from data" "#" grubu önermez.
 - OEE Settings → Reason Code 1 kartında "#" seçilemez (sabit: *Loss — not defined by the operator*); Unassigned
   "ayarda tanımsız kod" önerisine (Loss groups uyarısı) girmez.
+- **Sütun sırası** her sayfada aynı (`chartGroups`): ayardaki kayıp grubu sırası (OEE Settings → Loss groups,
+  satır başına ↑ ↓; `moveLossGroup`), sonra Short stops, sonra Speed, **en sonda Unassigned**. Planlamacının
+  istediği sıra STP, KLP, ARZ, KSD, OFC, KON, YNT — canlı ayarda ↑ ↓ ile verilir (koddan değiştirilmedi).
+  "Suggest from data" ayardaki sırayı korur, yeni kodları sona ekler.
+
+### Doğrulama: Asakai detail 23.10 PRS-110 vardiya 2, KLP %239 (2026-10-26)
+
+- Canlı: Loading 144 dk, KLP ≈ 344 dk, KON %45; gün satırı da %239; vardiya 1 ve 3 Loading 0. Excel: die %80, others %21.
+- Fixture'da (yalnız 21.09 duruşları) aynı örüntü: **MES Loading, vardiya süresi − planlı duruştan kısa** olan
+  vardiyalarda kayıtlı plansız duruş Loading − Production'ı aşar. 21.09 PRS-104 vardiya 1: Loading 185,7 + planlı
+  209,3 = 395 / 480 dk; kayıtlı plansız duruş 191,5 dk (MES Unscheduled 193,1 ile aynı) → %103 of Loading;
+  fark ≈ 85 dk = 480 − 395. PRS-109 v2 (445 / 480; fark 34,4 ≈ 35) ve PRS-108 v3 de böyle (`oeeBridge.test.ts`).
+- Kod hatası **bulunmadı**: duruşların vardiyası doğru eşleşiyor (her vardiyada kayıtlı planlı duruş = MES
+  Scheduled, kuruşu kuruşuna); MES duruşları vardiya sınırında bölüyor (14:59:59 / 15:00:00), vardiyayı aşan tek
+  duruş yok; gün satırı vardiya 2 ile aynı olduğuna göre Loading'i 0 olan vardiyaların kaybı güne eklenmiyor.
+  Neden veri: MES Loading vardiyanın bir kısmını (büyük olasılıkla siparişsiz / oturum açılmamış süre) dışarıda
+  bırakıyor, o süredeki duruşlar Downtimes'ta kalıyor. **Düzeltme yapılmadı.**
+- Excel'in %80'i 344 ÷ ≈ 430 dk'ya (vardiya − planlı duruş) uyuyor: Excel paydası MES Loading değil olabilir —
+  Excel formülüyle doğrulanmalı (açık soru). Köprü fazlayı "Over-recorded downtime" adımında gösterir.

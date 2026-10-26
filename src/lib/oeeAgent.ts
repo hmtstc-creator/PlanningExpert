@@ -10,7 +10,6 @@
 import {
   UNDEFINED_RC1,
   addDaysIso,
-  baseCode,
   classifyLoss,
   classifyLossKey,
   groupLabel,
@@ -807,9 +806,9 @@ function biggestLoss(lossDays: LossDay[], c: OeeConfig): { label: string; minute
   const m = new Map<string, number>()
   for (const l of lossDays)
     for (const [code, [min]] of Object.entries(l.codes)) {
-      // RC1 "#" → Unassigned (classifyLoss); RC2 "#" grubu en büyük kayıp olarak söylenmez.
+      // Tanımsızlar (RC1 / RC2 "#") → Unassigned (classifyLoss).
       const group = classifyLossKey(code, c)?.group
-      if (group === undefined || baseCode(group) === '#') continue
+      if (group === undefined) continue
       m.set(group, (m.get(group) ?? 0) + min)
     }
   const top = [...m].sort((a, b) => b[1] - a[1])[0]

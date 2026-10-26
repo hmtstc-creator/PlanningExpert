@@ -150,9 +150,9 @@ tanımında standartlansın.
 
 ## "#" duruşları hesaptan çıkar (2026-10-07, planlamacı)
 
-> ~~Reason Code 1 ya da 2'si "#"~~ → yalnız **Reason Code 2 "#"** (2026-10-26): Reason Code 1 "#"
-> artık kayıptır ve **Unassigned** kalemine girer (`classifyLoss`, `src/lib/oee.ts`;
-> ayrıntı `docs/oeedashboard.md` → *Reason Code 1 "#" = Unassigned*).
+> **Kalktı (2026-10-26, planlamacı):** RC1 ya da RC2 "#" olan kayıp duruşları artık
+> **Unassigned** kalemine girer (`classifyLoss`, `src/lib/oee.ts`; ayrıntı
+> `docs/oeedashboard.md` → *Tanımsız duruş = Unassigned, sütun sırası*). Aşağısı tarihçedir.
 
 Reason Code 1 ya da 2'si "#" olan (tanımsız) duruşlar köprünün hiçbir
 kalemine, Level 3'e, parça ve vardiya kırılımına girmez

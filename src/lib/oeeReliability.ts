@@ -346,9 +346,9 @@ export function partStops(events: DowntimeDay[], workCenter: string | null, mate
   for (const d of events) {
     if (workCenter && d.workCenter !== workCenter) continue
     for (const e of d.events) {
-      // RC1 "#" → Unassigned (classifyLoss); RC2 "#" (grubu tanımsız) listeye girmez.
+      // Tanımsızlar (RC1 / RC2 "#") → Unassigned (classifyLoss).
       const group = e.material === material ? classifyLoss(e.rc1, e.rc2, c)?.group : undefined
-      if (group === undefined || group === '#') continue
+      if (group === undefined) continue
       const shift = shiftOf(e, c)
       const k = `${d.date}|${shift ?? ''}|${group}|${e.textEn}`
       const r = map.get(k) ?? { date: d.date, shift, group, text: e.textEn || e.rc2, count: 0, minutes: 0, start: e.startTime.slice(0, 5) }
@@ -405,7 +405,7 @@ export function reasonShiftParts(
   for (const d of events) {
     for (const e of d.events as DowntimeEvent[]) {
       const group = classifyLoss(e.rc1, e.rc2, c)?.group
-      if (group === undefined || group === '#' || !gs.has(group)) continue
+      if (group === undefined || !gs.has(group)) continue
       const text = e.textEn || e.rc2
       const sh = shiftOf(e, c)
       const byShift = shifts.get(text) ?? new Map<number | null, number>()

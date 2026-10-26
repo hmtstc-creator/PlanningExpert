@@ -24,8 +24,8 @@ const key = (r: { date: string; workCenter: string }) => `${r.date}|${r.workCent
 const round2 = (v: number) => Math.round(v * 100) / 100
 /**
  * Kayıp sayılan bütün kodlar bölünür (isLossRc1), "#" dahil: MES onların kısalarını da
- * Production'dan düşmez. RC1 "#" kısaları `#|STP<` olur → grup `Unassigned<` → Short stops
- * (classifyLoss). Köprü RC2 "#" ve "#<"i kalemlere almaz (isUndefinedCode).
+ * Production'dan düşmez. Tanımsızların (RC1 / RC2 "#") kısaları `#|STP<`, `UNSCD_DOWN|#<` olur
+ * → grup `Unassigned<` → Short stops (classifyLoss).
  */
 const splittable = (rc1: string, rc2: string, c: OeeConfig) => isLossRc1(rc1, c) && !isShortCode(rc2)
 

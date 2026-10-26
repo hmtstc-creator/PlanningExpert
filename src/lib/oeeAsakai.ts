@@ -45,8 +45,9 @@ export const ASAKAI_HIGHLIGHT = 0.1
 export const ASAKAI_DROP = ['UTS']
 
 /**
- * Asakai tablolarının kayıp sütunları: grafik sütunları, "grafikte gizli"
- * olanlar dahil — "#" (tanımsız) grafikte yok, tabloda var (2026-09-28).
+ * Asakai tablolarının kayıp sütunları: grafik sütunları (chartGroups sırası: ayardaki
+ * gruplar, Speed, en sonda Unassigned), "grafikte gizli" olanlar dahil. Tanımsızlar
+ * (RC1 / RC2 "#") Unassigned sütunundadır (2026-10-26; ayardaki "#" grubu kullanılmaz).
  * Bütün grupları ASAKAI_DROP'ta olan sütun yok. Kısa duruşlar (< eşik) sütun
  * değil, SPEED_LOSS'un içinde (planlamacı, 2026-10-26; Loss Bridge'deki gibi, #81).
  * `lossDays` kısa duruşları ayrılmış özet olmalı: kısalar kendi kodunda sayılmaz.
@@ -59,7 +60,7 @@ export function asakaiColumns(c: OeeConfig, lossDays: LossDay[]): string[] {
   })
 }
 
-/** Unassigned (ayarda tanımsız kod) yalnız sayfada süresi varsa sütun olur. */
+/** Unassigned (tanımsız duruş ya da ayarda olmayan kod) yalnız sayfada süresi varsa sütun olur. */
 export function dropEmptyUnassigned(columns: string[], rows: LossRow[]): string[] {
   return columns.filter((col) => col !== UNASSIGNED || rows.some((r) => (r.shares[col] ?? 0) > 0))
 }

@@ -42,7 +42,7 @@ import {
   type SheetRows,
   type WeeklyRow,
 } from './oee'
-import { SHORT_STOPS, SPEED, UNDEFINED_RC1, classifyLoss, isBreakRc1, isLossRc1, lossBreakdown } from './oee'
+import { SHORT_STOPS, SPEED, UNDEFINED_RC1, classifyLoss, isBreakRc1, isLossRc1, lossBreakdown, moveLossGroup } from './oee'
 import { OEE_SUGGESTED } from './settingsDefaults'
 
 // Veri: ASAKAI_2026_REV_12.xlsm'den kesit (Transfer 39. hafta vardiyaları,
@@ -349,17 +349,22 @@ describe('oee workbook', () => {
       ...plant,
       lossGroups: [
         { code: 'KLP', label: 'Die', chart: 'Die', breakdown: true },
-        { code: '#', label: 'Unexplained', chart: '#', breakdown: false, hidden: true },
+        { code: 'X', label: 'Hidden', chart: 'X', breakdown: false, hidden: true },
         { code: 'A', label: 'A', chart: 'Others', breakdown: false, hidden: true },
         { code: 'B', label: 'B', chart: 'Others', breakdown: false },
+        // Ayardaki "#" grubu kullanılmaz (tanımsızlar Unassigned, 2026-10-26).
+        { code: '#', label: 'Unexplained', chart: '#', breakdown: false, hidden: true },
       ],
     }
     const columns = chartGroups(c)
-    expect(columns).toEqual(['Die', '#', 'Others', 'Speed'])
+    expect(columns).toEqual(['Die', 'X', 'Others', 'Speed'])
     // Sütunun bütün grupları gizliyse grafikten çıkar; biri görünüyorsa kalır.
     expect(visibleChartGroups(columns, c)).toEqual(['Die', 'Others', 'Speed'])
+    // Öneri "#" grubu eklemez; ayarda varsa silmez, sıra korunur.
     const s = suggestConfig({ days, shifts: parsed.shifts, downtimes: parsed.downtimes }, EMPTY_CONFIG, OEE_SUGGESTED)
-    expect(s.lossGroups.filter((g) => g.hidden).map((g) => g.code)).toEqual(s.lossGroups.some((g) => g.code === '#') ? ['#'] : [])
+    expect(s.lossGroups.some((g) => g.code === '#')).toBe(false)
+    const kept = suggestConfig({ days, shifts: parsed.shifts, downtimes: parsed.downtimes }, s, OEE_SUGGESTED)
+    expect(kept.lossGroups.map((g) => g.code)).toEqual(s.lossGroups.map((g) => g.code))
   })
 
   it('ISO weeks', () => {
@@ -522,7 +527,7 @@ describe('subLosses (Losses Trend: alt kayıplar)', () => {
   })
 })
 
-describe('Reason Code 1 "#" → Unassigned (planlamacı, 2026-10-26)', () => {
+describe('Reason Code 1 ya da 2 "#" → Unassigned (planlamacı, 2026-10-26)', () => {
   const cfg: OeeConfig = {
     ...EMPTY_CONFIG,
     // "#" kayıp listesinde değil: yine de kayıptır.
@@ -545,6 +550,11 @@ describe('Reason Code 1 "#" → Unassigned (planlamacı, 2026-10-26)', () => {
     // RC2 "#" de ayardaki "#" grubuna değil Unassigned'a gider.
     expect(classifyLoss('#', '#', cfg)?.column).toBe(UNASSIGNED)
     expect(classifyLoss('UNSCD_DOWN', 'STP', cfg)).toEqual({ group: 'STP', column: 'Setup' })
+    // RC2 "#" (ya da boş) de tanımsızdır: ayardaki "#" grubu kullanılmaz (2026-10-26).
+    expect(classifyLoss('UNSCD_DOWN', '#', cfg)).toEqual({ group: UNASSIGNED, column: UNASSIGNED })
+    expect(classifyLoss('UNSCD_DOWN', '', cfg)?.group).toBe(UNASSIGNED)
+    expect(classifyLoss('UNSCD_DOWN', '#<', cfg)).toEqual({ group: `${UNASSIGNED}<`, column: SHORT_STOPS })
+    expect(classifyLoss('SCHED_DOWN', '#', cfg)).toBeNull()
   })
 
   it('kısa duruşlar Short stops, planlı duruşlar etkilenmez, alt kayıplar ve sütunlar aynı kuralla', () => {
@@ -555,12 +565,28 @@ describe('Reason Code 1 "#" → Unassigned (planlamacı, 2026-10-26)', () => {
     const b = lossBreakdown(times, [d], cfg)
     expect(b.groups).toEqual({ [UNASSIGNED]: 30, [`${UNASSIGNED}<`]: 1.5, STP: 20 })
     expect(b.chart).toEqual({ [UNASSIGNED]: 30, [SHORT_STOPS]: 1.5, Setup: 20, [SPEED]: 8.5 })
-    expect(chartGroups(cfg, [d])).toEqual(['Setup', '#', UNASSIGNED, SHORT_STOPS, SPEED])
+    // Sıra: ayardaki gruplar ("#" grubu yok), Short stops, Speed, en sonda Unassigned.
+    expect(chartGroups(cfg, [d])).toEqual(['Setup', SHORT_STOPS, SPEED, UNASSIGNED])
     expect(Object.fromEntries(subLosses([d], cfg, UNASSIGNED))).toEqual({ 'DIE SETUP': { minutes: 30, count: 1 } })
     expect(Object.fromEntries(subLosses([d], cfg, 'Setup'))).toEqual({ 'DIE SETUP': { minutes: 20, count: 1 } })
     expect(isLossRc1('SCHED_DOWN', cfg)).toBe(false)
     expect(isBreakRc1('SCHED_DOWN', cfg)).toBe(true)
     // "#" planlı listede olsa bile planlı değildir, kayıptır.
     expect(isBreakRc1('#', { ...cfg, breakReasonCodes: ['SCHED_DOWN', '#'] })).toBe(false)
+  })
+})
+
+describe('sütun sırası (planlamacı, 2026-10-26)', () => {
+  const g = (code: string) => ({ code, label: code, chart: code, breakdown: false })
+  const cfg: OeeConfig = { ...EMPTY_CONFIG, lossReasonCodes: ['UNSCD_DOWN'], lossGroups: ['KLP', 'STP', 'ARZ'].map(g) }
+  const d: LossDay = { date: '2026-10-19', costCenter: 'C', workCenter: 'W', codes: { 'UNSCD_DOWN|ARZ<': [1, 1], 'UNSCD_DOWN|#': [5, 1] }, reasons: {} }
+
+  it('ayardaki sıra, sonra Short stops, Speed, en sonda Unassigned; ↑ ↓ sırayı değiştirir', () => {
+    expect(chartGroups(cfg, [d])).toEqual(['KLP', 'STP', 'ARZ', SHORT_STOPS, SPEED, UNASSIGNED])
+    const up = { ...cfg, lossGroups: moveLossGroup(cfg.lossGroups, 1, -1) }
+    expect(chartGroups(up, [d])).toEqual(['STP', 'KLP', 'ARZ', SHORT_STOPS, SPEED, UNASSIGNED])
+    expect(moveLossGroup(cfg.lossGroups, 0, -1)).toBe(cfg.lossGroups)
+    expect(moveLossGroup(cfg.lossGroups, 2, 1)).toBe(cfg.lossGroups)
+    expect(moveLossGroup(cfg.lossGroups, 2, -1).map((x) => x.code)).toEqual(['KLP', 'ARZ', 'STP'])
   })
 })

@@ -276,7 +276,6 @@ describe('Agent Insights: loss code meanings', () => {
     const xs = undefinedLossCodes([{ ...loss(FROM, { 'UNSCD_DOWN|OFC': [30, 2], 'UNSCD_DOWN|KLP': [10, 1], 'SCHED_DOWN|UTS': [25, 2] }) }, { ...loss(TO, { 'UNSCD_DOWN|OFC': [5, 1], 'UNSCD_DOWN|': [7, 1] }) }], c)
     expect(xs).toEqual([
       { code: 'OFC', min: 35, count: 3 },
-      { code: '#', min: 7, count: 1 },
     ])
     const codes = lossCodeMeanings(c, ['OFC'])
     expect(codes.OFC).toBe('not defined in OEE Settings; logistics / waiting for material (transport, empty boxes, missing raw material, crane)')

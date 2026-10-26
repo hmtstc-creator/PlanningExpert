@@ -5,7 +5,7 @@
 // ya da kurallar. Aynı konu açıkken yeniden yazılmaz, yalnızca "son görüldü"
 // güncellenir. Kararlar: docs/oee-agent-report.md → OEE open topics.
 
-import { addDaysIso, baseCode, classifyLossKey, costCenterName, groupLabel, type DayRow, type LossDay, type OeeConfig } from './oee'
+import { addDaysIso, classifyLossKey, costCenterName, groupLabel, type DayRow, type LossDay, type OeeConfig } from './oee'
 import type { StopDay } from './oeeReliability'
 import { splitShortStops } from './oeeShortStops'
 
@@ -40,8 +40,8 @@ export interface GroupDay {
 }
 
 /**
- * Gün ve kayıp özetini sıkıştırır: yalnızca kayıp sayılan (classifyLoss) ve
- * grubu "#" olmayan duruşlar; RC1 "#" duruşları "Unassigned" grubunda.
+ * Gün ve kayıp özetini sıkıştırır: yalnızca kayıp sayılan duruşlar (classifyLoss);
+ * tanımsızlar (RC1 / RC2 "#") "Unassigned" grubunda.
  * Süre histogramı (`stops`) verilirse aynı kod ikiye bölünür (oeeShortStops.ts):
  * < eşik duruşlar `ARZ<` ayrı konudur (hız kaybı), ≥ eşik `ARZ` kullanılabilirlik.
  */
@@ -60,7 +60,7 @@ export function compactDays(days: DayRow[], rawLosses: LossDay[], c: OeeConfig, 
     const row = at(l.date, l.costCenter, l.workCenter)
     for (const [k, [min]] of Object.entries(l.codes)) {
       const group = classifyLossKey(k, c)?.group
-      if (!group || baseCode(group) === '#') continue
+      if (!group) continue
       row.groups[group] = (row.groups[group] ?? 0) + min
     }
   }

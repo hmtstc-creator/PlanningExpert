@@ -116,9 +116,9 @@ function OeeGuidePage() {
           </li>
           <li>
             which Reason Code 1 is a loss and which is a planned break (Reason Code 1 “{UNDEFINED_RC1}” — not defined by the operator — is
-            always a loss and shows as {UNASSIGNED}, whatever its Reason Code 2),
+            always a loss; a stop with Reason Code 1 or 2 “{UNDEFINED_RC1}” shows as {UNASSIGNED}),
           </li>
-          <li>names of the loss groups (Reason Code 2), their chart columns and which are breakdowns,</li>
+          <li>names of the loss groups (Reason Code 2), their order (↑ ↓ — the column order on every page), chart columns and which are breakdowns,</li>
           <li>which downtime texts are a planned or unplanned setup,</li>
           <li>production time after a setup for OK, weeks in the trends, rows in the top lists.</li>
         </ul>

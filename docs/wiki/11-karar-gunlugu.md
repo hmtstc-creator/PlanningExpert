@@ -1,6 +1,6 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-26 (Reason Code 1 "#" = Unassigned) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-26 (tanımsız duruş = Unassigned, sütun sırası) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
@@ -21,7 +21,8 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 ## OEE analizi
 
-- **Reason Code 1 "#" = Unassigned, her zaman kayıp** (2026-10-26, planlamacı) — operatör duruşu tanımlamamış; RC2'ye bakılmaz, ayarda "#" kayıp işaretli olmasa da kayıp, planlı değil. Kural tek yerde (`classifyLoss`, `src/lib/oee.ts`), bütün OEE tüketicileri onu kullanır; kısa duruş bölmesi aynen (`Unassigned<` → Short stops). Özetler ham kodla kalır, veri taşıması yok. 2026-10-07 köprü kararı ("#" hesaptan çıkar) yalnız RC2 "#" için kaldı. *Alt.: yüklemede RC2'yi "Unassigned"a yazmak* (ham veri bozulur, geçmiş yeniden yüklenmeli); *her tüketicide ayrı kontrol* (dağınık, eskir).
+- **Tanımsız duruş (RC1 ya da RC2 "#") = Unassigned; sütun sırası tek kaynak** (2026-10-26, planlamacı) — RC1 "#" her zaman kayıp (ayarda işaretli olmasa da), planlı değil; RC2 "#" kendi RC1'i kayıpsa kayıp; ikisi de her sayfada Unassigned. Kural tek yerde (`classifyLoss`, `src/lib/oee.ts`); kısa duruş bölmesi aynen (`Unassigned<` → Short stops); ayardaki "#" grubu kullanılmaz (silinmez). 2026-10-07 köprü kararı ("#" hesap dışı) kalktı. Sütunlar: ayardaki grup sırası (Settings ↑ ↓), Short stops, Speed, en sonda Unassigned. Özetler ham kodla kalır, veri taşıması yok. *Alt.: yüklemede RC2'yi "Unassigned"a yazmak* (ham veri bozulur, geçmiş yeniden yüklenmeli); *her tüketicide ayrı kontrol* (dağınık, eskir).
+- **Kayıp > %100 of Loading kod hatası değil** (2026-10-26, doğrulama) — MES Loading vardiya − planlıdan kısa olunca (ör. 21.09 PRS-104 v1: 395 / 480 dk) kayıtlı duruş Loading'i aşar (%103); vardiya eşleşmesi doğru, düzeltme yok. Canlı 23.10 PRS-110 v2 %239 aynı örüntü olmalı; Excel paydası (≈ vardiya − planlı) açık soru.
 - **Asakai weekly: masraf yeri başına blok, Excel'in yan yana düzeni değil** (2026-10-26, #83, planlamacı: "30 iş yerli costcenter'da format bozulmasın") — üstte aylık / 10 hafta / günler, altta iş yeri başına tek satır (günlerin OEE'si + haftanın kayıpları; iki Excel tablosu birleşti). İş yeri sayısı yalnız tabloyu uzatır; PDF çok sayfa, blok bölünmez. *Alt.: Excel'in birebir yan yana düzeni* (2'den çok masraf yeri ya da ~10'dan çok iş yerinde sığmıyor). Asakai detail Excel'deki gibi kaldı (aşağı uzar).
 - **Asakai detail kırmızı hücre = ≥ %10 of Loading** (2026-10-26, #83) — Excel'deki kural çıkarılamadı; varsayım, planlamacı onaylamadı (`ASAKAI_HIGHLIGHT`, 09'da açık).
 - **Kod değişince OEE geçmişi yeni koda taşınır** (2026-10-24, Ahmet, K5) — aynı work center'ın geçmişi iki koda bölünmesin; taşıma arka planda sayfa sayfa (mutasyon sınırı), çakışmada yeni kodlu satır kalır (daha yenidir, aynı gün iki kez sayılmaz). SAP bir süre eski kodu getirir: `workCenterAliases` yüklemede çevirir, zincir kısaltılır (A → B → C ise A → C). *Alt.: geçmiş eski kodla kalsın* (önceki kural; trend kesiliyordu); *istemci imleçle taşısın* (`rebuildStored` gibi; Master Data yetkilisinde OEE yetkisi olmayabilir, sayfa kapanınca yarım kalırdı).

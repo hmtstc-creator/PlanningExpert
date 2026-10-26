@@ -189,7 +189,10 @@ interface ReasonEntry extends LossEntry {
   text: string
 }
 
-/** Kayıp sayılan duruşlar (classifyLoss), "#" dahil; RC1 "#" grubu Unassigned. */
+/** Tanımsız duruşun grubu (RC1 / RC2 "#", classifyLoss → Unassigned; kısa duruşta `Unassigned<`). */
+const isUn = (g: string) => baseCode(g) === UNASSIGNED
+
+/** Kayıp sayılan duruşlar (classifyLoss), tanımsızlar dahil (grup Unassigned). */
 function lossEntries(losses: LossDay[], c: OeeConfig): { codes: LossEntry[]; parts: PartEntry[]; reasons: ReasonEntry[] } {
   const codes: LossEntry[] = []
   const parts: PartEntry[] = []
@@ -198,18 +201,18 @@ function lossEntries(losses: LossDay[], c: OeeConfig): { codes: LossEntry[]; par
     for (const [k, [min, count]] of Object.entries(l.reasons ?? {})) {
       const cls = classifyLossKey(k, c)
       if (!cls) continue
-      reasons.push({ date: l.date, workCenter: l.workCenter, group: cls.group || '#', text: cls.rest.trim().toUpperCase() || '(no text)', min, count })
+      reasons.push({ date: l.date, workCenter: l.workCenter, group: cls.group, text: cls.rest.trim().toUpperCase() || '(no text)', min, count })
     }
     for (const [k, [min, count]] of Object.entries(l.codes)) {
       const cls = classifyLossKey(k, c)
       if (!cls) continue
-      codes.push({ date: l.date, workCenter: l.workCenter, group: cls.group || '#', min, count })
+      codes.push({ date: l.date, workCenter: l.workCenter, group: cls.group, min, count })
     }
     for (const [k, [min, count]] of Object.entries(l.parts ?? {})) {
       const cls = classifyLossKey(k, c)
       const part = cls?.rest.split('|')[0]
       if (!cls || !part || part === '#') continue
-      parts.push({ date: l.date, workCenter: l.workCenter, group: cls.group || '#', part, min, count })
+      parts.push({ date: l.date, workCenter: l.workCenter, group: cls.group, part, min, count })
     }
   }
   return { codes, parts, reasons }
@@ -276,7 +279,7 @@ export function lossCodeMeanings(c: OeeConfig, undefinedCodes: string[] = []): R
     out[code] = `not defined in OEE Settings${m ? `; ${m}` : ''}`
   }
   // RC1 "#" duruşlarının grubu (classifyLoss): operatör sebep girmemiş.
-  out[UNASSIGNED] ??= 'Unassigned: Reason Code 1 “#” — the operator did not define the stop; counted as a loss'
+  out[UNASSIGNED] ??= 'Unassigned: Reason Code 1 or 2 “#” — the operator did not define the stop; counted as a loss'
   return out
 }
 
@@ -292,11 +295,9 @@ export function undefinedLossCodes(losses: LossDay[], c: OeeConfig): UndefinedCo
   const by = new Map<string, UndefinedCode>()
   for (const l of losses) {
     for (const [k, [min, count]] of Object.entries(l.codes)) {
-      // RC1 "#" → Unassigned: programın kendi grubudur, ayarda tanımlanmaz.
-      const group = classifyLossKey(k, c)?.group
-      if (group === undefined || baseCode(group) === UNASSIGNED) continue
-      const code = group || '#'
-      if (known.has(code)) continue
+      // Tanımsızlar (RC1 / RC2 "#") → Unassigned: programın kendi grubudur, ayarda tanımlanmaz.
+      const code = classifyLossKey(k, c)?.group
+      if (code === undefined || isUn(code) || known.has(code)) continue
       const x = by.get(code) ?? { code, min: 0, count: 0 }
       x.min += min
       x.count += count
@@ -344,7 +345,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
   const shortCodes = short(entries.codes)
   const shortReasons = short(entries.reasons)
   const shortMin = shortStopMinOf(c)
-  const label = (g: string) => (g === '#' ? 'unclassified (#)' : groupLabel(g, c))
+  const label = (g: string) => (isUn(g) ? 'unclassified (#)' : groupLabel(g, c))
   const minTotal = t.minWeeklyMin * weeks
   const out: Signal[] = []
 
@@ -363,7 +364,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
   const loadByPart = new Map<string, number>()
   for (const o of orders) if (o.material) loadByPart.set(o.material, (loadByPart.get(o.material) ?? 0) + o.loadingMin)
   const totalLoad = [...loadByPart.values()].reduce((a, x) => a + x, 0)
-  for (const [group, list] of groupBy(parts.filter((p) => p.group !== '#'), (p) => p.group)) {
+  for (const [group, list] of groupBy(parts.filter((p) => !isUn(p.group)), (p) => p.group)) {
     const total = sumMin(list)
     if (total < minTotal) continue
     const byPart = [...groupBy(list, (p) => p.part)].map(([part, xs]) => ({ part, min: sumMin(xs), count: xs.reduce((a, x) => a + x.count, 0), xs }))
@@ -400,7 +401,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
   // 2. Parça × iş yeri: aynı parça bir iş yerinde yükleme saati başına çok daha fazla kayıp üretiyor.
   const loadPartWc = new Map<string, number>()
   for (const o of orders) if (o.material) loadPartWc.set(`${o.material}|${o.workCenter}`, (loadPartWc.get(`${o.material}|${o.workCenter}`) ?? 0) + o.loadingMin)
-  for (const [part, list] of groupBy(parts.filter((p) => p.group !== '#'), (p) => p.part)) {
+  for (const [part, list] of groupBy(parts.filter((p) => !isUn(p.group)), (p) => p.part)) {
     const wcs = [...new Set([...loadPartWc.keys()].filter((k) => k.startsWith(`${part}|`)).map((k) => k.slice(part.length + 1)))]
     const rows = wcs
       .map((wc) => {
@@ -424,7 +425,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         finding: `On ${hi.wc} ${part} loses ${hi.perHour.toFixed(1)} min per loading hour, on ${lo.wc} only ${lo.perHour.toFixed(1)}.`,
         evidence: withReasons(
           rows.map((r) => `${r.wc}: ${dur(r.load)} loading, ${dur(r.min)} loss`).join('; ') + '.',
-          reasons.filter((r) => r.workCenter === hi.wc && r.group !== '#'),
+          reasons.filter((r) => r.workCenter === hi.wc && !isUn(r.group)),
         ),
         whyNonObvious: 'Machine and part Paretos are read separately; the same part behaving differently on two machines points at the machine set-up, not at the part.',
         firstCheck: `Compare the set-up (shut height, feed, sensors) of ${hi.wc} with ${lo.wc} for ${part}.`,
@@ -468,7 +469,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         finding: `On days with ${avg(many, (p) => p.n).toFixed(1)} orders availability is ${pct(avg(many, (p) => p.avail))}, with ${avg(few, (p) => p.n).toFixed(1)} orders ${pct(avg(few, (p) => p.avail))} (r = ${r.toFixed(2)}, ${pts.length} days).`,
         evidence: withReasons(
           `Correlation of orders per day and availability over ${pts.length} days: ${r.toFixed(2)}.`,
-          reasons.filter((x) => x.workCenter === wc && x.group !== '#'),
+          reasons.filter((x) => x.workCenter === wc && !isUn(x.group)),
         ),
         whyNonObvious: 'Changeover loss is spread over many small stops and reasons; only the day-by-day link to the number of orders shows that lot size, not a breakdown, is the lever.',
         firstCheck: `Check the set-up times of ${wc} and whether small lots could be combined in the plan.`,
@@ -512,7 +513,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
           finding: `Shift ${n} OEE ${pct(a)} against ${pct(b)} for the other shifts on ${wc}; worse in ${Math.round(share * worseWeeks.length)} of ${worseWeeks.length} weeks.`,
           evidence: withReasons(
             `Shift ${n}: ${dur(me.loadingMin)} loading, availability ${pct(ratios(me).availability ?? 0)}, performance ${pct(ratios(me).performance ?? 0)}.`,
-            reasons.filter((x) => x.workCenter === wc && x.group !== '#'),
+            reasons.filter((x) => x.workCenter === wc && !isUn(x.group)),
           ),
           whyNonObvious: 'Daily and weekly OEE average the shifts; a steady gap of one shift on one machine disappears in the totals.',
           firstCheck: `Walk shift ${n} on ${wc}: start-up, staffing and the first hour after the handover.`,
@@ -527,7 +528,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
 
   // 5. Haftanın günü: bir günde kayıp oranı diğer günlerin belirgin üstünde.
   for (const [wc, list] of groupBy(
-    codes.filter((x) => x.group !== '#'),
+    codes.filter((x) => !isUn(x.group)),
     (x) => x.workCenter,
   )) {
     const loadDay = Array(7).fill(0)
@@ -552,7 +553,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
           finding: `On ${WEEKDAYS[i]}s ${wc} loses ${(rt * 60).toFixed(1)} min per loading hour, on the other days ${(base * 60).toFixed(1)}.`,
           evidence: withReasons(
             WEEKDAYS.map((w, j) => `${w} ${rates[j] === null ? '—' : ((rates[j] as number) * 60).toFixed(1)}`).join(' · ') + ' min / loading h.',
-            reasons.filter((x) => x.workCenter === wc && x.group !== '#' && weekday(x.date) === i),
+            reasons.filter((x) => x.workCenter === wc && !isUn(x.group) && weekday(x.date) === i),
           ),
           whyNonObvious: 'Weekly reports add the days together; a weekday pattern points at planning, staffing or the start of the week rather than at a machine fault.',
           firstCheck: `Look at what is different on ${WEEKDAYS[i]}s on ${wc}: first shift start, material supply, maintenance slot or the part mix.`,
@@ -570,7 +571,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
   // (bölünmüş özet); yoksa eski kural (ortalama ≤ microMaxMin).
   const split = shortCodes.length > 0
   for (const [key, list] of groupBy(
-    (split ? shortCodes : codes).filter((x) => x.group !== '#'),
+    (split ? shortCodes : codes).filter((x) => !isUn(x.group)),
     (x) => `${x.workCenter}|${x.group}`,
   )) {
     const total = sumMin(list)
@@ -603,7 +604,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
 
   // 7. Rejim değişimi: kayıp bir tarihten sonra sıçradı.
   for (const [key, list] of groupBy(
-    codes.filter((x) => x.group !== '#'),
+    codes.filter((x) => !isUn(x.group)),
     (x) => `${x.workCenter}|${x.group}`,
   )) {
     const [wc, group] = key.split('|')
@@ -674,7 +675,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
 
   // 9. Veri kalitesi: sebebi girilmemiş kayıp, hiç ıskarta / red yok.
   const allLoss = sumMin(codes)
-  const unclassified = codes.filter((x) => x.group === '#')
+  const unclassified = codes.filter((x) => isUn(x.group))
   const un = sumMin(unclassified)
   if (allLoss > 0 && un / allLoss >= t.unclassifiedShare && un >= minTotal) {
     const byWc = [...groupBy(unclassified, (x) => x.workCenter)].map(([wc, xs]) => ({ wc, min: sumMin(xs) })).sort((a, b) => b.min - a.min)
@@ -689,7 +690,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
             .slice(0, 3)
             .map((x) => `${x.wc} ${dur(x.min)}`)
             .join(', ') + '.',
-          reasons.filter((x) => x.group === '#'),
+          reasons.filter((x) => isUn(x.group)),
         ),
         whyNonObvious: 'Every loss Pareto is built only on the coded part; an uncoded share this large can change which loss looks biggest.',
         firstCheck: `Ask the operators of ${byWc[0]?.wc ?? 'the line'} why stops are left without a reason, and make the reason mandatory.`,
@@ -721,8 +722,8 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
 
   // 10. Sebepsiz büyük duruş: "#" olay başına çok uzun — büyük duruşlar nedensiz kalıyor.
   for (const [wc, list] of groupBy(codes, (x) => x.workCenter)) {
-    const un = list.filter((x) => x.group === '#')
-    const coded = list.filter((x) => x.group !== '#')
+    const un = list.filter((x) => isUn(x.group))
+    const coded = list.filter((x) => !isUn(x.group))
     const unMin = sumMin(un)
     const unCount = un.reduce((a, x) => a + x.count, 0)
     const codedCount = coded.reduce((a, x) => a + x.count, 0)
@@ -738,7 +739,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
         finding: `${unCount} stops with "#" average ${dur(unAvg)}, coded stops ${codedCount ? dur(codedAvg) : '—'}; ${dur(unMin)} in total.`,
         evidence: withReasons(
           `${(unCount / weeks).toFixed(1)} uncoded stops a week on ${wc}.`,
-          reasons.filter((x) => x.workCenter === wc && x.group === '#'),
+          reasons.filter((x) => x.workCenter === wc && isUn(x.group)),
         ),
         whyNonObvious: 'The uncoded share looks like a small count of stops; it is the longest stops that are left without a reason, so the biggest losses never reach the Pareto.',
         firstCheck: `Go through the longest "#" stops on ${wc} with the shift leaders and give each a reason; check whether the terminal lets a long stop close without one.`,
@@ -753,7 +754,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
 
   // 11. Sık ve kısa ayar: aynı ayar metni çok sık, her biri birkaç dakika (ör. elektrot ayarı).
   for (const [key, list] of groupBy(
-    reasons.filter((x) => x.group !== '#' && isSetupReason(x.group, x.text, c)),
+    reasons.filter((x) => !isUn(x.group) && isSetupReason(x.group, x.text, c)),
     (x) => `${x.workCenter}|${x.group}|${x.text}`,
   )) {
     const total = sumMin(list)
@@ -781,7 +782,7 @@ export function insightSignals(input: InsightInput, t: InsightThresholds = INSIG
 
   // 12. Mola sonrası artık duruş: moladan sonra hat geç başlıyor, kayıp olarak yazılıyor.
   for (const [wc, list] of groupBy(
-    reasons.filter((x) => x.group !== '#' && AFTER_BREAK.test(x.text)),
+    reasons.filter((x) => !isUn(x.group) && AFTER_BREAK.test(x.text)),
     (x) => x.workCenter,
   )) {
     const total = sumMin(list)

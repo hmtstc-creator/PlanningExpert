@@ -7,7 +7,7 @@ import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
 import { agentThresholds, groupRole, type AgentThresholds } from '../../lib/oeeAgent'
-import { MES_SHORT_STOP_MIN, UNASSIGNED, UNDEFINED_RC1, addDaysIso, configProblems, shortStopMinOf, dataCostCenters, lossDayOf, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
+import { MES_SHORT_STOP_MIN, SHORT_STOPS, SPEED, UNASSIGNED, UNDEFINED_RC1, addDaysIso, isUndefinedRc2, moveLossGroup, configProblems, shortStopMinOf, dataCostCenters, lossDayOf, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
 import { defaultLossMeaning, undefinedLossCodes } from '../../lib/oeeInsights'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
@@ -253,7 +253,7 @@ function OeeSettingsPage() {
 
       <Card
         title="Reason Code 1"
-        info={`Which downtimes count as a loss (their minutes ÷ loading time) and which are planned breaks (shown apart after a setup). Reason Code 1 “${UNDEFINED_RC1}” means the operator did not define the stop: it is always a loss and shows as ${UNASSIGNED} on every OEE page, whatever its Reason Code 2 (its short stops stay in Short stops).`}
+        info={`Which downtimes count as a loss (their minutes ÷ loading time) and which are planned breaks (shown apart after a setup). Reason Code 1 “${UNDEFINED_RC1}” means the operator did not define the stop: it is always a loss and shows as ${UNASSIGNED} on every OEE page, whatever its Reason Code 2 (its short stops stay in Short stops). A loss with Reason Code 2 “${UNDEFINED_RC1}” is ${UNASSIGNED} too.`}
       >
         <Rows
           head={['Reason Code 1', 'Counts as']}
@@ -287,7 +287,7 @@ function OeeSettingsPage() {
 
       <Card
         title="Loss groups"
-        info="Reason Code 2 of the loss downtimes. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. The availability / performance split is not set per group: every unplanned stop shorter than the short-stop limit (Numbers below) is a performance loss, longer ones are availability — the same code is split by duration. Agent role: whether the Agent Report reads the group as a die loss (Die Follow-up) or a machine loss (Machine Follow-up); Auto guesses it from the chart column and the name. Meaning: what the code stands for, in plain words — Agent Insights gives it to the AI, which otherwise only sees the abbreviation. An empty Meaning uses the default shown in grey; what you write always wins."
+        info={`Reason Code 2 of the loss downtimes. Order (↑ ↓): every OEE page shows the columns in this order, then ${SHORT_STOPS}, ${SPEED} and last ${UNASSIGNED}. A stop with Reason Code 1 or 2 “${UNDEFINED_RC1}” is always ${UNASSIGNED}: a “${UNDEFINED_RC1}” row here is not used. Name: shown in tables. Chart column: groups with the same column are added together in the charts (e.g. several small groups into 'Others'). In charts: untick for groups shown only in the tables (e.g. unexplained downtimes). Breakdown: shown in the MTTR / MTBF table. The availability / performance split is not set per group: every unplanned stop shorter than the short-stop limit (Numbers below) is a performance loss, longer ones are availability — the same code is split by duration. Agent role: whether the Agent Report reads the group as a die loss (Die Follow-up) or a machine loss (Machine Follow-up); Auto guesses it from the chart column and the name. Meaning: what the code stands for, in plain words — Agent Insights gives it to the AI, which otherwise only sees the abbreviation. An empty Meaning uses the default shown in grey; what you write always wins.`}
       >
         {undefinedCodes.length > 0 && (
           <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -304,9 +304,19 @@ function OeeSettingsPage() {
           </p>
         )}
         <Rows
-          head={['Reason Code 2', 'Name', 'Meaning (for the AI)', 'Chart column', 'In charts', 'Breakdown', 'Agent role', '']}
+          head={['Order', 'Reason Code 2', 'Name', 'Meaning (for the AI)', 'Chart column', 'In charts', 'Breakdown', 'Agent role', '']}
           rows={c.lossGroups.map((g, i) => [
-            g.code,
+            <span key="o" className="flex gap-2">
+              <MoveButton label="↑" title="Move up" disabled={i === 0} onClick={() => set({ lossGroups: moveLossGroup(c.lossGroups, i, -1) })} />
+              <MoveButton label="↓" title="Move down" disabled={i === c.lossGroups.length - 1} onClick={() => set({ lossGroups: moveLossGroup(c.lossGroups, i, 1) })} />
+            </span>,
+            isUndefinedRc2(g.code) ? (
+              <span key="code" title={`Not used: stops with Reason Code 2 “${UNDEFINED_RC1}” are always ${UNASSIGNED}`}>
+                {g.code || '(empty)'} <span className="text-xs text-muted-foreground">— not used, shown as {UNASSIGNED}</span>
+              </span>
+            ) : (
+              g.code
+            ),
             <input key="l" className={input} value={g.label} onChange={(e) => set({ lossGroups: c.lossGroups.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />,
             <input
               key="m"
@@ -494,6 +504,21 @@ function StepBox({ n, done, title, children }: { n: number; done: boolean; title
       </p>
       <div className="space-y-1 text-xs">{children}</div>
     </li>
+  )
+}
+
+function MoveButton({ label, title, disabled, onClick }: { label: string; title: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      disabled={disabled}
+      onClick={onClick}
+      className="text-xs text-muted-foreground underline hover:text-foreground disabled:cursor-default disabled:no-underline disabled:opacity-30"
+    >
+      {label}
+    </button>
   )
 }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import fixture from './oee.fixture.json'
-import { chartGroups, daysFromShifts, lossDayOf, oeeOf, parseOeeWorkbook, sumTimes, type OeeConfig, type SheetRows } from './oee'
+import { UNASSIGNED, chartGroups, daysFromShifts, lossDayOf, oeeOf, parseOeeWorkbook, sumTimes, type LossDay, type OeeConfig, type SheetRows } from './oee'
 import { ASAKAI_WEEKS, asakaiColumns, asakaiDetail, asakaiWeekly, dropEmptyUnassigned } from './oeeAsakai'
 
 // Gerçek kesit (ASAKAI dosyası): Progressive ve Transfer, 21 Eylül haftası.
@@ -94,11 +94,14 @@ describe('Asakai columns', () => {
     ],
   }
 
-  it('"#" grafikte gizli ama tabloda var; UTS sütunu yok', () => {
+  it('ayardaki "#" grubu sütun değil, tanımsızlar en sonda Unassigned (UNASSIGNED); UTS sütunu yok', () => {
     const cols = asakaiColumns(c, [])
-    expect(cols).toContain('#')
+    expect(cols).not.toContain('#')
     expect(cols).not.toContain('UTS')
     expect(cols.at(-1)).toBe('Speed')
+    const undef: LossDay = { date: '2026-10-19', costCenter: 'C', workCenter: 'W', codes: { 'UNSCD_DOWN|#': [10, 1], '#|KLP': [5, 1] }, reasons: {} }
+    const withUndef = asakaiColumns(c, [undef])
+    expect(withUndef.slice(-2)).toEqual(['Speed', UNASSIGNED])
   })
 
   it('UTS başka gruplarla aynı sütundaysa sütun kalır', () => {

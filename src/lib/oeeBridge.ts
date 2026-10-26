@@ -32,7 +32,6 @@ import {
   MES_SHORT_STOP_MIN,
   SHORT_MARK,
   UNASSIGNED,
-  UNDEFINED_RC1,
   addDaysIso,
   baseCode,
   classifyLoss,
@@ -130,36 +129,8 @@ const chartOf = (code: string, c: OeeConfig) => {
 }
 const hiddenGroup = (code: string, c: OeeConfig) => !!c.lossGroups.find((g) => g.code === baseCode(code))?.hidden
 
-/**
- * Grubu "#" olan duruş: Reason Code 2 "#" (planlamacı, 2026-10-07: köprünün
- * hesaplarından çıkar). Hiçbir kaleme, Level 3'e, parça / vardiya kırılımına
- * girmez; Loading − Production'ın parçası olduğundan "Not explained" farkında
- * kalır (köprü yine kapanır, OEE değişmez).
- * Reason Code 1 "#" bundan ayrıdır (planlamacı, 2026-10-26): operatörün
- * tanımlamadığı duruştur, kayıptır ve "Unassigned" kalemine girer (classifyLoss).
- */
-export const isUndefinedCode = (rc1: string, rc2: string) => rc1 !== UNDEFINED_RC1 && baseCode(rc2) === '#'
-
-const withoutUndefined = (l: LossDay): LossDay => {
-  const keep = (rec: Record<string, [number, number]>) =>
-    Object.fromEntries(
-      Object.entries(rec).filter(([k]) => {
-        const [rc1, rc2] = k.split('|')
-        return !isUndefinedCode(rc1, rc2)
-      }),
-    )
-  return { ...l, codes: keep(l.codes), reasons: keep(l.reasons), ...(l.parts && { parts: keep(l.parts) }) }
-}
-
-/** "#" duruşlarının dakikası (veri notu için). */
-const undefinedMinutes = (list: LossDay[]) =>
-  sum(
-    list.flatMap((l) =>
-      Object.entries(l.codes)
-        .filter(([k]) => isUndefinedCode(k.split('|')[0], k.split('|')[1]))
-        .map(([, [m]]) => m),
-    ),
-  )
+// Tanımsız duruşlar (Reason Code 1 ya da 2 "#"): kayıptır ve "Unassigned" kalemine girer
+// (classifyLoss, planlamacı 2026-10-26). 2026-10-07'deki "# hesap dışı" kuralı kalktı.
 
 /** Kayıp grubu (classifyLoss) → [dakika, adet]. */
 function groupMinutes(lossDays: LossDay[], c: OeeConfig): Map<string, [number, number]> {
@@ -247,15 +218,13 @@ const rankableColumn = (label: string, groups: string[], c: OeeConfig) =>
  * Köprü. `days` ve `lossDays` seçilen kapsam ve döneme süzülmüş olmalı.
  * Taban Loading time (= %100); planlı duruşlar köprüye girmez.
  */
-export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig): Bridge {
-  const allLossDays = rawLossDays.map(withoutUndefined)
+export function buildBridge(days: DayRow[], allLossDays: LossDay[], c: OeeConfig): Bridge {
   // Zaman tabanı gün × makine kayıtlarıdır: duruşlar yalnızca vardiya verisi
   // olan gün × makinede sayılır (vardiyası olmayan günün duruşu — ör. hiç
   // çalışılmamış vardiyanın 480 dk "scheduled downtime" kaydı — tabanı olmadan
   // kayıp sayılmasın). Eşleşmeyenler veri notunda.
   const dayKeys = new Set(days.filter((d) => d.loadingMin + d.scheduledMin > 0).map(key))
   const lossDays = matchedLossDays(days, allLossDays)
-  const undefinedMin = undefinedMinutes(matchedLossDays(days, rawLossDays))
   const lossKeys = new Set(allLossDays.map(key))
   const coverage = {
     dayRows: dayKeys.size,
@@ -434,10 +403,6 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
       const rc1 = k.split('|')[0]
       if (!isLossRc1(rc1, c) && !isBreakRc1(rc1, c)) unclassified += m
     }
-  if (undefinedMin >= 0.5)
-    warnings.push(
-      `${Math.round(undefinedMin)} min of downtime with Reason Code 2 “#” (undefined) are left out of the loss items — they are part of “${NOT_EXPLAINED}”.`,
-    )
   if (unclassified >= 0.5)
     warnings.push(
       `${Math.round(unclassified)} min of downtime have a Reason Code 1 that is neither a loss nor a break (OEE Settings) — counted in “${NOT_EXPLAINED}”.`,
@@ -573,15 +538,9 @@ export const NOT_IN_ORDERS = 'Not in order data'
  */
 export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Set, prev: Level3Set): Level3Row[] {
   const map = new Map<string, Level3Row>()
-  // "#" duruşları köprüdeki gibi dışarıda.
-  const clean = (set: Level3Set): Level3Set => ({
-    ...set,
-    lossDays: set.lossDays.map(withoutUndefined),
-    events: set.events?.map((d) => ({ ...d, events: d.events.filter((e) => !isUndefinedCode(e.rc1, e.rc2)) })),
-  })
   const sets = [
-    [clean(cur), false],
-    [clean(prev), true],
+    [cur, false],
+    [prev, true],
   ] as const
 
   if (item.key === 'pf:speed') {
