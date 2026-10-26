@@ -1,9 +1,10 @@
 # 08 · Sürüm günlüğü
 
-> Son güncelleme: 2026-10-25 (haritada kullanıcı hesabı: e-posta, aktif, creator) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
+> Son güncelleme: 2026-10-26 (köprüde kısa duruşlar kalem değil) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| — | 2026-10-26 | **Loss Bridge: < 2 dk kısa duruşlar kalem değil** — “KLP < 2 min”, “STP < 2 min” gibi adımlar kalktı; kısalar Speed loss'un içinde (not dakikasını yazar), analizi MTTR & MTBF süre kovalarında. Scrap / Reject kalır. | Planlamacı isteği; A, availability kaybı ve “Not explained” değişmez (`oeeShortStops.test.ts`). |
 | — | 2026-10-25 | **Organization map: kullanıcı hesabı** — *Users & groups* görünümünde kullanıcı düğümünün panelinde *Account*: e-posta, *Active*, *Creator* (*Save account*; ad ve gruplar korunur). Alanlar tek kaynak: `src/components/people/UserAccount.tsx` (`UserAccountFields`), Users & permissions kullanıcı paneliyle ortak | Eski sayfaları kaldırma öncesi son eksik (kullanıcı kararı 2026-10-25); sunucu (`users.update`) ve şema değişmedi |
 | #79 | 2026-10-25 | **Organization map: parola, her yerden çıkış, güvenlik kontrolü** — *Users & groups* görünümünde kullanıcı düğümünün panelinde *Sign-in*: son giriş, kilit, *Sign out everywhere*, *Set / Reset password*; şirket düğümünde katlanır *Security check* (`SecurityPanel`). Bileşen tek kaynak: `src/components/people/UserSignIn.tsx`, Users & permissions kullanıcı paneliyle ortak | Eski sayfaları kaldırma öncesi son eksik (kullanıcı kararı 2026-10-25); sunucu (`users.signOutEverywhere`, `auth.setPasswordAsAdmin`, `platform.securityOverview`) ve şema değişmedi |
 | #77 | 2026-10-25 | **Organization map: grup izinleri** — *Users & groups* görünümünde grup düğümünün panelinde *Access*: Board grubu, gördüğü plant'ler ve modül / alan izin matrisi (*Save access*). Alanlar tek kaynak: `src/components/people/GroupAccess.tsx` (`GroupAccessFields`), Users & permissions grup paneliyle ortak | Eski sayfaları kaldırma öncesi eksiklerin haritaya taşınması (kullanıcı kararı 2026-10-25); sunucu (`users.saveGroup`) ve şema değişmedi |

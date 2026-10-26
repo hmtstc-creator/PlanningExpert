@@ -697,8 +697,10 @@ Uygulama:
   trendler, haftalık / aylık, Daily Report, Board, KPI). Kısa duruşlar zaten P'nin içinde.
 - Kayıp ekranları aynı kodu **olay süresine göre** böler (`src/lib/oeeShortStops.ts`): kayıp özeti
   (`oeeLossDays`) süre histogramıyla (`oeeStopDays`, dilim = tam dakika) ikiye ayrılır; kısa duruşlar
-  `ARZ<` gibi ayrı Reason Code 2 olur. Loss Bridge: uzunlar availability kalemi, kısalar "Machine < 2 min"
-  performans kalemi; hız kaybı = Production − Operation − kısa duruşlar; Availability = MES A. Losses
+  `ARZ<` gibi ayrı Reason Code 2 olur. Loss Bridge: uzunlar availability kalemi; kısalar **köprüde kalem
+  değil** (2026-10-26, planlamacı: "2 dk altı görünmesin, ayrı yerde analiz edeceğiz") — hız kaybının
+  (Production − Operation) içinde kalır, adım notu dakikasını yazar, analizi MTTR & MTBF süre kovalarında;
+  Availability = MES A, kısalar availability'yi ve "Not explained"ı etkilemez (testle denetlenir). Losses
   Trend: "Short stops" sütunu, Speed = Production − Operation − kısa duruşlar. Toplam ve OEE değişmez.
 - Eşik tek yerde: OEE Settings → Numbers → *Short-stop limit* (`shortStopMin`, varsayılan
   `MES_SHORT_STOP_MIN` = 2, tam dakika). 2'den farklıysa A / P yine MES'tir (vardiya ve MES haftalık /
