@@ -9,6 +9,7 @@ import {
   type LossDay,
   type ParsedOee,
 } from './oee'
+import { downtimeKey, mergeDowntimes } from './oeeDedup'
 
 type Cell = string | number
 
@@ -129,19 +130,18 @@ export function fromStoredLoss(l: StoredLossDay): LossDay | null {
 /** Okunabilen (yeni biçimdeki) kayıp özetleri. */
 export const fromStoredLosses = (list: StoredLossDay[]): LossDay[] => list.map(fromStoredLoss).filter((x): x is LossDay => x !== null)
 
-/** Bir duruşun kimliği: aynı iş merkezinde aynı başlangıç anı ve sipariş aynı duruştur. */
-export const eventKey = (e: DowntimeEvent) => `${e.startDate}|${e.startTime}|${e.order}`
+/**
+ * Bir duruşun kimliği: aynı iş merkezinde aynı başlangıç ve bitiş anı aynı
+ * duruştur; sipariş anahtara girmez (planlamacı, 2026-10-26 — src/lib/oeeDedup.ts).
+ */
+export const eventKey = downtimeKey
 
 /**
  * Aynı gün × iş merkezinin eski ve yeni duruşları: yeni dosyadaki satır aynı
  * duruşsa (eventKey) eskisinin yerine geçer (ör. nedeni sonradan
  * düzeltilmiş), değilse eklenir. Eski satır silinmez. Sıra: başlangıç anı.
  */
-export function mergeEvents(existing: DowntimeEvent[], incoming: DowntimeEvent[]): DowntimeEvent[] {
-  const map = new Map(existing.map((e) => [eventKey(e), e]))
-  for (const e of incoming) map.set(eventKey(e), e)
-  return [...map.values()].sort((a, b) => `${a.startDate} ${a.startTime}`.localeCompare(`${b.startDate} ${b.startTime}`))
-}
+export const mergeEvents = mergeDowntimes
 
 // ---- yükleme -------------------------------------------------------------------
 

@@ -783,3 +783,25 @@ Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **
   bırakıyor, o süredeki duruşlar Downtimes'ta kalıyor. **Düzeltme yapılmadı.**
 - Excel'in %80'i 344 ÷ ≈ 430 dk'ya (vardiya − planlı duruş) uyuyor: Excel paydası MES Loading değil olabilir —
   Excel formülüyle doğrulanmalı (açık soru). Köprü fazlayı "Over-recorded downtime" adımında gösterir.
+
+## Tekrar satır kuralı ve Check duplicates (2026-10-26, planlamacı)
+
+Bağlam: canlı Asakai'de 23.10 PRS-110 vardiya 2 KLP Excel'in ≈3 katı görünüyordu; planlamacı farkın
+Excel hatası olduğunu doğruladı (site doğru). Karar **önleme amaçlı**:
+
+- **Duruş:** aynı makine (Work Center) + aynı başlangıç (StartDate + StartTime) + aynı bitiş
+  (EndDate + EndTime) = aynı duruş, tek satır. Sipariş anahtara girmez (önceki kimlik: başlangıç +
+  sipariş). Yeni yüklenen eskisinin yerine geçer: dosyanın içinde son satır, saklı veride önceki /
+  sonraki günün (± 1) kaydında kalan eski kopya silinir. Başlangıç ya da bitiş saati olmayan satır
+  ayıklanmaz. Etkilenen günlerin kayıp özeti (`oeeLossDays`, parça kırılımı dahil) ve süre histogramı
+  (`oeeStopDays`) yeniden hesaplanır.
+- **Vardiya (Shiftly KPI):** aynı gün + vardiya (Shift Group) + makine — yükleme bu anahtarla zaten
+  üzerine yazıyordu. Artık anahtarda birden çok kayıt bulunursa ilki güncellenir, fazlası silinir;
+  gün toplamı (`oeeDays`) aynı kuralla tek kayıt.
+- **Check duplicates** (OEE Data, `oee.data` düzenleme yetkisi): bütün saklı duruş ve vardiya
+  satırlarını sayfa sayfa tarar (duruş 20, vardiya 150 kayıt / çağrı), bulunanı gösterir (satır,
+  dakika, gün × makine, fazla özet kaydı); onaylanınca siler ve özetleri yeniden hesaplar. Yalnız
+  seçili fabrika. Aynı gün × makinenin fazla kaydı bütünüyle silinir (yükleme hep ilk kaydı
+  yeniler); iki günde aynı duruş varsa sonraki günün kaydı kalır.
+- Kod: kural `src/lib/oeeDedup.ts` (testli: 3 kez yüklenmiş 115 dk KLP → 1 satır, 115 dk), sunucu
+  `convex/oee.ts` (`upsertDowntimeDays`, `upsertShifts`, `duplicates`). Şema değişmedi.
