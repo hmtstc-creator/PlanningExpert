@@ -7,7 +7,7 @@ import { InfoTip, PageHeader } from '../../components/PageHeader'
 import { useMutation, useQuery } from '../../lib/convexTransport'
 import { friendlyError } from '../../lib/mutationErrors'
 import { agentThresholds, groupRole, type AgentThresholds } from '../../lib/oeeAgent'
-import { MES_SHORT_STOP_MIN, addDaysIso, configProblems, shortStopMinOf, dataCostCenters, lossDayOf, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
+import { MES_SHORT_STOP_MIN, UNASSIGNED, UNDEFINED_RC1, addDaysIso, configProblems, shortStopMinOf, dataCostCenters, lossDayOf, suggestConfig, withPlantCostCenters, type DayRow, type OeeConfig, type Pick, type ShiftRow } from '../../lib/oee'
 import { defaultLossMeaning, undefinedLossCodes } from '../../lib/oeeInsights'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
 import { useCanOpen, usePlant } from '../../lib/plantContext'
@@ -251,27 +251,36 @@ function OeeSettingsPage() {
         )}
       </Card>
 
-      <Card title="Reason Code 1" info="Which downtimes count as a loss (their minutes ÷ loading time) and which are planned breaks (shown apart after a setup).">
+      <Card
+        title="Reason Code 1"
+        info={`Which downtimes count as a loss (their minutes ÷ loading time) and which are planned breaks (shown apart after a setup). Reason Code 1 “${UNDEFINED_RC1}” means the operator did not define the stop: it is always a loss and shows as ${UNASSIGNED} on every OEE page, whatever its Reason Code 2 (its short stops stay in Short stops).`}
+      >
         <Rows
           head={['Reason Code 1', 'Counts as']}
           rows={rc1Values.map((v) => [
             v,
-            <select
-              key="k"
-              className={input}
-              value={c.lossReasonCodes.includes(v) ? 'loss' : c.breakReasonCodes.includes(v) ? 'break' : 'none'}
-              onChange={(e) => {
-                const lossReasonCodes = c.lossReasonCodes.filter((x) => x !== v)
-                const breakReasonCodes = c.breakReasonCodes.filter((x) => x !== v)
-                if (e.target.value === 'loss') lossReasonCodes.push(v)
-                if (e.target.value === 'break') breakReasonCodes.push(v)
-                set({ lossReasonCodes, breakReasonCodes })
-              }}
-            >
-              <option value="loss">Loss</option>
-              <option value="break">Planned break</option>
-              <option value="none">Neither</option>
-            </select>,
+            v === UNDEFINED_RC1 ? (
+              <span key="k" className="text-sm text-muted-foreground">
+                Loss — not defined by the operator, shown as {UNASSIGNED}
+              </span>
+            ) : (
+              <select
+                key="k"
+                className={input}
+                value={c.lossReasonCodes.includes(v) ? 'loss' : c.breakReasonCodes.includes(v) ? 'break' : 'none'}
+                onChange={(e) => {
+                  const lossReasonCodes = c.lossReasonCodes.filter((x) => x !== v)
+                  const breakReasonCodes = c.breakReasonCodes.filter((x) => x !== v)
+                  if (e.target.value === 'loss') lossReasonCodes.push(v)
+                  if (e.target.value === 'break') breakReasonCodes.push(v)
+                  set({ lossReasonCodes, breakReasonCodes })
+                }}
+              >
+                <option value="loss">Loss</option>
+                <option value="break">Planned break</option>
+                <option value="none">Neither</option>
+              </select>
+            ),
           ])}
         />
       </Card>

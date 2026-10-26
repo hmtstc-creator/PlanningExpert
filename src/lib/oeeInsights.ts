@@ -10,7 +10,7 @@
 // yapay zekâ yoksa en güçlü 3 sinyal kurallarla gösterilir.
 // Kararlar: docs/oee-agent-report.md → Agent Insights.
 
-import { baseCode, groupLabel, isShortCode, ratios, shiftNumber, shortStopMinOf, type DayRow, type LossDay, type OeeConfig, type OeeTimes, type OrderRow, type ShiftRow } from './oee'
+import { UNASSIGNED, baseCode, classifyLossKey, groupLabel, isShortCode, ratios, shiftNumber, shortStopMinOf, type DayRow, type LossDay, type OeeConfig, type OeeTimes, type OrderRow, type ShiftRow } from './oee'
 import type { StopDay } from './oeeReliability'
 import { splitShortStops } from './oeeShortStops'
 import { LOSS_CODE_MEANINGS } from './settingsDefaults'
@@ -189,26 +189,27 @@ interface ReasonEntry extends LossEntry {
   text: string
 }
 
-/** Kayıp sayılan duruşlar (Reason Code 1 kayıp listesinde), "#" dahil. */
+/** Kayıp sayılan duruşlar (classifyLoss), "#" dahil; RC1 "#" grubu Unassigned. */
 function lossEntries(losses: LossDay[], c: OeeConfig): { codes: LossEntry[]; parts: PartEntry[]; reasons: ReasonEntry[] } {
   const codes: LossEntry[] = []
   const parts: PartEntry[] = []
   const reasons: ReasonEntry[] = []
   for (const l of losses) {
     for (const [k, [min, count]] of Object.entries(l.reasons ?? {})) {
-      const [rc1, rc2, ...rest] = k.split('|')
-      if (!c.lossReasonCodes.includes(rc1)) continue
-      reasons.push({ date: l.date, workCenter: l.workCenter, group: rc2 || '#', text: rest.join('|').trim().toUpperCase() || '(no text)', min, count })
+      const cls = classifyLossKey(k, c)
+      if (!cls) continue
+      reasons.push({ date: l.date, workCenter: l.workCenter, group: cls.group || '#', text: cls.rest.trim().toUpperCase() || '(no text)', min, count })
     }
     for (const [k, [min, count]] of Object.entries(l.codes)) {
-      const [rc1, rc2] = k.split('|')
-      if (!c.lossReasonCodes.includes(rc1)) continue
-      codes.push({ date: l.date, workCenter: l.workCenter, group: rc2 || '#', min, count })
+      const cls = classifyLossKey(k, c)
+      if (!cls) continue
+      codes.push({ date: l.date, workCenter: l.workCenter, group: cls.group || '#', min, count })
     }
     for (const [k, [min, count]] of Object.entries(l.parts ?? {})) {
-      const [rc1, rc2, part] = k.split('|')
-      if (!c.lossReasonCodes.includes(rc1) || !part || part === '#') continue
-      parts.push({ date: l.date, workCenter: l.workCenter, group: rc2 || '#', part, min, count })
+      const cls = classifyLossKey(k, c)
+      const part = cls?.rest.split('|')[0]
+      if (!cls || !part || part === '#') continue
+      parts.push({ date: l.date, workCenter: l.workCenter, group: cls.group || '#', part, min, count })
     }
   }
   return { codes, parts, reasons }
@@ -274,6 +275,8 @@ export function lossCodeMeanings(c: OeeConfig, undefinedCodes: string[] = []): R
     const m = defaultLossMeaning(code, c)
     out[code] = `not defined in OEE Settings${m ? `; ${m}` : ''}`
   }
+  // RC1 "#" duruşlarının grubu (classifyLoss): operatör sebep girmemiş.
+  out[UNASSIGNED] ??= 'Unassigned: Reason Code 1 “#” — the operator did not define the stop; counted as a loss'
   return out
 }
 
@@ -289,9 +292,11 @@ export function undefinedLossCodes(losses: LossDay[], c: OeeConfig): UndefinedCo
   const by = new Map<string, UndefinedCode>()
   for (const l of losses) {
     for (const [k, [min, count]] of Object.entries(l.codes)) {
-      const [rc1, rc2] = k.split('|')
-      const code = rc2 || '#'
-      if (!c.lossReasonCodes.includes(rc1) || known.has(code)) continue
+      // RC1 "#" → Unassigned: programın kendi grubudur, ayarda tanımlanmaz.
+      const group = classifyLossKey(k, c)?.group
+      if (group === undefined || baseCode(group) === UNASSIGNED) continue
+      const code = group || '#'
+      if (known.has(code)) continue
       const x = by.get(code) ?? { code, min: 0, count: 0 }
       x.min += min
       x.count += count

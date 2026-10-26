@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import fixture from './oee.fixture.json'
 import {
+  UNASSIGNED,
   daysFromShifts,
   inScope,
   lossDayOf,
@@ -339,37 +340,61 @@ describe('denetçi bulguları (2026-10-06)', () => {
     expect(sumRows(speedRows)).toBeCloseTo(0, 9)
   })
 
-  it('"#" duruşları hesaptan çıkar: kalem yok, fark adımında kalır, köprü kapanır, OEE aynı', () => {
+  it('Reason Code 2 "#" duruşları hesaptan çıkar: kalem yok, fark adımında kalır, köprü kapanır, OEE aynı', () => {
+    // Fixture'daki "#" duruşları RC1 "#"tır; RC2 kuralını göstermek için RC1'i kayıp koduna çevir.
+    const rc2Only = pLoss.map((l) => {
+      const swap = (rec: Record<string, [number, number]>) =>
+        Object.fromEntries(Object.entries(rec).map(([k, v]) => [k.startsWith('#|') ? `UNSCD_DOWN|${k.slice(2)}` : k, v]))
+      return { ...l, codes: swap(l.codes), reasons: swap(l.reasons), ...(l.parts && { parts: swap(l.parts) }) }
+    })
     const open = { ...plant, lossGroups: plant.lossGroups.map((g) => (g.code === '#' ? { ...g, hidden: false } : g)) }
-    const b = buildBridge(pDays, pLoss, open)
+    const b = buildBridge(pDays, rc2Only, open)
     expectCloses(b)
     expect(b.items.some((i) => i.groups.includes('#'))).toBe(false)
     expect(b.oee).toBeCloseTo(ratios(sumTimes(pDays)).oee!, 9)
-    // "#" dakikaları kadar fark adımı büyür (kayıtlar daha az açıklar).
-    const hash = pLoss.reduce(
+    const hash = rc2Only.reduce(
       (a, l) =>
         a +
         Object.entries(l.codes)
-          .filter(([k]) => k.split('|').includes('#'))
+          .filter(([k]) => k.split('|')[1] === '#')
           .reduce((x, [, [m]]) => x + m, 0),
       0,
     )
     expect(hash).toBeGreaterThan(0)
-    const withHash = { ...plant, lossReasonCodes: plant.lossReasonCodes }
     const recorded = (x: typeof b) =>
       x.items.filter((i) => i.family === 'availability' && i.key !== 'av:unexplained').reduce((a, i) => a + i.minutes, 0)
     expect(b.totals.loading - b.totals.production - recorded(b)).toBeCloseTo(b.notExplained, 6)
-    expect(buildBridge(pDays, pLoss, withHash).warnings.some((w) => w.includes('Reason Code “#”'))).toBe(true)
+    expect(b.warnings.some((w) => w.includes('Reason Code 2 “#”'))).toBe(true)
     // Level 3 de "#" görmez: açıklanmayanın makine kırılımı adımla aynı.
     const un = b.items.find((i) => i.key === 'av:unexplained')!
     const rows = level3(
       un,
       'machine',
       open,
-      { days: pDays, lossDays: matchedLossDays(pDays, pLoss), orders: [] },
+      { days: pDays, lossDays: matchedLossDays(pDays, rc2Only), orders: [] },
       { days: [], lossDays: [], orders: [] },
     )
     expect(rows.reduce((a, r) => a + r.minutes, 0)).toBeCloseTo(b.notExplained, 6)
+    // Reason Code 1 "#" (planlamacı, 2026-10-26): aynı dakikalar kayıptır, "Unassigned" kalemi olur.
+    const rc1 = buildBridge(pDays, pLoss, open)
+    expectCloses(rc1)
+    const unassigned = rc1.items.find((i) => i.label === UNASSIGNED)!
+    const rc1Min = matchedLossDays(pDays, pLoss).reduce(
+      (a, l) =>
+        a +
+        Object.entries(l.codes)
+          .filter(([k]) => k.startsWith('#|'))
+          .reduce((x, [, [m]]) => x + m, 0),
+      0,
+    )
+    expect(rc1Min).toBeGreaterThan(0)
+    expect(unassigned.minutes).toBeCloseTo(rc1Min, 6)
+    expect(unassigned.groups).toEqual([UNASSIGNED])
+    expect(b.notExplained - rc1.notExplained).toBeCloseTo(rc1Min, 6)
+    expect(rc1.oee).toBeCloseTo(b.oee!, 9)
+    expect(rc1.warnings.some((w) => w.includes('“#”'))).toBe(false)
+    const unRows = level3(unassigned, 'machine', open, { days: pDays, lossDays: matchedLossDays(pDays, pLoss), orders: [] }, { days: [], lossDays: [], orders: [] })
+    expect(unRows.reduce((a, r) => a + r.minutes, 0)).toBeCloseTo(rc1Min, 6)
   })
 })
 

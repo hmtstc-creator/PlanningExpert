@@ -745,3 +745,19 @@ Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **
   sayılmaz.
 - Excel'den farklar: hız kaybı eksiye düşmez (Production − Operation − kısa duruş, en az 0); gün etiketleri "21.09"
   (Excel'de "00/mm" hatası); gelecek aylar 0% yerine boş.
+
+## Reason Code 1 "#" = Unassigned (2026-10-26, planlamacı)
+
+- Reason Code 1 **"#"** = duruşu operatör tanımlamamış. Reason Code 2 ne olursa olsun bu kayıp **her yerde
+  Unassigned** (`UNASSIGNED`) altında görünür ve **kayıp sayılır** — ayarda `lossReasonCodes` içinde "#" olmasa
+  bile; planlı duruş (`breakReasonCodes`) sayılmaz. Ör. RC1 "#" / RC2 "STP" 30 dk → Unassigned 30 dk, Setup 0.
+- Kural **tek yerde**: `src/lib/oee.ts` → `UNDEFINED_RC1`, `isLossRc1`, `isBreakRc1`, `classifyLoss` /
+  `classifyLossKey` (rc1 + rc2 → kayıp mı, grup kodu, grafik sütunu). Losses Trend (`lossBreakdown`, `subLosses`,
+  `chartGroups`), Loss Bridge ve Level 3, kısa duruş bölmesi, Asakai, Daily Report, Agent Report, Agent Insights,
+  Open Topics, MTTR / MTBF parça listeleri bunu kullanır.
+- **Kısa duruş** ayrımı aynen çalışır: `#|STP<` → grup `Unassigned<` → *Short stops* (hız kaybı); ≥ eşik → Unassigned.
+- Özetler ham kodla (`${rc1}|${rc2}`) durur; gruplama okurken yapılır — veri taşıması / şema değişikliği yok.
+- 2026-10-07 köprü kararı ("#" duruşları hesaptan çıkar) artık yalnız **Reason Code 2 "#"** (gerçek bir kayıp
+  koduyla) için geçerli; o dakikalar "Not explained"da kalır. OEE ve A / P / Q değişmez (MES süreleri).
+- OEE Settings → Reason Code 1 kartında "#" seçilemez (sabit: *Loss — not defined by the operator*); Unassigned
+  "ayarda tanımsız kod" önerisine (Loss groups uyarısı) girmez.

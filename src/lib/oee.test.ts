@@ -42,6 +42,7 @@ import {
   type SheetRows,
   type WeeklyRow,
 } from './oee'
+import { SHORT_STOPS, SPEED, UNDEFINED_RC1, classifyLoss, isBreakRc1, isLossRc1, lossBreakdown } from './oee'
 import { OEE_SUGGESTED } from './settingsDefaults'
 
 // Veri: ASAKAI_2026_REV_12.xlsm'den kesit (Transfer 39. hafta vardiyaları,
@@ -158,7 +159,9 @@ describe('oee workbook', () => {
     // Ayarsız: masraf yeri "Unassigned" alanına düşer, veri kaybolmaz.
     expect(inScope(days[0], { area: 'Unassigned', key: 'all' }, EMPTY_CONFIG)).toBe(true)
     const b = lossForPeriod(days, parsed.downtimes.map(lossDayOf), { area: 'Unassigned', key: 'all' }, EMPTY_CONFIG, '2026-09-21', '2026-09-21')
-    expect(Object.keys(b.groups)).toEqual([])
+    // Ayarda kayıp kodu yok: yalnız Reason Code 1 "#" duruşları (operatör tanımlamamış) kayıptır,
+    // hepsi Unassigned'da (classifyLoss, planlamacı 2026-10-26).
+    expect(Object.keys(b.groups)).toEqual([UNASSIGNED])
   })
 
   it('suggests the settings from the codes in the data', () => {
@@ -516,5 +519,48 @@ describe('subLosses (Losses Trend: alt kayıplar)', () => {
   it('an unnamed group belongs to Unassigned', () => {
     const out = subLosses([day({ 'UNSCD_DOWN|XX|SOMETHING': [5, 1] })], cfg, UNASSIGNED)
     expect(out.get('SOMETHING')).toEqual({ minutes: 5, count: 1 })
+  })
+})
+
+describe('Reason Code 1 "#" → Unassigned (planlamacı, 2026-10-26)', () => {
+  const cfg: OeeConfig = {
+    ...EMPTY_CONFIG,
+    // "#" kayıp listesinde değil: yine de kayıptır.
+    lossReasonCodes: ['UNSCD_DOWN'],
+    breakReasonCodes: ['SCHED_DOWN'],
+    lossGroups: [
+      { code: 'STP', label: 'Setup', chart: 'Setup', breakdown: false },
+      { code: '#', label: 'Undefined', chart: '#', breakdown: false, hidden: true },
+    ],
+  }
+  const times = { ...sumTimes([]), loadingMin: 480, productionMin: 400, operatingMin: 390 }
+  const day = (codes: LossDay['codes'], reasons: LossDay['reasons'] = {}): LossDay => ({ date: '2026-10-19', costCenter: 'C', workCenter: 'W', codes, reasons })
+
+  it('RC1 "#" / RC2 "STP" 30 min → Unassigned 30 min, Setup 0', () => {
+    const b = lossBreakdown(times, [day({ '#|STP': [30, 1] })], cfg)
+    expect(b.groups).toEqual({ [UNASSIGNED]: 30 })
+    expect(b.chart[UNASSIGNED]).toBe(30)
+    expect(b.chart.Setup ?? 0).toBe(0)
+    expect(classifyLoss(UNDEFINED_RC1, 'STP', cfg)).toEqual({ group: UNASSIGNED, column: UNASSIGNED })
+    // RC2 "#" de ayardaki "#" grubuna değil Unassigned'a gider.
+    expect(classifyLoss('#', '#', cfg)?.column).toBe(UNASSIGNED)
+    expect(classifyLoss('UNSCD_DOWN', 'STP', cfg)).toEqual({ group: 'STP', column: 'Setup' })
+  })
+
+  it('kısa duruşlar Short stops, planlı duruşlar etkilenmez, alt kayıplar ve sütunlar aynı kuralla', () => {
+    const d = day(
+      { '#|STP': [30, 1], '#|STP<': [1.5, 1], 'UNSCD_DOWN|STP': [20, 1], 'SCHED_DOWN|UTS': [20, 1] },
+      { '#|STP|DIE SETUP': [30, 1], '#|STP<|DIE SETUP': [1.5, 1], 'UNSCD_DOWN|STP|DIE SETUP': [20, 1] },
+    )
+    const b = lossBreakdown(times, [d], cfg)
+    expect(b.groups).toEqual({ [UNASSIGNED]: 30, [`${UNASSIGNED}<`]: 1.5, STP: 20 })
+    expect(b.chart).toEqual({ [UNASSIGNED]: 30, [SHORT_STOPS]: 1.5, Setup: 20, [SPEED]: 8.5 })
+    expect(chartGroups(cfg, [d])).toEqual(['Setup', '#', UNASSIGNED, SHORT_STOPS, SPEED])
+    expect(Object.fromEntries(subLosses([d], cfg, UNASSIGNED))).toEqual({ 'DIE SETUP': { minutes: 30, count: 1 } })
+    expect(Object.fromEntries(subLosses([d], cfg, 'Setup'))).toEqual({ 'DIE SETUP': { minutes: 20, count: 1 } })
+    expect(isLossRc1('SCHED_DOWN', cfg)).toBe(false)
+    expect(isBreakRc1('SCHED_DOWN', cfg)).toBe(true)
+    // "#" planlı listede olsa bile planlı değildir, kayıptır.
+    expect(isBreakRc1('#', { ...cfg, breakReasonCodes: ['SCHED_DOWN', '#'] })).toBe(false)
   })
 })

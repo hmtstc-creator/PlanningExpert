@@ -324,6 +324,54 @@ export const baseCode = (rc2: string) => (isShortCode(rc2) ? rc2.slice(0, -SHORT
 /** Losses Trend'de kısa duruşların tek sütunu (hız kaybından ayrı). */
 export const SHORT_STOPS = 'Short stops'
 
+// ---- duruşun sınıfı (tek kaynak) ---------------------------------------------
+//
+// Planlamacı, 2026-10-26: Reason Code 1 = "#" ise duruş operatör tarafından
+// tanımlanmamıştır. Reason Code 2 ne olursa olsun kayıp sayılır (ayarda
+// lossReasonCodes içinde "#" olmasa bile) ve her yerde "Unassigned" grubunda
+// görünür. Özetler ham kodla (`${rc1}|${rc2}`) durur; gruplama okurken yapılır.
+// Kayıp ekranlarının hepsi aşağıdaki fonksiyonları kullanır.
+
+/** Operatörün tanımlamadığı duruşun Reason Code 1'i. */
+export const UNDEFINED_RC1 = '#'
+
+export interface LossClass {
+  /** Kayıp grubu kodu: Reason Code 2 ya da (RC1 "#") Unassigned; kısa duruşsa sonda `<`. */
+  group: string
+  /** Grafik sütunu: ayardaki Chart column, tanımsız grup Unassigned, kısa duruş Short stops. */
+  column: string
+}
+
+/** Kayıp sayılan Reason Code 1 mi: "#" her zaman, diğerleri OEE Settings'teki listeden. */
+export const isLossRc1 = (rc1: string, c: OeeConfig): boolean =>
+  rc1 === UNDEFINED_RC1 || c.lossReasonCodes.includes(rc1)
+
+/** Planlı duruş (mola …) Reason Code 1'i mi: "#" hiçbir zaman planlı değildir. */
+export const isBreakRc1 = (rc1: string, c: OeeConfig): boolean =>
+  rc1 !== UNDEFINED_RC1 && c.breakReasonCodes.includes(rc1)
+
+/** Kayıp grubunun (kodun) grafik sütunu; ayarda yoksa "Unassigned"; kısa duruş "Short stops". */
+export const lossColumnOf = (group: string, c: OeeConfig): string =>
+  isShortCode(group) ? SHORT_STOPS : group === UNASSIGNED ? UNASSIGNED : c.lossGroups.find((g) => g.code === group)?.chart || UNASSIGNED
+
+/**
+ * Bir duruşun (Reason Code 1 + 2) sınıfı — TEK KAYNAK. Kayıp değilse null.
+ * RC1 "#": grup Unassigned (kısa duruşsa `Unassigned<` → Short stops), RC2'ye bakılmaz.
+ * Ör. RC1 "#" / RC2 "STP" 30 dk → Unassigned 30 dk, Setup (STP) 0.
+ */
+export function classifyLoss(rc1: string, rc2: string, c: OeeConfig): LossClass | null {
+  if (!isLossRc1(rc1, c)) return null
+  const group = rc1 === UNDEFINED_RC1 ? (isShortCode(rc2) ? UNASSIGNED + SHORT_MARK : UNASSIGNED) : rc2
+  return { group, column: lossColumnOf(group, c) }
+}
+
+/** Özet anahtarının (`rc1|rc2|…`) kayıp sınıfı ve kalanı (metin / parça). */
+export function classifyLossKey(key: string, c: OeeConfig): (LossClass & { rc1: string; rc2: string; rest: string }) | null {
+  const [rc1, rc2 = '', ...rest] = key.split('|')
+  const cls = classifyLoss(rc1, rc2, c)
+  return cls && { ...cls, rc1, rc2, rest: rest.join('|') }
+}
+
 // ---- oranlar -----------------------------------------------------------------
 
 export interface OeeRatios {
@@ -684,11 +732,9 @@ export function lossDayOf(day: DowntimeDay): LossDay {
 export function chartGroups(c: OeeConfig, lossDays: LossDay[] = []): string[] {
   const out: string[] = []
   for (const g of c.lossGroups) if (g.chart && !out.includes(g.chart)) out.push(g.chart)
-  const known = new Set(c.lossGroups.map((g) => g.code))
-  const lossKeys = lossDays.flatMap((d) => Object.keys(d.codes).map((k) => k.split('|'))).filter(([rc1]) => c.lossReasonCodes.includes(rc1))
-  const hasUnknown = lossKeys.some(([, rc2]) => !isShortCode(rc2) && !known.has(rc2))
-  if (hasUnknown && !out.includes(UNASSIGNED)) out.push(UNASSIGNED)
-  if (lossKeys.some(([, rc2]) => isShortCode(rc2)) && !out.includes(SHORT_STOPS)) out.push(SHORT_STOPS)
+  const lossCols = new Set(lossDays.flatMap((d) => Object.keys(d.codes).map((k) => classifyLossKey(k, c)?.column ?? '')))
+  if (lossCols.has(UNASSIGNED) && !out.includes(UNASSIGNED)) out.push(UNASSIGNED)
+  if (lossCols.has(SHORT_STOPS) && !out.includes(SHORT_STOPS)) out.push(SHORT_STOPS)
   out.push(SPEED)
   return out
 }
@@ -721,22 +767,17 @@ export function lossBreakdown(times: OeeTimes, lossDays: LossDay[], c: OeeConfig
   const chart: Record<string, number> = {}
   for (const d of lossDays) {
     for (const [k, [m, n]] of Object.entries(d.codes)) {
-      const [rc1, rc2] = k.split('|')
-      if (!c.lossReasonCodes.includes(rc1)) continue
-      groups[rc2] = (groups[rc2] ?? 0) + m
-      counts[rc2] = (counts[rc2] ?? 0) + n
-      const col = lossColumnOf(rc2, c)
-      chart[col] = (chart[col] ?? 0) + m
+      const cls = classifyLossKey(k, c)
+      if (!cls) continue
+      groups[cls.group] = (groups[cls.group] ?? 0) + m
+      counts[cls.group] = (counts[cls.group] ?? 0) + n
+      chart[cls.column] = (chart[cls.column] ?? 0) + m
     }
   }
   // Kısa duruşlar MES'te Production − Operation'ın içindedir: hız kaybı kalan kısımdır.
   chart[SPEED] = Math.max(0, times.productionMin - times.operatingMin - (chart[SHORT_STOPS] ?? 0))
   return { loadingMin: times.loadingMin, groups, counts, chart, oee: oeeOf(times) }
 }
-
-/** Kayıp grubunun (Reason Code 2) grafik sütunu; ayarda yoksa "Unassigned"; kısa duruş "Short stops". */
-export const lossColumnOf = (rc2: string, c: OeeConfig) =>
-  isShortCode(rc2) ? SHORT_STOPS : c.lossGroups.find((g) => g.code === rc2)?.chart || UNASSIGNED
 
 /**
  * Bir kayıp sütununun alt kayıpları: kayıp sayılan duruşların metni (ör. STP →
@@ -747,9 +788,9 @@ export function subLosses(lossDays: LossDay[], c: OeeConfig, column: string): Ma
   const out = new Map<string, { minutes: number; count: number }>()
   for (const d of lossDays) {
     for (const [k, [m, n]] of Object.entries(d.reasons)) {
-      const [rc1, rc2, ...rest] = k.split('|')
-      if (!c.lossReasonCodes.includes(rc1) || lossColumnOf(rc2, c) !== column) continue
-      const text = rest.join('|') || rc2
+      const cls = classifyLossKey(k, c)
+      if (!cls || cls.column !== column) continue
+      const text = cls.rest || cls.rc2
       const row = out.get(text) ?? { minutes: 0, count: 0 }
       row.minutes += m
       row.count += n
@@ -839,10 +880,10 @@ export function reasonPareto(lossDays: LossDay[], scope: Scope, c: OeeConfig, mo
     if (!inScope(d, scope, c) || d.date < prev || d.date > end) continue
     const current = d.date >= monday
     for (const [k, [min, count]] of Object.entries(d.reasons)) {
-      const [rc1, rc2, ...rest] = k.split('|')
-      if (!c.lossReasonCodes.includes(rc1)) continue
-      const text = rest.join('|') || rc2
-      const row = map.get(text) ?? { text, group: rc2, minutes: 0, count: 0, previousMinutes: 0 }
+      const cls = classifyLossKey(k, c)
+      if (!cls) continue
+      const text = cls.rest || cls.rc2
+      const row = map.get(text) ?? { text, group: cls.group, minutes: 0, count: 0, previousMinutes: 0 }
       if (current) {
         row.minutes += min
         row.count += count
@@ -1067,7 +1108,7 @@ export function setupAnalysis(days: DowntimeDay[], orders: OrderRow[], scope: Sc
         if (sp.e <= b.e || sp.s >= windowEnd) continue
         const m = Math.min(sp.e, windowEnd) - Math.max(sp.s, b.e)
         if (m <= 0) continue
-        const key = c.breakReasonCodes.includes(sp.ev.rc1) ? BREAK_KEY : sp.ev.rc2 || '#'
+        const key = isBreakRc1(sp.ev.rc1, c) ? BREAK_KEY : classifyLoss(sp.ev.rc1, sp.ev.rc2, c)?.group ?? (sp.ev.rc2 || '#')
         lost[key] = (lost[key] ?? 0) + m
       }
       const status: SetupStatus = reached !== null ? 'ok' : next ? 'nok' : 'open'
@@ -1183,7 +1224,8 @@ export function suggestConfig(
   const isLoss = (v: string) => v === '#' || /UN/i.test(v)
   const lossReasonCodes = current.lossReasonCodes.length ? current.lossReasonCodes : [...rc1].filter(isLoss).sort()
   const breakReasonCodes = current.breakReasonCodes.length ? current.breakReasonCodes : [...rc1].filter((v) => v && !isLoss(v)).sort()
-  const rc2 = new Set(events.filter((e) => lossReasonCodes.includes(e.rc1)).map((e) => e.rc2 || '#'))
+  // RC1 "#" duruşları Unassigned'dadır (classifyLoss): kendi RC2 grubunu önermez.
+  const rc2 = new Set(events.filter((e) => e.rc1 !== UNDEFINED_RC1 && lossReasonCodes.includes(e.rc1)).map((e) => e.rc2 || '#'))
   const lossGroups = [...rc2].sort().map((code) => current.lossGroups.find((g) => g.code === code) ?? { code, label: code, chart: code, breakdown: false, hidden: code === '#' })
   const texts = new Set(events.map((e) => e.textEn.trim().toUpperCase()))
   const setupTexts = current.setupTexts.length
@@ -1747,7 +1789,7 @@ export function lossCoverage(days: DayRow[], lossDays: LossDay[], scope: Scope, 
     const l = lossBy.get(key(d))
     if (!l) continue
     let dt = 0
-    for (const [k, [m]] of Object.entries(l.codes)) if (c.lossReasonCodes.includes(k.split('|')[0])) dt += m
+    for (const [k, [m]] of Object.entries(l.codes)) if (isLossRc1(k.split('|')[0], c)) dt += m
     const w = perWc.get(d.workCenter) ?? { kpi: 0, downtimes: 0 }
     w.kpi += d.unscheduledMin
     w.downtimes += dt

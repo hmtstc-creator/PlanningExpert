@@ -150,6 +150,10 @@ tanımında standartlansın.
 
 ## "#" duruşları hesaptan çıkar (2026-10-07, planlamacı)
 
+> ~~Reason Code 1 ya da 2'si "#"~~ → yalnız **Reason Code 2 "#"** (2026-10-26): Reason Code 1 "#"
+> artık kayıptır ve **Unassigned** kalemine girer (`classifyLoss`, `src/lib/oee.ts`;
+> ayrıntı `docs/oeedashboard.md` → *Reason Code 1 "#" = Unassigned*).
+
 Reason Code 1 ya da 2'si "#" olan (tanımsız) duruşlar köprünün hiçbir
 kalemine, Level 3'e, parça ve vardiya kırılımına girmez
 (src/lib/oeeBridge.ts `isUndefinedCode`). OEE ve A / P / Q MES sürelerinden

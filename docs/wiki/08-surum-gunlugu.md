@@ -1,9 +1,10 @@
 # 08 · Sürüm günlüğü
 
-> Son güncelleme: 2026-10-26 (Asakai: kısa duruşlar hız kaybında) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
+> Son güncelleme: 2026-10-26 (OEE: Reason Code 1 "#" = Unassigned) · Kaynak: `git log` (her satır bir birleştirilmiş PR). **Yeni iş bitince en üste bir satır eklenir.**
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| — | 2026-10-26 | **OEE: Reason Code 1 "#" = Unassigned** — operatörün tanımlamadığı duruş RC2'den bağımsız her sayfada *Unassigned*, her zaman kayıp (ayarda "#" yoksa da), planlı değil; kısa duruşları *Short stops*. Tek kaynak `classifyLoss` (`src/lib/oee.ts`); köprü, Level 3, Asakai, ajanlar, Insights, Topics, MTTR/MTBF onu kullanır. Köprüde artık *Unassigned* kalemi; "#" hesap dışı kuralı yalnız RC2 "#" için | Planlamacı kararı 2026-10-26; özetler ham kodla, veri taşıması / şema değişikliği yok |
 | — | 2026-10-26 | **Asakai: kısa duruşlar (< 2 dk) sütun değil** — tablolarda ve günlük grafikte *Short stops* yok; süreleri SPEED_LOSS'un içinde (Loss Bridge'deki gibi, #81), kendi kodunda sayılmaz | Planlamacı 2026-10-26: "2 dk'nın altındakiler görünmesin" |
 | #85 | 2026-10-26 | **Asakai sütunları** — tablolarda "#" (tanımsız, UNDEFINED) görünür (grafikte gizli, tabloda var); UTS sütunu yok (`ASAKAI_DROP`); Unassigned yalnız süresi varsa; Detail'de Short stops sütunu geri geldi (sütunlar ayrılmış özetten) | Planlamacı, canlı ekran 2026-10-26: "UTS kaldır, # tanımsızlar gelmeli" |
 | #83 | 2026-10-26 | **OEE: Asakai weekly ve Asakai detail** — Excel "Metal Stamping Daily Follow Up" (masraf yeri başına blok; 30 iş yerinde de düzenli) ve vardiya × makine ayrıntısı, A4 yatay Save PDF (`sheetToPdf` → `widthPx`). Hesap `src/lib/oeeAsakai.ts` (mevcut `lossBreakdown`, `shiftSlice`, trendler; testli); çizim `src/components/AsakaiSheet.tsx`. Ayrıntı: `docs/oeedashboard.md` | Planlamacı talebi 2026-10-26; sunucu ve şema değişmedi, OEE hesabı değişmedi |

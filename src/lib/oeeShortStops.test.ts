@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import fixture from './oee.fixture.json'
 import {
   SHORT_STOPS,
+  UNASSIGNED,
   SPEED,
   daysFromShifts,
   inScope,
@@ -241,5 +242,22 @@ describe('MTTR / MTBF kovaları ve açık konular eşiği izler', () => {
     expect(total(b)).toBeCloseTo(total(a), 1)
     expect(b.some((r) => Object.keys(r.groups).some((g) => g.endsWith('<')))).toBe(true)
     expect(b.some((r) => Object.keys(r.groups).some((g) => g.startsWith('#')))).toBe(false)
+  })
+})
+
+describe('Reason Code 1 "#" kısa duruşları (2026-10-26)', () => {
+  it('"#" kayıp listesinde olmasa da bölünür: ≥ eşik Unassigned, < eşik Short stops', () => {
+    const cfg: OeeConfig = { ...plant, lossReasonCodes: ['UNSCD_DOWN'], lossGroups: plant.lossGroups.filter((g) => g.code !== '#') }
+    const base = { date: '2026-10-19', costCenter: 'C', workCenter: 'W' }
+    const loss: LossDay = { ...base, codes: { '#|STP': [31, 2] }, reasons: { '#|STP|X': [31, 2] } }
+    const stops = [{ ...base, bins: [{ rc1: '#', rc2: 'STP', text: 'X', bin: 1, count: 1, minutes: 1 }, { rc1: '#', rc2: 'STP', text: 'X', bin: 30, count: 1, minutes: 30 }] }]
+    const split = splitShortStops([loss], stops, cfg).lossDays
+    expect(split[0].codes).toEqual({ '#|STP': [30, 1], '#|STP<': [1, 1] })
+    const times = { ...sumTimes([]), loadingMin: 480, productionMin: 450, operatingMin: 440 }
+    const b = lossBreakdown(times, split, cfg)
+    expect(b.chart[UNASSIGNED]).toBe(30)
+    expect(b.chart[SHORT_STOPS]).toBe(1)
+    expect(b.chart[SPEED]).toBe(9)
+    expect(shortStopTotals(split, cfg)).toEqual({ minutes: 1, count: 1 })
   })
 })

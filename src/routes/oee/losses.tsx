@@ -184,7 +184,7 @@ function LossesPage() {
           <>
             <p>
               A loss is its downtime minutes (Downtimes; Reason Code 1 marked as a loss in Settings, grouped by
-              Reason Code 2 into the chart columns) ÷ Loading time of the same machines and days — "% of
+              Reason Code 2 into the chart columns; Reason Code 1 “#”, not defined by the operator, is always a loss under Unassigned) ÷ Loading time of the same machines and days — "% of
               Loading". <b>Speed</b> = (Production − Operation) ÷ Loading and has no sub-losses.
             </p>
             <p>
