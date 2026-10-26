@@ -105,6 +105,8 @@ export interface Bridge {
   outside: LossItem[]
   notExplained: number
   speed: number
+  /** Kısa duruşlar (< eşik): köprüde kalem değil, hız kaybının içinde (bilgi). */
+  shortStops: number
   warnings: string[]
   /** Köprüye giren gün × makine kayıtları ve duruş kaydı olmayanlar (veri notu). */
   coverage: { dayRows: number; withoutDowntimes: string[]; downtimesWithoutShift: string[] }
@@ -115,7 +117,7 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 /** Kayıp grubunun köprüdeki ailesi: kısa duruş kodu (`ARZ<`) performans, diğerleri availability. */
 export const familyOf = (code: string): LossFamily => (isShortCode(code) ? 'performance' : 'availability')
 
-/** Köprü kalemi: grafik sütunu; kısa duruşlar "<sütun> < 2 min" (aynı kod iki aileye bölünür). */
+/** Kalem etiketi: grafik sütunu; kısa duruşlar "<sütun> < 2 min" (Level 3 / ayrıntı). */
 const chartOf = (code: string, c: OeeConfig) => {
   const col = c.lossGroups.find((g) => g.code === baseCode(code))?.chart || UNASSIGNED
   return isShortCode(code) ? `${col} < ${shortStopMinOf(c)} min` : col
@@ -291,22 +293,18 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
     (code) => familyOf(code) === 'availability',
     (code) => chartOf(code, c),
   )
-  const perfCols = columns(
-    losses,
-    c,
-    (code) => familyOf(code) === 'performance',
-    (code) => chartOf(code, c),
-  )
+  // Kısa duruşlar (`ARZ<`, < eşik) köprüde kalem değildir (planlamacı, 2026-10-26: ayrı yerde,
+  // MTTR & MTBF süre kovalarında analiz edilir). MES onları Production'dan düşmez: hız kaybının
+  // içinde kalırlar; availability'ye ve "Not explained"a hiç girmezler.
+  const shortStops = sum([...losses].filter(([code]) => familyOf(code) === 'performance').map(([, [m]]) => m))
   // Köprüde büyükten küçüğe (Pareto gibi okunur).
   availCols.sort((a, b) => b.minutes - a.minutes)
-  perfCols.sort((a, b) => b.minutes - a.minutes)
   const recAvail = sum(availCols.map((x) => x.minutes))
-  const recPerf = sum(perfCols.map((x) => x.minutes))
   // Kayıtların Loading − Production ile farkı (az kayıt: açıklanmayan; fazla kayıt: eksi).
   // Kısa duruşlar Production'dan düşülmemiştir (MES): farka girmez, Production − Operation'dan çıkar.
   const notExplained = L - P - recAvail
   const C = P
-  const speed = P - Op - recPerf
+  const speed = P - Op
   const qualityMin = Op - E
   const scrapMin = pieces > 0 ? (qualityMin * scrap) / Math.max(1, scrap + reject) : 0
   const rejectMin = qualityMin - scrapMin
@@ -347,22 +345,13 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
     })
   }
   steps.push({ key: 'C', label: TOTAL_LABEL.C, kind: 'total', minutes: C, note: `Production time ÷ Loading time = ${pct(C, L)}` })
-  for (const p of perfCols)
-    steps.push({
-      key: `pf:${p.label}`,
-      label: p.label,
-      kind: 'loss',
-      family: 'performance',
-      minutes: p.minutes,
-      note: hiddenNote(p.groups),
-    })
   steps.push({
     key: 'pf:speed',
     label: speed < 0 ? SPEED_GAIN : SPEED_LOSS,
     kind: 'loss',
     family: 'performance',
     minutes: speed,
-    note: `Production − Operation time${recPerf ? ' − short stops' : ''}: ${pct(speed, C)} of the production time = ${pct(speed, L)} of the loading time`,
+    note: `Production − Operation time: ${pct(speed, C)} of the production time = ${pct(speed, L)} of the loading time${shortStops >= 0.5 ? `; includes ${Math.round(shortStops)} min of short stops < ${shortStopMinOf(c)} min (analysed on MTTR & MTBF)` : ''}`,
   })
   steps.push({
     key: 'D',
@@ -420,9 +409,6 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
       item(`av:${a.label}`, a.label, 'availability', a.minutes, a.count, a.groups, rankableColumn(a.label, a.groups, c)),
     ),
     ...(Math.abs(notExplained) >= 0.5 ? [item('av:unexplained', unexplainedLabel, 'availability', notExplained, 0, [], false)] : []),
-    ...perfCols.map((p) =>
-      item(`pf:${p.label}`, p.label, 'performance', p.minutes, p.count, p.groups, rankableColumn(p.label, p.groups, c)),
-    ),
     item('pf:speed', speed < 0 ? SPEED_GAIN : SPEED_LOSS, 'performance', speed, 0, [], speed > 0),
     item('q:scrap', 'Scrap', 'quality', scrapMin, scrap, [], scrapMin > 0),
     item('q:reject', 'Reject', 'quality', rejectMin, reject, [], rejectMin > 0),
@@ -485,6 +471,7 @@ export function buildBridge(days: DayRow[], rawLossDays: LossDay[], c: OeeConfig
     outside: plannedItems.filter((i) => Math.abs(i.minutes) >= 0.5).sort((a, b) => b.minutes - a.minutes),
     notExplained,
     speed,
+    shortStops,
     warnings,
     coverage,
   }
@@ -564,8 +551,6 @@ function qualityMinutes(days: DayRow[], scrap: boolean): { minutes: number; coun
 }
 
 export const NOT_IN_ORDERS = 'Not in order data'
-/** Hız kaybının parça kırılımında: kısa duruşlar ayrı kalem olduğu için düşülür. */
-export const SHORT_STOPS_ROW = 'Short stops (own items)'
 
 /**
  * Level 3 kırılımı. `cur` ve `prev`: bu ve önceki dönemin (kapsama süzülmüş,
@@ -593,14 +578,7 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
 
   if (item.key === 'pf:speed') {
     for (const [set, isPrev] of sets) {
-      // Kısa duruşlar kendi kalemleridir: makine başına düşülür (köprüyle aynı kural).
-      const short = new Map<string, number>()
-      for (const l of set.lossDays)
-        for (const [k, [m]] of Object.entries(l.codes)) {
-          const [rc1, rc2] = k.split('|')
-          if (c.lossReasonCodes.includes(rc1) && isShortCode(rc2)) short.set(l.workCenter, (short.get(l.workCenter) ?? 0) + m)
-        }
-      const shortTotal = sum([...short.values()])
+      // Kısa duruşlar hız kaybının içindedir (köprüde kalem değil): düşülmez.
       if (by === 'part') {
         let covered = 0
         for (const o of set.orders) {
@@ -610,10 +588,8 @@ export function level3(item: LossItem, by: Level3By, c: OeeConfig, cur: Level3Se
         }
         const total = sum(set.days.map((d) => d.productionMin - d.operatingMin))
         if (Math.abs(total - covered) >= 0.05) addRow(map, '__noorders', NOT_IN_ORDERS, total - covered, 0, isPrev)
-        if (shortTotal >= 0.05) addRow(map, '__short', SHORT_STOPS_ROW, -shortTotal, 0, isPrev)
       } else {
         for (const d of set.days) addRow(map, d.workCenter, d.workCenter, d.productionMin - d.operatingMin, 0, isPrev)
-        for (const [wc, m] of short) addRow(map, wc, wc, -m, 0, isPrev)
       }
     }
     return finish(map, false)

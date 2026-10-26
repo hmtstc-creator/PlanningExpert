@@ -16,7 +16,7 @@ import {
   type OeeConfig,
   type SheetRows,
 } from './oee'
-import { NOT_EXPLAINED, SHORT_STOPS_ROW, buildBridge, level3, type Bridge } from './oeeBridge'
+import { NOT_EXPLAINED, buildBridge, level3, type Bridge } from './oeeBridge'
 import { bucketsOf, fromStoredStops, stopDayOf } from './oeeReliability'
 import { compactDays } from './oeeTopics'
 import { shortStopNote, shortStopTotals, splitShortStops } from './oeeShortStops'
@@ -156,7 +156,7 @@ describe('kayıp özetinin süreye göre bölünmesi', () => {
   })
 })
 
-describe('Loss Bridge: < 2 dk performans, ≥ 2 dk availability', () => {
+describe('Loss Bridge: < 2 dk kalem değil (hız kaybında), ≥ 2 dk availability', () => {
   const t = sumTimes(pDays)
   const old = buildBridge(pDays, pLoss, plant)
   const split = splitShortStops(pLoss, allStops, plant).lossDays
@@ -172,18 +172,28 @@ describe('Loss Bridge: < 2 dk performans, ≥ 2 dk availability', () => {
     expect(b.oee).toBeCloseTo(old.oee!, 9)
   })
 
-  it('aynı kod iki aileye bölünür; hız kaybı = Production − Operation − kısa duruşlar', () => {
-    const perf = b.items.filter((i) => i.family === 'performance' && i.key !== 'pf:speed')
-    expect(perf.length).toBeGreaterThan(0)
-    expect(perf.every((i) => i.label.endsWith('< 2 min') && i.groups.every((g) => g.endsWith('<')))).toBe(true)
-    expect(sum(perf.map((i) => i.minutes))).toBeCloseTo(short, 6)
-    expect(b.speed).toBeCloseTo(t.productionMin - t.operatingMin - short, 6)
+  it('< 2 dk köprüde görünmez; hız kaybı = Production − Operation (kısalar içinde)', () => {
+    expect(short).toBeGreaterThan(0)
+    expect(b.items.some((i) => i.label.includes('< 2 min') || i.groups.some((g) => g.endsWith('<')))).toBe(false)
+    expect(b.steps.some((s) => s.label.includes('< 2 min'))).toBe(false)
+    expect(b.items.filter((i) => i.family === 'performance').map((i) => i.key)).toEqual(['pf:speed'])
+    expect(b.shortStops).toBeCloseTo(short, 6)
+    expect(b.speed).toBeCloseTo(t.productionMin - t.operatingMin, 6)
+    expect(b.speed).toBeCloseTo(old.speed, 6)
+  })
+
+  it('< 2 dk availability sonucunu etkilemez', () => {
+    // Bölmeden önceki ve sonraki köprüde A ve availability kaybı aynı (MES: Production'dan düşülmez).
+    expect(b.availability).toBeCloseTo(old.availability!, 9)
+    expect(b.level1!.availability).toBeCloseTo(old.level1!.availability, 9)
+    const avail = (x: Bridge) => sum(x.steps.filter((s) => s.family === 'availability').map((s) => s.minutes))
+    expect(avail(b)).toBeCloseTo(t.loadingMin - t.productionMin, 6)
     // Kısa duruşlar Loading − Production'da değildir: "Not explained" kayıtlı uzunlara göre.
     expect(b.notExplained).toBeCloseTo(old.notExplained + short, 6)
     expect(b.steps.some((s) => s.label === NOT_EXPLAINED || s.key === 'av:unexplained')).toBe(Math.abs(b.notExplained) >= 0.5)
   })
 
-  it('Level 3: kısa kalem nedenlere, hız kaybı makinelere toplamıyla eşit', () => {
+  it('Level 3: hız kaybı makinelere ve parçalara toplamıyla eşit (kısalar düşülmez)', () => {
     const set = { days: pDays, lossDays: split, orders: [] }
     const empty = { days: [], lossDays: [], orders: [] }
     for (const item of b.items.filter((i) => i.family === 'performance')) {
@@ -195,7 +205,6 @@ describe('Loss Bridge: < 2 dk performans, ≥ 2 dk availability', () => {
     }
     const speed = b.items.find((i) => i.key === 'pf:speed')!
     const parts = level3(speed, 'part', plant, set, empty)
-    expect(parts.find((r) => r.label === SHORT_STOPS_ROW)?.minutes).toBeCloseTo(-short, 6)
     expect(sum(parts.map((r) => r.minutes))).toBeCloseTo(speed.minutes, 4)
   })
 })
