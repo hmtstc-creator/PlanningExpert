@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-25 (haritada kullanıcı hesabı: e-posta / aktif / creator) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-26 (2–10 dk ARZ kaynağı sorusu) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -43,6 +43,7 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Sıradaki olası işler (karar bekler)
 
+- **MTTR'de 2–10 dk ARZ kayıtlarının kaynağı:** program süreyi MES dosyasından ("Stoppage Duration") olduğu gibi alır, bölmez. Kullanıcıya göre < 10 dk ARZ elle girilemiyor; olası neden MES'in makine duruşuna otomatik ARZ vermesi ya da uzun arızayı vardiya / sipariş sınırında bölmesi. İstenirse `bucketDetail` (`src/lib/oeeReliability.ts`) içine "vardiya sınırında / önceki ARZ'ye bitişik" sayacı eklenir.
 - Müşteri tüketim saatleriyle gerçek duruş süresi tahmini (ZPP_DAILY saat kırılımı yok; veri gerekir).
 - Lot bölmede 4+ parça ve farklı preslerde parça (şu an 2–3 parça, aynı preste).
 - `todolist.md` §4 (kurumsallaşma): güvence, veri modeli, güvenlik, kod ve doküman düzeni.
