@@ -209,11 +209,16 @@ export interface PlanInputs {
   /** Eksik okunan tablolar ('master data', 'demand', 'stock'). */
   truncatedInputs: string[]
   /**
-   * Planlamacının pres bazında müdahalesi: plan başlangıcı (pres bu andan
-   * önce yeni iş almaz) ve onaylı işlerin gecikmesi (+ geride, − ileride).
+   * Planlamacının pres bazında müdahalesi: kapalı aralık (`holdFrom*` →
+   * `from*`; başlangıç boşsa şu an — pres bitiş anından önce yeni iş almaz)
+   * ve onaylı işlerin gecikmesi (+ geride, − ileride).
    */
   pressStarts?: {
     press: string
+    /** Kapalı aralığın başlangıcı (takvim günü + gece yarısından dakika); boşsa şu an. */
+    holdFromDate?: string
+    holdFromMinute?: number
+    /** Kapalı aralığın bitişi = plan bu andan başlar. */
     fromDate?: string
     fromMinute?: number
     reason?: string
@@ -557,29 +562,39 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       endsAfterNow(job) &&
       !dayFrozenJobs.includes(job),
   )
-  // Planlamacı bir presi belli bir ana kadar tuttuysa (operatör yok,
-  // hammadde yok…) o presin bu andan önce başlayan onaylı işleri yapılamaz:
-  // serbest bırakılır, motor onları tutulma bittikten sonra yeniden planlar.
+  // Planlamacı bir presi bir aralıkta kapattıysa (operatör yok, hammadde
+  // yok…; başlangıç boşsa şu andan) o aralığa değen onaylı işler yapılamaz:
+  // serbest bırakılır, motor onları yeniden planlar.
   const nowDay = buildDayTimeline(shiftStartMinute, shiftMinutes, 3, plannedStops)
-  const heldUntil = new Map<string, { date: string; clock: number; net: number; reason: string }>()
-  for (const ps of inputs.pressStarts ?? []) {
-    if (!ps.fromDate) continue
-    const minute = ps.fromMinute ?? shiftStartMinute
+  type HoldMoment = { date: string; clock: number; net: number }
+  const holdMoment = (date: string, minute: number): HoldMoment => {
     const at =
       minute < shiftStartMinute
-        ? { date: isoDate(addDays(new Date(`${ps.fromDate}T00:00:00`), -1)), clock: minute + 1440 }
-        : { date: ps.fromDate, clock: minute }
-    const net = clockToNet(at.clock, nowDay)
-    // Geçmişte kalan bir başlangıç artık bir şey tutmaz.
-    if (at.date < todayIso || (at.date === todayIso && net <= nowNet)) continue
-    heldUntil.set(ps.press, { ...at, net, reason: ps.reason?.trim() || 'planner' })
+        ? { date: isoDate(addDays(new Date(`${date}T00:00:00`), -1)), clock: minute + 1440 }
+        : { date, clock: minute }
+    return { ...at, net: clockToNet(at.clock, nowDay) }
+  }
+  const before = (a: { date: string; net: number }, b: { date: string; net: number }) =>
+    a.date < b.date || (a.date === b.date && a.net < b.net)
+  const heldUntil = new Map<string, HoldMoment & { from?: HoldMoment; reason: string }>()
+  for (const ps of inputs.pressStarts ?? []) {
+    if (!ps.fromDate) continue
+    const end = holdMoment(ps.fromDate, ps.fromMinute ?? shiftStartMinute)
+    // Geçmişte kalan bir bitiş artık bir şey tutmaz.
+    if (!before({ date: todayIso, net: nowNet }, end)) continue
+    const from = ps.holdFromDate ? holdMoment(ps.holdFromDate, ps.holdFromMinute ?? shiftStartMinute) : undefined
+    // Başlangıç geçmişteyse ya da bitişten sonra değilse aralık şu andan başlar.
+    const start = from && before({ date: todayIso, net: nowNet }, from) && before(from, end) ? from : undefined
+    heldUntil.set(ps.press, { ...end, from: start, reason: ps.reason?.trim() || 'planner' })
   }
   const released = new Set<SnapshotJob>()
   for (const job of [...dayFrozenJobs, ...runningJobs]) {
     const held = heldUntil.get(job.press)
-    if (held && (job.date < held.date || (job.date === held.date && job.setupStartMinute < held.net))) {
-      released.add(job)
-    }
+    if (!held) continue
+    const startsBeforeEnd = before({ date: job.date, net: job.setupStartMinute }, held)
+    const endsAfterStart =
+      !held.from || before(held.from, { date: job.endDate ?? job.date, net: job.endMinute ?? job.setupStartMinute })
+    if (startsBeforeEnd && endsAfterStart) released.add(job)
   }
   const frozenJobs = [...dayFrozenJobs, ...runningJobs].filter((job) => !released.has(job))
   const frozenSet = new Set(frozenJobs)
@@ -743,19 +758,20 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     }
   }
 
-  // Planlamacının tuttuğu pres: şu andan başlangıç anına kadar kapalı.
+  // Planlamacının kapattığı pres: başlangıçtan (boşsa şu andan) bitişe kadar kapalı.
   for (const [press, held] of heldUntil) {
     for (const date of horizonDates) {
-      if (date < todayIso) continue
+      if (date < todayIso || (held.from && date < held.from.date)) continue
       if (date > held.date) break
+      const start = held.from && date === held.from.date ? held.from.clock : shiftStartMinute
       const end = date === held.date ? held.clock : shiftStartMinute + 1440
-      if (end <= shiftStartMinute) continue
+      if (end <= start) continue
       breakdownRows.push({
         press,
         date,
-        startMinute: shiftStartMinute,
+        startMinute: start,
         endMinute: end,
-        reason: `Held until ${held.date} ${clockText(held.clock % 1440)}: ${held.reason}`,
+        reason: `${held.from ? `Held ${held.from.date} ${clockText(held.from.clock % 1440)} – ` : 'Held until '}${held.date} ${clockText(held.clock % 1440)}: ${held.reason}`,
         status: 'planned',
       })
     }
