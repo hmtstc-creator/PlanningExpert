@@ -39,8 +39,8 @@ import { splitShortStops } from './oeeShortStops'
 
 export const ASAKAI_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export const ASAKAI_WEEKS = 10
-/** Ayrıntı sayfasında hücre bu paydan büyükse kırmızı (% of Loading). */
-export const ASAKAI_HIGHLIGHT = 0.1
+/** Ayrıntı sayfasında her iş yerinin gününde en büyük bu kadar duruş kırmızı (planlamacı, 2026-10-28). */
+export const ASAKAI_TOP = 2
 /** Asakai'de sütunu olmayan kayıp grupları (planlamacı, 2026-10-26: UTS planlı mola, çay / yemek). */
 export const ASAKAI_DROP = ['UTS']
 
@@ -63,6 +63,16 @@ export function asakaiColumns(c: OeeConfig, lossDays: LossDay[]): string[] {
 /** Unassigned (tanımsız duruş ya da ayarda olmayan kod) yalnız sayfada süresi varsa sütun olur. */
 export function dropEmptyUnassigned(columns: string[], rows: LossRow[]): string[] {
   return columns.filter((col) => col !== UNASSIGNED || rows.some((r) => (r.shares[col] ?? 0) > 0))
+}
+
+/**
+ * Kırmızı hücreler: satırın en büyük `ASAKAI_TOP` duruş sütunu (süresi olanlar).
+ * Speed duruş değil, Unassigned öncelik değil (planlamacı, 2026-10-28): sayılmaz.
+ */
+export function asakaiTopStops(row: LossRow, columns: string[], n = ASAKAI_TOP): Set<string> {
+  if (!(row.loadingMin > 0)) return new Set()
+  const stops = columns.filter((col) => col !== SPEED && col !== UNASSIGNED && col !== SHORT_STOPS && (row.shares[col] ?? 0) > 0)
+  return new Set(stops.sort((a, b) => row.shares[b] - row.shares[a]).slice(0, n))
 }
 
 /** Bir satırın kayıp payları: grafik sütunu → Loading'e oranı (0–1). */
