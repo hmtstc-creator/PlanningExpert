@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { capacityModel } from './capacityModel'
-import { dayOvertime, patternProblem, pressDay, type PressDaySources } from './pressCalendar'
+import { dayOvertime, dayShiftsProblem, patternProblem, pressDay, type PressDaySources } from './pressCalendar'
 
 const full = { id: 'full', name: 'Full overtime', startMinute: 420, durationMinutes: 480 }
 const half = { id: 'half', name: 'Half overtime', startMinute: 420, durationMinutes: 240 }
@@ -31,7 +31,7 @@ describe('press calendar rules (docs/decisions.md)', () => {
     // 2 vardiya 07:00–23:00: 23:00'dan 8 saat = 3. vardiya, sığar.
     expect(dayOvertime(2, 420, 480, [third]).problems).toEqual([])
     // Normal vardiyayla çakışan tam mesai reddedilir.
-    expect(dayOvertime(2, 420, 480, [full]).problems[0]).toMatch(/overlaps the normal shifts/)
+    expect(dayOvertime(2, 420, 480, [full]).problems[0]).toMatch(/overlaps the normal shift/)
     // 3 vardiya + 3. vardiya mesaisi 24 saati aşar.
     expect(dayOvertime(3, 420, 480, [third]).problems[0]).toMatch(/overlaps|24 hours/)
   })
@@ -99,6 +99,53 @@ describe('press calendar rules (docs/decisions.md)', () => {
     expect(model.isPlantWorkingDate('2026-09-16')).toBe(false)
     expect(model.isPlantWorkingDate('2026-09-19')).toBe(true) // P2 Cumartesi çalışıyor
     expect(model.isPlantWorkingDate('2026-09-20')).toBe(false)
+  })
+})
+
+describe('day record (Production Plan → Work calendar)', () => {
+  // Şablon 5 gün × 2 vardiya (07:00–23:00). Gün kaydı her şeyin önüne geçer.
+  it('opens a single non-consecutive shift: only the 3rd, 23:00–07:00', () => {
+    const wed = pressDay(sources({ dayShifts: new Map([['P1|2026-09-16', [3]]]) }), 'P1', '2026-09-14', '2026-09-16')
+    expect(wed).toMatchObject({ shifts: 1, activeShifts: [3], fromDayRecord: true })
+    const model = capacityModel({
+      shiftMinutes: 480,
+      shiftStartMinute: 420,
+      plannedStops: [{ shiftIndex: 3, name: 'Meal', kind: 'meal', startMinute: 180, durationMinutes: 30 }],
+      templates: [{ press: 'P1', workingDays: 5, shiftsPerDay: 2 }],
+      dayShifts: [{ press: 'P1', date: '2026-09-16', shifts: [3] }],
+      holidays: new Set(),
+    })
+    const day = model.weekBuckets('P1', new Date('2026-09-14T00:00:00Z'))[2]
+    // 480 dk vardiya − 30 dk 3. vardiya yemeği = 450 net dk.
+    expect(day).toMatchObject({ shifts: 1, activeShifts: [3], minutes: 450, shiftNetMinutes: [450] })
+  })
+
+  it('wins over the pattern and a holiday; 1..n stays a plain count', () => {
+    const src = sources({
+      holidays: new Set(['2026-09-16']),
+      dayShifts: new Map([
+        ['P1|2026-09-16', [1]],
+        ['P1|2026-09-17', []],
+        ['P1|2026-09-19', [2, 1]],
+      ]),
+    })
+    expect(pressDay(src, 'P1', '2026-09-14', '2026-09-16').shifts).toBe(1) // tatil, gün kaydıyla açık
+    expect(pressDay(src, 'P1', '2026-09-14', '2026-09-17').shifts).toBe(0) // iş günü, kapatıldı
+    const sat = pressDay(src, 'P1', '2026-09-14', '2026-09-19')
+    expect(sat.shifts).toBe(2)
+    expect(sat.activeShifts).toBeUndefined()
+  })
+
+  it('a shift that overlaps the day overtime, or does not exist, is rejected', () => {
+    const src = sources({
+      dayShifts: new Map([['P1|2026-09-16', [1, 3]]]),
+      datedOvertime: new Map([['P1|2026-09-16', [{ press: 'P1', date: '2026-09-16', definitionId: 'third' }]]]),
+    })
+    expect(pressDay(src, 'P1', '2026-09-14', '2026-09-16').problems[0]).toMatch(/overlaps the normal shift 23:00/)
+    expect(dayShiftsProblem([4], 480)).toMatch(/shifts 1–3/)
+    expect(dayShiftsProblem([1, 1], 480)).toMatch(/twice/)
+    expect(dayShiftsProblem([2], 720)).toBeNull()
+    expect(dayShiftsProblem([3], 720)).toMatch(/shifts 1–2/)
   })
 })
 

@@ -12,9 +12,13 @@
 //    tanımıyla açılır. Normal düzen dışındaki her çalışma mesaidir.
 //  - Bir üretim günü 24 saati geçemez (planlı duruşlar dahil); bu yüzden bir
 //    presin haftası da 168 saati geçemez.
+//  - Gün kaydı (Production Plan → Work calendar, "nihai karar") o pres × günün
+//    vardiyalarını tek tek belirler: gün kaydı > istisna hafta > şablon.
+//    Tatil günü de gün kaydıyla açılabilir; vardiyalar art arda olmak zorunda
+//    değildir (ör. yalnız 3. vardiya).
 
 import { friendlyError } from './mutationErrors'
-import type { OvertimeWindow } from './shiftTimeline'
+import { activeShiftList, type OvertimeWindow } from './shiftTimeline'
 
 export const DAY_MINUTES = 1440
 export const WEEK_MINUTES = 7 * DAY_MINUTES
@@ -54,6 +58,29 @@ export interface RecurringOvertime {
   /** Haftanın günü: MO..SU. */
   dayKey: string
   definitionId: string
+}
+
+/** Bir pres × günün vardiya kaydı: çalışan vardiya numaraları (1'den). Boş liste = kapalı gün. */
+export interface DayShifts {
+  press: string
+  /** Üretim günü (ISO). */
+  date: string
+  shifts: number[]
+}
+
+/** Günde sığan vardiya sayısı (ör. 8 saatlik vardiyada 3). */
+export function maxShiftsPerDay(shiftMinutes: number): number {
+  return Math.max(1, Math.floor(DAY_MINUTES / Math.max(1, shiftMinutes)))
+}
+
+/** Gün kaydı kontrolü: vardiya numarası 1..günde sığan vardiya, tekrar yok. */
+export function dayShiftsProblem(shifts: number[], shiftMinutes: number): string | null {
+  const max = maxShiftsPerDay(shiftMinutes)
+  for (const n of shifts) {
+    if (!Number.isInteger(n) || n < 1 || n > max) return `Shift ${n} does not exist — a day has shifts 1–${max}.`
+  }
+  if (new Set(shifts).size !== shifts.length) return 'A shift is listed twice.'
+  return null
 }
 
 /** Pazartesi = 0 … Pazar = 6. */
@@ -97,15 +124,20 @@ export function patternProblem(pattern: WeekPattern, shiftMinutes: number): stri
  * Bir günün mesai pencereleri ve sorunları. Kurallar: pencere üretim günü
  * içinde kalır (en fazla 24 saat), normal vardiyalarla ve birbiriyle
  * çakışmaz. Sorunlu pencere plana alınmaz, sorun metni döner.
+ * `shifts`: vardiya sayısı (1'den art arda) ya da çalışan vardiya numaraları.
  */
 export function dayOvertime(
-  shifts: number,
+  shifts: number | number[],
   shiftStartMinute: number,
   shiftMinutes: number,
   defs: Pick<OvertimeDefinition, 'startMinute' | 'durationMinutes' | 'name'>[],
 ): { windows: OvertimeWindow[]; problems: string[] } {
   const dayEnd = shiftStartMinute + DAY_MINUTES
-  const normal = normalWindow(shifts, shiftStartMinute, shiftMinutes)
+  const active = Array.isArray(shifts) ? shifts : activeShiftList(shifts)
+  const normals = active.map((n) => ({
+    start: shiftStartMinute + (n - 1) * shiftMinutes,
+    end: shiftStartMinute + n * shiftMinutes,
+  }))
   const windows: OvertimeWindow[] = []
   const problems: string[] = []
   const sorted = defs
@@ -117,8 +149,9 @@ export function dayOvertime(
       problems.push(`${label}: no duration.`)
     } else if (w.end > dayEnd) {
       problems.push(`${label} runs past ${clockText(dayEnd)}: a day cannot exceed 24 hours.`)
-    } else if (normal.end > normal.start && w.start < normal.end && normal.start < w.end) {
-      problems.push(`${label} overlaps the normal shifts ${clockText(normal.start)}–${clockText(normal.end)}.`)
+    } else if (normals.some((n) => w.start < n.end && n.start < w.end)) {
+      const n = normals.find((x) => w.start < x.end && x.start < w.end)!
+      problems.push(`${label} overlaps the normal shift ${clockText(n.start)}–${clockText(n.end)}.`)
     } else if (windows.some((x) => w.start < x.end && x.start < w.end)) {
       problems.push(`${label} overlaps another overtime on the same day.`)
     } else {
@@ -139,6 +172,8 @@ export interface PressDaySources {
   datedOvertime: Map<string, DatedOvertime[]>
   definitions: Map<string, OvertimeDefinition>
   holidays: Set<string>
+  /** `${press}|${date}` → gün kaydı (çalışan vardiya numaraları). */
+  dayShifts?: Map<string, number[]>
 }
 
 export interface PressDay {
@@ -147,9 +182,20 @@ export interface PressDay {
   isHoliday: boolean
   /** Normal vardiya sayısı. */
   shifts: number
+  /** Çalışan vardiya numaraları; yalnız 1'den art arda değilse dolu (bkz. DayShape). */
+  activeShifts?: number[]
+  /** Vardiyalar gün kaydından (Production Plan → Work calendar) geliyor. */
+  fromDayRecord?: boolean
   overtime: OvertimeWindow[]
   /** Plana alınamayan mesai kayıtları (çakışma, 24 saat). */
   problems: string[]
+}
+
+/** Vardiya numaralarını sıralar; 1..n ise `activeShifts` gerekmez. */
+export function shiftShape(list: number[]): { shifts: number; activeShifts?: number[] } {
+  const sorted = Array.from(new Set(list)).sort((a, b) => a - b)
+  const consecutive = sorted.every((n, i) => n === i + 1)
+  return consecutive ? { shifts: sorted.length } : { shifts: sorted.length, activeShifts: sorted }
 }
 
 /** Bir presin bir üretim günü: normal vardiyalar + açılan mesailer. */
@@ -160,8 +206,12 @@ export function pressDay(src: PressDaySources, press: string, weekStart: string,
   const template = src.templates.get(press)
   const pattern = src.weekOverrides.get(`${press}|${weekStart}`) ?? template
   if (!pattern) return { date, dayKey, isHoliday, shifts: 0, overtime: [], problems: [] }
+  // Gün kaydı (nihai karar) her şeyin önüne geçer, tatilde de.
+  const record = src.dayShifts?.get(`${press}|${date}`)
   // Pazartesiden sırayla; tatil günü kaybolur, kaymaz.
-  const shifts = !isHoliday && index < pattern.workingDays ? pattern.shiftsPerDay : 0
+  const shape = record
+    ? shiftShape(record)
+    : { shifts: !isHoliday && index < pattern.workingDays ? pattern.shiftsPerDay : 0 }
   const defs: OvertimeDefinition[] = []
   for (const o of src.datedOvertime.get(`${press}|${date}`) ?? []) {
     const def = src.definitions.get(o.definitionId)
@@ -175,8 +225,8 @@ export function pressDay(src: PressDaySources, press: string, weekStart: string,
       if (def) defs.push(def)
     }
   }
-  const { windows, problems } = dayOvertime(shifts, src.shiftStartMinute, src.shiftMinutes, defs)
-  return { date, dayKey, isHoliday, shifts, overtime: windows, problems }
+  const { windows, problems } = dayOvertime(shape.activeShifts ?? shape.shifts, src.shiftStartMinute, src.shiftMinutes, defs)
+  return { date, dayKey, isHoliday, ...shape, ...(record ? { fromDayRecord: true } : {}), overtime: windows, problems }
 }
 
 /** Sunucu hatasının kullanıcıya gösterilecek kısmı (bkz. mutationErrors.friendlyError). */

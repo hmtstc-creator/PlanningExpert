@@ -183,6 +183,11 @@ export interface PlanInputs {
   overtimeDefinitions?: { id: string; name: string; description?: string; startMinute: number; durationMinutes: number }[]
   /** Tarihli mesailer: hangi pres, hangi üretim günü, hangi tanım. */
   pressOvertime?: { press: string; date: string; definitionId: string }[]
+  /**
+   * Gün kayıtları (Production Plan → Work calendar): o pres × günün çalışan
+   * vardiya numaraları. İstisna hafta ve şablonun önüne geçer.
+   */
+  pressDayShifts?: { press: string; date: string; shifts: number[] }[]
   settings: PlanSettings | null
   workCalendar: { workingDays?: string[]; holidays?: string[] } | null
   officialHolidays: { date: string; name: string }[]
@@ -246,6 +251,8 @@ export interface PlanDay {
   date: string
   /** Normal vardiya sayısı. */
   shifts: number
+  /** Çalışan vardiya numaraları; yalnız 1'den art arda değilse dolu (gün kaydı). */
+  activeShifts?: number[]
   minutes: number
   /** O güne açılan mesai pencereleri (saat ekseni). */
   overtime?: OvertimeWindow[]
@@ -505,6 +512,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     weekOverrides: inputs.weekOverrides,
     overtimeDefinitions: inputs.overtimeDefinitions,
     pressOvertime: inputs.pressOvertime,
+    dayShifts: inputs.pressDayShifts,
     holidays,
   })
   const patternOf = capModel.patternOf
@@ -701,7 +709,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   const horizonDateSet = new Set<string>()
   for (const [pressName, list] of buckets) {
     for (const b of list) {
-      dayShapeByPressDate.set(`${pressName}|${b.date}`, { shifts: b.shifts, overtime: b.overtime })
+      dayShapeByPressDate.set(`${pressName}|${b.date}`, { shifts: b.shifts, activeShifts: b.activeShifts, overtime: b.overtime })
       horizonDateSet.add(b.date)
     }
   }
@@ -1728,7 +1736,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   for (const [press, list] of buckets) {
     for (const b of list) {
       if (b.shifts > 0 || b.minutes > 0 || b.overtime?.length) {
-        days.push({ press, date: b.date, shifts: b.shifts, minutes: b.minutes, ...(b.overtime?.length ? { overtime: b.overtime } : {}) })
+        days.push({
+          press,
+          date: b.date,
+          shifts: b.shifts,
+          ...(b.activeShifts ? { activeShifts: b.activeShifts } : {}),
+          minutes: b.minutes,
+          ...(b.overtime?.length ? { overtime: b.overtime } : {}),
+        })
       }
     }
   }

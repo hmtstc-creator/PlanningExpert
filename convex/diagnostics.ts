@@ -26,6 +26,7 @@ const TABLES = [
   'rawInTransit',
   'overtimeDefinitions',
   'pressOvertime',
+  'pressDayShifts',
   'planSnapshots',
   'changeLog',
   'moldMaintenance',

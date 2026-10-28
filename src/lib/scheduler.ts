@@ -535,6 +535,8 @@ interface DayWindow {
   startNet: number
   /** Setup'ın durmadan geçtiği molalar (net yer, saat süresi). */
   setupBreaks?: { at: number; minutes: number }[]
+  /** Bu günün vardiya net süreleri; gün kaydı art arda olmayan vardiya açtıysa (DayBucket). */
+  shiftNetMinutes?: number[]
 }
 
 /**
@@ -610,6 +612,7 @@ function buildTimeline(buckets: DayBucket[]): PressTimeline {
       capacity: bucket.minutes,
       startNet: bucket.startMinute ?? 0,
       setupBreaks: bucket.setupBreaks ? [...bucket.setupBreaks].sort((a, b) => a.at - b.at) : undefined,
+      ...(bucket.shiftNetMinutes ? { shiftNetMinutes: bucket.shiftNetMinutes } : {}),
     })
     offset += bucket.minutes
   }
@@ -1462,7 +1465,7 @@ function reserveSlot(
     const dayEnd = day.startNet + day.capacity
     // Vardiya sınırı: gün içinde vardiya sonuna sığmıyorsa sonrakine geç.
     // Vardiya devri serbestse yalnızca gün sonu sınırdır.
-    const shiftEnd = crossShifts ? dayEnd : shiftEndAfter(within, shiftNetMinutes, dayEnd)
+    const shiftEnd = crossShifts ? dayEnd : shiftEndAfter(within, day.shiftNetMinutes ?? shiftNetMinutes, dayEnd)
 
     // Defter üretim gününe göre tutulur; 3 vardiyalı preste gece sonu
     // (06:xx) ile ertesi günün 07:00'ı yan yanadır. Komşu günlerin kayıtları

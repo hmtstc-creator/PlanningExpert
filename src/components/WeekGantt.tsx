@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
+  activeShiftList,
   buildDayTimeline,
   netIntervalToClockBlocks,
   type PlannedStop,
@@ -138,6 +139,8 @@ export interface WeekGanttDay {
   date: string
   /** Normal vardiya sayısı. */
   shifts: number
+  /** Çalışan vardiya numaraları; yalnız 1'den art arda değilse (gün kaydı). */
+  activeShifts?: number[]
   /** Açılan mesai pencereleri (üretim gününün saat ekseni). */
   overtime?: { start: number; end: number; name?: string }[]
   capacityMinutes: number
@@ -146,7 +149,7 @@ export interface WeekGanttDay {
 /** Günün çalışılan son dakikası (birinci vardiyanın başından). */
 function daySpan(day: WeekGanttDay, shiftStartMinute: number, shiftMinutes: number): number {
   const ot = Math.max(0, ...(day.overtime ?? []).map((o) => o.end - shiftStartMinute))
-  return Math.max(day.shifts * shiftMinutes, ot)
+  return Math.max(Math.max(0, ...activeShiftList(day)) * shiftMinutes, ot)
 }
 
 export interface WeekGanttPress {
@@ -491,7 +494,7 @@ export function WeekGantt({
         .filter((d) => dayIndex.has(d.date))
         .flatMap((d) => {
           const base = dayIndex.get(d.date)! * dayWidthMinutes
-          const list = d.shifts > 0 ? [{ start: base, end: base + d.shifts * shiftMinutes }] : []
+          const list = activeShiftList(d).map((n) => ({ start: base + (n - 1) * shiftMinutes, end: base + n * shiftMinutes }))
           for (const o of d.overtime ?? []) list.push({ start: base + o.start - shiftStartMinute, end: base + o.end - shiftStartMinute })
           return list
         })

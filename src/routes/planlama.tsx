@@ -113,16 +113,18 @@ function PlanlamaPage() {
   )
   const allJobs = useMemo(() => Array.from(new Set(weeks.flatMap((w) => w.jobs))), [weeks])
 
-  const { shiftsByPressDate, capacityByPressDate, overtimeByPressDate } = useMemo(() => {
+  const { shiftsByPressDate, activeByPressDate, capacityByPressDate, overtimeByPressDate } = useMemo(() => {
     const shifts = new Map<string, number>()
+    const active = new Map<string, number[]>()
     const capacity = new Map<string, number>()
     const overtime = new Map<string, { start: number; end: number; name?: string }[]>()
     for (const day of run?.days ?? []) {
       shifts.set(`${day.press}|${day.date}`, day.shifts)
+      if (day.activeShifts) active.set(`${day.press}|${day.date}`, day.activeShifts)
       capacity.set(`${day.press}|${day.date}`, day.minutes)
       if (day.overtime?.length) overtime.set(`${day.press}|${day.date}`, day.overtime)
     }
-    return { shiftsByPressDate: shifts, capacityByPressDate: capacity, overtimeByPressDate: overtime }
+    return { shiftsByPressDate: shifts, activeByPressDate: active, capacityByPressDate: capacity, overtimeByPressDate: overtime }
   }, [run])
 
   /** Pres bakımları grafikte ayrı çizilir — iş listesine karışmaz. */
@@ -159,6 +161,7 @@ function PlanlamaPage() {
   }
   const dayShapeOf = (press: string, date: string) => ({
     shifts: shiftsByPressDate.get(`${press}|${date}`) ?? 0,
+    activeShifts: activeByPressDate.get(`${press}|${date}`),
     overtime: overtimeByPressDate.get(`${press}|${date}`),
   })
   const checkMove = (job: PlanJob | null, segments: MoveSegment[], target: MoveTarget) =>
@@ -282,10 +285,13 @@ function PlanlamaPage() {
         <PressWeekShifts
           presses={presses}
           dates={allDates}
+          shiftMinutes={shiftMinutes}
           dayOf={(press, date) => {
             const key = `${press}|${date}`
             const shifts = shiftsByPressDate.get(key)
-            return shifts === undefined ? undefined : { shifts, overtime: overtimeByPressDate.get(key) ?? [] }
+            return shifts === undefined
+              ? undefined
+              : { shifts, activeShifts: activeByPressDate.get(key), overtime: overtimeByPressDate.get(key) ?? [] }
           }}
         />
 
@@ -472,6 +478,7 @@ function PlanlamaPage() {
                   days: allDates.map((d) => ({
                     date: d,
                     shifts: shiftsByPressDate.get(`${p.name}|${d}`) ?? 0,
+                    activeShifts: activeByPressDate.get(`${p.name}|${d}`),
                     overtime: overtimeByPressDate.get(`${p.name}|${d}`),
                     capacityMinutes: capacityByPressDate.get(`${p.name}|${d}`) ?? 0,
                   })),

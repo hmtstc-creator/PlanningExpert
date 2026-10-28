@@ -426,17 +426,23 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const horizonEnd = plusDays(monday, weeks * 7 - 1)
 
   // ---- pres takvimi (bağımsız): haftalık düzen Pazartesiden sırayla, tatil
-  // günü kaybolur (kaymaz); istisna hafta şablonun önüne geçer.
+  // günü kaybolur (kaymaz); istisna hafta şablonun önüne geçer; gün kaydı
+  // (pres × gün vardiya numaraları) her şeyin, tatilin de önüne geçer.
   const tplBy = new Map(inputs.templates.map((t) => [t.press, t]))
   const ovBy = new Map((inputs.weekOverrides ?? []).map((o) => [`${o.press}|${o.weekStart}`, o]))
-  const normalShiftsOn = (press: string, iso: string) => {
-    if (holidays.has(iso)) return 0
+  const dayRecBy = new Map((inputs.pressDayShifts ?? []).map((d) => [`${d.press}|${d.date}`, d.shifts]))
+  const firstN = (n: number) => Array.from({ length: Math.max(0, n) }, (_, i) => i + 1)
+  /** O günün çalışan normal vardiya numaraları (1'den). */
+  const normalShiftsOn = (press: string, iso: string): number[] => {
     const pat = ovBy.get(`${press}|${mondayOfIso(iso)}`) ?? tplBy.get(press)
-    if (!pat) return 0
-    return weekdayIndex(iso) < pat.workingDays ? pat.shiftsPerDay : 0
+    if (!pat) return []
+    const rec = dayRecBy.get(`${press}|${iso}`)
+    if (rec) return Array.from(new Set(rec)).sort((a, b) => a - b)
+    if (holidays.has(iso)) return []
+    return weekdayIndex(iso) < pat.workingDays ? firstN(pat.shiftsPerDay) : []
   }
   /** Fabrikanın iş günü: tatil değil ve en az bir presin normal vardiyası var. */
-  const isWorkingDay = (iso: string) => !holidays.has(iso) && inputs.presses.some((p) => normalShiftsOn(p.name, iso) > 0)
+  const isWorkingDay = (iso: string) => !holidays.has(iso) && inputs.presses.some((p) => normalShiftsOn(p.name, iso).length > 0)
   // Teslimde tatil gözetilmez: bakiye ve bugünün ihtiyacı ertesi gün, teslim saatinde.
   const needMoment = (day: string) => absMinute(day <= demandToday ? plusDays(demandToday, 1) : day, cutoff)
   /** `iso`dan `n` iş günü geriye (iş günü = takvim çalışma günü). */
@@ -509,12 +515,12 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   for (let i = 0; i < weeks * 7; i++) horizonDates.push(plusDays(monday, i))
   const blocksCache = new Map<string, Block[]>()
   /** Stopları çıkarılmış saat blokları: normal vardiyalar + mesai pencereleri. */
-  function productiveBlocks(shifts: number, overtime: Block[] = []): Block[] {
-    const key = `${shifts}|${overtime.map((o) => `${o.start}-${o.end}`).join(',')}`
+  function productiveBlocks(shifts: number[], overtime: Block[] = []): Block[] {
+    const key = `${shifts.join(',')}|${overtime.map((o) => `${o.start}-${o.end}`).join(',')}`
     const hit = blocksCache.get(key)
     if (hit) return hit
     const windows: { ws: number; we: number; shift: number | null }[] = []
-    for (let i = 1; i <= shifts; i++) windows.push({ ws: shiftStart + (i - 1) * shiftLen, we: shiftStart + i * shiftLen, shift: i })
+    for (const i of shifts) windows.push({ ws: shiftStart + (i - 1) * shiftLen, we: shiftStart + i * shiftLen, shift: i })
     for (const o of overtime) windows.push({ ws: o.start, we: o.end, shift: null })
     windows.sort((a, b) => a.ws - b.ws)
     const out: Block[] = []
@@ -551,12 +557,11 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const key = `${o.press}|${o.date}`
     datedBy.set(key, [...(datedBy.get(key) ?? []), o.definitionId])
   }
-  const overtimeOn = (press: string, iso: string, shifts: number): Block[] => {
+  const overtimeOn = (press: string, iso: string, shifts: number[]): Block[] => {
     const ids = [...(datedBy.get(`${press}|${iso}`) ?? [])]
     if (!holidays.has(iso)) {
       for (const r of tplBy.get(press)?.recurringOvertime ?? []) if (r.dayKey === DAY_KEYS[weekdayIndex(iso)]) ids.push(r.definitionId)
     }
-    const normalEnd = shiftStart + shifts * shiftLen
     const out: Block[] = []
     const cand = ids
       .map((id) => defBy.get(id))
@@ -568,13 +573,13 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
       .sort((x, y) => x.start - y.start)
     for (const w of cand) {
       if (w.end <= w.start || w.end > shiftStart + 1440) continue
-      if (shifts > 0 && w.start < normalEnd && shiftStart < w.end) continue
+      if (shifts.some((n) => w.start < shiftStart + n * shiftLen && shiftStart + (n - 1) * shiftLen < w.end)) continue
       if (out.some((x) => w.start < x.end && x.start < w.end)) continue
       out.push(w)
     }
     return out
   }
-  const dayInfo = new Map<string, { shifts: number; overtime: Block[]; netCap: number }>()
+  const dayInfo = new Map<string, { shifts: number[]; overtime: Block[]; netCap: number }>()
   for (const p of inputs.presses) {
     for (const d of horizonDates) {
       const shifts = normalShiftsOn(p.name, d)
@@ -586,7 +591,10 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   }
   for (const d of run.days ?? []) {
     const mine = dayInfo.get(`${d.press}|${d.date}`)
-    if (mine && mine.shifts !== d.shifts) warn(`Calendar differs on ${d.press} ${d.date}: validator ${mine.shifts} shifts, engine ${d.shifts}.`)
+    const engine = (d.activeShifts ?? firstN(d.shifts)).join(',')
+    if (mine && mine.shifts.join(',') !== engine) {
+      warn(`Calendar differs on ${d.press} ${d.date}: validator shifts [${mine.shifts.join(',')}], engine [${engine}].`)
+    }
   }
   /** Net aralık → saat blokları (günün gece yarısından dakika). Gün sonunu aşan kısım uzatılır. */
   const netToClock = (a: number, b: number, blocks: Block[]): Block[] => {
@@ -606,8 +614,8 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     }
     return res
   }
-  const netPointToAbs = (date: string, net: number, shifts: number, overtime: Block[] = []) => {
-    const blocks = shifts > 0 || overtime.length ? productiveBlocks(shifts, overtime) : productiveBlocks(1)
+  const netPointToAbs = (date: string, net: number, shifts: number[], overtime: Block[] = []) => {
+    const blocks = shifts.length > 0 || overtime.length ? productiveBlocks(shifts, overtime) : productiveBlocks([1])
     let acc = 0
     for (const blk of blocks) {
       const len = blk.end - blk.start
@@ -617,12 +625,12 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const tail = blocks.length ? blocks[blocks.length - 1].end : shiftStart
     return absMinute(date, tail + (net - acc))
   }
-  const shiftsOn = (press: string, date: string) => dayInfo.get(`${press}|${date}`)?.shifts ?? 0
+  const shiftsOn = (press: string, date: string) => dayInfo.get(`${press}|${date}`)?.shifts ?? []
   const overtimeOnDay = (press: string, date: string) => dayInfo.get(`${press}|${date}`)?.overtime ?? []
   const segToAbs = (press: string, date: string, a: number, b: number): Block[] => {
     const sh = shiftsOn(press, date)
     const ot = overtimeOnDay(press, date)
-    return netToClock(a, b, sh > 0 || ot.length ? productiveBlocks(sh, ot) : productiveBlocks(3)).map((x) => ({
+    return netToClock(a, b, sh.length > 0 || ot.length ? productiveBlocks(sh, ot) : productiveBlocks([1, 2, 3])).map((x) => ({
       start: absMinute(date, x.start),
       end: absMinute(date, x.end),
     }))
@@ -1453,7 +1461,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     )[0]
     const engineDeadline =
       firstLate && firstLate.deadlineDate && firstLate.deadlineMinute !== undefined
-        ? labelOfAbs(netPointToAbs(firstLate.deadlineDate, firstLate.deadlineMinute, 3))
+        ? labelOfAbs(netPointToAbs(firstLate.deadlineDate, firstLate.deadlineMinute, [1, 2, 3]))
         : firstLate?.deadlineLabel ?? null
     const lateH = sos.reduce<number | null>((mx, x) => {
       if (x.recoveredAt === null) return mx
@@ -1744,7 +1752,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     for (const sg of j.segs) {
       r6.check()
       const info = dayInfo.get(`${j.press}|${sg.date}`)
-      if (!info || (info.shifts <= 0 && info.overtime.length === 0)) {
+      if (!info || (info.shifts.length === 0 && info.overtime.length === 0)) {
         r6.fail(`${j.id}: ${sg.kind} on ${sg.date}, a non-working day for ${j.press}.`)
         continue
       }
@@ -1773,7 +1781,10 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
       }
       if (!setupsCrossShifts) {
         let bound = 0
-        for (const len of shiftNet) {
+        // Gün kaydı art arda olmayan vardiya açtıysa sınırlar o günün vardiyalarından.
+        const own = dayInfo.get(`${j.press}|${sg.date}`)?.shifts
+        const lens = own && own.some((n, k) => n !== k + 1) ? own.map((n) => shiftNet[n - 1] ?? Math.max(1, shiftLen)) : shiftNet
+        for (const len of lens) {
           bound += len
           if (sg.start < bound - EPS && sg.end > bound + EPS) {
             r7.fail(`${j.id}: ${sg.kind} on ${sg.date} crosses the shift change (net ${Math.round(bound)}).`)

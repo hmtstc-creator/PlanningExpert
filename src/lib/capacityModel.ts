@@ -11,6 +11,7 @@ import { addDays, isoDate } from './dates'
 import {
   pressDay,
   type DatedOvertime,
+  type DayShifts,
   type OvertimeDefinition,
   type PressDaySources,
   type RecurringOvertime,
@@ -31,6 +32,8 @@ export interface CapacitySources {
   weekOverrides?: ({ press: string; weekStart: string } & WeekPattern)[]
   overtimeDefinitions?: OvertimeDefinition[]
   pressOvertime?: DatedOvertime[]
+  /** Gün kayıtları (pres × gün vardiyaları): istisna hafta ve şablonun önüne geçer. */
+  dayShifts?: DayShifts[]
   /** Elle girilen + resmi tatiller. */
   holidays: Set<string>
 }
@@ -90,6 +93,7 @@ export function capacityModel(src: CapacitySources): CapacityModel {
     datedOvertime,
     definitions: new Map((src.overtimeDefinitions ?? []).map((d) => [d.id, d])),
     holidays: src.holidays,
+    dayShifts: new Map((src.dayShifts ?? []).map((d) => [`${d.press}|${d.date}`, d.shifts])),
   }
   const patternOf = (press: string, weekStart: Date) =>
     day.weekOverrides.get(`${press}|${isoDate(weekStart)}`) ?? day.templates.get(press) ?? null
@@ -103,7 +107,7 @@ export function capacityModel(src: CapacitySources): CapacityModel {
       undefined,
       (date) => {
         const d = pressDay(day, press, ws, date)
-        return { shifts: d.shifts, overtime: d.overtime }
+        return { shifts: d.shifts, activeShifts: d.activeShifts, overtime: d.overtime }
       },
     )
   }

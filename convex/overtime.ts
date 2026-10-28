@@ -187,7 +187,7 @@ export const setRecurringOvertime = guardedMutation({
 
 // ---- yardımcılar ----------------------------------------------------------
 
-async function sources(ctx: Ctx): Promise<PressDaySources> {
+export async function sources(ctx: Ctx): Promise<PressDaySources> {
   const settings = await ctx.db
     .query('globalShiftSettings')
     .withIndex('by_key', (q: Ctx) => q.eq('key', 'default'))
@@ -205,6 +205,7 @@ async function sources(ctx: Ctx): Promise<PressDaySources> {
   const overrides = await ctx.db.query('pressWeekOverrides').collect()
   const defs = await ctx.db.query('overtimeDefinitions').collect()
   const dated = await ctx.db.query('pressOvertime').collect()
+  const dayRecords = await ctx.db.query('pressDayShifts').collect()
   const datedOvertime = new Map<string, { press: string; date: string; definitionId: string }[]>()
   for (const o of dated) {
     const key = `${o.press}|${o.date}`
@@ -223,11 +224,12 @@ async function sources(ctx: Ctx): Promise<PressDaySources> {
       ]),
     ),
     holidays: new Set<string>([...(calendar?.holidays ?? []), ...official.map((h: Ctx) => h.date)]),
+    dayShifts: new Map(dayRecords.map((d: Ctx) => [`${d.press}|${d.date}`, d.shifts])),
   }
 }
 
 /** Pres listesinin tek kaynağı Press Definitions (presses tablosu). */
-async function requireDefinedPress(ctx: Ctx, press: string) {
+export async function requireDefinedPress(ctx: Ctx, press: string) {
   const found = await ctx.db
     .query('presses')
     .withIndex('by_name', (q: Ctx) => q.eq('name', press))
@@ -235,7 +237,7 @@ async function requireDefinedPress(ctx: Ctx, press: string) {
   if (!found) throw new ConvexError(`${press} is not defined on Work Center Definitions — define the work center first.`)
 }
 
-async function hasCalendar(ctx: Ctx, press: string) {
+export async function hasCalendar(ctx: Ctx, press: string) {
   return !!(await ctx.db
     .query('pressTemplates')
     .withIndex('by_press', (q: Ctx) => q.eq('press', press))
@@ -248,7 +250,7 @@ function mondayOf(iso: string) {
   return d.toISOString().slice(0, 10)
 }
 
-async function dayOf(ctx: Ctx, press: string, date: string) {
+export async function dayOf(ctx: Ctx, press: string, date: string) {
   return pressDay(await sources(ctx), press, mondayOf(date), date)
 }
 

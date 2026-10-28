@@ -1,6 +1,6 @@
 # 02 · Planlama motoru
 
-> Son güncelleme: 2026-10-28 · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
+> Son güncelleme: 2026-10-28 (gün kaydı: pres × gün vardiyaları) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
 > Kullanıcıya dönük anlatım: sitede **Planning Logic**
 
 Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Aynı girdi aynı planı verir
@@ -11,6 +11,11 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
 1. **Girdiler** (`PlanInputs`): master data (parçalar), ZPP (haftalık), ZPP_DAILY (günlük), stok (MB52, yalnızca
    *Finished goods* depoları), preslerin takvimi, resmi tatiller, planlı duruşlar, kalıp bakımı / hazırlığı / alarmı,
    onaylı plan (dondurulmuş ufuk), onaylı işler (kilitler), plan müdahaleleri, yoldaki hammadde.
+   - **Pres takvimi önceliği** (`pressCalendar.pressDay`, tek kaynak): **gün kaydı** (`pressDayShifts`, Production Plan →
+     *Work calendar* hücresine tıklama) > istisna hafta > şablon. Gün kaydı tatilde de geçerlidir ve vardiyalar art arda
+     olmak zorunda değildir (ör. yalnız 3. vardiya): `DayShape.activeShifts` / `DayBucket.activeShifts` taşır, zaman
+     çizelgesi (`buildDayTimeline`), kova net dakikası, zamanlayıcının vardiya sınırı (`DayBucket.shiftNetMinutes`) ve
+     bağımsız doğrulayıcı (kendi `normalShiftsOn`'u) bunu okur. `activeShifts` yalnız 1..n değilse doludur.
 2. **Talep → lot** (`buildDemandSchedule`, `planning.ts`):
    - ZPP_DAILY kapsadığı günlerde **tam tarihine** düşer; ötesinde haftalık ZPP çalışma günlerine eşit yayılır; bakiye bugündür.
    - **ZPP_DAILY önce, haftalık ZPP uzun vade** (Slayt 1, 2026-10-28): ZPP_DAILY yüklü ve bugüne ulaşıyorsa haftalık ZPP'den gelen

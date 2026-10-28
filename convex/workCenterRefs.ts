@@ -20,6 +20,7 @@ const PRESS_TABLES: { table: string; index: string; label: string }[] = [
   { table: 'pressTemplates', index: 'by_press', label: 'Work Calendar pattern' },
   { table: 'pressOvertime', index: 'by_press_date', label: 'overtime' },
   { table: 'pressWeekOverrides', index: 'by_press_week', label: 'exception weeks' },
+  { table: 'pressDayShifts', index: 'by_press_date', label: 'day shifts' },
   { table: 'pressMaintenance', index: 'by_press', label: 'maintenance' },
   { table: 'machineProblems', index: 'by_press', label: 'breakdowns' },
   { table: 'pressPlanStarts', index: 'by_press', label: 'plan start' },

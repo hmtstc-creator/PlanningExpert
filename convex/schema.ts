@@ -515,6 +515,18 @@ export default defineSchema({
     .index('by_definition', ['plantId', 'definitionId'])
     .index('by_plant', ['plantId']),
 
+  // Gün kaydı (Production Plan → Work calendar, "nihai karar"): bir presin bir
+  // üretim gününde çalışan vardiya numaraları (1'den; boş = kapalı gün).
+  // İstisna hafta ve şablonun önüne geçer (src/lib/pressCalendar.ts).
+  pressDayShifts: defineTable({
+    ...plantField,
+    press: v.string(),
+    date: v.string(),
+    shifts: v.array(v.number()),
+  })
+    .index('by_press_date', ['plantId', 'press', 'date'])
+    .index('by_plant', ['plantId']),
+
   // İstisna haftalar: plan değişikliği olan belirli bir hafta için
   // şablonu geçersiz kılan kayıt.
   pressWeekOverrides: defineTable({
