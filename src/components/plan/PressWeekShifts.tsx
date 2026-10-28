@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { useMutation, useQuery } from 'convex/react'
+import { useMutation, useQuery } from '../../lib/convexTransport'
 import { useMemo, useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'

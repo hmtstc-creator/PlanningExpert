@@ -1,6 +1,6 @@
 # 07 · Çalışma sözleşmesi ve mimari etki kontrolü
 
-> Son güncelleme: 2026-10-25 (otomatik model seçimi) · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
+> Son güncelleme: 2026-10-28 (Convex kancaları yalnız convexTransport) · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
 
 Hafıza wiki'de olduğu için her iş yeni bir oturumda başlayabilir; bu sayfa her oturumun **ilk okuyacağı yerdir**.
 
@@ -20,6 +20,8 @@ Genel mimariye zarar vermediğini **önce** kontrol et. Kısa kontrol listesi (c
 Bir madde "hayır" ise **uygulama**; nedenini ve alternatifi kullanıcıya yaz. Karar gerekiyorsa `docs/decisions.md`'ye eklenir.
 
 ## Otomatik korumalar (kırılırsa CI kırmızı)
+
+- Arayüzde Convex kancaları (`useQuery`, `useMutation`, `useAction`) yalnız `src/lib/convexTransport`'tan alınır: oturum jetonunu o ekler. `convex/react`'tan doğrudan alınırsa canlıda "Server Error" olur; `architecture.test.ts` bunu yakalar.
 
 | Koruma | Denetlediği |
 |---|---|
