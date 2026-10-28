@@ -40,7 +40,20 @@ export interface OvertimeWindow extends Segment {
 /** Bir günün şekli: normal vardiya sayısı ve açılan mesai pencereleri. */
 export interface DayShape {
   shifts: number
+  /**
+   * Çalışan vardiyaların numaraları (1'den), artan. Yalnız gün kaydı 1'den
+   * art arda olmayan vardiya açtığında (ör. yalnız 3. vardiya) dolu;
+   * yoksa 1..shifts. `shifts` her zaman bu listenin uzunluğudur.
+   */
+  activeShifts?: number[]
   overtime?: OvertimeWindow[]
+}
+
+/** Günün çalışan vardiya numaraları: `activeShifts`, yoksa 1..shifts. */
+export function activeShiftList(day: number | DayShape): number[] {
+  if (typeof day !== 'number' && day.activeShifts) return day.activeShifts
+  const n = typeof day === 'number' ? day : day.shifts
+  return Array.from({ length: Math.max(0, n) }, (_, i) => i + 1)
 }
 
 export interface DayTimeline {
@@ -112,13 +125,12 @@ export function buildDayTimeline(
   day: number | DayShape,
   stops: PlannedStop[],
 ): DayTimeline {
-  const shiftsToday = typeof day === 'number' ? day : day.shifts
   const overtime = typeof day === 'number' ? [] : day.overtime ?? []
   const segments: Segment[] = []
   const resolved: StopBlock[] = []
   const shiftStarts: number[] = []
 
-  for (let i = 1; i <= shiftsToday; i++) {
+  for (const i of activeShiftList(day)) {
     const window = shiftWindow(i, shiftStartMinute, shiftMinutes)
     shiftStarts.push(window.start)
 

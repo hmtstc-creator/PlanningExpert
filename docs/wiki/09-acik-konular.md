@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-28 (düzenlemeler sunumu: slayt 4 takvim düzenleme devam, slayt 6 bekliyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-28 (düzenlemeler sunumu: slayt 4 tamam, slayt 6 bekliyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -16,14 +16,10 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
-- **Düzenlemeler sunumu (2026-10-28) — slayt 4 kalan: takvimden vardiya düzenleme.** Slayt 1, 2, 3, 5 bitti (#91, #93, #94, #95);
-  slayt 4'ün düzeni ve kapalı aralık #94'te. Kalan: Production Plan ortadaki *Work calendar* (`src/components/plan/PressWeekShifts.tsx`,
-  bugün yalnız gösterir, kaynak `run.days`) hücresine tıklayınca o pres × gün × vardiya açılıp kapansın — "nihai karar ekranı".
-  Sıradaki adım: gün bazlı vardiya kaydı tasarla (yeni tablo, ör. `pressDayShifts {press, date, shifts: number[]}`, `plantField`,
-  `guardedMutation` alanı `planning.calendar`), öncelik: gün kaydı > istisna hafta > şablon. Bakılacak yerler: `pressCalendar.ts:156`
-  (`pressDay`, tek kaynak), `capacityModel.ts` (`weekBuckets`), `shiftTimeline.ts:41,109` (`DayShape` bugün vardiya **sayısı**; ardışık
-  olmayan vardiya, ör. yalnız 3., için `activeShifts` gerekir), `planning.ts:1141` (`buildWeekBuckets`, vardiya başına duruş dakikası),
-  doğrulayıcı kapasiteyi kendisi kuruyorsa onu da. Motor + doğrulayıcı + Planning Logic + `schema:snapshot` → `derin` ajanı.
+- **Düzenlemeler sunumu (2026-10-28) — slayt 1–5 bitti.** Slayt 1, 2, 3, 5 (#91, #93, #94, #95); slayt 4'ün düzeni #94'te,
+  takvimden vardiya düzenleme (gün kaydı `pressDayShifts`, hücreye tıkla) ayrı PR'da. Kullanıcıda denenecek: hücre tıklaması →
+  *Calculate plan* → Gantt'ta ve Work Calendar'da o gün; mesaiyle çakışan vardiya hatası; ↺ ile şablona dönüş.
+  Sınır: Work Calendar sayfası gün kaydını kapasiteye katar ama ayrıca işaretlemez; gün kaydının toplu listesi yok.
   Slayt 6 (departman / cost center seçimi) **başlanmayacak** — kullanıcı: en son, planlama doğru çalıştıktan sonra (`todolist.md`).
   #95 sınırları: öne alınmış uzun vade lotu da en sona gider; `summary.longTermShort` arayüzde (`PlanChecks`) gösterilmiyor.
 - **Asakai / OEE (#83–#87) — canlıda kontrol ve planlamacıya sorular:**

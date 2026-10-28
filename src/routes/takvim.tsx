@@ -558,7 +558,7 @@ function PressCalendarSection() {
 
   // Takvimin tek formülü (plan, Capacity Dashboard ve Performance ile aynı):
   // Pazartesiden sırayla gün, tatil kaybolur, tarihli ve tekrarlayan mesai.
-  const { definitions: overtimeDefinitions, pressOvertime } = useOvertimeData()
+  const { definitions: overtimeDefinitions, pressOvertime, dayShifts } = useOvertimeData()
   const calendarModel = useMemo(
     () =>
       capacityModel({
@@ -569,9 +569,10 @@ function PressCalendarSection() {
         weekOverrides: allOverrides,
         overtimeDefinitions: overtimeDefinitions.map((d) => ({ ...d, id: d._id })),
         pressOvertime,
+        dayShifts,
         holidays: new Set([...holidaySet, ...manualHolidays]),
       }),
-    [shiftMinutes, shiftStartMinute, plannedStops, templatesList, allOverrides, overtimeDefinitions, pressOvertime, holidaySet, manualHolidays],
+    [shiftMinutes, shiftStartMinute, plannedStops, templatesList, allOverrides, overtimeDefinitions, pressOvertime, dayShifts, holidaySet, manualHolidays],
   )
 
   type Override = WeekPattern & { weekStart: string }

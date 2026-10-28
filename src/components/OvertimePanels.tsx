@@ -35,7 +35,9 @@ export interface PressOvertimeRow {
 export function useOvertimeData() {
   const definitions = (useQuery(api.overtime.listDefinitions) ?? []) as OvertimeDefinitionRow[]
   const pressOvertime = (useQuery(api.overtime.listPressOvertime) ?? []) as PressOvertimeRow[]
-  return { definitions, pressOvertime }
+  // Gün kayıtları (Production Plan → Work calendar): takvimin bir parçası.
+  const dayShifts = (useQuery(api.dayShifts.list) ?? []) as { press: string; date: string; shifts: number[] }[]
+  return { definitions, pressOvertime, dayShifts }
 }
 
 const hours = (minutes: number) => `${Math.round((minutes / 60) * 10) / 10} h`

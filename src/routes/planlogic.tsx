@@ -339,6 +339,15 @@ function PlanLogicPage() {
             Capacity Dashboard is the same record.
           </li>
           <li>
+            A <b>day record</b> is the final word for one work center and one day: on the Production
+            Plan, <b>Work calendar</b> box, a click on a cell opens or closes that shift. It wins over
+            the week exception, the pattern and a holiday (order: day record → week exception →
+            pattern). The shifts do not have to follow each other: only the 3rd shift (with 8 h
+            shifts from 07:00: 23:00–07:00) is 480 min, 450 net with a 30 min 3rd-shift meal. A shift
+            that overlaps that day's overtime is refused; ↺ removes the record. It reaches the plan
+            on the next Calculate plan.
+          </li>
+          <li>
             A public holiday is a day off: its shifts are lost, never moved to another day.
             Overtime opened on the holiday is planned. Recurring overtime does not run on a
             holiday — open it on the date.
@@ -825,7 +834,10 @@ function PlanLogicPage() {
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           Next to it, <b>Work calendar</b> shows the chosen work center week by week: shifts 1–3 per
-          day as the plan uses them (Work Calendar, week exceptions, holidays) and overtime hours.
+          day as the plan uses them (Work Calendar, week exceptions, holidays, day records) and
+          overtime hours. Clicking a cell opens or closes that shift — a day record (see{' '}
+          <a href="#capacity">Build the capacity</a>); a dashed cell is not in the plan until the
+          next Calculate plan.
         </p>
       </section>
 

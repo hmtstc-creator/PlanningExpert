@@ -3630,6 +3630,36 @@
       "optional": false
     }
   },
+  "pressDayShifts": {
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "press": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "shifts": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "number"
+        }
+      },
+      "optional": false
+    }
+  },
   "pressMaintenance": {
     "actualDate": {
       "fieldType": {

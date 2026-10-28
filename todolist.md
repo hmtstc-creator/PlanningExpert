@@ -131,12 +131,12 @@ yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
 - [x] **[G]** (#91) Slayt 2 — Demand: *High runner threshold* girişi kalkar; stoğun karşıladığı hafta / gün
   hücreleri yeşil arka plan (weekly + daily).
 - [x] **[G]** (#91) Slayt 3 — Stock: tek sayfa; *Storage Location* kolonu *Unrestricted*'tan önce, satır satır.
-- [ ] **[G]** Slayt 4 — Production Plan üst bölüm 3 kutu: sol *Plan settings* (başlangıç **ve bitiş** saati),
+- [x] **[G]** Slayt 4 — Production Plan üst bölüm 3 kutu: sol *Plan settings* (başlangıç **ve bitiş** saati),
   orta pres bazlı haftalık vardiya takvimi (iş yeri filtresi, gün tarihleri), sağ veri güncelleme
   tarihleri + son hesaplama + *Approve plan*. Frozen days uyarısı kalır.
   - [x] (#94) Düzen, kapalı aralık (başlangıç – bitiş), takvim gösterimi.
-  - [ ] Takvim hücresine tıklayıp vardiya aç / kapa: gün bazlı vardiya kaydı (pres × gün × vardiya),
-    `pressCalendar.pressDay` → kapasite modeli → motor ve doğrulayıcı.
+  - [x] Takvim hücresine tıklayıp vardiya aç / kapa: gün kaydı `pressDayShifts` (pres × gün × vardiya),
+    `pressCalendar.pressDay` → kapasite modeli → motor ve doğrulayıcı (2026-10-28).
 - [x] **[G]** (#93) Slayt 5 — İş penceresi: başlıkta *Req dates (d1, d2…) – adet*, *Start / End time*,
   *Status* (sabah 08:00'e göre saat erken / geç; rulo fazlası *overstock*), *Exclude*'dan sonra
   *Main / Alternative work center* bilgisi.

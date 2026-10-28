@@ -115,7 +115,7 @@ function PerformansPage() {
     startMinute: number
     durationMinutes: number
   }[]
-  const { definitions: overtimeDefinitions, pressOvertime } = useOvertimeData()
+  const { definitions: overtimeDefinitions, pressOvertime, dayShifts } = useOvertimeData()
   const country = globalSettings?.country || plantCountry
   const officialHolidays = (useQuery(api.holidays.listByCountry, { country }) ?? []) as { date: string }[]
   const availableMinutes = useMemo(() => {
@@ -127,6 +127,7 @@ function PerformansPage() {
       weekOverrides,
       overtimeDefinitions: overtimeDefinitions.map((d) => ({ ...d, id: d._id })),
       pressOvertime,
+      dayShifts,
       holidays: new Set<string>([
         ...((workCalendar?.holidays ?? []) as string[]),
         ...officialHolidays.map((h) => h.date),
@@ -145,7 +146,7 @@ function PerformansPage() {
       }
     }
     return total
-  }, [presses, templates, weekOverrides, plannedStops, overtimeDefinitions, pressOvertime, officialHolidays, workCalendar, from, to, shiftMinutes, globalSettings?.shiftStartMinute])
+  }, [presses, templates, weekOverrides, plannedStops, overtimeDefinitions, pressOvertime, dayShifts, officialHolidays, workCalendar, from, to, shiftMinutes, globalSettings?.shiftStartMinute])
 
   const utilisation = capacityUtilisation(theoretical, availableMinutes)
 

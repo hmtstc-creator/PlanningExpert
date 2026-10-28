@@ -1105,6 +1105,13 @@ export interface DayBucket {
   date: string
   dayKey: string
   shifts: number
+  /** Çalışan vardiya numaraları; yalnız 1'den art arda değilse dolu (gün kaydı). */
+  activeShifts?: number[]
+  /**
+   * Bu günün vardiyalarının net süreleri (sırayla). Yalnız `activeShifts`
+   * doluysa; motor vardiya sınırını genel `shiftNetMinutes` yerine bundan okur.
+   */
+  shiftNetMinutes?: number[]
   isOvertime: boolean
   isHoliday: boolean
   /** Bu günde kullanılabilir net üretim dakikası. */
@@ -1146,7 +1153,11 @@ export function buildWeekBuckets(
   /** @deprecated Genel çalışma günleri kaldırıldı; okunmaz. */
   _workingDayKeys?: readonly string[],
   /** O günün normal vardiyası ve açılan mesaileri (pressCalendar.pressDay). */
-  dayOf?: (date: string, index: number, isHoliday: boolean) => { shifts: number; overtime: OvertimeWindow[] },
+  dayOf?: (
+    date: string,
+    index: number,
+    isHoliday: boolean,
+  ) => { shifts: number; activeShifts?: number[]; overtime: OvertimeWindow[] },
 ): DayBucket[] {
   const buckets: DayBucket[] = []
   for (let i = 0; i < 7; i++) {
@@ -1156,13 +1167,20 @@ export function buildWeekBuckets(
     const day = dayOf
       ? dayOf(dateStr, i, isHoliday)
       : { shifts: !isHoliday && i < pattern.workingDays ? pattern.shiftsPerDay : 0, overtime: [] as OvertimeWindow[] }
+    const active = 'activeShifts' in day ? day.activeShifts : undefined
     buckets.push({
       date: dateStr,
       dayKey,
       shifts: day.shifts,
+      ...(active
+        ? {
+            activeShifts: active,
+            shiftNetMinutes: active.map((n) => netShiftMinutes(settings.shiftMinutes, settings, n - 1)),
+          }
+        : {}),
       isOvertime: day.overtime.length > 0,
       isHoliday,
-      minutes: dayNetMinutes(day.shifts, day.overtime, settings),
+      minutes: dayNetMinutes(active ?? day.shifts, day.overtime, settings),
       ...(day.overtime.length > 0 ? { overtime: day.overtime } : {}),
     })
   }
@@ -1170,12 +1188,15 @@ export function buildWeekBuckets(
 }
 
 /** Günün net dakikası: normal vardiyalar + mesai, planlı duruşlar düşülmüş. */
-function dayNetMinutes(shifts: number, overtime: OvertimeWindow[], settings: ShiftSettings): number {
+function dayNetMinutes(shifts: number | number[], overtime: OvertimeWindow[], settings: ShiftSettings): number {
+  const shape = Array.isArray(shifts) ? { shifts: shifts.length, activeShifts: shifts, overtime } : { shifts, overtime }
   if (settings.plannedStops && settings.shiftStartMinute !== undefined) {
-    return buildDayTimeline(settings.shiftStartMinute, settings.shiftMinutes, { shifts, overtime }, settings.plannedStops)
-      .netMinutes
+    return buildDayTimeline(settings.shiftStartMinute, settings.shiftMinutes, shape, settings.plannedStops).netMinutes
   }
-  return dayMinutes(shifts, settings.shiftMinutes, settings) + overtime.reduce((a, w) => a + (w.end - w.start), 0)
+  const normal = Array.isArray(shifts)
+    ? shifts.reduce((a, n) => a + netShiftMinutes(settings.shiftMinutes, settings, n - 1), 0)
+    : dayMinutes(shifts, settings.shiftMinutes, settings)
+  return normal + overtime.reduce((a, w) => a + (w.end - w.start), 0)
 }
 
 /** Haftanın normal (mesaisiz) net dakikası. */

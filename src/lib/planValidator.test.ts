@@ -4,6 +4,7 @@ import { computePlan, type PlanInputs, type PlanRun } from './planPipeline'
 import { mooreHodgson, validatePlan, type PlanValidation } from './planValidator'
 import type { ScheduledJob } from './scheduler'
 import { randomPlant } from './randomPlant.fixture'
+import { buildDayTimeline, netToClock } from './shiftTimeline'
 
 // Pazartesi 14 Eylül 2026, 07:00 Romanya — vardiya yeni başladı.
 const MONDAY_0700 = Date.UTC(2026, 8, 14, 4, 0)
@@ -764,3 +765,23 @@ function stress(seed: number, nMat: number): PlanInputs {
     ],
   })
 }
+
+describe('day record (Production Plan → Work calendar)', () => {
+  it('only the 3rd shift on Monday: engine and validator see the same night shift', () => {
+    // Şablon 5 gün × 1 vardiya (07:00–15:00). Gün kaydı Pazartesi yalnız 3.
+    // vardiyayı açar: 23:00–07:00, 480 net dk; 1. vardiya o gün kapalı.
+    const inputs = plant({ pressDayShifts: [{ press: '104', date: D(0), shifts: [3] }] })
+    const run = computePlan(inputs, MONDAY_0700)
+    const monday = run.days.find((d) => d.press === '104' && d.date === D(0))!
+    expect(monday).toMatchObject({ shifts: 1, activeShifts: [3], minutes: 480 })
+    const first = run.jobs.filter((j) => j.press === '104').sort((a, b) => a.date.localeCompare(b.date) || a.setupStartMinute - b.setupStartMinute)[0]
+    expect(first.date).toBe(D(0))
+    // Net dakika → saat: günün tek parçası 3. vardiya, iş 23:00'dan önce başlamaz.
+    const night = buildDayTimeline(420, 480, { shifts: 1, activeShifts: [3] }, [])
+    expect(night.segments).toEqual([{ start: 1380, end: 1860 }])
+    expect(netToClock(first.setupStartMinute, night)).toBeGreaterThanOrEqual(1380)
+    const v = validatePlan(inputs, run, MONDAY_0700)
+    expect(v.warnings.filter((w) => w.startsWith('Calendar differs'))).toEqual([])
+    expect(rule(v, 'working-time').broken).toBe(0)
+  })
+})

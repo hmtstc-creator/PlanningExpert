@@ -94,6 +94,12 @@ export const smallInputs = plantInternalQuery({
         date: o.date,
         definitionId: o.definitionId,
       })),
+      // Gün kayıtları: pres × gün çalışan vardiyalar (Production Plan → Work calendar).
+      pressDayShifts: (await ctx.db.query('pressDayShifts').collect()).map((d: Ctx) => ({
+        press: d.press,
+        date: d.date,
+        shifts: d.shifts,
+      })),
       // Planlamacının pres başlangıcı / gecikme müdahaleleri.
       pressStarts: await ctx.db.query('pressPlanStarts').collect(),
       // Yoldaki hammadde — MRP'de varış haftasında giriş.
