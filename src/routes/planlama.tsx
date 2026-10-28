@@ -11,7 +11,8 @@ import { useCurrentUser } from '../lib/currentUser'
 import { type PlanDataSources } from '../lib/sapUploads'
 import { InfoTip, PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
-import { PlanDataLine } from '../components/plan/PlanPanels'
+import { PlanDataList } from '../components/plan/PlanPanels'
+import { PressWeekShifts } from '../components/plan/PressWeekShifts'
 import { PressStartPanel } from '../components/plan/PressStartPanel'
 import { JobDialog, type JobDraft } from '../components/plan/JobDialog'
 import { MoveDialog, type MoveDraft } from '../components/plan/MoveDialog'
@@ -252,43 +253,105 @@ function PlanlamaPage() {
         }
       />
 
-      <PressStartPanel presses={presses.map((p) => p.name)} />
+      {/* Üst bölüm, 3 kutu (planlamacı 2026-10-28): solda plan ayarları, ortada
+          seçilen iş yerinin haftalık çalışma takvimi, sağda veri tarihleri,
+          son hesap ve onay. */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
+        <PressStartPanel presses={presses.map((p) => p.name)} className="" />
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-border p-3 text-sm">
-        {run ? (
-          <span className="text-muted-foreground">
-            Calculated on the server{' '}
-            <strong className="text-foreground">{minutesAgo(run.computedAt, nowMs)}</strong>{' '}
-            ({new Date(run.computedAt).toLocaleString('en-GB')})
-          </span>
-        ) : run === null ? (
-          <span className="text-muted-foreground">No plan yet — press Calculate plan.</span>
-        ) : (
-          <span className="text-muted-foreground">Loading the plan…</span>
-        )}
-        {recalculating && (
-          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">Calculating…</span>
-        )}
-        {stale && (
-          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
-            Data changed {minutesAgo(planStatus!.dataChangedAt!, nowMs)} — the plan is not up to date, press Calculate plan
-          </span>
-        )}
-        {failedLast && (
-          <span className="text-xs text-destructive">
-            Last calculation failed: {planStatus?.lastError}
-          </span>
-        )}
-        <button
-          onClick={() => void requestNow({})}
-          disabled={recalculating}
-          className={`ml-auto rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${stale || run === null ? 'bg-foreground text-background hover:opacity-90' : 'border border-input hover:bg-muted'}`}
-        >
-          {recalculating ? 'Calculating…' : 'Calculate plan'}
-        </button>
+        <PressWeekShifts
+          presses={presses}
+          dates={allDates}
+          dayOf={(press, date) => {
+            const key = `${press}|${date}`
+            const shifts = shiftsByPressDate.get(key)
+            return shifts === undefined ? undefined : { shifts, overtime: overtimeByPressDate.get(key) ?? [] }
+          }}
+        />
+
+        <div className="flex flex-col gap-2 rounded-lg border border-border p-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => void handleApprove()}
+              disabled={
+                approving ||
+                engineJobs.length === 0 ||
+                inputsLoading ||
+                recalculating ||
+                stale ||
+                truncatedInputs.length > 0
+              }
+              title={
+                truncatedInputs.length > 0
+                  ? 'Part of the data did not reach the planner'
+                  : inputsLoading
+                    ? 'Still loading the plan'
+                    : recalculating
+                      ? 'Wait for the calculation to finish'
+                      : stale
+                        ? 'The data changed — press Calculate plan first'
+                        : undefined
+              }
+              className="ml-auto order-last rounded-md bg-foreground px-5 py-2.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
+            >
+              {approving ? 'Approving…' : 'Approve plan'}
+            </button>
+            {approvedAt && <span className="text-sm text-emerald-600">Approved ✓ {approvedAt}</span>}
+            {latestSnapshot && !approvedAt && (
+              <span className="text-sm text-muted-foreground">
+                Last approved plan: {new Date(latestSnapshot.createdAt).toLocaleString('en-GB')} ·{' '}
+                {latestSnapshot.jobCount} jobs
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {run ? (
+              <span className="text-muted-foreground">
+                Calculated on the server{' '}
+                <strong className="text-foreground">{minutesAgo(run.computedAt, nowMs)}</strong>{' '}
+                ({new Date(run.computedAt).toLocaleString('en-GB')})
+              </span>
+            ) : run === null ? (
+              <span className="text-muted-foreground">No plan yet — press Calculate plan.</span>
+            ) : (
+              <span className="text-muted-foreground">Loading the plan…</span>
+            )}
+            {recalculating && (
+              <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">Calculating…</span>
+            )}
+            {stale && (
+              <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                Data changed {minutesAgo(planStatus!.dataChangedAt!, nowMs)} — the plan is not up to date, press Calculate plan
+              </span>
+            )}
+            {failedLast && (
+              <span className="text-xs text-destructive">
+                Last calculation failed: {planStatus?.lastError}
+              </span>
+            )}
+            <button
+              onClick={() => void requestNow({})}
+              disabled={recalculating}
+              className={`ml-auto rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${stale || run === null ? 'bg-foreground text-background hover:opacity-90' : 'border border-input hover:bg-muted'}`}
+            >
+              {recalculating ? 'Calculating…' : 'Calculate plan'}
+            </button>
+          </div>
+          {run && <PlanDataList sources={(run as { dataSources?: PlanDataSources }).dataSources} />}
+          {run && (
+            // Onaydan önce bakılacak özet; ayrıntılar Overview'da.
+            <Link
+              to="/planningexpert"
+              className={`self-start rounded-md px-2.5 py-1 text-xs font-medium hover:underline ${
+                planChecksOk ? 'bg-emerald-50 text-emerald-800' : 'bg-destructive/10 text-destructive'
+              }`}
+            >
+              {planChecksOk ? 'Plan check: all rules hold ✓' : 'Plan check: rules broken — see Overview'}
+              {` · ${lateCount} late · ${unplanned.length} unplanned`}
+            </Link>
+          )}
+        </div>
       </div>
-
-      {run && <PlanDataLine sources={(run as { dataSources?: PlanDataSources }).dataSources} />}
 
       {truncatedInputs.length > 0 && (
         <div className="mt-6 rounded-lg border-2 border-destructive bg-destructive/10 p-4">
@@ -326,53 +389,6 @@ function PlanlamaPage() {
           the near term will stop moving.
         </p>
       )}
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          onClick={() => void handleApprove()}
-          disabled={
-            approving ||
-            engineJobs.length === 0 ||
-            inputsLoading ||
-            recalculating ||
-            stale ||
-            truncatedInputs.length > 0
-          }
-          title={
-            truncatedInputs.length > 0
-              ? 'Part of the data did not reach the planner'
-              : inputsLoading
-                ? 'Still loading the plan'
-                : recalculating
-                  ? 'Wait for the calculation to finish'
-                  : stale
-                    ? 'The data changed — press Calculate plan first'
-                    : undefined
-          }
-          className="rounded-md bg-foreground px-5 py-2.5 text-sm font-medium text-background hover:opacity-90 disabled:opacity-50"
-        >
-          {approving ? 'Approving…' : 'Approve plan'}
-        </button>
-        {approvedAt && <span className="text-sm text-emerald-600">Approved ✓ {approvedAt}</span>}
-        {latestSnapshot && !approvedAt && (
-          <span className="text-sm text-muted-foreground">
-            Last approved plan: {new Date(latestSnapshot.createdAt).toLocaleString('en-GB')} ·{' '}
-            {latestSnapshot.jobCount} jobs
-          </span>
-        )}
-        {run && (
-          // Onaydan önce bakılacak özet; ayrıntılar Overview'da.
-          <Link
-            to="/planningexpert"
-            className={`ml-auto rounded-md px-2.5 py-1 text-xs font-medium hover:underline ${
-              planChecksOk ? 'bg-emerald-50 text-emerald-800' : 'bg-destructive/10 text-destructive'
-            }`}
-          >
-            {planChecksOk ? 'Plan check: all rules hold ✓' : 'Plan check: rules broken — see Overview'}
-            {` · ${lateCount} late · ${unplanned.length} unplanned`}
-          </Link>
-        )}
-      </div>
 
       {latestSnapshot?.truncated && (
         <p className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">

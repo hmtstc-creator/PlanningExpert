@@ -6,6 +6,8 @@ import { InfoTip } from '../PageHeader'
 /** Hat bazlı plan başlangıcı / geride-ileride paneli (Production Plan). */
 type PressStartRow = {
   press: string
+  holdFromDate?: string
+  holdFromMinute?: number
   fromDate?: string
   fromMinute?: number
   reason?: string
@@ -23,7 +25,7 @@ const toTime = (m?: number) =>
  * kadar yeni iş almaz (operatör yok, hammadde yok…) ya da hat onaylı plana
  * göre geride/ileride. Belirtilmeyen pres her zamanki gibi şu andan planlanır.
  */
-export function PressStartPanel({ presses }: { presses: string[] }) {
+export function PressStartPanel({ presses, className = 'mt-4' }: { presses: string[]; className?: string }) {
   const rows = (useQuery(api.pressPlanStarts.list) ?? []) as PressStartRow[]
   const save = useMutation(api.pressPlanStarts.set)
   const clearAll = useMutation(api.pressPlanStarts.clearAll)
@@ -33,10 +35,10 @@ export function PressStartPanel({ presses }: { presses: string[] }) {
   const active = rows.filter((r) => r.fromDate || r.delayMinutes)
   const list = Array.from(new Set([...presses, ...rows.map((r) => r.press)])).sort()
   return (
-    <div className={`mt-4 rounded-lg border p-3 ${active.length > 0 ? 'border-sky-300 bg-sky-50/60' : 'border-border'}`}>
+    <div className={`${className} min-w-0 rounded-lg border p-3 ${active.length > 0 ? 'border-sky-300 bg-sky-50/60' : 'border-border'}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
-          <span className="font-semibold text-foreground">Plan settings — work center start &amp; delays</span>{' '}
+          <span className="font-semibold text-foreground">Plan settings — work center closed periods &amp; delays</span>{' '}
           <span className="text-muted-foreground">
             {active.length === 0
               ? '· every work center is planned from now'
@@ -44,7 +46,9 @@ export function PressStartPanel({ presses }: { presses: string[] }) {
                   .map((r) =>
                     [
                       r.press,
-                      r.fromDate ? `from ${r.fromDate} ${toTime(r.fromMinute)}${r.reason ? ` (${r.reason})` : ''}` : '',
+                      r.fromDate
+                        ? `${r.holdFromDate ? `closed ${r.holdFromDate} ${toTime(r.holdFromMinute)} – ` : 'closed until '}${r.fromDate} ${toTime(r.fromMinute)}${r.reason ? ` (${r.reason})` : ''}`
+                        : '',
                       r.delayMinutes ? `${r.delayMinutes > 0 ? '+' : ''}${Math.round((r.delayMinutes / 60) * 10) / 10} h` : '',
                     ]
                       .filter(Boolean)
@@ -68,9 +72,9 @@ export function PressStartPanel({ presses }: { presses: string[] }) {
             How these work
             <InfoTip label="About work center start and delays">
               <p>
-                <b>Plan from</b>: the work center takes no new work before this date and time (no operator,
-                no raw material…). Approved jobs on it that would start earlier are released and
-                planned again after it.
+                <b>Closed from – to</b>: the work center takes no work between these two moments (no
+                operator, no raw material…). Leave <i>from</i> empty to close it from now until <i>to</i>.
+                Approved jobs that touch the closed period are released and planned again.
               </p>
               <p>
                 <b>Behind / ahead</b>: the line did not keep to the approved plan. +3 h moves the
@@ -98,7 +102,15 @@ export function PressStartPanel({ presses }: { presses: string[] }) {
                 void Promise.all(
                   list.map((press) => {
                     const r = byPress.get(press)
-                    return save({ press, fromDate: r?.fromDate, fromMinute: r?.fromMinute, reason: r?.reason, delayMinutes: minutes || undefined })
+                    return save({
+                      press,
+                      holdFromDate: r?.holdFromDate,
+                      holdFromMinute: r?.holdFromMinute,
+                      fromDate: r?.fromDate,
+                      fromMinute: r?.fromMinute,
+                      reason: r?.reason,
+                      delayMinutes: minutes || undefined,
+                    })
                   }),
                 )
                 setAllDelay('')
@@ -124,7 +136,8 @@ export function PressStartPanel({ presses }: { presses: string[] }) {
               <thead className="bg-muted/60 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">Work center</th>
-                  <th className="px-3 py-2 font-medium">Plan from (date, time)</th>
+                  <th className="px-3 py-2 font-medium">Closed from (date, time)</th>
+                  <th className="px-3 py-2 font-medium">Closed to (date, time)</th>
                   <th className="px-3 py-2 font-medium">Reason</th>
                   <th className="px-3 py-2 font-medium">Behind / ahead (h)</th>
                   <th className="px-3 py-2" />
@@ -150,8 +163,18 @@ function PressStartRowEditor({
 }: {
   press: string
   row: PressStartRow | undefined
-  save: (args: { press: string; fromDate?: string; fromMinute?: number; reason?: string; delayMinutes?: number }) => Promise<unknown>
+  save: (args: {
+    press: string
+    holdFromDate?: string
+    holdFromMinute?: number
+    fromDate?: string
+    fromMinute?: number
+    reason?: string
+    delayMinutes?: number
+  }) => Promise<unknown>
 }) {
+  const [startDate, setStartDate] = useState(row?.holdFromDate ?? '')
+  const [startTime, setStartTime] = useState(toTime(row?.holdFromMinute) || '07:00')
   const [date, setDate] = useState(row?.fromDate ?? '')
   const [time, setTime] = useState(toTime(row?.fromMinute) || '07:00')
   const [reason, setReason] = useState(row?.reason ?? '')
@@ -162,6 +185,8 @@ function PressStartRowEditor({
     return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : undefined
   }
   const dirty =
+    startDate !== (row?.holdFromDate ?? '') ||
+    (startDate !== '' && minuteOf(startTime) !== row?.holdFromMinute) ||
     date !== (row?.fromDate ?? '') ||
     (date !== '' && minuteOf(time) !== row?.fromMinute) ||
     reason !== (row?.reason ?? '') ||
@@ -174,6 +199,8 @@ function PressStartRowEditor({
           ? { press }
           : {
               press,
+              holdFromDate: date && startDate ? startDate : undefined,
+              holdFromMinute: date && startDate ? minuteOf(startTime) : undefined,
               fromDate: date || undefined,
               fromMinute: date ? minuteOf(time) : undefined,
               reason: reason || undefined,
@@ -187,6 +214,11 @@ function PressStartRowEditor({
   return (
     <tr className="border-t border-border">
       <td className="px-3 py-1.5 font-medium text-foreground">{press}</td>
+      <td className="px-3 py-1.5">
+        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} aria-label={`${press} closed from date`} className="rounded-md border border-input bg-background px-2 py-1 text-xs" />{' '}
+        <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} disabled={!startDate} aria-label={`${press} closed from time`} className="rounded-md border border-input bg-background px-2 py-1 text-xs disabled:opacity-50" />
+        {!startDate && <span className="ml-1 text-[11px] text-muted-foreground">now</span>}
+      </td>
       <td className="px-3 py-1.5">
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded-md border border-input bg-background px-2 py-1 text-xs" />{' '}
         <input type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={!date} className="rounded-md border border-input bg-background px-2 py-1 text-xs disabled:opacity-50" />

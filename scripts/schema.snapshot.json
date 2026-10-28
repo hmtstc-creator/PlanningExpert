@@ -3770,6 +3770,18 @@
       },
       "optional": true
     },
+    "holdFromDate": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "holdFromMinute": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
     "plantId": {
       "fieldType": {
         "type": "id",

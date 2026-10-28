@@ -19,6 +19,8 @@ const rowValidator = v.object({
   _id: v.id('pressPlanStarts'),
   _creationTime: v.number(),
   press: v.string(),
+  holdFromDate: v.optional(v.string()),
+  holdFromMinute: v.optional(v.number()),
   fromDate: v.optional(v.string()),
   fromMinute: v.optional(v.number()),
   reason: v.optional(v.string()),
@@ -39,6 +41,9 @@ export const set = guardedMutation({
   areas: ['planning.plan'],
   args: {
     press: v.string(),
+    // Kapalı aralığın başlangıcı; boşsa şu an. Bitiş = fromDate/fromMinute.
+    holdFromDate: v.optional(v.string()),
+    holdFromMinute: v.optional(v.number()),
     fromDate: v.optional(v.string()),
     fromMinute: v.optional(v.number()),
     reason: v.optional(v.string()),
@@ -48,15 +53,29 @@ export const set = guardedMutation({
   handler: async (ctx, args) => {
     const press = args.press.trim()
     if (!press) throw new ConvexError('Work center is required')
-    if (args.fromDate !== undefined && !DATE.test(args.fromDate)) throw new ConvexError('Date must be YYYY-MM-DD')
-    if (args.fromMinute !== undefined && (!Number.isFinite(args.fromMinute) || args.fromMinute < 0 || args.fromMinute >= 1440)) {
-      throw new ConvexError('Time must be between 00:00 and 23:59')
+    for (const date of [args.fromDate, args.holdFromDate]) {
+      if (date !== undefined && !DATE.test(date)) throw new ConvexError('Date must be YYYY-MM-DD')
+    }
+    for (const minute of [args.fromMinute, args.holdFromMinute]) {
+      if (minute !== undefined && (!Number.isFinite(minute) || minute < 0 || minute >= 1440)) {
+        throw new ConvexError('Time must be between 00:00 and 23:59')
+      }
+    }
+    if (args.holdFromDate && !args.fromDate) throw new ConvexError('Set the end of the closed period too')
+    if (
+      args.holdFromDate &&
+      args.fromDate &&
+      `${args.holdFromDate}|${String(args.holdFromMinute ?? 0).padStart(4, '0')}` >= `${args.fromDate}|${String(args.fromMinute ?? 0).padStart(4, '0')}`
+    ) {
+      throw new ConvexError('The start must be before the end')
     }
     if (args.delayMinutes !== undefined && (!Number.isFinite(args.delayMinutes) || Math.abs(args.delayMinutes) > 7 * 1440)) {
       throw new ConvexError('Delay must be at most 7 days either way')
     }
     const doc = {
       press,
+      holdFromDate: args.fromDate ? args.holdFromDate : undefined,
+      holdFromMinute: args.fromDate && args.holdFromDate ? (args.holdFromMinute ?? 0) : undefined,
       fromDate: args.fromDate,
       fromMinute: args.fromDate ? (args.fromMinute ?? 0) : undefined,
       reason: args.reason?.trim().slice(0, 200) || undefined,

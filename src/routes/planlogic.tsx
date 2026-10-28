@@ -759,16 +759,19 @@ function PlanLogicPage() {
       </section>
 
       <section id="press-start" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Planner's hand — work center start and delays</h2>
+        <h2 className="text-sm font-semibold text-foreground">Planner's hand — closed periods and delays</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Unless you say otherwise every work center is planned from now. At the top of the Production
-          Plan (<b>Plan settings</b>) you can set, per work center, before recalculating:
+          Unless you say otherwise every work center is planned from now. At the top left of the
+          Production Plan (<b>Plan settings</b>) you can set, per work center, before recalculating:
         </p>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            <b>Plan from</b> (date and time) with a reason — no operator, no raw material… The
-            work center takes no new work before it; approved jobs that would start earlier are released
-            and planned again after it.
+            <b>Closed from – to</b> (date and time) with a reason — no operator, no raw material…
+            The work center takes no work between the two moments; the closed hours show on the
+            chart. Leave <i>from</i> empty to close it from now until <i>to</i>. Example: closed
+            Monday 07:30 – 10:00 on a 07:00 shift — a 60-minute job does not fit in the first half
+            hour, so it starts at 10:00; a job before a later closed period (12:00 – 14:00) is not
+            moved. Approved jobs that touch the closed period are released and planned again.
           </li>
           <li>
             <b>Behind / ahead</b> (hours): the line did not keep to the approved plan. +3 h moves
@@ -780,6 +783,10 @@ function PlanLogicPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Work that is not approved needs no correction: every Calculate plan rebuilds the plan from
           the current moment.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Next to it, <b>Work calendar</b> shows the chosen work center week by week: shifts 1–3 per
+          day as the plan uses them (Work Calendar, week exceptions, holidays) and overtime hours.
         </p>
       </section>
 
