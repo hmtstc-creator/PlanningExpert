@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useState } from 'react'
 
 import { api } from '../../../convex/_generated/api'
+import { dottedDate, jobStatus } from '../../lib/jobStatus'
 import type { PlanJob } from '../../lib/planPipeline'
 import { useSafeMutation } from '../../lib/useSafeMutation'
 import { ErrorBanner } from '../ErrorBanner'
@@ -21,9 +22,16 @@ export interface JobDraft {
   override?: { id: string; qty: number }
   /** İş tek tek onaylanmış (kilitli). */
   lock?: { id: string; approvedBy?: string; createdAt: number; manual?: boolean }
+  /** Setup başlangıcı ve iş bitişi, okunur saat ("Wed 28 Oct 13:20"). */
+  startLabel?: string
+  endLabel?: string
+  /** Malzeme ana verisi: ana ve alternatif iş yerleri (bilgi). */
+  mainMachine?: string
+  altMachines?: string[]
 }
 
 const pcs = (n: number) => Math.round(n).toLocaleString('en-GB')
+const hrs = (h: number) => `${h.toLocaleString('en-GB', { maximumFractionDigits: 1 })} hour${h === 1 ? '' : 's'}`
 const dayLabel = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })
 
@@ -50,6 +58,8 @@ export function JobDialog({ draft, onClose, onMove }: { draft: JobDraft; onClose
   const qty = Number(value.replace(/[\s.,]/g, ''))
   const valid = value.trim() !== '' && Number.isFinite(qty) && qty >= 0
   const coils = draft.piecesPerCoil && valid ? Math.ceil(qty / draft.piecesPerCoil) : 0
+  const requirements = job.requirements ?? []
+  const status = jobStatus(job.quantity, requirements)
 
   /** Değişikliği yaz, sonra planı yeniden hesaplat. */
   const thenRecalc = async (write: Promise<boolean>) => {
@@ -86,7 +96,7 @@ export function JobDialog({ draft, onClose, onMove }: { draft: JobDraft; onClose
             </p>
             <p className="mt-0.5 text-lg font-bold">{job.material}</p>
             <p className="text-xs text-muted-foreground">
-              {job.press} · {dayLabel(job.date)} · {pcs(job.quantity)} pcs
+              {job.press} · {dayLabel(job.date)}
               {!draft.lock && ` · lot ${draft.bucket}`}
             </p>
           </div>
@@ -94,6 +104,50 @@ export function JobDialog({ draft, onClose, onMove }: { draft: JobDraft; onClose
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {/* İhtiyaç ve durum (planlamacı 2026-10-28): ihtiyaç günü 08:00'e göre erken / geç, rulo fazlası overstock. */}
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+          <dt className="text-muted-foreground">Req dates</dt>
+          <dd>
+            {requirements.length > 0
+              ? `(${[...new Set(requirements.map((r) => dottedDate(r.date)))].join(', ')}) – ${pcs(requirements.reduce((a, r) => a + r.qty, 0))}`
+              : job.longTerm
+                ? 'long term (weekly ZPP) — fills free capacity'
+                : 'none in the horizon (stock build)'}
+          </dd>
+          {draft.startLabel && (
+            <>
+              <dt className="text-muted-foreground">Start time</dt>
+              <dd>{draft.startLabel}</dd>
+            </>
+          )}
+          {draft.endLabel && (
+            <>
+              <dt className="text-muted-foreground">End time</dt>
+              <dd>{draft.endLabel}</dd>
+            </>
+          )}
+          <dt className="text-muted-foreground">Status</dt>
+          <dd>
+            {status.map((p, i) => (
+              <span key={i}>
+                {i > 0 && ' and '}
+                {pcs(p.qty)} pcs{' '}
+                <span
+                  className={
+                    p.kind === 'late'
+                      ? 'font-semibold text-destructive'
+                      : p.kind === 'overstock'
+                        ? 'text-amber-700 dark:text-amber-300'
+                        : 'text-emerald-700 dark:text-emerald-300'
+                  }
+                >
+                  ({p.kind === 'overstock' ? 'overstock' : p.kind === 'onTime' ? 'on time' : `${hrs(p.hours ?? 0)} ${p.kind === 'late' ? 'late' : 'before'}`})
+                </span>
+              </span>
+            ))}
+          </dd>
+        </dl>
 
         {error && (
           <div className="mt-3">
@@ -286,6 +340,16 @@ export function JobDialog({ draft, onClose, onMove }: { draft: JobDraft; onClose
               )}
             </div>
           </>
+        )}
+
+        {/* Bilgi: malzeme ana verisindeki iş yerleri. */}
+        {(draft.mainMachine || (draft.altMachines?.length ?? 0) > 0) && (
+          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-lg border border-border p-3 text-sm">
+            <dt className="text-muted-foreground">Main work center</dt>
+            <dd>{draft.mainMachine || '—'}</dd>
+            <dt className="text-muted-foreground">Alternative</dt>
+            <dd>{draft.altMachines?.length ? draft.altMachines.join(', ') : '—'}</dd>
+          </dl>
         )}
       </div>
     </div>

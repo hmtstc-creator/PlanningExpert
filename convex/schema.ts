@@ -182,7 +182,10 @@ export default defineSchema({
   pressPlanStarts: defineTable({
     ...plantField,
     press: v.string(),
-    // Plan başlangıcı: takvim günü + saat (gece yarısından dakika).
+    // Kapalı aralığın başlangıcı (takvim günü + dakika); boşsa şu an.
+    holdFromDate: v.optional(v.string()),
+    holdFromMinute: v.optional(v.number()),
+    // Plan başlangıcı = kapalı aralığın bitişi: takvim günü + saat (gece yarısından dakika).
     fromDate: v.optional(v.string()),
     fromMinute: v.optional(v.number()),
     reason: v.optional(v.string()),

@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { Fragment } from 'react'
 import type { PlanAudit } from '../../lib/planAudit'
 import type { PlanAlarms } from '../../lib/planAlarms'
 import { SAP_UPLOAD_KEYS, SAP_UPLOAD_LABELS, formatPlantTime, type PlanDataSources } from '../../lib/sapUploads'
@@ -113,5 +114,36 @@ export function PlanDataLine({ sources }: { sources: PlanDataSources | undefined
         SAP Data →
       </Link>
     </p>
+  )
+}
+
+/** Production Plan sağ kutu: planın hesaplandığı dosyalar ve yüklenme tarihleri, alt alta. */
+export function PlanDataList({ sources }: { sources: PlanDataSources | undefined }) {
+  return (
+    <div className="text-xs">
+      <p className="font-medium text-foreground">
+        Data last updated{' '}
+        <Link to="/sapdata" className="font-normal text-muted-foreground underline hover:text-foreground">
+          SAP Data →
+        </Link>
+      </p>
+      {sources === undefined ? (
+        <p className="text-muted-foreground">File details are recorded from the next calculation on.</p>
+      ) : (
+        <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+          {SAP_UPLOAD_KEYS.map((key) => {
+            const source = sources[key]
+            return (
+              <Fragment key={key}>
+                <dt className="text-muted-foreground">{SAP_UPLOAD_LABELS[key].split(' — ')[1]}</dt>
+                <dd className={source ? 'text-foreground' : 'text-amber-700 dark:text-amber-300'} title={source?.fileName}>
+                  {source ? formatPlantTime(source.uploadedAt) : 'not uploaded'}
+                </dd>
+              </Fragment>
+            )
+          })}
+        </dl>
+      )}
+    </div>
   )
 }

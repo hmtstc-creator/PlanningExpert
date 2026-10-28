@@ -411,6 +411,14 @@ export interface ScheduledJob {
   neededQuantity?: number
   /** Gecikme, saat (plan hesaplanırken doldurulur). */
   lateHours?: number
+  /**
+   * İşin karşıladığı ihtiyaç noktaları (iş penceresi, planlamacı 2026-10-28):
+   * ihtiyaç günü, o güne düşen adet, teslim anı ve o adedin hazır olduğu an.
+   * `hours` plan hesaplanırken doldurulur: hazır an − teslim anı (artı geç,
+   * eksi erken). Lotun ihtiyaç dışı kalan kısmı (rulo / min. lot fazlası)
+   * `quantity − Σ qty`'dir.
+   */
+  requirements?: JobRequirement[]
   /** İhtiyaç haftasından önce, pres boş kalmasın diye öne çekildi. */
   pulledForward?: boolean
   /**
@@ -427,6 +435,46 @@ export interface ScheduledJob {
   decision?: PlacementDecision
   /** Uzun vade lotu (haftalık ZPP, ZPP_DAILY'nin ötesi): boş kapasiteye kondu. */
   longTerm?: boolean
+}
+
+export interface JobRequirement {
+  /** İhtiyaç günü (stoğun eksiye düştüğü gün). */
+  date: string
+  /** O güne düşen adet (birikimli değil). */
+  qty: number
+  deadlineDate: string
+  deadlineMinute: number
+  readyDate: string
+  readyMinute: number
+  /** Hazır an − teslim anı, saat; artı geç, eksi erken. */
+  hours?: number
+}
+
+/**
+ * İşin ihtiyaç noktaları: lotun kontrol noktalarından, her biri o güne düşen
+ * adet ve o adedin üretimde hazır olduğu an (teslim kontrolüyle aynı pay).
+ */
+export function jobRequirements(entry: DemandEntry, segments: JobSegment[], quantity: number): JobRequirement[] {
+  if (entry.noStockout) return []
+  const points = (entry.checkpoints ?? []).filter((c) => c.deadlineDate !== undefined && c.deadlineNet !== undefined)
+  const out: JobRequirement[] = []
+  let prev = 0
+  for (const cp of points) {
+    const qty = Math.round(cp.fraction * quantity) - Math.round(prev * quantity)
+    prev = Math.max(prev, cp.fraction)
+    if (qty <= 0) continue
+    const ready = readyMoment(segments, cp.fraction)
+    if (!ready) continue
+    out.push({
+      date: cp.date,
+      qty,
+      deadlineDate: cp.deadlineDate!,
+      deadlineMinute: cp.deadlineNet!,
+      readyDate: ready.date,
+      readyMinute: ready.minute,
+    })
+  }
+  return out
 }
 
 export interface UnplannedItem {
@@ -2225,6 +2273,8 @@ function placeRun(
     deadlineMinute: delivery.deadlineNet ?? entry.deadlineNet,
     deadlineLabel: delivery.deadlineLabel ?? entry.deadlineLabel,
     neededQuantity: entry.noStockout || entry.longTerm ? 0 : Math.round(delivery.fraction * run.quantity),
+    // Uzun vade lotu geç sayılmaz; iş penceresinde ihtiyaç noktası da göstermez.
+    requirements: entry.longTerm ? [] : jobRequirements(entry, best.segments, run.quantity),
     urgentSetup: !!best.urgent && !sameMaterial,
     pulledForward,
     ...(pulledForward ? { pulledFrom: entry.earliestDate } : {}),

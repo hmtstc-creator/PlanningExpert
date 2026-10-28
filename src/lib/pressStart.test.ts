@@ -80,6 +80,21 @@ describe('plan start per press', () => {
     expect(noRuleBroken(inputs, run)).toEqual([])
   })
 
+  it('a closed period (start – end) closes only that window', () => {
+    // Pzt 07:30–10:00 kapalı: 60 dk'lık iş 07:00–07:30'a sığmaz, 10:00'dan (net 180) sonra başlar.
+    const inside = plant({ pressStarts: [{ press: '104', holdFromDate: '2026-09-14', holdFromMinute: 450, fromDate: '2026-09-14', fromMinute: 600, reason: 'No operator' }] })
+    const run = computePlan(inside, MONDAY_0700)
+    const b = run.jobs.find((j) => j.material === 'B')!
+    expect(b.date === '2026-09-14' ? b.setupStartMinute >= 180 : b.date > '2026-09-14').toBe(true)
+    expect(run.maintenance.some((m) => m.label.startsWith('Held 2026-09-14 07:30 – 2026-09-14 10:00: No operator'))).toBe(true)
+    expect(noRuleBroken(inside, run)).toEqual([])
+    // Pzt 12:00–14:00 kapalı: iş sabah 07:00'de başlar, aralıktan etkilenmez.
+    const later = plant({ pressStarts: [{ press: '104', holdFromDate: '2026-09-14', holdFromMinute: 720, fromDate: '2026-09-14', fromMinute: 840 }] })
+    const run2 = computePlan(later, MONDAY_0700)
+    const b2 = run2.jobs.find((j) => j.material === 'B')!
+    expect([b2.date, b2.setupStartMinute]).toEqual(['2026-09-14', 0])
+  })
+
   it('a start in the past changes nothing', () => {
     const run = computePlan(plant({ pressStarts: [{ press: '104', fromDate: '2026-09-10', fromMinute: 420 }] }), MONDAY_0700)
     expect(run.maintenance).toEqual([])
