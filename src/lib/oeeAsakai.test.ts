@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import fixture from './oee.fixture.json'
 import { UNASSIGNED, chartGroups, daysFromShifts, lossDayOf, oeeOf, parseOeeWorkbook, sumTimes, type LossDay, type OeeConfig, type SheetRows } from './oee'
-import { ASAKAI_WEEKS, asakaiColumns, asakaiDetail, asakaiWeekly, dropEmptyUnassigned } from './oeeAsakai'
+import { ASAKAI_WEEKS, asakaiColumns, asakaiTopStops, asakaiDetail, asakaiWeekly, dropEmptyUnassigned } from './oeeAsakai'
 
 // Gerçek kesit (ASAKAI dosyası): Progressive ve Transfer, 21 Eylül haftası.
 const parsed = parseOeeWorkbook(fixture as unknown as Record<string, SheetRows>)
@@ -113,6 +113,17 @@ describe('Asakai columns', () => {
     const row = (v: number) => ({ label: 'x', loadingMin: 100, oee: 0.5, shares: { Unassigned: v } })
     expect(dropEmptyUnassigned(['Setup', 'Unassigned'], [row(0)])).toEqual(['Setup'])
     expect(dropEmptyUnassigned(['Setup', 'Unassigned'], [row(0.02)])).toEqual(['Setup', 'Unassigned'])
+  })
+})
+
+describe('Asakai red cells', () => {
+  it('iş yerinin en büyük 2 duruşu; Speed ve Unassigned sayılmaz', () => {
+    const row = { label: 'W', loadingMin: 480, oee: 0.6, shares: { STP: 0.05, KLP: 0.12, ARZ: 0.02, Speed: 0.3, Unassigned: 0.2, KON: 0 } }
+    const cols = ['STP', 'KLP', 'ARZ', 'KON', 'Speed', 'Unassigned']
+    expect([...asakaiTopStops(row, cols)].sort()).toEqual(['KLP', 'STP'])
+    // Tek duruş varsa yalnız o; Loading yoksa hiçbiri.
+    expect([...asakaiTopStops({ ...row, shares: { ARZ: 0.01 } }, cols)]).toEqual(['ARZ'])
+    expect(asakaiTopStops({ ...row, loadingMin: 0 }, cols).size).toBe(0)
   })
 })
 

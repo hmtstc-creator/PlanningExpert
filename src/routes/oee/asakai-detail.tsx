@@ -10,7 +10,7 @@ import { SavePdfButton } from '../../components/SavePdfButton'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
 import { areaNames, lossDayOf, type OrderRow, type ShiftRow } from '../../lib/oee'
-import { ASAKAI_HIGHLIGHT, asakaiColumns, asakaiDetail, dropEmptyUnassigned, type LossRow } from '../../lib/oeeAsakai'
+import { ASAKAI_TOP, asakaiColumns, asakaiTopStops, asakaiDetail, dropEmptyUnassigned } from '../../lib/oeeAsakai'
 import { fromStoredStops, stopDayOf } from '../../lib/oeeReliability'
 import { splitShortStops } from '../../lib/oeeShortStops'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
@@ -52,10 +52,11 @@ function AsakaiDetailPage() {
   const sheetRef = useRef<HTMLDivElement>(null)
   // Excel'deki gibi tek tablo: masraf yerleri ardışık (Progressive, Transfer).
   const machines = groups.flatMap((g) => g.machines)
+  // Her iş yerinin gününde en büyük duruşlar kırmızı (vardiya satırları değil).
+  const topOf = new Map(machines.map((m) => [m.workCenter, asakaiTopStops(m.total, columns)]))
   const partCols = Math.max(PART_COLUMNS, ...machines.map((m) => m.parts.length))
   const day = dm(sel.date)
   const loading = shiftRows === undefined || evRaw === undefined
-  const red = (r: LossRow, c: string) => r.loadingMin > 0 && (r.shares[c] ?? 0) >= ASAKAI_HIGHLIGHT
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
@@ -68,8 +69,8 @@ function AsakaiDetailPage() {
             <p>
               The dark row of each work center is the day; rows 1, 2, 3 are its shifts (shift numbers from{' '}
               <Link to="/oee/settings">OEE Settings</Link>
-              ). Losses are shares of the loading time, split by shift as on Loss Bridge; a red cell is {Math.round(ASAKAI_HIGHLIGHT * 100)}
-              % or more.
+              ). Losses are shares of the loading time, split by shift as on Loss Bridge; red cells are the {ASAKAI_TOP} largest
+              stops of each work center&apos;s day (Speed and Unassigned are not counted).
             </p>
             <p>Right: the materials of the day (orders file), each shift&apos;s good quantity and OEE — e.g. &quot;12660 - %90&quot;.</p>
           </>
@@ -175,11 +176,14 @@ function AsakaiDetailPage() {
                     <Cell bg={X.salmonLight} bold>
                       {Math.round(m.total.loadingMin)}
                     </Cell>
-                    {columns.map((c) => (
-                      <Cell key={c} bg={X.slate} color="#fff" bold>
-                        {share(m.total, c)}
-                      </Cell>
-                    ))}
+                    {columns.map((c) => {
+                      const red = topOf.get(m.workCenter)?.has(c)
+                      return (
+                        <Cell key={c} bg={red ? X.bad : X.slate} color={red ? X.badText : '#fff'} bold>
+                          {share(m.total, c)}
+                        </Cell>
+                      )
+                    })}
                     <td />
                     {Array.from({ length: partCols }, (_, i) => (
                       <Cell key={i} bg={X.yellow} bold>
@@ -200,7 +204,7 @@ function AsakaiDetailPage() {
                       <Cell bg={X.salmonLight}>{pct(s.oee ?? 0)}</Cell>
                       <Cell bg={X.salmonLight}>{Math.round(s.loadingMin)}</Cell>
                       {columns.map((c) => (
-                        <Cell key={c} bg={red(s, c) ? X.bad : X.lightBlue} color={red(s, c) ? X.badText : undefined}>
+                        <Cell key={c} bg={X.lightBlue}>
                           {share(s, c)}
                         </Cell>
                       ))}
