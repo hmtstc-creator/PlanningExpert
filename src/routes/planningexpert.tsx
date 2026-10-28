@@ -135,7 +135,7 @@ function HomePage() {
           <strong className="text-foreground">{Math.round(week!.remaining / 60).toLocaleString('en-GB')} h</strong> still available of{' '}
           {Math.round(week!.full / 60).toLocaleString('en-GB')} h.
           {run.capacityFactor !== 1 && ` Capacity adjusted by the measured attainment rate: ${Math.round(run.capacityFactor * 100)} %.`}
-          {run.dailyUntil && ` Sales days from ZPP_DAILY up to ${run.dailyUntil}, then the weekly ZPP.`}
+          {run.dailyUntil && ` Sales days from ZPP_DAILY up to ${run.dailyUntil} are planned first; the weekly ZPP (long-term) only fills the capacity left.`}
         </p>
       )}
 

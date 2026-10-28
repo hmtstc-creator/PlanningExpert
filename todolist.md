@@ -126,8 +126,8 @@ Kullanıcı kararları (2026-10-23):
 Kullanıcı sunumu (`duzenlemeler.pptx`, 6 slayt). Slayt 1–5 bu işte yapılıyor; slayt 6 **en son**
 yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
 
-- [ ] **[G]** Slayt 1 — 2 haftalık plan önce **ZPP_DAILY**'ye saygı duyar; ZPP (long term / haftalık)
-  yalnız kalan boş kapasiteyi doldurur.
+- [x] **[G]** Slayt 1 — 2 haftalık plan önce **ZPP_DAILY**'ye saygı duyar; ZPP (long term / haftalık)
+  yalnız kalan boş kapasiteyi doldurur. (2026-10-28: `longTerm` lot, kısmi hafta bölünür; wiki 02)
 - [ ] **[G]** Slayt 2 — Demand: *High runner threshold* girişi kalkar; stoğun karşıladığı hafta / gün
   hücreleri yeşil arka plan (weekly + daily).
 - [ ] **[G]** Slayt 3 — Stock: tek sayfa; *Storage Location* kolonu *Unrestricted*'tan önce, satır satır.

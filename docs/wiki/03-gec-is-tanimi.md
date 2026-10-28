@@ -1,6 +1,6 @@
 # 03 · Geç iş tanımı
 
-> Son güncelleme: 2026-10-22 · Kaynak: `scheduler.ts` (`deliveryCheck`), `planPipeline.ts` (`lateShare`, `explainLate`), `planValidator.ts`
+> Son güncelleme: 2026-10-28 · Kaynak: `scheduler.ts` (`deliveryCheck`), `planPipeline.ts` (`lateShare`, `explainLate`), `planValidator.ts`
 > Kullanıcıya dönük anlatım: Planning Logic → *Late jobs are re-planned*
 
 ## Tanım
@@ -10,6 +10,10 @@
 Teslimde tatil gözetilmez (müşteri tatilde de isteyebilir).
 
 Bir lot, **herhangi bir** kontrol noktasında gereken pay hazır değilse geçtir. Rapor **ilk kaçırılan** noktayı gösterir.
+
+**Uzun vade lotu geç sayılmaz** (2026-10-28): ZPP_DAILY yüklüyken haftalık ZPP'den gelen lot yalnızca boş kapasiteyi doldurur ([02](02-planlama-motoru.md)).
+Günlük lotun kontrol noktaları da yalnızca günlük talebi sayar. Doğrulayıcının kendi kuralı: yalnızca uzun vade adedi eksikse bu bir
+müşteri duruşu değildir, `summary.longTermShort`'ta sayılır.
 
 ## Pay (adet ∝ üretim dakikası)
 

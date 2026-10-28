@@ -110,6 +110,9 @@ export function readDailyDemand(
  * - Hafta tamamen kapsanıyorsa haftalık rakam kullanılmaz; toplam, günlük
  *   dosyanın toplamıdır.
  *
+ * `weekly`: toplamın haftalık ZPP'den gelen kısmı (ZPP_DAILY yüklüyken
+ * "uzun vade" talebi; planlama bunu günlük talepten sonra, boş kapasiteye koyar).
+ *
  * `openDays` haftanın bugünden itibaren talep alabilecek günleri (iş günleri).
  * Geçmiş günlerin günlük talebi sayılmaz — o kısım ZPP'nin bakiyesindedir.
  */
@@ -121,15 +124,20 @@ export function splitWeek(input: {
   openDays: string[]
   daily?: { date: string; qty: number }[]
   dailyUntil: string | null
-}): { total: number; perDay: Map<string, number> } {
+}): { total: number; perDay: Map<string, number>; weekly: number; weeklyPerDay: Map<string, number> } {
   const perDay = new Map<string, number>()
+  const weeklyPerDay = new Map<string, number>()
   const add = (date: string, qty: number) => perDay.set(date, (perDay.get(date) ?? 0) + qty)
+  const addWeekly = (date: string, qty: number) => {
+    add(date, qty)
+    weeklyPerDay.set(date, (weeklyPerDay.get(date) ?? 0) + qty)
+  }
 
   if (!input.daily || !input.dailyUntil || input.dailyUntil < input.weekStart) {
     // Günlük veri yok ya da bu haftaya ulaşmıyor: eski yöntem.
     const days = input.openDays.length > 0 ? input.openDays : [input.today]
-    if (input.weeklyQty > 0) for (const d of days) add(d, input.weeklyQty / days.length)
-    return { total: input.weeklyQty, perDay }
+    if (input.weeklyQty > 0) for (const d of days) addWeekly(d, input.weeklyQty / days.length)
+    return { total: input.weeklyQty, perDay, weekly: input.weeklyQty, weeklyPerDay }
   }
 
   let dailySum = 0
@@ -138,12 +146,12 @@ export function splitWeek(input: {
     add(date, qty)
     dailySum += qty
   }
-  if (input.dailyUntil >= input.weekEnd) return { total: dailySum, perDay }
+  if (input.dailyUntil >= input.weekEnd) return { total: dailySum, perDay, weekly: 0, weeklyPerDay }
 
   // Hafta kısmen kapsanıyor: kalan haftalık adet kapsanmayan günlere.
   const rest = Math.max(0, input.weeklyQty - dailySum)
   const uncovered = input.openDays.filter((d) => d > input.dailyUntil!)
   const days = uncovered.length > 0 ? uncovered : input.openDays.length > 0 ? input.openDays : [input.today]
-  if (rest > 0) for (const d of days) add(d, rest / days.length)
-  return { total: dailySum + rest, perDay }
+  if (rest > 0) for (const d of days) addWeekly(d, rest / days.length)
+  return { total: dailySum + rest, perDay, weekly: rest, weeklyPerDay }
 }

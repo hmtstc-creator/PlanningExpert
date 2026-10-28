@@ -975,18 +975,23 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
             (j.readyMinute - j.deadlineMinute),
         )
       : Math.max(0, ((Date.parse(j.date) - Date.parse(j.dueDate)) / dayMs) * 1440)
-  // Müşteri önce: en az plansız, en az geç MALZEME (bir parçanın üç geç
+  // Müşteri önce: en az plansız (günlük), en az geç MALZEME (bir parçanın üç geç
   // lotu tek duruştur), en az geç saat, sonra en az geç lot. Saat tam saate
   // yuvarlanır ki doluluk ve setup gerçekten karar verebilsin.
   const lateHoursOf = (r: ReturnType<typeof schedule>) =>
     Math.round(r.jobs.filter((j) => j.late).reduce((a, j) => a + lateMinutes(j), 0) / 60)
   const lateMaterialsOf = (r: ReturnType<typeof schedule>) =>
     new Set(r.jobs.filter((j) => j.late).map((j) => j.material)).size
+  // Uzun vade lotları (ZPP_DAILY yüklüyken haftalık ZPP) puanda EN SONDA:
+  // plansız kalan bir uzun vade lotu, bir günlük lotun gecikmesinden her
+  // zaman daha az kötüdür; onarım, senaryo ve yerel arama günlük lotu feda
+  // ederek uzun vade lotu sığdırmaz.
   const score = (r: ReturnType<typeof schedule>) => [
-    r.unplanned.length,
+    r.unplanned.filter((u) => !u.longTerm).length,
     lateMaterialsOf(r),
     lateHoursOf(r),
     r.jobs.filter((j) => j.late).length,
+    r.unplanned.filter((u) => u.longTerm).length,
   ]
   const better = (a: number[], b: number[]) => {
     for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i]

@@ -136,6 +136,12 @@ export interface DemandEntry {
    * (`index` 1'den başlar). Parçalar arasına başka bir lot girebilir.
    */
   splitPart?: { index: number; of: number; label: string }
+  /**
+   * Uzun vade lotu (ZPP_DAILY yüklüyken haftalık ZPP'den gelen talep): SAP'nin
+   * günlük taahhüdü değildir. Bütün günlük lotlar yerleştikten SONRA, yalnızca
+   * kalan boş kapasiteye konur; geç sayılmaz, puanda en sondadır.
+   */
+  longTerm?: boolean
 }
 
 export interface DeliveryCheckpoint {
@@ -239,12 +245,18 @@ export function buildDemandSchedule(
   const calendar = demandCalendar(options)
   // malzeme → gün → talep (stok projeksiyonu için)
   const dayDemand = new Map<string, Map<string, number>>()
+  // ZPP_DAILY yüklü ve bugüne ulaşıyorsa haftalık ZPP'den gelen talep "uzun
+  // vade"dir (SAP'nin günlük taahhüdü değil): ayrı lot olur, en son yerleşir.
+  const longTermActive = !!options.dailyUntil && options.dailyUntil >= calendar.today
+  // malzeme → gün → uzun vade talebi (günlük lotların teslim noktaları bunu saymaz)
+  const dayDemandLongTerm = new Map<string, Map<string, number>>()
 
   for (const row of rows) {
     const weeklyPeriods = row.periods.map((p) => ({ label: p.label, qty: Math.abs(p.qty) }))
     // Haftalık rakam, ZPP_DAILY'nin kapsadığı günlerde günlük dosyayla
     // değiştirilir: satış günü orada yazan gündür.
     const perDay = new Map<string, number>()
+    const perDayLongTerm = new Map<string, number>()
     if (Math.abs(row.overdue) > 0) perDay.set(calendar.today, Math.abs(row.overdue))
     const periods = calendar.weeks.map((week, w) => {
       const split = splitWeek({
@@ -257,9 +269,17 @@ export function buildDemandSchedule(
         dailyUntil: options.dailyUntil ?? null,
       })
       for (const [date, qty] of split.perDay) perDay.set(date, (perDay.get(date) ?? 0) + qty)
-      return { label: weeklyPeriods[w]?.label ?? `+${w}w`, qty: split.total }
+      for (const [date, qty] of split.weeklyPerDay) {
+        perDayLongTerm.set(date, (perDayLongTerm.get(date) ?? 0) + qty)
+      }
+      return {
+        label: weeklyPeriods[w]?.label ?? `+${w}w`,
+        qty: split.total,
+        weekly: longTermActive ? split.weekly : 0,
+      }
     })
     dayDemand.set(row.material, perDay)
+    if (longTermActive) dayDemandLongTerm.set(row.material, perDayLongTerm)
     const weeklyAvg =
       periods.length > 0 ? periods.reduce((s, p) => s + p.qty, 0) / periods.length : 0
     const dailyRate = weeklyAvg > 0 ? weeklyAvg / workingDaysPerWeek : 0
@@ -291,16 +311,37 @@ export function buildDemandSchedule(
       const due = isoDate(addDays(baseMonday, index * 7))
       // Acil mi dolgu mu, stok projeksiyonu belirler (stoğun bittiği gün ve
       // emniyet stoğu); burada her kalem dolgu olarak başlar.
-      list.push({
-        material: row.material,
-        qty: period.qty,
-        dueDate: due,
-        earliestDate: due,
-        bucketLabel: period.label,
-        phase: 'fill',
-        urgency: 0,
-        daysOfCover,
-      })
+      const dailyQty = period.qty - period.weekly
+      if (dailyQty > 1e-9) {
+        list.push({
+          material: row.material,
+          qty: dailyQty,
+          dueDate: due,
+          earliestDate: due,
+          bucketLabel: period.label,
+          phase: 'fill',
+          urgency: 0,
+          daysOfCover,
+        })
+      }
+      if (period.weekly > 1e-9) {
+        // Uzun vade: haftanın ZPP_DAILY'nin kapsamadığı kısmı. Hafta kısmen
+        // kapsanıyorsa ayrı kalem olur (karışık lot yok); anahtarı günlük
+        // kalemden ayrı tutmak için tarihi kapsanan son günün ertesidir.
+        const mixed = dailyQty > 1e-9
+        const after = mixed && options.dailyUntil ? isoDate(addDays(new Date(`${options.dailyUntil}T00:00:00`), 1)) : due
+        list.push({
+          material: row.material,
+          qty: period.weekly,
+          dueDate: after > due ? after : due,
+          earliestDate: after > due ? after : due,
+          bucketLabel: mixed ? `${period.label} LT` : period.label,
+          phase: 'fill',
+          urgency: 0,
+          daysOfCover,
+          longTerm: true,
+        })
+      }
     })
 
     // Stok en erken ihtiyaçtan başlayarak düşülür.
@@ -349,8 +390,9 @@ export function buildDemandSchedule(
       const required = Math.max(ownQty, otherQty)
       if (required <= 0) continue
 
-      levelToRequired(entriesByMaterial, material, week, ownWeek, ownQty, required, baseIso)
-      levelToRequired(entriesByMaterial, partner, week, otherWeek, otherQty, required, baseIso)
+      const lt = (list: DemandEntry[]) => list.length > 0 && list.every((e) => e.longTerm)
+      levelToRequired(entriesByMaterial, material, week, ownWeek, ownQty, required, baseIso, lt(otherWeek))
+      levelToRequired(entriesByMaterial, partner, week, otherWeek, otherQty, required, baseIso, lt(ownWeek))
     }
   }
 
@@ -361,7 +403,7 @@ export function buildDemandSchedule(
   roundMaterialsToCoilLot(entriesByMaterial, products, pairedWith, options.quantityOverrides)
 
   // Lotların ZAMANI: haftanın başı değil, öngörülen stoğun bittiği gün.
-  timeLotsByProjectedStock(entriesByMaterial, rows, options, pairedWith, calendar, dayDemand)
+  timeLotsByProjectedStock(entriesByMaterial, rows, options, pairedWith, calendar, dayDemand, dayDemandLongTerm)
 
   // Eş ürün çifti TEK iştir: aynı vuruş ikisini birden verir. Eşin lotu,
   // eşi tanımlayan ana ürünün aynı zamanlı lotuna katılır; ayrı planlansaydı
@@ -373,6 +415,7 @@ export function buildDemandSchedule(
     .filter((entry) => entry.qty > 0)
     .sort(
       (a, b) =>
+        Number(!!a.longTerm) - Number(!!b.longTerm) ||
         phaseRank(a.phase) - phaseRank(b.phase) ||
         a.dueDate.localeCompare(b.dueDate) ||
         b.urgency - a.urgency,
@@ -416,6 +459,11 @@ function mergeCoProductLots(
         )
       }
       match.noStockout = !!match.noStockout && !!lot.noStockout
+      // Eşlerden biri günlük talep için gerekiyorsa çift günlük lottur.
+      if (match.longTerm && !lot.longTerm) {
+        match.longTerm = undefined
+        match.phase = lot.phase
+      }
       if (phaseRank(lot.phase) < phaseRank(match.phase)) match.phase = lot.phase
       match.urgency = Math.max(match.urgency, lot.urgency)
       if (lot.earliestDate < match.earliestDate) match.earliestDate = lot.earliestDate
@@ -447,6 +495,7 @@ function timeLotsByProjectedStock(
   pairedWith: Map<string, string>,
   calendar: DemandCalendar,
   dayDemand: Map<string, Map<string, number>>,
+  dayDemandLongTerm: Map<string, Map<string, number>> = new Map(),
 ): void {
   const safetyDays = Math.max(0, Math.round(options.safetyStockDays ?? 0))
   const today = calendar.today
@@ -479,7 +528,15 @@ function timeLotsByProjectedStock(
   // lotu aynı güne, ikisinden hangisi önce bitecekse ONA göre konmalı.
   const timing = new Map<
     string,
-    { due: number; start: number; need: number; none: boolean; checkpoints: DeliveryCheckpoint[] }
+    {
+      due: number
+      start: number
+      need: number
+      none: boolean
+      checkpoints: DeliveryCheckpoint[]
+      /** Günlük kökenli ama yalnızca uzun vade talebini karşılıyor. */
+      longTermOnly: boolean
+    }
   >()
   const key = (material: string, week: string) => `${material}|${week}`
 
@@ -492,6 +549,14 @@ function timeLotsByProjectedStock(
     const demand = new Array<number>(days.length).fill(0)
     for (const [date, qty] of dayDemand.get(material) ?? []) {
       demand[dayIndex.get(date < today ? today : date) ?? 0] += qty
+    }
+    // Günlük lotun teslim noktaları yalnızca günlük talebi (ZPP_DAILY +
+    // bakiye) sayar: rulo fazlasının karşıladığı uzun vade günleri günlük
+    // lotu geç yapmaz. Uzun vade yoksa iki dizi aynıdır.
+    const longTermDays = dayDemandLongTerm.get(material)
+    const dailyDemand = demand.slice()
+    for (const [date, qty] of longTermDays ?? []) {
+      dailyDemand[dayIndex.get(date < today ? today : date) ?? 0] -= qty
     }
 
     let supply = row?.stock ?? 0
@@ -506,14 +571,22 @@ function timeLotsByProjectedStock(
           break
         }
       }
+      // Teslim noktalarının saydığı talep: uzun vade lotunda hepsi, günlük
+      // lotta yalnızca günlük talep.
+      const cpDemand = lot.longTerm || !longTermDays ? demand : dailyDemand
+      let cpConsumed = consumed
+      if (cpDemand !== demand && stockout >= 0) {
+        cpConsumed = 0
+        for (let i = 0; i <= stockout; i++) cpConsumed += cpDemand[i]
+      }
       // O gün eksik kalan adet: lotun teslim anına kadar hazır olması gereken kısmı.
-      const need = stockout >= 0 ? Math.max(0, consumed - supply) : 0
+      const need = stockout >= 0 ? Math.max(0, cpConsumed - supply) : 0
       // Lotun karşıladığı sonraki günler de birer teslim noktasıdır.
       const checkpoints: DeliveryCheckpoint[] = []
       if (stockout >= 0 && lot.qty > 0) {
-        let cumulative = consumed
+        let cumulative = cpConsumed
         for (let i = stockout; i < days.length && checkpoints.length < 40; i++) {
-          if (i > stockout) cumulative += demand[i]
+          if (i > stockout) cumulative += cpDemand[i]
           const short = Math.min(lot.qty, cumulative - supply)
           const last = checkpoints[checkpoints.length - 1]
           if (short > (last ? last.fraction * lot.qty : 0) + 1e-6) {
@@ -533,6 +606,8 @@ function timeLotsByProjectedStock(
         need: lot.qty > 0 ? Math.min(1, need / lot.qty) : 0,
         none: stockout < 0,
         checkpoints,
+        // Günlük talebin hiçbir gününü karşılamıyor: aslında uzun vade lotudur.
+        longTermOnly: !!longTermDays && !lot.longTerm && stockout >= 0 && checkpoints.length === 0,
       })
     }
   }
@@ -559,7 +634,12 @@ function timeLotsByProjectedStock(
       lot.dueDate = days[due] ?? lot.dueDate
       lot.earliestDate = days[start] ?? lot.earliestDate
       lot.daysOfCover = due
-      if (lot.phase !== 'backlog') {
+      if (own.longTermOnly && (!other || other.longTermOnly)) lot.longTerm = true
+      if (lot.longTerm) {
+        // Uzun vade: aciliyeti yok, boş kapasiteyi dolduran dolgudur.
+        lot.phase = 'fill'
+        lot.urgency = 0
+      } else if (lot.phase !== 'backlog') {
         lot.phase = start === 0 ? 'urgent' : 'fill'
         lot.urgency = lot.phase === 'urgent' ? Math.max(1, 99 - due) : 0
       }
@@ -585,6 +665,7 @@ function levelToRequired(
   currentQty: number,
   required: number,
   baseIso: string,
+  longTerm = false,
 ): void {
   if (currentQty >= required) return
   const extra = required - currentQty
@@ -605,6 +686,7 @@ function levelToRequired(
     phase: 'fill',
     urgency: 0,
     daysOfCover: Number.POSITIVE_INFINITY,
+    ...(longTerm ? { longTerm: true } : {}),
   })
   entriesByMaterial.set(material, list)
 }
