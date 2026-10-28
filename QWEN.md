@@ -13,18 +13,28 @@ Claude'un kuralları `CLAUDE.md`'dedir; çelişki olursa `CLAUDE.md` üstündür
 - Yeni bağımlılık ekleme.
 - Mevcut kod biçimini koru. Bu depoda yorumlar ve kullanıcıya görünen metinler Türkçedir.
 
-## Dokunmaman gereken dosyalar
+## Sınırların
 
-Bunlar planlama motorunun çekirdeği ve mimari korumalarıdır; değişiklikleri mimari
-karar ister. Dokunursan iş durur ve hiçbir değişiklik itilmez:
+Yazdığın hiçbir şey doğrudan çalışma dalına girmez. Düzeltmelerin ayrı bir dala
+(`qwen/<dal>`) iter; oradan çalışma dalına **yalnız Claude** okuyup karar vererek alır.
+Son söz Claude'undur.
 
-- `src/lib/planPipeline.ts`, `src/lib/scheduler.ts`, `src/lib/planValidator.ts`
-- `src/lib/planning.ts`, `src/lib/oee.ts`, `convex/oee.ts`
-- `src/lib/architecture.test.ts`, `convex/schema.ts`
-- `src/routes/planlogic.tsx` (Planning Logic sayfası)
-- `CLAUDE.md`, `QWEN.md`, `.github/workflows/`, `scripts/qwen-yesil.sh`
+**1. Dokunmaman gereken dosyalar.** Dokunursan iş durur, hiçbir değişiklik itilmez:
+
+- Motor ve mimari: `src/lib/planPipeline.ts`, `scheduler.ts`, `planValidator.ts`,
+  `planning.ts`, `oee.ts`, `architecture.test.ts`, `src/routes/planlogic.tsx`,
+  `convex/schema.ts`, `convex/oee.ts`
+- Bağımlılık ve yapılandırma: `package.json`, `package-lock.json`, `tsconfig.json`,
+  `vite.config.ts`, `vitest.config.ts`
+- Altyapı ve belge: `.github/`, `scripts/`, `deploy/`, `docs/`, `CLAUDE.md`,
+  `QWEN.md`, `.gitignore`
 
 Tek çözüm bu dosyaların içindeyse **dur ve nedenini yaz**; düzeltmeyi Claude yapar.
+
+**2. Dosya silemez, yeniden adlandıramazsın.**
+
+**3. Boyut sınırı:** en fazla 10 dosya ve 300 değişen satır. Aşarsan iş durur —
+o boyut mekanik düzeltme değil, yeniden yazma demektir.
 
 ## Mimarinin bilmen gereken kadarı
 

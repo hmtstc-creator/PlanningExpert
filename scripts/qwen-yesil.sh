@@ -5,8 +5,20 @@
 # hataların düzeltme döngüsü burada, ücretsiz bir modelde döner. Claude'a
 # yalnız kısa rapor gelir (qwen-rapor.md).
 #
-# Qwen MİMARİYE DOKUNMAZ. Motor, doğrulayıcı, OEE ve şema dosyaları korunur
-# (KORUNAN listesi); bunlara dokunduysa değişiklik itilmez, iş kırmızı biter.
+# Qwen'in yazdığı hiçbir şey doğrudan çalışma dalına girmez. Düzeltmeler ayrı
+# bir dala (qwen/<dal>) itilir; oradan çalışma dalına yalnız Claude alır.
+# Kullanıcı kararı 2026-10-28: "kodları başka yapay zeka yazsa da sen final
+# kontrolcü ol; başka ajanların neye dokunup dokunamayacağını sen belirle."
+#
+# Üç katmanlı sınır:
+#   1. KORUNAN  — mimari, yapılandırma, belge ve altyapı dosyaları: dokunulursa dur
+#   2. SILME    — dosya silme ya da yeniden adlandırma yasak
+#   3. BOYUT    — en fazla 10 dosya / 300 satır; aşarsa dur
+# Üçünden biri çiğnenirse hiçbir şey itilmez, iş kırmızı biter.
+#
+# UYARI: koruma adımı `git checkout -- .` ve `git clean -fd` çalıştırır, yani
+# çalışma kopyasındaki commit'lenmemiş her şeyi siler. Bu betiği denerken
+# ayrı bir worktree kullan, canlı çalışma kopyanda değil.
 #
 # Gerekli ortam değişkenleri:
 #   OPENAI_API_KEY   ücretsiz sağlayıcının anahtarı (GitHub secret)
@@ -22,10 +34,8 @@ TUR_SINIRI="${QWEN_TUR:-4}"
 RAPOR="qwen-rapor.md"
 CIKTI=".qwen-verify.txt"
 
-# Qwen'in dokunmaması gereken dosyalar: planlama motoru, doğrulayıcı, OEE,
-# şema, mimari testleri ve Planning Logic sayfası. Bunlar mimari karar ister;
-# yanlış yama, düzeltmesi için daha çok Claude tokeni harcatır.
 KORUNAN=(
+    # Planlama motoru ve mimari korumaları
     "src/lib/planPipeline.ts"
     "src/lib/scheduler.ts"
     "src/lib/planValidator.ts"
@@ -35,11 +45,27 @@ KORUNAN=(
     "src/routes/planlogic.tsx"
     "convex/schema.ts"
     "convex/oee.ts"
+    # Bağımlılıklar ve yapılandırma: bir paket eklemek ya da derleyici ayarını
+    # gevşetmek hatayı düzeltmez, saklar.
+    "package.json"
+    "package-lock.json"
+    "tsconfig.json"
+    "vite.config.ts"
+    "vitest.config.ts"
+    # Altyapı ve belge: ajan kendi sınırını ya da yayın akışını değiştiremez.
+    ".github"
+    "scripts"
+    "deploy"
+    "docs"
     "CLAUDE.md"
     "QWEN.md"
-    ".github/workflows"
-    "scripts/qwen-yesil.sh"
+    ".gitignore"
 )
+
+# En fazla bu kadar dosya ve değişen satır; aşarsa düzeltme değil, yeniden
+# yazma yapılıyor demektir.
+EN_FAZLA_DOSYA=10
+EN_FAZLA_SATIR=300
 
 yaz() { printf '%s\n' "$*" >> "$RAPOR"; }
 
@@ -108,7 +134,9 @@ Rules you must follow:
 - Fix ONLY what is needed to make the build and the existing tests pass.
 - Do NOT change behaviour, do NOT redesign, do NOT refactor beyond the fix.
 - Do NOT weaken or delete a test to make it pass. Fix the code instead.
-- NEVER edit these files (they are architecture-critical and protected):
+- Do NOT delete or rename any file.
+- Keep the change small: at most $EN_FAZLA_DOSYA files and $EN_FAZLA_SATIR changed lines.
+- NEVER edit these paths (protected; the job is aborted if you do):
   ${KORUNAN[*]}
   If the only possible fix is inside one of them, stop and explain why instead.
 - Do not add new dependencies.
@@ -139,17 +167,42 @@ done
 yaz ""
 
 # --------------------------------------------------------------- korumalar
+dur() {  # dur BAŞLIK AÇIKLAMA : her şeyi geri al, kırmızı bit
+    yaz "## Durduruldu: $1"
+    yaz ""
+    yaz "$2"
+    yaz ""
+    yaz "Hiçbir değişiklik itilmedi; dal el değmemiş durumda."
+    git checkout -- . 2> /dev/null || true
+    git clean -fd 2> /dev/null || true
+    exit 2
+}
+
 DOKUNULAN="$(korunan_degisti)"
 if [ -n "$DOKUNULAN" ]; then
-    yaz "## Durduruldu: korunan dosyalara dokunuldu"
-    yaz ""
-    yaz "Qwen şu dosyaları değiştirdi, bu yüzden hiçbir değişiklik itilmedi:"
-    yaz '```'
-    yaz "$DOKUNULAN"
-    yaz '```'
-    yaz "Bu dosyalar mimari karar ister; düzeltmeyi Claude yapmalı."
-    git checkout -- . 2> /dev/null || true
-    exit 2
+    dur "korunan dosyalara dokunuldu" \
+"Qwen şu dosyaları değiştirdi:
+\`\`\`
+$DOKUNULAN
+\`\`\`
+Bu dosyalar mimari ya da altyapı kararı ister; düzeltmeyi Claude yapar."
+fi
+
+SILINEN="$(git diff --name-only --diff-filter=DR)"
+if [ -n "$SILINEN" ]; then
+    dur "dosya silindi ya da adı değişti" \
+"Qwen'in dosya silmesi ya da yeniden adlandırması yasak:
+\`\`\`
+$SILINEN
+\`\`\`"
+fi
+
+DOSYA_SAYISI="$(git diff --name-only | wc -l)"
+SATIR_SAYISI="$(git diff --numstat | awk '{e+=$1; s+=$2} END {print e+s+0}')"
+if [ "$DOSYA_SAYISI" -gt "$EN_FAZLA_DOSYA" ] || [ "$SATIR_SAYISI" -gt "$EN_FAZLA_SATIR" ]; then
+    dur "değişiklik fazla büyük" \
+"$DOSYA_SAYISI dosya, $SATIR_SAYISI satır (sınır: $EN_FAZLA_DOSYA dosya, $EN_FAZLA_SATIR satır).
+Bu boyut mekanik düzeltme değil, yeniden yazma demektir."
 fi
 
 if [ "$SONUC" -ne 0 ]; then
@@ -161,15 +214,24 @@ if [ "$SONUC" -ne 0 ]; then
     yaz '```'
     yaz "Qwen'in yaptığı kısmi değişiklikler itilmedi; dal el değmemiş durumda."
     git checkout -- . 2> /dev/null || true
+    git clean -fd 2> /dev/null || true
     exit 1
 fi
 
 # --------------------------------------------------------------- yeşil
-yaz "## Sonuç: yeşil"
+yaz "## Sonuç: yeşil — Claude'un onayı bekleniyor"
 yaz ""
-yaz "Değişen dosyalar:"
+yaz "$DOSYA_SAYISI dosya, $SATIR_SAYISI satır değişti:"
 yaz '```'
 yaz "$(git diff --stat | tail -20)"
+yaz '```'
+yaz ""
+yaz "Değişiklikler **çalışma dalına girmedi**. Ayrı bir dala (\`qwen/<dal>\`) itildi;"
+yaz "çalışma dalına almadan önce Claude okuyup karar verir."
+yaz ""
+yaz "Tam fark:"
+yaz '```diff'
+yaz "$(git diff | head -200)"
 yaz '```'
 rm -f "$CIKTI" .qwen-tur-*.txt
 exit 0

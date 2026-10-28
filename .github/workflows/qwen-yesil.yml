@@ -74,18 +74,22 @@ jobs:
         if: always()
         run: cat qwen-rapor.md >> "$GITHUB_STEP_SUMMARY" || true
 
-      - name: Düzeltmeleri dala it
+      # Çalışma dalına DOKUNULMAZ. Düzeltmeler ayrı bir dala iter; oradan
+      # çalışma dalına yalnız Claude okuyup karar vererek alır.
+      - name: Düzeltmeleri ayrı dala it
         if: steps.qwen.outcome == 'success'
         run: |
           if [ -z "$(git status --porcelain)" ]; then
             echo "Değişiklik yok."
             exit 0
           fi
+          DAL="$(git rev-parse --abbrev-ref HEAD)"
           git config user.name "qwen-bot"
           git config user.email "qwen-bot@users.noreply.github.com"
           git add -A
-          git commit -m "Verify yeşile çevrildi (Qwen)"
-          git push origin HEAD
+          git commit -m "Verify yeşile çevrildi (Qwen) — Claude onayı bekliyor"
+          git push --force origin "HEAD:refs/heads/qwen/$DAL"
+          echo "Düzeltmeler qwen/$DAL dalında. Çalışma dalı değişmedi."
 
       - name: Raporu PR'a yaz
         if: always() && github.event_name == 'pull_request'

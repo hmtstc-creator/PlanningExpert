@@ -20,11 +20,15 @@ dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
 - **Yayın otomatiktir** (2026-10-22): `planningexpert-autodeploy.timer` → `scripts/deploy.sh`. Elle çalıştırmak gerekmez.
 - **Qwen: verify yeşile çevir** (2026-10-28, kullanıcı kararı): mekanik hataların düzeltme döngüsü Claude'un bağlamında
   değil, ücretsiz bir modelde döner (`.github/workflows/qwen-yesil.yml` → `scripts/qwen-yesil.sh`). Tetikleme: PR'a `qwen`
-  etiketi ya da Actions → Run workflow (dal adı). `main`'de çalışmaz. En çok 4 tur; yeşil olursa düzeltmeler dala itilir,
-  olmazsa hiçbir şey itilmez. **Korunan dosyalara** (motor, doğrulayıcı, OEE, şema, `architecture.test.ts`, `planlogic.tsx`,
-  `CLAUDE.md`, `QWEN.md`, iş akışları, betiğin kendisi) dokunulduysa değişiklik geri alınır ve iş kırmızı biter — oralar
-  mimari karar ister, Claude düzeltir. Kurallar `QWEN.md`'de; anahtar `QWEN_API_KEY` gizli değeri, sağlayıcı
-  `QWEN_BASE_URL` / `QWEN_MODEL` değişkenleri (varsayılan OpenRouter + `qwen/qwen3-coder:free`).
+  etiketi ya da Actions → Run workflow (dal adı). `main`'de çalışmaz, en çok 4 tur.
+  **Çalışma dalına hiçbir şey itilmez:** yeşil olursa düzeltmeler ayrı bir dala (`qwen/<dal>`) iter, oradan çalışma dalına
+  yalnız Claude okuyup karar vererek alır (kullanıcı kararı 2026-10-28: "sen final kontrolcü ol"). Üç sınırdan biri
+  çiğnenirse her şey geri alınır ve iş kırmızı biter: **korunan yollar** (motor, doğrulayıcı, OEE, şema,
+  `architecture.test.ts`, `planlogic.tsx`, `package*.json`, `tsconfig`, `vite`/`vitest` ayarları, `.github/`, `scripts/`,
+  `deploy/`, `docs/`, `CLAUDE.md`, `QWEN.md`), **dosya silme / yeniden adlandırma**, **boyut** (en çok 10 dosya, 300 satır).
+  Kurallar `QWEN.md`'de; anahtar `QWEN_API_KEY` gizli değeri, sağlayıcı `QWEN_BASE_URL` / `QWEN_MODEL` değişkenleri
+  (varsayılan OpenRouter + `qwen/qwen3-coder:free`). Betiği denerken ayrı worktree kullan: koruma adımı
+  `git checkout -- .` ve `git clean -fd` çalıştırır.
 
 ## `scripts/deploy.sh` ne yapar
 
