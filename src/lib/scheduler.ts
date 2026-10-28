@@ -71,7 +71,9 @@ export function deliveryCheck(
   deadlineNet?: number
   deadlineLabel?: string
 } {
-  if (entry.noStockout) return { late: false, fraction: 0 }
+  // Uzun vade lotu (ZPP_DAILY yüklüyken haftalık ZPP) müşteriyi bekletmez:
+  // yalnızca boş kapasiteyi doldurur, geç sayılmaz.
+  if (entry.noStockout || entry.longTerm) return { late: false, fraction: 0 }
   const after = (r: { date: string; minute: number }, date: string, net: number) =>
     r.date > date || (r.date === date && r.minute > net + 1e-6)
   const points = (entry.checkpoints ?? []).filter(
@@ -431,6 +433,8 @@ export interface ScheduledJob {
   mountedFirst?: boolean
   /** Neden bu pres: sıra numarası ve adayların karşılaştırması. */
   decision?: PlacementDecision
+  /** Uzun vade lotu (haftalık ZPP, ZPP_DAILY'nin ötesi): boş kapasiteye kondu. */
+  longTerm?: boolean
 }
 
 export interface JobRequirement {
@@ -479,6 +483,8 @@ export interface UnplannedItem {
   phase: DemandEntry['phase']
   dueDate: string
   reason: string
+  /** Uzun vade lotu: günlük lotlardan sonra boş kapasite kalmadı. */
+  longTerm?: boolean
   /** Hangi presler denendi ve neden olmadı — varsa. */
   decision?: PlacementDecision
 }
@@ -569,6 +575,8 @@ interface Booking {
   earliest?: number
   /** Araya başka kalıp girdiği için sonradan eklenen setup (dk). */
   addedSetup?: number
+  /** Uzun vade lotunun kaydı. */
+  longTerm?: boolean
   job?: ScheduledJob
 }
 
@@ -952,6 +960,10 @@ export function schedule(
   }
   const ordered = [...demand].sort(
     (a, b) =>
+      // Uzun vade lotları (ZPP_DAILY yüklüyken haftalık ZPP) her zaman en
+      // sonda: bütün günlük lotlar (öne alınanlar dahil) yerleştikten sonra
+      // yalnızca kalan boş kapasiteye girerler.
+      Number(!!a.longTerm) - Number(!!b.longTerm) ||
       Number(!prioritised.has(a.material)) - Number(!prioritised.has(b.material)) ||
       // Faz önce: öne alınan (onarım) lot yalnızca kendi fazının önüne geçer.
       // Önce boost gelince dolgu lotları bakiyenin önüne geçip bakiyeyi
@@ -966,6 +978,7 @@ export function schedule(
       jobs,
       unplanned: ordered.map((entry) => ({
         material: entry.material,
+        ...(entry.longTerm ? { longTerm: true } : {}),
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
@@ -1028,7 +1041,8 @@ export function schedule(
   const placedEarly = new Set<DemandEntry>()
   const pendingFill = new Map<string, DemandEntry[]>()
   for (const e of ordered) {
-    if (e.phase !== 'fill' || e.boost) continue
+    // Uzun vade lotu takılı kalıp kuralıyla günlük lotun önüne geçemez.
+    if (e.phase !== 'fill' || e.boost || e.longTerm) continue
     if (excluded.has(e.material) || pinned.has(e.material) || prioritised.has(e.material)) continue
     const list = pendingFill.get(e.material) ?? []
     list.push(e)
@@ -1072,6 +1086,7 @@ export function schedule(
     if (excluded.has(entry.material)) {
       unplanned.push({
         material: entry.material,
+        ...(entry.longTerm ? { longTerm: true } : {}),
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
@@ -1084,6 +1099,7 @@ export function schedule(
     if (!product) {
       unplanned.push({
         material: entry.material,
+        ...(entry.longTerm ? { longTerm: true } : {}),
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
@@ -1105,6 +1121,7 @@ export function schedule(
       ].some((m) => m && m.trim())
       unplanned.push({
         material: entry.material,
+        ...(entry.longTerm ? { longTerm: true } : {}),
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
@@ -1124,6 +1141,7 @@ export function schedule(
     if (pin?.press && !pressByName.has(pin.press)) {
       unplanned.push({
         material: entry.material,
+        ...(entry.longTerm ? { longTerm: true } : {}),
         quantity: entry.qty,
         phase: entry.phase,
         dueDate: entry.dueDate,
@@ -1139,7 +1157,7 @@ export function schedule(
     // olmayan iş). Önce ucuz ön kontrol: adaylardan birinde başka bir
     // kalıp takılı ve o kalıbın bekleyen dolgu lotu var mı?
     const mountedBefore = new Map<string, string>()
-    if (entry.phase === 'urgent' && !entry.boost && !pin && !prioritised.has(entry.material) && runs.length === 1) {
+    if (entry.phase === 'urgent' && !entry.longTerm && !entry.boost && !pin && !prioritised.has(entry.material) && runs.length === 1) {
       for (const press of allowedPresses) {
         const mounted = mountedAt(press, entry.earliestDate)
         if (mounted && mounted !== entry.material && fillFor(mounted, press)) mountedBefore.set(press, mounted)
@@ -1190,6 +1208,7 @@ export function schedule(
       else {
         unplanned.push({
           material: entry.material,
+          ...(entry.longTerm ? { longTerm: true } : {}),
           quantity: run.quantity,
           phase: entry.phase,
           dueDate: entry.dueDate,
@@ -1226,6 +1245,7 @@ export function schedule(
       } else {
         unplanned.push({
           material: entry.material,
+          ...(entry.longTerm ? { longTerm: true } : {}),
           quantity: run.quantity,
           phase: entry.phase,
           dueDate: entry.dueDate,
@@ -1696,6 +1716,13 @@ function tryPlaceOnPress(
     const nextIndex = firstEndAfter(timeline.bookings, end)
     const next = timeline.bookings[nextIndex]
     let followSetup: Placement['followSetup']
+    // Uzun vade lotu, setup'sız devam eden bir günlük işin önüne girip ona
+    // setup geri getiremez: günlük lot hiçbir koşulda etkilenmez.
+    if (entry.longTerm && next && next.noSetup && !next.longTerm && next.material !== entry.material && next.start >= end) {
+      start = firstFreePoint(timeline, Math.max(start + 1, next.end))
+      if (start >= timeline.total) return null
+      continue
+    }
     if (next && next.noSetup && next.material !== entry.material && next.start >= end) {
       const minutes = next.setupIfNeeded ?? 0
       // Geri gelen setup da vinç ve setup ekibi kuralına uyar: boşlukta,
@@ -2074,6 +2101,7 @@ function placeRun(
     noSetup: best.sameMaterial,
     setupIfNeeded: run.setupMinutes,
     earliest: bestEarliest,
+    ...(entry.longTerm ? { longTerm: true } : {}),
   }
   insertBooking(timeline, booking)
   // Bu iş, arkasından setup'sız gelen başka bir kalıbın önüne girdiyse o
@@ -2195,6 +2223,7 @@ function placeRun(
     )
   }
   if (pinned) reasonParts.push('pinned by user')
+  if (entry.longTerm) reasonParts.push('long-term (weekly ZPP beyond ZPP_DAILY): fills free capacity after the daily lots')
   if (entry.boost) reasonParts.push('moved forward so it is not late')
   if (pulledForward) reasonParts.push(`pulled forward from ${entry.earliestDate} so the work center is not idle`)
   if (bestIsContinuation) reasonParts.push('continues the die already mounted — no new setup')
@@ -2243,13 +2272,15 @@ function placeRun(
     deadlineDate: delivery.deadlineDate ?? entry.deadlineDate,
     deadlineMinute: delivery.deadlineNet ?? entry.deadlineNet,
     deadlineLabel: delivery.deadlineLabel ?? entry.deadlineLabel,
-    neededQuantity: entry.noStockout ? 0 : Math.round(delivery.fraction * run.quantity),
-    requirements: jobRequirements(entry, best.segments, run.quantity),
+    neededQuantity: entry.noStockout || entry.longTerm ? 0 : Math.round(delivery.fraction * run.quantity),
+    // Uzun vade lotu geç sayılmaz; iş penceresinde ihtiyaç noktası da göstermez.
+    requirements: entry.longTerm ? [] : jobRequirements(entry, best.segments, run.quantity),
     urgentSetup: !!best.urgent && !sameMaterial,
     pulledForward,
     ...(pulledForward ? { pulledFrom: entry.earliestDate } : {}),
     continued: bestIsContinuation,
     decision,
+    ...(entry.longTerm ? { longTerm: true } : {}),
   }
   booking.job = job
   return job

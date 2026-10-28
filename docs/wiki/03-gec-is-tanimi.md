@@ -11,6 +11,10 @@ Teslimde tatil gözetilmez (müşteri tatilde de isteyebilir).
 
 Bir lot, **herhangi bir** kontrol noktasında gereken pay hazır değilse geçtir. Rapor **ilk kaçırılan** noktayı gösterir.
 
+**Uzun vade lotu geç sayılmaz** (2026-10-28): ZPP_DAILY yüklüyken haftalık ZPP'den gelen lot yalnızca boş kapasiteyi doldurur ([02](02-planlama-motoru.md)).
+Günlük lotun kontrol noktaları da yalnızca günlük talebi sayar. Doğrulayıcının kendi kuralı: yalnızca uzun vade adedi eksikse bu bir
+müşteri duruşu değildir, `summary.longTermShort`'ta sayılır.
+
 ## Pay (adet ∝ üretim dakikası)
 
 Parçalar, işin üretim (`run`) dakikaları boyunca düzgün çıkar; setup ve kalite onayı adet vermez. Böylece:

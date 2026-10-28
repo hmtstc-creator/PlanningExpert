@@ -248,6 +248,24 @@ function PlanLogicPage() {
             is due today.
           </li>
           <li>
+            <b>ZPP_DAILY first — weekly ZPP is long-term.</b> When ZPP_DAILY is
+            loaded (and reaches today), it is SAP's commitment for the days it
+            covers. Demand that comes from the weekly ZPP — the days after
+            ZPP_DAILY's last day, and every part that has no ZPP_DAILY row — becomes a
+            separate <b>long-term</b> lot. Long-term lots are placed only{' '}
+            <b>after every daily lot</b> (backlog, urgent, fill and lots moved to the
+            front), only into the capacity that is left, never in front of a daily job
+            that continues its die without a setup, and they are <b>never late</b>. A
+            week only partly covered by ZPP_DAILY is <b>split</b>, never mixed: the
+            covered days make the daily lot, the rest is a long-term lot labelled{' '}
+            <code>W38 LT</code>. Whole coils still apply: the daily lot's spare pieces
+            reduce the long-term lot. Example: ZPP_DAILY up to Wednesday with 1 000
+            on Monday and 1 000 on Wednesday, weekly W38 = 5 000, a coil gives 2 500
+            pcs → daily lot 2 500 (one coil, checked only on Monday and Wednesday) +
+            long-term lot 2 500 (3 000 on Thursday–Friday − 500 spare). Without
+            ZPP_DAILY nothing is long-term and the weekly ZPP is planned as before.
+          </li>
+          <li>
             <b>Timing — projected stock.</b> Walking day by day, the engine
             finds the day the stock — plus every lot planned before — would
             drop below zero. That is the lot's <b>stock-out day</b>.
@@ -435,6 +453,15 @@ function PlanLogicPage() {
             <b>Fill</b> — every other lot: future days and weeks. It may start{' '}
             {current.safety} working day(s) before its stock runs out, or up to{' '}
             {current.pullForward} days earlier when a work center would stand idle.
+          </li>
+          <li>
+            <b>Long-term</b> (only when ZPP_DAILY is loaded) — lots from the weekly
+            ZPP. They come after all of the above, even after materials moved to the
+            front, and only fill the free capacity that is left. Example: one work
+            center, one shift; part D needs 7 000 pcs on Wednesday in ZPP_DAILY
+            (700 min + 30 min setup), part L has only a weekly 4 000. D runs first
+            on Monday and is on time; L follows on Tuesday as a long-term lot and is
+            not late. Had L gone first, D would have been ready too late.
           </li>
         </ol>
         <p>
@@ -633,9 +660,10 @@ function PlanLogicPage() {
             changes never overlap.
           </li>
           <li>
-            <b>Keep the best plan</b>: fewest unplanned, then fewest late
+            <b>Keep the best plan</b>: fewest unplanned (daily lots), then fewest late
             <b>parts</b> (three late lots of one part are one customer stop), then
-            fewest late hours. A round that does not improve does not stop the
+            fewest late hours, and only then the fewest unplanned long-term lots.
+            Long-term lots are never late and never moved forward. A round that does not improve does not stop the
             search — the next round may — but the best plan so far is kept.
           </li>
         </ol>
@@ -729,8 +757,8 @@ function PlanLogicPage() {
             one that can start first, or the least loaded one.
           </li>
           <li>
-            <b>Best</b> means: fewest unplanned, then fewest late parts, then
-            fewest late hours, then the highest production time (setups do not
+            <b>Best</b> means: fewest unplanned daily lots, then fewest late parts, then
+            fewest late hours, then the fewest unplanned long-term lots, then the highest production time (setups do not
             count as production), then the fewest setups. Utilisation never wins
             over a late part.
           </li>
@@ -991,7 +1019,9 @@ function PlanLogicPage() {
             {current.cutoff}, production arrives as it is pressed. Every moment
             stock goes below zero is a real customer stop. The late list must
             match it exactly — a part the engine missed, or a false alarm, is
-            shown.
+            shown. Its own rule for ZPP_DAILY: when only weekly-ZPP (long-term)
+            quantity is short, it is counted as a long-term shortage, not a
+            customer stop.
           </li>
           <li>
             <b>Asks "could any plan have avoided it?"</b> for each short part: is
@@ -1340,7 +1370,9 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
             <li>
               After the last day in ZPP_DAILY, only weekly totals exist, so
               those weeks are spread evenly over the plant's working days (not a holiday and at
-              least one work center has normal shifts).
+              least one work center has normal shifts). With ZPP_DAILY loaded they are
+              long-term lots: if the capacity is used up by daily lots they stay
+              unplanned rather than delay a daily lot.
             </li>
             <li>
               Re-planning to remove late jobs is a set of trials, not a full

@@ -118,6 +118,11 @@ export interface ValidationSummary {
   /** Gerçek stok bitişi olan malzeme (grup) sayısı ve an sayısı. */
   realStockouts: number
   stockoutMoments: number
+  /**
+   * ZPP_DAILY yüklüyken yalnızca uzun vade (haftalık ZPP) adedi eksik kalan
+   * malzeme sayısı — müşteri duruşu sayılmaz.
+   */
+  longTermShort?: number
   /** Motorun geç gösterdiği malzeme (grup) sayısı. */
   engineLate: number
   capacityProven: number
@@ -367,6 +372,8 @@ interface NeedEvent {
   at: number
   qty: number
   day: string
+  /** Uzun vade talebi: ZPP_DAILY yüklüyken haftalık ZPP'den gelen adet. */
+  longTerm?: boolean
 }
 
 export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): PlanValidation {
@@ -832,10 +839,15 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   }
   const weeklyBy = new Map(inputs.weeklyDemand.map((w) => [w.material, w]))
   const events = new Map<string, NeedEvent[]>()
-  const addEvent = (material: string, day: string, qty: number) => {
+  // Kendi kuralı (motordan bağımsız): ZPP_DAILY bugüne ulaşıyorsa SAP'nin
+  // günlük taahhüdü odur; haftalık ZPP'den gelen adet "uzun vade"dir. Uzun
+  // vade adedinin stokta eksik kalması müşteri duruşu sayılmaz (boş
+  // kapasiteye konan dolgu); bakiye ve ZPP_DAILY adetleri sayılır.
+  const longTermActive = !!dailyUntil && dailyUntil >= demandToday
+  const addEvent = (material: string, day: string, qty: number, weekly = false) => {
     if (!(qty > 0)) return
     const list = events.get(material) ?? []
-    list.push({ at: needMoment(day), qty, day })
+    list.push({ at: needMoment(day), qty, day, ...(weekly && longTermActive ? { longTerm: true } : {}) })
     events.set(material, list)
   }
   for (const material of new Set([...weeklyBy.keys(), ...dailyBy.keys()])) {
@@ -853,7 +865,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
       }
       if (!daily || !dailyUntil || dailyUntil < ws) {
         const days = open.length ? open : [demandToday]
-        if (weeklyQty > 0) for (const d of days) addEvent(material, d, weeklyQty / days.length)
+        if (weeklyQty > 0) for (const d of days) addEvent(material, d, weeklyQty / days.length, true)
         continue
       }
       let dailySum = 0
@@ -866,7 +878,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
       const rest = Math.max(0, weeklyQty - dailySum)
       const uncovered = open.filter((d) => d > dailyUntil!)
       const days = uncovered.length ? uncovered : open.length ? open : [demandToday]
-      if (rest > 0) for (const d of days) addEvent(material, d, rest / days.length)
+      if (rest > 0) for (const d of days) addEvent(material, d, rest / days.length, true)
     }
   }
   for (const list of events.values()) list.sort((a, b) => a.at - b.at)
@@ -979,17 +991,26 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const frozenTotal = new Map<string, number>()
   for (const [m, list] of pieces) frozenTotal.set(m, list.filter((p) => p.frozen).reduce((x, p) => x + p.qty, 0))
   const shortAtEnd = new Map<string, number>()
+  const longTermShort = new Set<string>()
   for (const material of materialsAll) {
     const list = pieces.get(material) ?? []
     const base = stock0.get(material) ?? 0
     const evs = events.get(material) ?? []
     let cum = 0
+    let cumDaily = 0
     for (let i = 0; i < evs.length; i++) {
       cum += evs[i].qty
+      if (!evs[i].longTerm) cumDaily += evs[i].qty
       if (i + 1 < evs.length && evs[i + 1].at === evs[i].at) continue
       const t = evs[i].at
-      const short = cum - (base + producedBy(list, t))
+      const supplied = base + producedBy(list, t)
+      const short = cum - supplied
       if (short <= QTY_TOL) continue
+      // Eksik yalnızca uzun vade adedindeyse müşteri duruşu değildir.
+      if (cumDaily - supplied <= QTY_TOL) {
+        longTermShort.add(material)
+        continue
+      }
       const rec = catchUp(list, base, cum, t)
       if (rec !== null && rec - t <= MIN_TOL) continue
       let here = 0
@@ -1961,6 +1982,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     },
     realStockouts: simShort.size,
     stockoutMoments: stockouts.length,
+    longTermShort: longTermShort.size,
     engineLate: engineLate.size,
     capacityProven: fcount('capacity-proven'),
     lateLowerBound,

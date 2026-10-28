@@ -111,7 +111,9 @@ export function JobDialog({ draft, onClose, onMove }: { draft: JobDraft; onClose
           <dd>
             {requirements.length > 0
               ? `(${[...new Set(requirements.map((r) => dottedDate(r.date)))].join(', ')}) – ${pcs(requirements.reduce((a, r) => a + r.qty, 0))}`
-              : 'none in the horizon (stock build)'}
+              : job.longTerm
+                ? 'long term (weekly ZPP) — fills free capacity'
+                : 'none in the horizon (stock build)'}
           </dd>
           {draft.startLabel && (
             <>
