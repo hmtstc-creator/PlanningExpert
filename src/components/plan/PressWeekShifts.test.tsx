@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@tanstack/react-router', () => ({ Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
 const setDay = vi.fn(async () => null)
 let records: { press: string; date: string; shifts: number[] }[] = []
-vi.mock('convex/react', () => ({ useQuery: () => records, useMutation: () => setDay }))
+vi.mock('../../lib/convexTransport', () => ({ useQuery: () => records, useMutation: () => setDay }))
 
 import { PressWeekShifts } from './PressWeekShifts'
 

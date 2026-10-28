@@ -63,6 +63,20 @@ describe('architecture: server and UI layers', () => {
     expect(bad).toEqual([])
   })
 
+  it('Convex hooks only via convexTransport (it adds the session token)', () => {
+    // convex/react'tan doğrudan useQuery / useMutation jetonsuz çağırır: sunucu
+    // oturumu bulamaz, sayfa "Server Error" verir (2026-10-28, dayShifts:list).
+    const walk = (dir: string): string[] =>
+      readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((d) =>
+        d.isDirectory() ? walk(`${dir}/${d.name}`) : /\.tsx?$/.test(d.name) && !/\.test\./.test(d.name) ? [`${dir}/${d.name}`] : [],
+      )
+    const allowed = new Set(['src/lib/convexTransport.tsx', 'src/components/convex-client-provider.tsx'])
+    const bad = walk('src')
+      .filter((f) => !allowed.has(f))
+      .filter((f) => /import\s*\{[^}]*\b(useQuery|useMutation|useAction)\b[^}]*\}\s*from\s*'convex\/react'/.test(readFileSync(join(ROOT, f), 'utf8')))
+    expect(bad).toEqual([])
+  })
+
   it('components never import pages (routes)', () => {
     const walk = (dir: string): string[] =>
       readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((d) =>
