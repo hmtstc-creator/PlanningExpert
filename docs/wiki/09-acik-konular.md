@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-28 (Asakai onayları, kırmızı = en büyük 2 duruş; düzenlemeler sunumu: slayt 4 tamam, slayt 6 bekliyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-28 (Asakai onayları, kırmızı = en büyük 2 duruş, vardiyalar da; düzenlemeler sunumu: slayt 4 tamam, slayt 6 bekliyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -25,7 +25,7 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 - **Asakai / OEE (#83–#87) — canlıda kontrol ve planlamacıya sorular:**
   1. Planlamacı OEE Settings → Loss groups'ta ↑ ↓ ile sırayı bir kez vermeli: STP, KLP, ARZ, KSD, OFC, KON, YNT (sonra kodda sabit: Short stops, Speed, Unassigned).
   2. ~~**KLP %239 — pay farkı (payda aynı)**~~ — **çözüldü: Excel hatası, site doğru (2026-10-26).** 23.10 PRS-110 v2'de Excel ≈115 dk KLP gösteriyordu, site ≈344 dk; planlamacı farkın Excel'de olduğunu doğruladı. Önlem olarak tekrar satır kuralı ve *Check duplicates* eklendi (aşağıda 11'de karar).
-  3. ~~Onay bekleyen~~ — **kararlandı (2026-10-28):** Unassigned köprüde kalem, öncelik değil (kalsın); Agent notları ve MTTR/MTBF Unassigned'ı almıyor (doğru; MTBF = dönemin Production time'ı ÷ o gruptaki duruş sayısı, Unassigned duruşlar sayılmaz). Detail kırmızı: ≥ %10 değil, her iş yerinin gününde en büyük 2 duruş (`ASAKAI_TOP`, #100). Açık soru: vardiya satırları (1-2-3) da kendi en büyük 2 duruşuyla boyansın mı? (şimdi boyanmıyor; istenirse `asakai-detail.tsx` vardiya hücreleri + `asakaiTopStops(s, columns)`).
+  3. ~~Onay bekleyen~~ — **kararlandı (2026-10-28):** Unassigned köprüde kalem, öncelik değil (kalsın); Agent notları ve MTTR/MTBF Unassigned'ı almıyor (doğru; MTBF = dönemin Production time'ı ÷ o gruptaki duruş sayısı, Unassigned duruşlar sayılmaz). Detail kırmızı: ≥ %10 değil, her iş yerinin gününde en büyük 2 duruş (`ASAKAI_TOP`, #100). Vardiya satırları (1-2-3) da kendi en büyük 2 duruşuyla boyanır (kullanıcı 2026-10-28, `asakai-detail.tsx` → `asakaiTopStops(s, columns)`).
   4. Save PDF (A4) gerçek veriyle tarayıcıda denenmedi (kullanıcı; buluttan gerçek veri yok). Risk: 1400 px sayfa A4'e ~0,76 küçülür, 11 px yazı ~6 pt; okunmazsa `SHEET_WIDTH` / font büyütülür.
 - **K7 — dört geliştirme işi (karar 2026-10-24, #59):** Board / KPI kırılımına bölüm seviyesi, bölüm sorumlusu, holding hedefi (girilmezse şirket planlarının toplamı), Board A3 / PDF çıktısı. Her biri ayrı oturum; önce `docs/board.md` ve `todolist.md` §2 *Organizasyon ve Board*. Bölüm seviyesi (#61), bölüm sorumlusu (#62) ve holding hedefi (#64; yalnız oranlar, grup kapsamında) yapıldı. Board A3 / PDF da yapıldı (2026-10-25): **K7'nin dört işi tamam.** Kullanıcıda denenecek: Responsible seçimi, Group targets ve Board PDF'inin A3'e sığması (ısı haritası geniş ekranda alınırsa küçülür).
 - **K5 (#59) — canlıda ilk kod değişikliğinde bak:** *Change code* sonrası OEE sayfalarında eski kod kaybolmalı, geçmiş yeni kodda görünmeli; taşıma arka planda (`convex/workCenterHistory.ts` → `move`, tablo başına sayfa). Eski kodla yüklenen dosya yeni koda yazılır (`workCenterAliases`).

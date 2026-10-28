@@ -125,6 +125,14 @@ describe('Asakai red cells', () => {
     expect([...asakaiTopStops({ ...row, shares: { ARZ: 0.01 } }, cols)]).toEqual(['ARZ'])
     expect(asakaiTopStops({ ...row, loadingMin: 0 }, cols).size).toBe(0)
   })
+
+  it('vardiya satırı kendi en büyük 2 duruşuyla boyanır (günden bağımsız)', () => {
+    const cols = ['STP', 'KLP', 'ARZ']
+    const day = { label: 'W', loadingMin: 1440, oee: 0.6, shares: { STP: 0.05, KLP: 0.12, ARZ: 0.02 } }
+    const shift3 = { label: '3', loadingMin: 480, oee: 0.5, shares: { STP: 0.01, KLP: 0.04, ARZ: 0.06 } }
+    expect([...asakaiTopStops(day, cols)].sort()).toEqual(['KLP', 'STP'])
+    expect([...asakaiTopStops(shift3, cols)].sort()).toEqual(['ARZ', 'KLP'])
+  })
 })
 
 describe('Asakai short stops', () => {

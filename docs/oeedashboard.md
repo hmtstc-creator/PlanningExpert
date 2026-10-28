@@ -734,8 +734,8 @@ Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **
   (planlamacı, 2026-10-26): iş yeri sayısı yalnız tabloyu uzatır. PDF çok sayfa, blok sayfa arasında bölünmez.
 - **Asakai detail** (`/oee/asakai-detail`): seçili gün, makine başına koyu satır = gün, 1-2-3 = vardiyalar: OEE,
   Loading (dk), kayıp sütunları; sağda günün malzemeleri ve vardiyada "iyi adet - %OEE" (sipariş dosyasından).
-  Her iş yerinin gün satırında en büyük 2 duruş kırmızı (`ASAKAI_TOP`, `asakaiTopStops`); Speed duruş değil,
-  Unassigned öncelik değil, sayılmaz; vardiya satırları boyanmaz (planlamacı, 2026-10-28).
+  Her satırda (iş yerinin günü ve her vardiyası ayrı ayrı) kendi en büyük 2 duruşu kırmızı (`ASAKAI_TOP`, `asakaiTopStops`);
+  Speed duruş değil, Unassigned öncelik değil, sayılmaz (planlamacı, 2026-10-28; vardiyalar da boyanır, aynı gün).
 - Hesap yeni değil (`src/lib/oeeAsakai.ts`): OEE toplam süreden, kayıplar Losses Trend'in `lossBreakdown`'u, vardiya
   kesiti Loss Bridge'in `shiftSlice`'ı, kısa duruşlar ayrılır. Kayıp sütunları OEE Settings'teki grafik sütunları.
 - **Sütunlar** (2026-10-26, planlamacı; ~~"#" sütunu~~ → tanımsızlar en sonda UNASSIGNED, aşağıdaki bölüm): tablolar "#" (tanımsız, başlık UNDEFINED) gibi *grafikte gizli* grupları da
