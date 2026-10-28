@@ -570,6 +570,17 @@ function PlanLogicPage() {
             .
           </li>
           <li>
+            The <b>job window</b> (click a bar) shows the same check per job: the
+            <b> Req dates</b> the job covers and their quantity, start and end time,
+            and a <b>Status</b> per need day — how many pieces are ready how many
+            hours <b>before</b> or <b>late</b> against {current.cutoff} on that day.
+            What the lot makes beyond the need (rounding up to whole coils or the
+            Min. lot) is <b>overstock</b>. Example: 3,000 pcs of backlog, one coil
+            makes 6,000 → &ldquo;3,000 pcs (2 hours late) and 3,000 pcs
+            (overstock)&rdquo;. A job whose stock lasts the whole horizon has no
+            need day: all of it is overstock (stock build).
+          </li>
+          <li>
             What does not fit anywhere goes to <b>Unplanned</b>, with the
             reason and a link to the fix (no master data, no eligible work center, no
             free capacity…).
