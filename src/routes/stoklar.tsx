@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { usePaginatedQuery } from '../lib/convexTransport'
-import { useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { PageHeader } from '../components/PageHeader'
@@ -10,152 +10,142 @@ export const Route = createFileRoute('/stoklar')({
   component: StoklarPage,
 })
 
+type StockLine = StockCols & { id: string; plant?: string; location?: string }
+
+type StockCols = { unrestricted: number; quality: number; restricted: number; blocked: number; returns: number; transit: number }
+
+const fmt = (n: number) => n.toLocaleString('en-GB', { maximumFractionDigits: 3 })
+
 function StoklarPage() {
-  const { results: rows, status } = usePaginatedQuery(
+  const { results: rows, status, loadMore } = usePaginatedQuery(
     api.stock.list,
     {},
     { initialNumItems: 500 },
   )
-  const [view, setView] = useState<'summary' | 'detail'>('summary')
   const [search, setSearch] = useState('')
+  const term = search.trim().toLowerCase()
+  // Arama yazılınca kalan sayfalar da yüklenir ki eşleşme kaçmasın.
+  useEffect(() => {
+    if (term && status === 'CanLoadMore') loadMore(500)
+  }, [term, status, loadMore])
 
-  const summary = useMemo(() => {
-    const map = new Map<
-      string,
-      { material: string; unrestricted: number; quality: number; restricted: number; blocked: number; returns: number; transit: number; locations: number }
-    >()
+  // Tek tablo: malzeme başına depo satırları alt alta; birden çok depo varsa altında toplam satırı.
+  const groups = useMemo(() => {
+    const map = new Map<string, { material: string; total: StockCols; locations: StockLine[] }>()
     for (const r of rows) {
-      const existing = map.get(r.material) ?? {
+      if (term && !r.material.toLowerCase().includes(term)) continue
+      const g = map.get(r.material) ?? {
         material: r.material,
-        unrestricted: 0,
-        quality: 0,
-        restricted: 0,
-        blocked: 0,
-        returns: 0,
-        transit: 0,
-        locations: 0,
+        total: { unrestricted: 0, quality: 0, restricted: 0, blocked: 0, returns: 0, transit: 0 },
+        locations: [] as StockLine[],
       }
-      existing.unrestricted += r.unrestricted ?? 0
-      existing.quality += r.qualityInspection ?? 0
-      existing.restricted += r.restricted ?? 0
-      existing.blocked += r.blocked ?? 0
-      existing.returns += r.returns ?? 0
-      existing.transit += r.transit ?? 0
-      existing.locations += 1
-      map.set(r.material, existing)
+      const line: StockLine = {
+        id: r._id,
+        plant: r.plant ?? undefined,
+        location: r.storageLocation ?? undefined,
+        unrestricted: r.unrestricted ?? 0,
+        quality: r.qualityInspection ?? 0,
+        restricted: r.restricted ?? 0,
+        blocked: r.blocked ?? 0,
+        returns: r.returns ?? 0,
+        transit: r.transit ?? 0,
+      }
+      g.locations.push(line)
+      for (const k of Object.keys(g.total) as (keyof StockCols)[]) g.total[k] += line[k]
+      map.set(r.material, g)
     }
-    return Array.from(map.values()).sort((a, b) => a.material.localeCompare(b.material))
-  }, [rows])
+    const list = Array.from(map.values()).sort((a, b) => a.material.localeCompare(b.material))
+    for (const g of list) g.locations.sort((a, b) => (a.location ?? '').localeCompare(b.location ?? ''))
+    return list
+  }, [rows, term])
 
-  const filteredSummary = summary.filter((s) => s.material.toLowerCase().includes(search.toLowerCase()))
-  const filteredRows = rows.filter((r) => r.material.toLowerCase().includes(search.toLowerCase()))
+  const cells = (c: StockCols, strong = false) => (
+    <>
+      <td className={`px-3 py-2 ${strong ? 'font-semibold text-foreground' : 'text-foreground'}`}>{fmt(c.unrestricted)}</td>
+      <td className="px-3 py-2 text-muted-foreground">{fmt(c.quality)}</td>
+      <td className="px-3 py-2 text-muted-foreground">{fmt(c.restricted)}</td>
+      <td className="px-3 py-2 text-muted-foreground">{fmt(c.blocked)}</td>
+      <td className="px-3 py-2 text-muted-foreground">{fmt(c.returns)}</td>
+      <td className="px-3 py-2 text-muted-foreground">{fmt(c.transit)}</td>
+    </>
+  )
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="Stock"
-        summary="Stock from the SAP MB52 report, per material and location."
+        summary="Stock from the SAP MB52 report, per material and storage location."
         links={relatedPages('/stoklar')}
         info={
           <p>
-            Total available stock is calculated per material; the detail view breaks it down by
-            storage location. MB52 is uploaded on <Link to="/sapdata">SAP Data</Link>; which
-            locations count is set on <Link to="/depolar">Storage Locations</Link>.
+            Each row is one storage location of a material; a material held in more than one
+            location gets a total row below its locations. MB52 is uploaded on{' '}
+            <Link to="/sapdata">SAP Data</Link>; which locations count for the plan is set on{' '}
+            <Link to="/depolar">Storage Locations</Link>.
           </p>
         }
       />
 
-
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setView('summary')}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'summary' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-          >
-            Summary (by material)
-          </button>
-          <button
-            onClick={() => setView('detail')}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === 'detail' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
-          >
-            Detail (by storage location)
-          </button>
-        </div>
         <input
           className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
           placeholder="Search material…"
+          aria-label="Search material"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      {view === 'summary' ? (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-muted text-muted-foreground">
+      <div className="mt-4 overflow-x-auto rounded-lg border border-border">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-muted text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">Material</th>
+              <th className="px-3 py-2 font-medium">Plant</th>
+              <th className="px-3 py-2 font-medium">Storage Location</th>
+              <th className="px-3 py-2 font-medium">Unrestricted</th>
+              <th className="px-3 py-2 font-medium">Quality inspection</th>
+              <th className="px-3 py-2 font-medium">Restricted</th>
+              <th className="px-3 py-2 font-medium">Blocked</th>
+              <th className="px-3 py-2 font-medium">Returns</th>
+              <th className="px-3 py-2 font-medium">Transit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {status === 'LoadingFirstPage' && (
+              <tr><td className="px-3 py-3 text-muted-foreground" colSpan={9}>Loading…</td></tr>
+            )}
+            {status !== 'LoadingFirstPage' && groups.length === 0 && (
               <tr>
-                <th className="px-3 py-2 font-medium">Materyal</th>
-                <th className="px-3 py-2 font-medium">Unrestricted</th>
-                <th className="px-3 py-2 font-medium">Kalite Kontrolde</th>
-                <th className="px-3 py-2 font-medium">Restricted</th>
-                <th className="px-3 py-2 font-medium">Bloke</th>
-                <th className="px-3 py-2 font-medium">Returns</th>
-                <th className="px-3 py-2 font-medium">Transit</th>
-                <th className="px-3 py-2 font-medium">Locations</th>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={9}>
+                  {rows.length > 0 ? 'No material matches the search.' : 'No stock data uploaded yet.'}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {status === 'LoadingFirstPage' && (
-                <tr><td className="px-3 py-3 text-muted-foreground" colSpan={8}>Loading…</td></tr>
-              )}
-              {status !== 'LoadingFirstPage' && filteredSummary.length === 0 && (
-                <tr><td className="px-3 py-3 text-muted-foreground" colSpan={8}>No stock data uploaded yet.</td></tr>
-              )}
-              {filteredSummary.map((s) => (
-                <tr key={s.material} className="border-t border-border">
-                  <td className="px-3 py-2 font-medium text-foreground">{s.material}</td>
-                  <td className="px-3 py-2 text-foreground">{s.unrestricted}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{s.quality}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{s.restricted}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{s.blocked}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{s.returns}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{s.transit}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{s.locations}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-muted text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Materyal</th>
-                <th className="px-3 py-2 font-medium">Fabrika</th>
-                <th className="px-3 py-2 font-medium">Depo Yeri</th>
-                <th className="px-3 py-2 font-medium">Unrestricted</th>
-                <th className="px-3 py-2 font-medium">Kalite</th>
-                <th className="px-3 py-2 font-medium">Restricted</th>
-                <th className="px-3 py-2 font-medium">Bloke</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.map((r) => (
-                <tr key={r._id} className="border-t border-border">
-                  <td className="px-3 py-2 text-foreground">{r.material}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{r.plant ?? '—'}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{r.storageLocation ?? '—'}</td>
-                  <td className="px-3 py-2 text-foreground">{r.unrestricted ?? 0}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{r.qualityInspection ?? 0}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{r.restricted ?? 0}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{r.blocked ?? 0}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            )}
+            {groups.map((g) => (
+              <Fragment key={g.material}>
+                {g.locations.map((l, i) => (
+                  <tr key={l.id} className={i === 0 ? 'border-t border-border' : ''}>
+                    <td className="px-3 py-2 font-medium text-foreground">{i === 0 ? g.material : ''}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{l.plant ?? '—'}</td>
+                    <td className="px-3 py-2 text-foreground">{l.location ?? '—'}</td>
+                    {cells(l)}
+                  </tr>
+                ))}
+                {g.locations.length > 1 && (
+                  <tr className="bg-muted/40">
+                    <td className="px-3 py-2" />
+                    <td className="px-3 py-2 text-xs text-muted-foreground" colSpan={2}>
+                      Total · {g.locations.length} locations
+                    </td>
+                    {cells(g.total, true)}
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

@@ -121,6 +121,26 @@ Kullanıcı kararları (2026-10-23):
   saate taşı (telefonda basılı tut), ya da iş penceresi → *Move…*; orada kilitlenir.
   Kalıp / pres uygunluğu kontrol edilmez — sabitleme (`pin`) gibi planlamacının kararı.
 
+### Düzenlemeler sunumu (2026-10-28)
+
+Kullanıcı sunumu (`duzenlemeler.pptx`, 6 slayt). Slayt 1–5 bu işte yapılıyor; slayt 6 **en son**
+yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
+
+- [ ] **[G]** Slayt 1 — 2 haftalık plan önce **ZPP_DAILY**'ye saygı duyar; ZPP (long term / haftalık)
+  yalnız kalan boş kapasiteyi doldurur.
+- [ ] **[G]** Slayt 2 — Demand: *High runner threshold* girişi kalkar; stoğun karşıladığı hafta / gün
+  hücreleri yeşil arka plan (weekly + daily).
+- [ ] **[G]** Slayt 3 — Stock: tek sayfa; *Storage Location* kolonu *Unrestricted*'tan önce, satır satır.
+- [ ] **[G]** Slayt 4 — Production Plan üst bölüm 3 kutu: sol *Plan settings* (başlangıç **ve bitiş** saati),
+  orta pres bazlı haftalık vardiya takvimi (iş yeri filtresi, gün tarihleri), sağ veri güncelleme
+  tarihleri + son hesaplama + *Approve plan*. Frozen days uyarısı kalır.
+- [ ] **[G]** Slayt 5 — İş penceresi: başlıkta *Req dates (d1, d2…) – adet*, *Start / End time*,
+  *Status* (sabah 08:00'e göre saat erken / geç; rulo fazlası *overstock*), *Exclude*'dan sonra
+  *Main / Alternative work center* bilgisi.
+- [ ] **[G]** Slayt 6 — **(başlama; en son)** Production planning yalnız presler için değil: departman
+  seçimi → altındaki iş yerleri listelenir; çoklu seçimli **cost center** filtresi. Nut welding ve
+  başka firma / tesis için de plan yapılabilmeli. Önkoşul: planlama doğru çalışıyor olmalı.
+
 ### Organizasyon teyidi (2026-10-03)
 
 | Bağ | Durum | Nasıl korunuyor |
