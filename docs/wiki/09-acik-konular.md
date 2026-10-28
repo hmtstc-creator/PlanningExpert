@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-26 (KLP %239 çözüldü: Excel hatası; tekrar satır önlemi) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-28 (düzenlemeler sunumu: slayt 4 takvim düzenleme devam, slayt 6 bekliyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -16,6 +16,16 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
+- **Düzenlemeler sunumu (2026-10-28) — slayt 4 kalan: takvimden vardiya düzenleme.** Slayt 1, 2, 3, 5 bitti (#91, #93, #94, #95);
+  slayt 4'ün düzeni ve kapalı aralık #94'te. Kalan: Production Plan ortadaki *Work calendar* (`src/components/plan/PressWeekShifts.tsx`,
+  bugün yalnız gösterir, kaynak `run.days`) hücresine tıklayınca o pres × gün × vardiya açılıp kapansın — "nihai karar ekranı".
+  Sıradaki adım: gün bazlı vardiya kaydı tasarla (yeni tablo, ör. `pressDayShifts {press, date, shifts: number[]}`, `plantField`,
+  `guardedMutation` alanı `planning.calendar`), öncelik: gün kaydı > istisna hafta > şablon. Bakılacak yerler: `pressCalendar.ts:156`
+  (`pressDay`, tek kaynak), `capacityModel.ts` (`weekBuckets`), `shiftTimeline.ts:41,109` (`DayShape` bugün vardiya **sayısı**; ardışık
+  olmayan vardiya, ör. yalnız 3., için `activeShifts` gerekir), `planning.ts:1141` (`buildWeekBuckets`, vardiya başına duruş dakikası),
+  doğrulayıcı kapasiteyi kendisi kuruyorsa onu da. Motor + doğrulayıcı + Planning Logic + `schema:snapshot` → `derin` ajanı.
+  Slayt 6 (departman / cost center seçimi) **başlanmayacak** — kullanıcı: en son, planlama doğru çalıştıktan sonra (`todolist.md`).
+  #95 sınırları: öne alınmış uzun vade lotu da en sona gider; `summary.longTermShort` arayüzde (`PlanChecks`) gösterilmiyor.
 - **Asakai / OEE (#83–#87) — canlıda kontrol ve planlamacıya sorular:**
   1. Planlamacı OEE Settings → Loss groups'ta ↑ ↓ ile sırayı bir kez vermeli: STP, KLP, ARZ, KSD, OFC, KON, YNT (sonra kodda sabit: Short stops, Speed, Unassigned).
   2. ~~**KLP %239 — pay farkı (payda aynı)**~~ — **çözüldü: Excel hatası, site doğru (2026-10-26).** 23.10 PRS-110 v2'de Excel ≈115 dk KLP gösteriyordu, site ≈344 dk; planlamacı farkın Excel'de olduğunu doğruladı. Önlem olarak tekrar satır kuralı ve *Check duplicates* eklendi (aşağıda 11'de karar).
