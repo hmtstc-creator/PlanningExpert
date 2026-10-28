@@ -210,7 +210,7 @@ if [ "$SONUC" -ne 0 ]; then
     yaz ""
     yaz "Kalan hatalar:"
     yaz '```'
-    yaz "$(hatalar | head -25)"
+    yaz "$(hatalar | head -15)"
     yaz '```'
     yaz "Qwen'in yaptığı kısmi değişiklikler itilmedi; dal el değmemiş durumda."
     git checkout -- . 2> /dev/null || true
@@ -223,15 +223,18 @@ yaz "## Sonuç: yeşil — Claude'un onayı bekleniyor"
 yaz ""
 yaz "$DOSYA_SAYISI dosya, $SATIR_SAYISI satır değişti:"
 yaz '```'
-yaz "$(git diff --stat | tail -20)"
+yaz "$(git diff --stat | tail -12)"
 yaz '```'
 yaz ""
-yaz "Değişiklikler **çalışma dalına girmedi**. Ayrı bir dala (\`qwen/<dal>\`) itildi;"
-yaz "çalışma dalına almadan önce Claude okuyup karar verir."
-yaz ""
-yaz "Tam fark:"
-yaz '```diff'
-yaz "$(git diff | head -200)"
+DAL="$(git rev-parse --abbrev-ref HEAD)"
+yaz "Qwen'in son sözü:"
 yaz '```'
+yaz "$(tail -8 ".qwen-tur-$TUR.txt" 2> /dev/null)"
+yaz '```'
+yaz ""
+# Tam fark rapora yazılmaz: rapor PR yorumu olarak Claude'un bağlamına girer.
+# Claude farkı dalda, önce --stat sonra yalnız şüpheli dosya olarak okur.
+yaz "Değişiklikler **çalışma dalına girmedi**; \`qwen/$DAL\` dalında. Claude okuyup karar verir:"
+yaz "\`git fetch origin qwen/$DAL && git diff --stat HEAD origin/qwen/$DAL\`"
 rm -f "$CIKTI" .qwen-tur-*.txt
 exit 0

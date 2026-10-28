@@ -12,6 +12,8 @@ Bu dosya depoda çalışan her Claude oturumu (bulut ya da sunucu) için geçerl
   `WeekGantt.tsx` 1100 · `convex/schema.ts` 990 · `todolist.md` 506 (yalnız ilgili bölüm).
 - **Uzun çıktıyı kısalt:** `npm run verify 2>&1 | tail -40`; tek test için `npx vitest run <dosya>`;
   hata ararken `| grep -E "FAIL|Error|✗" | head -30`. `git diff` yerine `git diff --stat`, gerekirse tek dosya.
+- **Mekanik verify hatası Qwen'e:** tip hatası, kırık test, bozuk import → `/qwen` skill'i (PR'a `qwen` etiketi).
+  Claude döngüye girmez; yalnız PR'a düşen kısa raporu ve `git diff --stat`'ı okur, final kararı verir.
 - **Geniş arama alt ajana:** birçok dosyada "nerede kullanılıyor?" taraması `Explore` ajanıyla; ana sohbete
   yalnız sonuç gelir.
 - **Kısa yanıt:** yapılanı özetlemek için dosyayı tekrar okuma; Edit hata vermediyse değişiklik yapılmıştır.

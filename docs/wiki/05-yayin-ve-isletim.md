@@ -1,6 +1,6 @@
 # 05 · Yayın ve işletim
 
-> Son güncelleme: 2026-10-28 (Qwen verify iş akışı) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
+> Son güncelleme: 2026-10-28 (Qwen standardı: `/qwen` skill'i, kısa rapor) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
 
 ## Çalışma şekli (özet)
 
@@ -29,6 +29,9 @@ dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
   Kurallar `QWEN.md`'de; anahtar `QWEN_API_KEY` gizli değeri, sağlayıcı `QWEN_BASE_URL` / `QWEN_MODEL` değişkenleri
   (varsayılan OpenRouter + `qwen/qwen3-coder:free`). Betiği denerken ayrı worktree kullan: koruma adımı
   `git checkout -- .` ve `git clean -fd` çalıştırır.
+  **Claude tarafı standardı** (`.claude/skills/qwen/SKILL.md`, 2026-10-28): ne zaman Qwen'e verilir, tek çağrıyla
+  tetikleme (etiket), job log okunmaz, rapor başlığına göre karar tablosu, `diff --stat` → yalnız şüpheli dosya ile final
+  kontrol, iş başına en çok 1 Qwen denemesi. Rapor tam farkı **içermez** (yalnız `--stat` + Qwen'in son 8 satırı + dal adı).
 
 ## `scripts/deploy.sh` ne yapar
 
