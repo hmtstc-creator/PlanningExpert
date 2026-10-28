@@ -1,6 +1,6 @@
 # 05 · Yayın ve işletim
 
-> Son güncelleme: 2026-10-23 · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
+> Son güncelleme: 2026-10-28 (Qwen verify iş akışı) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
 
 ## Çalışma şekli (özet)
 
@@ -18,6 +18,13 @@ dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
 - **CI başlamadıysa çakışmaya bak** (2026-10-23, #46): main'le çakışan PR'da (`mergeable_state: dirty`) `verify` hiç çalışmaz; main dala birleştirilir (aynı gün birden çok oturum main'e yazıyor, en sık `08-surum-gunlugu.md` tablosunun ilk satırı çakışır — iki satır da kalır).
 - **Birleşen PR'ın dalı otomatik silinir** (`.github/workflows/delete-merged-branches.yml`; `workflow_dispatch` ile eskiler tek seferde temizlenir).
 - **Yayın otomatiktir** (2026-10-22): `planningexpert-autodeploy.timer` → `scripts/deploy.sh`. Elle çalıştırmak gerekmez.
+- **Qwen: verify yeşile çevir** (2026-10-28, kullanıcı kararı): mekanik hataların düzeltme döngüsü Claude'un bağlamında
+  değil, ücretsiz bir modelde döner (`.github/workflows/qwen-yesil.yml` → `scripts/qwen-yesil.sh`). Tetikleme: PR'a `qwen`
+  etiketi ya da Actions → Run workflow (dal adı). `main`'de çalışmaz. En çok 4 tur; yeşil olursa düzeltmeler dala itilir,
+  olmazsa hiçbir şey itilmez. **Korunan dosyalara** (motor, doğrulayıcı, OEE, şema, `architecture.test.ts`, `planlogic.tsx`,
+  `CLAUDE.md`, `QWEN.md`, iş akışları, betiğin kendisi) dokunulduysa değişiklik geri alınır ve iş kırmızı biter — oralar
+  mimari karar ister, Claude düzeltir. Kurallar `QWEN.md`'de; anahtar `QWEN_API_KEY` gizli değeri, sağlayıcı
+  `QWEN_BASE_URL` / `QWEN_MODEL` değişkenleri (varsayılan OpenRouter + `qwen/qwen3-coder:free`).
 
 ## `scripts/deploy.sh` ne yapar
 
