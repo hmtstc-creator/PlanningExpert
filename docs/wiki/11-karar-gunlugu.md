@@ -1,6 +1,6 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-28 (Asakai kırmızı = en büyük 2 duruş, vardiyalar da; gün kaydı, ZPP_DAILY önceliği, kapalı aralık, iş penceresi durumu) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-28 (Work calendar Edit / Save; Asakai kırmızı = en büyük 2 duruş, vardiyalar da; gün kaydı, ZPP_DAILY önceliği, kapalı aralık, iş penceresi durumu) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
@@ -8,6 +8,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 - **ZPP_DAILY önce, haftalık ZPP yalnız boş kapasiteye** (2026-10-28, #95) — SAP'nin günlük ihtiyacına saygı; haftalık talebin güne bölünmesine planlamacı güvenmiyor. Kısmen kapsanan hafta bölünür (`W38` + `W38 LT`), uzun vade lotu geç sayılmaz, öne alınsa da günlük lotların arkasında kalır. *Alt.: karışık lotu ilk ihtiyaç gününe göre sınıflamak* (haftalık talep günlük önceliğe taşınırdı).
 - **Gün kaydı = nihai karar** (2026-10-28) — Production Plan → *Work calendar* hücresi pres × gün × vardiyayı tek tek açar / kapatır; gün kaydı > istisna hafta > şablon, tatilde de. Vardiya numarası listesi tutulur (sayı değil), çünkü "yalnız 3. vardiya" gibi art arda olmayan günler gerekir. Plan elle hesaplanır kuralı korunur: kayıt "plan güncel değil" işareti koyar. *Alt.: hücre tıklamasıyla istisna hafta yazmak* (bütün haftayı değiştirirdi, tek günü değil).
+- **Work calendar yazma anı = Save** (2026-10-28, #105) — kutu okuma kipinde açılır; *Edit* ile taslak, *Save* ile tek seferde yazılır (vardiya + o günün tarihli mesaisi). Kaydetme sırası mesai kaldırma → gün kaydı → mesai ekleme: sunucu açılan vardiyayla çakışan mesaiyi reddediyor. *Alt.: her tıklamada anında yazmak* (#97'deki davranış — yanlış tıklama hemen canlı veriye gidiyordu, mesai de buradan düzenlenemiyordu).
 - **Plan settings = kapalı aralık** (2026-10-28, #94) — "başlangıç bitiş saati, sadece öteleme olmasın": pres `holdFrom` → `from` arası iş almaz, başlangıç boşsa şu andan. *Alt.: yalnız "plan until" (bitişten sonra kapalı)* — aralık ikisini de kapsar.
 - **İş penceresi durumu ihtiyaç günü 08:00'e göre** (2026-10-28, #93) — her ihtiyaç noktası için saat önce / geç; ihtiyacı aşan rulo / min. lot fazlası *overstock*. Geç tanımıyla aynı teslim anı ve pay (`jobRequirements`).
 
