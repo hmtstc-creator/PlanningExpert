@@ -137,6 +137,8 @@ yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
   - [x] (#94) Düzen, kapalı aralık (başlangıç – bitiş), takvim gösterimi.
   - [x] Takvim hücresine tıklayıp vardiya aç / kapa: gün kaydı `pressDayShifts` (pres × gün × vardiya),
     `pressCalendar.pressDay` → kapasite modeli → motor ve doğrulayıcı (2026-10-28).
+  - [x] (#104) *Edit* / *Save* / *Cancel*: değişiklikler taslakta tutulur, tek seferde yazılır; aynı kipte
+    OT satırından o güne mesai eklenir / kaldırılır (2026-10-28).
 - [x] **[G]** (#93) Slayt 5 — İş penceresi: başlıkta *Req dates (d1, d2…) – adet*, *Start / End time*,
   *Status* (sabah 08:00'e göre saat erken / geç; rulo fazlası *overstock*), *Exclude*'dan sonra
   *Main / Alternative work center* bilgisi.

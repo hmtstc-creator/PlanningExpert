@@ -17,8 +17,9 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 ## Devam
 
 - **Düzenlemeler sunumu (2026-10-28) — slayt 1–5 bitti.** Slayt 1, 2, 3, 5 (#91, #93, #94, #95); slayt 4'ün düzeni #94'te,
-  takvimden vardiya düzenleme (gün kaydı `pressDayShifts`, hücreye tıkla) #97. Kullanıcıda denenecek: hücre tıklaması →
-  *Calculate plan* → Gantt'ta ve Work Calendar'da o gün; mesaiyle çakışan vardiya hatası; ↺ ile şablona dönüş.
+  takvimden vardiya düzenleme (gün kaydı `pressDayShifts`, hücreye tıkla) #97, Edit / Save + mesai #104. Kullanıcıda
+  denenecek: *Edit* → hücre tıklaması → *Save* → *Calculate plan* → Gantt'ta ve Work Calendar'da o gün; mesaiyle
+  çakışan vardiya hatası; ↺ ile şablona dönüş; OT satırından mesai ekleme / kaldırma.
   Sınır: Work Calendar sayfası gün kaydını kapasiteye katar ama ayrıca işaretlemez; gün kaydının toplu listesi yok.
   Slayt 6 (departman / cost center seçimi) **başlanmayacak** — kullanıcı: en son, planlama doğru çalıştıktan sonra (`todolist.md`).
   #95 sınırları: öne alınmış uzun vade lotu da en sona gider; `summary.longTermShort` arayüzde (`PlanChecks`) gösterilmiyor.
