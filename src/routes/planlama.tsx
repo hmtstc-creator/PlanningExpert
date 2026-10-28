@@ -69,7 +69,7 @@ function PlanlamaPage() {
   // Elle iş (stok amaçlı): pencere açıkken parça listesi yüklenir.
   // Elle iş penceresi: kapalıysa null; boşluğa tıklanınca pres / gün / saat dolu gelir.
   const [addingJob, setAddingJob] = useState<GanttMoveTarget | true | null>(null)
-  const products = (useQuery(api.products.listAll, addingJob !== null ? {} : 'skip')?.rows ?? []) as ProductSpec[]
+  const products = (useQuery(api.products.listAll, addingJob !== null || jobDraft !== null ? {} : 'skip')?.rows ?? []) as ProductSpec[]
   const quantityRules = useMemo(
     () =>
       new Map(
@@ -177,6 +177,26 @@ function PlanlamaPage() {
         ...ganttMaintenance.filter((m) => m.press === target.press).map((m) => m.segments),
       ],
     })
+  /** Net dakika → okunur saat ("Wed 28 Oct 13:20"); gece vardiyası ertesi takvim gününe düşer. */
+  const clockLabel = (press: string, date: string, netMinute: number) => {
+    const clock = Math.round(netToClock(netMinute, buildDayTimeline(shiftStartMinute, shiftMinutes, dayShapeOf(press, date), plannedStops)))
+    const day = new Date(`${date}T00:00:00`)
+    day.setDate(day.getDate() + Math.floor(clock / 1440))
+    const m = ((clock % 1440) + 1440) % 1440
+    return `${day.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })} ${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+  }
+  /** İş penceresine bilgi: başlangıç / bitiş saati, ana ve alternatif iş yerleri. */
+  const jobInfo = (job: PlanJob) => {
+    const product = products.find((p) => p.code === job.material)
+    return {
+      startLabel: clockLabel(job.press, job.date, job.setupStartMinute),
+      endLabel: clockLabel(job.press, job.endDate ?? job.date, job.endMinute),
+      mainMachine: product?.mainMachine,
+      altMachines: [product?.altMachine1, product?.altMachine2, product?.altMachine3, product?.altMachine4].filter(
+        (m): m is string => !!m && m.trim() !== '',
+      ),
+    }
+  }
   /** "Move…" penceresinin ilk değeri: işin şimdiki başlangıcı (geçmişteyse şu an). */
   const currentStart = (job: PlanJob): MoveTarget => {
     const clock = netToClock(job.setupStartMinute, buildDayTimeline(shiftStartMinute, shiftMinutes, dayShapeOf(job.press, job.date), plannedStops))
@@ -514,7 +534,7 @@ function PlanlamaPage() {
             />
             {jobDraft && (
               <JobDialog
-                draft={jobDraft}
+                draft={{ ...jobDraft, ...jobInfo(jobDraft.job) }}
                 onClose={() => setJobDraft(null)}
                 onMove={() => {
                   const job = jobDraft.job

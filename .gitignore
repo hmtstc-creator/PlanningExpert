@@ -8,3 +8,8 @@ dist
 tsconfig.tsbuildinfo
 convex/_generated
 backups/
+
+# Qwen verify iş akışının geçici dosyaları
+qwen-rapor.md
+.qwen-verify.txt
+.qwen-tur-*.txt

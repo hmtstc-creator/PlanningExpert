@@ -1440,18 +1440,26 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // Gecikme = gereken adedin hazır olduğu saat − teslim anı (ör. Sal 08:00).
   const shiftNetHours = fullDay.netMinutes / 3 / 60
   const clockTs = (date: string, clock: number) => Date.parse(`${date}T00:00:00Z`) + clock * 60_000
-  for (const job of result.jobs) {
-    if (!job.late || !job.readyDate || job.readyMinute === undefined || !job.deadlineDate || job.deadlineMinute === undefined) continue
-    const shape = dayShapeByPressDate.get(`${job.press}|${job.readyDate}`) ?? { shifts: 3 }
+  /** Hazır an (presin o günkü takvimiyle) − teslim anı, saat; artı geç, eksi erken. */
+  const hoursAfterDeadline = (press: string, readyDate: string, readyMinute: number, deadlineDate: string, deadlineMinute: number) => {
+    const shape = dayShapeByPressDate.get(`${press}|${readyDate}`) ?? { shifts: 3 }
     const pressDay = buildDayTimeline(
       shiftStartMinute,
       shiftMinutes,
       shape.shifts > 0 || shape.overtime?.length ? shape : { shifts: 1 },
       plannedStops,
     )
-    const ready = clockTs(job.readyDate, netToClock(job.readyMinute, pressDay))
-    const deadline = clockTs(job.deadlineDate, netToClock(job.deadlineMinute, fullDay))
-    job.lateHours = Math.max(0.1, Math.round(((ready - deadline) / 3_600_000) * 10) / 10)
+    const ready = clockTs(readyDate, netToClock(readyMinute, pressDay))
+    const deadline = clockTs(deadlineDate, netToClock(deadlineMinute, fullDay))
+    return Math.round(((ready - deadline) / 3_600_000) * 10) / 10
+  }
+  for (const job of result.jobs) {
+    // İş penceresi: her ihtiyaç noktası kaç saat erken / geç karşılanıyor.
+    for (const r of job.requirements ?? []) {
+      r.hours = hoursAfterDeadline(job.press, r.readyDate, r.readyMinute, r.deadlineDate, r.deadlineMinute)
+    }
+    if (!job.late || !job.readyDate || job.readyMinute === undefined || !job.deadlineDate || job.deadlineMinute === undefined) continue
+    job.lateHours = Math.max(0.1, hoursAfterDeadline(job.press, job.readyDate, job.readyMinute, job.deadlineDate, job.deadlineMinute))
   }
   const lateByMaterial = new Map<string, ScheduledJob[]>()
   for (const job of result.jobs) {
