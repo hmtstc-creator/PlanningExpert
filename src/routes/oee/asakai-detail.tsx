@@ -52,7 +52,7 @@ function AsakaiDetailPage() {
   const sheetRef = useRef<HTMLDivElement>(null)
   // Excel'deki gibi tek tablo: masraf yerleri ardışık (Progressive, Transfer).
   const machines = groups.flatMap((g) => g.machines)
-  // Her iş yerinin gününde en büyük duruşlar kırmızı (vardiya satırları değil).
+  // Her iş yerinin gününde ve her vardiyasında kendi en büyük duruşları kırmızı.
   const topOf = new Map(machines.map((m) => [m.workCenter, asakaiTopStops(m.total, columns)]))
   const partCols = Math.max(PART_COLUMNS, ...machines.map((m) => m.parts.length))
   const day = dm(sel.date)
@@ -70,7 +70,8 @@ function AsakaiDetailPage() {
               The dark row of each work center is the day; rows 1, 2, 3 are its shifts (shift numbers from{' '}
               <Link to="/oee/settings">OEE Settings</Link>
               ). Losses are shares of the loading time, split by shift as on Loss Bridge; red cells are the {ASAKAI_TOP} largest
-              stops of each work center&apos;s day (Speed and Unassigned are not counted).
+              stops of each row — the work center&apos;s day and each of its shifts on their own (Speed and Unassigned are not
+              counted).
             </p>
             <p>Right: the materials of the day (orders file), each shift&apos;s good quantity and OEE — e.g. &quot;12660 - %90&quot;.</p>
           </>
@@ -191,34 +192,37 @@ function AsakaiDetailPage() {
                       </Cell>
                     ))}
                   </tr>
-                  {m.shifts.map((s, si) => (
-                    <tr key={s.label}>
-                      {si === 0 && (
-                        <Cell bg={X.lineCell} bold rowSpan={m.shifts.length}>
-                          {m.workCenter}
-                        </Cell>
-                      )}
-                      <Cell bg={X.lineCell} bold>
-                        {s.label}
-                      </Cell>
-                      <Cell bg={X.salmonLight}>{pct(s.oee ?? 0)}</Cell>
-                      <Cell bg={X.salmonLight}>{Math.round(s.loadingMin)}</Cell>
-                      {columns.map((c) => (
-                        <Cell key={c} bg={X.lightBlue}>
-                          {share(s, c)}
-                        </Cell>
-                      ))}
-                      <td />
-                      {Array.from({ length: partCols }, (_, i) => {
-                        const cell = m.parts[i] ? m.partCells[si][m.parts[i]] : undefined
-                        return (
-                          <Cell key={i}>
-                            {cell ? `${Math.round(cell.good)} - %${cell.oee === null ? '' : Math.round(cell.oee * 100)}` : ''}
+                  {m.shifts.map((s, si) => {
+                    const top = asakaiTopStops(s, columns)
+                    return (
+                      <tr key={s.label}>
+                        {si === 0 && (
+                          <Cell bg={X.lineCell} bold rowSpan={m.shifts.length}>
+                            {m.workCenter}
                           </Cell>
-                        )
-                      })}
-                    </tr>
-                  ))}
+                        )}
+                        <Cell bg={X.lineCell} bold>
+                          {s.label}
+                        </Cell>
+                        <Cell bg={X.salmonLight}>{pct(s.oee ?? 0)}</Cell>
+                        <Cell bg={X.salmonLight}>{Math.round(s.loadingMin)}</Cell>
+                        {columns.map((c) => (
+                          <Cell key={c} bg={top.has(c) ? X.bad : X.lightBlue} color={top.has(c) ? X.badText : undefined}>
+                            {share(s, c)}
+                          </Cell>
+                        ))}
+                        <td />
+                        {Array.from({ length: partCols }, (_, i) => {
+                          const cell = m.parts[i] ? m.partCells[si][m.parts[i]] : undefined
+                          return (
+                            <Cell key={i}>
+                              {cell ? `${Math.round(cell.good)} - %${cell.oee === null ? '' : Math.round(cell.oee * 100)}` : ''}
+                            </Cell>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               ))}
             </table>
