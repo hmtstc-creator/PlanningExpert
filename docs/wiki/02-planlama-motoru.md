@@ -1,6 +1,6 @@
 # 02 · Planlama motoru
 
-> Son güncelleme: 2026-10-28 (gün kaydı: pres × gün vardiyaları) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
+> Son güncelleme: 2026-10-28 (gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
 > Kullanıcıya dönük anlatım: sitede **Planning Logic**
 
 Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Aynı girdi aynı planı verir
@@ -12,7 +12,7 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
    *Finished goods* depoları), preslerin takvimi, resmi tatiller, planlı duruşlar, kalıp bakımı / hazırlığı / alarmı,
    onaylı plan (dondurulmuş ufuk), onaylı işler (kilitler), plan müdahaleleri, yoldaki hammadde.
    - **Pres takvimi önceliği** (`pressCalendar.pressDay`, tek kaynak): **gün kaydı** (`pressDayShifts`, Production Plan →
-     *Work calendar* hücresine tıklama) > istisna hafta > şablon. Gün kaydı tatilde de geçerlidir ve vardiyalar art arda
+     *Work calendar* kutusunda **Edit** → hücreye tıklama → **Save**) > istisna hafta > şablon. Gün kaydı tatilde de geçerlidir ve vardiyalar art arda
      olmak zorunda değildir (ör. yalnız 3. vardiya): `DayShape.activeShifts` / `DayBucket.activeShifts` taşır, zaman
      çizelgesi (`buildDayTimeline`), kova net dakikası, zamanlayıcının vardiya sınırı (`DayBucket.shiftNetMinutes`) ve
      bağımsız doğrulayıcı (kendi `normalShiftsOn`'u) bunu okur. `activeShifts` yalnız 1..n değilse doludur.

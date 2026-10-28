@@ -340,11 +340,14 @@ function PlanLogicPage() {
           </li>
           <li>
             A <b>day record</b> is the final word for one work center and one day: on the Production
-            Plan, <b>Work calendar</b> box, a click on a cell opens or closes that shift. It wins over
+            Plan, <b>Work calendar</b> box, press <b>Edit</b>, then a click on a cell opens or closes
+            that shift and <b>Save</b> writes the whole week at once (Cancel drops it). It wins over
             the week exception, the pattern and a holiday (order: day record → week exception →
             pattern). The shifts do not have to follow each other: only the 3rd shift (with 8 h
             shifts from 07:00: 23:00–07:00) is 480 min, 450 net with a 30 min 3rd-shift meal. A shift
-            that overlaps that day's overtime is refused; ↺ removes the record. It reaches the plan
+            that overlaps that day's overtime is refused; ↺ removes the record. In the same Edit
+            mode the OT row adds or removes that day's dated overtime; Save applies the overtime
+            removals first, then the day records, then the new overtime. It reaches the plan
             on the next Calculate plan.
           </li>
           <li>
@@ -835,9 +838,10 @@ function PlanLogicPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Next to it, <b>Work calendar</b> shows the chosen work center week by week: shifts 1–3 per
           day as the plan uses them (Work Calendar, week exceptions, holidays, day records) and
-          overtime hours. Clicking a cell opens or closes that shift — a day record (see{' '}
-          <a href="#capacity">Build the capacity</a>); a dashed cell is not in the plan until the
-          next Calculate plan.
+          overtime hours. It is read-only until you press <b>Edit</b>: then a click on a cell opens
+          or closes that shift — a day record (see <a href="#capacity">Build the capacity</a>) — and
+          the OT row adds or removes that day's overtime. Nothing is written until <b>Save</b>;
+          a dashed cell is not in the plan until the next Calculate plan.
         </p>
       </section>
 
