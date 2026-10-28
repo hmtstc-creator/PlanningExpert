@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
+import { stockCoverage } from '../lib/stockCoverage'
 
 export const Route = createFileRoute('/siparisler')({
   component: SiparislerPage,
@@ -23,7 +24,6 @@ function SiparislerPage() {
   )
 
   const [view, setView] = useState<'weekly' | 'daily'>('weekly')
-  const [highRunnerThreshold, setHighRunnerThreshold] = useState('1500')
 
   const [search, setSearch] = useState('')
   const term = search.trim().toLowerCase()
@@ -53,8 +53,6 @@ function SiparislerPage() {
     return first ? first.periods.map((p) => p.label) : []
   }, [allRows])
 
-  const threshold = Number(highRunnerThreshold) || 0
-
   return (
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
@@ -65,7 +63,8 @@ function SiparislerPage() {
           <p>
             Negative values are the shortfall that must be produced. Both files are uploaded on{' '}
             <Link to="/sapdata">SAP Data</Link>. Where ZPP_DAILY covers a day it overrides the
-            weekly ZPP; beyond it the weekly total is spread over the plant's working days.
+            weekly ZPP; beyond it the weekly total is spread over the plant's working days. A green
+            cell means the plan stock still covers the cumulative requirement up to that period.
           </p>
         }
       />
@@ -86,15 +85,6 @@ function SiparislerPage() {
             Daily view
           </button>
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <label className="text-muted-foreground">High runner threshold (weekly avg. qty):</label>
-          <input
-            type="number"
-            className="w-24 rounded-md border border-input bg-background px-2 py-1"
-            value={highRunnerThreshold}
-            onChange={(e) => setHighRunnerThreshold(e.target.value)}
-          />
-        </div>
         <input
           className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
           placeholder="Filter material…"
@@ -111,7 +101,6 @@ function SiparislerPage() {
               <th className="sticky left-0 bg-muted px-3 py-2 font-medium">Material</th>
               <th className="px-3 py-2 font-medium" title="MB52 stock in the locations ticked Finished goods — the stock the plan uses">Stock (plan)</th>
               <th className="px-3 py-2 font-medium">Overdue</th>
-              {view === 'weekly' && <th className="px-3 py-2 font-medium">Class</th>}
               {periodLabels.map((label) => (
                 <th key={label} className="whitespace-nowrap px-3 py-2 font-medium">
                   {label}
@@ -122,48 +111,35 @@ function SiparislerPage() {
           <tbody>
             {loading && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={4 + periodLabels.length}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={3 + periodLabels.length}>
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={4 + periodLabels.length}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={3 + periodLabels.length}>
                   {allRows.length > 0 ? 'No material matches the filter.' : 'No data uploaded yet.'}
                 </td>
               </tr>
             )}
             {rows.map((r) => {
-              const weeklyAvg =
-                r.periods.length > 0
-                  ? r.periods.reduce((s, p) => s + Math.abs(p.qty), 0) / r.periods.length
-                  : 0
-              const isHighRunner = weeklyAvg >= threshold
+              const stock = planStock.get(r.material) ?? 0
+              const covered = stockResult ? stockCoverage(stock, r.overdue ?? 0, r.periods.map((p) => p.qty)) : []
               return (
                 <tr key={r._id} className="border-t border-border">
                   <td className="sticky left-0 bg-background px-3 py-2 font-medium text-foreground">
                     {r.material}
                   </td>
-                  <td className="px-3 py-2 text-foreground">{stockResult ? (planStock.get(r.material) ?? 0).toLocaleString('en-GB') : '…'}</td>
+                  <td className="px-3 py-2 text-foreground">{stockResult ? stock.toLocaleString('en-GB') : '…'}</td>
                   <td className={`px-3 py-2 ${((r.overdue ?? 0) < 0) ? 'text-destructive' : 'text-foreground'}`}>
                     {r.overdue ?? 0}
                   </td>
-                  {view === 'weekly' && (
-                    <td className="px-3 py-2">
-                      {isHighRunner ? (
-                        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
-                          High Runner
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Normal</span>
-                      )}
-                    </td>
-                  )}
                   {r.periods.map((p, i) => (
                     <td
                       key={i}
-                      className={`px-3 py-2 ${p.qty < 0 ? 'text-destructive' : 'text-muted-foreground'}`}
+                      className={`px-3 py-2 ${covered[i] ? 'bg-emerald-100 dark:bg-emerald-950' : ''} ${p.qty < 0 ? 'text-destructive' : 'text-muted-foreground'}`}
+                      title={covered[i] ? 'Covered by stock' : undefined}
                     >
                       {p.qty}
                     </td>
