@@ -1,6 +1,6 @@
 # 03 · Geç iş tanımı
 
-> Son güncelleme: 2026-10-22 · Kaynak: `scheduler.ts` (`deliveryCheck`), `planPipeline.ts` (`lateShare`, `explainLate`), `planValidator.ts`
+> Son güncelleme: 2026-10-28 · Kaynak: `scheduler.ts` (`deliveryCheck`, `jobRequirements`), `planPipeline.ts` (`lateShare`, `explainLate`), `planValidator.ts`
 > Kullanıcıya dönük anlatım: Planning Logic → *Late jobs are re-planned*
 
 ## Tanım
@@ -23,6 +23,14 @@ Son parçanın gecikmesi: üretim teslimden 6 saat sonra başlayıp j saat süre
 gerçek bekleme ortalamaya daha yakındır. Müşterinin gerçek duruş süresi, onun tüketim saatleri bilinmeden **hesaplanmaz** (tahmindir).
 
 Örnek (`lateShare.test.ts`): 6000 adet bakiye, 600 adet/saat, tek vardiya → teslimde 5100 hazır (**%85**), 900 adet (**%15**) 1,5 saat sonra; ortalama ≈ 0,8 saat.
+
+## İş penceresi: ihtiyaç ve durum
+
+Her işe motor `requirements` yazar (`jobRequirements`, `scheduler.ts`): lotun kontrol noktalarından ihtiyaç günü, o güne düşen
+adet (pay farkı × iş adedi), teslim anı ve o payın hazır olduğu an. `planPipeline` her noktaya `hours` = hazır an − teslim
+anı (saat; artı geç, eksi erken) yazar — `lateHours` ile aynı saat çevirisi. İş penceresi (`JobDialog`) bunları
+`jobStatus` (`src/lib/jobStatus.ts`) ile "3 000 pcs (2 hours late) and 3 000 pcs (overstock)" biçiminde gösterir;
+overstock = iş adedi − Σ ihtiyaç (rulo / min. lot fazlası). Geç tanımı değişmedi; bu yalnız gösterimdir.
 
 ## "Why late" — neden geç
 
