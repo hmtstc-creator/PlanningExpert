@@ -4,6 +4,8 @@ import {
 } from 'convex/server'
 import { ConvexError, v } from 'convex/values'
 
+import { roundCycleMinutes } from '../src/lib/rateModel'
+
 import { materialUsage, materialUsageText } from './materialRefs'
 
 import { DIE_OR_PLANNING, adminMutation, guardedMutation, guardedQuery } from './guarded'
@@ -63,8 +65,8 @@ const productArgs = {
   stopEveryPcs: v.optional(v.number()),
 }
 
-/** Çevrim süresi dakika / adet, 3 hane (src/lib/rateModel.ts). */
-const round3 = (n: number | undefined) => (n === undefined ? undefined : Math.round(n * 1000) / 1000)
+/** Çevrim süresi dakika / adet, kayıt hassasiyeti src/lib/rateModel.ts'den. */
+const roundCycle = (n: number | undefined) => (n === undefined ? undefined : roundCycleMinutes(n))
 
 /**
  * Tek sorguda okunacak en fazla satır. Convex'in okuma sınırının altında
@@ -131,7 +133,7 @@ export const create = guardedMutation({
     const code = args.code.trim()
     if (!code) throw new ConvexError('Material code is required')
     const { name: _n, material: _m, ...rest } = args
-    return ctx.db.insert('products', { ...rest, cycleMinutes: round3(rest.cycleMinutes), code })
+    return ctx.db.insert('products', { ...rest, cycleMinutes: roundCycle(rest.cycleMinutes), code })
   },
 })
 
@@ -146,7 +148,7 @@ export const bulkUpsert = guardedMutation({
       const code = row.code.trim()
       if (!code) continue
       const { name: _n, material: _m, ...rest } = row
-      const data: Record<string, unknown> = { ...rest, cycleMinutes: round3(rest.cycleMinutes), code }
+      const data: Record<string, unknown> = { ...rest, cycleMinutes: roundCycle(rest.cycleMinutes), code }
       // Çevrim alanları dosyada yoksa elle girilen değer korunur.
       if (data.cycleMinutes === undefined) delete data.cycleMinutes
       if (data.stopEveryPcs === undefined) delete data.stopEveryPcs
@@ -253,7 +255,7 @@ export const updateField = guardedMutation({
         // cycle time; zero would make the job infinitely long.
         throw new ConvexError('Accepted OEE must be greater than 0 and at most 1')
       }
-      await ctx.db.patch(id, { [field]: field === 'cycleMinutes' ? round3(parsed) : parsed })
+      await ctx.db.patch(id, { [field]: field === 'cycleMinutes' ? roundCycle(parsed) : parsed })
       return null
     }
 

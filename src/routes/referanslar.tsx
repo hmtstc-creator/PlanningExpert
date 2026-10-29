@@ -20,7 +20,9 @@ import { useSafeMutation } from '../lib/useSafeMutation'
 import { lotRuleOf, piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
 import {
   CYCLE_DECIMALS,
+  CYCLE_STORE_DECIMALS,
   cycleMinutesFromSeconds,
+  formatCycleInput,
   hasCycleTime,
   minutesPerPiece,
   piecesPerHour,
@@ -258,6 +260,8 @@ function ReferanslarPage() {
         cycleMinutesFromSeconds(
           n(
             row['Saturasyon'] ??
+              row['Birim süre saniye'] ??
+              row['Birim Süre Saniye'] ??
               row['Saturation'] ??
               row['Cycle Time (sec)'] ??
               row['Cycle time (s/pc)'] ??
@@ -289,7 +293,7 @@ function ReferanslarPage() {
               Save on the row.
             </p>
             <p>
-              <b>Cycle time</b> (minutes per piece, {CYCLE_DECIMALS} decimals) is the speed of every
+              <b>Cycle time</b> (minutes per piece, kept to {CYCLE_STORE_DECIMALS} decimals) is the speed of every
               part on every work center — presses, nut welding, spot welding, assembly alike: a job of
               N pieces runs N × cycle time at full speed. A part loaded earlier with SPM and cavities
               but no cycle time still runs 1 ÷ (SPM × cavities) minutes per piece.
@@ -331,7 +335,7 @@ function ReferanslarPage() {
           expectedColumns={[
             'Material (or Malzeme)',
             'Co-Product',
-            'Cycle time (min/pc) (or Saturasyon, in seconds)',
+            'Cycle time (min/pc) (or Saturasyon / Birim süre saniye, in seconds)',
             'Raw Material Code',
             'Coil Weight (Kg)',
             'Gross Weight (Kg/piece)',
@@ -361,7 +365,7 @@ function ReferanslarPage() {
         >
           <Field label="Material (code)" value={form.code} onChange={(v) => update('code', v)} placeholder="M250SP001RO" />
           <Field label="Co-Product" value={form.coProduct} onChange={(v) => update('coProduct', v)} placeholder="M250SP002RO" />
-          <Field label="Cycle time (min / piece, 3 decimals)" value={form.cycleMinutes} onChange={(v) => update('cycleMinutes', v)} type="number" placeholder="0.750" />
+          <Field label="Cycle time (min / piece)" value={form.cycleMinutes} onChange={(v) => update('cycleMinutes', v)} type="number" placeholder="0.750" />
           <Field label="Stop every (pcs) — optional" value={form.stopEveryPcs} onChange={(v) => update('stopEveryPcs', v)} type="number" placeholder="500" />
           <Field label="Raw Material Code" value={form.rawMaterialCode} onChange={(v) => update('rawMaterialCode', v)} placeholder="SD51-100-0976" />
           <Field label="Coil Weight (Kg)" value={form.coilWeight} onChange={(v) => update('coilWeight', v)} type="number" placeholder="8000" />
@@ -422,8 +426,15 @@ function ReferanslarPage() {
                   Cycle time (min/pc)
                   <InfoTip label="Cycle time">
                     <p>
-                      Minutes per piece, {CYCLE_DECIMALS} decimals — the speed of the part on every work center.
+                      Minutes per piece — the speed of the part on every work center.
                       A job of N pieces runs N × cycle time at full speed; Accepted OEE then widens the window.
+                    </p>
+                    <p>
+                      Values are kept to {CYCLE_STORE_DECIMALS} decimals and usually shown with{' '}
+                      {CYCLE_DECIMALS}. A part that runs under a second needs the finer figure:
+                      1.111 s is {formatCycleInput(1.1111111111111112 / 60)} min/pc, and rounding that
+                      to {CYCLE_DECIMALS} decimals would add 2.6 % to every job of the part. Files
+                      measured in seconds are converted on upload.
                     </p>
                     <p>Pieces per hour = 60 ÷ cycle time.</p>
                     <p>
@@ -521,7 +532,7 @@ function ReferanslarPage() {
                 >
                   <td className="px-1 py-1">{cell(field('code'), 'w-28')}</td>
                   <td className="px-1 py-1">
-                    {cell(field('cycleMinutes'), 'w-20', fixed3)}
+                    {cell(field('cycleMinutes'), 'w-24', fixedCycle)}
                     <RateHint product={p} />
                   </td>
                   <td className="px-1 py-1">{cell(field('coProduct'), 'w-28')}</td>
@@ -836,9 +847,12 @@ function RateHint({ product }: { product: { spm?: number; moldCavities?: number;
   )
 }
 
-/** Çevrim süresi kutusu: sayıysa 3 haneyle (0.75 → 0.750). */
-function fixed3(v: string): string {
+/**
+ * Çevrim süresi kutusu: olağan değer 3 haneyle (0.75 → 0.750), 3 haneye
+ * sığmayan ince değer kendi haliyle (0.01852) — bkz. `formatCycleInput`.
+ */
+function fixedCycle(v: string): string {
   const n = Number(v.trim().replace(',', '.'))
-  return v.trim() !== '' && Number.isFinite(n) ? n.toFixed(CYCLE_DECIMALS) : v
+  return v.trim() !== '' && Number.isFinite(n) ? formatCycleInput(n) : v
 }
 
