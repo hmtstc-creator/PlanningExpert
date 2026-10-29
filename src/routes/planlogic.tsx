@@ -848,6 +848,17 @@ function PlanLogicPage() {
             moved. Approved jobs that touch the closed period are released and planned again.
           </li>
           <li>
+            <b>A closed period is a planned stop, not a wall.</b> Production runs up to it, the press
+            stops with the coil still in it and continues after it — like a shift that is not
+            worked. Setup, quality approval and coil changes do not cross it; if the stop comes right
+            after the setup (no stroke yet) the job starts after the stop instead. When the stop cuts
+            a coil, the job ends when that coil is finished; the remaining coils become a new lot
+            that is planned next (the die is still mounted, so no setup). Example: 1,000 pcs per
+            coil, 100 min per coil, 3 coils, stop 09:00 – 10:00 on a 07:00 shift: setup 07:00 – 07:30,
+            first coil 07:30 – 09:00 and 10:00 – 10:10 → a 1,000-piece job; the other 2,000 follow at
+            10:10. If the die should come off instead, cancel that lot by hand.
+          </li>
+          <li>
             <b>Behind / ahead</b> (hours): the line did not keep to the approved plan. +3 h moves
             the approved (frozen and running) jobs 3 hours later and closes the first 3 hours as
             "Behind plan"; −2 h brings them forward, never before now. "All work centers" sets it for
