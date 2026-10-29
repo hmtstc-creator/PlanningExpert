@@ -67,6 +67,17 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Vardiya düzeni vardiya tanımının yapıldığı yerde detaylanır: ör. 2 × 8
   saat ya da 2 × 9 saat. Bir gün 24 saati doldurmak zorunda değildir, ama
   geçemez.
+- Mesai, günün **boş penceresine** açılır (planlamacı 2026-10-29): boş pencere
+  = üretim günü (ilk vardiya başlangıcından 24 saat) − açık vardiyalar − zaten
+  açılmış mesailer. 3 × 8 saat çalışan presin günü doludur, o güne mesai
+  açılamaz; mesai cumartesi / pazara (ya da dolu olmayan bir güne) açılır.
+  06:30'dan 2 × 9 s 40 dk çalışan preste (06:30–16:10, 16:10–01:50)
+  01:50–06:30 boştur: en çok 4 s 40 dk'lık gece mesaisi oraya açılır.
+  Production Plan → *Work calendar* kutusu bunu gün gün yazar
+  (*free 01:50–06:30* / *full (24 h)*) ve sığmayan mesaiyi seçtirmez.
+- Kapalı cumartesi–pazar plan günlerinde görünmez (kapasite 0), ama *Work
+  calendar* kutusunda gösterilen haftanın **her** günü düzenlenebilir: hafta
+  sonu çalışması ya mesaiyle ya da gün kaydıyla (vardiyayı elle açarak) girilir.
 - Capacity Dashboard'dan açılan fazla mesai o presin Work Calendar kaydını
   günceller (aynı kayıt; zaten böyle).
 - Sınırlar: bir gün 24 saati, bir presin haftası 168 saati (7 × 24) geçemez;

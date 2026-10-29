@@ -107,6 +107,94 @@ export function normalWindow(shifts: number, shiftStartMinute: number, shiftMinu
   return { start: shiftStartMinute, end: shiftStartMinute + Math.max(0, shifts) * shiftMinutes }
 }
 
+export interface Window {
+  start: number
+  end: number
+}
+
+const overlaps = (a: Window, b: Window) => a.start < b.end && b.start < a.end
+
+/**
+ * Çalışan vardiyaların pencereleri. Gün kaydıyla vardiyalar art arda olmak
+ * zorunda değildir (ör. yalnız 3. vardiya), bu yüzden her vardiya ayrı pencere.
+ */
+export function normalWindows(shifts: number | number[], shiftStartMinute: number, shiftMinutes: number): Window[] {
+  const active = Array.isArray(shifts) ? [...shifts].sort((a, b) => a - b) : activeShiftList(shifts)
+  return active.map((n) => ({
+    start: shiftStartMinute + (n - 1) * shiftMinutes,
+    end: shiftStartMinute + n * shiftMinutes,
+  }))
+}
+
+/**
+ * Bir mesai penceresinin sorunu (tek kontrol — `dayOvertime` ve arayüzdeki
+ * "bu mesai bu güne sığar mı?" aynı kuralı kullanır). `null` = plana alınır.
+ */
+export function overtimeWindowProblem(w: OvertimeWindow, normals: Window[], taken: Window[], dayEnd: number): string | null {
+  const label = `${w.name ?? 'Overtime'} ${clockText(w.start)}–${clockText(w.end)}`
+  if (w.end <= w.start) return `${label}: no duration.`
+  if (w.end > dayEnd) return `${label} runs past ${clockText(dayEnd)}: a day cannot exceed 24 hours.`
+  const n = normals.find((x) => overlaps(w, x))
+  if (n) return `${label} overlaps the normal shift ${clockText(n.start)}–${clockText(n.end)}.`
+  if (taken.some((x) => overlaps(w, x))) return `${label} overlaps another overtime on the same day.`
+  return null
+}
+
+/**
+ * Günün boş (çalışılmayan) aralıkları: üretim gününden normal vardiyalar ve
+ * açılmış mesailer düşülür. Üç vardiya × 8 saat çalışan bir günde boşluk
+ * yoktur (mesai açılamaz); 06:30'dan iki × 9 s 40 dk çalışan günde
+ * 01:50–06:30 boştur, gece mesaisi oraya açılır.
+ */
+export function freeWindows(
+  shifts: number | number[],
+  shiftStartMinute: number,
+  shiftMinutes: number,
+  openOvertime: Window[] = [],
+): Window[] {
+  const dayEnd = shiftStartMinute + DAY_MINUTES
+  const busy = [...normalWindows(shifts, shiftStartMinute, shiftMinutes), ...openOvertime].sort((a, b) => a.start - b.start)
+  const free: Window[] = []
+  let cursor = shiftStartMinute
+  for (const b of busy) {
+    if (b.start > cursor) free.push({ start: cursor, end: Math.min(b.start, dayEnd) })
+    cursor = Math.max(cursor, b.end)
+  }
+  if (cursor < dayEnd) free.push({ start: cursor, end: dayEnd })
+  return free.filter((w) => w.end > w.start)
+}
+
+/** Boş dakika toplamı (gün doluysa 0). */
+export function freeMinutes(
+  shifts: number | number[],
+  shiftStartMinute: number,
+  shiftMinutes: number,
+  openOvertime: Window[] = [],
+): number {
+  return freeWindows(shifts, shiftStartMinute, shiftMinutes, openOvertime).reduce((a, w) => a + (w.end - w.start), 0)
+}
+
+/**
+ * Bu mesai tanımı bu güne açılabilir mi? `null` = açılabilir, metin = nedeni.
+ * Arayüz bunu seçenek listesinde kullanır; sunucu aynı kuralı `dayOvertime`
+ * üzerinden uygular, böylece gösterilen ile kaydedilen ayrışmaz.
+ */
+export function overtimeFitProblem(
+  def: Pick<OvertimeDefinition, 'startMinute' | 'durationMinutes' | 'name'>,
+  shifts: number | number[],
+  shiftStartMinute: number,
+  shiftMinutes: number,
+  openDefs: Pick<OvertimeDefinition, 'startMinute' | 'durationMinutes' | 'name'>[] = [],
+): string | null {
+  const taken = dayOvertime(shifts, shiftStartMinute, shiftMinutes, openDefs).windows
+  return overtimeWindowProblem(
+    overtimeWindowOf(def, shiftStartMinute),
+    normalWindows(shifts, shiftStartMinute, shiftMinutes),
+    taken,
+    shiftStartMinute + DAY_MINUTES,
+  )
+}
+
 /** Düzen kontrolü: günde vardiya × süre 24 saati geçemez. */
 export function patternProblem(pattern: WeekPattern, shiftMinutes: number): string | null {
   if (!Number.isInteger(pattern.workingDays) || pattern.workingDays < 0 || pattern.workingDays > 7) {
@@ -133,30 +221,14 @@ export function dayOvertime(
   defs: Pick<OvertimeDefinition, 'startMinute' | 'durationMinutes' | 'name'>[],
 ): { windows: OvertimeWindow[]; problems: string[] } {
   const dayEnd = shiftStartMinute + DAY_MINUTES
-  const active = Array.isArray(shifts) ? shifts : activeShiftList(shifts)
-  const normals = active.map((n) => ({
-    start: shiftStartMinute + (n - 1) * shiftMinutes,
-    end: shiftStartMinute + n * shiftMinutes,
-  }))
+  const normals = normalWindows(shifts, shiftStartMinute, shiftMinutes)
   const windows: OvertimeWindow[] = []
   const problems: string[] = []
-  const sorted = defs
-    .map((d) => overtimeWindowOf(d, shiftStartMinute))
-    .sort((a, b) => a.start - b.start)
+  const sorted = defs.map((d) => overtimeWindowOf(d, shiftStartMinute)).sort((a, b) => a.start - b.start)
   for (const w of sorted) {
-    const label = `${w.name ?? 'Overtime'} ${clockText(w.start)}–${clockText(w.end)}`
-    if (w.end <= w.start) {
-      problems.push(`${label}: no duration.`)
-    } else if (w.end > dayEnd) {
-      problems.push(`${label} runs past ${clockText(dayEnd)}: a day cannot exceed 24 hours.`)
-    } else if (normals.some((n) => w.start < n.end && n.start < w.end)) {
-      const n = normals.find((x) => w.start < x.end && x.start < w.end)!
-      problems.push(`${label} overlaps the normal shift ${clockText(n.start)}–${clockText(n.end)}.`)
-    } else if (windows.some((x) => w.start < x.end && x.start < w.end)) {
-      problems.push(`${label} overlaps another overtime on the same day.`)
-    } else {
-      windows.push(w)
-    }
+    const problem = overtimeWindowProblem(w, normals, windows, dayEnd)
+    if (problem) problems.push(problem)
+    else windows.push(w)
   }
   return { windows, problems }
 }

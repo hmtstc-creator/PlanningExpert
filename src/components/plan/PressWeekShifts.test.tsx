@@ -56,6 +56,7 @@ const view = () => (
     presses={[{ name: 'P2' }, { name: 'P1' }]}
     dates={['2026-10-26', '2026-10-27']}
     shiftMinutes={480}
+    shiftStartMinute={420}
     dayOf={(p, d) => (shifts[`${p}|${d}`] === undefined ? undefined : { shifts: shifts[`${p}|${d}`], overtime: [] })}
   />
 )
@@ -113,16 +114,54 @@ describe('PressWeekShifts', () => {
   })
 
   it('mesai eklenip kaldırılır; Save sırası: önce kaldırma, sonra ekleme', async () => {
-    definitions = [{ _id: 'def1', name: 'Full', startMinute: 420, durationMinutes: 480 }]
+    definitions = [{ _id: 'def1', name: 'Night', startMinute: 1380, durationMinutes: 480 }]
     pressOvertime = [{ _id: 'ot1', press: 'P1', date: '2026-10-26', definitionId: 'def1' }]
     render(view())
     edit()
-    fireEvent.click(screen.getByTitle(/Full on 26\.10\.2026 for P1 — click to remove/))
+    fireEvent.click(screen.getByTitle(/Night on 26\.10\.2026 for P1 — click to remove/))
     fireEvent.change(screen.getByLabelText('Add overtime on 27.10.2026'), { target: { value: 'def1' } })
     fireEvent.click(screen.getByText('Save'))
     await flush()
     expect(removeOvertime).toHaveBeenCalledWith({ id: 'ot1' })
     expect(addOvertime).toHaveBeenCalledWith({ press: 'P1', date: '2026-10-27', definitionId: 'def1' })
     expect(removeOvertime.mock.invocationCallOrder[0]).toBeLessThan(addOvertime.mock.invocationCallOrder[0])
+  })
+
+  // Planlamacı 2026-10-29: "günüm zaten dolu, niye oraya mesai açayım — bunu
+  // cumartesiye açabilmeliyim". Kapasitesi 0 olan gün plan günlerinde yok,
+  // ama haftanın her günü düzenlenebilir.
+  it('dolu gün "full (24 h)" der; kapalı cumartesiye mesai açılır', async () => {
+    definitions = [{ _id: 'def1', name: 'Weekend_8h_s1', startMinute: 420, durationMinutes: 480 }]
+    render(
+      <PressWeekShifts
+        presses={[{ name: 'P1' }]}
+        // Plan yalnız çalışılan günleri döner: cumartesi–pazar listede yok.
+        dates={['2026-10-29', '2026-10-30']}
+        shiftMinutes={480}
+        shiftStartMinute={420}
+        dayOf={(_p, d) => (d <= '2026-10-30' ? { shifts: 3, overtime: [] } : undefined)}
+      />,
+    )
+    edit()
+    // Perşembe 3 × 8 saat = 24 saat: mesai açılamaz.
+    expect(screen.queryByLabelText('Add overtime on 29.10.2026')).toBeNull()
+    expect(screen.getAllByText('full (24 h)').length).toBe(2) // Per + Cum
+    // Cumartesi kapalı: bütün gün boş, mesai açılır.
+    expect(screen.getAllByText('free 07:00–07:00').length).toBe(2) // Cmt + Paz: bütün gün boş
+    fireEvent.change(screen.getByLabelText('Add overtime on 31.10.2026'), { target: { value: 'def1' } })
+    fireEvent.click(screen.getByText('Save'))
+    await flush()
+    expect(addOvertime).toHaveBeenCalledWith({ press: 'P1', date: '2026-10-31', definitionId: 'def1' })
+  })
+
+  it('sığmayan mesai taslağa girmez, nedeni yazılır', () => {
+    // Salı 2 vardiya 07:00–23:00; 07:00 başlayan tam mesai normal vardiyayla çakışır.
+    definitions = [{ _id: 'def1', name: 'Full', startMinute: 420, durationMinutes: 480 }]
+    render(view())
+    edit()
+    fireEvent.change(screen.getByLabelText('Add overtime on 27.10.2026'), { target: { value: 'def1' } })
+    expect(screen.getByText(/overlaps the normal shift 07:00–15:00/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Save'))
+    expect(addOvertime).not.toHaveBeenCalled()
   })
 })

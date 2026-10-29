@@ -1,6 +1,6 @@
 # 02 · Planlama motoru
 
-> Son güncelleme: 2026-10-28 (gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
+> Son güncelleme: 2026-10-29 (mesai günün boş penceresine: hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
 > Kullanıcıya dönük anlatım: sitede **Planning Logic**
 
 Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Aynı girdi aynı planı verir
@@ -16,6 +16,12 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
      olmak zorunda değildir (ör. yalnız 3. vardiya): `DayShape.activeShifts` / `DayBucket.activeShifts` taşır, zaman
      çizelgesi (`buildDayTimeline`), kova net dakikası, zamanlayıcının vardiya sınırı (`DayBucket.shiftNetMinutes`) ve
      bağımsız doğrulayıcı (kendi `normalShiftsOn`'u) bunu okur. `activeShifts` yalnız 1..n değilse doludur.
+   - **Mesai günün boş penceresine açılır** (2026-10-29): boş pencere = üretim günü (ilk vardiya başlangıcından 24 saat)
+     − açık vardiyalar − açılmış mesailer (`pressCalendar.freeWindows` / `freeMinutes`; "sığar mı?" `overtimeFitProblem`,
+     tek kontrol `overtimeWindowProblem` — `dayOvertime` de onu kullanır). 3 × 8 saat çalışan günde boşluk yoktur, mesai
+     ancak dolu olmayan bir güne (çoğunlukla **cumartesi / pazar**) açılır; 06:30'dan 2 × 9 s 40 dk çalışan preste
+     01:50–06:30 boştur, gece mesaisi oraya sığar. Kapalı hafta sonu planın günlerinde görünmez (kapasite 0,
+     `groupPlanWeeks` `minutes > 0`), ama *Work calendar* kutusunda gösterilen haftanın her günü düzenlenebilir.
 2. **Talep → lot** (`buildDemandSchedule`, `planning.ts`):
    - ZPP_DAILY kapsadığı günlerde **tam tarihine** düşer; ötesinde haftalık ZPP çalışma günlerine eşit yayılır; bakiye bugündür.
    - **ZPP_DAILY önce, haftalık ZPP uzun vade** (Slayt 1, 2026-10-28): ZPP_DAILY yüklü ve bugüne ulaşıyorsa haftalık ZPP'den gelen

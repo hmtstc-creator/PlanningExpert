@@ -361,6 +361,18 @@ function PlanLogicPage() {
             or another overtime.
           </li>
           <li>
+            <b>Overtime goes where the day is free.</b> The free window of a day is the production
+            day (24 h from the first shift start) minus the open shifts and the overtime already
+            opened. A work center running <b>3 × 8 h</b> is full: no overtime fits on a working day —
+            it is opened on a day that is not full, normally <b>Saturday or Sunday</b>. A work center
+            running <b>2 × 9 h 40</b> from 06:30 (06:30–16:10 and 16:10–01:50) has 01:50–06:30 free:
+            a night overtime of at most 4 h 40 fits there. The Production Plan <b>Work calendar</b>
+            box writes this on the OT row of every day: <i>free 01:50–06:30</i>, or <i>full (24 h)</i>
+            when nothing fits; an overtime that does not fit cannot be chosen. The whole displayed
+            week can be edited, closed Saturday and Sunday included — that is how weekend work is
+            opened, either as overtime or as a day record that opens the shifts themselves.
+          </li>
+          <li>
             A work center without a Work Calendar pattern has no capacity; the Production Plan shows
             a red alarm. A day never exceeds 24 hours (planned stops included), so a work center week
             never exceeds 168 hours — longer entries are refused when saved.
@@ -840,8 +852,11 @@ function PlanLogicPage() {
           day as the plan uses them (Work Calendar, week exceptions, holidays, day records) and
           overtime hours. It is read-only until you press <b>Edit</b>: then a click on a cell opens
           or closes that shift — a day record (see <a href="#capacity">Build the capacity</a>) — and
-          the OT row adds or removes that day's overtime. Nothing is written until <b>Save</b>;
-          a dashed cell is not in the plan until the next Calculate plan.
+          the OT row adds or removes that day's overtime. Every day of the week can be edited,
+          including a Saturday or Sunday that is closed and therefore absent from the plan's days;
+          the OT row only offers the overtime that fits that day's free window and writes
+          <i>full (24 h)</i> when the day already works 24 hours. Nothing is written until
+          <b>Save</b>; a dashed cell is not in the plan until the next Calculate plan.
         </p>
       </section>
 
