@@ -85,5 +85,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 - **Format şablona %100 uyar, sayfa çoğalır** (2026-10-29, kullanıcı) — SOP kalite belgesi, denetimde şablonla aynı olmalı. *Alt.: sayfaya sığdırmak için düzeni esnetmek* (reddedildi).
 - **Kare adımdan seçilir, sahneden değil** (2026-10-28) — gereksiz kare istenmiyor; model adım saniyesini verir, ffmpeg yalnız onu alır. *Alt.: `select='gt(scene,0.3)'` + en çok 15 kare* — operasyonla ilgisiz kareler, eksik adımlar.
 - **Video Convex deposuna değil volume'e** (2026-10-28) — gece yedeği dosya deposunu da alıyor (30 kopya); video saklanacağı için disk dolardı. *Alt.: Convex `ctx.storage`* — kareler gibi küçük dosyalar için kalır.
+- **Worker Convex'e jetonlu HTTP uçlarıyla girer, yönetici anahtarıyla değil** (2026-10-29) — uç yalnız `sopJobs` kuyruğunu açar, worker'ın elinde bütün veritabanını açan anahtar olmaz. *Alt.: `CONVEX_SELF_HOSTED_ADMIN_KEY` ile Convex istemcisi* — sızarsa bütün veri açıkta.
+- **Doğrulama tek kaynakta, Convex'te** (2026-10-29) — worker cevabı `/check` ile Convex'teki zod şemasına sordurur; iki dilde iki şema yazılmaz.
 - **Yetki creator** (2026-10-28, kullanıcı) — `guarded` → `companyAdmin`. *Alt.: yeni yetki alanı `machine.sop`* — şema + izin matrisi değişirdi, gerek yok.
 

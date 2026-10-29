@@ -151,3 +151,19 @@ Yeniden yayın gerekmez. Deneme: OEE → Open Topics → *Analyse the last day* 
 önce işlendiyse bir sonraki yüklemede çalışır). Satırda "AI (model)" görünmeli.
 Ücretsiz katmanda servis gönderilen veriyi (masraf yeri / iş yeri / kayıp grubu adları
 ve dakikalar) kendi geliştirmesi için kullanabilir.
+
+## SOP Builder — işleyici ve yapay zekâ (Machine Follow-up → SOP Builder)
+
+Video analizi ayrı kapsayıcıda çalışır (`sop-worker`, `deploy/compose.yml`): ffmpeg + Gemini
+Files API. Anahtarlar **worker'ın** ortamındadır (`deploy/.env`), OEE'nin `AI_API_KEY`'inden
+ayrı; Convex'e yalnız worker jetonu yazılır. Kurulum adımları: `deploy/README.md` → *SOP Builder*.
+
+| Değişken | Nerede | Ne |
+|---|---|---|
+| `SOP_WORKER_TOKEN` | `deploy/.env` **ve** Convex (`npx convex env set`) | Worker ↔ Convex jetonu (ikisinde aynı; `openssl rand -hex 32`) |
+| `SOP_AI_KEY` | `deploy/.env` | Gemini anahtarı (Google AI Studio `AIza…`); yoksa `AI_API_KEY` denenir |
+| `SOP_AI_MODEL` | `deploy/.env` (isteğe bağlı) | Varsayılan `gemini-flash-latest`; videoyu anlayan bir Gemini modeli olmalı |
+
+Ücretsiz katmanda Google gönderilen videoyu kendi geliştirmesi için kullanabilir; gizli bir
+operasyon için ücretli katman (faturalandırma açık proje) kullanılmalı.
+

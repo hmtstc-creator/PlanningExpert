@@ -9,6 +9,7 @@ import { LEGACY_ROLE_GROUPS, MODULES, isBoardUser, isPlatform, uniformPermission
 import { digestDue, localNow } from '../src/lib/digest'
 import { SIGNIN_KEEP_MS } from '../src/lib/signinGuard'
 import { calendarShifts, effectiveShifts } from '../src/lib/shifts'
+import { draftStorageIds } from '../src/lib/sop/sopSchema'
 
 /**
  * Şirket / fabrika bağlamı ve tek seferlik geçiş (docs/plant-genisletme.md).
@@ -319,7 +320,7 @@ export const purgeExpiredSessions = internalMutation({
 
 /** Yüklenip bir kayda bağlanmayan dosya bu kadar beklenir (rapor yazılırken yüklenen fotoğraf). */
 export const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000
-/** Dosyaya bağlanan tablolar; burada olmayan bir tabloya fotoğraf eklenirse buraya da yazılmalı. */
+/** Dosyaya bağlanan tablolar (`photos` alanı); burada olmayan bir tabloya fotoğraf eklenirse buraya da yazılmalı. SOP ayrıca taranır. */
 export const PHOTO_TABLES = ['moldProblems', 'machineProblems'] as const
 const PHOTO_SCAN_LIMIT = 6000
 const ORPHAN_DELETE_LIMIT = 200
@@ -342,6 +343,13 @@ export const purgeOrphanUploads = internalMutation({
       const rows = await ctx.db.query(table).take(PHOTO_SCAN_LIMIT + 1)
       if (rows.length > PHOTO_SCAN_LIMIT) return 0
       for (const r of rows) for (const p of r.photos ?? []) used.add(p)
+    }
+    // SOP: henüz worker'a geçmemiş video ve taslağın kareleri (convex/sop.ts).
+    const sops = await ctx.db.query('sopJobs').take(PHOTO_SCAN_LIMIT + 1)
+    if (sops.length > PHOTO_SCAN_LIMIT) return 0
+    for (const j of sops) {
+      if (j.videoStorageId) used.add(j.videoStorageId)
+      for (const id of draftStorageIds(j.draftJson)) used.add(id)
     }
     let n = 0
     for (const f of old) {

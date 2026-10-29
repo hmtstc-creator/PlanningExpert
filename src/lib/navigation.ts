@@ -185,6 +185,7 @@ export const MODULE_AREAS: Area[] = [
     link('/machine-followup/breakdowns', 'Breakdowns', 'Report, solve, history', 'zap'),
     link('/machine-followup/maintenance', 'Maintenance', 'Planned work center maintenance', 'wrench'),
     link('/machine-followup/reports', 'Reports', 'Pareto by work center and problem', 'pareto'),
+    link('/machine-followup/sop', 'SOP Builder', 'Standard operating procedure from a video (creators only)', 'sheet'),
   ]),
   area('kpi', 'KPI', 'KPI', '/kpi', 'target', 'violet', 'kpi', [
     link('/kpi', 'Overview', 'Monthly and weekly KPIs at a glance', 'dashboard'),
@@ -312,6 +313,7 @@ const RELATED_PAGES: Record<string, string[]> = {
   '/die-followup/maintenance': ['/alarms', '/planlama', '/referanslar', '/die-followup/problems'],
   '/die-followup/reports': ['/die-followup/problems', '/oee/losses'],
   // Machine Follow-up
+  '/machine-followup/sop': ['/machine-followup', '/machine-followup/breakdowns', '/machine-followup/maintenance'],
   '/machine-followup': ['/machine-followup/breakdowns', '/machine-followup/maintenance', '/alarms', '/makineler'],
   '/machine-followup/breakdowns': ['/machine-followup/reports', '/machine-followup/maintenance', '/oee/losses', '/planlama'],
   '/machine-followup/maintenance': ['/takvim', '/planlama', '/machine-followup/breakdowns', '/makineler'],
@@ -376,3 +378,24 @@ export function relatedPages(path: string): { to: string; label: string }[] {
 
 /** Test için: kısayol haritası. */
 export const RELATED_PAGE_MAP: Readonly<Record<string, readonly string[]>> = RELATED_PAGES
+
+/**
+ * Yalnız şirket creator'ının (ve platformun) açtığı sayfalar: menüde, aramada
+ * ve ilgili sayfalarda başkasına görünmez (src/lib/plantContext.tsx →
+ * useCanOpen); sunucu da reddeder (convex/sop.ts).
+ */
+export const CREATOR_ONLY_PAGES = ['/machine-followup/sop'] as const
+
+export const isCreatorOnly = (path: string): boolean =>
+  CREATOR_ONLY_PAGES.some((p) => path === p || path.startsWith(`${p}/`))
+
+/** Menü ağacından creator'a özel sayfaları çıkarır (boş kalan grup da düşer). */
+export function withoutCreatorOnly(nodes: NavNode[]): NavNode[] {
+  return nodes.flatMap((n) => {
+    if (n.to && isCreatorOnly(n.to)) return []
+    if (!n.children) return [n]
+    const children = withoutCreatorOnly(n.children)
+    return children.length || n.to ? [{ ...n, children }] : []
+  })
+}
+
