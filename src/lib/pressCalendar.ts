@@ -175,6 +175,29 @@ export function freeMinutes(
 }
 
 /**
+ * Günün **mesaiye açık** penceresi — "boş zaman" ile aynı şey değildir
+ * (planlamacı 2026-10-29).
+ *
+ * Çalışılan günde vardiyalar günün ızgarasıdır: kapatılmış bir vardiya
+ * mesaiyle değil, hücresi yeniden açılarak çalıştırılır. Mesai yalnız
+ * ızgaranın bittiği yerden üretim gününün sonuna kadar olan zamana açılır:
+ * 8 saatlik vardiyada günde 3 vardiya sığar, ızgara 24 saati doldurur ve
+ * hafta içi mesai penceresi **yoktur**; 9 s 40 dk'lık vardiyada günde 2
+ * vardiya sığar (19 s 20 dk), 01:50–06:30 ızgaranın dışındadır ve gece
+ * uzatma mesaisi oraya açılır.
+ *
+ * Hiç normal vardiyası olmayan gün (cumartesi, pazar, tatil) bütünüyle
+ * normal düzenin dışındadır: bütün gün mesaiye açıktır.
+ */
+export function overtimeWindows(shifts: number | number[], shiftStartMinute: number, shiftMinutes: number): Window[] {
+  const dayEnd = shiftStartMinute + DAY_MINUTES
+  const active = Array.isArray(shifts) ? shifts : activeShiftList(shifts)
+  if (active.length === 0) return [{ start: shiftStartMinute, end: dayEnd }]
+  const gridEnd = shiftStartMinute + maxShiftsPerDay(shiftMinutes) * shiftMinutes
+  return gridEnd < dayEnd ? [{ start: gridEnd, end: dayEnd }] : []
+}
+
+/**
  * Bu mesai tanımı bu güne açılabilir mi? `null` = açılabilir, metin = nedeni.
  * Arayüz bunu seçenek listesinde kullanır; sunucu aynı kuralı `dayOvertime`
  * üzerinden uygular, böylece gösterilen ile kaydedilen ayrışmaz.
@@ -187,12 +210,22 @@ export function overtimeFitProblem(
   openDefs: Pick<OvertimeDefinition, 'startMinute' | 'durationMinutes' | 'name'>[] = [],
 ): string | null {
   const taken = dayOvertime(shifts, shiftStartMinute, shiftMinutes, openDefs).windows
-  return overtimeWindowProblem(
-    overtimeWindowOf(def, shiftStartMinute),
+  const w = overtimeWindowOf(def, shiftStartMinute)
+  const problem = overtimeWindowProblem(
+    w,
     normalWindows(shifts, shiftStartMinute, shiftMinutes),
     taken,
     shiftStartMinute + DAY_MINUTES,
   )
+  if (problem) return problem
+  // Çalışılan günün vardiya ızgarasının içi mesai değildir: o vardiya
+  // takvimden açılır (bkz. overtimeWindows).
+  const open = overtimeWindows(shifts, shiftStartMinute, shiftMinutes)
+  if (open.some((o) => w.start >= o.start && w.end <= o.end)) return null
+  const label = `${def.name ?? 'Overtime'} ${clockText(w.start)}–${clockText(w.end)}`
+  return open.length === 0
+    ? `${label}: this work center's shifts already cover the whole day — open the shift on the work calendar instead of overtime.`
+    : `${label} is inside the normal shift grid — overtime can only be opened between ${clockText(open[0].start)} and ${clockText(open[0].end)} on a working day.`
 }
 
 /** Düzen kontrolü: günde vardiya × süre 24 saati geçemez. */

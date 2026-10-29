@@ -98,3 +98,46 @@ describe('WeekGantt — gap click', () => {
     expect(onGapClick).toHaveBeenCalledWith({ press: 'PRS104', date: '2026-10-22', clockMinute: 720 })
   })
 })
+
+describe('WeekGantt — kapalı vardiya', () => {
+  // Planlamacı 2026-10-29: "ben cuma vardiya kapattım ama programlama
+  // çalışıyor". Plan işi doğru yere koyuyordu (07:00–15:00 + 23:00–07:00);
+  // çubuk iş × gün tek parça çizildiği için kapalı 15:00–23:00'ın üstünü
+  // boyuyordu.
+  const closedMiddle: WeekGanttJob = {
+    ...job,
+    date: '2026-10-30',
+    material: 'C-300',
+    setupStartMinute: 0,
+    endMinute: 960,
+    segments: [{ kind: 'run', date: '2026-10-30', start: 0, end: 960 }],
+  }
+  const render2 = (activeShifts?: number[], shifts = 2) =>
+    render(
+      <WeekGantt
+        dates={['2026-10-30']}
+        presses={[
+          { name: 'PRS104', hall: 'H1', days: [{ date: '2026-10-30', shifts, activeShifts, capacityMinutes: shifts * 480 }] },
+        ]}
+        jobs={[closedMiddle]}
+        stops={[]}
+        shiftStartMinute={420}
+        shiftMinutes={480}
+      />,
+    )
+
+  it('1. ve 3. vardiya açıkken iş iki çubuk olur, 15:00–23:00 boş kalır', () => {
+    const view = render2([1, 3])
+    const bars = Array.from(view.container.querySelectorAll<HTMLElement>('[title*="C-300"]'))
+    expect(bars).toHaveLength(2)
+    expect(bars[0].title).toContain('07:00–15:00')
+    expect(bars[1].title).toContain('23:00–07:00')
+  })
+
+  it('vardiyalar art arda olunca çubuk bölünmez (mola çubuğu bölmez kuralı)', () => {
+    const view = render2(undefined, 3)
+    const bars = Array.from(view.container.querySelectorAll<HTMLElement>('[title*="C-300"]'))
+    expect(bars).toHaveLength(1)
+    expect(bars[0].title).toContain('07:00–23:00')
+  })
+})

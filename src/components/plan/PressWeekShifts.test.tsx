@@ -116,6 +116,8 @@ describe('PressWeekShifts', () => {
   it('mesai eklenip kaldırılır; Save sırası: önce kaldırma, sonra ekleme', async () => {
     definitions = [{ _id: 'def1', name: 'Night', startMinute: 1380, durationMinutes: 480 }]
     pressOvertime = [{ _id: 'ot1', press: 'P1', date: '2026-10-26', definitionId: 'def1' }]
+    // Salı kapatıldı: kapalı günün tamamı mesaiye açıktır.
+    records = [{ press: 'P1', date: '2026-10-27', shifts: [] }]
     render(view())
     edit()
     fireEvent.click(screen.getByTitle(/Night on 26\.10\.2026 for P1 — click to remove/))
@@ -130,7 +132,7 @@ describe('PressWeekShifts', () => {
   // Planlamacı 2026-10-29: "günüm zaten dolu, niye oraya mesai açayım — bunu
   // cumartesiye açabilmeliyim". Kapasitesi 0 olan gün plan günlerinde yok,
   // ama haftanın her günü düzenlenebilir.
-  it('dolu gün "full (24 h)" der; kapalı cumartesiye mesai açılır', async () => {
+  it('vardiyaları 24 saati dolduran güne mesai teklif edilmez; kapalı cumartesiye açılır', async () => {
     definitions = [{ _id: 'def1', name: 'Weekend_8h_s1', startMinute: 420, durationMinutes: 480 }]
     render(
       <PressWeekShifts
@@ -145,7 +147,7 @@ describe('PressWeekShifts', () => {
     edit()
     // Perşembe 3 × 8 saat = 24 saat: mesai açılamaz.
     expect(screen.queryByLabelText('Add overtime on 29.10.2026')).toBeNull()
-    expect(screen.getAllByText('full (24 h)').length).toBe(2) // Per + Cum
+    expect(screen.getAllByText('shifts cover 24 h').length).toBe(2) // Per + Cum
     // Cumartesi kapalı: bütün gün boş, mesai açılır.
     expect(screen.getAllByText('free 07:00–07:00').length).toBe(2) // Cmt + Paz: bütün gün boş
     fireEvent.change(screen.getByLabelText('Add overtime on 31.10.2026'), { target: { value: 'def1' } })
@@ -154,14 +156,29 @@ describe('PressWeekShifts', () => {
     expect(addOvertime).toHaveBeenCalledWith({ press: 'P1', date: '2026-10-31', definitionId: 'def1' })
   })
 
-  it('sığmayan mesai taslağa girmez, nedeni yazılır', () => {
-    // Salı 2 vardiya 07:00–23:00; 07:00 başlayan tam mesai normal vardiyayla çakışır.
-    definitions = [{ _id: 'def1', name: 'Full', startMinute: 420, durationMinutes: 480 }]
-    render(view())
+  // Planlamacı 2026-10-29: 06:30–16:10 ve 16:10–01:50 çalışan tesiste
+  // 01:50–06:30 (4 s 40 dk) gece uzatma mesaisine açıktır, fazlası değil.
+  it('2 × 9 s 40 dk düzeninde gece mesaisi pencereye sığmazsa taslağa girmez', () => {
+    definitions = [
+      { _id: 'ok', name: 'Night', startMinute: 110, durationMinutes: 280 },
+      { _id: 'uzun', name: 'Night+', startMinute: 110, durationMinutes: 340 },
+    ]
+    render(
+      <PressWeekShifts
+        presses={[{ name: 'P1' }]}
+        dates={['2026-10-26', '2026-10-27']}
+        shiftMinutes={580}
+        shiftStartMinute={390}
+        dayOf={() => ({ shifts: 2, overtime: [] })}
+      />,
+    )
     edit()
-    fireEvent.change(screen.getByLabelText('Add overtime on 27.10.2026'), { target: { value: 'def1' } })
-    expect(screen.getByText(/overlaps the normal shift 07:00–15:00/)).toBeTruthy()
+    // Haftanın yedi günü de aynı düzende: ızgaranın dışı mesaiye açık.
+    expect(screen.getAllByText('free 01:50–06:30').length).toBe(7)
+    fireEvent.change(screen.getByLabelText('Add overtime on 27.10.2026'), { target: { value: 'uzun' } })
+    expect(screen.getByText(/24 hours/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('Add overtime on 27.10.2026'), { target: { value: 'ok' } })
     fireEvent.click(screen.getByText('Save'))
-    expect(addOvertime).not.toHaveBeenCalled()
+    expect(addOvertime).toHaveBeenCalledWith({ press: 'P1', date: '2026-10-27', definitionId: 'ok' })
   })
 })

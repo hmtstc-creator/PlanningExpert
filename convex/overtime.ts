@@ -4,6 +4,7 @@ import { guardedMutation, guardedQuery } from './guarded'
 import {
   DAY_MINUTES,
   WEEKDAY_KEYS,
+  overtimeFitProblem,
   pressDay,
   type OvertimeDefinition,
   type PressDaySources,
@@ -134,6 +135,11 @@ export const addPressOvertime = guardedMutation({
     if (sameDay.some((o: Ctx) => o.definitionId === args.definitionId)) {
       throw new ConvexError(`${def.name} is already open on ${args.date} for ${press}.`)
     }
+    // Yeni kayıt günün mesai penceresine girmeli: çalışılan günde vardiya
+    // ızgarasının içi mesai değildir (planlamacı 2026-10-29). Eski kayıtlar
+    // bu kontrolden geçmez — plan onları eskisi gibi hesaplar.
+    const fit = await fitProblemOn(ctx, press, args.date, def)
+    if (fit) throw new ConvexError(`Cannot open ${def.name} on ${args.date} for ${press}: ${fit}`)
     // Yaz, sonra denetle: sorun varsa hata işlemi geri alır, kayıt kalmaz.
     await ctx.db.insert('pressOvertime', { press, date: args.date, definitionId: args.definitionId })
     const day = await dayOf(ctx, press, args.date)
@@ -178,8 +184,17 @@ export const setRecurringOvertime = guardedMutation({
     src.holidays = new Set()
     for (let i = 0; i < 7; i++) {
       const date = `2001-01-0${i + 1}` // 1 Ocak 2001 Pazartesi
-      const problems = pressDay(src, press, '2001-01-01', date).problems
-      if (problems.length) throw new ConvexError(`${WEEKDAY_KEYS[i]}: ${problems.join(' ')}`)
+      const day = pressDay(src, press, '2001-01-01', date)
+      if (day.problems.length) throw new ConvexError(`${WEEKDAY_KEYS[i]}: ${day.problems.join(' ')}`)
+      // Günün mesai penceresi: çalışılan günde vardiya ızgarasının dışı.
+      // Çakışmaları yukarıdaki `problems` zaten yakalar.
+      for (const it of items) {
+        if (it.dayKey !== WEEKDAY_KEYS[i]) continue
+        const def = src.definitions.get(it.definitionId)
+        if (!def) continue
+        const fit = overtimeFitProblem(def, day.activeShifts ?? day.shifts, src.shiftStartMinute, src.shiftMinutes)
+        if (fit) throw new ConvexError(`${WEEKDAY_KEYS[i]}: ${fit}`)
+      }
     }
     return null
   },
@@ -252,6 +267,24 @@ function mondayOf(iso: string) {
 
 export async function dayOf(ctx: Ctx, press: string, date: string) {
   return pressDay(await sources(ctx), press, mondayOf(date), date)
+}
+
+/**
+ * Yeni bir mesai kaydı o güne açılabilir mi (arayüzle aynı kural:
+ * `pressCalendar.overtimeFitProblem`)? `null` = açılabilir.
+ */
+async function fitProblemOn(
+  ctx: Ctx,
+  press: string,
+  date: string,
+  def: Pick<OvertimeDefinition, 'name' | 'startMinute' | 'durationMinutes'>,
+): Promise<string | null> {
+  const src = await sources(ctx)
+  const day = pressDay(src, press, mondayOf(date), date)
+  const open = (src.datedOvertime.get(`${press}|${date}`) ?? [])
+    .map((o) => src.definitions.get(o.definitionId))
+    .filter((d): d is OvertimeDefinition => !!d)
+  return overtimeFitProblem(def, day.activeShifts ?? day.shifts, src.shiftStartMinute, src.shiftMinutes, open)
 }
 
 async function problemsForDefinition(ctx: Ctx, id: string): Promise<string[]> {

@@ -361,16 +361,27 @@ function PlanLogicPage() {
             or another overtime.
           </li>
           <li>
-            <b>Overtime goes where the day is free.</b> The free window of a day is the production
-            day (24 h from the first shift start) minus the open shifts and the overtime already
-            opened. A work center running <b>3 × 8 h</b> is full: no overtime fits on a working day —
-            it is opened on a day that is not full, normally <b>Saturday or Sunday</b>. A work center
-            running <b>2 × 9 h 40</b> from 06:30 (06:30–16:10 and 16:10–01:50) has 01:50–06:30 free:
-            a night overtime of at most 4 h 40 fits there. The Production Plan <b>Work calendar</b>
-            box writes this on the OT row of every day: <i>free 01:50–06:30</i>, or <i>full (24 h)</i>
-            when nothing fits; an overtime that does not fit cannot be chosen. The whole displayed
-            week can be edited, closed Saturday and Sunday included — that is how weekend work is
-            opened, either as overtime or as a day record that opens the shifts themselves.
+            <b>Overtime is opened outside the shift grid, not inside it.</b> On a day the work
+            center works, the shifts are the day's grid: a shift that is closed is reopened on the
+            work calendar, not as overtime. Overtime therefore only fits between the end of the
+            grid and the end of the production day. A work center with <b>8 h</b> shifts fits
+            3 of them in a day, the grid covers all 24 h, and <b>no overtime can be opened on a
+            working day</b> — it is opened on a day the work center does not work, normally
+            <b>Saturday or Sunday</b>. A work center with <b>9 h 40</b> shifts fits 2 of them
+            (06:30–16:10 and 16:10–01:50 = 19 h 20), so 01:50–06:30 is outside the grid and a
+            night overtime of at most 4 h 40 is opened there. A day with no normal shift at all
+            (Saturday, Sunday, a holiday) is entirely outside the normal pattern: the whole day
+            takes overtime.
+          </li>
+          <li>
+            The overtime still has to fit in time that is actually free: the production day
+            (24 h from the first shift start) minus the open shifts and the overtime already
+            opened. The Production Plan <b>Work calendar</b> box writes the result on the OT row of
+            every day — <i>free 01:50–06:30</i>, <i>full</i> when the window is taken, or
+            <i>shifts cover 24 h</i> when the grid leaves no window; an overtime that does not fit
+            cannot be chosen. The whole displayed week can be edited, closed Saturday and Sunday
+            included — that is how weekend work is opened, either as overtime or as a day record
+            that opens the shifts themselves.
           </li>
           <li>
             A work center without a Work Calendar pattern has no capacity; the Production Plan shows
@@ -857,6 +868,12 @@ function PlanLogicPage() {
           the OT row only offers the overtime that fits that day's free window and writes
           <i>full (24 h)</i> when the day already works 24 hours. Nothing is written until
           <b>Save</b>; a dashed cell is not in the plan until the next Calculate plan.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          On the chart a job is drawn as <b>one bar per working stretch</b>. Planned stops do not
+          break the bar — they are small dots inside it — but a <b>closed shift does</b>: with the
+          1st and 3rd shift open and the 2nd closed, the work is drawn as 07:00–15:00 and
+          23:00–07:00 with 15:00–23:00 left empty, because the work center does not run then.
         </p>
       </section>
 

@@ -7,6 +7,7 @@ import {
   freeMinutes,
   freeWindows,
   overtimeFitProblem,
+  overtimeWindows,
   patternProblem,
   pressDay,
   type PressDaySources,
@@ -138,10 +139,34 @@ describe('free window: where overtime fits (planlamacı 2026-10-29)', () => {
     expect(overtimeFitProblem(night, 2, start, len, [night])).toMatch(/overlaps another overtime/)
   })
 
-  it('a day record with a gap leaves that gap free (only the 1st and 3rd shift)', () => {
-    // 1. ve 3. vardiya açık: 15:00–23:00 boş kalır.
+  it('a day record with a gap leaves that gap free, but it is a shift slot, not overtime', () => {
+    // 1. ve 3. vardiya açık: 15:00–23:00 fiziksel olarak boştur…
     expect(freeWindows([1, 3], 420, 480)).toEqual([{ start: 900, end: 1380 }])
-    expect(overtimeFitProblem({ name: 'Mid', startMinute: 900, durationMinutes: 480 }, [1, 3], 420, 480)).toBeNull()
+    // …ama kapatılan 2. vardiyanın yeridir: mesai değil, takvimden açılır.
+    expect(overtimeFitProblem({ name: 'Mid', startMinute: 900, durationMinutes: 480 }, [1, 3], 420, 480)).toMatch(
+      /shifts already cover the whole day/,
+    )
+  })
+
+  it('overtime window: outside the shift grid on a working day, the whole day when closed', () => {
+    // 3 × 8 saat ızgarası 24 saati doldurur: hafta içi mesai penceresi yok.
+    expect(overtimeWindows(2, 420, 480)).toEqual([])
+    expect(overtimeWindows(3, 420, 480)).toEqual([])
+    // 9 s 40 dk'lık vardiyada günde 2 vardiya sığar: 01:50–06:30 mesaiye açık.
+    expect(overtimeWindows(2, 390, 580)).toEqual([{ start: 1550, end: 1830 }])
+    expect(overtimeWindows(1, 390, 580)).toEqual([{ start: 1550, end: 1830 }])
+    // Kapalı gün (cumartesi, pazar, tatil): bütün gün normal düzenin dışında.
+    expect(overtimeWindows(0, 420, 480)).toEqual([{ start: 420, end: 1860 }])
+    expect(overtimeWindows([], 390, 580)).toEqual([{ start: 390, end: 1830 }])
+  })
+
+  it('a weekday overtime inside the shift grid is refused; the same one fits on the closed Saturday', () => {
+    // Planlamacı 2026-10-29: "benim hafta içi için mesai tanımım yok".
+    // Perşembe 3. vardiya kapatıldı — o saat mesai değil, kapalı vardiyadır.
+    expect(overtimeFitProblem(third, [1, 2], 420, 480)).toMatch(/shifts already cover the whole day/)
+    expect(overtimeFitProblem(third, 0, 420, 480)).toBeNull()
+    // 2 × 9 s 40 dk: gece uzatma mesaisi ızgaranın dışında, kabul edilir.
+    expect(overtimeFitProblem({ name: 'Night', startMinute: 110, durationMinutes: 280 }, 2, 390, 580)).toBeNull()
   })
 })
 
