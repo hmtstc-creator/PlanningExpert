@@ -225,6 +225,14 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Ara mamul (172 üretir, 171 tüketir): 171'in çektiği miktar 172'nin ZPP talebindedir; stok yalnız 172'nin mamul
   stoğunda sayılır, hammadde MRP'sine (stok, ihtiyaç, satın alma) girmez. Çift sayım yok.
 
+### SOP oluşturma (2026-10-28 / 29)
+- Çıktı PDF; çıktıdan önce düzenleme ekranı (metin ve fotoğraf). Format `docs/sop/sop-sablon.xlsx` şablonuna
+  **%100 uyar**, yapı bozulmaz; 6 adımdan fazlası için sayfa çoğaltılır.
+- İçerik tek dilli: Türkçe ya da Romence. Video süre / boyut sınırı yok; video saklanabilir.
+- Kareleri ve açıklamaları sistem kendisi çıkarır; kullanıcı yalnız düzeltir.
+- Yetki yalnız creator. Makine serbest metin, hazırlayan elle yazılır, vardiya yok.
+- Ayrıntı: `docs/wiki/12-sop-olusturma.md`.
+
 ## Aksiyon listesi
 
 Uygulandı (2026-09-26, "programı düzelt"):

@@ -5,7 +5,7 @@ gelince ilk bakılan yer burasıdır. Burası dağınık belgelerin (`docs/*.md`
 sitedeki *Planning Logic*) yerine geçmez; hepsine **yön gösterir** ve konuşmalarda alınan
 kararları, öğrenilenleri ve sürüm geçmişini tek yerde toplar.
 
-> Son güncelleme: 2026-10-22 · main `f905340` (PR #22)
+> Son güncelleme: 2026-10-29 (12 SOP oluşturma eklendi)
 
 ## Nereden başlamalı
 
@@ -22,6 +22,7 @@ kararları, öğrenilenleri ve sürüm geçmişini tek yerde toplar.
 | Neler açık, neler riskli? | [09 Açık konular](09-acik-konular.md) |
 | Bu kelime ne demek? (lot, kova, kontrol noktası…) | [10 Sözlük](10-sozluk.md) |
 | Neden böyle yapıldı? | [11 Karar günlüğü](11-karar-gunlugu.md) |
+| **SOP oluşturma**: videodan SOP, şablon formatı (%100 uyum kuralı) | [12 SOP oluşturma](12-sop-olusturma.md) |
 
 ## Belge haritası (wiki dışındakiler)
 

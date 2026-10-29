@@ -620,3 +620,9 @@ Cevap bu değerlendirmeden önce **hayır**dı.
   eski plan, kapasite aşımı %, kaç hafta) plant ayarı; boşsa başlangıç değeri
   (`TODAY_DEFAULTS`).
 
+## SOP oluşturma (2026-10-29)
+
+- [ ] **[K]** Şablon soruları cevaplansın (yazdırma alanı, alan eşlemesi, künye kodları, KKD, fotoğraf sayısı) — docs/wiki/12-sop-olusturma.md → Açık sorular.
+- [ ] **[G]** `/sop` sayfası: yükleme, kuyruk, `sop-worker` (ffmpeg + Gemini Files API), düzenleme ekranı = PDF (şablona %100 uyum, sayfa çoğaltma). Şema değişikliği öncesi kullanıcıya sorulur.
+- [ ] **[S]** Sunucuya `SOP_AI_KEY` (Gemini) — worker kapsayıcısının ortamına (`deploy/.env`), adımlar iş bitince `deploy/README.md`'de.
+
