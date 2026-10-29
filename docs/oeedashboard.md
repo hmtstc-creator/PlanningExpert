@@ -99,8 +99,12 @@ EndDate · EndTime · **Shift** · **Week** · **material** · **min**
 ## Formüller (doğrulandı — 557 vardiya satırının hepsinde birebir tutuyor)
 
 Tanımlar (planlamacının adlarıyla):
-- **Loading time** = Loading Time(Min) — vardiya süresi eksi planlı duruş
-  (8 saatlik vardiyada genelde Loading + Scheduled = 480).
+- **Loading time** = Loading Time(Min) — **dosyadan olduğu gibi alınır**; program
+  bundan hiçbir şey düşmez (planlı duruş dahil), yalnız vardiya / gün toplamı
+  için toplar. MES'in tanımı vardiya süresi eksi planlı duruştur (8 saatlik
+  vardiyada genelde Loading + Scheduled = 480), ama gerçekte çoğu zaman bundan
+  kısadır (bkz. *Doğrulama: Asakai detail 23.10 PRS-110 vardiya 2*); ekrandaki sayı her zaman dosyadaki
+  değerdir.
 - **Production time** = Net Production Time(Min).
 - **Operation time** = Net Operating Time(Min).
 
