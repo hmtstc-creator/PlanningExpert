@@ -119,6 +119,24 @@ describe('plan start per press', () => {
     expect(noRuleBroken(inputs, run)).toEqual([])
   })
 
+  it('a breakdown with an expected end is bridged the same way', () => {
+    // Aynı C lotu; arıza Pzt 09:00, beklenen devreye giriş 10:00.
+    const inputs = plant({
+      products: [{ code: 'C', moldCavities: 1, spm: 10, setupMinutes: 30, coilSetupMinutes: 10, grossWeight: 1, coilWeight: 1000, mainMachine: '104' }],
+      weeklyDemand: [{ material: 'C', overdue: -3000, periods: [] }],
+      machineProblems: [{ press: '104', problemType: 'Hydraulic', occurredAt: '2026-09-14', occurredMinute: 540, stopsPress: true, expectedUpDate: '2026-09-14', expectedUpMinute: 600, status: 'open' }],
+    })
+    const run = computePlan(inputs, MONDAY_0700)
+    const jobs = run.jobs.filter((j) => j.material === 'C').sort((a, b) => a.setupStartMinute - b.setupStartMinute)
+    expect(jobs.map((j) => j.quantity)).toEqual([1000, 2000])
+    expect(jobs[0].segments.map((s) => [s.kind, s.start, s.end])).toEqual([
+      ['setup', 0, 30],
+      ['run', 30, 120],
+      ['run', 180, 190],
+    ])
+    expect(noRuleBroken(inputs, run)).toEqual([])
+  })
+
   it('a planned stop right after the setup is not bridged: the job starts after it', () => {
     // Setup 07:00–07:30, duruş 07:30–10:00: ilk vuruş yok → iş 10:00'dan sonra.
     const inputs = plant({ pressStarts: [{ press: '104', holdFromDate: '2026-09-14', holdFromMinute: 450, fromDate: '2026-09-14', fromMinute: 600 }] })
