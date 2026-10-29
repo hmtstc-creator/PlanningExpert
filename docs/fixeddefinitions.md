@@ -43,6 +43,7 @@ kullanıcı tanımlasın. "Öneri" sütunu geliştiricinin önerisidir, karar de
 | 41 | Ana sayfa Updates: akıştaki en çok olay | 12 | `src/lib/updates.ts` (FEED_LIMIT) | P | |
 | 42 | Updates'in okuduğu son kayıtlar (teknik) | Die / Machine konusu 50, Change Log 200 (plan onayı), OEE yüklemesi 10 | `convex/updates.ts` | P (teknik) | |
 | 43 | Çevrim süresi yoksa üretim hızı (geri uyum) | 1 ÷ (SPM × göz) dk/adet; göz yoksa 1; SPM de yoksa süre tanımsız (doğrulayıcı "no cycle time" der) | `src/lib/rateModel.ts` (`minutesPerPiece`) | P | P — 2026-10-29 (kullanıcı: bütün parçalar çevrim süresiyle) |
+| 44 | Çevrim süresinin hassasiyeti | kayıt 5 hane, gösterim 3 hane (dakika / adet) | `src/lib/rateModel.ts` (`CYCLE_STORE_DECIMALS`, `CYCLE_DECIMALS`) | P | P — 2026-10-29 (kullanıcı: saniyenin altında çalışan pres parçası 3 hanede %2,6 şişiyordu) |
 
 Not: Eski "14 gün stok = acil" kuralının kodu kaldırıldı; acil tanımı stok
 projeksiyonundan gelir.

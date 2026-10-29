@@ -17,9 +17,18 @@
 /** Çevrim süresinin gösterim hassasiyeti (dakika, virgülden sonra 3 hane). */
 export const CYCLE_DECIMALS = 3
 
-/** Dakikayı 3 haneye yuvarlar (kayıt ve gösterim aynı değeri kullanır). */
+/**
+ * Kaydın hassasiyeti (dakika, virgülden sonra 5 hane) — kullanıcı kararı
+ * 2026-10-29. Gösterimden daha ince, çünkü pres parçaları saniyenin altında
+ * çalışır: 1.111 sn = 0.01852 dk/adet; 3 haneye yuvarlanmış 0.019 dk %2.6
+ * fazla süre demek olur ve doğrudan iş süresine, kapasiteye yansır. Ekranda
+ * süre yine 3 haneyle görünür (`CYCLE_DECIMALS`).
+ */
+export const CYCLE_STORE_DECIMALS = 5
+
+/** Dakikayı kayıt hassasiyetine (5 hane) yuvarlar — saklanan tek biçim. */
 export function roundCycleMinutes(minutes: number): number {
-  const f = 10 ** CYCLE_DECIMALS
+  const f = 10 ** CYCLE_STORE_DECIMALS
   return Math.round(minutes * f) / f
 }
 
@@ -28,12 +37,28 @@ export function formatCycleMinutes(minutes: number | null | undefined): string {
 }
 
 /**
- * Saniye cinsinden verilen çevrim süresini dakika / adete çevirir (3 hane).
+ * Düzenlenebilir kutuda görünen süre: olağan değerler 3 haneyle (0.75 →
+ * "0.750"), 3 haneye sığmayan ince değerler kendi haliyle ("0.01852").
+ * Kutu kaydın değerini olduğu gibi göstermeli; 0.01852 yerine 0.019 yazmak
+ * kullanıcıya yanlış sayı gösterir ve kutuya dokunulunca onu kaydeder.
+ */
+export function formatCycleInput(minutes: number | null | undefined): string {
+  if (!minutes || minutes <= 0) return ''
+  const full = minutes.toFixed(CYCLE_STORE_DECIMALS)
+  const trimmed = full.replace(/0+$/, '')
+  const [int, dec = ''] = trimmed.split('.')
+  return dec.length >= CYCLE_DECIMALS ? trimmed : `${int}.${dec.padEnd(CYCLE_DECIMALS, '0')}`
+}
+
+/**
+ * Saniye cinsinden verilen çevrim süresini dakika / adete çevirir (kayıt
+ * hassasiyeti 5 hane).
  *
- * Punta / montaj hatlarının süreleri sahada saniye olarak ölçülür ve Excel'e
- * saniye yazılır ("Saturasyon"). Motorun tek dili dakika / adet olduğu için
- * çevrim yüklemede burada yapılır; başka yerde kopyalanmaz. 0 ya da negatif
- * değer "süre tanımsız" demektir (undefined döner, elle girilen değer korunur).
+ * Punta, montaj ve pres hatlarının süreleri sahada saniye olarak ölçülür ve
+ * Excel'e saniye yazılır ("Saturasyon", "Birim süre saniye"). Motorun tek dili
+ * dakika / adet olduğu için çevrim yüklemede burada yapılır; başka yerde
+ * kopyalanmaz. 0 ya da negatif değer "süre tanımsız" demektir (undefined
+ * döner, elle girilen değer korunur).
  */
 export function cycleMinutesFromSeconds(seconds: number | undefined): number | undefined {
   if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) return undefined

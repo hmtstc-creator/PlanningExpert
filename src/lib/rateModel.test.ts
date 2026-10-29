@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { computeRunPlan, splitByMoldLimit } from './planning'
 import {
+  CYCLE_STORE_DECIMALS,
   cavitiesOf,
   cycleMinutesFromSeconds,
+  formatCycleInput,
   formatCycleMinutes,
   hasCycleTime,
   minutesPerPiece,
@@ -38,10 +40,12 @@ describe('üretim hızı: tek dil dakika / adet', () => {
     expect(runMinutesFor({}, 100)).toBe(0)
   })
 
-  it('çevrim süresi 3 hane', () => {
-    expect(roundCycleMinutes(0.12345)).toBe(0.123)
-    expect(roundCycleMinutes(1.0005)).toBe(1.001)
+  it('kayıt 5 hane, gösterim 3 hane', () => {
+    expect(roundCycleMinutes(0.123456789)).toBe(0.12346)
+    expect(roundCycleMinutes(1.000005)).toBe(1.00001)
+    // Gösterim 3 hanede kalır: ekranda okunan sayı değişmedi.
     expect(formatCycleMinutes(0.5)).toBe('0.500')
+    expect(formatCycleMinutes(0.12346)).toBe('0.123')
     expect(formatCycleMinutes(0)).toBe('')
   })
 })
@@ -100,5 +104,25 @@ describe('computeRunPlan: süre = adet × dakika / adet', () => {
     expect(cycleMinutesFromSeconds(undefined)).toBeUndefined()
     expect(cycleMinutesFromSeconds(0)).toBeUndefined()
     expect(cycleMinutesFromSeconds(-5)).toBeUndefined()
+  })
+
+  it('kayıt 5 hane: saniyenin altında çalışan pres parçası yuvarlamada kaybolmaz', () => {
+    expect(CYCLE_STORE_DECIMALS).toBe(5)
+    // 1.1111 sn: 3 haneye yuvarlanmış 0.019 dk %2.6 fazla süre demekti.
+    expect(cycleMinutesFromSeconds(1.1111111111111112)).toBe(0.01852)
+    expect(cycleMinutesFromSeconds(0.8571428571428571)).toBe(0.01429)
+    expect(cycleMinutesFromSeconds(3.5294117647058822)).toBe(0.05882)
+    // 10.000 adetlik iş: 5 haneyle 185.2 dk, 3 haneyle 190 dk olurdu.
+    expect(10_000 * cycleMinutesFromSeconds(1.1111111111111112)!).toBeCloseTo(185.2, 1)
+  })
+
+  it('kutuda görünen süre: olağan değer 3 hane, ince değer kendi hali', () => {
+    expect(formatCycleInput(0.75)).toBe('0.750')
+    expect(formatCycleInput(0.137)).toBe('0.137')
+    expect(formatCycleInput(0.01852)).toBe('0.01852')
+    expect(formatCycleInput(0.0143)).toBe('0.0143')
+    expect(formatCycleInput(1)).toBe('1.000')
+    expect(formatCycleInput(0)).toBe('')
+    expect(formatCycleInput(undefined)).toBe('')
   })
 })

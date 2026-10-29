@@ -9,7 +9,7 @@ import { OVER_RECORDED } from '../lib/oeeBridge'
 import { SHORT_STOP_DATA_FROM } from '../lib/oeeShortStops'
 import { computeRunPlan } from '../lib/planning'
 import { leadTimeLookup, type LeadTimeRow } from '../lib/rawLeadTime'
-import { CYCLE_DECIMALS, cycleMinutesFromSeconds } from '../lib/rateModel'
+import { CYCLE_DECIMALS, CYCLE_STORE_DECIMALS, cycleMinutesFromSeconds, formatCycleInput } from '../lib/rateModel'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
@@ -93,9 +93,12 @@ function PlanLogicPage() {
 
   // Süre örneği koddan hesaplanır; aynı sayılar src/lib/rateModel.test.ts'te.
   const cycleExample = { qty: 1200, minutes: 0.25, oee: 0.6 }
-  // Punta hatlarının dosyası süreyi saniye yazar; yüklemede 60'a bölünür.
+  // Punta ve pres dosyaları süreyi saniye yazar; yüklemede 60'a bölünür.
   const cycleSecondsExample = 8.22
   const cycleFromSeconds = cycleMinutesFromSeconds(cycleSecondsExample)
+  // Saniyenin altında çalışan pres parçası: kayıt 5 hane olmasa süre şişerdi.
+  const pressSecondsExample = 1.1111111111111112
+  const pressCycle = cycleMinutesFromSeconds(pressSecondsExample)!
   const cycleRun = computeRunPlan({ code: 'X', cycleMinutes: cycleExample.minutes }, cycleExample.qty)
   const cycleRunOee = computeRunPlan(
     { code: 'X', cycleMinutes: cycleExample.minutes, performanceFactor: cycleExample.oee },
@@ -572,8 +575,15 @@ function PlanLogicPage() {
           A part without a cycle time but with the old SPM and cavities runs 1 ÷ (SPM × cavities) min/piece — its
           time is exactly what it was (strokes ÷ SPM). With neither, the part has no speed and the plan check flags
           it (“no cycle time in master data”). A master data file may give the time in seconds instead — the
-          spot welding and assembly lines are measured that way (a <b>Saturasyon</b> column) — and the upload
-          divides it by 60: {cycleSecondsExample} s = {cycleFromSeconds?.toFixed(CYCLE_DECIMALS)} min/piece.
+          presses, spot welding and assembly lines are all measured that way (a <b>Saturasyon</b> or{' '}
+          <b>Birim süre saniye</b> column) — and the upload divides it by 60:{' '}
+          {cycleSecondsExample} s = {cycleFromSeconds?.toFixed(CYCLE_DECIMALS)} min/piece. Cycle times are
+          kept to {CYCLE_STORE_DECIMALS} decimals and shown with {CYCLE_DECIMALS}, because a press part can
+          run under a second: {pressSecondsExample.toFixed(CYCLE_DECIMALS)} s is{' '}
+          {formatCycleInput(pressCycle)} min/piece, and at {CYCLE_DECIMALS} decimals it would be{' '}
+          {pressCycle.toFixed(CYCLE_DECIMALS)} — 2.6 % more time on every job of that part
+          ({(10_000 * pressCycle).toFixed(1)} min for 10,000 pieces against{' '}
+          {(10_000 * Number(pressCycle.toFixed(CYCLE_DECIMALS))).toFixed(1)} min).
           Strokes = ⌈pieces ÷ cavities⌉ (= pieces when no cavities are
           entered) count only for the mould shot limit and strokes per coil.
           Setup, frequency stops (coil changes …) and quality approval sit inside that time; when they do not fit, the job is the pure

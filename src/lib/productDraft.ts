@@ -8,6 +8,8 @@
 // SPM ve kalıp gözü tabloda yok (2026-10-29): süre çevrim süresinden gelir.
 // Eski kayıtlardaki değerler sunucuda durur; satır kaydı onlara dokunmaz.
 
+import { formatCycleInput, roundCycleMinutes } from './rateModel'
+
 export interface ProductField {
   name: keyof ProductDraft
   numeric: boolean
@@ -68,22 +70,31 @@ export function productDraftOf(product: Record<string, unknown>): ProductDraft {
   const draft = {} as ProductDraft
   for (const field of PRODUCT_FIELDS) draft[field.name] = text(product[field.name])
   draft.flexiblePress = product.flexiblePress ? 'yes' : ''
-  // Çevrim süresi her zaman 3 haneyle görünür (0.750).
+  // Çevrim süresi kaydın değeriyle görünür: olağan değer 3 haneyle (0.750),
+  // 3 haneye sığmayan ince değer kendi haliyle (0.01852) — kutu yanlış sayı
+  // göstermemeli (src/lib/rateModel.ts).
   const cycle = product.cycleMinutes
-  draft.cycleMinutes = typeof cycle === 'number' && cycle > 0 ? cycle.toFixed(3) : ''
+  draft.cycleMinutes = typeof cycle === 'number' ? formatCycleInput(cycle) : ''
   return draft
 }
 
 /**
- * İki kutu değeri aynı mı? Çevrim süresi 3 haneyle saklanır: "0.75" ile
- * "0.750" aynıdır (yazım farkı değişiklik sayılmaz).
+ * İki kutu değeri aynı mı? Çevrim süresi kayıt hassasiyetiyle saklanır:
+ * "0.75" ile "0.750" aynıdır (yazım farkı değişiklik sayılmaz), ama
+ * "0.019" ile "0.01852" ayrıdır — yoksa ince süreler kaydedilemez.
  */
 export function sameFieldValue(name: keyof ProductDraft, a: string, b: string): boolean {
   if (a === b) return true
   if (name !== 'cycleMinutes') return false
   const x = Number(a.trim().replace(',', '.'))
   const y = Number(b.trim().replace(',', '.'))
-  return a.trim() !== '' && b.trim() !== '' && Number.isFinite(x) && Number.isFinite(y) && Math.round(x * 1000) === Math.round(y * 1000)
+  return (
+    a.trim() !== '' &&
+    b.trim() !== '' &&
+    Number.isFinite(x) &&
+    Number.isFinite(y) &&
+    roundCycleMinutes(x) === roundCycleMinutes(y)
+  )
 }
 
 export function sameProductDraft(a: ProductDraft, b: ProductDraft): boolean {
