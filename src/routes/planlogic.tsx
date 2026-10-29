@@ -891,6 +891,33 @@ function PlanLogicPage() {
         </p>
       </section>
 
+      <section id="org-filter" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
+        <h2 className="text-sm font-semibold text-foreground">Department and cost center filter — a view, not a rule</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          At the top of the Production Plan page you pick a <b>department</b> and, under it, one or
+          more <b>cost centers</b>. The chart, the work center lists, the part list of <b>Add job</b>,
+          the <b>Pin to work center</b> list and the late-job count then show only those work centers.
+          The filter stays as you left it the next time you open the page.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          <b>It does not change the plan.</b> The plan is always calculated for the whole plant —
+          capacity, cranes, setup teams and mould limits are only correct when every work center is
+          seen at once — so filtering never moves a job, and two planners looking at different
+          departments see the same plan. Nothing is hidden from the engine; it is hidden from the
+          screen.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The link comes from the definitions: work center → cost center (
+          <Link to="/makineler" className="underline">Work Center Definitions</Link>) and cost center
+          → department (Company settings). A work center without a cost center is listed under{' '}
+          <i>Without a department</i> so it cannot get lost. Each option shows how many work centers
+          it holds; a department whose work centers all run on a <b>cycle time</b> (spot welding,
+          robot, assembly, nut welding) shows "not planned" — those work centers are not part of the
+          press plan yet (see <a href="#inputs" className="underline">Collect the data</a>) and are
+          planned separately.
+        </p>
+      </section>
+
       <section id="capacity-dashboard" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
         <h2 className="text-sm font-semibold text-foreground">Capacity Dashboard — Prediction OEE and Accepted OEE</h2>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
