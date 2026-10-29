@@ -3,14 +3,14 @@ import { useMemo, useRef } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { Cell, SHEET_FONT, SHEET_WIDTH, X, colTitle, pct, share } from '../../components/AsakaiSheet'
-import { OeeControls, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
+import { OeeControls, effectiveScope, oeeToday, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { dm } from '../../components/OeePeriodControl'
 import { PageHeader } from '../../components/PageHeader'
 import { SavePdfButton } from '../../components/SavePdfButton'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import { areaNames, lossDayOf, type OrderRow, type ShiftRow } from '../../lib/oee'
-import { ASAKAI_TOP, asakaiColumns, asakaiTopStops, asakaiDetail, dropEmptyUnassigned } from '../../lib/oeeAsakai'
+import { addDaysIso, areaNames, isoWeek, lossDayOf, type OrderRow, type ShiftRow } from '../../lib/oee'
+import { ASAKAI_TOP, asakaiColumns, asakaiDay, asakaiTopStops, asakaiDetail, definedWorkCenters, dropEmptyUnassigned } from '../../lib/oeeAsakai'
 import { fromStoredStops, stopDayOf } from '../../lib/oeeReliability'
 import { splitShortStops } from '../../lib/oeeShortStops'
 import { fromStoredDay, type StoredDowntimeDay } from '../../lib/oeeStore'
@@ -32,22 +32,30 @@ const PART_COLUMNS = 6
 function AsakaiDetailPage() {
   const sel = useOeeSelection()
   const { config } = useOeeConfig()
-  const q = { from: sel.date, to: sel.date }
+  // Bugün (sistemin çalışma günü) gizli: gün bitmediği için yarım veri yanlış gösterir — en son dün.
+  const today = oeeToday()
+  const lastDay = addDaysIso(today, -1)
+  const date = asakaiDay(sel.date, today)
+  const q = { from: date, to: date }
   const shiftRows = useQuery(api.oee.shifts, q) as ShiftRow[] | undefined
   const evRaw = useQuery(api.oee.downtimeDays, q) as StoredDowntimeDay[] | undefined
   const orders = (useQuery(api.oee.orders, q) ?? []) as OrderRow[]
   const shifts = shiftRows ?? []
+  // Masraf yerinin bütün iş yerleri (Makineler → masraf yeri): o gün verisi olmayan makine de satır olur.
+  const presses = (useQuery(api.presses.list) ?? []) as { name: string; costCenter?: string }[]
+  const defined = useMemo(() => definedWorkCenters(presses), [presses])
+  const filterRows = useMemo(() => [...shifts, ...defined], [shifts, defined])
 
-  const scope = effectiveScope(sel.scope, areaNames(shifts, config))
+  const scope = effectiveScope(sel.scope, areaNames(filterRows, config))
   const { groups, columns } = useMemo(() => {
     const events = (evRaw ?? []).map(fromStoredDay)
     // Kısa duruşlar ayrılır (kendi kodunda sayılmaz, hız kaybının içinde); "#" gibi grafikte gizli sütunlar dahil.
     const split = splitShortStops(events.map(lossDayOf), fromStoredStops(events.map(stopDayOf)), config).lossDays
     const all = asakaiColumns(config, split)
-    const groups = asakaiDetail({ shifts, events, orders }, scope, config, all)
+    const groups = asakaiDetail({ shifts, events, orders, defined }, scope, config, all)
     const rows = groups.flatMap((g) => g.machines.flatMap((m) => [m.total, ...m.shifts]))
     return { groups, columns: dropEmptyUnassigned(all, rows) }
-  }, [shifts, evRaw, orders, scope, config])
+  }, [shifts, evRaw, orders, defined, scope, config])
 
   const sheetRef = useRef<HTMLDivElement>(null)
   // Excel'deki gibi tek tablo: masraf yerleri ardışık (Progressive, Transfer).
@@ -55,7 +63,7 @@ function AsakaiDetailPage() {
   // Her iş yerinin gününde ve her vardiyasında kendi en büyük duruşları kırmızı.
   const topOf = new Map(machines.map((m) => [m.workCenter, asakaiTopStops(m.total, columns)]))
   const partCols = Math.max(PART_COLUMNS, ...machines.map((m) => m.parts.length))
-  const day = dm(sel.date)
+  const day = dm(date)
   const loading = shiftRows === undefined || evRaw === undefined
 
   return (
@@ -74,16 +82,22 @@ function AsakaiDetailPage() {
               counted).
             </p>
             <p>Right: the materials of the day (orders file), each shift&apos;s good quantity and OEE — e.g. &quot;12660 - %90&quot;.</p>
+            <p>
+              Today is not shown: the working day is not over, so its part-day data would make OEE and the loss shares wrong. The latest
+              day on the page is yesterday. Every work center of the cost center is a row (Machines → cost center), even when it has no
+              data on the selected day.
+            </p>
           </>
         }
       />
       <OeeControls
-        selection={sel}
-        rows={shifts}
+        selection={{ ...sel, date, week: isoWeek(date) }}
+        rows={filterRows}
         config={config}
+        maxDate={lastDay}
         actions={
           <SavePdfButton
-            fileName={pdfFileName(sel.date, 'ASAKAI DETAIL')}
+            fileName={pdfFileName(date, 'ASAKAI DETAIL')}
             disabled={!groups.length}
             make={() =>
               sheetToPdf(sheetRef.current!, {

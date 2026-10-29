@@ -2,7 +2,20 @@ import { describe, expect, it } from 'vitest'
 
 import fixture from './oee.fixture.json'
 import { UNASSIGNED, chartGroups, daysFromShifts, lossDayOf, oeeOf, parseOeeWorkbook, sumTimes, type LossDay, type OeeConfig, type SheetRows } from './oee'
-import { ASAKAI_WEEKS, asakaiColumns, asakaiTopStops, asakaiDetail, asakaiWeekly, dropEmptyUnassigned } from './oeeAsakai'
+import {
+  ASAKAI_WEEKS,
+  asakaiBefore,
+  asakaiColumns,
+  asakaiDay,
+  asakaiMonths,
+  asakaiTopStops,
+  asakaiDetail,
+  asakaiWeeks,
+  asakaiWorkCenters,
+  asakaiWeekly,
+  definedWorkCenters,
+  dropEmptyUnassigned,
+} from './oeeAsakai'
 
 // Gerçek kesit (ASAKAI dosyası): Progressive ve Transfer, 21 Eylül haftası.
 const parsed = parseOeeWorkbook(fixture as unknown as Record<string, SheetRows>)
@@ -144,5 +157,86 @@ describe('Asakai short stops', () => {
     // Production − Operation = 30 dk = 20 hız + 10 kısa → 30 / 400.
     expect(g.lossTotal.shares.Speed).toBeCloseTo(30 / 400, 9)
     expect(g.lossTotal.shares.Setup).toBeCloseTo(30 / 400, 9)
+  })
+})
+
+describe('Asakai: bugün gizli', () => {
+  const today = '2026-09-23'
+
+  it('seçili gün en çok dün; bugün ve sonrası satır değil', () => {
+    expect(asakaiDay('2026-09-21', today)).toBe('2026-09-21')
+    expect(asakaiDay(today, today)).toBe('2026-09-22')
+    expect(asakaiDay('2026-09-30', today)).toBe('2026-09-22')
+    const rows = [{ date: '2026-09-22' }, { date: today }, { date: '2026-09-24' }]
+    expect(asakaiBefore(rows, today).map((r) => r.date)).toEqual(['2026-09-22'])
+  })
+
+  it('bugünü kapsayan yüklenmiş hafta / ay satırı kullanılmaz', () => {
+    // 23.09.2026 = 39. hafta.
+    const w = (year: number, week: number) => ({ year, week }) as never
+    expect(asakaiWeeks([w(2026, 38), w(2026, 39), w(2025, 52)], today).map((r) => r.week)).toEqual([38, 52])
+    const m = (year: number, monthKey: string) => ({ year, monthKey }) as never
+    expect(asakaiMonths([m(2026, '08'), m(2026, '09'), m(2026, '10')], today).map((r) => r.monthKey)).toEqual(['08'])
+  })
+
+  it('bugünün satırları süzülünce o gün tabloda boş kalır', () => {
+    const base = days.find((d) => d.costCenter === '51010173')!
+    const rows = [
+      { ...base, date: '2026-09-21', loadingMin: 400, productionMin: 300, operatingMin: 270, good: 100, scrap: 0, reject: 0 },
+      { ...base, date: today, loadingMin: 100, productionMin: 10, operatingMin: 5, good: 1, scrap: 0, reject: 0 },
+    ]
+    const cols = asakaiColumns(plant, [])
+    const [withToday] = asakaiWeekly({ days: rows, weekly: [], monthly: [], lossDays: [] }, scope, plant, '2026-09-21', '2026-09-21', cols)
+    const [hidden] = asakaiWeekly(
+      { days: asakaiBefore(rows, today), weekly: [], monthly: [], lossDays: [] },
+      scope,
+      plant,
+      '2026-09-21',
+      '2026-09-21',
+      cols,
+    )
+    // Çarşamba (23.09) bugün: gizliyken OEE'si yok, hafta toplamı yalnız pazartesiden.
+    expect(withToday.dailyTotal.days[2]).not.toBeNull()
+    expect(hidden.dailyTotal.days[2]).toBeNull()
+    expect(hidden.dailyTotal.week).toBeCloseTo(hidden.dailyTotal.days[0]!, 9)
+  })
+})
+
+describe('Asakai: masraf yerinin bütün iş yerleri', () => {
+  const defined = definedWorkCenters([
+    { name: 'MRK-01', costCenter: '51010173' },
+    { name: 'PRS-105', costCenter: '51010173' },
+    { name: 'APR-01', costCenter: '51010172' },
+    { name: 'NOCC' },
+  ])
+
+  it('tanımdaki ve verideki iş yerleri birlikte, tekrarsız', () => {
+    expect(definedWorkCenters([{ name: 'NOCC' }])).toEqual([])
+    expect(asakaiWorkCenters('51010173', [{ workCenter: 'PRS-104', costCenter: '51010173' }, { workCenter: 'APR-01', costCenter: '51010172' }], defined)).toEqual([
+      'MRK-01',
+      'PRS-104',
+      'PRS-105',
+    ])
+  })
+
+  it('detail: o gün verisi olmayan tanımlı makine de satır (değerleri boş)', () => {
+    const shifts = parsed.shifts.filter((r) => r.date === day)
+    const groups = asakaiDetail({ shifts, events: [], orders: [], defined }, scope, plant, columns)
+    const g = groups.find((x) => x.name === 'Progressive')!
+    const mrk = g.machines.find((m) => m.workCenter === 'MRK-01')
+    expect(mrk).toBeTruthy()
+    expect(mrk!.total.loadingMin).toBe(0)
+    expect(mrk!.shifts).toHaveLength(3)
+    // Başka masraf yerinin tanımlı makinesi bu gruba girmez.
+    expect(g.machines.some((m) => m.workCenter === 'APR-01')).toBe(false)
+  })
+
+  it('weekly: o hafta verisi olmayan tanımlı makine de satır', () => {
+    const groups = asakaiWeekly({ days, weekly: [], monthly: [], lossDays, defined }, scope, plant, day, day, columns)
+    const g = groups.find((x) => x.name === 'Progressive')!
+    const i = g.daily.findIndex((m) => m.workCenter === 'MRK-01')
+    expect(i).toBeGreaterThanOrEqual(0)
+    expect(g.daily[i].week).toBeNull()
+    expect(g.losses[i].loadingMin).toBe(0)
   })
 })

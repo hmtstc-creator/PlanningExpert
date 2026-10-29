@@ -744,6 +744,16 @@ Excel'deki iki sayfanın birebir kopyası, OEE menüsünde; ikisi de A4 yatay **
   yalnız sayfada süresi varsa sütun olur. **Kısa duruşlar** (< 2 dk, MES'in Production − Operation farkının içinde)
   sütun değil, **SPEED_LOSS**'un içinde (planlamacı, 2026-10-26; Loss Bridge'deki gibi, #81) — kendi kodunda (KLP, STP …)
   sayılmaz.
+- **Bugün gizli** (kullanıcı, 2026-10-29): iki sayfa da sistemin çalışma gününü (bugünü) göstermez — gün bitmediği
+  için o gün yüklenen yarım veri OEE'yi ve kayıp paylarını yanlış gösterir. Seçili gün en çok **dün** olur
+  (`asakaiDay`; tarih kutusunun `max`'ı dün), gün / kayıp / duruş satırları `< bugün` süzülür (`asakaiBefore`) ve
+  **bugünü kapsayan yüklenmiş hafta / ay satırı kullanılmaz** (`asakaiWeeks`, `asakaiMonths`): o dönemin OEE'si
+  günlerin toplamından gelir. Geçmiş bir gün seçilince hiçbir şey değişmez.
+- **Masraf yerinin bütün iş yerleri** (kullanıcı, 2026-10-29: "bir departman seçtiğimde altındaki bütün iş yerleri
+  gelmeli"): iş yeri listesi artık yalnız o gün / hafta verisi olanlar değil, **Work Center Definitions**'ta
+  (Makineler → masraf yeri) o masraf yerine bağlı bütün iş yerleri + verideki iş yerleri (`definedWorkCenters`,
+  `asakaiWorkCenters`). Verisi olmayan makine de satır olur, değerleri boş. Üstteki alan / makine seçeneklerine de
+  tanımlı iş yerleri girer (ör. Nut welding altındaki MRK makineleri o gün çalışmasa da görünür).
 - Excel'den farklar: hız kaybı eksiye düşmez (Production − Operation − kısa duruş, en az 0); gün etiketleri "21.09"
   (Excel'de "00/mm" hatası); gelecek aylar 0% yerine boş.
 

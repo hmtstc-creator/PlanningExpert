@@ -3,14 +3,26 @@ import { useMemo, useRef } from 'react'
 
 import { api } from '../../../convex/_generated/api'
 import { AsakaiBars, AsakaiStacked, Cell, SHEET_FONT, SHEET_WIDTH, X, colTitle, pct, share } from '../../components/AsakaiSheet'
-import { OeeControls, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
+import { OeeControls, effectiveScope, oeeToday, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
 import { dm } from '../../components/OeePeriodControl'
 import { PageHeader } from '../../components/PageHeader'
 import { SavePdfButton } from '../../components/SavePdfButton'
 import { useQuery } from '../../lib/convexTransport'
 import { relatedPages } from '../../lib/navigation'
-import { addDaysIso, areaNames, visibleChartGroups, type DayRow, type MonthlyRow, type WeeklyRow } from '../../lib/oee'
-import { ASAKAI_DAYS, ASAKAI_WEEKS, asakaiColumns, asakaiWeekly, dropEmptyUnassigned, type WeeklyGroup } from '../../lib/oeeAsakai'
+import { addDaysIso, areaNames, isoWeek, mondayOfIso, visibleChartGroups, type DayRow, type MonthlyRow, type WeeklyRow } from '../../lib/oee'
+import {
+  ASAKAI_DAYS,
+  ASAKAI_WEEKS,
+  asakaiBefore,
+  asakaiColumns,
+  asakaiDay,
+  asakaiMonths,
+  asakaiWeeks,
+  asakaiWeekly,
+  definedWorkCenters,
+  dropEmptyUnassigned,
+  type WeeklyGroup,
+} from '../../lib/oeeAsakai'
 import { fromStoredStops, type StoredStopDay } from '../../lib/oeeReliability'
 import { splitShortStops } from '../../lib/oeeShortStops'
 import { fromStoredLosses, type StoredLossDay } from '../../lib/oeeStore'
@@ -31,30 +43,43 @@ export const Route = createFileRoute('/oee/asakai-weekly')({
 function AsakaiWeeklyPage() {
   const sel = useOeeSelection()
   const { config } = useOeeConfig()
-  const yearStart = `${sel.date.slice(0, 4)}-01-01`
-  const trendFrom = addDaysIso(sel.monday, -7 * (ASAKAI_WEEKS - 1))
+  // Bugün (sistemin çalışma günü) gizli: gün bitmediği için yarım veri yanlış gösterir — en son dün.
+  const today = oeeToday()
+  const lastDay = addDaysIso(today, -1)
+  const date = asakaiDay(sel.date, today)
+  const monday = mondayOfIso(date)
+  const sunday = addDaysIso(monday, 6)
+  const week = isoWeek(date)
+  const yearStart = `${date.slice(0, 4)}-01-01`
+  const trendFrom = addDaysIso(monday, -7 * (ASAKAI_WEEKS - 1))
   const from = trendFrom < yearStart ? trendFrom : yearStart
-  const days = (useQuery(api.oee.days, { from, to: sel.sunday }) ?? []) as DayRow[]
+  const dayRows = (useQuery(api.oee.days, { from, to: sunday }) ?? []) as DayRow[]
   const periods = useQuery(api.oee.periods) as { weekly: WeeklyRow[]; monthly: MonthlyRow[] } | undefined
-  const week = { from: sel.monday, to: sel.sunday }
-  const lossRaw = (useQuery(api.oee.lossDays, week) ?? []) as StoredLossDay[]
-  const stopRaw = (useQuery(api.oee.stopDays, week) ?? []) as StoredStopDay[]
-  const weekly = periods?.weekly ?? []
-  const monthly = periods?.monthly ?? []
+  const span = { from: monday, to: sunday }
+  const lossRaw = (useQuery(api.oee.lossDays, span) ?? []) as StoredLossDay[]
+  const stopRaw = (useQuery(api.oee.stopDays, span) ?? []) as StoredStopDay[]
+  // Bugün ve sonrası hiçbir hesaba girmez; bugünü kapsayan yüklenmiş hafta / ay satırı da kullanılmaz.
+  const days = useMemo(() => asakaiBefore(dayRows, today), [dayRows, today])
+  const weekly = useMemo(() => asakaiWeeks(periods?.weekly ?? [], today), [periods, today])
+  const monthly = useMemo(() => asakaiMonths(periods?.monthly ?? [], today), [periods, today])
+  // Masraf yerinin bütün iş yerleri (Makineler → masraf yeri): o hafta verisi olmayan makine de satır olur.
+  const presses = (useQuery(api.presses.list) ?? []) as { name: string; costCenter?: string }[]
+  const defined = useMemo(() => definedWorkCenters(presses), [presses])
+  const filterRows = useMemo(() => [...days, ...defined], [days, defined])
 
-  const scope = effectiveScope(sel.scope, areaNames(days, config))
+  const scope = effectiveScope(sel.scope, areaNames(filterRows, config))
   const { groups, columns, chartColumns } = useMemo(() => {
-    const lossDays = splitShortStops(fromStoredLosses(lossRaw), fromStoredStops(stopRaw), config).lossDays
+    const lossDays = asakaiBefore(splitShortStops(fromStoredLosses(lossRaw), fromStoredStops(stopRaw), config).lossDays, today)
     // Tablo "#" gibi grafikte gizli sütunları da gösterir; yığılı grafik göstermez.
     const all = asakaiColumns(config, lossDays)
-    const groups = asakaiWeekly({ days, weekly, monthly, lossDays }, scope, config, sel.date, sel.monday, all)
+    const groups = asakaiWeekly({ days, weekly, monthly, lossDays, defined }, scope, config, date, monday, all)
     const columns = dropEmptyUnassigned(all, groups.flatMap((g) => [...g.losses, g.lossTotal]))
     return { groups, columns, chartColumns: visibleChartGroups(columns, config) }
-  }, [days, weekly, monthly, lossRaw, stopRaw, scope, config, sel.date, sel.monday])
+  }, [days, weekly, monthly, lossRaw, stopRaw, defined, scope, config, date, monday, today])
 
   const sheetRef = useRef<HTMLDivElement>(null)
   const title = `${(scope.area || 'OEE').toUpperCase()} DAILY FOLLOW UP`
-  const ticks = ASAKAI_DAYS.map((_, i) => dm(addDaysIso(sel.monday, i)).slice(0, 5))
+  const ticks = ASAKAI_DAYS.map((_, i) => dm(addDaysIso(monday, i)).slice(0, 5))
 
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
@@ -72,16 +97,22 @@ function AsakaiWeeklyPage() {
             <p>
               The week is the week of the selected date. Loss columns are the chart columns of <Link to="/oee/settings">OEE Settings</Link>.
             </p>
+            <p>
+              Today is not shown: the working day is not over, so its part-day data would make OEE and the loss shares wrong. The latest
+              day on the page is yesterday, and the week, month and 10-week bars of the current period are the sum of the days before
+              today. Every work center of the cost center is a row (Machines → cost center), even when it has no data in the week.
+            </p>
           </>
         }
       />
       <OeeControls
-        selection={sel}
-        rows={days}
+        selection={{ ...sel, date, monday, sunday, week }}
+        rows={filterRows}
         config={config}
+        maxDate={lastDay}
         actions={
           <SavePdfButton
-            fileName={pdfFileName(sel.date, 'ASAKAI WEEKLY')}
+            fileName={pdfFileName(date, 'ASAKAI WEEKLY')}
             disabled={!groups.length}
             make={() =>
               sheetToPdf(sheetRef.current!, {
@@ -97,7 +128,7 @@ function AsakaiWeeklyPage() {
 
       {!groups.length ? (
         <p className="mt-6 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No OEE data for W{sel.week.week}. Upload the file on{' '}
+          No OEE data for W{week.week}. Upload the file on{' '}
           <Link to="/oee/data" className="underline">
             OEE Data
           </Link>
@@ -120,7 +151,7 @@ function AsakaiWeeklyPage() {
                   padding: '7px 0',
                 }}
               >
-                {dm(sel.date)}
+                {dm(date)}
               </div>
             </div>
             {groups.map((g) => (
@@ -132,7 +163,7 @@ function AsakaiWeeklyPage() {
                   <AsakaiBars title="MONTHLY" points={g.monthly} />
                   <AsakaiBars title={`WEEKLY - LAST ${ASAKAI_WEEKS} WEEK`} points={g.weekly} />
                   <AsakaiStacked
-                    title={`W${sel.week.week} BY DAY`}
+                    title={`W${week.week} BY DAY`}
                     columns={chartColumns}
                     rows={g.stacked.map((r, i) => ({ ...r, tick: ticks[i] }))}
                   />
