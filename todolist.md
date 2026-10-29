@@ -139,6 +139,9 @@ yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
     `pressCalendar.pressDay` → kapasite modeli → motor ve doğrulayıcı (2026-10-28).
   - [x] (#104) *Edit* / *Save* / *Cancel*: değişiklikler taslakta tutulur, tek seferde yazılır; aynı kipte
     OT satırından o güne mesai eklenir / kaldırılır (2026-10-28).
+  - [x] (#109) Hafta sonuna mesai: gösterilen haftanın her günü düzenlenebilir (kapalı cumartesi–pazar
+    plan günlerinde yoktu); OT satırı günün **boş penceresini** yazar (*free 01:50–06:30* / *full (24 h)*),
+    sığmayan mesai seçilemez. Boş pencere = üretim günü − vardiyalar − açık mesailer (2026-10-29).
 - [x] **[G]** (#93) Slayt 5 — İş penceresi: başlıkta *Req dates (d1, d2…) – adet*, *Start / End time*,
   *Status* (sabah 08:00'e göre saat erken / geç; rulo fazlası *overstock*), *Exclude*'dan sonra
   *Main / Alternative work center* bilgisi.

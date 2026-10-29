@@ -3,7 +3,14 @@ import { useMutation, useQuery } from "../../lib/convexTransport";
 import { useMemo, useState } from "react";
 
 import { api } from "../../../convex/_generated/api";
-import { maxShiftsPerDay, serverErrorText } from "../../lib/pressCalendar";
+import {
+  clockText,
+  dayOvertime,
+  freeWindows,
+  maxShiftsPerDay,
+  overtimeFitProblem,
+  serverErrorText,
+} from "../../lib/pressCalendar";
 import { activeShiftList } from "../../lib/shiftTimeline";
 
 /** Bir presin bir günü: planın kullandığı normal vardiyalar ve mesai pencereleri. */
@@ -72,6 +79,7 @@ export function PressWeekShifts({
   dates,
   dayOf,
   shiftMinutes,
+  shiftStartMinute,
 }: {
   presses: { name: string; hall?: string }[];
   /** Planın günleri (ISO, artan). */
@@ -79,6 +87,8 @@ export function PressWeekShifts({
   dayOf: (press: string, date: string) => PressShiftDay | undefined;
   /** Vardiya süresi (dk): günde kaç vardiya satırı gösterileceği. */
   shiftMinutes?: number;
+  /** Birinci vardiyanın başlangıcı (gece yarısından dk): mesai pencereleri. */
+  shiftStartMinute?: number;
 }) {
   const records = useQuery(api.dayShifts.list) as
     | { press: string; date: string; shifts: number[] }[]
@@ -132,6 +142,18 @@ export function PressWeekShifts({
   const monday = weeks.includes(week) ? week : (weeks[0] ?? "");
   const days = monday ? WEEKDAYS.map((_, i) => plusDays(monday, i)) : [];
   const inPlan = new Set(dates);
+  /**
+   * Gösterilen haftanın **her** günü düzenlenebilir — kapalı gün de
+   * (planlamacı 2026-10-29): kapalı cumartesiye mesai açmanın başka yolu yok.
+   * Plan kapasitesi 0 olan günü hesaba katmadığı için (`groupPlanWeeks`,
+   * `minutes > 0`) cumartesi–pazar plan günlerinde hiç görünmez; bu yüzden
+   * `inPlan` burada ölçü değildir. Yalnız planın ilk gününden önceki günler
+   * (geçmiş) kilitli kalır; hafta zaten plan ufkundan geliyor.
+   */
+  const horizonStart = dates[0] ?? "";
+  const editable = (d: string) => !!horizonStart && d >= horizonStart;
+  const startMinute = shiftStartMinute ?? 0;
+  const slot = shiftMinutes ?? 480;
   const dirty =
     Object.keys(draft).length > 0 || otAdd.length > 0 || otDrop.length > 0;
   const reset = () => {
@@ -160,6 +182,26 @@ export function PressWeekShifts({
     pressOvertime.filter(
       (o) => o.press === selected && o.date === d && !otDrop.includes(o._id),
     );
+  /** O güne açık (kaydedilmiş + taslaktaki) mesai tanımları. */
+  const openDefsOf = (d: string) =>
+    [
+      ...datedOvertime(d).map((o) => defOf.get(o.definitionId)),
+      ...otAdd.filter((a) => a.date === d).map((a) => defOf.get(a.definitionId)),
+    ].filter((x): x is OvertimeDefinition => !!x);
+  /**
+   * Günün boş (çalışılmayan) aralıkları: 24 saatten açık vardiyalar ve açık
+   * mesailer düşülür (tek kaynak `pressCalendar.freeWindows`). Boşluk yoksa
+   * o güne mesai açılamaz — üç vardiya × 8 saat çalışan gün zaten doludur.
+   */
+  const freeOf = (d: string) => {
+    const shifts = shownOf(d);
+    const open = openDefsOf(d);
+    const windows = dayOvertime(shifts, startMinute, slot, open).windows;
+    return freeWindows(shifts, startMinute, slot, windows);
+  };
+  /** Bu mesai tanımı o güne sığar mı? `null` = sığar, metin = nedeni. */
+  const fitProblem = (d: string, def: OvertimeDefinition) =>
+    overtimeFitProblem(def, shownOf(d), startMinute, slot, openDefsOf(d));
   const toggle = (d: string, s: number) => {
     const now = shownOf(d);
     const next = now.includes(s)
@@ -351,11 +393,11 @@ export function PressWeekShifts({
                     {s}
                   </th>
                   {days.map((d) => {
-                    if (!inPlan.has(d)) {
+                    if (!editable(d)) {
                       return (
                         <td
                           key={d}
-                          title="Outside the plan"
+                          title="Outside the planning horizon"
                           className="h-7 border border-border bg-muted/40"
                         />
                       );
@@ -402,12 +444,16 @@ export function PressWeekShifts({
                   if (editing) {
                     const dated = datedOvertime(d);
                     const planned = otAdd.filter((a) => a.date === d);
+                    const free = editable(d) ? freeOf(d) : [];
+                    const freeText = free
+                      .map((w) => `${clockText(w.start)}–${clockText(w.end)}`)
+                      .join(" ");
                     return (
                       <td
                         key={d}
                         className="h-7 border border-border p-0.5 align-top text-[10px]"
                       >
-                        {inPlan.has(d) ? (
+                        {editable(d) ? (
                           <div className="flex flex-col gap-0.5">
                             {dated.map((o) => (
                               <button
@@ -441,27 +487,62 @@ export function PressWeekShifts({
                                 ✕
                               </button>
                             ))}
-                            <select
-                              aria-label={`Add overtime on ${dotted(d)}`}
-                              value=""
-                              disabled={busy || definitions.length === 0}
-                              onChange={(e) => {
-                                if (e.target.value)
-                                  setOtAdd((prev) => [
-                                    ...prev,
-                                    { date: d, definitionId: e.target.value },
-                                  ]);
-                              }}
-                              className="w-full rounded border border-input bg-background text-[10px]"
-                            >
-                              <option value="">+ overtime</option>
-                              {definitions.map((def) => (
-                                <option key={def._id} value={def._id}>
-                                  {def.name} {hhmm(def.startMinute)}–
-                                  {hhmm(def.startMinute + def.durationMinutes)}
-                                </option>
-                              ))}
-                            </select>
+                            {free.length === 0 ? (
+                              <span
+                                title={`${selected} ${dotted(d)} is already working 24 hours — overtime fits only where the day is free. Close a shift, or open the overtime on a day that is not full (e.g. Saturday).`}
+                                className="rounded bg-muted px-1 text-muted-foreground"
+                              >
+                                full (24 h)
+                              </span>
+                            ) : (
+                              <>
+                                <select
+                                  aria-label={`Add overtime on ${dotted(d)}`}
+                                  value=""
+                                  disabled={busy || definitions.length === 0}
+                                  onChange={(e) => {
+                                    const def = defOf.get(e.target.value);
+                                    if (!def) return;
+                                    // Sunucunun reddedeceği mesai taslağa
+                                    // girmesin: nedeni hemen yazılır.
+                                    const problem = fitProblem(d, def);
+                                    if (problem) {
+                                      setError(`${dotted(d)}: ${problem}`);
+                                      return;
+                                    }
+                                    setError(null);
+                                    setOtAdd((prev) => [
+                                      ...prev,
+                                      { date: d, definitionId: def._id },
+                                    ]);
+                                  }}
+                                  title={`${selected} ${dotted(d)} is free ${freeText}`}
+                                  className="w-full rounded border border-input bg-background text-[10px]"
+                                >
+                                  <option value="">+ overtime</option>
+                                  {definitions.map((def) => {
+                                    const problem = fitProblem(d, def);
+                                    return (
+                                      <option
+                                        key={def._id}
+                                        value={def._id}
+                                        disabled={!!problem}
+                                        title={problem ?? undefined}
+                                      >
+                                        {def.name} {hhmm(def.startMinute)}–
+                                        {hhmm(
+                                          def.startMinute + def.durationMinutes,
+                                        )}
+                                        {problem ? " · does not fit" : ""}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                <span className="text-muted-foreground">
+                                  free {freeText}
+                                </span>
+                              </>
+                            )}
                           </div>
                         ) : null}
                       </td>

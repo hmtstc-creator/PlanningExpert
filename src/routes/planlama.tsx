@@ -286,6 +286,7 @@ function PlanlamaPage() {
           presses={presses}
           dates={allDates}
           shiftMinutes={shiftMinutes}
+          shiftStartMinute={shiftStartMinute}
           dayOf={(press, date) => {
             const key = `${press}|${date}`
             const shifts = shiftsByPressDate.get(key)

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
 import { capacityModel } from './capacityModel'
-import { dayOvertime, dayShiftsProblem, patternProblem, pressDay, type PressDaySources } from './pressCalendar'
+import {
+  dayOvertime,
+  dayShiftsProblem,
+  freeMinutes,
+  freeWindows,
+  overtimeFitProblem,
+  patternProblem,
+  pressDay,
+  type PressDaySources,
+} from './pressCalendar'
 
 const full = { id: 'full', name: 'Full overtime', startMinute: 420, durationMinutes: 480 }
 const half = { id: 'half', name: 'Half overtime', startMinute: 420, durationMinutes: 240 }
@@ -99,6 +108,40 @@ describe('press calendar rules (docs/decisions.md)', () => {
     expect(model.isPlantWorkingDate('2026-09-16')).toBe(false)
     expect(model.isPlantWorkingDate('2026-09-19')).toBe(true) // P2 Cumartesi çalışıyor
     expect(model.isPlantWorkingDate('2026-09-20')).toBe(false)
+  })
+})
+
+describe('free window: where overtime fits (planlamacı 2026-10-29)', () => {
+  it('3 × 8 h fills the day — overtime fits only on a day that is not full (e.g. the closed Saturday)', () => {
+    // Üç vardiya 07:00–07:00: gün dolu, hiçbir mesai sığmaz.
+    expect(freeWindows(3, 420, 480)).toEqual([])
+    expect(freeMinutes(3, 420, 480)).toBe(0)
+    expect(overtimeFitProblem(third, 3, 420, 480)).toMatch(/overlaps the normal shift/)
+    // Kapalı cumartesi: gün bütünüyle boş, aynı mesai sığar.
+    expect(freeWindows(0, 420, 480)).toEqual([{ start: 420, end: 1860 }])
+    expect(overtimeFitProblem(third, 0, 420, 480)).toBeNull()
+    expect(overtimeFitProblem(full, 0, 420, 480)).toBeNull()
+  })
+
+  it('two 9 h 40 min shifts from 06:30 leave 01:50–06:30 free — a night overtime fits there', () => {
+    const start = 390 // 06:30
+    const len = 580 // 9 s 40 dk → 06:30–16:10 ve 16:10–01:50
+    expect(freeWindows(2, start, len)).toEqual([{ start: 1550, end: 1830 }]) // 01:50–06:30
+    expect(freeMinutes(2, start, len)).toBe(280)
+    const night = { name: 'Night', startMinute: 110, durationMinutes: 280 } // 01:50, 4 s 40 dk
+    expect(overtimeFitProblem(night, 2, start, len)).toBeNull()
+    // 10 dakika uzunu üretim gününü aşar (gün 06:30'da biter).
+    expect(overtimeFitProblem({ ...night, durationMinutes: 290 }, 2, start, len)).toMatch(/24 hours/)
+    // Gece mesaisi açıldıktan sonra gün dolar.
+    const windows = dayOvertime(2, start, len, [night]).windows
+    expect(freeWindows(2, start, len, windows)).toEqual([])
+    expect(overtimeFitProblem(night, 2, start, len, [night])).toMatch(/overlaps another overtime/)
+  })
+
+  it('a day record with a gap leaves that gap free (only the 1st and 3rd shift)', () => {
+    // 1. ve 3. vardiya açık: 15:00–23:00 boş kalır.
+    expect(freeWindows([1, 3], 420, 480)).toEqual([{ start: 900, end: 1380 }])
+    expect(overtimeFitProblem({ name: 'Mid', startMinute: 900, durationMinutes: 480 }, [1, 3], 420, 480)).toBeNull()
   })
 })
 
