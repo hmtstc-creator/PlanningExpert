@@ -17,8 +17,11 @@ import { PressStartPanel } from '../components/plan/PressStartPanel'
 import { JobDialog, type JobDraft } from '../components/plan/JobDialog'
 import { MoveDialog, type MoveDraft } from '../components/plan/MoveDialog'
 import { AddJobDialog } from '../components/plan/AddJobDialog'
-import type { ProductSpec } from '../lib/planning'
+import { eligiblePressesOf, type ProductSpec } from '../lib/planning'
 import { dayMonth, minutesAgo, usePlanState } from '../components/plan/usePlanState'
+import { PlanOrgFilter, usePlanOrgFilter } from '../components/plan/PlanOrgFilter'
+import type { OrgCostCenter, OrgPress } from '../lib/planOrgFilter'
+import { usePlant } from '../lib/plantContext'
 /** Planın böldüğü lotun parça son eki: "W38 (1/2)". */
 const SPLIT_SUFFIX = / \(\d+\/\d+\)$/
 
@@ -88,17 +91,39 @@ function PlanlamaPage() {
   const [ovPress, setOvPress] = useState('')
   const [ovDate, setOvDate] = useState('')
 
+  // Bölüm → masraf yeri bağı canlı tanımdan okunur (tek kaynak: Work Center
+  // Definitions ve Company settings); eski bir plan hesabı da süzülebilir.
+  const { ctx } = usePlant()
+  const workCenterRows = useQuery(api.presses.list) as OrgPress[] | undefined
+  // Kimlikleri sabit tut: `org.shows` her render değişirse Gantt boşuna yeniden çizilir.
+  const allWorkCenters = useMemo(() => workCenterRows ?? [], [workCenterRows])
+  const orgCostCenters = useMemo(() => (ctx?.active?.costCenters ?? []) as OrgCostCenter[], [ctx])
+  const orgDepartments = useMemo(() => ctx?.active?.departments ?? [], [ctx])
+  const org = usePlanOrgFilter(allWorkCenters, orgCostCenters, orgDepartments)
+
+  // "Add job" penceresinin malzeme listesi de süzgece uyar: görünür iş
+  // yerlerinden birine verilebilen parçalar.
+  const visibleProducts = useMemo(
+    () => (org.active ? products.filter((p) => eligiblePressesOf(p).some((m) => org.shows(m))) : products),
+    [products, org.active, org.shows],
+  )
+
   const inputsLoading = run === undefined
   const horizonWeeks = run?.horizonWeeks ?? 4
   const globalFrozenDays = run?.globalFrozenDays ?? 0
   const truncatedInputs = run?.truncatedInputs ?? []
-  const presses = run?.presses ?? []
+  const allPresses = run?.presses ?? []
+  // Görünür iş yerleri: bölüm / masraf yeri süzgeci (yalnız görünüm — plan
+  // her zaman fabrikanın tamamı için hesaplanır, bkz. src/lib/planOrgFilter.ts).
+  const presses = useMemo(() => allPresses.filter((p) => org.shows(p.name)), [allPresses, org.shows])
   const plannedStops = run?.plannedStops ?? []
   const unplanned = run?.unplanned ?? []
   const frozenCount = run?.frozenCount ?? 0
   const horizonStart = run?.horizonStart ?? ''
   const planChecksOk = (run?.audit?.ok ?? true) && (run?.validation?.summary.rulesBroken ?? 0) === 0
-  const lateCount = run?.lateItems?.length ?? engineJobs.filter((j) => j.late).length
+  const lateCount = run?.lateItems
+    ? run.lateItems.filter((i) => !org.active || i.presses.some((name) => org.shows(name))).length
+    : engineJobs.filter((j) => j.late && org.shows(j.press)).length
 
   const { date: todayIso, clockMinute: nowClockMinute } = productionDayOf(
     plantClock(nowMs, run?.timeZone),
@@ -111,7 +136,10 @@ function PlanlamaPage() {
     () => Array.from(new Set(weeks.flatMap((w) => w.dates))).sort(),
     [weeks],
   )
-  const allJobs = useMemo(() => Array.from(new Set(weeks.flatMap((w) => w.jobs))), [weeks])
+  const allJobs = useMemo(
+    () => Array.from(new Set(weeks.flatMap((w) => w.jobs))).filter((j) => org.shows(j.press)),
+    [weeks, org.shows],
+  )
 
   const { shiftsByPressDate, activeByPressDate, capacityByPressDate, overtimeByPressDate } = useMemo(() => {
     const shifts = new Map<string, number>()
@@ -130,7 +158,7 @@ function PlanlamaPage() {
   /** Pres bakımları grafikte ayrı çizilir — iş listesine karışmaz. */
   const ganttMaintenance = useMemo<WeekGanttJob[]>(
     () =>
-      (run?.maintenance ?? []).map((block) => ({
+      (run?.maintenance ?? []).filter((block) => org.shows(block.press)).map((block) => ({
         date: block.date,
         press: block.press,
         material: block.label,
@@ -142,7 +170,7 @@ function PlanlamaPage() {
           { kind: 'maintenance' as const, date: block.date, start: block.start, end: block.end },
         ],
       })),
-    [run],
+    [run, org.shows],
   )
 
   /** Grafikteki çubuğun plandaki işi ve (kilitliyse) kilidi. */
@@ -274,6 +302,14 @@ function PlanlamaPage() {
             </p>
           </>
         }
+      />
+
+      <PlanOrgFilter
+        options={org.options}
+        selection={org.selection}
+        onChange={org.setSelection}
+        planned={presses.length}
+        total={allPresses.length}
       />
 
       {/* Üst bölüm, 3 kutu (planlamacı 2026-10-28): solda plan ayarları, ortada
@@ -441,7 +477,7 @@ function PlanlamaPage() {
         </p>
       )}
 
-      {weeks.length > 0 && (
+      {weeks.length > 0 && presses.length > 0 && (
         <div className="mt-8">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-foreground">
@@ -555,7 +591,7 @@ function PlanlamaPage() {
               <AddJobDialog
                 presses={presses.map((p) => ({ name: p.name, hall: p.hall, feedsCoil: p.feedsCoil }))}
                 dates={allDates.filter((d) => d >= todayIso)}
-                products={products}
+                products={visibleProducts}
                 initial={
                   addingJob === true
                     ? { press: presses[0]?.name ?? '', date: todayIso, clockMinute: Math.ceil(nowClockMinute / 5) * 5 }

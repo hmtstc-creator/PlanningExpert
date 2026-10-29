@@ -148,9 +148,17 @@ yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
 - [x] **[G]** (#93) Slayt 5 — İş penceresi: başlıkta *Req dates (d1, d2…) – adet*, *Start / End time*,
   *Status* (sabah 08:00'e göre saat erken / geç; rulo fazlası *overstock*), *Exclude*'dan sonra
   *Main / Alternative work center* bilgisi.
-- [ ] **[G]** Slayt 6 — **(başlama; en son)** Production planning yalnız presler için değil: departman
+- [ ] **[G]** Slayt 6 — Production planning yalnız presler için değil: departman
   seçimi → altındaki iş yerleri listelenir; çoklu seçimli **cost center** filtresi. Nut welding ve
   başka firma / tesis için de plan yapılabilmeli. Önkoşul: planlama doğru çalışıyor olmalı.
+  - [x] **Süzgeç** (2026-10-29): Production Plan'ın en üstünde departman (tek) + cost center (çoklu)
+    seçimi; Gantt, iş listesi, *Plan settings*, *Work calendar*, *Add job* malzeme listesi,
+    *Pin to work center* ve geç iş sayısı süzgece uyar, seçim tarayıcıda kalır. Yalnız görünüm:
+    plan fabrikanın tamamı için hesaplanır (`src/lib/planOrgFilter.ts`, wiki 01 değişmez 8).
+  - [ ] **Cycle hatlarının planlanması** (nut welding, punta, robot, montaj): pres motoru yalnız
+    `rateModel: 'stroke'` iş yerlerini planlar (`pressPlanScope`). Süzgeçte bu iş yerleri
+    "not planned" diye sayılıyor; gerçekten planlanmaları ayrı ve büyük bir iş (çevrim süresi
+    bazlı yerleştirme, pres parçasıyla bağ).
 
 ### Organizasyon teyidi (2026-10-03)
 
