@@ -49,23 +49,23 @@ describe('PlanOrgFilter', () => {
       'Assembly · 1 WC',
     ])
     fireEvent.change(select, { target: { value: 'Press' } })
-    expect(onChange).toHaveBeenCalledWith({ department: 'Press', costCenters: [] })
+    expect(onChange).toHaveBeenCalledWith({ department: 'Press', costCenters: [], workCenters: [] })
   })
 
   it('masraf yeri rozeti çoklu seçer / bırakır', () => {
-    const onChange = view({ department: 'Press', costCenters: [] }, 3)
+    const onChange = view({ department: 'Press', costCenters: [], workCenters: [] }, 3)
     fireEvent.click(screen.getByRole('button', { name: /1100 — Press line/ }))
-    expect(onChange).toHaveBeenCalledWith({ department: 'Press', costCenters: ['1100'] })
+    expect(onChange).toHaveBeenCalledWith({ department: 'Press', costCenters: ['1100'], workCenters: [] })
   })
 
   it('nut welding bölümü de planda: "not planned" yazılmaz', () => {
-    view({ department: 'Assembly', costCenters: [] }, 1)
+    view({ department: 'Assembly', costCenters: [], workCenters: [] }, 1)
     expect(screen.getByText('Showing 1 of 4 work centers in the plan')).toBeTruthy()
     expect(screen.queryByText(/not planned|not part of the press plan|does not plan/)).toBeNull()
   })
 
   it('seçimde hiç iş yeri yoksa masraf yeri bağını kontrol etmeyi söyler', () => {
-    view({ department: 'Press', costCenters: ['1200'] }, 0)
+    view({ department: 'Press', costCenters: ['1200'], workCenters: [] }, 0)
     expect(screen.getByText(/Check the cost center of the work centers/)).toBeTruthy()
   })
 })

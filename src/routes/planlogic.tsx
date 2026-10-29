@@ -931,17 +931,29 @@ function PlanLogicPage() {
       </section>
 
       <section id="org-filter" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Department and cost center filter — a view, not a rule</h2>
+        <h2 className="text-sm font-semibold text-foreground">Department, cost center and work center filter — a view, not a rule</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          At the top of the Production Plan page you pick a <b>department</b> and, under it, one or
-          more <b>cost centers</b>. The chart, the work center lists, the part list of <b>Add job</b>,
-          the <b>Pin to work center</b> list and the late-job count then show only those work centers.
-          The filter stays as you left it the next time you open the page.
+          Three pages carry the same filter: <Link to="/planlama" className="underline">Production Plan</Link>,{' '}
+          <Link to="/referanslar" className="underline">Master Data</Link> and{' '}
+          <Link to="/capacity" className="underline">Capacity Dashboard</Link>. You pick a{' '}
+          <b>department</b>, then one or more of its <b>cost centers</b>, then — on Master Data and
+          the Capacity Dashboard — one or more <b>work centers</b>. Each level narrows the next, so
+          the work centers you can pick are exactly those of the cost centers of that department.
+          Each page remembers its own selection for the next time you open it.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          <b>It does not change the plan.</b> The plan is always calculated for the whole plant —
-          capacity, cranes, setup teams and mould limits are only correct when every work center is
-          seen at once — so filtering never moves a job, and two planners looking at different
+          What each page narrows: on Production Plan the chart, the work center lists, the part list
+          of <b>Add job</b>, the <b>Pin to work center</b> list and the late-job count; on Master
+          Data the part list — a part stays while its main work center <i>or one of its
+          alternatives</i> is among the chosen ones, and a part with no work center at all belongs
+          to no department and shows only with the filter off; on the Capacity Dashboard the cards,
+          the chart and the work center list.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          <b>It does not change the plan or the numbers.</b> The plan and the capacity forecast are
+          always calculated for the whole plant — capacity, cranes, setup teams and mould limits are
+          only correct when every work center is seen at once — so filtering never moves a job,
+          never changes an hour on the Capacity Dashboard, and two planners looking at different
           departments see the same plan. Nothing is hidden from the engine; it is hidden from the
           screen.
         </p>

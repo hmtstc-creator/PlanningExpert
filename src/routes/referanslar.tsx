@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
+import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport'
 import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -28,6 +28,9 @@ import {
   piecesPerHour,
 } from '../lib/rateModel'
 import { ExcelUpload } from '../components/ExcelUpload'
+import { PlanOrgFilter, usePlanOrgFilter } from '../components/plan/PlanOrgFilter'
+import { usePlant } from '../lib/plantContext'
+import { type OrgCostCenter, type OrgPress } from '../lib/planOrgFilter'
 import { friendlyError } from '../lib/mutationErrors'
 import { InfoTip, PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
@@ -82,12 +85,36 @@ function ReferanslarPage() {
     { initialNumItems: 200 },
   )
 
+  // Bölüm / masraf yeri / iş yeri süzgeci — plan sayfasıyla aynı hesap
+  // (src/lib/planOrgFilter.ts); bağ Work Center Definitions ve Company
+  // settings'ten okunur, burada kopya tutulmaz.
+  const { ctx } = usePlant()
+  const workCenterRows = useQuery(api.presses.list) as OrgPress[] | undefined
+  const allWorkCenters = useMemo(() => workCenterRows ?? [], [workCenterRows])
+  const orgCostCenters = useMemo(() => (ctx?.active?.costCenters ?? []) as OrgCostCenter[], [ctx])
+  const orgDepartments = useMemo(() => ctx?.active?.departments ?? [], [ctx])
+  const org = usePlanOrgFilter(
+    allWorkCenters,
+    orgCostCenters,
+    orgDepartments,
+    'planningexpert.masterData.orgFilter',
+  )
+  const visibleWorkCenterCount = useMemo(
+    () => allWorkCenters.filter((w) => org.shows(w.name)).length,
+    [allWorkCenters, org],
+  )
+
   // Excel uploads bring hundreds of rows; without a filter, correcting one
   // material means scrolling through all of them.
+  //
+  // Süzgeç etkinken parça, iş yerlerinden **biri** görünür iş yerleri
+  // arasındaysa listede kalır (ana iş yeri ya da bir alternatifi). Hiç iş
+  // yeri tanımlı olmayan parça hiçbir bölüme ait değildir: süzgeç
+  // kapatılınca yine görünür.
   const visibleProducts = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return products
-    return products.filter((p) =>
+    const matchesSearch = (p: (typeof products)[number]) =>
+      !q ||
       [
         p.code,
         p.coProduct,
@@ -97,9 +124,14 @@ function ReferanslarPage() {
         p.altMachine2,
         p.altMachine3,
         p.altMachine4,
-      ].some((v) => v && String(v).toLowerCase().includes(q)),
-    )
-  }, [products, search])
+      ].some((v) => v && String(v).toLowerCase().includes(q))
+    const matchesOrg = (p: (typeof products)[number]) =>
+      !org.active ||
+      [p.mainMachine, p.altMachine1, p.altMachine2, p.altMachine3, p.altMachine4].some(
+        (name) => name && org.shows(String(name)),
+      )
+    return products.filter((p) => matchesSearch(p) && matchesOrg(p))
+  }, [products, search, org])
 
   // Satır bazlı taslak: bir hücreyi düzenlemek satırı "Unsaved" yapar ve
   // kayıt açık bir eylemdir. Alanlar tek tek yazıldığı için (updateField)
@@ -401,7 +433,25 @@ function ReferanslarPage() {
         </form>
       </details>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+      <PlanOrgFilter
+        options={org.options}
+        selection={org.selection}
+        onChange={org.setSelection}
+        planned={visibleWorkCenterCount}
+        total={allWorkCenters.length}
+        subject="in this plant"
+        showWorkCenters
+        info={
+          <p>
+            Narrows the list below to the parts of a department: pick a department, then one of its
+            cost centers, then a work center. A part stays in the list when its main work center —
+            or one of its alternatives — is among them. A part with no work center at all belongs to
+            no department and shows only with the filter off.
+          </p>
+        }
+      />
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <input
           className="w-72 rounded-md border border-input bg-background px-3 py-2 text-sm"
           placeholder="Search material, machine or raw material code…"

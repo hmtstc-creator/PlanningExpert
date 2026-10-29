@@ -14,6 +14,8 @@ import {
   type CapacityWeek,
 } from '../lib/capacityForecast'
 import { useMutation, useQuery } from '../lib/convexTransport'
+import { PlanOrgFilter, usePlanOrgFilter } from '../components/plan/PlanOrgFilter'
+import { type OrgCostCenter, type OrgPress } from '../lib/planOrgFilter'
 import { formatPlantTime } from '../lib/sapUploads'
 import { PressWeekDays } from '../components/OvertimePanels'
 import { InfoTip, PageHeader } from '../components/PageHeader'
@@ -109,13 +111,39 @@ function CapacityPage() {
     }
   }
   const rawForecast = data?.capacity ?? null
-  const forecast = useMemo(
+  // Bölüm / masraf yeri / iş yeri süzgeci — plan ve Master Data ile aynı hesap
+  // (src/lib/planOrgFilter.ts). Yalnız görünümü daraltır: öngörü fabrikanın
+  // tamamı için hesaplanmıştır, süzgeç hesabı yeniden yapmaz.
+  const { ctx } = usePlant()
+  const workCenterRows = useQuery(api.presses.list) as OrgPress[] | undefined
+  const allWorkCenters = useMemo(() => workCenterRows ?? [], [workCenterRows])
+  const orgCostCenters = useMemo(() => (ctx?.active?.costCenters ?? []) as OrgCostCenter[], [ctx])
+  const orgDepartments = useMemo(() => ctx?.active?.departments ?? [], [ctx])
+  const org = usePlanOrgFilter(
+    allWorkCenters,
+    orgCostCenters,
+    orgDepartments,
+    'planningexpert.capacity.orgFilter',
+  )
+
+  const basisForecast = useMemo(
     () =>
       rawForecast
         ? { ...rawForecast, presses: rawForecast.presses.map((p) => ({ ...p, ...seriesForBasis(p, basis, acceptedRate) })) }
         : null,
     [rawForecast, basis, acceptedRate],
   )
+  // Süzgeçten geçen iş yerleri; bir hattın (grubun) hiç iş yeri kalmazsa hat
+  // da listeden düşer.
+  const forecast = useMemo(() => {
+    if (!basisForecast || !org.active) return basisForecast
+    const presses = basisForecast.presses.filter((p) => org.shows(p.press))
+    const groups = basisForecast.groups
+      .map((g) => ({ ...g, presses: g.presses.filter((name) => org.shows(name)) }))
+      .filter((g) => g.presses.length > 0)
+    return { ...basisForecast, presses, groups }
+  }, [basisForecast, org])
+  const shownWorkCenters = forecast?.presses.length ?? 0
   const options = forecast ? viewOptions(forecast) : []
   // Kayıtlı seçim artık yoksa (pres silindi vb.) ilk hat gösterilir.
   const selected = options.find((o) => o.key === selection) ?? options[0]
@@ -248,9 +276,33 @@ function CapacityPage() {
         )}
       </div>
 
+      <PlanOrgFilter
+        options={org.options}
+        selection={org.selection}
+        onChange={org.setSelection}
+        planned={shownWorkCenters}
+        total={basisForecast?.presses.length ?? allWorkCenters.length}
+        subject="in the forecast"
+        showWorkCenters
+        info={
+          <p>
+            Narrows this page to a department: pick a department, then one of its cost centers,
+            then a work center. The cards, the chart and the work center list all follow it. The
+            forecast itself is always computed for the whole plant, so the numbers do not change —
+            only what you see.
+          </p>
+        }
+      />
+
       {data && !forecast && (
         <p className="mt-6 text-sm text-muted-foreground">
           The capacity forecast appears after the next plan calculation.
+        </p>
+      )}
+
+      {forecast && forecast.presses.length === 0 && (
+        <p className="mt-6 text-sm text-muted-foreground">
+          No work center of this selection is in the forecast.
         </p>
       )}
 

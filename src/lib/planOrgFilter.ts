@@ -1,5 +1,6 @@
-// Production Plan sayfasının organizasyon süzgeci: bölüm → masraf yeri → iş
-// yeri. Yalnızca **görünümü** daraltır; plan her zaman fabrikanın tamamı için
+// Organizasyon süzgeci: bölüm → masraf yeri → iş yeri. Production Plan,
+// Master Data ve Capacity Dashboard aynı hesabı kullanır (tek kaynak).
+// Yalnızca **görünümü** daraltır; plan her zaman fabrikanın tamamı için
 // hesaplanır (motor kapasiteyi, vinci, kalıbı birlikte görmek zorundadır), bu
 // yüzden süzgeç motora girdi değildir.
 //
@@ -24,13 +25,18 @@ export interface OrgCostCenter {
   department?: string
 }
 
-/** Süzgeç durumu: boş bölüm = hepsi, boş masraf yeri listesi = bölümün hepsi. */
+/**
+ * Süzgeç durumu. Her kademe boşken üstündekinin hepsi demektir: boş bölüm =
+ * bütün bölümler, boş masraf yeri listesi = bölümün hepsi, boş iş yeri
+ * listesi = masraf yerlerinin hepsi.
+ */
 export interface PlanOrgSelection {
   department: string
   costCenters: string[]
+  workCenters: string[]
 }
 
-export const NO_ORG_FILTER: PlanOrgSelection = { department: '', costCenters: [] }
+export const NO_ORG_FILTER: PlanOrgSelection = { department: '', costCenters: [], workCenters: [] }
 
 export interface PlanOrgOption {
   value: string
@@ -42,9 +48,12 @@ export interface PlanOrgOption {
 export interface PlanOrgOptions {
   departments: PlanOrgOption[]
   costCenters: PlanOrgOption[]
+  /** Seçili bölüm / masraf yerindeki iş yerlerinin adları (sayı taşımaz). */
+  workCenters: string[]
 }
 
-export const orgFilterActive = (s: PlanOrgSelection) => s.department !== '' || s.costCenters.length > 0
+export const orgFilterActive = (s: PlanOrgSelection) =>
+  s.department !== '' || s.costCenters.length > 0 || s.workCenters.length > 0
 
 /** İş yerinin masraf yeri kodu; kodu yoksa ya da plant'te tanımlı değilse UNASSIGNED. */
 export function costCenterOf(press: OrgPress, costCenters: OrgCostCenter[]): string {
@@ -81,6 +90,7 @@ export function visibleWorkCenters(
     const dept = code === UNASSIGNED ? UNASSIGNED : (index.get(code) ?? UNASSIGNED)
     if (selection.department !== '' && dept !== selection.department) continue
     if (selection.costCenters.length > 0 && !selection.costCenters.includes(code)) continue
+    if (selection.workCenters.length > 0 && !selection.workCenters.includes(press.name)) continue
     names.add(press.name)
   }
   return names
@@ -105,12 +115,20 @@ export function planOrgOptions(
 
   const byDepartment = new Map<string, number>()
   const byCostCenter = new Map<string, number>()
+  const workCenterNames: string[] = []
   for (const press of presses) {
     const code = costCenterOf(press, costCenters)
     const dept = code === UNASSIGNED ? UNASSIGNED : (index.get(code) ?? UNASSIGNED)
     add(byDepartment, dept)
     // Masraf yeri sayıları yalnız seçili bölümün (bölüm seçilmediyse hepsinin).
-    if (selection.department === '' || selection.department === dept) add(byCostCenter, code)
+    const inDepartment = selection.department === '' || selection.department === dept
+    if (inDepartment) add(byCostCenter, code)
+    // İş yeri listesi seçili bölüm + masraf yerine göre daralır; iş yeri
+    // seçiminin kendisi listeyi daraltmaz (yoksa seçtikten sonra ötekiler
+    // kaybolur ve seçim geri alınamaz).
+    if (inDepartment && (selection.costCenters.length === 0 || selection.costCenters.includes(code))) {
+      workCenterNames.push(press.name)
+    }
   }
 
   const option = (counts: Map<string, number>, value: string, label: string): PlanOrgOption => ({
@@ -136,7 +154,11 @@ export function planOrgOptions(
     costCenterOptions.push(option(byCostCenter, UNASSIGNED, 'Without a cost center'))
   }
 
-  return { departments: departmentOptions, costCenters: costCenterOptions }
+  return {
+    departments: departmentOptions,
+    costCenters: costCenterOptions,
+    workCenters: [...new Set(workCenterNames)].sort((a, b) => a.localeCompare(b)),
+  }
 }
 
 /**
@@ -151,5 +173,10 @@ export function pruneOrgSelection(selection: PlanOrgSelection, options: PlanOrgO
   }
   const allowed = new Set(options.costCenters.map((o) => o.value))
   const kept = selection.costCenters.filter((code) => allowed.has(code))
-  return kept.length === selection.costCenters.length ? selection : { ...selection, costCenters: kept }
+  const names = new Set(options.workCenters)
+  const keptNames = selection.workCenters.filter((name) => names.has(name))
+  if (kept.length === selection.costCenters.length && keptNames.length === selection.workCenters.length) {
+    return selection
+  }
+  return { ...selection, costCenters: kept, workCenters: keptNames }
 }
