@@ -10,7 +10,6 @@ import { UnsavedBar } from '../components/UnsavedBar'
 import { relatedPages } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
 import { UNNAMED_STOP, draftOf, pressPayload, sameDraft, stopPatch, stopValue } from '../lib/pressDraft'
-import { RATE_MODELS, type RateModel } from '../lib/rateModel'
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import {
@@ -86,42 +85,6 @@ function HallInfo() {
   )
 }
 
-/** Üretim modeli: work center parçayı neyle ölçer (src/lib/rateModel.ts). */
-function ModelInfo() {
-  return (
-    <>
-      <p>
-        <b>Production model</b> — how the work center measures a part. Every part takes the model of its main machine.
-      </p>
-      <ul className="ml-4 list-disc space-y-0.5">
-        <li>
-          <b>{RATE_MODELS.stroke.label}</b>: {RATE_MODELS.stroke.hint}. The raw material page orders steel in kg for these parts.
-        </li>
-        <li>
-          <b>{RATE_MODELS.cycle.label}</b>: {RATE_MODELS.cycle.hint}. In Master Data the part gets a cycle time in minutes per
-          piece (3 decimals) and “stop every N pieces” for its frequency stop (fixture setup …).
-        </li>
-      </ul>
-      <p>
-        Every line has its own plan structure; they are not mixed. A press part that goes on to a spot welding line is planned on the
-        press; the welding line is planned separately (no link between them today).
-      </p>
-    </>
-  )
-}
-
-function ModelSelect({ value, onChange, className = '' }: { value: RateModel; onChange: (v: RateModel) => void; className?: string }) {
-  return (
-    <select className={`${input} ${className}`} value={value} onChange={(e) => onChange(e.target.value as RateModel)}>
-      {(Object.keys(RATE_MODELS) as RateModel[]).map((m) => (
-        <option key={m} value={m}>
-          {RATE_MODELS[m].label}
-        </option>
-      ))}
-    </select>
-  )
-}
-
 /** Frekansiyel duruşun ne olduğu ve planlayıcıda nasıl çalıştığı. */
 function StopInfo() {
   return (
@@ -136,7 +99,7 @@ function StopInfo() {
       <ul className="ml-4 list-disc space-y-0.5">
         <li>
           On a press the interval is every coil (coil weight ÷ gross weight, Master Data). The first one is part of the setup; each
-          one after it stops the press. A cycle line keeps “Stop every N pieces” per part for its own plan.
+          one after it stops the press. A part without coil data (nut welding …) has no coil stop; “Stop every N pieces” is kept in Master Data but the planner does not use it yet.
         </li>
         <li>Its length is the part's <i>Frequency stop time</i> in Master Data.</li>
         <li>
@@ -817,7 +780,6 @@ function Detail({
     category?: string
     feedsCoil?: boolean
     frequencyStop?: string
-    rateModel?: RateModel
     costCenter?: string
   }) => Promise<boolean>
   prefillName: string | null
@@ -851,10 +813,6 @@ function Detail({
       label: 'Halls',
       value: count((p) => p.hall.trim()),
       chip: <Chip kind="hall" />,
-    },
-    {
-      label: 'Cycle lines',
-      value: list.filter((p) => p.rateModel === 'cycle').length,
     },
   ]
 
@@ -906,7 +864,7 @@ function Detail({
       )}
 
       {!single && (
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
           {stats.map((s) => (
             <div key={s.label} className="rounded-md border border-border bg-background px-3 py-2">
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -1134,14 +1092,6 @@ function WcTable({
             </th>
             <th className="px-3 py-2 font-medium">
               <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                Model
-                <InfoTip label="Production model">
-                  <ModelInfo />
-                </InfoTip>
-              </span>
-            </th>
-            <th className="px-3 py-2 font-medium">
-              <span className="inline-flex items-center gap-1 whitespace-nowrap">
                 Frequency stop
                 <InfoTip label="What a frequency stop is">
                   <StopInfo />
@@ -1212,9 +1162,6 @@ function WcTable({
                   <HallInput className="w-28" value={draft.hall} halls={halls} onChange={(v) => rows.edit(p._id, { hall: v })} />
                 </td>
                 <td className="px-3 py-2">
-                  <ModelSelect className="w-44" value={draft.rateModel} onChange={(v) => rows.edit(p._id, { rateModel: v })} />
-                </td>
-                <td className="px-3 py-2">
                   <StopSelect className="w-40" value={draft} onChange={(patch) => rows.edit(p._id, patch)} />
                 </td>
                 <td className="px-3 py-2">
@@ -1281,7 +1228,6 @@ function AddWorkCenter({
     category?: string
     feedsCoil?: boolean
     frequencyStop?: string
-    rateModel?: RateModel
     costCenter?: string
   }) => Promise<boolean>
   onNewCategory: () => Promise<string | null>
@@ -1294,7 +1240,6 @@ function AddWorkCenter({
   const [category, setCategory] = useState(node.kind === 'category' ? node.name : '')
   const [hall, setHall] = useState(node.kind === 'hall' ? node.name : '')
   const [stop, setStop] = useState({ feedsCoil: false, frequencyStop: '' })
-  const [rateModel, setRateModel] = useState<RateModel>('stroke')
   const [saving, setSaving] = useState(false)
   const add = async () => {
     const n = name.trim()
@@ -1307,7 +1252,6 @@ function AddWorkCenter({
         category: category || undefined,
         feedsCoil: stop.feedsCoil,
         frequencyStop: stop.frequencyStop || undefined,
-        rateModel,
         costCenter,
       })
       if (ok) {
@@ -1357,15 +1301,6 @@ function AddWorkCenter({
             </InfoTip>
           </span>
           <HallInput className="mt-1 block w-32" value={hall} halls={halls} onChange={setHall} />
-        </label>
-        <label className="text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            Model
-            <InfoTip label="Production model">
-              <ModelInfo />
-            </InfoTip>
-          </span>
-          <ModelSelect className="mt-1 block w-52" value={rateModel} onChange={setRateModel} />
         </label>
         <label className="text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">

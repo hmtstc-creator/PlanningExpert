@@ -155,10 +155,10 @@ yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
     seçimi; Gantt, iş listesi, *Plan settings*, *Work calendar*, *Add job* malzeme listesi,
     *Pin to work center* ve geç iş sayısı süzgece uyar, seçim tarayıcıda kalır. Yalnız görünüm:
     plan fabrikanın tamamı için hesaplanır (`src/lib/planOrgFilter.ts`, wiki 01 değişmez 8).
-  - [ ] **Cycle hatlarının planlanması** (nut welding, punta, robot, montaj): pres motoru yalnız
-    `rateModel: 'stroke'` iş yerlerini planlar (`pressPlanScope`). Süzgeçte bu iş yerleri
-    "not planned" diye sayılıyor; gerçekten planlanmaları ayrı ve büyük bir iş (çevrim süresi
-    bazlı yerleştirme, pres parçasıyla bağ).
+  - [x] **Cycle hatlarının planlanması** (nut welding, punta, robot, montaj) — 2026-10-29: motor
+    bütün parçaları ve iş yerlerini çevrim süresiyle (dk/adet, `rateModel.ts` `minutesPerPiece`)
+    planlar; `pressPlanScope` ve süzgeçteki "not planned" kalktı. Açık: pres parçası → punta hattı
+    bağı (ara mamul akışı) ve "Stop every N pcs" frekansiyel duruşu motorda yok.
 
 ### Organizasyon teyidi (2026-10-03)
 

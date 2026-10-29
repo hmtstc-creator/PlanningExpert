@@ -7,7 +7,8 @@
 //   talep     = o haftanın ZPP ihtiyacının saat karşılığı. Bu haftaya
 //               geçmiş bakiye (overdue) eklenir. Belirli depolardaki stok
 //               en erken ihtiyaçtan başlayarak düşülür.
-//               saat = vuruş ÷ SPM ÷ 60 ÷ performans çarpanı
+//               saat = adet × çevrim süresi (dk/adet) ÷ 60 ÷ performans
+//               çarpanı (çevrim süresi yoksa eski 1 ÷ (SPM × göz))
 //               (10 saatlik saf süre, %60 çarpanla 16,67 saat sayılır;
 //               setup ve onay bu pencerenin içindedir)
 //   fazla     = talep − kapasite (pozitifse)
@@ -20,6 +21,7 @@
 // sayılır.
 
 import type { ProductSpec } from './planning'
+import { cavitiesOf, minutesPerStroke } from './rateModel'
 
 /**
  * Stok sayılan depolar — plan ve kapasite öngörüsü aynı listeyi kullanır.
@@ -201,7 +203,9 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
       continue
     }
     const press = carrier.mainMachine?.trim() ?? ''
-    const spm = carrier.spm ?? 0
+    // Vuruşun dakikası (tek kaynak src/lib/rateModel.ts): çevrim süresi × göz,
+    // yoksa eski 1 ÷ SPM.
+    const perStroke = minutesPerStroke(carrier)
     if (!press || !pressSet.has(press)) {
       unassigned.push({
         material,
@@ -210,11 +214,11 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
       })
       continue
     }
-    if (spm <= 0) {
-      unassigned.push({ material, reason: 'no SPM', quantity: total })
+    if (perStroke <= 0) {
+      unassigned.push({ material, reason: 'no cycle time', quantity: total })
       continue
     }
-    const cav = (p?: ProductSpec) => (p?.moldCavities && p.moldCavities > 0 ? p.moldCavities : 1)
+    const cav = cavitiesOf
     // Bu malzemenin ve eşinin göz sayısı (eş ürün aynı vuruştan kendi gözü kadar çıkar).
     const ownCavities = cav(productByCode.get(material) ?? carrier)
     const partnerCavities = cav(partnerCode ? productByCode.get(partnerCode) : undefined)
@@ -228,8 +232,8 @@ export function buildCapacityForecast(input: ForecastInput): CapacityForecast {
       // Gereken vuruş: iki ürünün kendi adet ÷ kendi gözünün büyüğü.
       const strokes = Math.max(net[w] / ownCavities, (partnerNet?.[w] ?? 0) / partnerCavities)
       if (strokes <= 0) continue
-      row[w] += strokes / spm / factor
-      ideal[w] += strokes / spm
+      row[w] += (strokes * perStroke) / factor
+      ideal[w] += strokes * perStroke
     }
   }
 

@@ -1,6 +1,6 @@
 # 02 · Planlama motoru
 
-> Son güncelleme: 2026-10-29 (presi durduran arıza da planlı duruş gibi; kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
+> Son güncelleme: 2026-10-29 (bütün parçalar ve iş yerleri çevrim süresiyle: süre = adet × dk/adet, nut welding de planda; presi durduran arıza da planlı duruş gibi; kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
 > Kullanıcıya dönük anlatım: sitede **Planning Logic**
 
 Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Aynı girdi aynı planı verir
@@ -30,6 +30,19 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
      iş × gün × **çalışma penceresi** olarak gruplar. Planlı duruş çubuğu bölmez (içinde nokta), kapalı vardiya
      böler. Önceden iş × gün gruplandığı için `min(start)–max(end)` kapalı vardiyanın üstünü boyuyordu:
      plan doğru, çizim yanlıştı.
+   - **Bütün iş yerleri ve parçalar girer** (2026-10-29): `convex/planEngine.ts` hiçbir iş yerini ya da parçayı
+     elemez (eski `pressPlanScope` / cycle hattı ayrımı kalktı). `presses.rateModel` şemada eski kayıtlar için durur,
+     motor okumaz.
+   - **Süre tek kaynaktan** (`src/lib/rateModel.ts`): `minutesPerPiece(parça)` = `cycleMinutes` (> 0 ise); yoksa
+     geri uyum `1 ÷ (SPM × göz)` (göz yoksa 1); ikisi de yoksa 0 = süre tanımsız. İşin ideal süresi
+     `runMinutesFor` = vuruş × dk/vuruş: göz yoksa **adet × dk/adet** (1200 × 0,25 = 300 dk); eski SPM'li parçada
+     harfiyen `⌈adet ÷ göz⌉ ÷ SPM` (süre eskisiyle bit bit aynı). Göz yalnız vuruşu belirler (kalıp ömrü, rulo başına
+     vuruş, maks. baskı); göz silinince vuruş = adet. `computeRunPlan`, kapasite öngörüsü, `performance.ts`,
+     geç iş hesabı (`minutesPerPiece`) bunu kullanır; doğrulayıcı kendi kopyasıyla (`strokeMinutes`) "no cycle time in
+     master data" ve "faster than the cycle time allows" der.
+   - **Rulosuz / sacsız parça** (nut welding …): lot kuralı `missing` ama `cycleMinutes > 0` ise uyarı basılmaz
+     (plan uyarısı, iş gerekçesi "exact quantity (cycle time, no coil)", doğrulayıcı bayrağı); hammadde sayfası
+     da hammadde kodu + brüt ağırlık + rulo yoksa onu "eksik veri" saymaz. Min. lot varsa o uygulanır.
 2. **Talep → lot** (`buildDemandSchedule`, `planning.ts`):
    - ZPP_DAILY kapsadığı günlerde **tam tarihine** düşer; ötesinde haftalık ZPP çalışma günlerine eşit yayılır; bakiye bugündür.
    - **ZPP_DAILY önce, haftalık ZPP uzun vade** (Slayt 1, 2026-10-28): ZPP_DAILY yüklü ve bugüne ulaşıyorsa haftalık ZPP'den gelen

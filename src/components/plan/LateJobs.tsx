@@ -317,8 +317,7 @@ function LateCalcView({ item, calc }: { item: LateItem; calc: LateCalc }) {
           </li>
           <li>
             Speed: {calc.piecesPerHour.toLocaleString('en-GB')} pcs/h
-            {calc.spm ? ` from SPM ${calc.spm}` : ''}
-            {calc.cavities ? ` × ${calc.cavities} cavities` : ''}
+            {calc.minutesPerPiece ? ` from a cycle time of ${calc.minutesPerPiece} min/pc` : ''}
             {calc.performanceFactor ? ` × performance ${Math.round(calc.performanceFactor * 100)}%` : ''}; setup {calc.setupMinutes} min, quality approval{' '}
             {calc.qualityMinutes} min — <Link to="/referanslar" className="underline">Master Data</Link>.
           </li>

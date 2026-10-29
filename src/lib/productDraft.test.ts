@@ -12,6 +12,7 @@ const product = {
   coProduct: 'M250SP002RO',
   moldCavities: 2,
   spm: 16,
+  cycleMinutes: 0.75,
   rawMaterialCode: 'SD51-100-0976',
   coilWeight: 8000,
   grossWeight: 1.465,
@@ -27,7 +28,10 @@ const product = {
 describe('master data taslağı', () => {
   it('her alanı metne çevirir, tanımsızı boş kutu yapar', () => {
     const draft = productDraftOf(product)
-    expect(draft.moldCavities).toBe('2')
+    expect(draft.cycleMinutes).toBe('0.750')
+    // SPM ve göz tabloda yok (süre çevrim süresinden): taslak onlara dokunmaz.
+    expect('spm' in draft).toBe(false)
+    expect('moldCavities' in draft).toBe(false)
     expect(draft.grossWeight).toBe('1.465')
     // Tanımlanmamış alternatif makineler boş kutu olur, "undefined" değil.
     expect(draft.altMachine2).toBe('')
@@ -47,17 +51,17 @@ describe('master data taslağı', () => {
 
   it('yalnızca gerçekten değişen alanları yazar', () => {
     const server = productDraftOf(product)
-    const edited = { ...server, spm: '20', mainMachine: 'PRS-109' }
+    const edited = { ...server, cycleMinutes: '0.800', mainMachine: 'PRS-109' }
     expect(changedProductFields(edited, server).map((f) => f.name)).toEqual([
-      'spm',
       'mainMachine',
+      'cycleMinutes',
     ])
     expect(changedProductFields(server, server)).toEqual([])
   })
 
   it('sayısal alanları işaretler', () => {
     const numeric = PRODUCT_FIELDS.filter((f) => f.numeric).map((f) => f.name)
-    expect(numeric).toContain('spm')
+    expect(numeric).toContain('cycleMinutes')
     expect(numeric).toContain('grossWeight')
     expect(numeric).not.toContain('mainMachine')
     expect(numeric).not.toContain('code')

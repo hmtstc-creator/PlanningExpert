@@ -1,59 +1,91 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatCycleMinutes, minutesPerPiece, modelOfPart, piecesPerHour, pressPlanScope, rateModelOf, roundCycleMinutes } from './rateModel'
+import { computeRunPlan, splitByMoldLimit } from './planning'
+import {
+  cavitiesOf,
+  formatCycleMinutes,
+  hasCycleTime,
+  minutesPerPiece,
+  minutesPerStroke,
+  piecesPerHour,
+  roundCycleMinutes,
+  runMinutesFor,
+} from './rateModel'
 
-const presses = new Map([
-  ['PRS-1', { rateModel: undefined }],
-  ['PNT-1', { rateModel: 'cycle' }],
-])
-
-describe('üretim modeli', () => {
-  it('parça ana makinesinin modelini alır; tanımsız = pres', () => {
-    expect(modelOfPart({ mainMachine: 'PNT-1' }, presses)).toBe('cycle')
-    expect(modelOfPart({ mainMachine: 'PRS-1' }, presses)).toBe('stroke')
-    expect(modelOfPart({ mainMachine: 'X' }, presses)).toBe('stroke')
-    expect(rateModelOf({ rateModel: 'cycle' })).toBe('cycle')
+describe('üretim hızı: tek dil dakika / adet', () => {
+  it('çevrim süresi varsa o; saatte 60 ÷ çevrim', () => {
+    expect(minutesPerPiece({ cycleMinutes: 0.75 })).toBe(0.75)
+    expect(piecesPerHour({ cycleMinutes: 0.75 })).toBe(80)
+    // Çevrim süresi eski SPM / gözden önce gelir.
+    expect(minutesPerPiece({ cycleMinutes: 0.5, spm: 60, moldCavities: 2 })).toBe(0.5)
+    expect(hasCycleTime({ cycleMinutes: 0.5 })).toBe(true)
+    expect(hasCycleTime({ spm: 20 })).toBe(false)
   })
 
-  it('pres: saatte SPM × 60 × göz; adet başına dakika bunun tersi', () => {
+  it('geri uyum: çevrim süresi yoksa 1 ÷ (SPM × göz); göz yoksa 1', () => {
     // 18 SPM, 2 göz → dakikada 36, saatte 2160 adet; adet başına 1/36 dk.
-    const p = { spm: 18, moldCavities: 2 }
-    expect(piecesPerHour(p, 'stroke')).toBe(2160)
-    expect(minutesPerPiece(p, 'stroke')).toBeCloseTo(1 / 36, 10)
-    // Göz yazılmamış: 1.
-    expect(piecesPerHour({ spm: 20 }, 'stroke')).toBe(1200)
+    expect(minutesPerPiece({ spm: 18, moldCavities: 2 })).toBeCloseTo(1 / 36, 12)
+    expect(piecesPerHour({ spm: 18, moldCavities: 2 })).toBeCloseTo(2160, 9)
+    expect(piecesPerHour({ spm: 20 })).toBeCloseTo(1200, 9)
+    expect(minutesPerStroke({ spm: 20, moldCavities: 4 })).toBe(1 / 20)
+    expect(cavitiesOf({})).toBe(1)
   })
 
-  it('çevrim: dakika / adet, 3 hane; saatte 60 ÷ çevrim', () => {
-    expect(piecesPerHour({ cycleMinutes: 0.75 }, 'cycle')).toBe(80)
-    expect(minutesPerPiece({ cycleMinutes: 0.75 }, 'cycle')).toBeCloseTo(0.75, 10)
+  it('süre tanımsız: 0 (sıfıra bölme yok)', () => {
+    expect(minutesPerPiece({})).toBe(0)
+    expect(piecesPerHour({})).toBe(0)
+    expect(runMinutesFor({}, 100)).toBe(0)
+  })
+
+  it('çevrim süresi 3 hane', () => {
     expect(roundCycleMinutes(0.12345)).toBe(0.123)
     expect(roundCycleMinutes(1.0005)).toBe(1.001)
     expect(formatCycleMinutes(0.5)).toBe('0.500')
     expect(formatCycleMinutes(0)).toBe('')
-    // Çevrim süresi yoksa hız yok (sıfıra bölme yok).
-    expect(piecesPerHour({}, 'cycle')).toBe(0)
-  })
-
-  it('pres planı yalnızca pres hatlarını ve onların parçalarını içerir', () => {
-    const scope = pressPlanScope(
-      [{ name: 'PRS-1' }, { name: 'PNT-1', rateModel: 'cycle' }],
-      [
-        { code: 'A', mainMachine: 'PRS-1' },
-        { code: 'B', mainMachine: 'PNT-1' },
-        { code: 'C', mainMachine: '' },
-      ],
-    )
-    expect(scope.presses.map((p) => p.name)).toEqual(['PRS-1'])
-    expect(scope.products.map((p) => p.code)).toEqual(['A', 'C'])
-    expect([...scope.excludedParts]).toEqual(['B'])
-    expect(scope.cycleLines).toEqual(['PNT-1'])
   })
 })
 
-describe('eş ürün adedi (computeRunPlan)', () => {
-  it('eş ürün aynı vuruştan kendi göz sayısı kadar çıkar', async () => {
-    const { computeRunPlan } = await import('./planning')
+describe('computeRunPlan: süre = adet × dakika / adet', () => {
+  it('yalnız çevrim süreli parça (nut welding): 1200 adet × 0,25 dk = 300 dk, vuruş = adet', () => {
+    const run = computeRunPlan({ code: 'APR-601', cycleMinutes: 0.25 }, 1200)
+    expect(run.theoreticalRunMinutes).toBe(300)
+    expect(run.runMinutes).toBe(300)
+    expect(run.shots).toBe(1200)
+    expect(run.coilsNeeded).toBe(0)
+    // Planning Logic örneği: %60 Accepted OEE ile iş 300 ÷ 0,6 = 500 dk.
+    const withOee = computeRunPlan({ code: 'APR-601', cycleMinutes: 0.25, performanceFactor: 0.6 }, 1200)
+    expect(Math.round(withOee.totalMinutes)).toBe(500)
+  })
+
+  it('eski parça (çevrim süresi yok, SPM + göz var): süre eskisiyle bit bit aynı (vuruş ÷ SPM)', () => {
+    const old = (q: number, spm: number, cav: number) => Math.ceil(q / cav) / spm
+    for (const [q, spm, cav] of [
+      [1200, 18, 2],
+      [1001, 16, 4],
+      [7, 13, 3],
+      [5000, 22, 1],
+    ]) {
+      const run = computeRunPlan({ code: 'P', spm, moldCavities: cav }, q)
+      expect(run.theoreticalRunMinutes).toBe(old(q, spm, cav))
+      expect(run.shots).toBe(Math.ceil(q / cav))
+    }
+    // Çarpan ve setup ile tam pencere de aynı: 2000 adet, 2 göz, 1000 vuruş ÷ 20 SPM
+    // = 50 dk; %50 OEE → pencere 100 dk, 30 dk setup düşülünce üretim 70 dk.
+    const run = computeRunPlan({ code: 'P', spm: 20, moldCavities: 2, performanceFactor: 0.5, setupMinutes: 30 }, 2000)
+    expect(run.theoreticalRunMinutes).toBe(50)
+    expect(run.runMinutes).toBe(70)
+    expect(run.totalMinutes).toBe(100)
+  })
+
+  it('göz silinince vuruş = adet; göz varsa vuruş = ⌈adet ÷ göz⌉ (kalıp ömrü için)', () => {
+    expect(computeRunPlan({ code: 'P', cycleMinutes: 0.1 }, 900).shots).toBe(900)
+    expect(computeRunPlan({ code: 'P', cycleMinutes: 0.1, moldCavities: 4 }, 900).shots).toBe(225)
+    // Kalıp limiti adet = vuruş üzerinden bölünür.
+    const parts = splitByMoldLimit({ code: 'P', cycleMinutes: 0.1, maxShots: 400 }, 900)
+    expect(parts.map((r) => r.quantity)).toEqual([400, 400, 100])
+  })
+
+  it('eş ürün aynı vuruştan kendi göz sayısı kadar çıkar', () => {
     // 1200 adet A, 4 göz → 300 vuruş; eşi 2 gözlü → 600 adet.
     expect(computeRunPlan({ code: 'A', coProduct: 'B', moldCavities: 4, spm: 10 }, 1200, 2).coProductQuantity).toBe(600)
     // Eşin gözü bilinmiyorsa asılınki.

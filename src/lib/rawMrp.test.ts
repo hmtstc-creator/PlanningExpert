@@ -81,6 +81,25 @@ describe('raw material MRP (plan independent)', () => {
     ])
   })
 
+  it('a part without steel but with a cycle time (nut welding) is not missing data', () => {
+    const plan = buildRawRequirements({
+      products: [
+        { code: 'NUT', cycleMinutes: 0.25 },
+        // Çevrim süresi var ama brüt ağırlığı girilmiş: sac bekleniyor, eksik sayılır.
+        { code: 'W', cycleMinutes: 0.5, grossWeight: 1 },
+      ],
+      weeklyDemand: [
+        { material: 'NUT', periods: [{ label: 'W39', qty: -10 }] },
+        { material: 'W', periods: [{ label: 'W39', qty: -4 }] },
+      ],
+      finishedStock: new Map(),
+      rawStock: new Map(),
+      weeks,
+    })
+    expect(plan.items).toHaveLength(0)
+    expect(plan.missingSpec).toEqual([{ material: 'W', pieces: 4, reason: 'no raw material code' }])
+  })
+
   it('every week end holds the next N working days (10 = 2 weeks) and each order gets the extra', () => {
     // 7 000 kg/hafta, 5 iş günü. 10 iş günü emniyet = sonraki iki haftanın tüketimi.
     const r = rawMrp(

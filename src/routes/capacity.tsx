@@ -158,7 +158,7 @@ function CapacityPage() {
               first. Each part counts on its main work center; a co-product pair counts once.
             </p>
             <p>
-              <b>Hours</b> = pieces ÷ cavities ÷ SPM ÷ OEE (10 h at 60 % counts as 16.7 h; setup and
+              <b>Hours</b> = pieces × cycle time (min/pc) ÷ 60 ÷ OEE (10 h at 60 % counts as 16.7 h; setup and
               approval sit inside that time). OEE is chosen below: A) Prediction OEE — one rate for
               every part, set on this page, or B) each part's Accepted OEE from Master Data.
             </p>
@@ -718,7 +718,7 @@ function Unassigned({ forecast }: { forecast: CapacityForecast }) {
         <Link to="/referanslar" className="underline">
           Master Data
         </Link>{' '}
-        (main work center and SPM) so their hours count.
+        (main work center and cycle time) so their hours count.
       </p>
       <ul className="mt-2 grid grid-cols-1 gap-x-6 gap-y-0.5 text-xs sm:grid-cols-2 lg:grid-cols-3">
         {forecast.unassigned.map((u) => (

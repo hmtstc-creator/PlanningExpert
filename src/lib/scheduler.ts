@@ -15,6 +15,7 @@ import {
   splitByMoldLimit,
 } from './planning'
 import { addDays, isoDate } from './dates'
+import { hasCycleTime } from './rateModel'
 
 /** ISO tarihe gün ekler/çıkarır. */
 function shiftIsoDate(date: string, days: number): string {
@@ -2318,7 +2319,9 @@ function placeRun(
     run.coilsNeeded === 0
       ? (product.minLotQty ?? 0) > 0
         ? `min. lot ${Math.round(product.minLotQty ?? 0).toLocaleString('en-GB')} pcs`
-        : '⚠ no Min. lot and no coil weight in master data — exact quantity'
+        : hasCycleTime(product)
+          ? 'exact quantity (cycle time, no coil)'
+          : '⚠ no Min. lot and no coil weight in master data — exact quantity'
       : run.coilsNeeded === 1
         ? '1 full coil'
         : `${run.coilsNeeded} full coils`,

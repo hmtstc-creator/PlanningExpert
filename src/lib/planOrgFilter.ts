@@ -7,12 +7,8 @@
 // tablosu), masraf yeri → bölüm (plant kaydı). Tek kaynak orası; burada kopya
 // tutulmaz.
 //
-// Pres planı yalnız `rateModel: 'stroke'` iş yerlerini kapsar
-// (src/lib/rateModel.ts `pressPlanScope`). Cycle hatları (punta, robot,
-// montaj, nut welding) henüz planlanmaz; süzgeç bunları "plan dışı" diye
-// sayar ki seçilen bölüm boş görünürse nedeni belli olsun.
-
-import { rateModelOf } from './rateModel'
+// Bütün iş yerleri planlanır (2026-10-29: süre her parçada çevrim süresinden
+// gelir; pres / cycle ayrımı yoktur), bu yüzden "plan dışı" sayaç yoktur.
 
 /** Bölümü ya da masraf yeri olmayan iş yerlerinin seçenek değeri. */
 export const UNASSIGNED = '(none)'
@@ -20,7 +16,6 @@ export const UNASSIGNED = '(none)'
 export interface OrgPress {
   name: string
   costCenter?: string
-  rateModel?: string | null
 }
 
 export interface OrgCostCenter {
@@ -40,10 +35,8 @@ export const NO_ORG_FILTER: PlanOrgSelection = { department: '', costCenters: []
 export interface PlanOrgOption {
   value: string
   label: string
-  /** Pres planına giren iş yeri sayısı (stroke). */
-  planned: number
-  /** Tanımlı ama pres planına girmeyen iş yeri sayısı (cycle hatları). */
-  other: number
+  /** Bu seçenekteki iş yeri sayısı (hepsi planlanır). */
+  count: number
 }
 
 export interface PlanOrgOptions {
@@ -96,7 +89,7 @@ export function visibleWorkCenters(
 /**
  * Seçim kutularının içeriği. Masraf yeri listesi seçili bölüme göre daralır;
  * hiç iş yeri olmayan bölüm / masraf yeri listeye girmez (ölü seçenek olmaz).
- * `planned` pres planına giren, `other` plan dışı (cycle) iş yeri sayısıdır.
+ * `count` seçenekteki iş yeri sayısıdır.
  * Bölüm sırası plant kaydındaki sıradır; listede olmayan bölümler sonra,
  * bölümsüzler en sonda.
  */
@@ -108,28 +101,22 @@ export function planOrgOptions(
 ): PlanOrgOptions {
   const index = departmentIndex(costCenters)
   const nameOf = new Map(costCenters.map((c) => [c.code, c.name]))
-  const empty = () => ({ planned: 0, other: 0 })
-  const add = (into: Map<string, { planned: number; other: number }>, key: string, press: OrgPress) => {
-    const row = into.get(key) ?? empty()
-    if (rateModelOf(press) === 'stroke') row.planned += 1
-    else row.other += 1
-    into.set(key, row)
-  }
+  const add = (into: Map<string, number>, key: string) => into.set(key, (into.get(key) ?? 0) + 1)
 
-  const byDepartment = new Map<string, { planned: number; other: number }>()
-  const byCostCenter = new Map<string, { planned: number; other: number }>()
+  const byDepartment = new Map<string, number>()
+  const byCostCenter = new Map<string, number>()
   for (const press of presses) {
     const code = costCenterOf(press, costCenters)
     const dept = code === UNASSIGNED ? UNASSIGNED : (index.get(code) ?? UNASSIGNED)
-    add(byDepartment, dept, press)
+    add(byDepartment, dept)
     // Masraf yeri sayıları yalnız seçili bölümün (bölüm seçilmediyse hepsinin).
-    if (selection.department === '' || selection.department === dept) add(byCostCenter, code, press)
+    if (selection.department === '' || selection.department === dept) add(byCostCenter, code)
   }
 
-  const option = (counts: Map<string, { planned: number; other: number }>, value: string, label: string): PlanOrgOption => ({
+  const option = (counts: Map<string, number>, value: string, label: string): PlanOrgOption => ({
     value,
     label,
-    ...(counts.get(value) ?? empty()),
+    count: counts.get(value) ?? 0,
   })
 
   const deptOrder = departments.filter((d) => byDepartment.has(d))

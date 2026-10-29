@@ -462,6 +462,16 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const c = productBy.get(m)?.moldCavities
     return c && c > 0 ? c : 1
   }
+  // Vuruşların ideal süresi (dk). Motordan bağımsız küçük kopya; tanım
+  // src/lib/rateModel.ts: çevrim süresi (dk/adet) varsa vuruş × göz × çevrim,
+  // yoksa geri uyum için vuruş ÷ SPM. 0 = süre tanımsız.
+  const strokeMinutes = (p: ProductSpec | undefined, strokes: number) => {
+    if (!p || strokes <= 0) return 0
+    const cycle = p.cycleMinutes ?? 0
+    if (cycle > 0) return strokes * (p.moldCavities && p.moldCavities > 0 ? p.moldCavities : 1) * cycle
+    return p.spm && p.spm > 0 ? strokes / p.spm : 0
+  }
+  const hasRate = (p: ProductSpec | undefined) => strokeMinutes(p, 1) > 0
   const partnerOf = new Map<string, string>()
   for (const p of inputs.products) {
     const co = p.coProduct?.trim()
@@ -1091,8 +1101,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const minWork = (g: string, strokes: number, press: string, qPrimary: number) => {
     const p = primaryOf(g)
     if (!p) return 0
-    const spm = p.spm && p.spm > 0 ? p.spm : 0
-    const theor = spm > 0 ? strokes / spm : 0
+    const theor = strokeMinutes(p, strokes)
     const f = p.performanceFactor && p.performanceFactor > 0 ? Math.min(1, p.performanceFactor) : 1
     const pc = piecesPerCoil(p)
     const feeds = pressByName.get(press)?.feedsCoil !== false
@@ -1437,9 +1446,10 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     }
     const primary = primaryOf(g)
     if (primary) {
-      if (!(primary.spm && primary.spm > 0)) flags.push(`${primary.code}: no SPM in master data.`)
+      if (!hasRate(primary)) flags.push(`${primary.code}: no cycle time in master data.`)
       if (!primary.mainMachine?.trim()) flags.push(`${primary.code}: no main work center in master data.`)
-      if (!((primary.minLotQty ?? 0) > 0) && piecesPerCoil(primary) <= 0) flags.push(`${primary.code}: no Min. lot and no real coil weight — lot size unknown.`)
+      // Çevrim süreli parça (nut welding …) rulo / sac kullanmaz: bayrak değil.
+      if (!((primary.minLotQty ?? 0) > 0) && piecesPerCoil(primary) <= 0 && !((primary.cycleMinutes ?? 0) > 0)) flags.push(`${primary.code}: no Min. lot and no real coil weight — lot size unknown.`)
     }
     return flags
   }
@@ -1526,9 +1536,8 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     const p = primaryOf(g)
     const unit = coilUnit(p)
     const strokes = unit > 0 ? Math.ceil(need.qPrimary / unit) * Math.floor(unit / cav(p!.code)) : need.strokes
-    const spm = p?.spm && p.spm > 0 ? p.spm : 0
     const f = p?.performanceFactor && p.performanceFactor > 0 ? Math.min(1, p.performanceFactor) : 1
-    const windowRun = spm > 0 && allowedFrom < windowEnd ? Math.max(strokes, need.strokes) / spm / f : 0
+    const windowRun = hasRate(p) && allowedFrom < windowEnd ? strokeMinutes(p, Math.max(strokes, need.strokes)) / f : 0
     groupWork.set(g, { group: g, presses, allowedFrom, windowRun, needsNew: true })
   }
   const perPress: PressEfficiency[] = []
@@ -1796,7 +1805,7 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   }
 
   // R8 lot fiziği
-  const r8 = rule('lot-rules', 'Whole coils (or ≥ Min. lot), mould shot limit, run not faster than SPM, no frequency stops on work centers without one')
+  const r8 = rule('lot-rules', 'Whole coils (or ≥ Min. lot), mould shot limit, run not faster than the cycle time, no frequency stops on work centers without one')
   const lotSums = new Map<string, { qty: number; jobs: AJob[] }>()
   for (const j of planJobs) {
     const key = `${j.material}|${j.job?.bucketLabel ?? ''}|${j.job?.dueDate ?? ''}`
@@ -1819,9 +1828,9 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     if (maxShots > 0 && j.shots > maxShots && !(shotsPerCoil > maxShots && j.shots <= shotsPerCoil)) {
       r8.fail(`${j.id}: ${j.shots} shots exceeds the mould limit ${maxShots}.`)
     }
-    const spm = p.spm && p.spm > 0 ? p.spm : 0
+    const minRun = strokeMinutes(p, j.shots)
     const runMin = j.runSegs.reduce((x, b) => x + (b.end - b.start), 0)
-    if (spm > 0 && runMin < j.shots / spm - 0.5) r8.fail(`${j.id}: runs ${Math.round(runMin)} min, faster than ${spm} SPM allows (${Math.round(j.shots / spm)} min).`)
+    if (minRun > 0 && runMin < minRun - 0.5) r8.fail(`${j.id}: runs ${Math.round(runMin)} min, faster than the cycle time allows (${Math.round(minRun)} min).`)
     if (pressByName.get(j.press)?.feedsCoil === false && j.coilSegs.length > 0) r8.fail(`${j.id}: frequency stop on ${j.press}, which has none.`)
   }
   for (const [key, e] of lotSums) {

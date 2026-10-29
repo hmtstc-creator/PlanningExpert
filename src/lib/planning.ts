@@ -1,6 +1,7 @@
 import { addDays, isoDate } from './dates'
 import { splitWeek } from './dailyDemand'
 import { DEFAULT_WORKING_DAYS } from './settingsDefaults'
+import { runMinutesFor } from './rateModel'
 import { intermediateCodes } from './stockLocations'
 import { buildDayTimeline, type OvertimeWindow, type PlannedStop } from './shiftTimeline'
 
@@ -897,8 +898,12 @@ function primaryOfPair(
 export interface ProductSpec {
   code: string
   coProduct?: string
+  /** Kalıp gözü: yalnız vuruş sayısını belirler (vuruş = ⌈adet ÷ göz⌉); süreyi değil. */
   moldCavities?: number
+  /** @deprecated Geri uyum: `cycleMinutes` yoksa süre 1 ÷ (SPM × göz) dk/adet. */
   spm?: number
+  /** Çevrim süresi, dakika / adet — bütün iş yerlerinde sürenin kaynağı (src/lib/rateModel.ts). */
+  cycleMinutes?: number
   /** Kg / shot (bir vuruşta tüketilen brüt ağırlık). */
   grossWeight?: number
   /** Ortalama rulo ağırlığı (kg). */
@@ -995,8 +1000,9 @@ export interface RunPlan {
 export function computeRunPlan(product: ProductSpec, quantity: number, coProductCavities?: number): RunPlan {
   const cavities = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
   const shots = Math.ceil(quantity / cavities)
-  const spm = product.spm && product.spm > 0 ? product.spm : 0
-  const theoreticalRunMinutes = spm > 0 ? shots / spm : 0
+  // Süre: adet × dakika / adet (göz yoksa vuruş = adet). Tek kaynak
+  // src/lib/rateModel.ts; eski SPM'li parçada vuruş ÷ SPM ile aynıdır.
+  const theoreticalRunMinutes = runMinutesFor(product, quantity)
 
   const grossWeight = product.grossWeight ?? 0
   const coilWeight = product.coilWeight ?? 0

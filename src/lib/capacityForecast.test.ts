@@ -90,7 +90,7 @@ describe('buildCapacityForecast', () => {
       }),
     )
     expect(f.unassigned).toEqual([
-      { material: 'B', reason: 'no SPM', quantity: 20 },
+      { material: 'B', reason: 'no cycle time', quantity: 20 },
       { material: 'A', reason: 'main work center PRS-999 is not defined', quantity: 10 },
       { material: 'C', reason: 'not in master data', quantity: 5 },
     ])
