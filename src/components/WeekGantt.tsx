@@ -565,12 +565,16 @@ export function WeekGantt({
         // Pencere dışında kalan parça (ör. bakım) kendi başına çizilir.
         return i < 0 ? `x${Math.round(pos)}` : i
       }
+      // Planlı duruş (kapalı aralık) da çubuğu böler: üretim duruşun önünde
+      // ve arkasında sürer, arası duruş bloğudur.
+      const stopStarts = blocks.filter((b) => b.kind === 'maintenance').map((b) => b.start)
+      const stopsBefore = (pos: number) => stopStarts.filter((s) => s < pos).length
       const groups = new Map<string, { job: WeekGanttJob; parts: PlacedBlock[] }>()
       const jobIds = new Map<WeekGanttJob, number>()
       for (const b of blocks) {
         if (!b.job || b.kind === 'idle') continue
         if (!jobIds.has(b.job)) jobIds.set(b.job, jobIds.size)
-        const key = `${jobIds.get(b.job)}|${dayOf(b.start)}|${spanAt(b.start)}`
+        const key = `${jobIds.get(b.job)}|${dayOf(b.start)}|${spanAt(b.start)}|${b.kind === 'maintenance' ? 0 : stopsBefore(b.start)}`
         const group = groups.get(key) ?? { job: b.job, parts: [] }
         group.parts.push(b)
         groups.set(key, group)

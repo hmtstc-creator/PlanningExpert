@@ -95,6 +95,37 @@ describe('plan start per press', () => {
     expect([b2.date, b2.setupStartMinute]).toEqual(['2026-09-14', 0])
   })
 
+  it('production runs up to a planned stop, finishes the cut coil after it, the rest is a new lot', () => {
+    // C: 1.000 adet/rulo (1 kg parça, 1.000 kg rulo), 10 vuruş/dk → rulo 100 dk.
+    // Lot 3 rulo = 3.000. Pzt 09:00–10:00 duruş (net 120–180).
+    // Setup 07:00–07:30, 1. rulo 07:30–09:00 (90 dk) → duruş → 10:00–10:10 rulo biter.
+    // İş 1 rulo (1.000) ile biter; kalan 2.000 yeni parti, kalıp takılı → setup'sız 10:10'da.
+    const inputs = plant({
+      products: [{ code: 'C', moldCavities: 1, spm: 10, setupMinutes: 30, coilSetupMinutes: 10, grossWeight: 1, coilWeight: 1000, mainMachine: '104' }],
+      weeklyDemand: [{ material: 'C', overdue: -3000, periods: [] }],
+      pressStarts: [{ press: '104', holdFromDate: '2026-09-14', holdFromMinute: 540, fromDate: '2026-09-14', fromMinute: 600, reason: 'No operator' }],
+    })
+    const run = computePlan(inputs, MONDAY_0700)
+    const jobs = run.jobs.filter((j) => j.material === 'C').sort((a, b) => a.setupStartMinute - b.setupStartMinute)
+    expect(jobs.map((j) => j.quantity)).toEqual([1000, 2000])
+    const [head, rest] = jobs
+    expect(head.segments.map((s) => [s.kind, s.start, s.end])).toEqual([
+      ['setup', 0, 30],
+      ['run', 30, 120],
+      ['run', 180, 190],
+    ])
+    expect(rest.setupMinutes).toBe(0)
+    expect([rest.date, rest.segments[0].start]).toEqual(['2026-09-14', 190])
+    expect(noRuleBroken(inputs, run)).toEqual([])
+  })
+
+  it('a planned stop right after the setup is not bridged: the job starts after it', () => {
+    // Setup 07:00–07:30, duruş 07:30–10:00: ilk vuruş yok → iş 10:00'dan sonra.
+    const inputs = plant({ pressStarts: [{ press: '104', holdFromDate: '2026-09-14', holdFromMinute: 450, fromDate: '2026-09-14', fromMinute: 600 }] })
+    const b = computePlan(inputs, MONDAY_0700).jobs.find((j) => j.material === 'B')!
+    expect(b.date === '2026-09-14' ? b.setupStartMinute >= 180 : b.date > '2026-09-14').toBe(true)
+  })
+
   it('a start in the past changes nothing', () => {
     const run = computePlan(plant({ pressStarts: [{ press: '104', fromDate: '2026-09-10', fromMinute: 420 }] }), MONDAY_0700)
     expect(run.maintenance).toEqual([])

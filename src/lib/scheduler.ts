@@ -10,6 +10,7 @@ import {
   type ShiftSettings,
   computeRunPlan,
   eligiblePressesOf,
+  piecesPerCoil,
   shotsPerCoil,
   splitByMoldLimit,
 } from './planning'
@@ -338,6 +339,8 @@ export interface FixedJob {
   press: string
   date: string
   segments: { kind: string; date: string; start: number; end: number }[]
+  /** Planlı duruş: üretim üstünden atlayabilir (bkz. `Booking.pausable`). */
+  pausable?: boolean
 }
 
 /**
@@ -579,6 +582,13 @@ interface Booking {
   addedSetup?: number
   /** Uzun vade lotunun kaydı. */
   longTerm?: boolean
+  /**
+   * Planlamacının kapattığı aralık (planlı duruş): üretim bunun üstünden
+   * vardiya kapanışı gibi atlar — pres durur, rulo takılı kalır, duruş
+   * bitince kaldığı yerden sürer. Setup, kalite onayı ve rulo değişimi
+   * atlayamaz.
+   */
+  pausable?: boolean
   job?: ScheduledJob
 }
 
@@ -689,7 +699,9 @@ function firstFreePoint(timeline: PressTimeline, from: number): number {
  * yüzden bitişiklik değil sıra aranır.
  */
 function materialBefore(timeline: PressTimeline, at: number): string | null {
-  const index = firstEndAfter(timeline.bookings, at) - 1
+  let index = firstEndAfter(timeline.bookings, at) - 1
+  // Planlı duruş kalıbı sökmez: duruştan önce takılı olan kalıp hâlâ takılı.
+  while (index >= 0 && timeline.bookings[index].pausable) index--
   return index >= 0 ? timeline.bookings[index].material : null
 }
 
@@ -1062,6 +1074,10 @@ export function schedule(
     if (!timeline) return null
     return materialBefore(timeline, firstFreePoint(timeline, offsetOfDate(timeline, date)))
   }
+  // Planlı duruş varsa (planlamacının kapattığı aralık) kesilen işi rulo
+  // sınırında bölmek için yerleştirme geri alınabilmeli.
+  const hasHolds = (options.fixedJobs ?? []).some((j) => j.pausable)
+
   // Durumun kopyası: deneme tutmazsa geri dönmek için. Her kopya en fazla
   // bir kez geri yüklenir, bu yüzden geri yüklerken yeniden kopyalanmaz.
   const snapshot = () => ({
@@ -1223,11 +1239,11 @@ export function schedule(
     }
 
     let producedBefore = 0
-    for (const run of runs) {
+    // Tek partiyi yerleştirir; kayıt yalnız sonuç kabul edilince yazılır.
+    const placeOne = (run: RunPlan) => {
       step += 1
       const decision: PlacementDecision = { step, candidates: [] }
       const runEntry = runs.length > 1 ? runShareOf(entry, producedBefore, run.quantity) : entry
-      producedBefore += run.quantity
       const placed = placeRun(
         runEntry,
         product,
@@ -1243,8 +1259,30 @@ export function schedule(
         !!pin,
         decision,
       )
-      if (placed) {
-        jobs.push(placed)
+      return { placed, decision }
+    }
+    for (let runIndex = 0; runIndex < runs.length; runIndex++) {
+      let run = runs[runIndex]
+      // Planlı duruşla kesilen iş, kesilen rulo bitince biter; kalan rulolar
+      // yeni parti olarak hemen arkasından sıraya girer (kalıp takılıysa
+      // setup'sız sürer; planlamacı istemezse o partiyi iptal eder).
+      const beforeRun = hasHolds ? snapshot() : null
+      const stepBefore = step
+      let result = placeOne(run)
+      const cut = result.placed ? holdCuts.get(result.placed) : undefined
+      const unit = piecesPerCoil(product)
+      if (beforeRun && cut && unit > 0 && cut * unit < run.quantity) {
+        restore(beforeRun)
+        step = stepBefore
+        const head = computeRunPlan(product, cut * unit, coCavities(product))
+        const rest = computeRunPlan(product, run.quantity - cut * unit, coCavities(product))
+        runs.splice(runIndex, 1, head, rest)
+        run = head
+        result = placeOne(run)
+      }
+      producedBefore += run.quantity
+      if (result.placed) {
+        jobs.push(result.placed)
       } else {
         unplanned.push({
           material: entry.material,
@@ -1255,7 +1293,7 @@ export function schedule(
           reason: pin
             ? 'Not enough free capacity on the pinned work center/day'
             : 'Not enough free capacity in the visible calendar',
-          decision,
+          decision: result.decision,
         })
       }
     }
@@ -1343,6 +1381,7 @@ function applyFixedJobs(
       end: max,
       material: job.material,
       noSetup: !job.segments.some((seg) => seg.kind === 'setup'),
+      ...(job.pausable ? { pausable: true } : {}),
     })
     void perDate
     const visible = job.segments.filter((seg) => timeline.days.some((d) => d.date === seg.date))
@@ -1383,6 +1422,14 @@ interface Placement {
   urgent?: boolean
   /** Arkadaki setup'sız işe geri gelen setup'ın yeri (vinç ayrıldı). */
   followSetup?: { global: number; date: string; start: number; minutes: number }
+  /** Üretimin üstünden atladığı planlı duruşlar (eksen sırasıyla). */
+  pausedOver: Booking[]
+  /**
+   * Üretim bir planlı duruşla kesildi ve duruştan sonra daha rulo var: iş,
+   * kesilen rulo bitince biter; bu kadar rulo tutulur, kalanı yeni parti
+   * olarak sıraya döner.
+   */
+  cutAfterCoils?: number
 }
 
 /**
@@ -1658,9 +1705,32 @@ function tryPlaceOnPress(
 
     // 3) Üretim, rulo başına parçalar hâlinde; aralarına rulo değişimi girer.
     //    Üretim gün sınırını aşabilir — yarım kalan iş ertesi gün sürer.
+    //    Planlı duruş (planlamacının kapattığı aralık) vardiya kapanışı gibi
+    //    atlanır: pres durur, rulo takılı kalır, duruş bitince sürer.
     let failed = false
+    const pausedOver: Booking[] = []
+    // İlk duruşta kaçıncı rulonun sonuna kadar üretim tutulur (-1: üretim
+    // başlamadan duruş geldi, kesilecek rulo yok).
+    let firstPauseCoil: number | null = null
+    // `cursor`dan başlayan `length` dakikalık işe değen ilk planlı duruş.
+    const pauseAhead = (length: number): Booking | null => {
+      const hit = firstOverlap(timeline, cursor, cursor + length)
+      return hit && hit.pausable && hit.start >= cursor ? hit : null
+    }
+    const pauseAt = (hold: Booking, coil: number) => {
+      pausedOver.push(hold)
+      if (firstPauseCoil === null) firstPauseCoil = coil
+      cursor = hold.end
+    }
     run.coilRunMinutes.forEach((minutes, index) => {
       if (failed) return
+      // Rulo değişimi duruşa değiyorsa duruştan sonra yapılır (rulo bitmiş,
+      // yenisi duruştan sonra bağlanır).
+      if (index > 0 && coilChangeMinutes > 0) {
+        for (let hold = pauseAhead(coilChangeMinutes); hold; hold = pauseAhead(coilChangeMinutes)) {
+          pauseAt(hold, index - 1)
+        }
+      }
       if (index > 0 && coilChangeMinutes > 0) {
         const slot = reserveSlot(
           timeline,
@@ -1694,9 +1764,17 @@ function tryPlaceOnPress(
         })
         cursor = slot.global + coilChangeMinutes
       }
-      if (minutes > 0) {
-        segments.push(...toDatedSegments(timeline, 'run', cursor, cursor + minutes))
-        cursor += minutes
+      let left = minutes
+      while (left > 0) {
+        const hold = pauseAhead(left)
+        const piece = hold ? hold.start - cursor : left
+        if (piece > 0) {
+          segments.push(...toDatedSegments(timeline, 'run', cursor, cursor + piece))
+          cursor += piece
+          left -= piece
+        }
+        // Rulo daha başlamadan gelen duruş onu kesmez: önceki rulo tamdır.
+        if (hold) pauseAt(hold, left === minutes ? index - 1 : index)
       }
     })
     if (failed) return null
@@ -1705,7 +1783,20 @@ function tryPlaceOnPress(
     if (end > timeline.total) return null
 
     // Pres o sırada başka bir iş yapıyorsa o işin bitişinden sonra dene.
-    const busy = firstOverlap(timeline, setupGlobalStart, end)
+    // Üretimin üstünden atladığı planlı duruşlar çakışma sayılmaz.
+    // Duruş üretim başlamadan geldiyse (setup / onay bitti, ilk vuruş yok)
+    // atlanmaz: kalıp boşuna bekler; iş duruştan sonraya kayar.
+    let busy: Booking | null =
+      (firstPauseCoil as number | null) === -1 ? pausedOver[0] ?? null : null
+    for (let from = setupGlobalStart; !busy && from < end; ) {
+      const hit = firstOverlap(timeline, from, end)
+      if (!hit) break
+      if (!pausedOver.includes(hit)) {
+        busy = hit
+        break
+      }
+      from = hit.end
+    }
     if (busy) {
       start = firstFreePoint(timeline, Math.max(start + 1, busy.end))
       if (start >= timeline.total) return null
@@ -1816,6 +1907,8 @@ function tryPlaceOnPress(
     if (!conflict) {
       const first = segments[0]
       const last = segments[segments.length - 1]
+      // Kapanışta atanır; TS daraltmasını kırmak için tip açıkça verilir.
+      const pauseCoil = firstPauseCoil as number | null
       return {
         press: pressName,
         date: first?.date ?? timeline.days[0]?.date ?? '',
@@ -1831,6 +1924,10 @@ function tryPlaceOnPress(
         coilReservations,
         waits,
         followSetup,
+        pausedOver,
+        ...(pauseCoil !== null && pauseCoil >= 0 && pauseCoil + 1 < run.coilRunMinutes.length
+          ? { cutAfterCoils: pauseCoil + 1 }
+          : {}),
       }
     }
 
@@ -1883,6 +1980,13 @@ function dieSpans(segments: { date: string; start: number; end: number }[]): Map
   }
   return spans
 }
+
+
+/**
+ * Planlı duruşla kesilen iş: kaç rulo tutulacağı (`Placement.cutAfterCoils`).
+ * Yalnız `schedule()` içinde okunur; işin kendisine (kalıcı kayda) yazılmaz.
+ */
+const holdCuts = new WeakMap<ScheduledJob, number>()
 
 /**
  * Önceki işten bu yana kalıp başka bir preste çalıştı mı? Çalıştıysa artık
@@ -2106,7 +2210,26 @@ function placeRun(
     earliest: bestEarliest,
     ...(entry.longTerm ? { longTerm: true } : {}),
   }
+  // Planlı duruşun üstünden atlayan iş eksende duruşla çakışmamalı (aralıklar
+  // çakışmaz kuralı): duruşun önü ve arkası ayrı kayıt olur; arka parçalar
+  // aynı kalıbın setup'sız devamıdır.
+  // İlk parça işin kaydıdır (setup bilgisi ve iş ona bağlanır).
+  const cuts = [...best.pausedOver.map((h) => ({ start: h.start, end: h.end })), { start: best.endGlobal, end: best.endGlobal }]
+  booking.end = cuts[0].start
   insertBooking(timeline, booking)
+  for (let i = 1; i < cuts.length; i++) {
+    const from = cuts[i - 1].end
+    const to = cuts[i].start
+    if (to > from) {
+      insertBooking(timeline, {
+        start: from,
+        end: to,
+        material: entry.material,
+        noSetup: true,
+        ...(entry.longTerm ? { longTerm: true } : {}),
+      })
+    }
+  }
   // Bu iş, arkasından setup'sız gelen başka bir kalıbın önüne girdiyse o
   // işin setup'ı geri gelir: boşluğun sonuna yazılır. Kayıt kopyalanır
   // (deneme geri alınırsa eski hâli dönsün); işin kendisi schedule()
@@ -2286,5 +2409,6 @@ function placeRun(
     ...(entry.longTerm ? { longTerm: true } : {}),
   }
   booking.job = job
+  if (best.cutAfterCoils) holdCuts.set(job, best.cutAfterCoils)
   return job
 }

@@ -243,6 +243,8 @@ export interface MaintenanceBlock {
   label: string
   start: number
   end: number
+  /** Planlamacının kapattığı aralık (planlı duruş): üretim üstünden atlar. */
+  pausable?: boolean
 }
 
 /** Bir presin bir günü: kaç vardiya çalışıyor, kaç net dakikası kaldı. */
@@ -767,6 +769,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   }
 
   // Planlamacının kapattığı pres: başlangıçtan (boşsa şu andan) bitişe kadar kapalı.
+  // Planlı duruştur: üretim vardiya kapanışı gibi üstünden atlar (scheduler).
+  const heldRows = new Set<PressMaintenanceRow>()
   for (const [press, held] of heldUntil) {
     for (const date of horizonDates) {
       if (date < todayIso || (held.from && date < held.from.date)) continue
@@ -774,14 +778,16 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       const start = held.from && date === held.from.date ? held.from.clock : shiftStartMinute
       const end = date === held.date ? held.clock : shiftStartMinute + 1440
       if (end <= start) continue
-      breakdownRows.push({
+      const row: PressMaintenanceRow = {
         press,
         date,
         startMinute: start,
         endMinute: end,
         reason: `${held.from ? `Held ${held.from.date} ${clockText(held.from.clock % 1440)} – ` : 'Held until '}${held.date} ${clockText(held.clock % 1440)}: ${held.reason}`,
         status: 'planned',
-      })
+      }
+      breakdownRows.push(row)
+      heldRows.add(row)
     }
   }
 
@@ -791,7 +797,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     const shape = dayShapeByPressDate.get(`${row.press}|${row.date}`)
     if (!shape || (shape.shifts <= 0 && !shape.overtime?.length)) continue
     const block = pressMaintenanceBlock(row, buildDayTimeline(shiftStartMinute, shiftMinutes, shape, plannedStops))
-    if (block) maintenance.push(block)
+    if (block) maintenance.push(heldRows.has(row) ? { ...block, pausable: true } : block)
   }
 
   // Hat plana uyamadı: onaylı işler (donmuş ve çalışan) presin ekseninde
@@ -873,6 +879,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         press: block.press,
         date: block.date,
         segments: [{ kind: 'maintenance', date: block.date, start: block.start, end: block.end }],
+        ...(block.pausable ? { pausable: true } : {}),
       })),
     ],
     shiftNetMinutes: stopMinutesByShift.map((stopped) => Math.max(1, shiftMinutes - stopped)),
