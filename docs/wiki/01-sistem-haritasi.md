@@ -1,6 +1,6 @@
 # 01 · Sistem haritası
 
-> Son güncelleme: 2026-10-29 (bütün iş yerleri çevrim süresiyle planlanır; plan sayfasının bölüm / masraf yeri süzgeci) · Kaynak: `docs/architecture.md` (ayrıntı ve **tek kaynak haritası** orada)
+> Son güncelleme: 2026-10-29 (bütün iş yerleri çevrim süresiyle planlanır; master data Excel'i süreyi saniye de okur; plan sayfasının bölüm / masraf yeri süzgeci) · Kaynak: `docs/architecture.md` (ayrıntı ve **tek kaynak haritası** orada)
 
 ## Ne bu?
 
@@ -52,7 +52,7 @@ Hetzner VPS. Dış barındırma yok (Vercel / Convex Cloud kaldırıldı, 2026-1
 | Bağımsız doğrulama | `src/lib/planValidator.ts` (motorla kod paylaşmaz) |
 | Plan müdahaleleri | `convex/planOverrides.ts`, `convex/planJobLocks.ts` |
 | Plan sayfasının bölüm / masraf yeri süzgeci (yalnız görünüm) | `src/lib/planOrgFilter.ts` (saf), `src/components/plan/PlanOrgFilter.tsx` |
-| Üretim hızı: çevrim süresi dakika / adet (bütün parçalar, bütün iş yerleri; geri uyum 1 ÷ (SPM × göz)) | `src/lib/rateModel.ts` (`minutesPerPiece`, `runMinutesFor`); doğrulayıcıda bağımsız kopya (`planValidator.ts` `strokeMinutes`) |
+| Üretim hızı: çevrim süresi dakika / adet (bütün parçalar, bütün iş yerleri; geri uyum 1 ÷ (SPM × göz)) | `src/lib/rateModel.ts` (`minutesPerPiece`, `runMinutesFor`, saniyeli dosya için `cycleMinutesFromSeconds`); doğrulayıcıda bağımsız kopya (`planValidator.ts` `strokeMinutes`) |
 | Yetki | `convex/guarded.ts`, `convex/tenancy.ts` |
 | Organizasyon ağacı ve haritası (`/admin`, `/admin/map`) | `src/lib/orgTree.ts`, `src/lib/orgMap.ts` (`nodeEdits`), `src/components/org/OrgMapEditor.tsx`, `convex/platform.ts`, `convex/users.ts` |
 | İstemci taşıma (WebSocket / HTTPS) | `src/lib/convexTransport.tsx` |
