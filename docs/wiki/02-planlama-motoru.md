@@ -1,6 +1,6 @@
 # 02 · Planlama motoru
 
-> Son güncelleme: 2026-10-29 (kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
+> Son güncelleme: 2026-10-29 (presi durduran arıza da planlı duruş gibi; kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
 > Kullanıcıya dönük anlatım: sitede **Planning Logic**
 
 Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Aynı girdi aynı planı verir
@@ -53,7 +53,7 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
    **Elle eklenen iş** (Plan → *+ Add job*, stok amaçlı): süre `computeRunPlan` (motorla aynı), parça sırası `manualJobSegments` (setup → onay → rulo başına üretim, aralarda rulo değişimi; kalıp takılıysa setup yok, `feedsCoil` false ise rulo değişimi yok). Aynı `planMove` + `planJobLocks.move` yoluyla `phase: 'fill'` kilit olarak yazılır; adedi talepten düşer. Plan çıktısındaki `presses[]` artık `feedsCoil` taşır.
    **Kapalı aralık** (Plan settings, `pressPlanStarts`, 2026-10-28): pres `holdFrom*` → `from*` arasında iş almaz (başlangıç boşsa
    şu andan); aralık grafikte bakım bloğu gibi çizilir, aralığa değen onaylı işler serbest bırakılıp yeniden planlanır (`pressStart.test.ts`).
-   Kapalı aralık **planlı duruştur, duvar değildir** (2026-10-29): `MaintenanceBlock.pausable` → `FixedJob.pausable` →
+   Kapalı aralık ve presi durduran açık arıza **planlı duruştur, duvar değildir** (2026-10-29, #112 / #113): `MaintenanceBlock.pausable` → `FixedJob.pausable` →
    `Booking.pausable`. `tryPlaceOnPress` üretimi duruşa kadar yazar, duruşun sonundan sürdürür (vardiya kapanışı gibi);
    setup, kalite onayı ve rulo değişimi duruşu aşamaz, ilk vuruştan önce gelen duruş atlanmaz (iş duruştan sonraya kayar).
    Duruş bir ruloyu kestiyse iş o rulo bitince biter (`cutAfterCoils`): `schedule()` yerleştirmeyi geri alır, partiyi

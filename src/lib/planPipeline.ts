@@ -746,6 +746,9 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     (p) => p.status === 'open' && p.stopsPress,
   )
   const breakdownRows: PressMaintenanceRow[] = []
+  // Planlı duruş gibi işlenen aralıklar (arıza ve planlamacının kapattığı
+  // aralık): üretim üstünden atlar, kesilen rulo bitince iş biter (scheduler).
+  const heldRows = new Set<PressMaintenanceRow>()
   for (const b of openBreakdowns) {
     const from = toProductionClock(b.occurredAt, b.occurredMinute ?? shiftStartMinute)
     const to = b.expectedUpDate
@@ -757,20 +760,21 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
       const start = date === from.date ? from.clock : shiftStartMinute
       const end = to && date === to.date ? to.clock : shiftStartMinute + 1440
       if (end <= start) continue
-      breakdownRows.push({
+      const row: PressMaintenanceRow = {
         press: b.press,
         date,
         startMinute: start,
         endMinute: end,
         reason: `Breakdown: ${b.problemType}`,
         status: 'planned',
-      })
+      }
+      breakdownRows.push(row)
+      heldRows.add(row)
     }
   }
 
   // Planlamacının kapattığı pres: başlangıçtan (boşsa şu andan) bitişe kadar kapalı.
   // Planlı duruştur: üretim vardiya kapanışı gibi üstünden atlar (scheduler).
-  const heldRows = new Set<PressMaintenanceRow>()
   for (const [press, held] of heldUntil) {
     for (const date of horizonDates) {
       if (date < todayIso || (held.from && date < held.from.date)) continue

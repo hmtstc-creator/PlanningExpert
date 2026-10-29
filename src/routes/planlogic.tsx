@@ -447,7 +447,9 @@ function PlanLogicPage() {
             <b>Machine breakdown</b> (reported in Machine Follow-up with "the
             work center is stopped"): the work center is closed from the breakdown until
             the expected time it is back — or, with no expected time, until
-            the breakdown is solved. A fault that does not stop the work center does
+            the breakdown is solved. Like a closed period it is a planned stop: production runs up
+            to it and continues after it, the cut coil is finished and the remaining coils follow as
+            a new lot (see <i>Planner's hand</i>). A fault that does not stop the work center does
             not change the plan.
           </li>
           <li>
@@ -848,7 +850,8 @@ function PlanLogicPage() {
             moved. Approved jobs that touch the closed period are released and planned again.
           </li>
           <li>
-            <b>A closed period is a planned stop, not a wall.</b> Production runs up to it, the press
+            <b>A closed period — and an open breakdown that stops the press — is a planned stop, not a
+            wall.</b> Production runs up to it, the press
             stops with the coil still in it and continues after it — like a shift that is not
             worked. Setup, quality approval and coil changes do not cross it; if the stop comes right
             after the setup (no stroke yet) the job starts after the stop instead. When the stop cuts
