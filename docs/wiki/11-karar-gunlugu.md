@@ -1,6 +1,6 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-29 (plan süzgeci yalnız görünüm; Loading time dosyadan olduğu gibi; Asakai: bugün gizli, bütün iş yerleri; Work calendar Edit / Save; Asakai kırmızı = en büyük 2 duruş, vardiyalar da; gün kaydı, ZPP_DAILY önceliği, kapalı aralık, iş penceresi durumu) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-29 (SOP: PDF + düzenleme ekranı, kare adımdan, video volume'de; plan süzgeci yalnız görünüm; Loading time dosyadan olduğu gibi; Asakai: bugün gizli, bütün iş yerleri; Work calendar Edit / Save; Asakai kırmızı = en büyük 2 duruş, vardiyalar da; gün kaydı, ZPP_DAILY önceliği, kapalı aralık, iş penceresi durumu) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
@@ -78,3 +78,12 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 - **Harita yeni sunucu kodu yazmaz** (2026-10-22) — sürükle-bırak mevcut mutation'ları çağırır (`setCompanyHolding`, `updatePlant`, `users.update`, `saveGroup`); yetki ve denetim kaydı tek yerde kalır. Work center sürükleme yok: `presses.upsert` aktif plant ve tam kayıt ister. *Alt.: harita için yeni mutation* (kural kopyası).
 - **Tuval kütüphanesi `@xyflow/react` (sürüm sabit)** — kaydırma, yakınlaştırma, mini harita, çarpışma (`getIntersectingNodes`) hazır; yerleşim kendi saf fonksiyonumuz (test edilir). *Alt.: elle SVG tuval* (çok kod).
 - **PR'ı Claude birleştirir** (2026-10-22, kullanıcı) — CI `verify` yeşil ve açık yorum yoksa taslak PR hazır yapılır, squash merge edilir; kullanıcı beklenmez. *Alt.: kullanıcı birleştirir* (her PR'da bekleme).
+
+## SOP oluşturma
+
+- **Çıktı PDF, düzenleme ekranı = PDF** (2026-10-28) — kullanıcı çıktıdan önce metni ve kareyi düzeltmek istiyor; mevcut *Save PDF* (`src/lib/pdfSheet.ts`) ekrandakini basar, Romence / Türkçe harfler tarayıcıda çizildiği için sorunsuz, yeni paket gerekmez. *Alt.: şablonlu Excel (ExcelJS / openpyxl)* — şablonu yeniden kaydederken şekil ve resim kaybı riski, ayrı inceleme ekranı yine gerekirdi. Ayrıntı [12](12-sop-olusturma.md).
+- **Format şablona %100 uyar, sayfa çoğalır** (2026-10-29, kullanıcı) — SOP kalite belgesi, denetimde şablonla aynı olmalı. *Alt.: sayfaya sığdırmak için düzeni esnetmek* (reddedildi).
+- **Kare adımdan seçilir, sahneden değil** (2026-10-28) — gereksiz kare istenmiyor; model adım saniyesini verir, ffmpeg yalnız onu alır. *Alt.: `select='gt(scene,0.3)'` + en çok 15 kare* — operasyonla ilgisiz kareler, eksik adımlar.
+- **Video Convex deposuna değil volume'e** (2026-10-28) — gece yedeği dosya deposunu da alıyor (30 kopya); video saklanacağı için disk dolardı. *Alt.: Convex `ctx.storage`* — kareler gibi küçük dosyalar için kalır.
+- **Yetki creator** (2026-10-28, kullanıcı) — `guarded` → `companyAdmin`. *Alt.: yeni yetki alanı `machine.sop`* — şema + izin matrisi değişirdi, gerek yok.
+
