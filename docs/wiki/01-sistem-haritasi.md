@@ -1,6 +1,6 @@
 # 01 · Sistem haritası
 
-> Son güncelleme: 2026-10-29 (plan sayfasının bölüm / masraf yeri süzgeci) · Kaynak: `docs/architecture.md` (ayrıntı ve **tek kaynak haritası** orada)
+> Son güncelleme: 2026-10-29 (bütün iş yerleri çevrim süresiyle planlanır; plan sayfasının bölüm / masraf yeri süzgeci) · Kaynak: `docs/architecture.md` (ayrıntı ve **tek kaynak haritası** orada)
 
 ## Ne bu?
 
@@ -52,7 +52,7 @@ Hetzner VPS. Dış barındırma yok (Vercel / Convex Cloud kaldırıldı, 2026-1
 | Bağımsız doğrulama | `src/lib/planValidator.ts` (motorla kod paylaşmaz) |
 | Plan müdahaleleri | `convex/planOverrides.ts`, `convex/planJobLocks.ts` |
 | Plan sayfasının bölüm / masraf yeri süzgeci (yalnız görünüm) | `src/lib/planOrgFilter.ts` (saf), `src/components/plan/PlanOrgFilter.tsx` |
-| Üretim modeli (pres / cycle hattı), pres planının kapsamı | `src/lib/rateModel.ts` (`pressPlanScope`) |
+| Üretim hızı: çevrim süresi dakika / adet (bütün parçalar, bütün iş yerleri; geri uyum 1 ÷ (SPM × göz)) | `src/lib/rateModel.ts` (`minutesPerPiece`, `runMinutesFor`); doğrulayıcıda bağımsız kopya (`planValidator.ts` `strokeMinutes`) |
 | Yetki | `convex/guarded.ts`, `convex/tenancy.ts` |
 | Organizasyon ağacı ve haritası (`/admin`, `/admin/map`) | `src/lib/orgTree.ts`, `src/lib/orgMap.ts` (`nodeEdits`), `src/components/org/OrgMapEditor.tsx`, `convex/platform.ts`, `convex/users.ts` |
 | İstemci taşıma (WebSocket / HTTPS) | `src/lib/convexTransport.tsx` |
@@ -69,6 +69,7 @@ Hetzner VPS. Dış barındırma yok (Vercel / Convex Cloud kaldırıldı, 2026-1
 7. **Canlı veri korunur:** şema geri uyumlu olmalı (`npm run schema:snapshot`, `schemaGuard.test.ts`); yayın öncesi yedek alınır.
 8. **Süzgeç plana girmez:** Production Plan'ın bölüm / masraf yeri süzgeci (`planOrgFilter.ts`) yalnız
    **görünümü** daraltır. Plan her zaman fabrikanın tamamı için hesaplanır; kapasite, vinç, setup ekibi ve
-   kalıp sınırı ancak bütün iş yerleri bir arada görülünce doğrudur. Pres planı yalnız `rateModel: 'stroke'`
-   iş yerlerini kapsar (`pressPlanScope`); cycle hatları (punta, robot, montaj, nut welding) ayrı planlanır —
-   süzgeç bunları "plan dışı" diye sayar, sessizce yok saymaz.
+   kalıp sınırı ancak bütün iş yerleri bir arada görülünce doğrudur. **Hiçbir iş yeri ya da parça plandan
+   elenmez** (2026-10-29): pres, nut welding, punta, robot, montaj — hepsinin süresi parçanın çevrim
+   süresinden (dakika / adet, `rateModel.ts` `minutesPerPiece`) gelir; "plan dışı" iş yeri yoktur.
+   `presses.rateModel` şemada eski kayıtlar için durur, motor okumaz.

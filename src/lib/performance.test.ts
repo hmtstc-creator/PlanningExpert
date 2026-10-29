@@ -67,7 +67,15 @@ describe('theoreticalMinutes', () => {
   const products = new Map<string, ProductSpec>([
     ['A', { code: 'A', moldCavities: 2, spm: 50 }],
     ['B', { code: 'B' }],
+    ['N', { code: 'N', cycleMinutes: 0.25 }],
   ])
+
+  it('çevrim süreli parça: adet × dk/adet', () => {
+    // 1000 adet × 0,25 dk = 250 dakika (göz yok, SPM yok).
+    expect(
+      theoreticalMinutes([{ material: 'N', postingDate: '2026-09-14', quantity: 1000 }], products),
+    ).toBe(250)
+  })
 
   it('adet / göz / spm üzerinden teorik süreyi bulur', () => {
     // 1000 adet, 2 göz => 500 vuruş, 50 spm => 10 dakika
@@ -76,7 +84,7 @@ describe('theoreticalMinutes', () => {
     ).toBe(10)
   })
 
-  it('spm veya göz tanımsız mamulü atlar', () => {
+  it('süresi (çevrim / SPM) tanımsız mamulü atlar', () => {
     expect(
       theoreticalMinutes([{ material: 'B', postingDate: '2026-09-14', quantity: 1000 }], products),
     ).toBe(0)

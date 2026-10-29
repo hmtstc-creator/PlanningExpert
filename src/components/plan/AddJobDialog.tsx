@@ -61,7 +61,7 @@ export function AddJobDialog({
       : !(qty > 0)
         ? { error: 'Enter a quantity.' }
         : segments.length === 0
-          ? { error: `${product.code} has no speed (SPM) in the master data — the duration cannot be computed.` }
+          ? { error: `${product.code} has no cycle time in the master data — the duration cannot be computed.` }
           : check(segments, target)
   const eligible = product ? eligiblePressesOf(product) : []
   const offList = product && eligible.length > 0 && !eligible.includes(target.press)

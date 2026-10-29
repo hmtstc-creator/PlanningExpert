@@ -106,7 +106,7 @@ function SapDataPage() {
               calculation — press <b>Calculate plan</b> on Planning when the day's files are saved.
             </p>
             <p>
-              Master data (cavities, SPM, weights, machines) is maintained on{' '}
+              Master data (cycle time, weights, machines) is maintained on{' '}
               <Link to="/referanslar">Master Data</Link>. Which stock locations count is set on{' '}
               <Link to="/depolar">Storage Locations</Link>.
             </p>
@@ -225,7 +225,7 @@ function SapDataPage() {
       </div>
 
       <p className="mt-6 text-sm text-muted-foreground">
-        Master data (cavities, SPM, weights, machines) is maintained on the{' '}
+        Master data (cycle time, weights, machines) is maintained on the{' '}
         <Link to="/referanslar" className="underline hover:no-underline">
           Master Data
         </Link>{' '}

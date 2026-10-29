@@ -200,7 +200,9 @@ export default defineSchema({
     ...plantField,
     code: v.string(),
     coProduct: v.optional(v.string()),
+    // Kalıp gözü: yalnız vuruş sayısı (kalıp ömrü, rulo başına vuruş); süreyi değil.
     moldCavities: v.optional(v.number()),
+    // @deprecated (2026-10-29) Geri uyum: cycleMinutes yoksa süre 1 ÷ (SPM × göz).
     spm: v.optional(v.number()),
     rawMaterialCode: v.optional(v.string()),
     coilWeight: v.optional(v.number()),
@@ -228,10 +230,10 @@ export default defineSchema({
     material: v.optional(v.string()),
     // @deprecated Kullanılmıyor (yerine cycleMinutes); eski kayıtlarda kalabilir.
     cycleTimeSeconds: v.optional(v.number()),
-    // Çevrim hattı parçası (ana makinesi 'cycle': punta, robot, montaj):
-    // çevrim süresi, dakika / adet, virgülden sonra 3 hane. Pres planına girmez.
+    // Çevrim süresi, dakika / adet, virgülden sonra 3 hane: bütün parçalarda
+    // sürenin kaynağı (src/lib/rateModel.ts). Yoksa geri uyum: 1 ÷ (SPM × göz).
     cycleMinutes: v.optional(v.number()),
-    // Çevrim hattı: frekansiyel duruşlar arası adet (fikstür setup'ı …).
+    // Frekansiyel duruşlar arası adet (fikstür setup'ı …); saklanır, motor kullanmıyor.
     stopEveryPcs: v.optional(v.number()),
   }).index('by_code', ['plantId', 'code'])
     .index('by_plant', ['plantId']),
@@ -272,8 +274,9 @@ export default defineSchema({
     // seçim listesinden ('frequencyStop'). Doluysa feedsCoil true'dur — plan
     // motoru duruşu feedsCoil'e göre açar; ad yalnızca tanım ve ekran içindir.
     frequencyStop: v.optional(v.string()),
-    // Üretim modeli (src/lib/rateModel.ts): 'stroke' (pres; varsayılan) ya da
-    // 'cycle' (robot, montaj, kataforez — çevrim süresi, rulo/kg yok).
+    // @deprecated (2026-10-29) Üretim modeli ('stroke' | 'cycle'). Artık
+    // seçilmez ve motor okumaz: bütün iş yerleri çevrim süresiyle planlanır
+    // (src/lib/rateModel.ts). Eski kayıtlarda kalabilir.
     rateModel: v.optional(v.string()),
     // @deprecated Pres tonajı kaldırıldı (hiçbir hesapta yoktu).
     tonnage: v.optional(v.number()),

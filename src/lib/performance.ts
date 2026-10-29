@@ -4,6 +4,7 @@
 // için kullanılır.
 
 import type { ProductSpec } from './planning'
+import { minutesPerPiece } from './rateModel'
 
 export interface PlanRow {
   material: string
@@ -82,8 +83,8 @@ export function performanceFactor(rows: AdherenceRow[]): number | null {
 
 /**
  * Gerçekleşen üretimin teorik (ideal hızda) kaç dakika sürmesi gerektiğini
- * hesaplar. Referans kartında SPM veya göz sayısı tanımsız olan mamuller
- * atlanır.
+ * hesaplar: adet × çevrim süresi (dk/adet; yoksa eski 1 ÷ (SPM × göz)).
+ * Süresi tanımsız mamuller atlanır.
  */
 export function theoreticalMinutes(
   actual: ActualRow[],
@@ -92,10 +93,10 @@ export function theoreticalMinutes(
   let minutes = 0
   for (const row of actual) {
     const product = products.get(row.material)
-    const cavities = product?.moldCavities && product.moldCavities > 0 ? product.moldCavities : 0
-    const spm = product?.spm && product.spm > 0 ? product.spm : 0
-    if (cavities === 0 || spm === 0) continue
-    minutes += row.quantity / cavities / spm
+    // Adet × dakika / adet (tek kaynak src/lib/rateModel.ts).
+    const perPiece = minutesPerPiece(product)
+    if (perPiece <= 0) continue
+    minutes += row.quantity * perPiece
   }
   return minutes
 }

@@ -83,7 +83,7 @@ export const upsert = guardedMutation({
         category,
         feedsCoil,
         frequencyStop,
-        // Pres varsayılandır: yalnızca 'cycle' yazılır.
+        // @deprecated: motor okumaz, arayüz göndermez (eski istemci için kabul edilir).
         rateModel: args.rateModel === 'cycle' ? 'cycle' : undefined,
         // Tonaj kaldırıldı: eski değer kayıtta kalmasın.
         tonnage: undefined,

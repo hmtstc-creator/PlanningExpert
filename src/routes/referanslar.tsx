@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMutation, usePaginatedQuery, useQuery } from '../lib/convexTransport'
+import { useMutation, usePaginatedQuery } from '../lib/convexTransport'
 import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -18,7 +18,7 @@ import {
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { lotRuleOf, piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
-import { CYCLE_DECIMALS, RATE_MODELS, modelOfPart, piecesPerHour, type RateModel } from '../lib/rateModel'
+import { CYCLE_DECIMALS, hasCycleTime, minutesPerPiece, piecesPerHour } from '../lib/rateModel'
 import { ExcelUpload } from '../components/ExcelUpload'
 import { friendlyError } from '../lib/mutationErrors'
 import { InfoTip, PageHeader } from '../components/PageHeader'
@@ -33,8 +33,6 @@ export const Route = createFileRoute('/referanslar')({
 const emptyForm = {
   code: '',
   coProduct: '',
-  moldCavities: '',
-  spm: '',
   rawMaterialCode: '',
   coilWeight: '',
   grossWeight: '',
@@ -75,11 +73,6 @@ function ReferanslarPage() {
     {},
     { initialNumItems: 200 },
   )
-
-  // Parçanın üretim modeli ana makinesinden (Work Center Definitions).
-  const presses = (useQuery(api.presses.list) ?? []) as { name: string; rateModel?: string }[]
-  const pressByName = useMemo(() => new Map(presses.map((p) => [p.name, p])), [presses])
-  const hasCycle = presses.some((p) => p.rateModel === 'cycle')
 
   // Excel uploads bring hundreds of rows; without a filter, correcting one
   // material means scrolling through all of them.
@@ -139,8 +132,6 @@ function ReferanslarPage() {
       await createProduct({
         code: form.code.trim(),
         coProduct: str(form.coProduct),
-        moldCavities: num(form.moldCavities),
-        spm: num(form.spm),
         rawMaterialCode: str(form.rawMaterialCode),
         coilWeight: num(form.coilWeight),
         grossWeight: num(form.grossWeight),
@@ -240,8 +231,19 @@ function ReferanslarPage() {
           row['Performans Çarpanı'] ??
           row['performanceFactor'],
       ),
-      // Çevrim hattı parçaları (robot, montaj, hat); sütun yoksa korunur.
-      cycleMinutes: n(row['Cycle Time (min)'] ?? row['Cycle Time'] ?? row['Çevrim Süresi (dk)'] ?? row['Çevrim Süresi'] ?? row['cycleMinutes']),
+      // Çevrim süresi (dakika / adet): bütün parçalarda sürenin kaynağı.
+      // Sütun yoksa elle girilen değer korunur. SPM / Cavity yukarıda geri
+      // uyum için okunur (çevrim süresi yoksa süre 1 ÷ (SPM × göz)).
+      cycleMinutes: n(
+        row['Cycle time (min/pc)'] ??
+          row['Cycle Time (min/pc)'] ??
+          row['Cycle Time (min)'] ??
+          row['Cycle Time'] ??
+          row['Cycle'] ??
+          row['Çevrim Süresi (dk)'] ??
+          row['Çevrim Süresi'] ??
+          row['cycleMinutes'],
+      ),
       stopEveryPcs: n(row['Stop Every (pcs)'] ?? row['Stop Every'] ?? row['stopEveryPcs']),
     }))
     const validRows = parsed.filter((r) => r.code)
@@ -255,26 +257,32 @@ function ReferanslarPage() {
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="Master Data"
-        summary="The main part list: cavities, SPM, coil data, setup times, work centers and Accepted OEE."
+        summary="The main part list: cycle time, coil data, setup times, work centers and Accepted OEE."
         links={relatedPages('/referanslar')}
         info={
           <>
             <p>
-              Material code, co-product if any, cavities, SPM, raw material and coil data, setup
+              Material code, co-product if any, cycle time, raw material and coil data, setup
               times, mould shot limit and main/alternative machines. Upload an Excel file to load
               them in bulk, then click any cell in the table below to correct a value, then press
               Save on the row.
+            </p>
+            <p>
+              <b>Cycle time</b> (minutes per piece, {CYCLE_DECIMALS} decimals) is the speed of every
+              part on every work center — presses, nut welding, spot welding, assembly alike: a job of
+              N pieces runs N × cycle time at full speed. A part loaded earlier with SPM and cavities
+              but no cycle time still runs 1 ÷ (SPM × cavities) minutes per piece.
             </p>
             <p>
               <b>Lot:</b> gross weight is per piece, so a coil yields coil weight ÷ gross weight
               pieces — that is the lot unit, shown in the Pcs/coil column. Where the coil quantity
               is flexible (transfer work centers), enter <b>Min. lot</b> instead: the lot is then at
               least that many pieces, otherwise exactly the need, and the coil weight is ignored (it
-              may stay empty). A part with neither is flagged and planned at exactly the need.
+              may stay empty). A part with neither is planned at exactly the need — flagged, unless it
+              has a cycle time (nut welding and other parts without coil or sheet).
             </p>
             <p>
-              Cavities do not change that number; they decide how many strokes it takes. A
-              co-product comes out of the same grams, so it costs no extra material.
+              A co-product comes out of the same grams, so it costs no extra material.
             </p>
             <p>
               <b>Accepted OEE</b> (availability × performance, quality taken as 100 %) sets each
@@ -302,16 +310,15 @@ function ReferanslarPage() {
           expectedColumns={[
             'Material',
             'Co-Product',
-            'Cavity',
-            'SPM',
+            'Cycle time (min/pc)',
             'Raw Material Code',
             'Coil Weight (Kg)',
             'Gross Weight (Kg/piece)',
             'Min Lot (pcs) (optional)',
             'Setup Time',
             'Frequency Stop Time (min) (or Coil Setup Time)',
-            'Cycle Time (min) (cycle lines)',
-            'Stop Every (pcs) (cycle lines)',
+            'Stop Every (pcs) (optional)',
+            'SPM, Cavity (old files only)',
             'Main Machine',
             'Alternative 1-4',
             'Max Shot',
@@ -333,10 +340,8 @@ function ReferanslarPage() {
         >
           <Field label="Material (code)" value={form.code} onChange={(v) => update('code', v)} placeholder="M250SP001RO" />
           <Field label="Co-Product" value={form.coProduct} onChange={(v) => update('coProduct', v)} placeholder="M250SP002RO" />
-          <Field label="Cavity — presses" value={form.moldCavities} onChange={(v) => update('moldCavities', v)} type="number" placeholder="1" />
-          <Field label="SPM — presses" value={form.spm} onChange={(v) => update('spm', v)} type="number" placeholder="16" />
-          <Field label="Cycle time (min / piece, 3 decimals) — cycle lines" value={form.cycleMinutes} onChange={(v) => update('cycleMinutes', v)} type="number" placeholder="0.750" />
-          <Field label="Stop every (pcs) — cycle lines" value={form.stopEveryPcs} onChange={(v) => update('stopEveryPcs', v)} type="number" placeholder="500" />
+          <Field label="Cycle time (min / piece, 3 decimals)" value={form.cycleMinutes} onChange={(v) => update('cycleMinutes', v)} type="number" placeholder="0.750" />
+          <Field label="Stop every (pcs) — optional" value={form.stopEveryPcs} onChange={(v) => update('stopEveryPcs', v)} type="number" placeholder="500" />
           <Field label="Raw Material Code" value={form.rawMaterialCode} onChange={(v) => update('rawMaterialCode', v)} placeholder="SD51-100-0976" />
           <Field label="Coil Weight (Kg)" value={form.coilWeight} onChange={(v) => update('coilWeight', v)} type="number" placeholder="8000" />
           <Field label="Gross Weight (Kg/piece)" value={form.grossWeight} onChange={(v) => update('grossWeight', v)} type="number" placeholder="1.465" />
@@ -392,31 +397,25 @@ function ReferanslarPage() {
             <tr>
               <th className="px-3 py-2 font-medium">Material</th>
               <th className="px-3 py-2 font-medium">
-                <span className="inline-flex items-center gap-1">
-                  Model
-                  <InfoTip label="Production model">
-                    <p>The model comes from the main machine (Work Center Definitions):</p>
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                  Cycle time (min/pc)
+                  <InfoTip label="Cycle time">
                     <p>
-                      <b>Press</b> — {RATE_MODELS.stroke.hint}. Columns: Cavity, SPM, Raw material, Coil weight, Gross weight.
+                      Minutes per piece, {CYCLE_DECIMALS} decimals — the speed of the part on every work center.
+                      A job of N pieces runs N × cycle time at full speed; Accepted OEE then widens the window.
                     </p>
+                    <p>Pieces per hour = 60 ÷ cycle time.</p>
                     <p>
-                      <b>Cycle</b> — {RATE_MODELS.cycle.hint}. Columns: cycle time in minutes per piece, {CYCLE_DECIMALS} decimals (SPM
-                      column), and “stop every N pieces” for the frequency stop (Coil column). No cavity, coil or kg.
+                      Empty: a part loaded with SPM and cavities still runs 1 ÷ (SPM × cavities) min/pc (shown in grey).
+                      A part with neither has no speed and is flagged in the plan check.
                     </p>
-                    <p>Pieces per hour: press = SPM × 60 × cavities; cycle line = 60 ÷ cycle time (min).</p>
                   </InfoTip>
                 </span>
               </th>
               <th className="px-3 py-2 font-medium">Co-Product</th>
-              <th className="px-3 py-2 font-medium" title="Press: cavities (pieces per stroke). Not used on a cycle line">
-                Cavity
-              </th>
-              <th className="px-3 py-2 font-medium" title="Press: strokes per minute. Cycle line: cycle time in minutes per piece (3 decimals)">
-                {hasCycle ? 'SPM · cycle min/pc' : 'SPM'}
-              </th>
               <th className="px-3 py-2 font-medium">Raw Material</th>
-              <th className="px-3 py-2 font-medium" title="Press: coil weight (kg). Cycle line: pieces between frequency stops">
-                {hasCycle ? 'Coil Wt · stop every' : 'Coil Wt'}
+              <th className="px-3 py-2 font-medium" title="Coil weight (kg)">
+                Coil Wt
               </th>
               <th className="px-3 py-2 font-medium" title="Gross weight is per piece">
                 Gross Wt/pc
@@ -459,14 +458,14 @@ function ReferanslarPage() {
           <tbody>
             {status === 'LoadingFirstPage' && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={19}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={17}>
                   Loading…
                 </td>
               </tr>
             )}
             {status !== 'LoadingFirstPage' && visibleProducts.length === 0 && (
               <tr>
-                <td className="px-3 py-3 text-muted-foreground" colSpan={19}>
+                <td className="px-3 py-3 text-muted-foreground" colSpan={17}>
                   No materials added yet.
                 </td>
               </tr>
@@ -494,29 +493,34 @@ function ReferanslarPage() {
               )
               const field = (name: ProductField['name']) =>
                 PRODUCT_FIELDS.find((f) => f.name === name)!
-              const model: RateModel = modelOfPart(p, pressByName)
               return (
                 <tr
                   key={p._id}
                   className={`border-t border-border ${dirty ? 'bg-amber-50' : ''}`}
                 >
                   <td className="px-1 py-1">{cell(field('code'), 'w-28')}</td>
-                  <td className="px-2 py-1">
-                    <ModelBadge model={model} pph={piecesPerHour(p, model)} />
+                  <td className="px-1 py-1">
+                    {cell(field('cycleMinutes'), 'w-20', fixed3)}
+                    <RateHint product={p} />
                   </td>
                   <td className="px-1 py-1">{cell(field('coProduct'), 'w-28')}</td>
-                  <td className="px-1 py-1">{model === 'cycle' ? <NotUsed /> : cell(field('moldCavities'), 'w-20')}</td>
-                  <td className="px-1 py-1">{model === 'cycle' ? cell(field('cycleMinutes'), 'w-20', fixed3) : cell(field('spm'), 'w-20')}</td>
-                  <td className="px-1 py-1">{model === 'cycle' ? <NotUsed /> : cell(field('rawMaterialCode'), 'w-28')}</td>
-                  <td className="px-1 py-1">{model === 'cycle' ? cell(field('stopEveryPcs'), 'w-20') : cell(field('coilWeight'), 'w-20')}</td>
-                  <td className="px-1 py-1">{model === 'cycle' ? <NotUsed /> : cell(field('grossWeight'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('rawMaterialCode'), 'w-28')}</td>
+                  <td className="px-1 py-1">{cell(field('coilWeight'), 'w-20')}</td>
+                  <td className="px-1 py-1">{cell(field('grossWeight'), 'w-20')}</td>
                   <td className="px-1 py-1">{cell(field('minLotQty'), 'w-20')}</td>
                   <td className="px-3 py-2 text-muted-foreground" title="Coil weight ÷ gross weight per piece">
                     {(() => {
-                      if (model === 'cycle') return <NotUsed />
                       const spec = { ...p } as unknown as ProductSpec
                       const rule = lotRuleOf(spec)
                       if (rule === 'minLot') return <span className="text-xs">min. lot</span>
+                      // Çevrim süreli, rulosuz parça (nut welding …): tam ihtiyaç, uyarı değil.
+                      if (rule === 'missing' && hasCycleTime(spec)) {
+                        return (
+                          <span className="text-xs" title="No coil or sheet: planned at exactly the need">
+                            exact need
+                          </span>
+                        )
+                      }
                       if (rule === 'missing') {
                         return (
                           <span
@@ -792,25 +796,21 @@ function ApplyToAll() {
   )
 }
 
-/** Parçanın üretim modeli (ana makinesinden) ve saatlik adedi. */
-function ModelBadge({ model, pph }: { model: RateModel; pph: number }) {
+/**
+ * Çevrim süresi kutusunun altı: saatlik adet; çevrim süresi boşsa eski
+ * SPM × gözden gelen süre gri gösterilir (src/lib/rateModel.ts).
+ */
+function RateHint({ product }: { product: { spm?: number; moldCavities?: number; cycleMinutes?: number } }) {
+  const perPiece = minutesPerPiece(product)
+  if (perPiece <= 0) return <span className="block px-1 text-[10px] text-destructive">no speed</span>
+  const pph = Math.round(piecesPerHour(product)).toLocaleString('en-GB')
+  if (hasCycleTime(product)) return <span className="block px-1 text-[10px] text-muted-foreground">{pph} pcs/h</span>
   return (
-    <span className="whitespace-nowrap" title={`${RATE_MODELS[model].label} — ${RATE_MODELS[model].hint}`}>
-      <span
-        className={`rounded px-1.5 py-px text-[10px] font-semibold ${model === 'cycle' ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-800'}`}
-      >
-        {RATE_MODELS[model].short}
-      </span>
-      {pph > 0 && <span className="block text-[10px] text-muted-foreground">{Math.round(pph).toLocaleString('en-GB')} pcs/h</span>}
-    </span>
-  )
-}
-
-/** Çevrim hattında kullanılmayan alan (rulo, kg). */
-function NotUsed() {
-  return (
-    <span className="block px-2 text-xs text-muted-foreground/60" title="Not used on a cycle line (no coil, no kg)">
-      —
+    <span
+      className="block px-1 text-[10px] text-muted-foreground/70"
+      title={`No cycle time: from the old SPM ${product.spm ?? 0} × ${product.moldCavities || 1} cavities. Enter a cycle time to replace it.`}
+    >
+      {perPiece.toFixed(CYCLE_DECIMALS)} (SPM) · {pph} pcs/h
     </span>
   )
 }

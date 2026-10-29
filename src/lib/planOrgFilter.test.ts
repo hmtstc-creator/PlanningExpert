@@ -13,8 +13,8 @@ import {
   type OrgPress,
 } from './planOrgFilter'
 
-// Press bölümü: iki pres hattı + bir cycle hattı; Assembly bölümü: yalnız
-// cycle (nut welding) — pres planına girmez. Bir pres de masraf yerisiz.
+// Press bölümü: üç pres hattı + bir robot hattı; Assembly bölümü: nut
+// welding. Hepsi planlanır (çevrim süresi). Bir pres de masraf yerisiz.
 const costCenters: OrgCostCenter[] = [
   { code: '1100', name: 'Press line', department: 'Press' },
   { code: '1200', name: 'Transfer', department: 'Press' },
@@ -23,14 +23,14 @@ const costCenters: OrgCostCenter[] = [
 ]
 const departments = ['Press', 'Assembly']
 const presses: OrgPress[] = [
-  { name: 'P1', costCenter: '1100', rateModel: 'stroke' },
-  { name: 'P2', costCenter: '1100', rateModel: 'stroke' },
-  { name: 'T1', costCenter: '1200', rateModel: 'stroke' },
-  { name: 'R1', costCenter: '1200', rateModel: 'cycle' },
-  { name: 'NW1', costCenter: '2100', rateModel: 'cycle' },
-  { name: 'X1', costCenter: '9900', rateModel: 'stroke' },
-  { name: 'Z1', rateModel: 'stroke' },
-  { name: 'Z2', costCenter: '7777', rateModel: 'stroke' },
+  { name: 'P1', costCenter: '1100' },
+  { name: 'P2', costCenter: '1100' },
+  { name: 'T1', costCenter: '1200' },
+  { name: 'R1', costCenter: '1200' },
+  { name: 'NW1', costCenter: '2100' },
+  { name: 'X1', costCenter: '9900' },
+  { name: 'Z1' },
+  { name: 'Z2', costCenter: '7777' },
 ]
 
 describe('planOrgFilter: iş yerinin yeri', () => {
@@ -75,18 +75,18 @@ describe('planOrgFilter: görünür iş yerleri', () => {
 })
 
 describe('planOrgFilter: seçenekler', () => {
-  it('bölüm listesi plant sırasında, sayılar plan içi / plan dışı ayrı', () => {
+  it('bölüm listesi plant sırasında; her iş yeri sayılır (plan dışı yok)', () => {
     const { departments: opts } = planOrgOptions(presses, costCenters, departments, NO_ORG_FILTER)
     expect(opts.map((o) => o.value)).toEqual(['Press', 'Assembly', UNASSIGNED])
-    expect(opts[0]).toMatchObject({ label: 'Press', planned: 3, other: 1 })
-    // Nut welding yalnız cycle: bölümde planlanacak iş yeri yok.
-    expect(opts[1]).toMatchObject({ label: 'Assembly', planned: 0, other: 1 })
-    expect(opts[2]).toMatchObject({ label: 'Without a department', planned: 3, other: 0 })
+    expect(opts[0]).toEqual({ value: 'Press', label: 'Press', count: 4 })
+    // Nut welding da planlanır: "0 WC + 1 not planned" bir daha çıkmaz.
+    expect(opts[1]).toEqual({ value: 'Assembly', label: 'Assembly', count: 1 })
+    expect(opts[2]).toMatchObject({ label: 'Without a department', count: 3 })
   })
 
   it('iş yeri olmayan bölüm / masraf yeri listeye girmez', () => {
     const { departments: opts, costCenters: cc } = planOrgOptions(
-      [{ name: 'P1', costCenter: '1100', rateModel: 'stroke' }],
+      [{ name: 'P1', costCenter: '1100' }],
       costCenters,
       [...departments, 'Maintenance'],
       NO_ORG_FILTER,

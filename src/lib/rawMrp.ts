@@ -23,6 +23,7 @@
 //     eklenmez (kanban ileride ayrı bir kural olarak gelir).
 
 import type { ProductSpec } from './planning'
+import { hasCycleTime } from './rateModel'
 import { intermediateCodes } from './stockLocations'
 
 export interface MrpWeek {
@@ -239,6 +240,9 @@ export function buildRawRequirements(input: {
       }
       continue
     }
+    // Sacsız parça (nut welding …): hammadde kodu, brüt ağırlık ve rulo yok,
+    // çevrim süresi var — sac ihtiyacı yoktur, eksik veri sayılmaz.
+    if (carrier && !raw && gross <= 0 && !((carrier.coilWeight ?? 0) > 0) && hasCycleTime(carrier)) continue
     if (!carrier || !raw || gross <= 0) {
       missing.set(carrierCode, {
         pieces: total,

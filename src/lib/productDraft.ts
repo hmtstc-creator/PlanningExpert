@@ -4,6 +4,9 @@
 // sıfırdan farklıdır. Kayıt alan alan yazıldığı için (`products.updateField`)
 // kısmi kayıt riski yok; buradaki amaç kullanıcının neyi kaydetmediğini
 // görebilmesi.
+//
+// SPM ve kalıp gözü tabloda yok (2026-10-29): süre çevrim süresinden gelir.
+// Eski kayıtlardaki değerler sunucuda durur; satır kaydı onlara dokunmaz.
 
 export interface ProductField {
   name: keyof ProductDraft
@@ -13,8 +16,6 @@ export interface ProductField {
 export interface ProductDraft {
   code: string
   coProduct: string
-  moldCavities: string
-  spm: string
   rawMaterialCode: string
   coilWeight: string
   grossWeight: string
@@ -31,17 +32,15 @@ export interface ProductDraft {
   maxShots: string
   qualityApprovalMinutes: string
   performanceFactor: string
-  /** Çevrim hattı (src/lib/rateModel.ts): çevrim süresi, dakika / adet (3 hane). */
+  /** Çevrim süresi, dakika / adet (3 hane) — bütün parçalarda sürenin kaynağı (src/lib/rateModel.ts). */
   cycleMinutes: string
-  /** Çevrim hattı: frekansiyel duruşlar arası adet. */
+  /** Frekansiyel duruşlar arası adet (yalnız saklanır; motor kullanmıyor). */
   stopEveryPcs: string
 }
 
 export const PRODUCT_FIELDS: ProductField[] = [
   { name: 'code', numeric: false },
   { name: 'coProduct', numeric: false },
-  { name: 'moldCavities', numeric: true },
-  { name: 'spm', numeric: true },
   { name: 'rawMaterialCode', numeric: false },
   { name: 'coilWeight', numeric: true },
   { name: 'grossWeight', numeric: true },

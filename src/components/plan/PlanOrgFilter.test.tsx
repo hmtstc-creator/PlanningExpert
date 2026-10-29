@@ -14,10 +14,10 @@ const costCenters: OrgCostCenter[] = [
 ]
 const departments = ['Press', 'Assembly']
 const presses: OrgPress[] = [
-  { name: 'P1', costCenter: '1100', rateModel: 'stroke' },
-  { name: 'P2', costCenter: '1100', rateModel: 'stroke' },
-  { name: 'T1', costCenter: '1200', rateModel: 'stroke' },
-  { name: 'NW1', costCenter: '2100', rateModel: 'cycle' },
+  { name: 'P1', costCenter: '1100' },
+  { name: 'P2', costCenter: '1100' },
+  { name: 'T1', costCenter: '1200' },
+  { name: 'NW1', costCenter: '2100' },
 ]
 
 const view = (selection: PlanOrgSelection, planned: number, onChange = vi.fn()) => {
@@ -27,7 +27,7 @@ const view = (selection: PlanOrgSelection, planned: number, onChange = vi.fn()) 
       selection={selection}
       onChange={onChange}
       planned={planned}
-      total={3}
+      total={4}
     />,
   )
   return onChange
@@ -35,18 +35,18 @@ const view = (selection: PlanOrgSelection, planned: number, onChange = vi.fn()) 
 
 describe('PlanOrgFilter', () => {
   it('süzgeç kapalıyken plandaki bütün iş yerlerini söyler', () => {
-    view(NO_ORG_FILTER, 3)
-    expect(screen.getByText('All 3 work centers in the plan')).toBeTruthy()
+    view(NO_ORG_FILTER, 4)
+    expect(screen.getByText('All 4 work centers in the plan')).toBeTruthy()
     expect(screen.queryByText('Clear filter')).toBeNull()
   })
 
   it('bölüm seçenekleri sayılarıyla gelir; seçim masraf yeri seçimini sıfırlar', () => {
-    const onChange = view(NO_ORG_FILTER, 3)
+    const onChange = view(NO_ORG_FILTER, 4)
     const select = screen.getByRole('combobox') as HTMLSelectElement
     expect([...select.options].map((o) => o.text)).toEqual([
       'All departments',
       'Press · 3 WC',
-      'Assembly · 0 WC + 1 not planned',
+      'Assembly · 1 WC',
     ])
     fireEvent.change(select, { target: { value: 'Press' } })
     expect(onChange).toHaveBeenCalledWith({ department: 'Press', costCenters: [] })
@@ -58,9 +58,14 @@ describe('PlanOrgFilter', () => {
     expect(onChange).toHaveBeenCalledWith({ department: 'Press', costCenters: ['1100'] })
   })
 
-  it('yalnız cycle hattı olan bölüm seçilince nedeni yazılır', () => {
-    view({ department: 'Assembly', costCenters: [] }, 0)
-    expect(screen.getByText(/does not plan those yet/)).toBeTruthy()
-    expect(screen.getByText('Showing 0 of 3 work centers in the plan')).toBeTruthy()
+  it('nut welding bölümü de planda: "not planned" yazılmaz', () => {
+    view({ department: 'Assembly', costCenters: [] }, 1)
+    expect(screen.getByText('Showing 1 of 4 work centers in the plan')).toBeTruthy()
+    expect(screen.queryByText(/not planned|not part of the press plan|does not plan/)).toBeNull()
+  })
+
+  it('seçimde hiç iş yeri yoksa masraf yeri bağını kontrol etmeyi söyler', () => {
+    view({ department: 'Press', costCenters: ['1200'] }, 0)
+    expect(screen.getByText(/Check the cost center of the work centers/)).toBeTruthy()
   })
 })

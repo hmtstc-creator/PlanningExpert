@@ -63,6 +63,7 @@ import {
   type ScheduleVariant,
   type UnplannedItem,
 } from './scheduler'
+import { hasCycleTime, minutesPerPiece } from './rateModel'
 import { SETTINGS_DEFAULTS } from './settingsDefaults'
 
 /** Hammadde eksikliği bu kadar İŞ GÜNÜ içinde bir işi durduruyorsa acildir. */
@@ -337,7 +338,7 @@ export interface LateItem {
 
 /**
  * "71.4 h nereden geliyor": ilk geç lotun zaman çizgisi ve kullandığı
- * girdiler. Planlamacı kendi kriterlerini (talep, setup, SPM, vardiya)
+ * girdiler. Planlamacı kendi kriterlerini (talep, setup, çevrim süresi, vardiya)
  * buradan kontrol eder.
  */
 export interface LateCalc {
@@ -366,8 +367,8 @@ export interface LateCalc {
   lotQuantity: number
   /** Üretim hızı (adet/saat) — lot adedi ÷ üretim süresi. */
   piecesPerHour: number
-  spm?: number
-  cavities?: number
+  /** Ana veriden çevrim süresi (dakika / adet; src/lib/rateModel.ts `minutesPerPiece`). */
+  minutesPerPiece?: number
   performanceFactor?: number
   /** Setup başlangıcından hazır olmaya kadar presin çalışmadığı saat (vardiya yok, hafta sonu, mola). */
   pressOffHours: number
@@ -1662,8 +1663,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
         neededQuantity: needed,
         lotQuantity: job.quantity,
         piecesPerHour: job.runMinutes > 0 ? Math.round((job.quantity / job.runMinutes) * 60) : 0,
-        ...(product?.spm ? { spm: product.spm } : {}),
-        ...(product?.moldCavities ? { cavities: product.moldCavities } : {}),
+        ...(minutesPerPiece(product) > 0 ? { minutesPerPiece: Math.round(minutesPerPiece(product) * 1000) / 1000 } : {}),
         ...(product?.performanceFactor ? { performanceFactor: product.performanceFactor } : {}),
         pressOffHours: h1(off),
         hoursToDeadline: Math.round(toDeadline * 10) / 10,
@@ -1819,7 +1819,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // Lot kuralı eksik: ne minimum lot ne gerçek bir rulo ağırlığı var. Lot tam
   // ihtiyaç kadar kuruldu; ana veri düzeltilmeli.
   const noLotRule = Array.from(new Set(result.jobs.map((j) => j.material)))
-    .filter((m) => lotRuleOf(productByCode.get(m)) === 'missing')
+    // Çevrim süreli parça (nut welding …) rulo / sac kullanmaz: uyarı değil.
+    .filter((m) => lotRuleOf(productByCode.get(m)) === 'missing' && !hasCycleTime(productByCode.get(m)))
     .sort()
   if (noLotRule.length > 0) {
     warnings.push(

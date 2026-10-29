@@ -7,7 +7,9 @@ import { DEFAULT_PLANT_TIME_ZONE } from '../lib/dates'
 import { MES_SHORT_STOP_MIN, SHORT_STOPS, SPEED, UNASSIGNED, UNDEFINED_RC1 } from '../lib/oee'
 import { OVER_RECORDED } from '../lib/oeeBridge'
 import { SHORT_STOP_DATA_FROM } from '../lib/oeeShortStops'
+import { computeRunPlan } from '../lib/planning'
 import { leadTimeLookup, type LeadTimeRow } from '../lib/rawLeadTime'
+import { CYCLE_DECIMALS } from '../lib/rateModel'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
@@ -88,6 +90,14 @@ function PlanLogicPage() {
       }
     | null
     | undefined
+
+  // Süre örneği koddan hesaplanır; aynı sayılar src/lib/rateModel.test.ts'te.
+  const cycleExample = { qty: 1200, minutes: 0.25, oee: 0.6 }
+  const cycleRun = computeRunPlan({ code: 'X', cycleMinutes: cycleExample.minutes }, cycleExample.qty)
+  const cycleRunOee = computeRunPlan(
+    { code: 'X', cycleMinutes: cycleExample.minutes, performanceFactor: cycleExample.oee },
+    cycleExample.qty,
+  )
 
   const current = {
     horizon: settings?.planningHorizonWeeks ?? SETTINGS_DEFAULTS.planningHorizonWeeks,
@@ -210,10 +220,10 @@ function PlanLogicPage() {
             ['Coils in transit', 'In-transit Excel list: each quantity arrives in its ETA week (no ETA = this week)', '/sapdata'],
             [
               'Master data',
-              'Cavities, strokes per minute (SPM), setup and frequency stop (coil change) times, quality approval time, coil and gross weight, mould shot limit, main and alternative work centers, Flexible work center tick, co-product, Accepted OEE',
+              'Cycle time (minutes per piece) — the speed of every part on every work center; setup and frequency stop (coil change) times, quality approval time, coil and gross weight, mould shot limit, main and alternative work centers, Flexible work center tick, co-product, Accepted OEE. A part loaded earlier with SPM and cavities but no cycle time runs 1 ÷ (SPM × cavities) min/piece; cavities, where still entered, only count strokes (mould limit)',
               '/referanslar',
             ],
-            ['Work Centers', 'The single work center list: cost center, hall (crane and setup team), category (Gantt and Capacity Dashboard groups), production model (press — planned here; cycle line: spot welding, robot, assembly — cycle time in min/piece, not part of this plan), frequency stop (coil setup, fixture setup … or none), frozen days', '/makineler'],
+            ['Work Centers', 'The single work center list: cost center, hall (crane and setup team), category (Gantt and Capacity Dashboard groups), frequency stop (coil setup, fixture setup … or none), frozen days', '/makineler'],
             ['Work calendar', 'Per work center: weekly pattern (days from Monday × shifts), exception weeks, overtime (dated or recurring, from an overtime type); planned stops; public and manual holidays; planning settings', '/takvim'],
             ['Dies', 'Readiness (date and time), maintenance days, shot-limit alarms — from Die Follow-up', '/die-followup/maintenance'],
             ['Machines', 'Planned work center maintenance hours and open breakdowns that stop a work center — from Machine Follow-up', '/machine-followup/breakdowns'],
@@ -312,6 +322,12 @@ function PlanLogicPage() {
             <b>Neither?</b> A part with no Min. lot and no real coil weight (empty,
             or 1 kg as a placeholder) is a master data error: it is planned at
             exactly the need, and the plan and the Master Data page warn about it.
+          </li>
+          <li>
+            <b>No coil at all</b> (nut welding, spot welding, assembly …): a part with a
+            cycle time and no coil or sheet is planned at exactly the need (or its Min.
+            lot) <b>without</b> a warning, and the Raw Material page does not ask for its
+            steel.
           </li>
         </ul>
         <Example>
@@ -542,11 +558,18 @@ function PlanLogicPage() {
           <span aria-hidden>→ …</span>
         </div>
         <Formula>
-          strokes = ⌈quantity ÷ cavities⌉ · pure time = strokes ÷ SPM · job time = max(pure time ÷ Accepted OEE, pure time + setup +
+          pure time = pieces × cycle time (min/piece) · job time = max(pure time ÷ Accepted OEE, pure time + setup +
           frequency stops + approval)
         </Formula>
         <p className="text-xs text-muted-foreground">
-          Example: 10 h of pure stroke time at a 60 % Accepted OEE is a 16.7 h job.
+          Every part on every work center — press, nut welding, spot welding, assembly — is timed this way;
+          no work center is left out of the plan. Example: {cycleExample.qty.toLocaleString('en-GB')} pieces ×{' '}
+          {cycleExample.minutes.toFixed(CYCLE_DECIMALS)} min = {Math.round(cycleRun.theoreticalRunMinutes)} min of pure time; at a{' '}
+          {Math.round(cycleExample.oee * 100)} % Accepted OEE the job is {Math.round(cycleRunOee.totalMinutes)} min.
+          A part without a cycle time but with the old SPM and cavities runs 1 ÷ (SPM × cavities) min/piece — its
+          time is exactly what it was (strokes ÷ SPM). With neither, the part has no speed and the plan check flags
+          it (“no cycle time in master data”). Strokes = ⌈pieces ÷ cavities⌉ (= pieces when no cavities are
+          entered) count only for the mould shot limit and strokes per coil.
           Setup, frequency stops (coil changes …) and quality approval sit inside that time; when they do not fit, the job is the pure
           time plus those stops. Frequency stops = coils − 1 (coils = ⌈quantity ÷ pieces per coil⌉, pieces per coil = ⌊coil weight ÷
           gross weight⌋); a work center whose frequency stop is — none — never stops for it. A co-product comes from the same strokes:
@@ -764,7 +787,7 @@ function PlanLogicPage() {
         <p className="mt-2 text-sm text-amber-900">
           <b>How the hours are calculated</b> (tap the row): setup start → setup +
           quality approval + production of the needed pieces at the part's speed
-          (pieces per hour from SPM × cavities × performance) → pieces ready at the
+          (pieces per hour = 60 ÷ cycle time × performance) → pieces ready at the
           delivery time (on time share) → ready time of the last needed piece. Last
           piece late = ready − needed by (delivery time on the need day). When the press
           cannot make it, <i>Why late</i> compares the production time the press has between
@@ -911,10 +934,10 @@ function PlanLogicPage() {
           <Link to="/makineler" className="underline">Work Center Definitions</Link>) and cost center
           → department (Company settings). A work center without a cost center is listed under{' '}
           <i>Without a department</i> so it cannot get lost. Each option shows how many work centers
-          it holds; a department whose work centers all run on a <b>cycle time</b> (spot welding,
-          robot, assembly, nut welding) shows "not planned" — those work centers are not part of the
-          press plan yet (see <a href="#inputs" className="underline">Collect the data</a>) and are
-          planned separately.
+          it holds. Every work center is in the plan — presses as well as nut welding, spot welding,
+          robot and assembly lines — because every part is timed by its cycle time (see{' '}
+          <a href="#inputs" className="underline">Collect the data</a>); there is no “not planned” work
+          center.
         </p>
       </section>
 
@@ -926,7 +949,7 @@ function PlanLogicPage() {
             the Work Calendar, the Capacity Dashboard and Performance.
           </li>
           <li>
-            <b>Demand hours</b> = pieces ÷ cavities ÷ SPM ÷ OEE, after finished stock, earliest week
+            <b>Demand hours</b> = pieces × cycle time ÷ 60 ÷ OEE, after finished stock, earliest week
             first; this week carries the backlog. Groups are the work center <b>categories</b>.
           </li>
           <li>

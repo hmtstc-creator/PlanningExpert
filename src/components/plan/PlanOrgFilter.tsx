@@ -71,8 +71,7 @@ export function usePlanOrgFilter(presses: OrgPress[], costCenters: OrgCostCenter
   return { selection, setSelection, options, active, shows }
 }
 
-const countLabel = (planned: number, other: number) =>
-  `${planned} WC${other > 0 ? ` + ${other} not planned` : ''}`
+const countLabel = (count: number) => `${count} WC`
 
 /**
  * Bölüm → masraf yeri süzgeci (planlamacı isteği: plan sayfası yalnız preslerin
@@ -94,13 +93,6 @@ export function PlanOrgFilter({
   total: number
 }) {
   const active = orgFilterActive(selection)
-  const chosen = selection.department === '' ? null : options.departments.find((o) => o.value === selection.department)
-  // Seçilen bölümde pres planına girmeyen (cycle) iş yerleri: boş görünen
-  // bölümün nedeni budur.
-  const notPlanned =
-    selection.costCenters.length > 0
-      ? options.costCenters.filter((o) => selection.costCenters.includes(o.value)).reduce((s, o) => s + o.other, 0)
-      : (chosen?.other ?? 0)
 
   const toggle = (code: string) =>
     onChange({
@@ -137,7 +129,7 @@ export function PlanOrgFilter({
             <option value="">All departments</option>
             {options.departments.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label} · {countLabel(o.planned, o.other)}
+                {o.label} · {countLabel(o.count)}
               </option>
             ))}
           </select>
@@ -171,12 +163,11 @@ export function PlanOrgFilter({
                 type="button"
                 aria-pressed={on}
                 onClick={() => toggle(o.value)}
-                title={o.other > 0 ? `${o.other} work center(s) here are not part of the press plan` : undefined}
                 className={`rounded-full border px-2.5 py-1 text-xs ${
                   on ? 'border-sky-600 bg-sky-600 text-white' : 'border-input hover:bg-muted'
                 }`}
               >
-                {o.label} <span className={on ? 'opacity-80' : 'text-muted-foreground'}>· {countLabel(o.planned, o.other)}</span>
+                {o.label} <span className={on ? 'opacity-80' : 'text-muted-foreground'}>· {countLabel(o.count)}</span>
               </button>
             )
           })}
@@ -194,16 +185,7 @@ export function PlanOrgFilter({
 
       {active && planned === 0 && (
         <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-          {notPlanned > 0
-            ? `No work center here is part of the press plan. ${notPlanned} work center(s) in this selection run on a cycle time (spot welding, robot, assembly, nut welding); PlanningExpert does not plan those yet — they are planned separately.`
-            : 'No work center of this selection is in the plan. Check the cost center of the work centers on Work Center Definitions.'}
-        </p>
-      )}
-
-      {active && planned > 0 && notPlanned > 0 && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {notPlanned} further work center(s) in this selection run on a cycle time and are not part of
-          the press plan, so they are not shown.
+          No work center of this selection is in the plan. Check the cost center of the work centers on Work Center Definitions.
         </p>
       )}
 

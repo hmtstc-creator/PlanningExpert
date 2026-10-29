@@ -5,7 +5,6 @@ import { v } from 'convex/values'
 import { internal } from './_generated/api'
 import { internalAction } from './_generated/server'
 import { computePlan, type PlanInputs, type PlanRun } from '../src/lib/planPipeline'
-import { pressPlanScope } from '../src/lib/rateModel'
 import { compactSegments } from '../src/lib/segmentCompact'
 
 /**
@@ -63,27 +62,16 @@ async function loadInputs(ctx: Ctx, plantId: string): Promise<PlanInputs> {
     readTable(ctx, plantId, 'demandDaily'),
     readTable(ctx, plantId, 'stock'),
   ])
-  // Pres planı yalnızca pres hatlarınındır: çevrim hatları (punta, robot,
-  // montaj …) ve ana makinesi onlardan biri olan parçalar — talepleri,
-  // stokları, takvimleri ile — dışarıda kalır; onlar ayrıca planlanır.
-  const scope = pressPlanScope(small.presses as Ctx[], products.rows as Ctx[])
-  const keep = (row: Ctx) => !scope.excludedParts.has(row.material)
-  const onPress = (row: Ctx) => !scope.cycleLines.includes(row.press)
+  // Bütün iş yerleri ve bütün parçalar planlanır (2026-10-29): süre her
+  // parçada çevrim süresinden (dakika / adet) gelir; pres / çevrim ayrımı
+  // yoktur. `presses.rateModel` alanı şemada eski kayıtlar için durur,
+  // motor onu okumaz.
   return {
     ...small,
-    presses: scope.presses,
-    templates: (small.templates ?? []).filter(onPress),
-    weekOverrides: (small.weekOverrides ?? []).filter(onPress),
-    pressOvertime: (small.pressOvertime ?? []).filter(onPress),
-    pressDayShifts: (small.pressDayShifts ?? []).filter(onPress),
-    pressMaintenance: (small.pressMaintenance ?? []).filter(onPress),
-    overrides: (small.overrides ?? []).filter(keep),
-    jobLocks: (small.jobLocks ?? []).filter(keep),
-    products: scope.products,
-    weeklyDemand: demand.rows.filter(keep),
-    dailyDemand: daily.rows.filter(keep),
-    stock: stock.rows.filter(keep),
-    cycleScope: { lines: scope.cycleLines, parts: scope.excludedParts.size },
+    products: products.rows,
+    weeklyDemand: demand.rows,
+    dailyDemand: daily.rows,
+    stock: stock.rows,
     truncatedInputs: [
       products.complete ? null : 'master data',
       demand.complete ? null : 'demand',
@@ -161,13 +149,6 @@ export const recompute = internalAction({
     try {
       const inputs = await loadInputs(ctx, plantId)
       const run = computePlan(inputs, Date.now())
-      const cycle = (inputs as Ctx).cycleScope as { lines: string[]; parts: number }
-      if (cycle.lines.length) {
-        run.warnings.push(
-          `Not in the press plan: ${cycle.lines.length} cycle line(s) (${cycle.lines.slice(0, 6).join(', ')}${cycle.lines.length > 6 ? '…' : ''}) ` +
-            `and ${cycle.parts} part(s) whose main machine is one of them — they are planned separately.`,
-        )
-      }
       // Hangi yüklemelerle hesaplandı: SAP Data sayfası "bu dosya planda mı"
       // sorusunu bu kayda bakarak cevaplar.
       const dataSources = Object.fromEntries(

@@ -31,7 +31,7 @@ export const PAGE_KEYWORDS: Record<string, string> = {
   '/siparisler': 'talep sipariş ihtiyaç demand order zpp net',
   '/stoklar': 'stok envanter depo mb52 inventory',
   '/gerceklesen': 'gerçekleşen üretim hareket mb51 actual posting',
-  '/referanslar': 'ana veri referans parça malzeme kalıp göz cavity spm ağırlık part',
+  '/referanslar': 'ana veri referans parça malzeme kalıp göz cavity spm çevrim cycle ağırlık part',
   '/makineler': 'iş merkezi makine pres hat hall salon kategori work center',
   '/takvim': 'takvim vardiya tatil duruş mesai shift calendar',
   '/depolar': 'depo yer lokasyon storage location',

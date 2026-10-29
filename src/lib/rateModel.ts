@@ -1,45 +1,21 @@
-// Üretim modeli: work center'ın plan yapısı.
+// Üretim hızı: bütün parçalar ve bütün iş yerleri için TEK dil — çevrim
+// süresi (dakika / adet). Kullanıcı kararı 2026-10-29.
 //
-// Her hattın plan yapısı farklıdır; birleştirilmez:
+// Eskiden pres hatları SPM × göz ile, punta / robot / montaj (cycle) hatları
+// çevrim süresiyle ölçülür ve cycle hatları pres planına girmezdi. Artık
+// motor her iş yerini planlar; parçanın süresi yalnız buradan okunur:
 //
-//   Stroke (pres)   PlanningExpert'in planı: SPM × göz, tam rulo ya da Min.
-//                   lot, sac kg, vinç, kalıp setup'ı. Pres motoru yalnızca
-//                   bu work center'ları ve ana makinesi bunlardan biri olan
-//                   parçaları planlar.
-//   Cycle (hat)     Punta, robot, montaj, kataforez: parçanın çevrim süresi
-//                   (dakika / adet). Pres planına GİRMEZ — ayrıca planlanır;
-//                   pres parçasıyla bağı (punta hattına giden pres parçası)
-//                   bugün kurulmaz.
+//   1) `cycleMinutes > 0`  → o (dakika / adet).
+//   2) yoksa geri uyum     → 1 ÷ (SPM × göz)   (göz yoksa 1).
+//   3) ikisi de yok        → 0 = süre tanımsız (doğrulayıcı uyarır).
 //
-// Model work center'ın tanımıdır (Work Center Definitions); parça ana
-// makinesinin modelini alır.
-
-export type RateModel = 'stroke' | 'cycle'
-
-export const RATE_MODELS: Record<RateModel, { label: string; short: string; hint: string }> = {
-  stroke: {
-    label: 'Stroke — press',
-    short: 'Press',
-    hint: 'Strokes per minute × cavities, whole coils or Min. lot, steel in kg — planned by PlanningExpert',
-  },
-  cycle: {
-    label: 'Cycle — spot welding, robot, assembly, line',
-    short: 'Cycle',
-    hint: 'Cycle time in minutes per piece — not part of the press plan, planned separately',
-  },
-}
+// Göz (moldCavities) artık süreyi değil yalnız vuruş sayısını belirler:
+// vuruş = ⌈adet ÷ göz⌉ (kalıp ömrü, rulo başına vuruş, maks. baskı). Göz
+// silinince vuruş = adet. `presses.rateModel` şemada eski kayıtlar için
+// durur; motor onu okumaz.
 
 /** Çevrim süresinin gösterim hassasiyeti (dakika, virgülden sonra 3 hane). */
 export const CYCLE_DECIMALS = 3
-
-export function rateModelOf(press: { rateModel?: string | null } | undefined): RateModel {
-  return press?.rateModel === 'cycle' ? 'cycle' : 'stroke'
-}
-
-/** Parçanın modeli: ana makinesinin modeli (tanımsız makine: pres). */
-export function modelOfPart(product: { mainMachine?: string | null }, presses: Map<string, { rateModel?: string | null }>): RateModel {
-  return rateModelOf(presses.get(product.mainMachine?.trim() ?? ''))
-}
 
 /** Dakikayı 3 haneye yuvarlar (kayıt ve gösterim aynı değeri kullanır). */
 export function roundCycleMinutes(minutes: number): number {
@@ -51,48 +27,62 @@ export function formatCycleMinutes(minutes: number | null | undefined): string {
   return minutes && minutes > 0 ? minutes.toFixed(CYCLE_DECIMALS) : ''
 }
 
-/**
- * Parçanın saatlik adedi (ekran için).
- * - Pres: SPM × 60 × göz (bir vuruşta göz kadar parça).
- * - Çevrim: 60 ÷ çevrim süresi (dakika / adet).
- */
-export function piecesPerHour(
-  product: { spm?: number | null; moldCavities?: number | null; cycleMinutes?: number | null },
-  model: RateModel,
-): number {
-  if (model === 'cycle') {
-    const c = product.cycleMinutes ?? 0
-    return c > 0 ? 60 / c : 0
-  }
-  const cavities = product.moldCavities && product.moldCavities > 0 ? product.moldCavities : 1
-  return (product.spm ?? 0) * 60 * cavities
-}
-
-/** Bir adedin dakikası (iki model için de aynı dil: dakika / adet). */
-export function minutesPerPiece(
-  product: { spm?: number | null; moldCavities?: number | null; cycleMinutes?: number | null },
-  model: RateModel,
-): number {
-  const pph = piecesPerHour(product, model)
-  return pph > 0 ? 60 / pph : 0
+export interface RateFields {
+  spm?: number | null
+  moldCavities?: number | null
+  cycleMinutes?: number | null
 }
 
 /**
- * Pres planının girdisi: çevrim hatlarını ve ana makinesi çevrim hattı olan
- * parçaları (talepleri, stokları, takvimleri ile) dışarıda bırakır.
- * `excluded` ekranda "pres planında değil" diye söylenir.
+ * Çevrim süresi tanımlı parça (nut welding, punta, montaj …): rulo / sac
+ * verisi beklenmez; Min. lot yoksa tam ihtiyaç kadar planlanması uyarı değildir.
  */
-export function pressPlanScope<P extends { name: string; rateModel?: string | null }, Q extends { code: string; mainMachine?: string | null }>(
-  presses: P[],
-  products: Q[],
-): { presses: P[]; products: Q[]; excludedParts: Set<string>; cycleLines: string[] } {
-  const byName = new Map(presses.map((p) => [p.name, p]))
-  const cycleLines = presses.filter((p) => rateModelOf(p) === 'cycle').map((p) => p.name)
-  const excludedParts = new Set(products.filter((p) => modelOfPart(p, byName) === 'cycle').map((p) => p.code))
-  return {
-    presses: presses.filter((p) => rateModelOf(p) === 'stroke'),
-    products: products.filter((p) => !excludedParts.has(p.code)),
-    excludedParts,
-    cycleLines,
-  }
+export function hasCycleTime(product: RateFields | undefined): boolean {
+  return (product?.cycleMinutes ?? 0) > 0
+}
+
+/** Kalıp gözü (tanımsız ya da 0 ise 1): bir vuruşta çıkan adet. */
+export function cavitiesOf(product: RateFields | undefined): number {
+  const c = product?.moldCavities
+  return c && c > 0 ? c : 1
+}
+
+/**
+ * Bir vuruşun dakikası. Çevrim süreli parçada vuruş × göz × dk/adet; eski
+ * (yalnız SPM'li) parçada 1 ÷ SPM — böylece eski parçaların süresi
+ * (vuruş ÷ SPM) bit bit aynı kalır. 0 = süre tanımsız.
+ */
+export function minutesPerStroke(product: RateFields | undefined): number {
+  const cycle = product?.cycleMinutes ?? 0
+  if (cycle > 0) return cycle * cavitiesOf(product)
+  const spm = product?.spm ?? 0
+  return spm > 0 ? 1 / spm : 0
+}
+
+/** Bir adedin dakikası — TEK kaynak. 0 = süre tanımsız. */
+export function minutesPerPiece(product: RateFields | undefined): number {
+  const cycle = product?.cycleMinutes ?? 0
+  if (cycle > 0) return cycle
+  const spm = product?.spm ?? 0
+  return spm > 0 ? 1 / (spm * cavitiesOf(product)) : 0
+}
+
+/** Saatlik adet (ekran için): 60 ÷ dk/adet; süre tanımsızsa 0. */
+export function piecesPerHour(product: RateFields | undefined): number {
+  const m = minutesPerPiece(product)
+  return m > 0 ? 60 / m : 0
+}
+
+/**
+ * Bir işin ideal hızda üretim süresi (dk): vuruş × dk/vuruş. Göz yoksa
+ * vuruş = adet, yani adet × dk/adet.
+ */
+export function runMinutesFor(product: RateFields | undefined, quantity: number): number {
+  if (quantity <= 0) return 0
+  const strokes = Math.ceil(quantity / cavitiesOf(product))
+  const cycle = product?.cycleMinutes ?? 0
+  if (cycle > 0) return strokes * cavitiesOf(product) * cycle
+  // Geri uyum: eski formül harfiyen (vuruş ÷ SPM), yuvarlama farkı olmasın.
+  const spm = product?.spm ?? 0
+  return spm > 0 ? strokes / spm : 0
 }
