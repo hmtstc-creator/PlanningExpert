@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-28 (Asakai onayları, kırmızı = en büyük 2 duruş, vardiyalar da; düzenlemeler sunumu: slayt 4 tamam, slayt 6 bekliyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-29 (slayt 6: süzgeç bitti, cycle hatlarının planlanması açık) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -16,12 +16,26 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
+- **Slayt 6 — süzgeç bitti (#114), cycle hatlarının planlanması açık.** Production Plan'ın üstünde departman (tek) +
+  cost center (çoklu) süzgeci çalışıyor; Gantt, işler, *Plan settings*, *Work calendar*, *Add job*'un iş yeri ve malzeme
+  listesi, *Move…*, *Pin to work center* ve geç iş sayısı ona uyar, seçim tarayıcıda kalır. Dosyalar:
+  `src/lib/planOrgFilter.ts` (saf, testli), `src/components/plan/PlanOrgFilter.tsx` (`usePlanOrgFilter` + süzgeç),
+  `src/routes/planlama.tsx` (`org.shows` ile süzme; memo bağımlılıkları `org.shows` üzerinden — Gantt ağır, kimlik
+  her render değişmemeli), Planning Logic `#org-filter`.
+  **Sıradaki adım:** nut welding / punta / robot / montaj gerçekten planlanacaksa çevrim süresi (dakika / adet) bazlı
+  yerleştirme gerekir — pres motoru yalnız `rateModel: 'stroke'` iş yerlerini planlar (`pressPlanScope`,
+  `src/lib/rateModel.ts:85`). Bu ayrı ve büyük bir iş (yeni oturum): plan yapısı farklı (tam rulo / sac kg / kalıp
+  setup'ı yok), pres parçasıyla bağ (pres parçası → punta hattı) henüz kurulmuyor. `todolist.md` Slayt 6 altında
+  ayrı madde olarak duruyor.
+  **Kullanıcıda denenecek:** her bölümde seçim → Gantt ve *Add job* malzeme listesi doğru daralıyor mu; masraf yerisiz
+  iş yeri *Without a department* altında görünüyor mu (Organization map'teki düzeltmeler bittiğinde bu liste boşalmalı).
+  Sınır: süzgeç Overview (`/planningexpert`), KPI ve Excel çıktılarına uygulanmaz — oralar fabrika geneli kalır.
 - **Düzenlemeler sunumu (2026-10-28) — slayt 1–5 bitti.** Slayt 1, 2, 3, 5 (#91, #93, #94, #95); slayt 4'ün düzeni #94'te,
   takvimden vardiya düzenleme (gün kaydı `pressDayShifts`, hücreye tıkla) #97, Edit / Save + mesai #104. Kullanıcıda
   denenecek: *Edit* → hücre tıklaması → *Save* → *Calculate plan* → Gantt'ta ve Work Calendar'da o gün; mesaiyle
   çakışan vardiya hatası; ↺ ile şablona dönüş; OT satırından mesai ekleme / kaldırma.
   Sınır: Work Calendar sayfası gün kaydını kapasiteye katar ama ayrıca işaretlemez; gün kaydının toplu listesi yok.
-  Slayt 6 (departman / cost center seçimi) **başlanmayacak** — kullanıcı: en son, planlama doğru çalıştıktan sonra (`todolist.md`).
+  Slayt 6'nın **süzgeç** kısmı bitti (#114, aşağıda).
   #95 sınırları: öne alınmış uzun vade lotu da en sona gider; `summary.longTermShort` arayüzde (`PlanChecks`) gösterilmiyor.
 - **Asakai / OEE (#83–#87) — canlıda kontrol ve planlamacıya sorular:**
   1. Planlamacı OEE Settings → Loss groups'ta ↑ ↓ ile sırayı bir kez vermeli: STP, KLP, ARZ, KSD, OFC, KON, YNT (sonra kodda sabit: Short stops, Speed, Unassigned).
