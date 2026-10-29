@@ -15,8 +15,10 @@ import {
   chartShare,
   costCenterName,
   inScope,
+  isoWeek,
   lossBreakdown,
   lossForPeriod,
+  monthKeyOf,
   monthlyTrend,
   oeeOf,
   shiftNumber,
@@ -43,6 +45,50 @@ export const ASAKAI_WEEKS = 10
 export const ASAKAI_TOP = 2
 /** Asakai'de sütunu olmayan kayıp grupları (planlamacı, 2026-10-26: UTS planlı mola, çay / yemek). */
 export const ASAKAI_DROP = ['UTS']
+
+/** İş yeri → masraf yeri (verideki ya da tanımdaki satır). */
+type WcRow = { workCenter: string; costCenter: string }
+
+/**
+ * Bugün — sistemin çalışma günü — Asakai sayfalarında gizlidir (kullanıcı,
+ * 2026-10-29): gün bitmediği için o gün yüklenen yarım veri OEE'yi ve kayıp
+ * paylarını yanlış gösterir. Sayfa en son dünü gösterir.
+ */
+export const asakaiDay = (date: string, today: string): string => (date < today ? date : addDaysIso(today, -1))
+
+/** Bugün ve sonrası gizli: gün, kayıp, duruş, vardiya ve sipariş satırları süzülür. */
+export const asakaiBefore = <T extends { date: string }>(rows: T[], today: string): T[] => rows.filter((r) => r.date < today)
+
+/**
+ * Bugünü kapsayan (ve sonraki) yüklenmiş hafta satırı kullanılmaz: o haftanın
+ * OEE'si günlerin toplamından gelir, böylece bugün hesaba girmez.
+ */
+export function asakaiWeeks(rows: WeeklyRow[], today: string): WeeklyRow[] {
+  const { year, week } = isoWeek(today)
+  return rows.filter((w) => w.year < year || (w.year === year && w.week < week))
+}
+
+/** Bugünün ayını (ve sonrasını) kapsayan yüklenmiş ay satırı kullanılmaz. */
+export function asakaiMonths(rows: MonthlyRow[], today: string): MonthlyRow[] {
+  return rows.filter((m) => monthKeyOf(m.year, m.monthKey) < today.slice(0, 7))
+}
+
+/** Work Center Definitions (Makineler) → iş yeri / masraf yeri satırları. */
+export function definedWorkCenters(presses: { name: string; costCenter?: string }[]): WcRow[] {
+  return presses.filter((p) => p.costCenter).map((p) => ({ workCenter: p.name, costCenter: p.costCenter as string }))
+}
+
+/**
+ * Masraf yerinin iş yerleri: Work Center Definitions'ta o masraf yerine bağlı
+ * bütün iş yerleri ile verideki iş yerleri birlikte (kullanıcı, 2026-10-29:
+ * "bir departman seçtiğimde altındaki bütün iş yerleri gelmeli"). Seçili
+ * günde / haftada verisi olmayan makine de satır olur: değerleri boş görünür.
+ */
+export function asakaiWorkCenters(cc: string, rows: WcRow[], defined: WcRow[]): string[] {
+  const out = new Set(defined.filter((d) => d.costCenter === cc).map((d) => d.workCenter))
+  for (const r of rows) if (r.costCenter === cc) out.add(r.workCenter)
+  return [...out].sort()
+}
 
 /**
  * Asakai tablolarının kayıp sütunları: grafik sütunları (chartGroups sırası: ayardaki
@@ -100,9 +146,9 @@ export interface WeeklyGroup {
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
-/** Kapsamdaki masraf yerleri (veride olan), adına göre (Excel: Progressive, Transfer). */
-export function asakaiCostCenters(rows: { workCenter: string; costCenter: string }[], scope: Scope, c: OeeConfig): string[] {
-  const ccs = [...new Set(rows.filter((r) => r.costCenter && inScope(r, scope, c)).map((r) => r.costCenter))]
+/** Kapsamdaki masraf yerleri (veride ya da tanımda olan), adına göre (Excel: Progressive, Transfer). */
+export function asakaiCostCenters(rows: WcRow[], scope: Scope, c: OeeConfig, defined: WcRow[] = []): string[] {
+  const ccs = [...new Set([...rows, ...defined].filter((r) => r.costCenter && inScope(r, scope, c)).map((r) => r.costCenter))]
   return ccs.sort((a, b) => costCenterName(a, c).localeCompare(costCenterName(b, c)))
 }
 
@@ -127,6 +173,8 @@ export function asakaiWeekly(
     weekly: WeeklyRow[]
     monthly: MonthlyRow[]
     lossDays: LossDay[]
+    /** Work Center Definitions: masraf yerinin bütün iş yerleri (verisi olmasa da satır olur). */
+    defined?: WcRow[]
   },
   scope: Scope,
   c: OeeConfig,
@@ -136,7 +184,8 @@ export function asakaiWeekly(
 ): WeeklyGroup[] {
   const sunday = addDaysIso(monday, 6)
   const dates = ASAKAI_DAYS.map((_, i) => addDaysIso(monday, i))
-  return asakaiCostCenters(input.days, scope, c).map((cc) => {
+  const defined = (input.defined ?? []).filter((r) => r.costCenter && inScope(r, scope, c))
+  return asakaiCostCenters(input.days, scope, c, defined).map((cc) => {
     const s: Scope = { area: PLANT_AREA, key: cc }
     const month = monthlyTrend(input.days, input.monthly, s, c, date).total
     const monthly = MONTHS.map((label, i) =>
@@ -151,7 +200,7 @@ export function asakaiWeekly(
     )
     const weekly = weeklyTrend(input.days, input.weekly, s, c, monday, ASAKAI_WEEKS).total.map((p) => ({ ...p, label: p.label.slice(1) }))
     const inWeek = input.days.filter((d) => d.costCenter === cc && d.date >= monday && d.date <= sunday)
-    const machines = [...new Set(inWeek.filter((d) => d.loadingMin > 0).map((d) => d.workCenter))].sort()
+    const machines = asakaiWorkCenters(cc, inWeek.filter((d) => d.loadingMin > 0), defined)
     const oeeOn = (rows: DayRow[]) => (rows.some((r) => r.loadingMin > 0) ? oeeOf(sumTimes(rows)) : null)
     const daily = machines.map((wc) => {
       const mine = inWeek.filter((d) => d.workCenter === wc)
@@ -216,7 +265,13 @@ export function asakaiShifts(c: OeeConfig): number[] {
  * malzemeler. Vardiya kesiti Loss Bridge'inki; kısa duruşlar ayrılır.
  */
 export function asakaiDetail(
-  input: { shifts: ShiftRow[]; events: DowntimeDay[]; orders: OrderRow[] },
+  input: {
+    shifts: ShiftRow[]
+    events: DowntimeDay[]
+    orders: OrderRow[]
+    /** Work Center Definitions: masraf yerinin bütün iş yerleri (o gün verisi olmasa da satır olur). */
+    defined?: WcRow[]
+  },
   scope: Scope,
   c: OeeConfig,
   columns: string[],
@@ -233,8 +288,13 @@ export function asakaiDetail(
     return lossBreakdown(sumTimes(s.days), lossDays, c)
   }
   const numbers = asakaiShifts(c)
-  return asakaiCostCenters(shifts, scope, c).map((cc) => {
-    const wcs = [...new Set(shifts.filter((r) => r.costCenter === cc && r.loadingMin + r.scheduledMin > 0).map((r) => r.workCenter))].sort()
+  const defined = (input.defined ?? []).filter((r) => r.costCenter && inScope(r, scope, c))
+  return asakaiCostCenters(shifts, scope, c, defined).map((cc) => {
+    const wcs = asakaiWorkCenters(
+      cc,
+      shifts.filter((r) => r.loadingMin + r.scheduledMin > 0),
+      defined,
+    )
     const machines = wcs.map((wc): DetailMachine => {
       const orders = input.orders.filter((o) => o.workCenter === wc && (costCenterOf.get(o.workCenter) ?? cc) === cc)
       const parts = [...new Set(orders.map((o) => o.material).filter(Boolean))]

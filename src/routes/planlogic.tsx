@@ -927,6 +927,13 @@ function PlanLogicPage() {
             {SHORT_STOPS}, {SPEED}, {UNASSIGNED}.
           </li>
           <li>
+            <b>Asakai pages</b> (Asakai weekly, Asakai detail) do not show <b>today</b>, the system&apos;s working day: the day is not
+            over, so the part-day data uploaded during it would make OEE and the loss shares wrong. The latest day on both pages is
+            yesterday (the date box cannot go further), and the running week and month are the sum of the days before today — an
+            uploaded Weekly / Monthly KPI row that covers today is not used. Each page also shows <b>every work center of the cost
+            center</b> (Machines → cost center), even one without data on the selected day or week: its row stays empty.
+          </li>
+          <li>
             A loss share can pass 100 % of Loading when the MES Loading of a shift is shorter than shift time − planned stops (e.g.
             21.09 PRS-104 shift 1: Loading 185.7 + planned 209.3 = 395 of 480 min, recorded unplanned stops 191.5 min = 103 %). The
             stops are counted as recorded; the Loss Bridge shows the surplus as “{OVER_RECORDED}”.

@@ -37,6 +37,9 @@ function localIso(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/** Sistemin çalışma günü (yerel saat): Asakai sayfaları bugünü gizler. */
+export const oeeToday = () => localIso(new Date())
+
 /** Kaydedilmiş OEE ayarları; yoksa boş ayar ve eksikler listesi. */
 export function useOeeConfig(): { config: OeeConfig; problems: string[]; loaded: boolean; savedAt: number | null } {
   const doc = useQuery(api.oee.settings) as { config: OeeConfig; updatedAt: number } | null | undefined
@@ -147,6 +150,7 @@ export function OeeControls({
   notes,
   extra,
   actions,
+  maxDate,
 }: {
   selection: ReturnType<typeof useOeeSelection>
   /** Seçenekler için iş merkezi / masraf yeri listesi. */
@@ -162,6 +166,8 @@ export function OeeControls({
   extra?: ReactNode
   /** Sağda: ör. Save PDF düğmesi. */
   actions?: ReactNode
+  /** Seçilebilen en son gün (Asakai: dün — bugünün yarım verisi gizli). */
+  maxDate?: string
 }) {
   const { setScope, date, setDate, week } = selection
   const areas = useMemo(() => areaNames(rows, config), [rows, config])
@@ -221,6 +227,7 @@ export function OeeControls({
               <input
                 type="date"
                 value={date}
+                max={maxDate}
                 onChange={(e) => e.target.value && setDate(e.target.value)}
                 className="rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground"
               />
