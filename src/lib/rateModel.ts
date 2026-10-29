@@ -27,6 +27,19 @@ export function formatCycleMinutes(minutes: number | null | undefined): string {
   return minutes && minutes > 0 ? minutes.toFixed(CYCLE_DECIMALS) : ''
 }
 
+/**
+ * Saniye cinsinden verilen çevrim süresini dakika / adete çevirir (3 hane).
+ *
+ * Punta / montaj hatlarının süreleri sahada saniye olarak ölçülür ve Excel'e
+ * saniye yazılır ("Saturasyon"). Motorun tek dili dakika / adet olduğu için
+ * çevrim yüklemede burada yapılır; başka yerde kopyalanmaz. 0 ya da negatif
+ * değer "süre tanımsız" demektir (undefined döner, elle girilen değer korunur).
+ */
+export function cycleMinutesFromSeconds(seconds: number | undefined): number | undefined {
+  if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) return undefined
+  return roundCycleMinutes(seconds / 60)
+}
+
 export interface RateFields {
   spm?: number | null
   moldCavities?: number | null

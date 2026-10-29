@@ -18,7 +18,13 @@ import {
 import { useDraftRows } from '../lib/useDraftRows'
 import { useSafeMutation } from '../lib/useSafeMutation'
 import { lotRuleOf, piecesPerCoil, shotsPerCoil, type ProductSpec } from '../lib/planning'
-import { CYCLE_DECIMALS, hasCycleTime, minutesPerPiece, piecesPerHour } from '../lib/rateModel'
+import {
+  CYCLE_DECIMALS,
+  cycleMinutesFromSeconds,
+  hasCycleTime,
+  minutesPerPiece,
+  piecesPerHour,
+} from '../lib/rateModel'
 import { ExcelUpload } from '../components/ExcelUpload'
 import { friendlyError } from '../lib/mutationErrors'
 import { InfoTip, PageHeader } from '../components/PageHeader'
@@ -175,7 +181,7 @@ function ReferanslarPage() {
       return ['x', 'yes', 'y', 'true', '1', 'evet', 'da'].includes(t)
     }
     const parsed = rows.map((row) => ({
-      code: s(row['Material'] ?? row['Kod'] ?? row['code']) ?? '',
+      code: s(row['Material'] ?? row['Malzeme'] ?? row['Kod'] ?? row['code']) ?? '',
       coProduct: s(row['Co-Product'] ?? row['Eş Ürün'] ?? row['coProduct']),
       moldCavities: n(row['Cavity'] ?? row['Kalıp Gözü'] ?? row['moldCavities']),
       spm: n(row['SPM'] ?? row['Spm'] ?? row['spm']),
@@ -205,7 +211,9 @@ function ReferanslarPage() {
           row['Rulo Setup Süresi'] ??
           row['coilSetupMinutes'],
       ),
-      mainMachine: s(row['Main Machine'] ?? row['Ana Makine'] ?? row['mainMachine']),
+      mainMachine: s(
+        row['Main Machine'] ?? row['Main Work Center'] ?? row['Ana Makine'] ?? row['mainMachine'],
+      ),
       altMachine1: s(row['Alternative 1'] ?? row['Alternatif Makine 1'] ?? row['altMachine1']),
       altMachine2: s(row['Alternative 2'] ?? row['Alternatif Makine 2'] ?? row['altMachine2']),
       altMachine3: s(row['Alternative 3'] ?? row['Alternatif Makine 3'] ?? row['altMachine3']),
@@ -234,16 +242,29 @@ function ReferanslarPage() {
       // Çevrim süresi (dakika / adet): bütün parçalarda sürenin kaynağı.
       // Sütun yoksa elle girilen değer korunur. SPM / Cavity yukarıda geri
       // uyum için okunur (çevrim süresi yoksa süre 1 ÷ (SPM × göz)).
-      cycleMinutes: n(
-        row['Cycle time (min/pc)'] ??
-          row['Cycle Time (min/pc)'] ??
-          row['Cycle Time (min)'] ??
-          row['Cycle Time'] ??
-          row['Cycle'] ??
-          row['Çevrim Süresi (dk)'] ??
-          row['Çevrim Süresi'] ??
-          row['cycleMinutes'],
-      ),
+      // Punta / montaj hatlarının dosyası süreyi SANİYE yazar ("Saturasyon");
+      // dakika sütunu yoksa saniye sütunu dakikaya çevrilir (rateModel).
+      cycleMinutes:
+        n(
+          row['Cycle time (min/pc)'] ??
+            row['Cycle Time (min/pc)'] ??
+            row['Cycle Time (min)'] ??
+            row['Cycle Time'] ??
+            row['Cycle'] ??
+            row['Çevrim Süresi (dk)'] ??
+            row['Çevrim Süresi'] ??
+            row['cycleMinutes'],
+        ) ??
+        cycleMinutesFromSeconds(
+          n(
+            row['Saturasyon'] ??
+              row['Saturation'] ??
+              row['Cycle Time (sec)'] ??
+              row['Cycle time (s/pc)'] ??
+              row['Çevrim Süresi (sn)'] ??
+              row['cycleSeconds'],
+          ),
+        ),
       stopEveryPcs: n(row['Stop Every (pcs)'] ?? row['Stop Every'] ?? row['stopEveryPcs']),
     }))
     const validRows = parsed.filter((r) => r.code)
@@ -308,9 +329,9 @@ function ReferanslarPage() {
       <div className="mt-6">
         <ExcelUpload
           expectedColumns={[
-            'Material',
+            'Material (or Malzeme)',
             'Co-Product',
-            'Cycle time (min/pc)',
+            'Cycle time (min/pc) (or Saturasyon, in seconds)',
             'Raw Material Code',
             'Coil Weight (Kg)',
             'Gross Weight (Kg/piece)',
@@ -319,7 +340,7 @@ function ReferanslarPage() {
             'Frequency Stop Time (min) (or Coil Setup Time)',
             'Stop Every (pcs) (optional)',
             'SPM, Cavity (old files only)',
-            'Main Machine',
+            'Main Machine (or Main Work Center)',
             'Alternative 1-4',
             'Max Shot',
             'Quality Approval',

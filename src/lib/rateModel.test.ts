@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { computeRunPlan, splitByMoldLimit } from './planning'
 import {
   cavitiesOf,
+  cycleMinutesFromSeconds,
   formatCycleMinutes,
   hasCycleTime,
   minutesPerPiece,
@@ -90,5 +91,14 @@ describe('computeRunPlan: süre = adet × dakika / adet', () => {
     expect(computeRunPlan({ code: 'A', coProduct: 'B', moldCavities: 4, spm: 10 }, 1200, 2).coProductQuantity).toBe(600)
     // Eşin gözü bilinmiyorsa asılınki.
     expect(computeRunPlan({ code: 'A', coProduct: 'B', moldCavities: 4, spm: 10 }, 1200).coProductQuantity).toBe(1200)
+  })
+
+  it('saniye sütunu dakika / adete çevrilir (punta "Saturasyon"); boş ve 0 süre tanımsızdır', () => {
+    // 8.22 sn → 0.137 dk/adet; saatte 60 ÷ 0.137 ≈ 437 adet.
+    expect(cycleMinutesFromSeconds(8.22)).toBe(0.137)
+    expect(cycleMinutesFromSeconds(23.04)).toBe(0.384)
+    expect(cycleMinutesFromSeconds(undefined)).toBeUndefined()
+    expect(cycleMinutesFromSeconds(0)).toBeUndefined()
+    expect(cycleMinutesFromSeconds(-5)).toBeUndefined()
   })
 })
