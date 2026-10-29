@@ -9,6 +9,7 @@ import {
   freeWindows,
   maxShiftsPerDay,
   overtimeFitProblem,
+  overtimeWindows,
   serverErrorText,
 } from "../../lib/pressCalendar";
 import { activeShiftList } from "../../lib/shiftTimeline";
@@ -189,16 +190,31 @@ export function PressWeekShifts({
       ...otAdd.filter((a) => a.date === d).map((a) => defOf.get(a.definitionId)),
     ].filter((x): x is OvertimeDefinition => !!x);
   /**
-   * Günün boş (çalışılmayan) aralıkları: 24 saatten açık vardiyalar ve açık
-   * mesailer düşülür (tek kaynak `pressCalendar.freeWindows`). Boşluk yoksa
-   * o güne mesai açılamaz — üç vardiya × 8 saat çalışan gün zaten doludur.
+   * Günün mesaiye açık ve hâlâ boş olan aralıkları: önce günün **mesai
+   * penceresi** (çalışılan günde vardiya ızgarasının dışı, kapalı günde
+   * bütün gün — `pressCalendar.overtimeWindows`), sonra o pencereden açık
+   * vardiyalar ve açık mesailer düşülür (`freeWindows`). Üç vardiya × 8
+   * saat çalışan günün mesai penceresi yoktur: kapalı bir vardiya mesaiyle
+   * değil, hücresi açılarak çalıştırılır.
    */
   const freeOf = (d: string) => {
     const shifts = shownOf(d);
     const open = openDefsOf(d);
     const windows = dayOvertime(shifts, startMinute, slot, open).windows;
-    return freeWindows(shifts, startMinute, slot, windows);
+    const free = freeWindows(shifts, startMinute, slot, windows);
+    const allowed = overtimeWindows(shifts, startMinute, slot);
+    const out: { start: number; end: number }[] = [];
+    for (const a of allowed)
+      for (const f of free) {
+        const start = Math.max(a.start, f.start);
+        const end = Math.min(a.end, f.end);
+        if (end > start) out.push({ start, end });
+      }
+    return out;
   };
+  /** Günün mesai penceresi hiç yok mu (vardiyalar 24 saati dolduruyor)? */
+  const gridFull = (d: string) =>
+    overtimeWindows(shownOf(d), startMinute, slot).length === 0;
   /** Bu mesai tanımı o güne sığar mı? `null` = sığar, metin = nedeni. */
   const fitProblem = (d: string, def: OvertimeDefinition) =>
     overtimeFitProblem(def, shownOf(d), startMinute, slot, openDefsOf(d));
@@ -489,10 +505,14 @@ export function PressWeekShifts({
                             ))}
                             {free.length === 0 ? (
                               <span
-                                title={`${selected} ${dotted(d)} is already working 24 hours — overtime fits only where the day is free. Close a shift, or open the overtime on a day that is not full (e.g. Saturday).`}
+                                title={
+                                  gridFull(d)
+                                    ? `${selected} works ${maxShiftsPerDay(slot)} shifts of ${slot / 60} h, which cover the whole day, so ${dotted(d)} has no room for overtime: open or close the shifts on the rows above, and open overtime on a day the work center does not work (e.g. Saturday).`
+                                    : `${selected} ${dotted(d)}: the overtime window is already taken.`
+                                }
                                 className="rounded bg-muted px-1 text-muted-foreground"
                               >
-                                full (24 h)
+                                {gridFull(d) ? "shifts cover 24 h" : "full"}
                               </span>
                             ) : (
                               <>

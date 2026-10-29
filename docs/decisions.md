@@ -67,14 +67,28 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Vardiya düzeni vardiya tanımının yapıldığı yerde detaylanır: ör. 2 × 8
   saat ya da 2 × 9 saat. Bir gün 24 saati doldurmak zorunda değildir, ama
   geçemez.
-- Mesai, günün **boş penceresine** açılır (planlamacı 2026-10-29): boş pencere
-  = üretim günü (ilk vardiya başlangıcından 24 saat) − açık vardiyalar − zaten
-  açılmış mesailer. 3 × 8 saat çalışan presin günü doludur, o güne mesai
-  açılamaz; mesai cumartesi / pazara (ya da dolu olmayan bir güne) açılır.
-  06:30'dan 2 × 9 s 40 dk çalışan preste (06:30–16:10, 16:10–01:50)
-  01:50–06:30 boştur: en çok 4 s 40 dk'lık gece mesaisi oraya açılır.
-  Production Plan → *Work calendar* kutusu bunu gün gün yazar
-  (*free 01:50–06:30* / *full (24 h)*) ve sığmayan mesaiyi seçtirmez.
+- Mesai **vardiya ızgarasının dışına** açılır (planlamacı 2026-10-29, aynı gün
+  ikinci karar). Çalışılan günde vardiyalar günün ızgarasıdır: kapatılmış bir
+  vardiya mesaiyle değil, takvimden hücresi açılarak çalıştırılır. Mesai
+  penceresi = ızgaranın bitiminden üretim gününün sonuna kadar:
+  8 saatlik vardiyada günde 3 vardiya sığar, ızgara 24 saati doldurur,
+  **hafta içi mesai yoktur** (planlamacının sözü: "benim hafta içi için mesai
+  tanımım yok"); 9 s 40 dk'lık vardiyada günde 2 vardiya sığar (19 s 20 dk),
+  01:50–06:30 ızgaranın dışındadır ve en çok 4 s 40 dk'lık gece uzatma
+  mesaisi oraya açılır. Hiç normal vardiyası olmayan gün (cumartesi, pazar,
+  tatil) bütünüyle düzenin dışındadır: bütün gün mesaiye açıktır.
+  Bu, yukarıdaki 2026-09-26 tarihli "haftada 2 vardiya çalışan prese hafta
+  içi 3. vardiya mesaiyle açılır" örneğinin yerine geçer — gün kaydı (#97)
+  geldiğinden beri o vardiya hücreye tıklanarak açılıyor.
+- Mesai ayrıca **fiilen boş** zamana açılmalıdır: üretim günü − açık vardiyalar
+  − açılmış mesailer. Production Plan → *Work calendar* kutusu sonucu gün gün
+  yazar (*free 01:50–06:30* / *full* / *shifts cover 24 h*) ve sığmayan
+  mesaiyi seçtirmez; sunucu da yeni kaydı aynı kuralla denetler (eski kayıtlar
+  eskisi gibi planlanır).
+- **Gantt çubuğu kapalı vardiyanın üstünü boyamaz** (planlamacı 2026-10-29):
+  bir iş çalışılan her kesinti için ayrı çubuktur. Planlı duruş çubuğu bölmez
+  (içinde nokta olur), kapalı vardiya böler — 1. ve 3. vardiya açıkken iş
+  07:00–15:00 ve 23:00–07:00 olarak çizilir, 15:00–23:00 boş kalır.
 - Kapalı cumartesi–pazar plan günlerinde görünmez (kapasite 0), ama *Work
   calendar* kutusunda gösterilen haftanın **her** günü düzenlenebilir: hafta
   sonu çalışması ya mesaiyle ya da gün kaydıyla (vardiyayı elle açarak) girilir.

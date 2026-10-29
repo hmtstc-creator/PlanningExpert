@@ -549,12 +549,28 @@ export function WeekGantt({
       const dayOf = (pos: number) => Math.floor(pos / dayWidthMinutes)
       const toClock = (pos: number) =>
         clockLabel(pos - dayOf(pos) * dayWidthMinutes + shiftStartMinute)
+      // Çalışma pencereleri (bitişik vardiyalar tek pencere): çubuk bir
+      // pencerenin dışına taşamaz. Kapalı bir vardiya (ör. gün kaydıyla
+      // kapatılan 2. vardiya) iki pencere arasında boşluk bırakır; tek
+      // çubuk çizilseydi plan o saatte çalışıyormuş gibi görünürdü
+      // (planlamacı 2026-10-29).
+      const spans: { start: number; end: number }[] = []
+      for (const w of windows) {
+        const last = spans[spans.length - 1]
+        if (last && w.start <= last.end + 0.001) last.end = Math.max(last.end, w.end)
+        else spans.push({ ...w })
+      }
+      const spanAt = (pos: number) => {
+        const i = spans.findIndex((w) => pos >= w.start - 0.001 && pos < w.end)
+        // Pencere dışında kalan parça (ör. bakım) kendi başına çizilir.
+        return i < 0 ? `x${Math.round(pos)}` : i
+      }
       const groups = new Map<string, { job: WeekGanttJob; parts: PlacedBlock[] }>()
       const jobIds = new Map<WeekGanttJob, number>()
       for (const b of blocks) {
         if (!b.job || b.kind === 'idle') continue
         if (!jobIds.has(b.job)) jobIds.set(b.job, jobIds.size)
-        const key = `${jobIds.get(b.job)}|${dayOf(b.start)}`
+        const key = `${jobIds.get(b.job)}|${dayOf(b.start)}|${spanAt(b.start)}`
         const group = groups.get(key) ?? { job: b.job, parts: [] }
         group.parts.push(b)
         groups.set(key, group)
