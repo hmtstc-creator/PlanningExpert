@@ -1,6 +1,6 @@
 # 07 · Çalışma sözleşmesi ve mimari etki kontrolü
 
-> Son güncelleme: 2026-10-28 (Convex kancaları yalnız convexTransport) · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
+> Son güncelleme: 2026-10-30 (Planning Logic üç dilde) · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
 
 Hafıza wiki'de olduğu için her iş yeni bir oturumda başlayabilir; bu sayfa her oturumun **ilk okuyacağı yerdir**.
 
@@ -12,7 +12,7 @@ Genel mimariye zarar vermediğini **önce** kontrol et. Kısa kontrol listesi (c
 2. **Tek kaynak:** bu değer / formül / varsayılan zaten bir yerde var mı? Varsa orayı kullan, kopyalama (`docs/architecture.md` §2 tablosu).
 3. **Motorun değişmezleri** ([01](01-sistem-haritasi.md) *Değişmezler*): müşteri önce, rulo kesilmez, doğrulayıcı bağımsız, plan elle hesaplanır.
 4. **Canlı veri:** şema değişiyorsa geri uyumlu mu? Yeni tablo ayrı mı, `plantField` var mı, `guardedQuery/Mutation` kullanıldı mı? `npm run schema:snapshot`.
-5. **Planning Logic:** mantık değişiyorsa sayfa aynı PR'da güncelleniyor mu? Davranışı gösteren test var mı? (CI denetler.)
+5. **Planning Logic:** mantık değişiyorsa sayfa aynı PR'da **üç dilde** (EN `src/routes/planlogic.tsx`, TR / RO `src/components/planlogic/`) güncelleniyor mu? Davranışı gösteren test var mı? (CI denetler.)
 6. **Wiki:** ilgili sayfa + [08 Sürüm günlüğü](08-surum-gunlugu.md) güncellendi mi?
 7. **Etkilenen diğer sayfalar / hesaplar:** `grep` ile kullanım yerlerine bak (özellikle `PlanRun` alanları, `cockpit`, Overview, Excel çıktıları, doğrulayıcı).
 8. **Geri alınabilir mi?** Yayın otomatik olduğu için merge = canlı. Riskli değişiklik ayrı, küçük PR olur.
@@ -27,7 +27,7 @@ Bir madde "hayır" ise **uygulama**; nedenini ve alternatifi kullanıcıya yaz. 
 |---|---|
 | `src/lib/architecture.test.ts` | katman yönü (lib ↔ convex ↔ arayüz), saf hesap dosyaları React / Convex / TanStack içe aktarmaz, doğrulayıcı motor koduna bağlanmaz |
 | `src/lib/wiki.test.ts` | wiki dizini tam, bütün bağlantılar çalışıyor |
-| `scripts/check-logic-docs.sh` | mantık dosyası değişti ⇒ Planning Logic değişti |
+| `scripts/check-logic-docs.sh` | mantık dosyası değişti ⇒ Planning Logic üç dilde değişti; `planLogicLang.test.ts`: çevirilerde bölüm kimlikleri ve koddan okunan değerler kaynakla aynı |
 | `convex/schemaGuard.test.ts` (+ `schema.snapshot.json`) | şema geri uyumlu |
 | `convex/security.test.ts`, `tenancy.test.ts`, `authGuard.test.ts` | yetki ve fabrika kilidi |
 | `npm run verify` | tip + bütün testler + build |

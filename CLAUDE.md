@@ -65,6 +65,9 @@ okuduğu **tek yerdir**; kodla çelişmemeli, eksik kalmamalı.
   Kodda olup sayfada olmayan bir kural eksiktir; sayfada olup kodda olmayan bir kural hatadır.
 - Sayı, süre ve varsayılan değerler sayfada **koddan okunur** (ör. `SETTINGS_DEFAULTS`,
   `current.*`), elle yazılmaz; böylece eskimez.
+- Sayfa **üç dilde**: İngilizce kaynak (`planlogic.tsx`), Türkçe ve Romence çeviri
+  (`src/components/planlogic/PlanLogicTr.tsx`, `PlanLogicRo.tsx`); üçü aynı PR'da güncellenir. Programın ekran
+  adları (düğme, sayfa, alan) çeviride İngilizce kalır. Dil seçimi yalnız bu sayfadadır.
 - CI bunu denetler (`scripts/check-logic-docs.sh`): mantık dosyası değişip `planlogic.tsx`
   değişmediyse PR kırmızı olur. Gerçekten mantık değişmediyse (yeniden adlandırma, performans,
   yalnız test) commit mesajına ya da PR açıklamasına `[logic-docs: n/a] <neden>` yazılır.

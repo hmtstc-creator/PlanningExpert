@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { useQuery } from '../lib/convexTransport'
@@ -15,6 +15,8 @@ import { CYCLE_DECIMALS, CYCLE_STORE_DECIMALS, cycleMinutesFromSeconds, formatCy
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
 import { PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
+import { PlanLogicRo } from '../components/planlogic/PlanLogicRo'
+import { PlanLogicTr } from '../components/planlogic/PlanLogicTr'
 
 export const Route = createFileRoute('/planlogic')({
   component: PlanLogicPage,
@@ -64,7 +66,59 @@ function hhmm(minute: number): string {
 
 const dmy = (iso: string) => `${iso.slice(8)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`
 
+// Sayfanın dili: İngilizce kaynak; Türkçe ve Romence aynı sayfanın çevirisi
+// (src/components/planlogic/). Mantık değişince üçü birlikte güncellenir.
+const LANGS = [
+  ['en', 'English'],
+  ['tr', 'Türkçe'],
+  ['ro', 'Română'],
+] as const
+type Lang = (typeof LANGS)[number][0]
+const LANG_KEY = 'planlogic-lang'
+
 function PlanLogicPage() {
+  const [lang, setLang] = useState<Lang>(() => {
+    try {
+      const v = window.localStorage.getItem(LANG_KEY)
+      return v === 'tr' || v === 'ro' ? v : 'en'
+    } catch {
+      return 'en'
+    }
+  })
+  const choose = (l: Lang) => {
+    setLang(l)
+    try {
+      window.localStorage.setItem(LANG_KEY, l)
+    } catch {
+      // Saklanamıyorsa yalnızca bu oturumda kalır.
+    }
+  }
+  return (
+    <>
+      <div className="flex justify-end px-4 pt-4 sm:px-6" role="group" aria-label="Language">
+        <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
+          {LANGS.map(([code, label]) => (
+            <button
+              key={code}
+              type="button"
+              lang={code}
+              onClick={() => choose(code)}
+              aria-pressed={lang === code}
+              className={`px-3 py-1 font-medium ${
+                lang === code ? 'bg-foreground text-background' : 'bg-background text-foreground hover:bg-muted'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div lang={lang}>{lang === 'tr' ? <PlanLogicTr /> : lang === 'ro' ? <PlanLogicRo /> : <PlanLogicEn />}</div>
+    </>
+  )
+}
+
+function PlanLogicEn() {
   const leadRows = useQuery(api.rawLeadTimes.list) as LeadTimeRow[] | undefined
   const settings = useQuery(api.pressCalendar.getGlobalSettings) as
     | {
