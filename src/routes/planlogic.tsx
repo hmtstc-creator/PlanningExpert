@@ -8,6 +8,7 @@ import { MES_SHORT_STOP_MIN, SHORT_STOPS, SPEED, UNASSIGNED, UNDEFINED_RC1 } fro
 import { OVER_RECORDED } from '../lib/oeeBridge'
 import { SHORT_STOP_DATA_FROM } from '../lib/oeeShortStops'
 import { computeRunPlan } from '../lib/planning'
+import { allocateOperators, OPERATOR_EXAMPLE } from '../lib/operatorAllocation'
 import { leadTimeLookup, type LeadTimeRow } from '../lib/rawLeadTime'
 import { CYCLE_DECIMALS, CYCLE_STORE_DECIMALS, cycleMinutesFromSeconds, formatCycleInput } from '../lib/rateModel'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
@@ -411,6 +412,7 @@ function PlanLogicPage() {
             never exceeds 168 hours — longer entries are refused when saved.
           </li>
           <li>Planned stops falling inside overtime are deducted too.</li>
+          <OperatorPlanItem />
           <li>
             Days that have passed are skipped, and today starts at the current
             time — nothing is planned in the past. The plan day begins with the
@@ -1183,7 +1185,8 @@ function PlanLogicPage() {
             one die on two work centers (also overnight), two setups in one hall (also
             across 07:00), plant-wide setups, eligible work center, working time and
             maintenance, whole coils / Min. lot, pull-forward window, a die change
-            without a setup, backlog before urgent.
+            without a setup, backlog before urgent, and on an operator-plan cost center that
+            the crews of the running lines fit the operators entered for that shift.
           </li>
           <li>
             <b>Measures efficiency</b>: setups against the minimum possible,
@@ -1678,5 +1681,40 @@ function Table({ rows }: { rows: [string, string, string][] }) {
         </tbody>
       </table>
     </div>
+  )
+}
+
+/**
+ * Operatör planı (src/lib/operatorAllocation.ts). Örnek, testteki örnekle
+ * aynıdır: sayılar koddan (OPERATOR_EXAMPLE + allocateOperators) okunur.
+ */
+function OperatorPlanItem() {
+  const ex = OPERATOR_EXAMPLE
+  const decision = allocateOperators(ex).decisions[0]
+  const lines = ex.costCenters[0].lines.map((l) => l.press)
+  const minutesOf = (press: string) => ex.workload.filter((w) => w.press === press).reduce((x, w) => x + w.minutes, 0)
+  const noWork = lines.filter((l) => minutesOf(l) === 0)
+  const closed = lines.filter((l) => !decision.open.includes(l) && !noWork.includes(l))
+  return (
+    <li>
+      <b>Operator plan</b> (a second planning model per cost center, e.g. APR, spot and nut welding
+      lines; chosen on Company settings → cost center → <b>Planning model</b>). The lines of such a
+      cost center are not run by their calendar alone: on the Production Plan, <b>Operators per
+      shift</b> takes how many operators work each day and shift, and each line has a <b>crew</b>{' '}
+      (operators it needs to run one shift, 1 if not set). Before the capacity is built, for every
+      day and shift in turn the lines that still have work due this week (up to Sunday) are sorted
+      by the <b>earliest due date</b> (equal: the larger remaining minutes first) and opened while
+      their crew fits the operators left. Work = net lot quantity × minutes per piece on the
+      part's main work center, the same lots the engine plans. Every shift that runs (opened or
+      from the calendar) takes its net minutes off the line's work, so a line whose work is done —
+      or whose remaining work is only for next week — gets no operator. A day and shift without
+      an operator count keeps the calendar; a holiday keeps the calendar; a <b>day record set by
+      hand always wins</b> and its crew is taken from the operator count first. The result goes to
+      the engine as day records, so sequencing, setups and late-job rules are unchanged. Example:{' '}
+      {decision.operators} operators, {lines.length} lines with a crew of 1, {noWork.join(', ')}{' '}
+      without work: {decision.open.join(', ')} run ({ex.workload.find((w) => w.press === decision.open[1])?.minutes} and{' '}
+      {ex.workload.find((w) => w.press === decision.open[2])?.minutes} min are due the same day, so the larger goes first),{' '}
+      {closed.join(', ')} waits (no operator left) and {noWork.join(', ')} stays closed.
+    </li>
   )
 }

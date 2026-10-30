@@ -13,6 +13,8 @@ export interface OrgCostCenter {
   code: string
   name: string
   department?: string
+  /** Planlama modeli: yok / 'shift' = vardiya planı, 'operator' = operatör planı. */
+  planningModel?: 'shift' | 'operator'
 }
 
 export interface OrgWorkCenter {

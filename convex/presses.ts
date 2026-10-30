@@ -18,6 +18,7 @@ const pressValidator = v.object({
   tonnage: v.optional(v.number()),
   frozenDays: v.optional(v.number()),
   costCenter: v.optional(v.string()),
+  crewSize: v.optional(v.number()),
 })
 
 export const list = guardedQuery({
@@ -102,6 +103,28 @@ export const upsert = guardedMutation({
         costCenter,
       })
     }
+    return null
+  },
+})
+
+/**
+ * Operatör planı: hattın bir vardiyada çalışması için gereken adam sayısı
+ * (yok = 1). `null` alanı kaldırır. Upsert bu alana dokunmaz.
+ */
+export const setCrewSize = guardedMutation({
+  areas: ['planning.masterData'],
+  args: { name: v.string(), crewSize: v.union(v.number(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query('presses')
+      .withIndex('by_name', (q) => q.eq('name', args.name.trim()))
+      .first()
+    if (!existing) throw new ConvexError(`${args.name} is not a work center`)
+    if (args.crewSize !== null && (!Number.isInteger(args.crewSize) || args.crewSize < 1 || args.crewSize > 99)) {
+      throw new ConvexError('Crew size must be a whole number between 1 and 99')
+    }
+    await ctx.db.patch(existing._id, { crewSize: args.crewSize === null || args.crewSize === 1 ? undefined : args.crewSize })
     return null
   },
 })

@@ -17,12 +17,16 @@ export const UNASSIGNED = '(none)'
 export interface OrgPress {
   name: string
   costCenter?: string
+  /** Operatör planı: hattın vardiyada gereken adamı (yok = 1). */
+  crewSize?: number
 }
 
 export interface OrgCostCenter {
   code: string
   name: string
   department?: string
+  /** 'operator' = operatör planı (src/lib/operatorAllocation.ts); yok = vardiya planı. */
+  planningModel?: 'shift' | 'operator'
 }
 
 /**

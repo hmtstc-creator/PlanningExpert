@@ -13,6 +13,7 @@ import { InfoTip, PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
 import { PlanDataList } from '../components/plan/PlanPanels'
 import { PressWeekShifts } from '../components/plan/PressWeekShifts'
+import { OperatorHeadcountGrid } from '../components/plan/OperatorHeadcountGrid'
 import { PressStartPanel } from '../components/plan/PressStartPanel'
 import { JobDialog, type JobDraft } from '../components/plan/JobDialog'
 import { MoveDialog, type MoveDraft } from '../components/plan/MoveDialog'
@@ -415,6 +416,14 @@ function PlanlamaPage() {
           )}
         </div>
       </div>
+
+      {/* Operatör planı: 'operator' modelli cost center'larda gün × vardiya adam sayısı. */}
+      <OperatorHeadcountGrid
+        costCenters={orgCostCenters.filter((c) => c.planningModel === 'operator')}
+        workCenters={allWorkCenters}
+        dates={allDates}
+        shiftMinutes={shiftMinutes}
+      />
 
       {truncatedInputs.length > 0 && (
         <div className="mt-6 rounded-lg border-2 border-destructive bg-destructive/10 p-4">
