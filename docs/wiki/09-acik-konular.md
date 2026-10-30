@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-30 (SOP Builder: ilk gerçek video denemesi bekleniyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-30 (pres → nut welding bağı sıradaki iş; Qwen görev modu sorunu; SOP Builder: ilk gerçek video denemesi bekleniyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -16,6 +16,16 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
+- **Pres → nut welding bağı (ara mamul akışı)** (2026-10-30): #133 birleşti, açık PR / dal yok. Planlamacı sordu:
+  nut welding'de kullanılan parçanın pres üretimi zamanında mı? **Hayır, motor bakmıyor** — her hat kendi başına
+  planlanıyor (Planning Logic `#org-filter`'da yazıyor; `todolist.md` Slayt 6 "Cycle hatlarının planlanması" açık notu).
+  Sıradaki adım: parça → bileşen bağı nereden gelecek (BOM / master data alanı) kullanıcıyla netleşsin, sonra motor
+  tasarımı (`derin` ajanı). Motor + doğrulayıcı + Planning Logic aynı PR'da.
+- **Qwen görev modu çalışmadı** (2026-10-30, #133 sırasında): `qwen-yesil.yml` tur 1'de "verify yeşil, 0 dosya"
+  raporladı (görevi uygulamadan bitti; rapor "Başlangıç: verify kırmızı, 0 hata satırı" diyor), tur 2 40 dk takıldı ve
+  iptal edildi. `gh workflow run` bulut oturumunda GraphQL 403 verir; tetikleme
+  `gh api -X POST repos/<sahip>/<depo>/actions/workflows/qwen-yesil.yml/dispatches -f ref=main -f "inputs[dal]=…" -F "inputs[gorev]=@dosya"` ile.
+  Sıradaki adım: iş akışının görev modunu küçük bir görevle denemek, model / zaman aşımı ayarına bakmak.
 - **SOP Builder — ilk gerçek video** (2026-10-30): kod yayında (#121, #123), worker çalışıyor, Gemini anahtarı
   *Setup*'ta kayıtlı. Açık PR / dal yok. Sıradaki adım: kullanıcı gerçek bir videoyu yükler, sonuç birlikte okunur
   (adımlar, kare anları, kırmızı işaret, metin dili) ve gerekirse `sop-worker/prompt.md` / `prompt-verify.md`
