@@ -25,6 +25,9 @@
 #   OPENAI_BASE_URL  örn. https://openrouter.ai/api/v1
 #   OPENAI_MODEL     örn. qwen/qwen3-coder:free
 # İsteğe bağlı:
+#   QWEN_YEDEK_MODELLER  OpenRouter'da sırayla denenecek ek ücretsiz modeller (boşlukla)
+#   GEMINI_API_KEY       OpenRouter tükenince Google Gemini ücretsiz API'sine geçilir
+#   GEMINI_MODEL         varsayılan gemini-2.5-flash
 #   QWEN_TUR         en fazla kaç düzeltme turu (varsayılan 4)
 #   QWEN_GOREV       GÖREV MODU: Claude'un yazdığı kodlama görevi. Doluysa ilk
 #                    turda Qwen bu görevi kodlar, sonraki turlarda verify'ı
@@ -115,6 +118,36 @@ if [ ! -f "$HOME/.qwen/settings.json" ]; then
 JSON
 fi
 
+# ------------------------------------------------------- yedekli model çağrısı
+# Limit / model yok hatasında sıradaki ücretsiz adaya geçer. Hangi model yazarsa
+# yazsın sonuç aynı sınırlardan geçer ve son kontrol Claude'dadır.
+ADAYLAR=()
+for m in "$OPENAI_MODEL" ${QWEN_YEDEK_MODELLER:-}; do ADAYLAR+=("openrouter|$m"); done
+[ -n "${GEMINI_API_KEY:-}" ] && ADAYLAR+=("gemini|${GEMINI_MODEL:-gemini-2.5-flash}")
+ADAY_NO=0
+OR_ANAHTAR="$OPENAI_API_KEY"; OR_URL="$OPENAI_BASE_URL"
+qwen_cagir() {  # qwen_cagir GÖREV ÇIKTI
+    local kod
+    while [ "$ADAY_NO" -lt "${#ADAYLAR[@]}" ]; do
+        local aday="${ADAYLAR[$ADAY_NO]}"
+        if [ "${aday%%|*}" = gemini ]; then
+            export OPENAI_API_KEY="$GEMINI_API_KEY" OPENAI_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai/"
+        else
+            export OPENAI_API_KEY="$OR_ANAHTAR" OPENAI_BASE_URL="$OR_URL"
+        fi
+        export OPENAI_MODEL="${aday#*|}"
+        qwen --yolo -p "$1" > "$2" 2>&1; kod=$?
+        if [ "$kod" -ne 0 ] && grep -qiE "429|rate.?limit|quota|unavailable|404|402|exhausted" "$2"; then
+            yaz "- \`$OPENAI_MODEL\` kullanılamadı (limit / yok); sıradaki ücretsiz modele geçiliyor."
+            ADAY_NO=$((ADAY_NO + 1)); continue
+        fi
+        [ "$kod" -eq 0 ] && yaz "- Bu turu yazan model: \`$OPENAI_MODEL\`"
+        return "$kod"
+    done
+    yaz "- **Bütün ücretsiz modeller tükendi.** Yarın tekrar denenir ya da Claude devralır."
+    return 1
+}
+
 # --------------------------------------------------------------- 0. tur
 if [ -n "${QWEN_GOREV:-}" ]; then
     yaz "**Görev modu.** Görev:"
@@ -176,7 +209,7 @@ $(hatalar)
 PROMPT
 )"
     fi
-    qwen --yolo -p "$GOREV" > ".qwen-tur-$TUR.txt" 2>&1
+    qwen_cagir "$GOREV" ".qwen-tur-$TUR.txt"
     QWEN_KOD=$?
     if [ "$QWEN_KOD" -ne 0 ]; then
         yaz "- Tur $TUR: Qwen hata verdi (çıkış kodu $QWEN_KOD). Son satırlar:"
