@@ -657,6 +657,39 @@ describe('part 4 — hard rules on the absolute time axis', () => {
 })
 
 // --------------------------------------------------------------------------
+describe('R15 intermediate part (nut welding ← stamped part, advisory)', () => {
+  const R = (date: string, a: number, b: number): Seg => ({ kind: 'run', date, start: a, end: b })
+  // NW (nut welding, hat 201) sac yerine pres parçası P'yi kullanır: rawMaterialCode = 'P'.
+  const inputs = plant({
+    presses: [{ name: '104', hall: 'H1' }, { name: '201', hall: 'H2' }],
+    templates: ['104', '201'].map((press) => ({ press, workingDays: 5, shiftsPerDay: 1, overtimeShifts: 0 })),
+    products: [
+      { code: 'P', moldCavities: 1, spm: 10, setupMinutes: 0, mainMachine: '104' },
+      { code: 'NW', rawMaterialCode: 'P', cycleMinutes: 0.2, setupMinutes: 0, mainMachine: '201' },
+    ],
+    weeklyDemand: [],
+    stock: [{ material: 'P', storageLocation: '2009', unrestricted: 100, uploadedAt: MONDAY_0700 }],
+  })
+  const nw = job('NW', '201', [R(D(0), 600, 660)], 300)
+
+  it('100 in stock + 100 pressed before 11:00 < 300 used → one advisory warning, plan rules stay clean', () => {
+    const v = validatePlan(inputs, fakeRun(inputs, [job('P', '104', [R(D(0), 480, 540)], 100), nw]), MONDAY_0700)
+    const r = rule(v, 'component-ready')
+    expect(r.advisory).toBe(true)
+    expect(r.broken).toBe(1)
+    expect(r.examples[0]).toContain('needs 300 pcs of P')
+    expect(r.examples[0]).toContain('200 available')
+    expect(v.summary.componentShort).toBe(1)
+    expect(v.summary.rulesFailed).not.toContain('component-ready')
+  })
+
+  it('pressing 200 before the nut welding job ends covers it', () => {
+    const v = validatePlan(inputs, fakeRun(inputs, [job('P', '104', [R(D(0), 480, 540)], 200), nw]), MONDAY_0700)
+    expect(rule(v, 'component-ready').broken).toBe(0)
+    expect(v.summary.componentShort).toBe(0)
+  })
+})
+
 describe('data checks and output shape', () => {
   it('flags stock in 2010 that would cover the shortage and a backlog below stock', () => {
     const inputs = plant({

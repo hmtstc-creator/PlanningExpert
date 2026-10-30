@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-30 (pres → nut welding bağı sıradaki iş; Qwen görev modu sorunu; SOP Builder: ilk gerçek video denemesi bekleniyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-30 (pres → nut welding: R15 uyarısı yapıldı, motor kısıtı sıradaki; Qwen görev modu sorunu; SOP Builder: ilk gerçek video denemesi bekleniyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -16,11 +16,12 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
 
 ## Devam
 
-- **Pres → nut welding bağı (ara mamul akışı)** (2026-10-30): #133 birleşti, açık PR / dal yok. Planlamacı sordu:
-  nut welding'de kullanılan parçanın pres üretimi zamanında mı? **Hayır, motor bakmıyor** — her hat kendi başına
-  planlanıyor (Planning Logic `#org-filter`'da yazıyor; `todolist.md` Slayt 6 "Cycle hatlarının planlanması" açık notu).
-  Sıradaki adım: parça → bileşen bağı nereden gelecek (BOM / master data alanı) kullanıcıyla netleşsin, sonra motor
-  tasarımı (`derin` ajanı). Motor + doğrulayıcı + Planning Logic aynı PR'da.
+- **Pres → nut welding bağı (ara mamul akışı)** (2026-10-30): **bağın kaynağı kararlaştı** — nut welding parçasının
+  master data'daki *raw material* kodu bir pres (stamping) parçasının kodudur; ayrı BOM yok, 1 adet / adet kabul.
+  **Adım 1 yapıldı:** doğrulayıcıda R15 `component-ready` (yalnız uyarı, plan `ok`'unu bozmaz; Planning Logic
+  `#component-ready`). Sınırlar: bileşenin kendi müşteri talebi sayılmaz; bileşen stoku bütün depolardan; Gantt'ta
+  işaret yok. **Sıradaki adım (ayrı oturum, `derin`):** motor kısıtı — nut welding işi bileşen hazır olmadan
+  başlamasın (bileşen talebi zaten ZPP'de, wiki 04 *ara mamul*). Adet / adet 1 değilse alan gerekir (kullanıcıya sor).
 - **Qwen görev modu çalışmadı** (2026-10-30, #133 sırasında): `qwen-yesil.yml` tur 1'de "verify yeşil, 0 dosya"
   raporladı (görevi uygulamadan bitti; rapor "Başlangıç: verify kırmızı, 0 hata satırı" diyor), tur 2 40 dk takıldı ve
   iptal edildi. `gh workflow run` bulut oturumunda GraphQL 403 verir; tetikleme

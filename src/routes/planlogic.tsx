@@ -968,8 +968,8 @@ function PlanLogicPage() {
           shows <b>Operators per shift</b> (people per day and shift); both appear only when the
           selection holds both kinds. <b>Not yet linked:</b> a part made on a press and used on a
           welding line is planned on each line on its own — the welding job does not wait for the
-          press job that makes its part, so check that the pressed part is ready before the welding
-          date.
+          press job that makes its part. The independent check warns when it does not fit (see{' '}
+          <a href="#component-ready" className="underline">intermediate part not ready</a>).
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           The link comes from the definitions: work center → cost center (
@@ -1199,6 +1199,16 @@ function PlanLogicPage() {
             maintenance, whole coils / Min. lot, pull-forward window, a die change
             without a setup, backlog before urgent, and on an operator-plan cost center that
             the crews of the running lines fit the operators entered for that shift.
+          </li>
+          <li id="component-ready">
+            <b>Warns when an intermediate part is not ready</b> (advisory — not a broken rule, the
+            plan stays “OK”): when a part&apos;s <i>raw material</i> code is another part&apos;s code
+            (nut welding ← the stamped part it welds on), that stamped part is its component, 1 pc per
+            pc. At the end of each run of the nut welding job the component&apos;s stock (all
+            locations) plus what is produced by then must cover what has been used by then. Example:
+            100 in stock, 100 pressed by 09:00, nut welding uses 300 by 11:00 → “needs 300 pcs, 200
+            available”. The engine does <b>not</b> plan this link: each line is still planned on its
+            own and the component&apos;s own customer demand is not part of this count.
           </li>
           <li>
             <b>Measures efficiency</b>: setups against the minimum possible,

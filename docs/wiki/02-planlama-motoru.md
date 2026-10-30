@@ -1,6 +1,6 @@
 # 02 · Planlama motoru
 
-> Son güncelleme: 2026-10-30 (Production Plan takvim kutusu cost center modeline göre, ekip Work Calendar'da; operatör planı: haftalık operatör sayısı, operatör hattı her iş günü 3 vardiya, Capacity dashboard'da operatör sınırı; cost center bazında ikinci model, motorun önünde saf dağıtım aşaması; bütün parçalar ve iş yerleri çevrim süresiyle: süre = adet × dk/adet, nut welding de planda; presi durduran arıza da planlı duruş gibi; kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
+> Son güncelleme: 2026-10-30 (ara mamul uyarısı R15; Production Plan takvim kutusu cost center modeline göre, ekip Work Calendar'da; operatör planı: haftalık operatör sayısı, operatör hattı her iş günü 3 vardiya, Capacity dashboard'da operatör sınırı; cost center bazında ikinci model, motorun önünde saf dağıtım aşaması; bütün parçalar ve iş yerleri çevrim süresiyle: süre = adet × dk/adet, nut welding de planda; presi durduran arıza da planlı duruş gibi; kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
 > Kullanıcıya dönük anlatım: sitede **Planning Logic**
 
 Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Aynı girdi aynı planı verir
@@ -31,6 +31,11 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
      `run.operatorDayShifts`'i gün kaydı gibi okur ve **R14 `operator-headcount`** ile çalışan hatların ekip
      toplamının adam sayısını aşmadığını bağımsız denetler. Örnek (test + Planning Logic, `OPERATOR_EXAMPLE`):
      3 adam, 5 hat, L5 bakiyesiz → L1, L3, L2 açık (L3 900 dk > L2 600 dk, aynı vade), L4 adam kalmadı, L5 kapalı.
+   - **Ara mamul (pres → nut welding), yalnız uyarı** (2026-10-30, `planValidator.ts` R15 `component-ready`):
+     parçanın `rawMaterialCode`'u başka bir parçanın `code`'u ise o bileşendir (1 adet / adet). Motor bağa bakmaz
+     (her hat kendi başına); doğrulayıcı her çalışma parçasının sonunda bileşen stoku (bütün depolar) + o ana kadar
+     üretilen ≥ tüketilen mi diye bakar. `RuleCheck.advisory`: `rulesBroken` / `ok`'a girmez, `summary.componentShort`.
+     Örnek (test + Planning Logic): stok 100 + 100 preslenmiş, nut welding 300 kullanır → "needs 300 pcs, 200 available".
    - **Operatör hattı = 3 vardiya, haftalık operatör sayısı** (2026-10-30, `src/lib/operatorCapacity.ts`):
      operatör modelli cost center'ın hatlarında makine şablonu, tekrarlayan mesai ve istisna hafta **okunmaz**;
      Work Calendar'ın her iş gününde `OPERATOR_SHIFTS_PER_DAY` (3, `settingsDefaults.ts`) vardiya açık sayılır
