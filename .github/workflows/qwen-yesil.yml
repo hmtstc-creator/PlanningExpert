@@ -96,6 +96,18 @@ jobs:
           git push --force origin "HEAD:refs/heads/qwen/$DAL"
           echo "Düzeltmeler qwen/$DAL dalında. Çalışma dalı değişmedi."
 
+      # Claude bulut oturumu Actions kayıtlarını okuyamaz; rapor her durumda
+      # qwen-rapor/<dal> dalına yazılır, Claude oradan okur.
+      - name: Raporu dala yaz
+        if: always()
+        run: |
+          DAL="$(git rev-parse --abbrev-ref HEAD)"
+          cp qwen-rapor.md /tmp/r.md 2>/dev/null || echo "Rapor oluşmadı (Qwen adımı başlamadan durdu)." > /tmp/r.md
+          for f in .qwen-tur-*.txt; do [ -f "$f" ] && { echo; echo "## $f (son 30 satır)"; echo '```'; tail -30 "$f"; echo '```'; } >> /tmp/r.md; done
+          git config user.name "qwen-bot"; git config user.email "qwen-bot@users.noreply.github.com"
+          git checkout -q --orphan rapor-tmp && git rm -rfq . && cp /tmp/r.md qwen-rapor.md
+          git add qwen-rapor.md && git commit -qm "Qwen raporu" && git push -fq origin "HEAD:refs/heads/qwen-rapor/$DAL"
+
       - name: Raporu PR'a yaz
         if: always() && github.event_name == 'pull_request'
         env:
