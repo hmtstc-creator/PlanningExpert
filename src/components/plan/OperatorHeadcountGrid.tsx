@@ -196,7 +196,7 @@ export function OperatorHeadcountGrid({
         </p>
       )}
       {monday === "" ? (
-        <p className="mt-3 text-xs text-muted-foreground">No plan yet.</p>
+        <p className="mt-3 text-xs text-muted-foreground">No plan yet — press Calculate plan.</p>
       ) : (
         <div className="mt-2 overflow-x-auto">
           <table className="w-full table-fixed border-collapse text-center text-xs">
