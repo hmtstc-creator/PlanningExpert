@@ -117,6 +117,27 @@ function PlanlamaPage() {
   // Görünür iş yerleri: bölüm / masraf yeri süzgeci (yalnız görünüm — plan
   // her zaman fabrikanın tamamı için hesaplanır, bkz. src/lib/planOrgFilter.ts).
   const presses = useMemo(() => allPresses.filter((p) => org.shows(p.name)), [allPresses, org.shows])
+  // Takvim seçime göre: vardiya modelli iş yerleri Work calendar'da, operatör
+  // modelli cost center'lar Operators per shift'te. İkisi birden yalnız seçim
+  // her iki türü de içeriyorsa görünür.
+  const operatorCcCodes = useMemo(
+    () => new Set(orgCostCenters.filter((c) => c.planningModel === 'operator').map((c) => c.code)),
+    [orgCostCenters],
+  )
+  const ccOfWorkCenter = useMemo(
+    () => new Map(allWorkCenters.map((w) => [w.name, w.costCenter])),
+    [allWorkCenters],
+  )
+  const shiftPresses = useMemo(
+    () => presses.filter((p) => !operatorCcCodes.has(ccOfWorkCenter.get(p.name) ?? '')),
+    [presses, operatorCcCodes, ccOfWorkCenter],
+  )
+  const operatorCcs = useMemo(() => {
+    const visible = new Set(presses.map((p) => ccOfWorkCenter.get(p.name)))
+    return orgCostCenters.filter(
+      (c) => c.planningModel === 'operator' && (!org.active || visible.has(c.code)),
+    )
+  }, [orgCostCenters, presses, ccOfWorkCenter, org.active])
   const plannedStops = run?.plannedStops ?? []
   const unplanned = run?.unplanned ?? []
   const frozenCount = run?.frozenCount ?? 0
@@ -319,8 +340,9 @@ function PlanlamaPage() {
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
         <PressStartPanel presses={presses.map((p) => p.name)} className="" />
 
+        {shiftPresses.length > 0 ? (
         <PressWeekShifts
-          presses={presses}
+          presses={shiftPresses}
           dates={allDates}
           shiftMinutes={shiftMinutes}
           shiftStartMinute={shiftStartMinute}
@@ -332,6 +354,18 @@ function PlanlamaPage() {
               : { shifts, activeShifts: activeByPressDate.get(key), overtime: overtimeByPressDate.get(key) ?? [] }
           }}
         />
+        ) : operatorCcs.length > 0 ? (
+          <OperatorHeadcountGrid
+            costCenters={operatorCcs}
+            workCenters={allWorkCenters}
+            dates={allDates}
+            shiftMinutes={shiftMinutes}
+            editCrew={false}
+            className="min-w-0 rounded-lg border border-border p-3 text-sm"
+          />
+        ) : (
+          <div />
+        )}
 
         <div className="flex flex-col gap-2 rounded-lg border border-border p-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
@@ -373,7 +407,7 @@ function PlanlamaPage() {
               <span className="text-muted-foreground">
                 Calculated on the server{' '}
                 <strong className="text-foreground">{minutesAgo(run.computedAt, nowMs)}</strong>{' '}
-                ({new Date(run.computedAt).toLocaleString('en-GB')})
+                ({new Date(run.computedAt).toLocaleString('en-GB')}) · whole plant
               </span>
             ) : run === null ? (
               <span className="text-muted-foreground">No plan yet — press Calculate plan.</span>
@@ -395,6 +429,7 @@ function PlanlamaPage() {
             )}
             <button
               onClick={() => void requestNow({})}
+              title="Calculates every work center of the plant together — presses and operator lines. The department filter only narrows the view."
               disabled={recalculating}
               className={`ml-auto rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${stale || run === null ? 'bg-foreground text-background hover:opacity-90' : 'border border-input hover:bg-muted'}`}
             >
@@ -417,13 +452,16 @@ function PlanlamaPage() {
         </div>
       </div>
 
-      {/* Operatör planı: 'operator' modelli cost center'larda gün × vardiya adam sayısı. */}
-      <OperatorHeadcountGrid
-        costCenters={orgCostCenters.filter((c) => c.planningModel === 'operator')}
-        workCenters={allWorkCenters}
-        dates={allDates}
-        shiftMinutes={shiftMinutes}
-      />
+      {/* Operatör planı: seçimde vardiya modelli iş yeri de varsa altta; yoksa üstte takvimin yerinde. */}
+      {shiftPresses.length > 0 && operatorCcs.length > 0 && (
+        <OperatorHeadcountGrid
+          costCenters={operatorCcs}
+          workCenters={allWorkCenters}
+          dates={allDates}
+          shiftMinutes={shiftMinutes}
+          editCrew={false}
+        />
+      )}
 
       {truncatedInputs.length > 0 && (
         <div className="mt-6 rounded-lg border-2 border-destructive bg-destructive/10 p-4">

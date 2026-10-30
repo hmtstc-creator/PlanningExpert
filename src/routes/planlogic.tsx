@@ -961,6 +961,17 @@ function PlanLogicPage() {
           screen.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
+          <b>Calculate plan</b> therefore always calculates every work center together — presses and
+          operator-plan lines (nut welding, spot welding…) in one run, whatever the filter shows. The
+          calendar box follows the filter: work centers of a <i>Shift</i> cost center show the{' '}
+          <b>Work calendar</b> (shifts and overtime per work center), an <i>Operator</i> cost center
+          shows <b>Operators per shift</b> (people per day and shift); both appear only when the
+          selection holds both kinds. <b>Not yet linked:</b> a part made on a press and used on a
+          welding line is planned on each line on its own — the welding job does not wait for the
+          press job that makes its part, so check that the pressed part is ready before the welding
+          date.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
           The link comes from the definitions: work center → cost center (
           <Link to="/makineler" className="underline">Work Center Definitions</Link>) and cost center
           → department (Company settings). A work center without a cost center is listed under{' '}
@@ -1707,7 +1718,8 @@ function OperatorPlanItem() {
       lines; chosen on Company settings → cost center → <b>Planning model</b>). The lines of such a
       cost center are not run by their calendar alone: on the Production Plan, <b>Operators per
       shift</b> takes how many operators work each day and shift, and each line has a <b>crew</b>{' '}
-      (operators it needs to run one shift, 1 if not set). Before the capacity is built, for every
+      (operators it needs to run one shift, 1 if not set; entered on the Work Calendar → Capacity
+      overview, not on the Production Plan). Before the capacity is built, for every
       day and shift in turn the lines that still have work due this week (up to Sunday) are sorted
       by the <b>earliest due date</b> (equal: the larger remaining minutes first) and opened while
       their crew fits the operators left. Work = net lot quantity × minutes per piece on the
