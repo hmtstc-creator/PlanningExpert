@@ -557,6 +557,20 @@ export default defineSchema({
     .index('by_cc_date', ['plantId', 'costCenter', 'date'])
     .index('by_plant', ['plantId']),
 
+  // Operatör planı (uzun vade): 'operator' modelli cost center'da haftalık
+  // operatör sayısı (o hafta sahadaki kişi; vardiyalara bölünmez). Gün ×
+  // vardiya girilmemiş günlerde motor vardiya başına floor(haftalık ÷ 3)
+  // kullanır; Capacity dashboard kapasiteyi bununla sınırlar
+  // (src/lib/operatorCapacity.ts).
+  operatorWeekly: defineTable({
+    ...plantField,
+    costCenter: v.string(),
+    weekStart: v.string(),
+    operators: v.number(),
+  })
+    .index('by_cc_week', ['plantId', 'costCenter', 'weekStart'])
+    .index('by_plant', ['plantId']),
+
   // İstisna haftalar: plan değişikliği olan belirli bir hafta için
   // şablonu geçersiz kılan kayıt.
   pressWeekOverrides: defineTable({

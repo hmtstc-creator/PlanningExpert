@@ -141,6 +141,16 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
   sonraki haftanın işi kalmış hat adam almaz. Adam sayısı girilmeyen gün ×
   vardiyada ve tatilde takvim geçerlidir; elle girilmiş gün kaydı her zaman
   önce gelir.
+- **Operatör hattı her iş günü 3 vardiya; uzun vade haftalık kişi sayısı**
+  (2026-10-30, kullanıcı). Operatör modelli hatta makine şablonu ve istisna
+  hafta okunmaz: makine her iş günü 3 vardiya hazırdır, kaç hattın çalışacağını
+  adam belirler. Kısa vade gün × vardiya ızgarası (ilk 2 hafta), uzun vade
+  hafta × kişi (`operatorWeekly`, vardiyalara bölünmez). Izgara girilmemiş
+  günde motor vardiya başına ⌊haftalık ÷ 3⌋ adam kullanır (kişi günde bir
+  vardiya çalışır, üç vardiyaya eşit bölünür; artan kişi boşta sayılır).
+  Capacity dashboard'da hafta = min(makine × 3 × iş günü, haftalık ÷ ortalama
+  ekip × iş günü) vardiya. Neden: ekip planlaması haftalık kişi sayısıyla
+  yapılıyor; uzun vadede gün × vardiya girmek gerçekçi değil.
 
 ### İş günü (presler dışındaki hesaplar)
 - Teslim hesabında resmi tatiller kullanılmaz: müşteri tatil günü mal

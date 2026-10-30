@@ -41,6 +41,11 @@ export interface CapacityGridProps {
   bucketsOf?: (press: string, weekStart: Date) => import('../lib/planning').DayBucket[]
   /** Seçili pres-haftanın gün detayı (tarihli mesai açma). */
   renderDays?: (press: string, weekStart: Date) => React.ReactNode
+  /**
+   * Operatör planındaki hatlar: sabit 3 vardiya/gün gösterilir, hücre
+   * tıklanmaz (kapasiteyi adam sayısı belirler, istisna hafta girilmez).
+   */
+  lockedPresses?: Set<string>
   onSaveOverride: (press: string, weekStart: string, pattern: WeekPattern) => Promise<unknown>
   onClearOverride: (press: string, weekStart: string) => Promise<unknown>
 }
@@ -225,6 +230,11 @@ export function CapacityGrid(props: CapacityGridProps) {
                   <tr key={press.name}>
                     <td className="sticky left-0 z-10 whitespace-nowrap bg-card px-3 py-1 font-medium text-foreground">
                       {press.name}
+                      {props.lockedPresses?.has(press.name) && (
+                        <span className="ml-1 rounded bg-muted px-1 text-[10px] font-normal text-muted-foreground">
+                          operator plan
+                        </span>
+                      )}
                     </td>
                     {props.weekStarts.map((w) => {
                       const iso = isoDate(w)
@@ -233,6 +243,19 @@ export function CapacityGrid(props: CapacityGridProps) {
                       const step = intensityStep(cell.effectiveShifts, maxShifts)
                       const isEditing =
                         editing?.press === press.name && editing?.weekStart === iso
+                      if (props.lockedPresses?.has(press.name)) {
+                        return (
+                          <td key={iso} className="p-0.5">
+                            <div
+                              title={`${press.name} · ${weekLabel(iso)}\nOperator plan: ${cell.pattern.workingDays} days × ${cell.pattern.shiftsPerDay} shifts; the operators decide which lines run`}
+                              className="relative flex h-8 w-full cursor-default items-center justify-center rounded border border-dashed border-border tabular-nums"
+                              style={{ backgroundColor: RAMP[step], color: INK[step] }}
+                            >
+                              {cell.effectiveShifts}
+                            </div>
+                          </td>
+                        )
+                      }
                       return (
                         <td key={iso} className="p-0.5">
                           <button

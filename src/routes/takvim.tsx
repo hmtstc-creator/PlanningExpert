@@ -26,6 +26,8 @@ import {
 } from '../components/OvertimePanels'
 import { usePlant } from '../lib/plantContext'
 import { OperatorHeadcountGrid } from '../components/plan/OperatorHeadcountGrid'
+import { OperatorWeeklyTable } from '../components/plan/OperatorWeeklyTable'
+import { OPERATOR_SHIFTS_PER_DAY, operatorPattern } from '../lib/operatorCapacity'
 import { ShiftCodesEditor } from '../components/ShiftCodesEditor'
 
 export const Route = createFileRoute('/takvim')({
@@ -98,6 +100,28 @@ function totalMinutes(p: WeekPattern, shiftMinutes: number, overtimeShiftMinutes
   return weekTotalMinutes(p, { shiftMinutes, overtimeShiftMinutes, stopMinutesByShift: stops })
 }
 
+/** Capacity overview'daki cost center seçimi tarayıcıda kalır ('' = All). */
+const CC_FILTER_KEY = 'planningexpert.calendar.costCenter'
+
+function useStoredCostCenter(): [string, (next: string) => void] {
+  const [value, setValue] = useState<string>(() => {
+    try {
+      return window.localStorage.getItem(CC_FILTER_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const set = (next: string) => {
+    setValue(next)
+    try {
+      window.localStorage.setItem(CC_FILTER_KEY, next)
+    } catch {
+      // Tarayıcı saklamaya izin vermiyorsa seçim yalnız bu oturumda kalır.
+    }
+  }
+  return [value, set]
+}
+
 function PressCalendarSection() {
   const plantCountry = usePlant().ctx?.active?.country ?? ''
   const canEditCalendar = usePlant().canArea('planning.calendar', 'edit')
@@ -128,7 +152,13 @@ function PressCalendarSection() {
   // sayfası). Referanslarda geçen ama tanımlanmamış presler de listelenir ki
   // takvim tanımlanabilsin.
   const definedPresses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string; costCenter?: string; crewSize?: number }[]
-  const operatorCostCenters = ((usePlant().ctx?.active?.costCenters ?? []) as { code: string; name: string; planningModel?: string }[]).filter((c) => c.planningModel === 'operator')
+  const allCostCenters = (usePlant().ctx?.active?.costCenters ?? []) as { code: string; name: string; planningModel?: string }[]
+  const operatorCostCenters = allCostCenters.filter((c) => c.planningModel === 'operator')
+  // Capacity overview süzgeci: tek cost center ya da All. Tanımlı olmayan
+  // (silinmiş) saklı seçim All sayılır.
+  const [storedCc, setCcFilter] = useStoredCostCenter()
+  const ccFilter = allCostCenters.some((c) => c.code === storedCc) ? storedCc : ''
+  const selectedCc = allCostCenters.find((c) => c.code === ccFilter)
 
   // Pres listesinin tek kaynağı Press Definitions. Master data'da ya da eski
   // takvim kayıtlarında geçen ama tanımlı olmayan presler listeye girmez;
@@ -561,6 +591,18 @@ function PressCalendarSection() {
   // Takvimin tek formülü (plan, Capacity Dashboard ve Performance ile aynı):
   // Pazartesiden sırayla gün, tatil kaybolur, tarihli ve tekrarlayan mesai.
   const { definitions: overtimeDefinitions, pressOvertime, dayShifts } = useOvertimeData()
+  // Operatör modelli hatlar her iş günü 3 vardiya sayılır (şablon okunmaz).
+  const opPattern = useMemo(
+    () => operatorPattern(definedPresses, operatorCostCenters.map((c) => c.code), workingDayKeys),
+    // Sorgu her çizimde yeni dizi verir; değişmeyen içerikte takvim yeniden kurulmasın.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      definedPresses.map((p) => `${p.name}:${p.costCenter ?? ''}`).join('|'),
+      operatorCostCenters.map((c) => c.code).join(','),
+      workingDayKeys.join(','),
+    ],
+  )
+  const operatorLines = useMemo(() => new Set(opPattern.presses), [opPattern])
   const calendarModel = useMemo(
     () =>
       capacityModel({
@@ -573,9 +615,13 @@ function PressCalendarSection() {
         pressOvertime,
         dayShifts,
         holidays: new Set([...holidaySet, ...manualHolidays]),
+        operatorPattern: opPattern,
       }),
-    [shiftMinutes, shiftStartMinute, plannedStops, templatesList, allOverrides, overtimeDefinitions, pressOvertime, dayShifts, holidaySet, manualHolidays],
+    [shiftMinutes, shiftStartMinute, plannedStops, templatesList, allOverrides, overtimeDefinitions, pressOvertime, dayShifts, holidaySet, manualHolidays, opPattern],
   )
+  const gridPresses = ccFilter ? definedPresses.filter((p) => p.costCenter?.trim() === ccFilter) : definedPresses
+  // Bu haftadan itibaren (pencerenin ilk haftası geçen hafta).
+  const currentWeeks = weekStarts.slice(1).map(isoDate)
 
   type Override = WeekPattern & { weekStart: string }
   const overridesList = (useQuery(
@@ -642,32 +688,76 @@ function PressCalendarSection() {
         <OvertimeEntryPanel presses={pressOptions} />
       </CollapsibleSection>
 
-      {/* Operatör planı: Plan sayfasındaki ızgaranın aynısı; planlamacı takvimde de arar. */}
-      <OperatorHeadcountGrid
-        costCenters={operatorCostCenters}
-        workCenters={definedPresses}
-        dates={weekStarts.flatMap((w) => Array.from({ length: 7 }, (_, i) => isoDate(addDays(w, i))))}
-        shiftMinutes={shiftMinutes}
-      />
-
-      <CollapsibleSection id="takvim-grid" title="Capacity overview" hint="all work centers, all weeks — click a week to change it" defaultOpen>
+      <CollapsibleSection id="takvim-grid" title="Capacity overview" hint="work centers × weeks — pick a cost center; click a week to change it" defaultOpen>
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        <label className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Cost center</span>
+          <select
+            aria-label="Cost center"
+            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+            value={ccFilter}
+            onChange={(e) => setCcFilter(e.target.value)}
+          >
+            <option value="">All</option>
+            {allCostCenters.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.code} {c.name}
+                {c.planningModel === 'operator' ? ' · operator plan' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        {!selectedCc && operatorLines.size > 0 && (
+          <span className="text-xs text-muted-foreground">
+            Operator plan lines show {OPERATOR_SHIFTS_PER_DAY} shifts a day; pick their cost center to enter operators.
+          </span>
+        )}
+      </div>
+      {selectedCc?.planningModel === 'operator' ? (
+        <>
+          <OperatorWeeklyTable
+            costCenter={selectedCc.code}
+            lines={gridPresses}
+            weekStarts={currentWeeks}
+            workingDaysOf={(w) =>
+              Array.from({ length: 7 }, (_, i) => isoDate(addDays(new Date(`${w}T00:00:00`), i))).filter(
+                calendarModel.isPlantWorkingDate,
+              ).length
+            }
+          />
+          {/* Kısa vade: ilk 2 hafta gün × vardiya adam sayısı (Plan sayfasındaki ızgaranın aynısı). */}
+          <OperatorHeadcountGrid
+            costCenters={[selectedCc]}
+            workCenters={definedPresses}
+            dates={currentWeeks.slice(0, 2).flatMap((w) => Array.from({ length: 7 }, (_, i) => isoDate(addDays(new Date(`${w}T00:00:00`), i))))}
+            shiftMinutes={shiftMinutes}
+          />
+        </>
+      ) : (
       <div className="mt-4">
         <CapacityGrid
-          presses={definedPresses}
+          presses={gridPresses}
+          lockedPresses={operatorLines}
           templates={
             new Map(
-              templatesList.map((t) => [
-                t.press,
-                { workingDays: t.workingDays, shiftsPerDay: t.shiftsPerDay } as GridPattern,
-              ]),
+              templatesList
+                .filter((t) => !operatorLines.has(t.press))
+                .map((t) => [t.press, { workingDays: t.workingDays, shiftsPerDay: t.shiftsPerDay } as GridPattern] as const)
+                .concat(
+                  opPattern.presses.map(
+                    (p) => [p, { workingDays: opPattern.workingDays, shiftsPerDay: OPERATOR_SHIFTS_PER_DAY } as GridPattern] as const,
+                  ),
+                ),
             )
           }
           overrides={
             new Map(
-              allOverrides.map((o) => [
-                `${o.press}|${o.weekStart}`,
-                { workingDays: o.workingDays, shiftsPerDay: o.shiftsPerDay } as GridPattern,
-              ]),
+              allOverrides
+                .filter((o) => !operatorLines.has(o.press))
+                .map((o) => [
+                  `${o.press}|${o.weekStart}`,
+                  { workingDays: o.workingDays, shiftsPerDay: o.shiftsPerDay } as GridPattern,
+                ]),
             )
           }
           weekStarts={weekStarts}
@@ -695,6 +785,7 @@ function PressCalendarSection() {
           onClearOverride={(press, weekStart) => clearOverrideForGrid({ press, weekStart })}
         />
       </div>
+      )}
 
       </CollapsibleSection>
 
