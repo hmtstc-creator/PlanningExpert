@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-29 (slayt 6: süzgeç bitti, cycle hatlarının planlanması açık) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-30 (SOP Builder: ilk gerçek video denemesi bekleniyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -15,6 +15,12 @@
 Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mesajları görüldü; tedarik süreleri varsayılan (14 gün) kalır; OEE sayfaları her gün açılıyor (histogram kurulmuş).
 
 ## Devam
+
+- **SOP Builder — ilk gerçek video** (2026-10-30): kod yayında (#121, #123), worker çalışıyor, Gemini anahtarı
+  *Setup*'ta kayıtlı. Açık PR / dal yok. Sıradaki adım: kullanıcı gerçek bir videoyu yükler, sonuç birlikte okunur
+  (adımlar, kare anları, kırmızı işaret, metin dili) ve gerekirse `sop-worker/prompt.md` / `prompt-verify.md`
+  ayarlanır. Bakılacaklar: *Save PDF*'te fotoğraflar çıkıyor mu (depo CORS; `src/lib/pdfSheet.ts` `capture`),
+  worker günlüğü `docker compose -f deploy/compose.yml logs sop-worker`. Ayrıntı [12](12-sop-olusturma.md).
 
 - **Slayt 6 — süzgeç bitti (#114), cycle hatlarının planlanması açık.** Production Plan'ın üstünde departman (tek) +
   cost center (çoklu) süzgeci çalışıyor; Gantt, işler, *Plan settings*, *Work calendar*, *Add job*'un iş yeri ve malzeme
