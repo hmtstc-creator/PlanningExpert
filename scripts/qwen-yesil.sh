@@ -26,6 +26,9 @@
 #   OPENAI_MODEL     örn. qwen/qwen3-coder:free
 # İsteğe bağlı:
 #   QWEN_TUR         en fazla kaç düzeltme turu (varsayılan 4)
+#   QWEN_GOREV       GÖREV MODU: Claude'un yazdığı kodlama görevi. Doluysa ilk
+#                    turda Qwen bu görevi kodlar, sonraki turlarda verify'ı
+#                    yeşile çevirir. Sınırlar (korunan dosya, silme, boyut) aynen geçerli.
 
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 1
@@ -113,7 +116,13 @@ JSON
 fi
 
 # --------------------------------------------------------------- 0. tur
-if verify_calistir; then
+if [ -n "${QWEN_GOREV:-}" ]; then
+    yaz "**Görev modu.** Görev:"
+    yaz ""
+    yaz "> ${QWEN_GOREV//$'\n'/ }"
+    yaz ""
+    verify_calistir || true
+elif verify_calistir; then
     yaz "Verify **zaten yeşil**. Qwen çağrılmadı."
     exit 0
 fi
@@ -126,6 +135,26 @@ yaz ""
 SONUC=1
 for TUR in $(seq 1 "$TUR_SINIRI"); do
     echo "=== Qwen turu $TUR/$TUR_SINIRI ==="
+    if [ "$TUR" -eq 1 ] && [ -n "${QWEN_GOREV:-}" ]; then
+    GOREV="$(cat << PROMPT
+This is a TypeScript / React / Vite / Convex project. Implement this task:
+
+$QWEN_GOREV
+
+Rules you must follow:
+- Do exactly the task above, nothing more. No unrelated refactor or cleanup.
+- Do NOT weaken or delete a test. Add a small test if the task adds behaviour.
+- Do NOT delete or rename any file.
+- Keep the change small: at most $EN_FAZLA_DOSYA files and $EN_FAZLA_SATIR changed lines.
+- NEVER edit these paths (protected; the job is aborted if you do):
+  ${KORUNAN[*]}
+  If the task needs one of them, stop and explain why instead.
+- Do not add new dependencies.
+- Keep existing code style. Comments and user-facing strings in this repo are Turkish.
+- When done, \`npm run verify\` must pass.
+PROMPT
+)"
+    else
     GOREV="$(cat << PROMPT
 This is a TypeScript / React / Vite / Convex project. The command \`npm run verify\`
 (typecheck + vitest + vite build) is failing. Fix the failures.
@@ -146,6 +175,7 @@ Current failures:
 $(hatalar)
 PROMPT
 )"
+    fi
     qwen --yolo -p "$GOREV" > ".qwen-tur-$TUR.txt" 2>&1
     QWEN_KOD=$?
     if [ "$QWEN_KOD" -ne 0 ]; then

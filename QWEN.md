@@ -5,7 +5,9 @@ Claude'un kuralları `CLAUDE.md`'dedir; çelişki olursa `CLAUDE.md` üstündür
 
 ## Senin işin
 
-`npm run verify` (typecheck + vitest + vite build) kırmızıysa **yeşile çevirmek**. Hepsi bu.
+`npm run verify` (typecheck + vitest + vite build) kırmızıysa **yeşile çevirmek**.
+**Görev modunda** (`QWEN_GOREV` dolu) önce Claude'un yazdığı görevi kodlarsın, sonra verify yeşil olmalı;
+görevin dışına çıkmazsın.
 
 - Yalnız derlemenin ve var olan testlerin geçmesi için gerekeni düzelt.
 - Davranışı değiştirme, yeniden tasarlama, düzeltmenin ötesinde temizlik yapma.
