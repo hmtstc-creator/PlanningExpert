@@ -4,6 +4,7 @@ import { HEADER_FIELDS, type Header } from '../src/lib/sop/sopLayout'
 import { LANGUAGES, MAX_PHOTOS_PER_STEP, draftSchema, emptyDraft, type Draft } from '../src/lib/sop/sopSchema'
 import { canManageCompany } from '../src/lib/tenancy'
 import { adminMutation, guardedQuery } from './guarded'
+import { WORKER_KEY, WORKER_SEEN_MS, aiKeyKey, stateRow } from './sopQueue'
 
 /**
  * SOP oluşturma (docs/wiki/12-sop-olusturma.md): yalnız şirket creator'ı
@@ -44,17 +45,80 @@ async function deleteFiles(ctx: Any, job: Any) {
 }
 
 /**
- * İşleyici kurulu mu (Convex'te `SOP_WORKER_TOKEN` var mı)? Kurulmadan yüklenen
- * video Convex deposunda bekler ve her gece yedeğine girer: yükleme kapalı tutulur.
+ * Hazır mı: worker bağlı (son 5 dakikada sordu) ve şirketin Gemini anahtarı
+ * girilmiş. Hazır değilken yükleme kapalı: video Convex deposunda bekleyip her
+ * gece yedeğine girmesin.
  */
-const workerReady = () => !!process.env.SOP_WORKER_TOKEN
+async function readiness(ctx: Any) {
+  const worker = await stateRow(ctx, WORKER_KEY)
+  const key = await stateRow(ctx, aiKeyKey(ctx.plant.companyId))
+  const workerConnected = !!worker && Date.now() - (worker.value?.lastSeenAt ?? 0) < WORKER_SEEN_MS
+  const aiKey: string | undefined = key?.value?.key
+  return {
+    workerConnected,
+    workerPaired: !!worker,
+    aiKeySet: !!aiKey,
+    // Anahtarın kendisi tarayıcıya hiç gitmez; yalnız son 4 karakteri.
+    aiKeyHint: aiKey ? `…${aiKey.slice(-4)}` : '',
+    aiKeySetBy: key?.value?.setBy ?? '',
+    ready: workerConnected && !!aiKey,
+  }
+}
+
+async function requireReady(ctx: Any) {
+  const r = await readiness(ctx)
+  if (!r.aiKeySet) throw new ConvexError('Enter the Gemini key first (SOP Builder → AI key)')
+  if (!r.workerConnected) throw new ConvexError('The SOP worker is not running on the server')
+}
 
 export const status = guardedQuery({
   modules: MODULES,
   args: {},
   handler: async (ctx: Any) => {
     requireCreator(ctx)
-    return { workerReady: workerReady() }
+    return readiness(ctx)
+  },
+})
+
+/** Şirketin Gemini anahtarı (yalnız creator); sohbete / terminale yazılmasın diye sayfadan girilir. */
+export const setAiKey = adminMutation({
+  modules: MODULES,
+  affectsPlan: false,
+  args: { key: v.string() },
+  returns: v.null(),
+  handler: async (ctx: Any, { key }: Any) => {
+    const k = key.trim()
+    if (k.length < 20 || k.length > 200 || /\s/.test(k)) throw new ConvexError('This does not look like an API key')
+    const row = await stateRow(ctx, aiKeyKey(ctx.plant.companyId))
+    const value = { key: k, setBy: ctx.sessionUser.name, setAt: Date.now() }
+    if (row) await ctx.db.patch(row._id, { value, updatedAt: Date.now() })
+    else await ctx.db.insert('platformState', { key: aiKeyKey(ctx.plant.companyId), value, updatedAt: Date.now() })
+    return null
+  },
+})
+
+export const clearAiKey = adminMutation({
+  modules: MODULES,
+  affectsPlan: false,
+  args: {},
+  returns: v.null(),
+  handler: async (ctx: Any) => {
+    const row = await stateRow(ctx, aiKeyKey(ctx.plant.companyId))
+    if (row) await ctx.db.delete(row._id)
+    return null
+  },
+})
+
+/** Worker eşleşmesini siler: worker yeniden kurulduysa (diski silindiyse) bir sonraki soruda yeniden eşleşir. */
+export const resetWorker = adminMutation({
+  modules: MODULES,
+  affectsPlan: false,
+  args: {},
+  returns: v.null(),
+  handler: async (ctx: Any) => {
+    const row = await stateRow(ctx, WORKER_KEY)
+    if (row) await ctx.db.delete(row._id)
+    return null
   },
 })
 
@@ -123,7 +187,7 @@ export const generateUploadUrl = adminMutation({
   args: {},
   returns: v.string(),
   handler: async (ctx: Any) => {
-    if (!workerReady()) throw new ConvexError('The SOP worker is not set up on the server yet')
+    await requireReady(ctx)
     return ctx.storage.generateUploadUrl()
   },
 })
@@ -145,7 +209,7 @@ export const create = adminMutation({
   },
   returns: v.id('sopJobs'),
   handler: async (ctx: Any, a: Any) => {
-    if (!workerReady()) throw new ConvexError('The SOP worker is not set up on the server yet')
+    await requireReady(ctx)
     const meta = await ctx.db.system.get(a.videoStorageId)
     const isVideo = meta && (VIDEO_TYPES.test(meta.contentType ?? '') || VIDEO_NAMES.test(a.videoName))
     // Hata işlemi geri alır; bağlanmayan dosyayı gece temizliği siler (tenancy.purgeOrphanUploads).

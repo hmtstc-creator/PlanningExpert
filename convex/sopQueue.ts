@@ -14,6 +14,37 @@ import { internalMutation, internalQuery } from './_generated/server'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any
 
+/** platformState anahtarları: worker eşleşmesi (tek, platform düzeyinde) ve şirketin Gemini anahtarı. */
+export const WORKER_KEY = 'sopWorker'
+export const aiKeyKey = (companyId: string) => `sopAiKey:${companyId}`
+/** Worker bu kadar süredir sormadıysa "bağlı değil" görünür. */
+export const WORKER_SEEN_MS = 5 * 60_000
+
+export async function stateRow(ctx: Any, key: string) {
+  return ctx.db.query('platformState').withIndex('by_key', (q: Any) => q.eq('key', key)).first()
+}
+
+/**
+ * Worker kimliği: ilk gelen jeton eşleşir (worker jetonu kendisi üretir, kendi
+ * diskinde saklar). Uçlar yalnız Docker ağının içinden erişilir (3211 dışarıya
+ * açık değil); eşleşme sayfadan sıfırlanabilir (sop.resetWorker). Jetonun
+ * kendisi değil, SHA-256'sı saklanır.
+ */
+export const authWorker = internalMutation({
+  args: { hash: v.string() },
+  handler: async (ctx: Any, { hash }: Any) => {
+    const now = Date.now()
+    const row = await stateRow(ctx, WORKER_KEY)
+    if (!row) {
+      await ctx.db.insert('platformState', { key: WORKER_KEY, value: { tokenHash: hash, pairedAt: now, lastSeenAt: now }, updatedAt: now })
+      return { ok: true, paired: true }
+    }
+    if (row.value?.tokenHash !== hash) return { ok: false }
+    if (now - (row.value.lastSeenAt ?? 0) > 60_000) await ctx.db.patch(row._id, { value: { ...row.value, lastSeenAt: now }, updatedAt: now })
+    return { ok: true }
+  },
+})
+
 /** Kalp atışı bu kadar gelmeyen iş takılmış sayılır ve sıraya geri döner. */
 export const STUCK_MS = 10 * 60_000
 /** Bir iş en çok bu kadar denenir (worker çökmesi, ağ hatası). */
@@ -53,6 +84,13 @@ async function examplesFor(ctx: Any, job: Any) {
         steps: d.steps.slice(0, EXAMPLE_STEPS).map((s) => ({ temel_adim: s.text, puf_noktasi: s.key, nedeni: s.reason })),
       }
     })
+}
+
+/** İşin şirketinin Gemini anahtarı (sayfadan girilir); yoksa worker kendi ortamındakini dener. */
+async function aiKeyFor(ctx: Any, plantId: string): Promise<string | null> {
+  const plant = await ctx.db.get(plantId)
+  if (!plant?.companyId) return null
+  return (await stateRow(ctx, aiKeyKey(plant.companyId)))?.value?.key ?? null
 }
 
 /**
@@ -101,6 +139,7 @@ export const claim = internalMutation({
       notes: job.notes ?? '',
       keyMoments: job.keyMoments ?? [],
       examples: await examplesFor(ctx, job),
+      aiKey: await aiKeyFor(ctx, job.plantId),
       responseSchema: GEMINI_RESPONSE_SCHEMA,
     }
   },

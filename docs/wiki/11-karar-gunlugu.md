@@ -87,5 +87,6 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 - **Video Convex deposuna değil volume'e** (2026-10-28) — gece yedeği dosya deposunu da alıyor (30 kopya); video saklanacağı için disk dolardı. *Alt.: Convex `ctx.storage`* — kareler gibi küçük dosyalar için kalır.
 - **Worker Convex'e jetonlu HTTP uçlarıyla girer, yönetici anahtarıyla değil** (2026-10-29) — uç yalnız `sopJobs` kuyruğunu açar, worker'ın elinde bütün veritabanını açan anahtar olmaz. *Alt.: `CONVEX_SELF_HOSTED_ADMIN_KEY` ile Convex istemcisi* — sızarsa bütün veri açıkta.
 - **Doğrulama tek kaynakta, Convex'te** (2026-10-29) — worker cevabı `/check` ile Convex'teki zod şemasına sordurur; iki dilde iki şema yazılmaz.
+- **Sunucuda gizli değer yazılmaz: anahtar sayfadan, worker jetonu kendiliğinden** (2026-10-30) — sunucu oturumunda gizli giriş (`read -s`) yok, `.env` yazmak izinle engelli; anahtarı sohbete yazmak kural dışı. Kullanıcı: "beni uğraştırma". *Alt.: `deploy/.env` + `npx convex env set`* — her adım kullanıcıya ya da sohbete gizli değer taşıtıyordu.
 - **Yetki creator** (2026-10-28, kullanıcı) — `guarded` → `companyAdmin`. *Alt.: yeni yetki alanı `machine.sop`* — şema + izin matrisi değişirdi, gerek yok.
 

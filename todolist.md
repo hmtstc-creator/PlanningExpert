@@ -630,7 +630,7 @@ Cevap bu değerlendirmeden önce **hayır**dı.
 
 - [x] ✅ Şablon soruları cevaplandı (2026-10-29) — docs/wiki/12-sop-olusturma.md.
 - [x] ✅ SOP Builder ilk sürüm (Machine Follow-up → SOP Builder): yükleme, kuyruk, `sop-worker`, düzenleme ekranı = PDF.
-- [ ] **[S]** Sunucuda `sop-worker` kurulumu: `SOP_WORKER_TOKEN` (deploy/.env + Convex) ve `SOP_AI_KEY` — deploy/README.md → SOP Builder.
+- [ ] **[S]** SOP Builder → *Setup*: Gemini anahtarını yapıştır (worker'ı yayın kendisi kurar).
 - [ ] **[S]** Gerçek bir videoyla ilk deneme; *Save PDF*'te fotoğraflar çıkıyor mu (depo CORS).
 - [ ] **[K]** Videoyu ekranda oynatıp kaydırarak kare seçme (şimdilik saniye yazılıyor).
 

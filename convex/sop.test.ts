@@ -36,7 +36,11 @@ async function world() {
     if (done) break
     await t.mutation(api.tenancy.backfill, {})
   }
-  return { t, cr: await session(t, u.creator, 'cr'), pl: await session(t, u.planner, 'pl') }
+  const cr = await session(t, u.creator, 'cr')
+  // Hazır: Gemini anahtarı girilmiş, worker bağlı.
+  await t.mutation(api.sop.setAiKey, { token: cr, key: 'AIzaTESTKEY-1234567890abcd' })
+  await t.mutation(api.sopQueue.authWorker, { hash: 'worker-hash' })
+  return { t, cr, pl: await session(t, u.planner, 'pl') }
 }
 
 const video = (t: Any, type = 'video/mp4') => t.run((ctx: Any) => ctx.storage.store(new Blob(['fake video'], { type })))
@@ -64,20 +68,44 @@ async function newJob(t: Any, cr: string) {
 
 describe('SOP', () => {
   beforeEach(() => {
-    vi.stubEnv('SOP_WORKER_TOKEN', 'test-token')
     vi.useFakeTimers()
     vi.setSystemTime(Date.UTC(2026, 9, 29, 12, 0))
   })
-  afterEach(() => {
-    vi.useRealTimers()
-    vi.unstubAllEnvs()
+  afterEach(() => vi.useRealTimers())
+
+  it('anahtar ve worker hazır değilken yükleme kapalı; anahtar tarayıcıya gitmez', async () => {
+    const { t, cr } = await world()
+    const status = await t.query(api.sop.status, { token: cr })
+    expect(status).toMatchObject({ ready: true, aiKeySet: true, aiKeyHint: '…abcd', workerConnected: true })
+    expect(JSON.stringify(status)).not.toContain('AIzaTESTKEY')
+    await t.mutation(api.sop.clearAiKey, { token: cr })
+    await expect(t.mutation(api.sop.generateUploadUrl, { token: cr })).rejects.toThrow(/Gemini key/)
+    await t.mutation(api.sop.setAiKey, { token: cr, key: 'AIzaTESTKEY-1234567890abcd' })
+    // Worker 5 dakikadır sormadı: bağlı değil.
+    vi.setSystemTime(Date.UTC(2026, 9, 29, 12, 6))
+    await expect(t.mutation(api.sop.generateUploadUrl, { token: cr })).rejects.toThrow(/not running/)
+    await expect(t.mutation(api.sop.setAiKey, { token: cr, key: 'kısa' })).rejects.toThrow(/API key/)
   })
 
-  it('işleyici kurulmadan yükleme kapalı (video gece yedeğine girmesin)', async () => {
+  it('worker eşleşmesi: ilk jeton eşleşir, başkası reddedilir; sıfırlanınca yenisi eşleşir', async () => {
     const { t, cr } = await world()
-    vi.stubEnv('SOP_WORKER_TOKEN', '')
-    expect(await t.query(api.sop.status, { token: cr })).toEqual({ workerReady: false })
-    await expect(t.mutation(api.sop.generateUploadUrl, { token: cr })).rejects.toThrow(/not set up/)
+    expect((await t.mutation(api.sopQueue.authWorker, { hash: 'worker-hash' })).ok).toBe(true)
+    expect((await t.mutation(api.sopQueue.authWorker, { hash: 'other' })).ok).toBe(false)
+    await t.mutation(api.sop.resetWorker, { token: cr })
+    expect(await t.mutation(api.sopQueue.authWorker, { hash: 'other' })).toEqual({ ok: true, paired: true })
+  })
+
+  it('HTTP ucu: jetonsuz ya da kısa jetonla 401; eşleşmiş jetonla iş verir', async () => {
+    const { t, cr } = await world()
+    await t.mutation(api.sop.resetWorker, { token: cr })
+    const post = (token: string) => t.fetch('/sop/worker/claim', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: '{}' })
+    expect((await post('short')).status).toBe(401)
+    const tok = 'a'.repeat(64)
+    expect((await post(tok)).status).toBe(200)
+    expect((await post('b'.repeat(64))).status).toBe(401)
+    await newJob(t, cr)
+    const task = await (await post(tok)).json()
+    expect(task).toMatchObject({ type: 'analyze', aiKey: 'AIzaTESTKEY-1234567890abcd' })
   })
 
   it('yalnız creator kullanır', async () => {
