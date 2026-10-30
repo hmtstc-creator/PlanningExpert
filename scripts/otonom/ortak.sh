@@ -63,7 +63,7 @@ gemini_yaz() {
   fi
   git push -q -f origin "HEAD:refs/heads/$dal" || return 1
   gh api -X POST "repos/$REPO_SLUG/actions/workflows/qwen-yesil.yml/dispatches" \
-    -f ref=main -f "inputs[dal]=$dal" -f "inputs[gorev]=$gorev" || return 1
+    -f ref=main -f "inputs[dal]=$dal" -f "inputs[model]=gemini" -f "inputs[gorev]=$gorev" || return 1
   sleep 20
   run=$(gh run list -R "$REPO_SLUG" -w qwen-yesil.yml -L 5 --json databaseId,displayTitle,createdAt \
     -q "[.[] | select(.displayTitle | contains(\"$dal\"))][0].databaseId // empty")
