@@ -32,8 +32,10 @@ export function PressStartPanel({ presses, className = 'mt-4' }: { presses: stri
   const [open, setOpen] = useState(false)
   const [allDelay, setAllDelay] = useState('')
   const byPress = new Map(rows.map((r) => [r.press, r]))
-  const active = rows.filter((r) => r.fromDate || r.delayMinutes)
-  const list = Array.from(new Set([...presses, ...rows.map((r) => r.press)])).sort()
+  // Yalnız görünür iş yerleri (bölüm süzgeci): başka bölümün kaydı burada kalabalık yapmaz.
+  const shown = new Set(presses)
+  const active = rows.filter((r) => shown.has(r.press) && (r.fromDate || r.delayMinutes))
+  const list = [...presses].sort()
   return (
     <div className={`${className} min-w-0 rounded-lg border p-3 ${active.length > 0 ? 'border-sky-300 bg-sky-50/60' : 'border-border'}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -42,7 +44,9 @@ export function PressStartPanel({ presses, className = 'mt-4' }: { presses: stri
           <span className="text-muted-foreground">
             {active.length === 0
               ? '· every work center is planned from now'
-              : `· ${active
+              : active.length > 3
+                ? `· ${active.length} work centers closed or delayed`
+                : `· ${active
                   .map((r) =>
                     [
                       r.press,

@@ -13,6 +13,7 @@ import {
   serverErrorText,
 } from "../../lib/pressCalendar";
 import { activeShiftList } from "../../lib/shiftTimeline";
+import { InfoTip } from "../PageHeader";
 
 /** Bir presin bir günü: planın kullandığı normal vardiyalar ve mesai pencereleri. */
 export interface PressShiftDay {
@@ -284,6 +285,13 @@ export function PressWeekShifts({
     <div className="rounded-lg border border-border p-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-semibold text-foreground">Work calendar</span>
+        <InfoTip label="About the work calendar">
+          <p>
+            Press Edit to open or close shifts and organize overtime for this
+            work center. A dashed cell is not in the plan yet — press Calculate
+            plan.
+          </p>
+        </InfoTip>
         <select
           aria-label="Work center"
           value={selected}
@@ -585,23 +593,15 @@ export function PressWeekShifts({
               </tr>
             </tbody>
           </table>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {editing ? (
-              <>
-                Click a cell to open or close that shift for this work center
-                and day (↺ goes back to the pattern); on the OT row add or
-                remove overtime for that day. Nothing is written until you press
-                Save. A dashed cell is not in the plan yet — press Calculate
-                plan after saving.
-              </>
-            ) : (
-              <>
-                Press Edit to open or close shifts and organize overtime for
-                this work center. A dashed cell is not in the plan yet — press
-                Calculate plan.
-              </>
-            )}
-          </p>
+          {editing && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Click a cell to open or close that shift for this work center
+              and day (↺ goes back to the pattern); on the OT row add or
+              remove overtime for that day. Nothing is written until you press
+              Save. A dashed cell is not in the plan yet — press Calculate
+              plan after saving.
+            </p>
+          )}
           {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
         </div>
       )}

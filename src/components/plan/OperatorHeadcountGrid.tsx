@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { useMutation, useQuery } from "../../lib/convexTransport";
 import { maxShiftsPerDay, serverErrorText } from "../../lib/pressCalendar";
+import { InfoTip } from "../PageHeader";
 
 interface HeadcountRow {
   costCenter: string;
@@ -35,6 +36,8 @@ export function OperatorHeadcountGrid({
   workCenters,
   dates,
   shiftMinutes,
+  editCrew = true,
+  className = "mt-4 rounded-lg border border-border p-3 text-sm",
 }: {
   /** Planlama modeli 'operator' olan cost center'lar. */
   costCenters: { code: string; name: string }[];
@@ -42,6 +45,9 @@ export function OperatorHeadcountGrid({
   /** Planın günleri (ISO, artan). */
   dates: string[];
   shiftMinutes?: number;
+  /** Hat ekibi burada düzenlensin mi? Plan sayfasında hayır: ekip Work Calendar'da girilir. */
+  editCrew?: boolean;
+  className?: string;
 }) {
   const rows = useQuery(api.operatorHeadcount.list) as
     | HeadcountRow[]
@@ -119,9 +125,21 @@ export function OperatorHeadcountGrid({
   };
 
   return (
-    <div className="mt-4 rounded-lg border border-border p-3 text-sm">
+    <div className={className}>
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-semibold">Operators per shift</h3>
+        <InfoTip label="About the operator plan">
+          <p>
+            Operator plan: enter how many operators work each shift and press Save. When the plan
+            is recalculated they go to the lines with the earliest due work (crew
+            size permitting); a line with no work left this week gets none. An
+            empty cell keeps the Work Calendar; a day set by hand on the work
+            calendar always wins.
+          </p>
+          {!editCrew && (
+            <p>Crew (people one line needs to run) is set on the Work Calendar → Capacity overview.</p>
+          )}
+        </InfoTip>
         {costCenters.length > 1 ? (
           <select
             className="rounded-md border border-input bg-background px-2 py-1 text-xs"
@@ -172,13 +190,6 @@ export function OperatorHeadcountGrid({
           </button>
         </span>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Operator plan: enter how many operators work each shift and press Save. When the plan
-        is recalculated they go to the lines with the earliest due work (crew
-        size permitting); a line with no work left this week gets none. An
-        empty cell keeps the Work Calendar; a day set by hand on the work
-        calendar always wins.
-      </p>
       {error && (
         <p role="alert" className="mt-2 text-xs text-destructive">
           {error}
@@ -232,6 +243,7 @@ export function OperatorHeadcountGrid({
           </table>
         </div>
       )}
+      {editCrew && (
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
         <span className="text-muted-foreground">Crew per line:</span>
         {lines.map((l) => (
@@ -252,6 +264,7 @@ export function OperatorHeadcountGrid({
           <span className="text-amber-800">No work center is linked to this cost center yet.</span>
         )}
       </div>
+      )}
     </div>
   );
 }
