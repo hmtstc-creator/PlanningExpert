@@ -1,0 +1,14 @@
+# Otonom geliştirme (wiki 13): Görevleri Gemini ile uygula + yerel test. Kapalıyken (/etc/otonom/DURDUR) hiçbir şey yapmaz.
+#   journalctl -u planningexpert-otonom-uygula -n 50
+[Unit]
+Description=PlanningExpert otonom — Görevleri Gemini ile uygula + yerel test
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=otonom
+Nice=19
+IOSchedulingClass=idle
+ExecStart=/opt/planningexpert/scripts/otonom/uygula.sh
+TimeoutStartSec=34min

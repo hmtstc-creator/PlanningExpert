@@ -1,0 +1,14 @@
+# Otonom geliştirme (wiki 13): Saatlik eleştiri toplantısı. Kapalıyken (/etc/otonom/DURDUR) hiçbir şey yapmaz.
+#   journalctl -u planningexpert-otonom-toplanti -n 50
+[Unit]
+Description=PlanningExpert otonom — Saatlik eleştiri toplantısı
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=otonom
+Nice=19
+IOSchedulingClass=idle
+ExecStart=/opt/planningexpert/scripts/otonom/toplanti.sh
+TimeoutStartSec=30min
