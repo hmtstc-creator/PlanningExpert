@@ -1,0 +1,17 @@
+# Otonom geliştirme (wiki 13): Görevleri Gemini ile uygula + yerel test. Kapalıyken (/etc/otonom/DURDUR) hiçbir şey yapmaz.
+#   journalctl -u planningexpert-otonom-uygula -n 50
+[Unit]
+Description=PlanningExpert otonom — Görevleri Gemini ile uygula + yerel test
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=otonom
+Nice=19
+IOSchedulingClass=idle
+WorkingDirectory=/home/otonom/PlanningExpert
+# Betik kendi klonundan geçici klasöre kopyalanıp çalışır: klon çalışırken sıfırlansa da
+# bash yarım okunan dosyadan devam etmez; /opt'taki root dosyalarına izin gerekmez.
+ExecStart=/bin/bash -c 'd=$$(mktemp -d); cp /home/otonom/PlanningExpert/scripts/otonom/* "$$d"/; exec bash "$$d/uygula.sh"'
+TimeoutStartSec=55min

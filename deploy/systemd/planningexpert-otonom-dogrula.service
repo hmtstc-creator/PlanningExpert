@@ -1,0 +1,14 @@
+# Otonom geliştirme (wiki 13): Son değişiklik yayında mı (değilse yayınla). Kapalıyken (/etc/otonom/DURDUR) hiçbir şey yapmaz.
+#   journalctl -u planningexpert-otonom-dogrula -n 50
+[Unit]
+Description=PlanningExpert otonom — Son değişiklik yayında mı (değilse yayınla)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Nice=19
+IOSchedulingClass=idle
+ExecStart=/opt/planningexpert/scripts/otonom/dogrula.sh
+TimeoutStartSec=30min

@@ -1,0 +1,17 @@
+# Otonom geliştirme (wiki 13): Tek PR, CI yeşil, squash merge. Kapalıyken (/etc/otonom/DURDUR) hiçbir şey yapmaz.
+#   journalctl -u planningexpert-otonom-yayinla -n 50
+[Unit]
+Description=PlanningExpert otonom — Tek PR, CI yeşil, squash merge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=otonom
+Nice=19
+IOSchedulingClass=idle
+WorkingDirectory=/home/otonom/PlanningExpert
+# Betik kendi klonundan geçici klasöre kopyalanıp çalışır: klon çalışırken sıfırlansa da
+# bash yarım okunan dosyadan devam etmez; /opt'taki root dosyalarına izin gerekmez.
+ExecStart=/bin/bash -c 'd=$$(mktemp -d); cp /home/otonom/PlanningExpert/scripts/otonom/* "$$d"/; exec bash "$$d/yayinla.sh"'
+TimeoutStartSec=60min

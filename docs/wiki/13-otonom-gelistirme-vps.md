@@ -1,7 +1,7 @@
 # 13 · Otonom geliştirme (VPS) — mimari
 
-> Son güncelleme: 2026-10-30 (ilk sürüm: taslak → token aksiyonları → final mimari). **Durum: TASARIM.**
-> Kullanıcı "başla" demeden hiçbir parça kurulmaz ve çalıştırılmaz (kullanıcı kararı 2026-10-30).
+> Son güncelleme: 2026-10-30 (kuruldu: `scripts/otonom/*`, `planningexpert-otonom-*` zamanlayıcıları, Administration → *Autonomous development*). **Durum: KURULU, KAPALI** — aşağıdaki *Açma* adımları bitince çalışır.
+> Kullanıcı 2026-10-30 "başla" dedi. Kapatmak için tek komut: `touch /etc/otonom/DURDUR`.
 
 ## Amaç
 
@@ -97,3 +97,34 @@ toplantı kalitesi düşerse yeniden değerlendirilir.
 3. `scripts/otonom/*` ve systemd timer'ları (`otonom-toplanti`, `otonom-yayinla`, `otonom-dogrula`).
 4. Otonom Gelişim sayfası + Convex tablosu.
 5. İlk tur elle çalıştırılır, sonuç kullanıcıya gösterilir; sonra timer'lar açılır.
+
+## Kurulum (kodda)
+
+| Parça | Dosya | Saat |
+|---|---|---|
+| Ortak ayar, açık/kapalı kontrolü, kilit | `scripts/otonom/ortak.sh` | — |
+| Kullanıcı `otonom`, `/etc/otonom/env`, klon, `claude` + `gh` CLI (idempotent, root) | `scripts/otonom/kur.sh` | :50 öncesi |
+| Toplantı (sonnet, araçsız) → `kuyruk/` | `toplanti.sh` + `toplanti-prompt.md` | :00 |
+| Gemini yazar (`qwen-yesil.sh`, aynı sınırlar) → verify → haiku onayı → `hazir/` | `uygula.sh` + `onay-prompt.md` | :05 |
+| Toplu dal → verify → tek PR → CI yeşil (Gemini ≤3 düzeltme) → squash merge | `yayinla.sh` | :40 |
+| Kayıt kartı + `docs/otonom/durum.md` | `gunluk.mjs` → `src/data/otonom-gunluk.json` | :40 |
+| Sayfa ilişki haritası | `harita.mjs` → `docs/otonom/harita.md` | :00, :40 |
+| Yayında mı? değilse `planningexpert-autodeploy` hemen | `dogrula.sh` (root) | :50 |
+
+Zamanlayıcıları `deploy.sh` (`install_units`) kendisi kurar; elle iş yok. `otonom` betikleri kendi klonundan (`/home/otonom/PlanningExpert`) geçici klasöre kopyalanıp çalışır;
+`/opt/planningexpert`'teki root dosyalarına izin gerekmez, canlı kopyaya dokunmaz. `dogrula.sh` root'tur, `/opt`'tan çalışır. Durum: `/var/lib/otonom/`
+(`kuyruk`, `hazir`, `biten`, `toplantilar.jsonl`, `dogrula.log`). Günlük: `journalctl -u planningexpert-otonom-<ad>`.
+
+Sayfa: **Administration → Autonomous development** (yalnız site sahibi): saat, odak sayfa, toplantı özeti,
+her iyileştirme için *Before / After*, bekleyen öneriler.
+
+## Açma (kullanıcı, sunucuda bir kez)
+
+1. `sudo -iu otonom claude` → giriş yap (abonelik), çık.
+2. `sudo -iu otonom gh auth login` → GitHub (repo + workflow yetkisi).
+3. `/etc/otonom/env` var olsun (boş `GEMINI_API_KEY=` yeter). Anahtar **boşsa** Gemini GitHub iş akışında
+   çalışır (anahtar GitHub secret'ında; sunucuya gizli değer girmek gerekmez, Actions dakikası harcar);
+   doluysa sunucuda yerelde (ucuz). 2026-10-30 kurulumu: anahtar boş, `otonom` claude + gh girişi yapıldı.
+4. `/etc/otonom/DURDUR` yoksa döngü açıktır (env hazır kurulduğu için kur.sh DURDUR oluşturmaz).
+
+Herhangi biri eksikse betikler `kapalı: <neden>` yazıp çıkar (`journalctl -u planningexpert-otonom-toplanti`).
