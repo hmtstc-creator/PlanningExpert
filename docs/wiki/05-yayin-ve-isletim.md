@@ -1,6 +1,6 @@
 # 05 · Yayın ve işletim
 
-> Son güncelleme: 2026-10-29 (SOP işleyicisi `sop-worker`: kurulum deploy/README.md → SOP Builder) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
+> Son güncelleme: 2026-10-30 (sunucu oturumu gizli değer alamaz; sop-worker yayınla kurulur) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
 
 ## Çalışma şekli (özet)
 
@@ -53,6 +53,9 @@ Geri yükleme provası ayda bir (`deploy/README.md`). Şirket bazında dışa ak
 - Sunucudaki Claude oturumunun kalıcı izni yalnızca `deploy.sh` ve ilgili mesajlaşma içindir. Bulut oturumu sunucu oturumuna mesaj **gönderemez**
   (güvenilmeyen cihaz kuralı); sunucu bulut oturumuna yazabilir. Bu yüzden yayın zamanlayıcıya bırakıldı.
 - Gizli değerler (jeton, anahtar, parola) çıktıya, commit'e, PR'a yazılmaz.
+- **Sunucu oturumu gizli değer alamaz** (2026-10-30): `read -s` gibi gizli girişte klavye yok (komut boş döner, "oldu" gibi görünür),
+  `.env` okuma / yazma izinle engelli. Gizli değer gereken yeni bir özellikte değeri **sayfadan** girdir (ör. SOP Builder → Setup)
+  ya da kendiliğinden üret (worker jetonu); kullanıcıya terminal komutu verme. Çok satırlı komutu tek seferde yapıştırtma.
 
 ## Dokunulmaması gerekenler
 
