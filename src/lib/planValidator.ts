@@ -26,7 +26,7 @@ import type { PlanInputs, PlanRun } from './planPipeline'
 import type { ProductSpec } from './planning'
 import type { ScheduledJob } from './scheduler'
 import { stockScope } from './stockLocations'
-import { DEFAULT_WORKING_DAYS, SETTINGS_DEFAULTS } from './settingsDefaults'
+import { DEFAULT_WORKING_DAYS, OPERATOR_SHIFTS_PER_DAY, SETTINGS_DEFAULTS } from './settingsDefaults'
 
 // ---------------------------------------------------------------- çıktı tipleri
 
@@ -428,8 +428,18 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   // ---- pres takvimi (bağımsız): haftalık düzen Pazartesiden sırayla, tatil
   // günü kaybolur (kaymaz); istisna hafta şablonun önüne geçer; gün kaydı
   // (pres × gün vardiya numaraları) her şeyin, tatilin de önüne geçer.
-  const tplBy = new Map(inputs.templates.map((t) => [t.press, t]))
-  const ovBy = new Map((inputs.weekOverrides ?? []).map((o) => [`${o.press}|${o.weekStart}`, o]))
+  // Operatör modelli cost center'ın hatları: her iş günü OPERATOR_SHIFTS_PER_DAY
+  // vardiya açık; şablon, tekrarlayan mesai ve istisna hafta okunmaz.
+  const operatorCcs = new Set(inputs.operatorCostCenters ?? [])
+  const operatorLines = new Set(inputs.presses.filter((p) => p.costCenter && operatorCcs.has(p.costCenter.trim())).map((p) => p.name))
+  const operatorWorkingDays = Math.min(7, (inputs.workCalendar?.workingDays?.length ? inputs.workCalendar.workingDays : DEFAULT_WORKING_DAYS).length)
+  const tplBy = new Map<string, (typeof inputs.templates)[number]>(
+    inputs.templates.filter((t) => !operatorLines.has(t.press)).map((t) => [t.press, t]),
+  )
+  for (const press of operatorLines) tplBy.set(press, { press, workingDays: operatorWorkingDays, shiftsPerDay: OPERATOR_SHIFTS_PER_DAY })
+  const ovBy = new Map(
+    (inputs.weekOverrides ?? []).filter((o) => !operatorLines.has(o.press)).map((o) => [`${o.press}|${o.weekStart}`, o]),
+  )
   const dayRecBy = new Map((inputs.pressDayShifts ?? []).map((d) => [`${d.press}|${d.date}`, d.shifts]))
   // Operatör planının gün kayıtları motorun takvim kararıdır (adam sayısının
   // dağıtımı); elle kayıt her zaman önce gelir. Dağıtımın adam sayısını
@@ -1997,9 +2007,21 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   // her gün × vardiyada çalışan hatların ekip toplamı adam sayısını aşmaz
   // (elle gün kaydı bu sayıya dahildir ama o kaydın kendisi kural dışıdır).
   const r14 = rule('operator-headcount', 'Operator plan: on a day × shift with a headcount, the crews of the running lines fit the operators (manual day records excepted)')
-  const operatorCcs = new Set(inputs.operatorCostCenters ?? [])
+  // Adam sayısı: gün × vardiya satırları; o gün satırı olmayan iş günlerinde
+  // haftalık sayıdan vardiya başına floor(haftalık ÷ 3) (motordan bağımsız kopya).
+  const headcountRows = [...(inputs.operatorHeadcount ?? [])]
+  const dailyKeys = new Set(headcountRows.map((h) => `${h.costCenter}|${h.date}`))
+  for (const w of inputs.operatorWeekly ?? []) {
+    const perShift = Math.floor(Math.max(0, w.operators) / OPERATOR_SHIFTS_PER_DAY)
+    const weekMonday = mondayOfIso(w.weekStart)
+    for (let i = 0; i < 7; i++) {
+      const date = plusDays(weekMonday, i)
+      if (dailyKeys.has(`${w.costCenter}|${date}`) || !isWorkingDay(date)) continue
+      for (let shift = 1; shift <= OPERATOR_SHIFTS_PER_DAY; shift++) headcountRows.push({ costCenter: w.costCenter, date, shift, operators: perShift })
+    }
+  }
   const manualKeys = new Set((inputs.pressDayShifts ?? []).map((d) => `${d.press}|${d.date}`))
-  for (const h of inputs.operatorHeadcount ?? []) {
+  for (const h of headcountRows) {
     if (!operatorCcs.has(h.costCenter) || h.date < today || h.date > horizonEnd || holidays.has(h.date)) continue
     const lines = inputs.presses.filter((p) => p.costCenter === h.costCenter && tplBy.has(p.name))
     const running = lines.filter((p) => normalShiftsOn(p.name, h.date).includes(h.shift))

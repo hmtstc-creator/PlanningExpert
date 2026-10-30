@@ -17,6 +17,7 @@ import { useOvertimeData } from '../components/OvertimePanels'
 import { InfoTip, PageHeader } from '../components/PageHeader'
 import { relatedPages } from '../lib/navigation'
 import { usePlant } from '../lib/plantContext'
+import { operatorPattern } from '../lib/operatorCapacity'
 
 export const Route = createFileRoute('/performans')({
   component: PerformansPage,
@@ -43,7 +44,10 @@ function PerformansPage() {
   // Malzeme kartları da eksiksiz okunur: kartı görülmeyen bir malzemenin
   // göz sayısı ve kalıp limiti bilinmez, vuruş hesabı da yanlış çıkar.
   const products = useQuery(api.products.listAll)?.rows ?? []
-  const presses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string }[]
+  const presses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string; costCenter?: string }[]
+  const operatorCcCodes = ((usePlant().ctx?.active?.costCenters ?? []) as { code: string; planningModel?: string }[])
+    .filter((c) => c.planningModel === 'operator')
+    .map((c) => c.code)
   const templates = (useQuery(api.pressCalendar.listTemplates) ?? []) as {
     press: string
     workingDays: number
@@ -132,6 +136,8 @@ function PerformansPage() {
         ...((workCalendar?.holidays ?? []) as string[]),
         ...officialHolidays.map((h) => h.date),
       ]),
+      // Operatör modelli hatlar her iş günü 3 vardiya (plan ile aynı kabul).
+      operatorPattern: operatorPattern(presses, operatorCcCodes, workCalendar?.workingDays as string[] | undefined),
     })
     let total = 0
     for (const press of presses) {
@@ -146,7 +152,7 @@ function PerformansPage() {
       }
     }
     return total
-  }, [presses, templates, weekOverrides, plannedStops, overtimeDefinitions, pressOvertime, dayShifts, officialHolidays, workCalendar, from, to, shiftMinutes, globalSettings?.shiftStartMinute])
+  }, [presses, templates, weekOverrides, plannedStops, overtimeDefinitions, pressOvertime, dayShifts, officialHolidays, workCalendar, from, to, shiftMinutes, globalSettings?.shiftStartMinute, operatorCcCodes.join(',')])
 
   const utilisation = capacityUtilisation(theoretical, availableMinutes)
 

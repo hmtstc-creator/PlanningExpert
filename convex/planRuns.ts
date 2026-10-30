@@ -110,6 +110,12 @@ export const smallInputs = plantInternalQuery({
         shift: h.shift,
         operators: h.operators,
       })),
+      // Operatör planı (uzun vade): cost center × hafta operatör sayısı.
+      operatorWeekly: (await ctx.db.query('operatorWeekly').collect()).map((w: Ctx) => ({
+        costCenter: w.costCenter,
+        weekStart: w.weekStart,
+        operators: w.operators,
+      })),
       // Planlamacının pres başlangıcı / gecikme müdahaleleri.
       pressStarts: await ctx.db.query('pressPlanStarts').collect(),
       // Yoldaki hammadde — MRP'de varış haftasında giriş.

@@ -165,6 +165,12 @@ yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
     Açık: dağıtım setup süresini iş yüküne katmaz; iş yükü yalnız ana hatta sayılır (esnek parçanın
     alternatifi yok); talebin iş günü dağıtımı dağıtımdan önceki takvimle; Gantt'ta "operatör kararı" ayrı
     işaretlenmez (yalnız kapalı / açık vardiya).
+  - [x] **Operatör planı: haftalık kişi sayısı + 3 vardiya** — 2026-10-30: Work Calendar → Capacity
+    overview cost center süzgeci; operatör cost center'ı için *Operators per week* (`operatorWeekly`) ve
+    ilk 2 hafta gün × vardiya; operatör hattı her iş günü 3 vardiya; motor ⌊haftalık ÷ 3⌋; Capacity
+    dashboard min(makine, operatör) sınırı (`src/lib/operatorCapacity.ts`). Açık: Capacity dashboard'da
+    operatör sınırı yalnız haftalık değerden (gün × vardiya ızgarası dashboard'a yansımaz); haftalık değer
+    3'e tam bölünmezse artan kişi kullanılmaz; ortalama ekip hatlar arasında düz ortalama.
 
 ### Organizasyon teyidi (2026-10-03)
 

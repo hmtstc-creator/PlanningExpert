@@ -18,6 +18,7 @@ import {
   type WeekPattern,
 } from './pressCalendar'
 import type { PlannedStop } from './shiftTimeline'
+import { OPERATOR_SHIFTS_PER_DAY } from './settingsDefaults'
 
 export type { WeekPattern }
 /** @deprecated Adı eski; WeekPattern ile aynı. */
@@ -36,6 +37,12 @@ export interface CapacitySources {
   dayShifts?: DayShifts[]
   /** Elle girilen + resmi tatiller. */
   holidays: Set<string>
+  /**
+   * Operatör planı: bu hatlar her iş gününde OPERATOR_SHIFTS_PER_DAY vardiya
+   * açık sayılır; şablonları, tekrarlayan mesaileri ve istisna haftaları
+   * okunmaz (gün kaydı ve tarihli mesai geçerli). Bkz. src/lib/operatorCapacity.ts.
+   */
+  operatorPattern?: { presses: string[]; workingDays: number }
 }
 
 /** Vardiya başına planlı duruş (çay, yemek, devir…), index 0 = 1. vardiya. */
@@ -85,11 +92,18 @@ export function capacityModel(src: CapacitySources): CapacityModel {
     const key = `${o.press}|${o.date}`
     datedOvertime.set(key, [...(datedOvertime.get(key) ?? []), o])
   }
+  const operatorPresses = new Set(src.operatorPattern?.presses ?? [])
+  const templates = new Map(src.templates.filter((t) => !operatorPresses.has(t.press)).map((t) => [t.press, t]))
+  for (const press of operatorPresses) {
+    templates.set(press, { press, workingDays: src.operatorPattern!.workingDays, shiftsPerDay: OPERATOR_SHIFTS_PER_DAY })
+  }
   const day: PressDaySources = {
     shiftStartMinute: src.shiftStartMinute,
     shiftMinutes: src.shiftMinutes,
-    templates: new Map(src.templates.map((t) => [t.press, t])),
-    weekOverrides: new Map((src.weekOverrides ?? []).map((o) => [`${o.press}|${o.weekStart}`, o])),
+    templates,
+    weekOverrides: new Map(
+      (src.weekOverrides ?? []).filter((o) => !operatorPresses.has(o.press)).map((o) => [`${o.press}|${o.weekStart}`, o]),
+    ),
     datedOvertime,
     definitions: new Map((src.overtimeDefinitions ?? []).map((d) => [d.id, d])),
     holidays: src.holidays,

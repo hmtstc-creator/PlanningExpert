@@ -9,6 +9,7 @@ import { OVER_RECORDED } from '../lib/oeeBridge'
 import { SHORT_STOP_DATA_FROM } from '../lib/oeeShortStops'
 import { computeRunPlan } from '../lib/planning'
 import { allocateOperators, OPERATOR_EXAMPLE } from '../lib/operatorAllocation'
+import { OPERATOR_SHIFTS_PER_DAY, OPERATOR_WEEKLY_EXAMPLE, operatorWeekCapacity, shiftHeadcountFromWeekly } from '../lib/operatorCapacity'
 import { leadTimeLookup, type LeadTimeRow } from '../lib/rawLeadTime'
 import { CYCLE_DECIMALS, CYCLE_STORE_DECIMALS, cycleMinutesFromSeconds, formatCycleInput } from '../lib/rateModel'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
@@ -1695,6 +1696,11 @@ function OperatorPlanItem() {
   const minutesOf = (press: string) => ex.workload.filter((w) => w.press === press).reduce((x, w) => x + w.minutes, 0)
   const noWork = lines.filter((l) => minutesOf(l) === 0)
   const closed = lines.filter((l) => !decision.open.includes(l) && !noWork.includes(l))
+  const weekly = {
+    machines: OPERATOR_WEEKLY_EXAMPLE.crewSizes.length,
+    avgCrew: OPERATOR_WEEKLY_EXAMPLE.crewSizes.reduce<number>((x, c) => x + c, 0) / OPERATOR_WEEKLY_EXAMPLE.crewSizes.length,
+    cap: operatorWeekCapacity(OPERATOR_WEEKLY_EXAMPLE),
+  }
   return (
     <li>
       <b>Operator plan</b> (a second planning model per cost center, e.g. APR, spot and nut welding
@@ -1715,6 +1721,25 @@ function OperatorPlanItem() {
       without work: {decision.open.join(', ')} run ({ex.workload.find((w) => w.press === decision.open[1])?.minutes} and{' '}
       {ex.workload.find((w) => w.press === decision.open[2])?.minutes} min are due the same day, so the larger goes first),{' '}
       {closed.join(', ')} waits (no operator left) and {noWork.join(', ')} stays closed.
+      <br />
+      <b>Machines count {OPERATOR_SHIFTS_PER_DAY} shifts every working day.</b> For a line of an
+      operator-plan cost center the work center template and exception weeks are not read: every
+      working day of the Work Calendar is {OPERATOR_SHIFTS_PER_DAY} shifts (plan, Work Calendar,
+      Capacity dashboard, Performance and plan check alike); the operators decide which lines run.
+      Day records and dated overtime still apply.
+      <br />
+      <b>Operators per week</b> (Work Calendar → Capacity overview, pick the cost center): how many
+      people work in the week, not per shift. On a working day with no per-shift operator count the
+      plan uses ⌊weekly ÷ {OPERATOR_SHIFTS_PER_DAY}⌋ operators on each of the{' '}
+      {OPERATOR_SHIFTS_PER_DAY} shifts (the per-shift grid, for the first two weeks, always wins).
+      The Capacity dashboard caps the week at min(machines × {OPERATOR_SHIFTS_PER_DAY} × working
+      days, weekly operators ÷ average crew × working days) shifts; without a weekly count it is
+      machines × {OPERATOR_SHIFTS_PER_DAY} × working days. Example: {weekly.machines} lines with crews{' '}
+      {OPERATOR_WEEKLY_EXAMPLE.crewSizes.join(', ')} (average {weekly.avgCrew}),{' '}
+      {OPERATOR_WEEKLY_EXAMPLE.workingDays} working days, {OPERATOR_WEEKLY_EXAMPLE.weeklyOperators} operators:
+      machine limit {weekly.cap.machineShifts}, operator limit {weekly.cap.operatorShifts} → capacity{' '}
+      {weekly.cap.shifts} shifts; on a day without a per-shift count{' '}
+      {shiftHeadcountFromWeekly(OPERATOR_WEEKLY_EXAMPLE.weeklyOperators)} operators per shift.
     </li>
   )
 }

@@ -49,6 +49,7 @@ import { readDailyDemand } from './dailyDemand'
 import { buildCapacityForecast, type CapacityForecast } from './capacityForecast'
 import { capacityModel } from './capacityModel'
 import { allocateOperators, type LineWorkItem, type OperatorHeadcountRow } from './operatorAllocation'
+import { mergeWeeklyHeadcount, operatorPattern, operatorWeekCapacity, type OperatorWeeklyRow } from './operatorCapacity'
 import type { DayShifts } from './pressCalendar'
 import { isFinishedStockRowFor, isRawStockRowFor, stockScope, type CostCenterLocations } from './stockLocations'
 import {
@@ -197,6 +198,8 @@ export interface PlanInputs {
   operatorCostCenters?: string[]
   /** Operatör planı: cost center × gün × vardiya adam sayısı. */
   operatorHeadcount?: OperatorHeadcountRow[]
+  /** Operatör planı (uzun vade): cost center × hafta operatör sayısı. */
+  operatorWeekly?: OperatorWeeklyRow[]
   settings: PlanSettings | null
   workCalendar: { workingDays?: string[]; holidays?: string[] } | null
   officialHolidays: { date: string; name: string }[]
@@ -529,6 +532,8 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     overtimeDefinitions: inputs.overtimeDefinitions,
     pressOvertime: inputs.pressOvertime,
     holidays,
+    // Operatör modelli hatlar her iş günü 3 vardiya açık sayılır (şablon okunmaz).
+    operatorPattern: operatorPattern(presses, inputs.operatorCostCenters ?? [], inputs.workCalendar?.workingDays),
   }
   // Operatör planından ÖNCEKİ takvim (elle gün kayıtları dahil). Talebin iş
   // günlerine dağıtımı bununla yapılır; presin kapasitesi aşağıdaki
@@ -698,9 +703,14 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // 'operator' modelli cost center'larda gün × vardiya adam sayısı hatlara
   // dağıtılır; sonuç gün kaydı olarak takvime eklenir (elle kayıt önce gelir).
   // İş yükü motorun kendi talebinden: net lot adedi × dakika/adet, ana hat.
+  // Gün × vardiya girilmemiş iş günlerinde haftalık sayı: floor(haftalık ÷ 3).
   const operatorDayShifts = (() => {
     const codes = new Set(inputs.operatorCostCenters ?? [])
-    const headcount = (inputs.operatorHeadcount ?? []).filter((h) => codes.has(h.costCenter))
+    const headcount = mergeWeeklyHeadcount(
+      (inputs.operatorHeadcount ?? []).filter((h) => codes.has(h.costCenter)),
+      (inputs.operatorWeekly ?? []).filter((w) => codes.has(w.costCenter)),
+      isWorkingDate,
+    )
     if (codes.size === 0 || headcount.length === 0) return [] as DayShifts[]
     const costCenters = Array.from(codes).map((code) => ({
       code,
@@ -2036,20 +2046,38 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     }
     return { start: isoDate(start), label: `W${isoWeek(start)}`, holidays: names }
   })
+  // Operatör modelli cost center: makine × 3 vardiya takvimi (operatör
+  // dağıtımından önceki), haftalık operatör sayısı girilmişse
+  // min(makine sınırı, operatör sınırı) oranında (src/lib/operatorCapacity.ts).
+  const operatorCcs = new Set(inputs.operatorCostCenters ?? [])
+  const weeklyOperators = new Map((inputs.operatorWeekly ?? []).map((w) => [`${w.costCenter}|${w.weekStart}`, w.operators]))
+  const operatorFactor = (press: PlanPress, weekStart: string): number | null => {
+    const cc = press.costCenter?.trim()
+    if (!cc || !operatorCcs.has(cc)) return null
+    const operators = weeklyOperators.get(`${cc}|${weekStart}`)
+    if (operators === undefined) return 1
+    const monday = new Date(`${weekStart}T00:00:00`)
+    return operatorWeekCapacity({
+      crewSizes: presses.filter((p) => p.costCenter?.trim() === cc).map((p) => p.crewSize),
+      workingDays: Array.from({ length: 7 }, (_, d) => isoDate(addDays(monday, d))).filter(isWorkingDate).length,
+      weeklyOperators: operators,
+    }).factor
+  }
   const capacityMinutes = new Map<string, number[]>()
   for (const press of presses) {
     capacityMinutes.set(
       press.name,
-      forecastWeekList.map((_, w) => {
+      forecastWeekList.map((week, w) => {
         const start = addDays(horizonMonday, w * 7)
+        const factor = operatorFactor(press, week.start)
         let total = 0
-        for (const b of capModel.weekBuckets(press.name, start)) {
+        for (const b of (factor === null ? capModel : calendarModel).weekBuckets(press.name, start)) {
           // Net saat, bugünün geçmiş saatleri düşülmüş. Kabul katsayısı (A) ya
           // da parça performansı (B) Capacity Dashboard'da seçilir.
           const timeline = buildDayTimeline(shiftStartMinute, shiftMinutes, b, plannedStops)
           total += remainingCapacityMinutes(b.date, todayIso, nowClockMinute, b.minutes, timeline)
         }
-        return total
+        return factor === null || factor === 1 ? total : Math.round(total * factor)
       }),
     )
   }

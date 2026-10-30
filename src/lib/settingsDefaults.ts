@@ -40,6 +40,13 @@ export const SETTINGS_DEFAULTS = {
 /** Work Calendar'da gün seçilmemişse çalışma günleri. */
 export const DEFAULT_WORKING_DAYS: readonly string[] = ['MO', 'TU', 'WE', 'TH', 'FR']
 
+/**
+ * Operatör planı: 'operator' modelli cost center'ın hatları her iş gününde bu
+ * kadar vardiya açık sayılır (makine şablonu / istisna hafta okunmaz); kaç hat
+ * gerçekten çalışacağını adam sayısı belirler (src/lib/operatorCapacity.ts).
+ */
+export const OPERATOR_SHIFTS_PER_DAY = 3
+
 export type SettingKey = keyof typeof SETTINGS_DEFAULTS
 export type ResolvedSettings = { -readonly [K in SettingKey]: (typeof SETTINGS_DEFAULTS)[K] extends boolean ? boolean : (typeof SETTINGS_DEFAULTS)[K] extends string ? string : number }
 

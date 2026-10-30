@@ -2921,6 +2921,33 @@
       "optional": false
     }
   },
+  "operatorWeekly": {
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "operators": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "weekStart": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    }
+  },
   "overtimeDefinitions": {
     "description": {
       "fieldType": {

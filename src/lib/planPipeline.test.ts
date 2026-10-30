@@ -244,20 +244,67 @@ describe('operator plan (stage in front of the engine)', () => {
           { name: 'PRS-1', hall: 'H1', costCenter: 'W' },
           { name: 'PRS-2', hall: 'H1', costCenter: 'W' },
         ],
-        // 30 000 adet ÷ 20 vuruş/dk = 1500 dk: bugünün iki vardiyasından sonra yarına iş kalır.
-        weeklyDemand: [{ material: 'MAM-A', overdue: 0, periods: [{ label: 'W38', qty: 30_000 }] }],
+        // 45 000 adet ÷ 20 vuruş/dk = 2250 dk: bugünün üç vardiyasından (operatör
+        // hattı şablondan bağımsız 3 vardiya) sonra yarına iş kalır.
+        weeklyDemand: [{ material: 'MAM-A', overdue: 0, periods: [{ label: 'W38', qty: 45_000 }] }],
         operatorCostCenters: ['W'],
-        operatorHeadcount: [
-          { costCenter: 'W', date: '2026-09-17', shift: 1, operators: 1 },
-          { costCenter: 'W', date: '2026-09-17', shift: 2, operators: 1 },
-        ],
+        operatorHeadcount: [1, 2, 3].map((shift) => ({ costCenter: 'W', date: '2026-09-17', shift, operators: 1 })),
       }),
       NOW,
     )
-    // PRS-2'nin işi yok → o gün kapalı; PRS-1 takvimdeki gibi (kayıt yok).
-    expect(run.operatorDayShifts).toEqual([{ press: 'PRS-2', date: '2026-09-17', shifts: [] }])
+    // PRS-2'nin işi yok → o gün kapalı; PRS-1 işi bitene kadar (2 vardiya) açılır.
+    expect(run.operatorDayShifts).toEqual([
+      { press: 'PRS-1', date: '2026-09-17', shifts: [1, 2] },
+      { press: 'PRS-2', date: '2026-09-17', shifts: [] },
+    ])
     const rule = run.validation?.rules.find((r) => r.id === 'operator-headcount')
-    expect(rule).toMatchObject({ checked: 2, broken: 0 })
+    expect(rule).toMatchObject({ checked: 3, broken: 0 })
+  })
+
+  const operatorInputs = (overrides: Partial<PlanInputs> = {}) =>
+    inputs({
+      presses: [
+        { name: 'PRS-1', hall: 'H1', costCenter: 'W' },
+        { name: 'PRS-2', hall: 'H1', costCenter: 'W' },
+      ],
+      weeklyDemand: [{ material: 'MAM-A', overdue: 0, periods: [{ label: 'W38', qty: 45_000 }] }],
+      operatorCostCenters: ['W'],
+      ...overrides,
+    })
+
+  it('uses the weekly operator count (floor ÷ 3 per shift) on days without a per-shift headcount', () => {
+    const run = computePlan(
+      operatorInputs({
+        // Haftalık 5 kişi → vardiya başına floor(5 ÷ 3) = 1 adam.
+        operatorWeekly: [{ costCenter: 'W', weekStart: '2026-09-14', operators: 5 }],
+        // 18 Eylül'ün ızgarası girilmiş (0 adam): haftalık değerin önüne geçer.
+        operatorHeadcount: [1, 2, 3].map((shift) => ({ costCenter: 'W', date: '2026-09-18', shift, operators: 0 })),
+      }),
+      NOW,
+    )
+    const on = (date: string) => (run.operatorDayShifts ?? []).filter((d) => d.date === date)
+    expect(on('2026-09-17')).toEqual([
+      { press: 'PRS-1', date: '2026-09-17', shifts: [1, 2] },
+      { press: 'PRS-2', date: '2026-09-17', shifts: [] },
+    ])
+    expect(on('2026-09-18')).toEqual([
+      { press: 'PRS-1', date: '2026-09-18', shifts: [] },
+      { press: 'PRS-2', date: '2026-09-18', shifts: [] },
+    ])
+    expect(run.validation?.rules.find((r) => r.id === 'operator-headcount')).toMatchObject({ broken: 0 })
+  })
+
+  it('operator lines count 3 shifts a day; the weekly count caps the capacity dashboard', () => {
+    const twoWeeks = { weeklyDemand: [{ material: 'MAM-A', overdue: 0, periods: [{ label: 'W38', qty: 2000 }, { label: 'W39', qty: 0 }] }] }
+    const base = computePlan(operatorInputs(twoWeeks), NOW)
+    // Şablon 2 vardiya olsa da operatör hattı 3 vardiya: 2. hafta 5 gün × 3 × 8 sa = 120 sa.
+    expect(base.capacity!.presses.find((p) => p.press === 'PRS-2')!.capacity[1]).toBe(120)
+    const capped = computePlan(
+      // 2 hat × 3 × 5 = 30 vardiya; 3 operatör ÷ 1 × 5 = 15 vardiya → yarısı.
+      operatorInputs({ ...twoWeeks, operatorWeekly: [{ costCenter: 'W', weekStart: '2026-09-21', operators: 3 }] }),
+      NOW,
+    )
+    expect(capped.capacity!.presses.find((p) => p.press === 'PRS-2')!.capacity[1]).toBe(60)
   })
 
   it('a shift-plan cost center ignores headcount rows', () => {
