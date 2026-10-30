@@ -25,6 +25,7 @@ import {
   useOvertimeData,
 } from '../components/OvertimePanels'
 import { usePlant } from '../lib/plantContext'
+import { OperatorHeadcountGrid } from '../components/plan/OperatorHeadcountGrid'
 import { ShiftCodesEditor } from '../components/ShiftCodesEditor'
 
 export const Route = createFileRoute('/takvim')({
@@ -126,7 +127,8 @@ function PressCalendarSection() {
   // Pres listesi artık kalıcı `presses` tablosundan gelir (Makine Tanımları
   // sayfası). Referanslarda geçen ama tanımlanmamış presler de listelenir ki
   // takvim tanımlanabilsin.
-  const definedPresses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string }[]
+  const definedPresses = (useQuery(api.presses.list) ?? []) as { name: string; hall: string; costCenter?: string; crewSize?: number }[]
+  const operatorCostCenters = ((usePlant().ctx?.active?.costCenters ?? []) as { code: string; name: string; planningModel?: string }[]).filter((c) => c.planningModel === 'operator')
 
   // Pres listesinin tek kaynağı Press Definitions. Master data'da ya da eski
   // takvim kayıtlarında geçen ama tanımlı olmayan presler listeye girmez;
@@ -639,6 +641,14 @@ function PressCalendarSection() {
       <CollapsibleSection id="takvim-overtime" title="Overtime" hint="open or delete overtime on a date" defaultOpen>
         <OvertimeEntryPanel presses={pressOptions} />
       </CollapsibleSection>
+
+      {/* Operatör planı: Plan sayfasındaki ızgaranın aynısı; planlamacı takvimde de arar. */}
+      <OperatorHeadcountGrid
+        costCenters={operatorCostCenters}
+        workCenters={definedPresses}
+        dates={weekStarts.flatMap((w) => Array.from({ length: 7 }, (_, i) => isoDate(addDays(w, i))))}
+        shiftMinutes={shiftMinutes}
+      />
 
       <CollapsibleSection id="takvim-grid" title="Capacity overview" hint="all work centers, all weeks — click a week to change it" defaultOpen>
       <div className="mt-4">
