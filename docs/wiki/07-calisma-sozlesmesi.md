@@ -36,6 +36,10 @@ Bir madde "hayır" ise **uygulama**; nedenini ve alternatifi kullanıcıya yaz. 
 
 - **Onay beklemeden ilerle** (planlamacı): proje için emin olunan iş yayına alınır; silinmesi gereken şeyleri kullanıcıya söyle.
   Yayın otomatiktir; birleştirmeden önce CI yeşil olmalı. Dışarıya dönük / geri alınamaz işlerde (silme, harici hizmet) yine dikkatli ol.
+- **Sunucu işleri tek tek** (kullanıcı, 2026-10-30): sunucuda yapılacaklar toplu liste olarak verilmez; tek adım verilir,
+  kullanıcı yapıp sonucu yazar, sonra sıradaki. Aceleci, çoklu görev yok.
+- **Gereken işi sormadan yap:** kullanıcının "önce sor" dediği iş (ör. şema anlık görüntüsü) için sorarken neden gerekli
+  olduğunu da yaz; gereksiz soru turu açma.
 - **Dil:** kullanıcıya Türkçe, kısa, madde madde; commit ve PR metinleri Türkçe.
 - **Token tasarrufu** (2026-10-22, güncellendi): tek uzun sohbet 500k+ token'a çıktı (her tur bütün geçmiş yeniden
   okunur). Kural artık: **bir iş = bir oturum**; iş bitince ya da bağlam ~%40'ı geçince `/devir` skill'i ile wiki

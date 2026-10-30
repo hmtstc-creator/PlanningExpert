@@ -53,16 +53,9 @@ export function pageSlices(total: number, pageH: number, blocks: { top: number; 
 
 const frame = () => new Promise<void>((r) => requestAnimationFrame(() => r()))
 
-/** Parçayı PDF'e çevirir (Blob). */
-export async function sheetToPdf(sheet: HTMLElement, layout: SheetLayout): Promise<Blob> {
-  const [{ toCanvas }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')])
-  const page = pageMm(layout.size, layout.orientation)
-  const margin = layout.marginMm ?? (layout.pages === 'flow' ? 8 : 5)
-  const contentMm = { w: page.w - 2 * margin, h: page.h - 2 * margin }
-  // fit: ekrandaki genişlik (görünüm aynen kalır, sayfaya sığdırılır); flow: kâğıt genişliği.
-  const widthPx =
-    layout.widthPx ?? (layout.pages === 'fit' && sheet.offsetWidth > 0 ? sheet.offsetWidth : Math.round(contentMm.w * PX_PER_MM))
-
+/** Parçanın görünmez kopyası, açık temada, 2× çözünürlükte görüntü (+ bölünmeyecek bölümler). */
+async function capture(sheet: HTMLElement, widthPx: number): Promise<{ canvas: HTMLCanvasElement; blocks: { top: number; bottom: number }[]; scale: number }> {
+  const { toCanvas } = await import('html-to-image')
   const root = document.documentElement
   const wasDark = root.classList.contains('dark')
   const box = document.createElement('div')
@@ -110,35 +103,71 @@ export async function sheetToPdf(sheet: HTMLElement, layout: SheetLayout): Promi
       height: box.offsetHeight,
       style: { position: 'static', left: '0', top: '0', zIndex: 'auto' },
     })
-    const cssW = canvas.width / scale
-    const cssH = canvas.height / scale
-
-    const pdf = new jsPDF({ unit: 'mm', format: layout.size.toLowerCase(), orientation: layout.orientation, compress: true })
-    if (layout.pages === 'fit') {
-      const k = Math.min(contentMm.w / cssW, contentMm.h / cssH)
-      // Sayfaya sığdırılır, yatayda ortalanır.
-      pdf.addImage(canvas, 'PNG', margin + (contentMm.w - cssW * k) / 2, margin, cssW * k, cssH * k, undefined, 'FAST')
-    } else {
-      // Sayfa yüksekliği parçanın ölçeğinde (px).
-      const mmPerPx = contentMm.w / cssW
-      const slices = pageSlices(cssH, contentMm.h / mmPerPx, blocks)
-      slices.forEach((s, i) => {
-        if (i > 0) pdf.addPage()
-        const part = document.createElement('canvas')
-        part.width = canvas.width
-        part.height = Math.max(1, Math.round((s.to - s.from) * scale))
-        const ctx = part.getContext('2d')!
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, part.width, part.height)
-        ctx.drawImage(canvas, 0, Math.round(s.from * scale), canvas.width, part.height, 0, 0, part.width, part.height)
-        pdf.addImage(part, 'PNG', margin, margin, contentMm.w, (s.to - s.from) * mmPerPx, undefined, 'FAST')
-      })
-    }
-    return pdf.output('blob')
+    return { canvas, blocks, scale }
   } finally {
     box.remove()
     if (wasDark) root.classList.add('dark')
   }
+}
+
+/** Parçayı PDF'e çevirir (Blob). */
+export async function sheetToPdf(sheet: HTMLElement, layout: SheetLayout): Promise<Blob> {
+  const { jsPDF } = await import('jspdf')
+  const page = pageMm(layout.size, layout.orientation)
+  const margin = layout.marginMm ?? (layout.pages === 'flow' ? 8 : 5)
+  const contentMm = { w: page.w - 2 * margin, h: page.h - 2 * margin }
+  // fit: ekrandaki genişlik (görünüm aynen kalır, sayfaya sığdırılır); flow: kâğıt genişliği.
+  const widthPx =
+    layout.widthPx ?? (layout.pages === 'fit' && sheet.offsetWidth > 0 ? sheet.offsetWidth : Math.round(contentMm.w * PX_PER_MM))
+
+  const { canvas, blocks, scale } = await capture(sheet, widthPx)
+  const cssW = canvas.width / scale
+  const cssH = canvas.height / scale
+
+  const pdf = new jsPDF({ unit: 'mm', format: layout.size.toLowerCase(), orientation: layout.orientation, compress: true })
+  if (layout.pages === 'fit') {
+    const k = Math.min(contentMm.w / cssW, contentMm.h / cssH)
+    // Sayfaya sığdırılır, yatayda ortalanır.
+    pdf.addImage(canvas, 'PNG', margin + (contentMm.w - cssW * k) / 2, margin, cssW * k, cssH * k, undefined, 'FAST')
+  } else {
+    // Sayfa yüksekliği parçanın ölçeğinde (px).
+    const mmPerPx = contentMm.w / cssW
+    const slices = pageSlices(cssH, contentMm.h / mmPerPx, blocks)
+    slices.forEach((s, i) => {
+      if (i > 0) pdf.addPage()
+      const part = document.createElement('canvas')
+      part.width = canvas.width
+      part.height = Math.max(1, Math.round((s.to - s.from) * scale))
+      const ctx = part.getContext('2d')!
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, part.width, part.height)
+      ctx.drawImage(canvas, 0, Math.round(s.from * scale), canvas.width, part.height, 0, 0, part.width, part.height)
+      pdf.addImage(part, 'PNG', margin, margin, contentMm.w, (s.to - s.from) * mmPerPx, undefined, 'FAST')
+    })
+  }
+  return pdf.output('blob')
+}
+
+/**
+ * Her parça bir sayfa (SOP: şablonun her kopyası tek A3): parça kendi
+ * genişliğinde alınır, sayfaya sığdırılır, yatayda ve dikeyde ortalanır
+ * (şablonun yazdırma ayarı gibi).
+ */
+export async function sheetsToPdf(sheets: HTMLElement[], layout: Omit<SheetLayout, 'pages' | 'widthPx'>): Promise<Blob> {
+  const { jsPDF } = await import('jspdf')
+  const page = pageMm(layout.size, layout.orientation)
+  const margin = layout.marginMm ?? 5
+  const contentMm = { w: page.w - 2 * margin, h: page.h - 2 * margin }
+  const pdf = new jsPDF({ unit: 'mm', format: layout.size.toLowerCase(), orientation: layout.orientation, compress: true })
+  for (const [i, sheet] of sheets.entries()) {
+    const { canvas, scale } = await capture(sheet, sheet.offsetWidth)
+    const cssW = canvas.width / scale
+    const cssH = canvas.height / scale
+    const k = Math.min(contentMm.w / cssW, contentMm.h / cssH)
+    if (i > 0) pdf.addPage()
+    pdf.addImage(canvas, 'JPEG', margin + (contentMm.w - cssW * k) / 2, margin + (contentMm.h - cssH * k) / 2, cssW * k, cssH * k, undefined, 'FAST')
+  }
+  return pdf.output('blob')
 }
 
 const SVG_PAINT = ['fill', 'stroke', 'stop-color', 'flood-color', 'lighting-color'] as const

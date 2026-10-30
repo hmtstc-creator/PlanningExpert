@@ -67,6 +67,8 @@ import { Route as KpiMonthlyDashboardRouteImport } from './routes/kpi/monthly/da
 import { Route as KpiMonthlyEntryRouteImport } from './routes/kpi/monthly/entry'
 import { Route as KpiWeeklyDashboardRouteImport } from './routes/kpi/weekly/dashboard'
 import { Route as KpiWeeklyEntryRouteImport } from './routes/kpi/weekly/entry'
+import { Route as MachineFollowupSopIndexRouteImport } from './routes/machine-followup/sop/index'
+import { Route as MachineFollowupSopIdRouteImport } from './routes/machine-followup/sop/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -360,6 +362,16 @@ const KpiWeeklyEntryRoute = KpiWeeklyEntryRouteImport.update({
   path: '/kpi/weekly/entry',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MachineFollowupSopIndexRoute = MachineFollowupSopIndexRouteImport.update({
+  id: '/machine-followup/sop/',
+  path: '/machine-followup/sop/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MachineFollowupSopIdRoute = MachineFollowupSopIdRouteImport.update({
+  id: '/machine-followup/sop/$id',
+  path: '/machine-followup/sop/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -420,6 +432,8 @@ export interface FileRoutesByFullPath {
   '/kpi/monthly/entry': typeof KpiMonthlyEntryRoute
   '/kpi/weekly/dashboard': typeof KpiWeeklyDashboardRoute
   '/kpi/weekly/entry': typeof KpiWeeklyEntryRoute
+  '/machine-followup/sop/$id': typeof MachineFollowupSopIdRoute
+  '/machine-followup/sop/': typeof MachineFollowupSopIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -480,6 +494,8 @@ export interface FileRoutesByTo {
   '/kpi/monthly/entry': typeof KpiMonthlyEntryRoute
   '/kpi/weekly/dashboard': typeof KpiWeeklyDashboardRoute
   '/kpi/weekly/entry': typeof KpiWeeklyEntryRoute
+  '/machine-followup/sop/$id': typeof MachineFollowupSopIdRoute
+  '/machine-followup/sop': typeof MachineFollowupSopIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -541,6 +557,8 @@ export interface FileRoutesById {
   '/kpi/monthly/entry': typeof KpiMonthlyEntryRoute
   '/kpi/weekly/dashboard': typeof KpiWeeklyDashboardRoute
   '/kpi/weekly/entry': typeof KpiWeeklyEntryRoute
+  '/machine-followup/sop/$id': typeof MachineFollowupSopIdRoute
+  '/machine-followup/sop/': typeof MachineFollowupSopIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -603,6 +621,8 @@ export interface FileRouteTypes {
     | '/kpi/monthly/entry'
     | '/kpi/weekly/dashboard'
     | '/kpi/weekly/entry'
+    | '/machine-followup/sop/$id'
+    | '/machine-followup/sop/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -663,6 +683,8 @@ export interface FileRouteTypes {
     | '/kpi/monthly/entry'
     | '/kpi/weekly/dashboard'
     | '/kpi/weekly/entry'
+    | '/machine-followup/sop/$id'
+    | '/machine-followup/sop'
   id:
     | '__root__'
     | '/'
@@ -723,6 +745,8 @@ export interface FileRouteTypes {
     | '/kpi/monthly/entry'
     | '/kpi/weekly/dashboard'
     | '/kpi/weekly/entry'
+    | '/machine-followup/sop/$id'
+    | '/machine-followup/sop/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -784,6 +808,8 @@ export interface RootRouteChildren {
   KpiMonthlyEntryRoute: typeof KpiMonthlyEntryRoute
   KpiWeeklyDashboardRoute: typeof KpiWeeklyDashboardRoute
   KpiWeeklyEntryRoute: typeof KpiWeeklyEntryRoute
+  MachineFollowupSopIdRoute: typeof MachineFollowupSopIdRoute
+  MachineFollowupSopIndexRoute: typeof MachineFollowupSopIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1194,6 +1220,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KpiWeeklyEntryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/machine-followup/sop/': {
+      id: '/machine-followup/sop/'
+      path: '/machine-followup/sop'
+      fullPath: '/machine-followup/sop/'
+      preLoaderRoute: typeof MachineFollowupSopIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/machine-followup/sop/$id': {
+      id: '/machine-followup/sop/$id'
+      path: '/machine-followup/sop/$id'
+      fullPath: '/machine-followup/sop/$id'
+      preLoaderRoute: typeof MachineFollowupSopIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1256,6 +1296,8 @@ const rootRouteChildren: RootRouteChildren = {
   KpiMonthlyEntryRoute: KpiMonthlyEntryRoute,
   KpiWeeklyDashboardRoute: KpiWeeklyDashboardRoute,
   KpiWeeklyEntryRoute: KpiWeeklyEntryRoute,
+  MachineFollowupSopIdRoute: MachineFollowupSopIdRoute,
+  MachineFollowupSopIndexRoute: MachineFollowupSopIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

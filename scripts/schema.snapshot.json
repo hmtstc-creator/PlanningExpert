@@ -4375,6 +4375,198 @@
       "optional": true
     }
   },
+  "sopJobs": {
+    "aiModel": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "approvedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "approvedBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "attempts": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "claimedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "createdAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "createdBy": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "draftJson": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "error": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "finishedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "framesPending": {
+      "fieldType": {
+        "type": "boolean"
+      },
+      "optional": true
+    },
+    "heartbeatAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "keyMoments": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "number"
+        }
+      },
+      "optional": true
+    },
+    "language": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "machine": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "notes": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "partName": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "pendingFrames": {
+      "fieldType": {
+        "type": "array",
+        "value": {
+          "type": "object",
+          "value": {
+            "step": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "photo": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            },
+            "second": {
+              "fieldType": {
+                "type": "number"
+              },
+              "optional": false
+            }
+          }
+        }
+      },
+      "optional": true
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "progress": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "status": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "updatedAt": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "videoBytes": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "videoName": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "videoPath": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": true
+    },
+    "videoSeconds": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": true
+    },
+    "videoStorageId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "_storage"
+      },
+      "optional": true
+    }
+  },
   "stock": {
     "blocked": {
       "fieldType": {

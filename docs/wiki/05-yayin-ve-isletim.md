@@ -1,6 +1,6 @@
 # 05 · Yayın ve işletim
 
-> Son güncelleme: 2026-10-28 (Qwen verify iş akışı) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
+> Son güncelleme: 2026-10-29 (SOP işleyicisi `sop-worker`: kurulum deploy/README.md → SOP Builder) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
 
 ## Çalışma şekli (özet)
 
@@ -37,7 +37,7 @@ dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
 **yeni commit gelene ya da `--force`'a kadar yeniden denenmez** (5 dakikada bir yedek alınmasın).
 5. `deploy/systemd/planningexpert-*` birimlerini kurar / günceller (**root**; bu yüzden `main` yazma yetkisi ve CI zorunluluğu kritik).
 6. `portal.env` yükler, `SKIP_LOCAL_VERIFY=1 release.sh`: **yedek → Convex işlevleri + şema → site derlemesi** (`VITE_BUILD_*` gömülür: commit, mesaj, zaman).
-7. Yedekleri `chmod 600`, `restart web`, yerel + Funnel 200 kontrolü, kapsayıcılar, backend restart / OOM, bellek; Karabasan'a **dokunulmaz**. Gizli değerler çıktıda maskelenir.
+7. Yedekleri `chmod 600`, `restart web` (kuruluysa `sop-worker` da: `deploy/.env` → `SOP_WORKER_TOKEN`), yerel + Funnel 200 kontrolü, kapsayıcılar, backend restart / OOM, bellek; Karabasan'a **dokunulmaz**. Gizli değerler çıktıda maskelenir.
 
 Yayını doğrulama: **System → Connection diagnostics → Version on this site** (commit, mesaj, yayın zamanı UTC + Türkiye).
 Hata ayıklama (sunucuda): `systemctl list-timers planningexpert-autodeploy.timer`, `journalctl -u planningexpert-autodeploy -n 50`.
