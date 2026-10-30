@@ -17,39 +17,40 @@ import { PageHeader } from '../PageHeader'
 import { relatedPages } from '../../lib/navigation'
 
 /**
- * Motorun nasıl plan yaptığının açıklaması.
+ * Planning Logic sayfasının Türkçe çevirisi.
  *
- * Kod `src/lib/planPipeline.ts`, `planning.ts` ve `scheduler.ts` içinde;
- * burası onun planlamacının dilindeki karşılığı. Kurallardan biri
- * değişirse bu sayfa da değişmeli.
+ * Bu dosya `src/routes/planlogic.tsx` (İngilizce Planning Logic sayfası) ile
+ * birebir aynı yapıdadır; yalnız ekranda görünen metin Türkçedir. İngilizce
+ * sayfa değiştiğinde bu dosya da aynı PR'da birlikte güncellenmelidir.
+ * Kod `src/lib/planPipeline.ts`, `planning.ts` ve `scheduler.ts` içinde.
  */
 
 /** Hammadde MRP'sinin FMEA'sı: hata türü, etkisi, S, O, D, yöntemdeki önlem. */
 const FMEA_ROWS: [string, string, number, number, number, string][] = [
-  ['Plan and demand both counted', 'Same steel ordered twice', 8, 8, 3, 'Plan-independent: demand only; the safety stock absorbs plan timing and coil surplus'],
-  ['Finished stock not deducted', 'Over-ordering', 7, 5, 4, 'Locations ticked “Finished goods” on Storage Locations deducted first-in-first-out, the same as the plan; the row breaks the need down per finished product'],
-  ['Need of a part with stock read from its coil row', 'Steel seems needed while the part’s stock still covers', 5, 6, 6, 'Per-product breakdown: weeks covered by finished stock and the week steel is first needed, per part on the coil'],
-  ['Coil stock on hand not deducted', 'Steel already in the plant is ordered again', 8, 6, 5, 'Coil stock in the locations ticked “Raw material” is the opening stock'],
-  ['Co-product counted twice', 'Over-ordering on pairs', 6, 6, 5, 'Pair pressed once: strokes = larger need, steel on the primary part only'],
-  ['Part without raw code / gross weight', 'Its steel silently missing → line stops', 10, 5, 8, 'Listed in red on the page with pieces; never silently dropped'],
-  ['Gross weight in wrong unit (g / t)', 'Order 1000× off', 9, 3, 6, 'Weights above 50 kg or below 1 g per piece are flagged'],
-  ['Weekly buckets: safety checked only at week start', 'Below safety at the end of the week', 7, 7, 7, 'Every week end must hold the next N working days (10 = the next 2 weeks)'],
-  ['Steel ordered with no demand behind it', 'Dead stock, cash tied up', 6, 6, 5, 'No demand, no order: nothing is forecast beyond the last ZPP week (kanban comes later)'],
-  ['Backlog (overdue) ignored', 'Urgent steel missing now', 8, 4, 5, 'Backlog counted in the current week'],
-  ['Blocked / quality stock counted as available', 'Stock overstated', 7, 4, 6, 'Only unrestricted stock, and only in locations ticked on Storage Locations'],
-  ['Scrap, coil ends, setup loss', 'Slightly too little', 5, 8, 7, 'Standard extra per order (500 kg, adjustable)'],
-  ['Steel in transit unknown', 'Steel already on the way is ordered again', 7, 7, 8, 'In-transit Excel list: each quantity is a receipt in its ETA week (no ETA = this week)'],
-  ['In-transit ETA wrong or missing', 'Order a week too late or too early', 6, 5, 6, 'No ETA counts as this week; each arrival shows its ETA and PO on the page to check'],
+  ['Plan ve talep birlikte sayılır', 'Aynı sac iki kez sipariş edilir', 8, 8, 3, 'Plandan bağımsız: yalnız talep; plan zamanlamasını ve rulo fazlasını emniyet stoku karşılar'],
+  ['Mamul stok düşülmez', 'Fazla sipariş', 7, 5, 4, 'Storage Locations sayfasında “Finished goods” işaretli yerlerdeki stok, plandaki gibi ilk giren ilk çıkar sırasıyla önce düşülür; satır ihtiyacı mamul bazında ayrıştırır'],
+  ['Stoku olan parçanın ihtiyacı rulo satırından okunur', 'Parçanın stoku hâlâ yetiyorken sac gerekiyor görünür', 5, 6, 6, 'Mamul bazında ayrıştırma: rulodaki her parça için mamul stokunun karşıladığı hafta sayısı ve sacın ilk gerektiği hafta'],
+  ['Eldeki rulo stoku düşülmez', 'Fabrikada zaten olan sac yeniden sipariş edilir', 8, 6, 5, '“Raw material” işaretli yerlerdeki rulo stoku açılış stokudur'],
+  ['Ortak ürün iki kez sayılır', 'Çift parçalarda fazla sipariş', 6, 6, 5, 'Çift tek seferde basılır: vuruş = büyük olan ihtiyaç, sac yalnız ana parçada'],
+  ['Hammadde kodu / brüt ağırlığı olmayan parça', 'Sacı sessizce eksik kalır → hat durur', 10, 5, 8, 'Sayfada adediyle kırmızı listelenir; hiçbir zaman sessizce düşürülmez'],
+  ['Brüt ağırlık yanlış birimde (g / t)', 'Sipariş 1000 kat yanlış', 9, 3, 6, 'Parça başına 50 kg üstü ya da 1 g altı ağırlıklar işaretlenir'],
+  ['Haftalık kova: emniyet yalnız hafta başında kontrol edilir', 'Hafta sonunda emniyetin altına düşülür', 7, 7, 7, 'Her hafta sonu sonraki N iş gününü karşılamalı (10 = sonraki 2 hafta)'],
+  ['Arkasında talep olmayan sac sipariş edilir', 'Ölü stok, bağlanan nakit', 6, 6, 5, 'Talep yoksa sipariş yok: son ZPP haftasının ötesi tahmin edilmez (kanban daha sonra gelecek)'],
+  ['Birikmiş (gecikmiş) talep yok sayılır', 'Acil sac şu an eksik', 8, 4, 5, 'Birikmiş talep içinde bulunulan haftada sayılır'],
+  ['Bloke / kalite stoku kullanılabilir sayılır', 'Stok olduğundan fazla görünür', 7, 4, 6, 'Yalnız serbest stok ve yalnız Storage Locations sayfasında işaretli yerlerde'],
+  ['Hurda, rulo sonu, setup kaybı', 'Biraz eksik kalır', 5, 8, 7, 'Sipariş başına standart ek miktar (500 kg, ayarlanabilir)'],
+  ['Yoldaki sac bilinmez', 'Zaten yolda olan sac yeniden sipariş edilir', 7, 7, 8, 'Yoldaki malzeme Excel listesi: her miktar ETA haftasında giriş sayılır (ETA yoksa bu hafta)'],
+  ['Yoldaki malzemenin ETA’sı yanlış ya da eksik', 'Sipariş bir hafta geç ya da erken verilir', 6, 5, 6, 'ETA yoksa bu hafta sayılır; her gelişin ETA’sı ve PO’su kontrol için sayfada gösterilir'],
 ]
 
 const STEPS = [
-  { id: 'inputs', title: 'Collect the data' },
-  { id: 'demand', title: 'Net the demand' },
-  { id: 'capacity', title: 'Build the capacity' },
-  { id: 'blocks', title: 'Block what cannot run' },
-  { id: 'order', title: 'Put the work in order' },
-  { id: 'place', title: 'Place each job' },
-  { id: 'check', title: 'Check and report' },
+  { id: 'inputs', title: 'Verileri topla' },
+  { id: 'demand', title: 'Talebi netleştir' },
+  { id: 'capacity', title: 'Kapasiteyi kur' },
+  { id: 'blocks', title: 'Çalışamayanı kapat' },
+  { id: 'order', title: 'İşleri sıraya koy' },
+  { id: 'place', title: 'Her işi yerleştir' },
+  { id: 'check', title: 'Kontrol et ve raporla' },
 ]
 
 function hhmm(minute: number): string {
@@ -133,13 +134,13 @@ export function PlanLogicTr() {
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="Planning Logic"
-        summary="How the plan is calculated — the same rules, applied the same way every time."
+        summary="Plan nasıl hesaplanır — her seferinde aynı kurallar, aynı şekilde uygulanır."
         links={relatedPages('/planlogic')}
         info={
           <p>
-            Nobody places jobs by hand. The plan is calculated on the server from the data you
-            maintain, in the seven steps below, every time that data changes. To change the plan,
-            change its inputs.
+            Hiçbir iş elle yerleştirilmez. Plan, sizin güncel tuttuğunuz verilerden sunucuda,
+            aşağıdaki yedi adımda ve bu veriler her değiştiğinde yeniden hesaplanır. Planı
+            değiştirmek için girdilerini değiştirin.
           </p>
         }
       />
@@ -148,7 +149,7 @@ export function PlanLogicTr() {
 
       <Synoptic safetyDays={current.safety} />
 
-      <h2 className="mt-10 text-lg font-semibold text-foreground">The seven steps in detail</h2>
+      <h2 className="mt-10 text-lg font-semibold text-foreground">Yedi adımın ayrıntısı</h2>
       <ol className="mt-3 flex flex-wrap gap-2 text-xs">
         {STEPS.map((step, i) => (
           <li key={step.id} className="flex items-center gap-2">
@@ -167,177 +168,178 @@ export function PlanLogicTr() {
       </ol>
 
       <div className="mt-6 rounded-lg border border-border bg-muted/40 p-4">
-        <h2 className="text-sm font-semibold text-foreground">Your current settings</h2>
+        <h2 className="text-sm font-semibold text-foreground">Geçerli ayarlarınız</h2>
         <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-5">
-          <Setting label="Planning horizon" value={`${current.horizon} weeks`} />
+          <Setting label="Planning horizon" value={`${current.horizon} hafta`} />
           <Setting label="First shift starts" value={`${current.shiftStart} (${current.timeZone})`} />
-          <Setting label="Shift length" value={`${current.shiftMinutes} min`} />
-          <Setting label="Gap between mould setups (same hall)" value={`${current.setupGap} min`} />
-          <Setting label="Gap between coil changes (same hall)" value={`${current.coilGap} min`} />
+          <Setting label="Shift length" value={`${current.shiftMinutes} dk`} />
+          <Setting label="Gap between mould setups (same hall)" value={`${current.setupGap} dk`} />
+          <Setting label="Gap between coil changes (same hall)" value={`${current.coilGap} dk`} />
           <Setting label="Setups at the same time per hall" value={String(current.concurrent)} />
           <Setting label="Setups at once in the plant (normal)" value={String(current.plantNormal)} />
           <Setting label="Setups at once with backlog / late risk" value={String(current.plantUrgent)} />
-          <Setting label="Pull work forward" value={`${current.pullForward} days`} />
-          <Setting label="Setup over a shift change" value={current.crossShifts ? 'allowed' : 'not allowed'} />
-          <Setting label="Capacity factor" value={`${current.factor}%`} />
+          <Setting label="Pull work forward" value={`${current.pullForward} gün`} />
+          <Setting label="Setup over a shift change" value={current.crossShifts ? 'izinli' : 'izinli değil'} />
+          <Setting label="Capacity factor" value={`%${current.factor}`} />
           <Setting
             label="Frozen days"
-            value={current.frozen > 0 ? `${current.frozen} days` : 'off'}
+            value={current.frozen > 0 ? `${current.frozen} gün` : 'kapalı'}
           />
-          <Setting label="Safety stock" value={`${current.safety} working days`} />
+          <Setting label="Safety stock" value={`${current.safety} iş günü`} />
           <Setting label="Delivery time on the need day" value={current.cutoff} />
-          <Setting label="Utilisation target" value={`${current.target}% (next 7 days)`} />
+          <Setting label="Utilisation target" value={`%${current.target} (sonraki 7 gün)`} />
           <Setting label="Scenarios tried at most" value={String(current.maxScenarios)} />
-          <Setting label="Raw material safety" value={`${current.rawCoverage} working days`} />
+          <Setting label="Raw material safety" value={`${current.rawCoverage} iş günü`} />
           <Setting label="Raw order extra" value={`${current.rawExtra.toLocaleString('en-GB')} kg`} />
-          <Setting label="Urgent raw material" value={`${current.rawUrgent} working days`} />
-          <Setting label="Prediction OEE (dashboard only)" value={`${current.predictionOee}%`} />
+          <Setting label="Urgent raw material" value={`${current.rawUrgent} iş günü`} />
+          <Setting label="Prediction OEE (dashboard only)" value={`%${current.predictionOee}`} />
         </dl>
         <p className="mt-3 text-xs text-muted-foreground">
-          Change these on the{' '}
+          Bunları{' '}
           <Link to="/takvim" className="underline hover:no-underline">
             Work Calendar
           </Link>{' '}
-          page; the capacity factor comes from the{' '}
+          sayfasında değiştirin; kapasite faktörü{' '}
           <Link to="/performans" className="underline hover:no-underline">
             Performance
           </Link>{' '}
-          page; Prediction OEE from the{' '}
+          sayfasından, Prediction OEE ise{' '}
           <Link to="/capacity" className="underline hover:no-underline">
             Capacity Dashboard
           </Link>
-          .
+          {' '}sayfasından gelir.
         </p>
       </div>
 
-      <Step n={1} id="inputs" title="Collect the data">
-        <p>The engine reads everything the plan depends on:</p>
+      <Step n={1} id="inputs" title="Verileri topla">
+        <p>Motor, planın dayandığı her şeyi okur:</p>
         <Table
           rows={[
-            ['Demand', 'ZPP weekly net requirements and the overdue quantity', '/sapdata'],
-            ['Sales days', 'ZPP_DAILY: one column per day — the day each quantity is sold', '/sapdata'],
+            ['Talep', 'ZPP haftalık net ihtiyaçları ve gecikmiş miktar', '/sapdata'],
+            ['Satış günleri', 'ZPP_DAILY: her gün için bir sütun — her miktarın satıldığı gün', '/sapdata'],
             [
-              'Stock',
-              'MB52 unrestricted stock, counted per cost center: a part counts the locations of its main work center\'s cost center (Storage Locations → Locations per cost center) — its production (WIP) location and its finished goods locations for the plan, the validator, Demand and the Capacity Dashboard; a raw material code counts the raw material locations of the cost centers that consume it. Example: 171 and 173 have WIP 2009, raw and finished 1009; 172 has WIP 2010, raw and finished 1009 — stock of a 172 part lying in 2009 is not counted. Intermediate parts: a code that the plant itself makes (a product card or a co-product) and another part uses as raw material — e.g. 172 makes it, 171 consumes it — counts once, as finished stock of its maker; it never counts as raw material stock, never gets a coil need and is never suggested for purchase, because 171\'s draw is already in 172\'s ZPP demand. So 1009 being raw for 171 and finished for 172 does not count the same pieces twice. MB51 production of a part is a 101/102 into its cost center\'s WIP location. A cost center without a definition (or a part without a cost center) uses the location ticks: Finished goods, Raw material, Production receipt',
+              'Stok',
+              'MB52 serbest stoku, masraf yeri bazında sayılır: bir parça, ana iş yerinin masraf yerine ait yerleri sayar (Storage Locations → Locations per cost center) — plan, doğrulayıcı, Demand ve Capacity Dashboard için üretim (WIP) yerini ve mamul yerlerini; bir hammadde kodu ise onu tüketen masraf yerlerinin hammadde yerlerini sayar. Örnek: 171 ve 173 için WIP 2009, hammadde ve mamul 1009; 172 için WIP 2010, hammadde ve mamul 1009 — 2009’da duran bir 172 parçasının stoku sayılmaz. Ara mamuller: fabrikanın kendisinin yaptığı (ürün kartı ya da ortak ürün olan) ve başka bir parçanın hammadde olarak kullandığı bir kod — ör. 172 yapar, 171 tüketir — bir kez, yapanın mamul stoku olarak sayılır; hiçbir zaman hammadde stoku sayılmaz, rulo ihtiyacı doğurmaz ve satın alma önerisine girmez, çünkü 171’in çekişi zaten 172’nin ZPP talebinin içindedir. Bu yüzden 1009’un 171 için hammadde, 172 için mamul yeri olması aynı parçaları iki kez saydırmaz. Bir parçanın MB51 üretimi, masraf yerinin WIP yerine yapılan 101/102 hareketidir. Tanımı olmayan bir masraf yeri (ya da masraf yeri olmayan bir parça) yer işaretlerini kullanır: Finished goods, Raw material, Production receipt',
               '/depolar',
             ],
-            ['Coils in transit', 'In-transit Excel list: each quantity arrives in its ETA week (no ETA = this week)', '/sapdata'],
+            ['Yoldaki rulolar', 'Yoldaki malzeme Excel listesi: her miktar ETA haftasında gelir (ETA yoksa bu hafta)', '/sapdata'],
             [
               'Master data',
-              'Cycle time (minutes per piece) — the speed of every part on every work center; setup and frequency stop (coil change) times, quality approval time, coil and gross weight, mould shot limit, main and alternative work centers, Flexible work center tick, co-product, Accepted OEE. A part loaded earlier with SPM and cavities but no cycle time runs 1 ÷ (SPM × cavities) min/piece; cavities, where still entered, only count strokes (mould limit)',
+              'Çevrim süresi (parça başına dakika) — her parçanın her iş yerindeki hızı; setup ve frekans duruşu (rulo değişimi) süreleri, kalite onay süresi, rulo ve brüt ağırlık, kalıp vuruş limiti, ana ve alternatif iş yerleri, Flexible work center işareti, ortak ürün, Accepted OEE. Daha önce SPM ve göz sayısıyla yüklenmiş ama çevrim süresi olmayan bir parça 1 ÷ (SPM × göz) dk/adet çalışır; göz sayısı girilmişse yalnız vuruşları sayar (kalıp limiti)',
               '/referanslar',
             ],
-            ['Work Centers', 'The single work center list: cost center, hall (crane and setup team), category (Gantt and Capacity Dashboard groups), frequency stop (coil setup, fixture setup … or none), frozen days', '/makineler'],
-            ['Work calendar', 'Per work center: weekly pattern (days from Monday × shifts), exception weeks, overtime (dated or recurring, from an overtime type); planned stops; public and manual holidays; planning settings', '/takvim'],
-            ['Dies', 'Readiness (date and time), maintenance days, shot-limit alarms — from Die Follow-up', '/die-followup/maintenance'],
-            ['Machines', 'Planned work center maintenance hours and open breakdowns that stop a work center — from Machine Follow-up', '/machine-followup/breakdowns'],
-            ['Your rules', 'Exclude, pin to a work center/day, or move to the front', '/planlama'],
-            ['Approved plan', 'The last approved plan, for the frozen days', '/planlama'],
+            ['Work Centers', 'Tek iş yeri listesi: masraf yeri, hol (vinç ve setup ekibi), kategori (Gantt ve Capacity Dashboard grupları), frekans duruşu (rulo setup, fikstür setup … ya da yok), dondurulmuş günler', '/makineler'],
+            ['Work calendar', 'İş yeri bazında: haftalık düzen (pazartesiden itibaren gün × vardiya), istisna haftalar, mesai (tarihli ya da tekrarlayan, bir mesai türünden); planlı duruşlar; resmî ve elle girilen tatiller; planlama ayarları', '/takvim'],
+            ['Kalıplar', 'Hazır olma (tarih ve saat), bakım günleri, vuruş limiti alarmları — Die Follow-up’tan', '/die-followup/maintenance'],
+            ['Makineler', 'İş yerini durduran planlı bakım saatleri ve açık arızalar — Machine Follow-up’tan', '/machine-followup/breakdowns'],
+            ['Kurallarınız', 'Hariç tut, bir iş yerine/güne sabitle ya da öne al', '/planlama'],
+            ['Onaylı plan', 'Dondurulmuş günler için son onaylanan plan', '/planlama'],
           ]}
         />
       </Step>
 
-      <Step n={2} id="demand" title="Net the demand">
+      <Step n={2} id="demand" title="Talebi netleştir">
         <ul>
           <li>
-            Every ZPP column is one calendar week, starting with the current
-            week. Only the weeks inside the planning horizon are planned.
+            Her ZPP sütunu, içinde bulunulan haftadan başlayarak bir takvim
+            haftasıdır. Yalnız planlama ufkunun içindeki haftalar planlanır.
           </li>
           <li>
-            The overdue quantity becomes a <b>backlog</b> item due this week.
+            Gecikmiş miktar, bu hafta vadeli bir <b>birikmiş talep</b> kalemi olur.
           </li>
           <li>
-            Stock is deducted from the earliest need first: backlog, then this
-            week, then next week, and so on. What remains is what must be
-            produced.
+            Stok en erken ihtiyaçtan başlayarak düşülür: önce birikmiş talep, sonra
+            bu hafta, sonra gelecek hafta ve böyle devam eder. Kalan, üretilmesi
+            gereken miktardır.
           </li>
           <li>
-            <b>Sales days — ZPP_DAILY.</b> For every day the ZPP_DAILY file
-            covers, demand falls on the exact date in the file: 5 000 shipped
-            on Wednesday is 5 000 on Wednesday, not 1 000 a day. Beyond the
-            file's last day, the weekly ZPP is spread evenly over the plant's
-            working days — not a holiday and at least one work center has normal
-            shifts; overtime does not make a working day (a partly covered week
-            gets the rest of its weekly total on the uncovered days). The backlog
-            is due today.
+            <b>Satış günleri — ZPP_DAILY.</b> ZPP_DAILY dosyasının kapsadığı her
+            gün için talep dosyadaki tam tarihe düşer: çarşamba sevk edilen 5 000,
+            günde 1 000 değil, çarşamba günü 5 000’dir. Dosyanın son gününden
+            sonra haftalık ZPP, fabrikanın çalışma günlerine eşit dağıtılır —
+            tatil olmayan ve en az bir iş yerinin normal vardiyası olan günler;
+            mesai bir günü çalışma günü yapmaz (kısmen kapsanan bir haftanın
+            haftalık toplamının kalanı kapsanmayan günlere düşer). Birikmiş talep
+            bugün vadelidir.
           </li>
           <li>
-            <b>ZPP_DAILY first — weekly ZPP is long-term.</b> When ZPP_DAILY is
-            loaded (and reaches today), it is SAP's commitment for the days it
-            covers. Demand that comes from the weekly ZPP — the days after
-            ZPP_DAILY's last day, and every part that has no ZPP_DAILY row — becomes a
-            separate <b>long-term</b> lot. Long-term lots are placed only{' '}
-            <b>after every daily lot</b> (backlog, urgent, fill and lots moved to the
-            front), only into the capacity that is left, never in front of a daily job
-            that continues its die without a setup, and they are <b>never late</b>. A
-            week only partly covered by ZPP_DAILY is <b>split</b>, never mixed: the
-            covered days make the daily lot, the rest is a long-term lot labelled{' '}
-            <code>W38 LT</code>. Whole coils still apply: the daily lot's spare pieces
-            reduce the long-term lot. Example: ZPP_DAILY up to Wednesday with 1 000
-            on Monday and 1 000 on Wednesday, weekly W38 = 5 000, a coil gives 2 500
-            pcs → daily lot 2 500 (one coil, checked only on Monday and Wednesday) +
-            long-term lot 2 500 (3 000 on Thursday–Friday − 500 spare). Without
-            ZPP_DAILY nothing is long-term and the weekly ZPP is planned as before.
+            <b>Önce ZPP_DAILY — haftalık ZPP uzun vadelidir.</b> ZPP_DAILY
+            yüklendiğinde (ve bugüne ulaştığında), kapsadığı günler için SAP’nin
+            taahhüdüdür. Haftalık ZPP’den gelen talep — ZPP_DAILY’nin son gününden
+            sonraki günler ve ZPP_DAILY satırı olmayan her parça — ayrı bir{' '}
+            <b>uzun vadeli</b> lot olur. Uzun vadeli lotlar yalnız{' '}
+            <b>tüm günlük lotlardan sonra</b> (birikmiş, acil, dolgu ve öne alınan
+            lotlar), yalnız kalan kapasiteye yerleştirilir; kalıbını setupsız sürdüren
+            bir günlük işin önüne hiçbir zaman geçmez ve <b>hiçbir zaman geç olmaz</b>.
+            ZPP_DAILY’nin yalnız kısmen kapsadığı bir hafta karıştırılmaz,{' '}
+            <b>bölünür</b>: kapsanan günler günlük lotu, kalanı{' '}
+            <code>W38 LT</code> etiketli uzun vadeli lotu oluşturur. Tam rulo kuralı
+            yine geçerlidir: günlük lotun artan parçaları uzun vadeli lotu azaltır.
+            Örnek: ZPP_DAILY çarşambaya kadar, pazartesi 1 000 ve çarşamba 1 000;
+            haftalık W38 = 5 000; bir rulo 2 500 adet verir → günlük lot 2 500 (bir
+            rulo, yalnız pazartesi ve çarşamba kontrol edilir) + uzun vadeli lot
+            2 500 (perşembe–cuma 3 000 − 500 artan). ZPP_DAILY yoksa hiçbir şey uzun
+            vadeli değildir ve haftalık ZPP eskisi gibi planlanır.
           </li>
           <li>
-            <b>Timing — projected stock.</b> Walking day by day, the engine
-            finds the day the stock — plus every lot planned before — would
-            drop below zero. That is the lot's <b>stock-out day</b>.
+            <b>Zamanlama — öngörülen stok.</b> Motor gün gün ilerleyerek stokun
+            — daha önce planlanan her lot dahil — sıfırın altına düşeceği günü
+            bulur. Bu, lotun <b>stok bitiş günüdür</b>.
           </li>
           <li>
-            <b>Safety stock.</b> The lot may start{' '}
-            <b>{current.safety} working day(s)</b> before its stock-out day, and
-            not earlier, so stock does not pile up and the work center stays free
-            for parts that need it. If that day is already today or past, the
-            lot is <b>urgent</b>; otherwise it is <b>fill</b>.
+            <b>Emniyet stoku.</b> Lot, stok bitiş gününden{' '}
+            <b>{current.safety} iş günü</b> önce başlayabilir, daha erken değil;
+            böylece stok yığılmaz ve iş yeri ona ihtiyacı olan parçalara açık
+            kalır. Bu gün bugünse ya da geçmişse lot <b>acil</b>dir; değilse{' '}
+            <b>dolgu</b>dur.
           </li>
           <li>
-            <b>Produced but not yet in the stock file.</b> Approved jobs that
-            ran after the last MB52 upload count as stock until the next
-            upload. Example: 6 000 pcs pressed on Monday, stock uploaded again
-            on Tuesday morning — in between, the 6 000 are not planned a
-            second time. The Production Plan says when this assumption is in
-            use.
+            <b>Üretildi ama henüz stok dosyasında yok.</b> Son MB52 yüklemesinden
+            sonra çalışan onaylı işler, bir sonraki yüklemeye kadar stok sayılır.
+            Örnek: pazartesi 6 000 adet basıldı, stok salı sabahı yeniden yüklendi
+            — aradaki sürede bu 6 000 ikinci kez planlanmaz. Bu varsayım
+            kullanıldığında Production Plan bunu belirtir.
           </li>
           <li>
-            <b>Co-products</b> come out of the same stroke, so they cannot be
-            made separately. For each week, the pair is made for the larger of
-            the two requirements, and the pair is <b>one lot and one job</b> —
-            on the part that names the other as its co-product. The job shows
-            both quantities; work center time and setup are counted once.
+            <b>Ortak ürünler</b> aynı vuruştan çıkar, bu yüzden ayrı ayrı
+            yapılamaz. Her hafta için çift, iki ihtiyaçtan büyük olanına göre
+            yapılır ve çift <b>tek lot ve tek iş</b>tir — diğerini ortak ürünü
+            olarak gösteren parçada. İş iki miktarı da gösterir; iş yeri süresi
+            ve setup bir kez sayılır.
           </li>
           <li>
-            <b>Whole coils — always.</b> A mounted coil is run to the end, so
-            every coil-fed lot is a whole number of coils (strokes per coil ×
-            cavities). The surplus covers the following weeks and does not
-            trigger another coil; backlog and this week's need share the same
-            coil and the same setup. A coil is <b>never cut short</b> — not to
-            fit a gap and not to save a late job.
+            <b>Tam rulo — her zaman.</b> Takılan bir rulo sonuna kadar çalışılır;
+            bu yüzden rulodan beslenen her lot tam sayıda ruloya eşittir (rulo
+            başına vuruş × göz). Artan miktar sonraki haftaları karşılar ve yeni
+            bir rulo doğurmaz; birikmiş talep ile bu haftanın ihtiyacı aynı ruloyu
+            ve aynı setup’ı paylaşır. Bir rulo <b>hiçbir zaman yarıda kesilmez</b>
+            — ne bir boşluğa sığdırmak ne de geç bir işi kurtarmak için.
           </li>
           <li>
-            <b>Min. lot instead of the coil.</b> Where the coil quantity is
-            flexible (transfer work centers 106/107), a <b>Min. lot (pcs)</b> is entered
-            in master data. It replaces the coil: the lot is at least that many
-            pieces, and above it exactly the need (need 300, min. lot 2 000 → 2 000;
-            need 2 500 → 2 500). The surplus covers the following weeks. The coil
-            weight is then ignored and may stay empty.
+            <b>Rulo yerine Min. lot.</b> Rulo miktarının esnek olduğu yerlerde
+            (transfer iş yerleri 106/107) master data’ya bir <b>Min. lot (pcs)</b>{' '}
+            girilir. Ruloyu yerine geçer: lot en az o kadar adettir, üstünde ise
+            tam ihtiyaç kadar (ihtiyaç 300, min. lot 2 000 → 2 000; ihtiyaç
+            2 500 → 2 500). Artan miktar sonraki haftaları karşılar. Bu durumda
+            rulo ağırlığı dikkate alınmaz ve boş kalabilir.
           </li>
           <li>
-            <b>Neither?</b> A part with no Min. lot and no real coil weight (empty,
-            or 1 kg as a placeholder) is a master data error: it is planned at
-            exactly the need, and the plan and the Master Data page warn about it.
+            <b>İkisi de yok mu?</b> Min. lot’u ve gerçek rulo ağırlığı olmayan (boş
+            ya da yer tutucu olarak 1 kg) bir parça master data hatasıdır: tam
+            ihtiyaç kadar planlanır; plan ve Master Data sayfası bu konuda uyarır.
           </li>
           <li>
-            <b>No coil at all</b> (nut welding, spot welding, assembly …): a part with a
-            cycle time and no coil or sheet is planned at exactly the need (or its Min.
-            lot) <b>without</b> a warning, and the Raw Material page does not ask for its
-            steel.
+            <b>Hiç rulo yok</b> (somun kaynağı, punta kaynağı, montaj …): çevrim
+            süresi olan ve rulosu ya da sacı olmayan bir parça uyarı{' '}
+            <b>olmadan</b> tam ihtiyaç kadar (ya da Min. lot’u kadar) planlanır ve
+            Raw Material sayfası bunun sacını istemez.
           </li>
         </ul>
         <Example>
-          Backlog 200 pcs, next week 2 000 pcs, no stock. One coil gives 5 000
-          pcs. The backlog needs a coil, so 5 000 pcs are pressed now; the 4
-          800 surplus covers next week. Result: one job, one setup — not two.
+          Birikmiş talep 200 adet, gelecek hafta 2 000 adet, stok yok. Bir rulo
+          5 000 adet verir. Birikmiş talep bir rulo gerektirir, bu yüzden şimdi
+          5 000 adet basılır; artan 4 800 gelecek haftayı karşılar. Sonuç: iki
+          değil, tek iş ve tek setup.
         </Example>
       </Step>
 
@@ -345,799 +347,799 @@ export function PlanLogicTr() {
         <StockExample safetyDays={2} />
       </div>
 
-      <Step n={3} id="capacity" title="Build the capacity">
-        <p>For every work center and every day of the horizon:</p>
+      <Step n={3} id="capacity" title="Kapasiteyi kur">
+        <p>Her iş yeri ve ufkun her günü için:</p>
         <Formula>
-          net minutes = normal shifts × shift length + overtime windows − planned stops → × capacity factor
+          net dakika = normal vardiya × vardiya süresi + mesai pencereleri − planlı duruşlar → × kapasite faktörü
         </Formula>
         <ul>
           <li>
-            Each work center has <b>one calendar</b>: its standard week ("N days" are filled from
-            Monday: 5 = Mon–Fri, 6 = Mon–Sat; shifts per day), a <b>week exception</b> when
-            there is one, and the <b>overtime</b> opened on dates (or every week on the pattern)
-            with an overtime definition — start time and length. Overtime opened on the
-            Capacity Dashboard is the same record.
+            Her iş yerinin <b>tek bir takvimi</b> vardır: standart haftası (“N gün”
+            pazartesiden doldurulur: 5 = Pzt–Cum, 6 = Pzt–Cmt; günlük vardiya sayısı),
+            varsa bir <b>hafta istisnası</b> ve bir mesai tanımıyla — başlangıç saati
+            ve süre — tarihlere (ya da düzende her haftaya) açılan <b>mesailer</b>.
+            Capacity Dashboard’da açılan mesai de aynı kayıttır.
           </li>
           <li>
-            A <b>day record</b> is the final word for one work center and one day: on the Production
-            Plan, <b>Work calendar</b> box, press <b>Edit</b>, then a click on a cell opens or closes
-            that shift and <b>Save</b> writes the whole week at once (Cancel drops it). It wins over
-            the week exception, the pattern and a holiday (order: day record → week exception →
-            pattern). The shifts do not have to follow each other: only the 3rd shift (with 8 h
-            shifts from 07:00: 23:00–07:00) is 480 min, 450 net with a 30 min 3rd-shift meal. A shift
-            that overlaps that day's overtime is refused; ↺ removes the record. In the same Edit
-            mode the OT row adds or removes that day's dated overtime; Save applies the overtime
-            removals first, then the day records, then the new overtime. It reaches the plan
-            on the next Calculate plan.
+            Bir <b>gün kaydı</b>, bir iş yeri ve bir gün için son sözdür: Production
+            Plan’da <b>Work calendar</b> kutusunda <b>Edit</b>’e basın; ardından bir
+            hücreye tıklamak o vardiyayı açar ya da kapatır, <b>Save</b> bütün haftayı
+            bir kerede yazar (Cancel vazgeçer). Gün kaydı hafta istisnasına, düzene ve
+            tatile üstün gelir (sıra: gün kaydı → hafta istisnası → düzen). Vardiyaların
+            birbirini izlemesi gerekmez: yalnız 3. vardiya (07:00’den başlayan 8 sa’lik
+            vardiyalarla 23:00–07:00) 480 dk’dır; 30 dk 3. vardiya yemeğiyle net 450 dk.
+            O günün mesaisiyle çakışan bir vardiya reddedilir; ↺ kaydı siler. Aynı Edit
+            modunda OT satırı o günün tarihli mesaisini ekler ya da kaldırır; Save önce
+            mesai silmelerini, sonra gün kayıtlarını, sonra yeni mesaiyi uygular. Plana
+            bir sonraki Calculate plan’da yansır.
           </li>
           <li>
-            A public holiday is a day off: its shifts are lost, never moved to another day.
-            Overtime opened on the holiday is planned. Recurring overtime does not run on a
-            holiday — open it on the date.
+            Resmî tatil izin günüdür: vardiyaları kaybolur, hiçbir zaman başka bir
+            güne taşınmaz. Tatile açılan mesai planlanır. Tekrarlayan mesai tatilde
+            çalışmaz — onu o tarihe açın.
           </li>
           <li>
-            Shifts have the same length and follow each other from the first shift start (e.g. 2 ×
-            9 h from 07:00: 07:00–16:00, 16:00–01:00). Overtime may not overlap the normal shifts
-            or another overtime.
+            Vardiyalar aynı süreye sahiptir ve ilk vardiya başlangıcından itibaren
+            birbirini izler (ör. 07:00’den 2 × 9 sa: 07:00–16:00, 16:00–01:00). Mesai
+            normal vardiyalarla ya da başka bir mesaiyle çakışamaz.
           </li>
           <li>
-            <b>Overtime is opened outside the shift grid, not inside it.</b> On a day the work
-            center works, the shifts are the day's grid: a shift that is closed is reopened on the
-            work calendar, not as overtime. Overtime therefore only fits between the end of the
-            grid and the end of the production day. A work center with <b>8 h</b> shifts fits
-            3 of them in a day, the grid covers all 24 h, and <b>no overtime can be opened on a
-            working day</b> — it is opened on a day the work center does not work, normally
-            <b>Saturday or Sunday</b>. A work center with <b>9 h 40</b> shifts fits 2 of them
-            (06:30–16:10 and 16:10–01:50 = 19 h 20), so 01:50–06:30 is outside the grid and a
-            night overtime of at most 4 h 40 is opened there. A day with no normal shift at all
-            (Saturday, Sunday, a holiday) is entirely outside the normal pattern: the whole day
-            takes overtime.
+            <b>Mesai vardiya ızgarasının içine değil, dışına açılır.</b> İş yerinin
+            çalıştığı bir günde vardiyalar günün ızgarasıdır: kapalı bir vardiya mesai
+            olarak değil, iş takviminde yeniden açılır. Bu yüzden mesai yalnız
+            ızgaranın sonu ile üretim gününün sonu arasına sığar. <b>8 sa</b>’lik
+            vardiyası olan bir iş yerine günde 3 vardiya sığar, ızgara 24 saatin
+            tamamını kaplar ve <b>çalışma gününde mesai açılamaz</b> — mesai, iş
+            yerinin çalışmadığı bir güne, normalde <b>cumartesi ya da pazara</b>{' '}
+            açılır. <b>9 sa 40 dk</b>’lık vardiyası olan bir iş yerine 2 vardiya sığar
+            (06:30–16:10 ve 16:10–01:50 = 19 sa 20 dk); bu yüzden 01:50–06:30 ızgaranın
+            dışındadır ve oraya en fazla 4 sa 40 dk’lık bir gece mesaisi açılır. Hiç
+            normal vardiyası olmayan bir gün (cumartesi, pazar, tatil) tamamen normal
+            düzenin dışındadır: günün tamamına mesai açılabilir.
           </li>
           <li>
-            The overtime still has to fit in time that is actually free: the production day
-            (24 h from the first shift start) minus the open shifts and the overtime already
-            opened. The Production Plan <b>Work calendar</b> box writes the result on the OT row of
-            every day — <i>free 01:50–06:30</i>, <i>full</i> when the window is taken, or
-            <i>shifts cover 24 h</i> when the grid leaves no window; an overtime that does not fit
-            cannot be chosen. The whole displayed week can be edited, closed Saturday and Sunday
-            included — that is how weekend work is opened, either as overtime or as a day record
-            that opens the shifts themselves.
+            Mesai yine de gerçekten boş olan zamana sığmalıdır: üretim günü
+            (ilk vardiya başlangıcından itibaren 24 sa) eksi açık vardiyalar ve daha önce açılmış
+            mesailer. Production Plan’daki <b>Work calendar</b> kutusu sonucu her günün OT satırına
+            yazar — <i>free 01:50–06:30</i>, pencere doluysa <i>full</i>, ya da ızgara hiç pencere
+            bırakmıyorsa <i>shifts cover 24 h</i>; sığmayan bir mesai seçilemez. Gösterilen haftanın
+            tamamı, kapalı cumartesi ve pazar dahil, düzenlenebilir — hafta sonu çalışması da böyle
+            açılır: ya mesai olarak ya da vardiyaların kendisini açan bir gün kaydı olarak.
           </li>
           <li>
-            A work center without a Work Calendar pattern has no capacity; the Production Plan shows
-            a red alarm. A day never exceeds 24 hours (planned stops included), so a work center week
-            never exceeds 168 hours — longer entries are refused when saved.
+            Work Calendar düzeni olmayan bir iş yerinin kapasitesi yoktur; Production Plan kırmızı
+            bir alarm gösterir. Bir gün hiçbir zaman 24 saati aşmaz (planlı duruşlar dahil), bu yüzden
+            bir iş yerinin haftası hiçbir zaman 168 saati aşmaz — daha uzun girişler kaydedilirken reddedilir.
           </li>
-          <li>Planned stops falling inside overtime are deducted too.</li>
+          <li>Mesainin içine düşen planlı duruşlar da düşülür.</li>
           <OperatorPlanItem />
           <li>
-            Days that have passed are skipped, and today starts at the current
-            time — nothing is planned in the past. The plan day begins with the
-            first shift ({current.shiftStart}), so at 02:00 the night shift
-            still belongs to the previous day.
+            Geçmiş günler atlanır ve bugün şu anki saatten başlar — geçmişe
+            hiçbir şey planlanmaz. Plan günü ilk vardiyayla ({current.shiftStart})
+            başlar; bu yüzden saat 02:00’de gece vardiyası hâlâ bir önceki güne
+            aittir.
           </li>
           <li>
-            Each work center is one continuous timeline: a job that does not finish
-            before the shift or day ends simply continues in the next shift.
+            Her iş yeri kesintisiz tek bir zaman çizgisidir: vardiya ya da gün
+            bitmeden tamamlanmayan bir iş, bir sonraki vardiyada devam eder.
           </li>
         </ul>
       </Step>
 
-      <Step n={4} id="blocks" title="Block what cannot run">
+      <Step n={4} id="blocks" title="Çalışamayanı kapat">
         <ul>
           <li>
-            <b>Frozen days</b>: jobs from the approved plan in the first days
-            are kept exactly where they are, and what they produce is deducted
-            from demand. The engine plans only the free time around them.
+            <b>Frozen days</b>: ilk günlerdeki onaylı plan işleri tam bulundukları
+            yerde tutulur ve ürettikleri miktar talepten düşülür. Motor yalnız
+            onların çevresindeki boş zamanı planlar.
           </li>
           <li>
-            <b>Approved and moved jobs</b>: a job approved on its own (click it → Approve this job), or
-            dragged on the Gantt to another work center, day or time (on a phone: hold, then drag; or
-            click it → Move…), is locked there the same way — kept in place, its quantity deducted from
-            that part's demand, the other jobs planned around it. A move keeps the job's setup,
-            approval, production and frequency-stop minutes in order and pours them into the target
-            work center's working minutes from the drop point; when a day is full it carries on the
-            next working day (e.g. 120 min setup + 600 min production dropped at minute 1200 of a
-            1350-minute day: setup 1200–1320, 30 min production that day, the other 570 min the next
-            working day). It cannot start before now, must fit before the end of the plan, and cannot
-            overlap another approved or frozen job or maintenance on that work center.
+            <b>Onaylanan ve taşınan işler</b>: tek başına onaylanan (tıklayın → Approve this job) ya da
+            Gantt’ta başka bir iş yerine, güne veya saate sürüklenen (telefonda: basılı tutup sürükleyin;
+            ya da tıklayın → Move…) bir iş, orada aynı şekilde kilitlenir — yerinde tutulur, miktarı o
+            parçanın talebinden düşülür, diğer işler onun çevresine planlanır. Taşıma, işin setup, onay,
+            üretim ve frekans duruşu dakikalarını sırasıyla korur ve bırakıldığı noktadan itibaren hedef
+            iş yerinin çalışma dakikalarına döker; bir gün dolunca bir sonraki çalışma gününde devam eder
+            (ör. 1350 dakikalık bir günün 1200. dakikasına bırakılan 120 dk setup + 600 dk üretim: setup
+            1200–1320, o gün 30 dk üretim, kalan 570 dk bir sonraki çalışma günü). Şu andan önce
+            başlayamaz, planın sonundan önce bitmelidir ve o iş yerindeki başka bir onaylı ya da
+            dondurulmuş işle veya bakımla çakışamaz.
           </li>
           <li>
-            <b>Jobs added by hand</b> (Plan → + Add job, e.g. a part run for stock): part, quantity, work
-            center, day and start time. Clicking an idle gap on the chart (the dashed orange line) opens the
-            same form with that work center, day and the gap's start time filled in. The duration is the engine's own calculation for that part and
-            quantity, in the engine's order — setup (none if the die is already mounted), quality
-            approval, production per coil with a coil change between coils on a coil-fed work center
-            (e.g. 90 min setup + 15 min approval + coils of 200 and 150 min with a 20-min coil change =
-            475 min). The job is locked at that time like a moved job: its quantity comes off the part's
-            future demand, so later lots of that part shrink or disappear, and the work center's other
-            jobs move behind it. Same limits as a move; a part not defined for that work center is
-            allowed with a warning.
+            <b>Elle eklenen işler</b> (Plan → + Add job, ör. stok için çalıştırılan bir parça): parça, miktar,
+            iş yeri, gün ve başlangıç saati. Grafikteki boş bir aralığa (kesikli turuncu çizgi) tıklamak aynı
+            formu o iş yeri, gün ve aralığın başlangıç saati dolu olarak açar. Süre, motorun o parça ve miktar
+            için kendi hesabıdır, motorun sırasıyla — setup (kalıp zaten bağlıysa yok), kalite onayı, rulo
+            başına üretim ve rulodan beslenen iş yerinde rulolar arasında rulo değişimi (ör. 90 dk setup +
+            15 dk onay + 200 ve 150 dk’lık rulolar ve 20 dk rulo değişimi = 475 dk). İş, taşınan bir iş gibi
+            o saate kilitlenir: miktarı parçanın gelecekteki talebinden düşülür, böylece o parçanın sonraki
+            lotları küçülür ya da kaybolur ve iş yerinin diğer işleri onun arkasına kayar. Sınırlar
+            taşımadakiyle aynıdır; o iş yeri için tanımlı olmayan bir parçaya uyarıyla izin verilir.
           </li>
           <li>
-            <b>Deleting</b> (click a job): a job added by hand → <i>Delete job</i>, it leaves the plan and its
-            quantity is no longer deducted from demand; an approved or moved job → <i>Remove approval</i>, it goes
-            back to the engine, which plans it again; an engine job → <i>Delete this lot</i>, the lot is set to 0
-            pieces and its demand moves to the next lots of that part (the same as typing 0 as the lot quantity).
+            <b>Silme</b> (bir işe tıklayın): elle eklenen iş → <i>Delete job</i>, plandan çıkar ve miktarı artık
+            talepten düşülmez; onaylı ya da taşınmış iş → <i>Remove approval</i>, motora geri döner ve motor onu
+            yeniden planlar; motor işi → <i>Delete this lot</i>, lot 0 adete çekilir ve talebi o parçanın sonraki
+            lotlarına geçer (lot miktarına 0 yazmakla aynı).
           </li>
           <li>
-            <b>Work center maintenance</b> takes those clock hours out of that
-            work center's day; jobs flow around it.
+            <b>İş yeri bakımı</b> o saat aralığını iş yerinin gününden çıkarır;
+            işler onun çevresinden akar.
           </li>
           <li>
-            <b>Machine breakdown</b> (reported in Machine Follow-up with "the
-            work center is stopped"): the work center is closed from the breakdown until
-            the expected time it is back — or, with no expected time, until
-            the breakdown is solved. Like a closed period it is a planned stop: production runs up
-            to it and continues after it, the cut coil is finished and the remaining coils follow as
-            a new lot (see <i>Planner's hand</i>). A fault that does not stop the work center does
-            not change the plan.
+            <b>Makine arızası</b> (Machine Follow-up’ta “the work center is
+            stopped” ile bildirilen): iş yeri arızadan beklenen dönüş saatine kadar
+            — beklenen saat yoksa arıza çözülene kadar — kapatılır. Kapalı bir dönem
+            gibi planlı bir duruştur: üretim ona kadar çalışır ve ondan sonra devam
+            eder, kesilen rulo bitirilir ve kalan rulolar yeni bir lot olarak gelir
+            (bkz. <i>Planlamacının müdahalesi</i>). İş yerini durdurmayan bir arıza
+            planı değiştirmez.
           </li>
           <li>
-            <b>Mould maintenance</b> days: no part of a job with that mould may
-            fall on them.
+            <b>Kalıp bakımı</b> günleri: o kalıpla yapılan bir işin hiçbir parçası
+            bu günlere düşemez.
           </li>
           <li>
-            <b>Mould not ready</b>: with a ready date (and time), the mould is
-            blocked until that moment — ready at 10:00 means that day's
-            earlier hours are closed too; without a date, it is held out of
-            the plan entirely.
+            <b>Kalıp hazır değil</b>: hazır olma tarihi (ve saati) varsa kalıp o ana
+            kadar kapalıdır — saat 10:00’da hazır demek, o günün daha erken saatleri
+            de kapalı demektir; tarih yoksa kalıp tamamen plan dışında tutulur.
           </li>
           <li>
-            <b>Shot-limit alarm</b>: once a mould passes its periodic
-            maintenance limit, it is held out of the plan until the alarm is
-            closed.
+            <b>Vuruş limiti alarmı</b>: bir kalıp periyodik bakım limitini geçince,
+            alarm kapatılana kadar plan dışında tutulur.
           </li>
           <li>
-            <b>Excluded</b> materials (your rule) are not planned.
+            <b>Hariç tutulan</b> malzemeler (sizin kuralınız) planlanmaz.
           </li>
         </ul>
       </Step>
 
-      <Step n={5} id="order" title="Put the work in order">
-        <p>The requirements are planned one by one, in this order:</p>
+      <Step n={5} id="order" title="İşleri sıraya koy">
+        <p>İhtiyaçlar şu sırayla, tek tek planlanır:</p>
         <ol className="list-decimal">
-          <li>Materials you moved to the front (and lots moved forward so they are not late)</li>
+          <li>Öne aldığınız malzemeler (ve geç kalmasın diye öne alınan lotlar)</li>
           <li>
-            <b>Backlog</b> — the ZPP overdue quantity left after stock. Due the next
-            day at {current.cutoff}.
+            <b>Birikmiş talep</b> — stoktan sonra kalan ZPP gecikmiş miktarı. Ertesi
+            gün saat {current.cutoff}’da vadelidir.
           </li>
           <li>
-            <b>Urgent</b> — a lot whose stock falls to the safety level now: it runs
-            out within {current.safety} working day(s). Due at {current.cutoff} on the
-            day the stock runs out.
+            <b>Acil</b> — stoku şimdi emniyet seviyesine düşen lot: {current.safety}{' '}
+            iş günü içinde biter. Stokun bittiği gün saat {current.cutoff}’da
+            vadelidir.
           </li>
           <li>
-            <b>Fill</b> — every other lot: future days and weeks. It may start{' '}
-            {current.safety} working day(s) before its stock runs out, or up to{' '}
-            {current.pullForward} days earlier when a work center would stand idle.
+            <b>Dolgu</b> — diğer her lot: ileriki günler ve haftalar. Stoku bitmeden{' '}
+            {current.safety} iş günü önce, ya da bir iş yeri boş kalacaksa{' '}
+            {current.pullForward} güne kadar daha erken başlayabilir.
           </li>
           <li>
-            <b>Long-term</b> (only when ZPP_DAILY is loaded) — lots from the weekly
-            ZPP. They come after all of the above, even after materials moved to the
-            front, and only fill the free capacity that is left. Example: one work
-            center, one shift; part D needs 7 000 pcs on Wednesday in ZPP_DAILY
-            (700 min + 30 min setup), part L has only a weekly 4 000. D runs first
-            on Monday and is on time; L follows on Tuesday as a long-term lot and is
-            not late. Had L gone first, D would have been ready too late.
+            <b>Uzun vadeli</b> (yalnız ZPP_DAILY yüklüyse) — haftalık ZPP’den gelen
+            lotlar. Yukarıdakilerin hepsinden, öne alınan malzemelerden bile sonra
+            gelir ve yalnız kalan boş kapasiteyi doldurur. Örnek: tek iş yeri, tek
+            vardiya; D parçasının ZPP_DAILY’de çarşamba 7 000 adet ihtiyacı var
+            (700 dk + 30 dk setup), L parçasının yalnız haftalık 4 000’i var. D
+            pazartesi önce çalışır ve zamanındadır; L salı günü uzun vadeli lot
+            olarak gelir ve geç değildir. L önce gitseydi D çok geç hazır olurdu.
           </li>
         </ol>
         <p>
-          Backlog always goes before urgent, even when both are due at the same
-          moment. <b>One exception — the mounted die:</b> when an urgent job would
-          need a setup on a work center whose mounted die still has a fill lot waiting,
-          that fill lot runs on first without a setup, as long as the urgent job
-          is still ready by its delivery time. Otherwise the die would be taken
-          off for the urgent job and mounted again later — two setups instead of
-          one. If the urgent job would be late, it goes first.
+          Birikmiş talep, ikisi aynı anda vadeli olsa bile her zaman aciden önce
+          gelir. <b>Tek istisna — bağlı kalıp:</b> acil bir iş, bağlı kalıbının hâlâ
+          bekleyen bir dolgu lotu olduğu bir iş yerinde setup gerektirecekse, acil iş
+          teslim saatine hâlâ yetiştiği sürece o dolgu lotu setupsız önce çalışır.
+          Aksi hâlde kalıp acil iş için sökülür ve sonra yeniden bağlanırdı — bir
+          yerine iki setup. Acil iş geç kalacaksa önce o gider.
         </p>
         <p>
-          Within each group, the lot whose stock runs out first goes first.
-          When that is equal too, the part that can run on the <b>fewest
-          work centers</b> goes first: a single-work center part takes its slot before a
-          part with alternatives, which then spreads to the work centers that are
-          left. Whoever is placed first gets the best slots.
+          Her grubun içinde stoku önce biten lot önce gider. Bu da eşitse,{' '}
+          <b>en az iş yerinde</b> çalışabilen parça önce gider: tek iş yerli bir
+          parça, alternatifi olan bir parçadan önce yerini alır; alternatifli parça
+          sonra kalan iş yerlerine dağılır. Önce yerleşen en iyi yerleri alır.
         </p>
       </Step>
 
-      <Step n={6} id="place" title="Place each job">
+      <Step n={6} id="place" title="Her işi yerleştir">
         <p>
-          The candidates are the material's main work center — plus its
-          alternatives <b>only if the part is ticked Flexible work center</b> in
-          master data (or only the pinned work center). A part that is not flexible
-          always runs on its main work center, even if that makes it late: its
-          quality approval belongs to that work center. On each candidate the engine looks for
-          the earliest free time — also in gaps left earlier — and builds the
-          job:
+          Adaylar malzemenin ana iş yeri ve — <b>yalnız parça master data’da
+          Flexible work center olarak işaretliyse</b> — alternatifleridir (ya da
+          yalnız sabitlenen iş yeri). Esnek olmayan bir parça, geç kalacak olsa bile
+          her zaman ana iş yerinde çalışır: kalite onayı o iş yerine aittir. Motor her
+          adayda en erken boş zamanı arar — daha önce kalan boşluklar dahil — ve
+          işi kurar:
         </p>
         <div className="my-3 flex flex-wrap items-center gap-2 text-xs">
-          <Block tone="bg-slate-200 text-slate-900">Mould setup</Block>
+          <Block tone="bg-slate-200 text-slate-900">Kalıp setup</Block>
           <span aria-hidden>→</span>
-          <Block tone="bg-amber-100 text-amber-900">Quality approval</Block>
+          <Block tone="bg-amber-100 text-amber-900">Kalite onayı</Block>
           <span aria-hidden>→</span>
-          <Block tone="bg-emerald-100 text-emerald-900">Production (coil 1)</Block>
+          <Block tone="bg-emerald-100 text-emerald-900">Üretim (rulo 1)</Block>
           <span aria-hidden>→</span>
-          <Block tone="bg-sky-100 text-sky-900">Frequency stop (e.g. coil change)</Block>
+          <Block tone="bg-sky-100 text-sky-900">Frekans duruşu (ör. rulo değişimi)</Block>
           <span aria-hidden>→</span>
-          <Block tone="bg-emerald-100 text-emerald-900">Production (coil 2)</Block>
+          <Block tone="bg-emerald-100 text-emerald-900">Üretim (rulo 2)</Block>
           <span aria-hidden>→ …</span>
         </div>
         <Formula>
-          pure time = pieces × cycle time (min/piece) · job time = max(pure time ÷ Accepted OEE, pure time + setup +
-          frequency stops + approval)
+          saf süre = adet × çevrim süresi (dk/adet) · iş süresi = max(saf süre ÷ Accepted OEE, saf süre + setup +
+          frekans duruşları + onay)
         </Formula>
         <p className="text-xs text-muted-foreground">
-          Every part on every work center — press, nut welding, spot welding, assembly — is timed this way;
-          no work center is left out of the plan. Example: {cycleExample.qty.toLocaleString('en-GB')} pieces ×{' '}
-          {cycleExample.minutes.toFixed(CYCLE_DECIMALS)} min = {Math.round(cycleRun.theoreticalRunMinutes)} min of pure time; at a{' '}
-          {Math.round(cycleExample.oee * 100)} % Accepted OEE the job is {Math.round(cycleRunOee.totalMinutes)} min.
-          A part without a cycle time but with the old SPM and cavities runs 1 ÷ (SPM × cavities) min/piece — its
-          time is exactly what it was (strokes ÷ SPM). With neither, the part has no speed and the plan check flags
-          it (“no cycle time in master data”). A master data file may give the time in seconds instead — the
-          presses, spot welding and assembly lines are all measured that way (a <b>Saturasyon</b> or{' '}
-          <b>Birim süre saniye</b> column) — and the upload divides it by 60:{' '}
-          {cycleSecondsExample} s = {cycleFromSeconds?.toFixed(CYCLE_DECIMALS)} min/piece. Cycle times are
-          kept to {CYCLE_STORE_DECIMALS} decimals and shown with {CYCLE_DECIMALS}, because a press part can
-          run under a second: {pressSecondsExample.toFixed(CYCLE_DECIMALS)} s is{' '}
-          {formatCycleInput(pressCycle)} min/piece, and at {CYCLE_DECIMALS} decimals it would be{' '}
-          {pressCycle.toFixed(CYCLE_DECIMALS)} — 2.6 % more time on every job of that part
-          ({(10_000 * pressCycle).toFixed(1)} min for 10,000 pieces against{' '}
-          {(10_000 * Number(pressCycle.toFixed(CYCLE_DECIMALS))).toFixed(1)} min).
-          Strokes = ⌈pieces ÷ cavities⌉ (= pieces when no cavities are
-          entered) count only for the mould shot limit and strokes per coil.
-          Setup, frequency stops (coil changes …) and quality approval sit inside that time; when they do not fit, the job is the pure
-          time plus those stops. Frequency stops = coils − 1 (coils = ⌈quantity ÷ pieces per coil⌉, pieces per coil = ⌊coil weight ÷
-          gross weight⌋); a work center whose frequency stop is — none — never stops for it. A co-product comes from the same strokes:
-          strokes × its own cavities.
+          Her iş yerindeki her parça — pres, somun kaynağı, punta kaynağı, montaj — bu şekilde süre alır;
+          hiçbir iş yeri plan dışında kalmaz. Örnek: {cycleExample.qty.toLocaleString('en-GB')} adet ×{' '}
+          {cycleExample.minutes.toFixed(CYCLE_DECIMALS)} dk = {Math.round(cycleRun.theoreticalRunMinutes)} dk saf süre;{' '}
+          %{Math.round(cycleExample.oee * 100)} Accepted OEE ile iş {Math.round(cycleRunOee.totalMinutes)} dk’dır.
+          Çevrim süresi olmayan ama eski SPM ve göz sayısı olan bir parça 1 ÷ (SPM × göz) dk/adet çalışır — süresi
+          eskisinin tam aynısıdır (vuruş ÷ SPM). İkisi de yoksa parçanın hızı yoktur ve plan kontrolü onu
+          işaretler (“no cycle time in master data”). Bir master data dosyası süreyi saniye olarak da verebilir —
+          presler, punta kaynağı ve montaj hatlarının hepsi böyle ölçülür (<b>Saturasyon</b> ya da{' '}
+          <b>Birim süre saniye</b> sütunu) — ve yükleme bunu 60’a böler:{' '}
+          {cycleSecondsExample} sn = {cycleFromSeconds?.toFixed(CYCLE_DECIMALS)} dk/adet. Çevrim süreleri{' '}
+          {CYCLE_STORE_DECIMALS} ondalıkla saklanır ve {CYCLE_DECIMALS} ondalıkla gösterilir, çünkü bir pres
+          parçası bir saniyenin altında çalışabilir: {pressSecondsExample.toFixed(CYCLE_DECIMALS)} sn{' '}
+          {formatCycleInput(pressCycle)} dk/adet’tir; {CYCLE_DECIMALS} ondalıkta{' '}
+          {pressCycle.toFixed(CYCLE_DECIMALS)} olurdu — o parçanın her işinde %2,6 daha fazla süre
+          (10.000 adet için {(10_000 * pressCycle).toFixed(1)} dk’ya karşı{' '}
+          {(10_000 * Number(pressCycle.toFixed(CYCLE_DECIMALS))).toFixed(1)} dk).
+          Vuruş = ⌈adet ÷ göz⌉ (göz girilmemişse = adet) yalnız kalıp vuruş limiti
+          ve rulo başına vuruş için sayılır.
+          Setup, frekans duruşları (rulo değişimleri …) ve kalite onayı bu sürenin içindedir; sığmazlarsa iş, saf
+          süre artı bu duruşlardır. Frekans duruşu = rulo − 1 (rulo = ⌈miktar ÷ rulo başına adet⌉, rulo başına adet = ⌊rulo ağırlığı ÷
+          brüt ağırlık⌋); frekans duruşu — none — olan bir iş yeri bunun için hiç durmaz.
+          Ortak ürün aynı vuruşlardan çıkar:
+          vuruş × kendi göz sayısı.
         </p>
-        <p>It has to respect every rule at once:</p>
+        <p>İş aynı anda her kurala uymak zorundadır:</p>
         <ul>
           <li>
-            If the same mould is already on the work center, the setup is skipped.
+            İş yerinde aynı kalıp zaten bağlıysa setup atlanır.
           </li>
           <li>
             {current.crossShifts
-              ? 'A setup may start near the end of a shift and be finished by the next shift; it never runs past the last working minute of the day. Production can.'
-              : 'A setup or coil change never crosses the end of a shift — no crew starts a setup it cannot finish. Production can.'}
+              ? 'Bir setup vardiya sonuna yakın başlayıp bir sonraki vardiyada bitirilebilir; günün son çalışma dakikasını hiçbir zaman aşmaz. Üretim aşabilir.'
+              : 'Bir setup ya da rulo değişimi hiçbir zaman vardiya sonunu aşmaz — hiçbir ekip bitiremeyeceği bir setup’a başlamaz. Üretim aşabilir.'}
           </li>
           <li>
-            <b>Setups run on through tea and meal breaks.</b> The setup team is
-            indirect and takes its break after the setup. A 30-minute setup that
-            meets a 15-minute tea break after 15 minutes still takes 30 minutes;
-            production starts right after the break, and the break costs the work center
-            nothing. Shift handover and maintenance stops do pause a setup.
+            <b>Setup çay ve yemek molalarında da sürer.</b> Setup ekibi
+            dolaylı işçiliktir ve molasını setup’tan sonra kullanır. 15 dakika
+            sonra 15 dakikalık çay molasına denk gelen 30 dakikalık bir setup yine
+            30 dakika sürer; üretim moladan hemen sonra başlar ve mola iş yerine
+            hiçbir şeye mal olmaz. Vardiya devri ve bakım duruşları ise setup’ı durdurur.
           </li>
           <li>
-            <b>Setup team</b>: normally at most {current.plantNormal} mould setup(s) run at
-            the same time anywhere in the plant. <b>Dynamic rule:</b> for backlog, or for a
-            job that would otherwise start after its stock runs out, up to{' '}
-            {current.plantUrgent} setups may overlap so production starts sooner. Once the
-            urgent work is placed, setups go back to one after the other.
+            <b>Setup ekibi</b>: normalde fabrikanın herhangi bir yerinde aynı anda en
+            fazla {current.plantNormal} kalıp setup’ı yapılır. <b>Dinamik kural:</b>{' '}
+            birikmiş talep için ya da aksi hâlde stoku bittikten sonra başlayacak bir iş
+            için, üretim daha erken başlasın diye en fazla {current.plantUrgent} setup
+            çakışabilir. Acil işler yerleşince setup’lar yeniden birbiri ardına yapılır.
           </li>
           <li>
-            <b>No idle work center while work is waiting</b>: a lot may start up to{' '}
-            {current.pullForward} day(s) before it is needed when its work center would
-            otherwise stand idle, so the plan fills the working days you opened on the
-            Work Calendar — the same hours the Capacity Dashboard counts. If nothing is
-            urgent, the die already on the work center keeps running for its next lot first, so
-            no extra setup is made.
+            <b>İş beklerken boş iş yeri yok</b>: iş yeri aksi hâlde boş kalacaksa bir
+            lot, ihtiyaç duyulmadan en fazla {current.pullForward} gün önce
+            başlayabilir; böylece plan Work Calendar’da açtığınız çalışma günlerini
+            — Capacity Dashboard’un saydığı saatlerin aynısını — doldurur. Acil bir
+            şey yoksa iş yerinde zaten bağlı olan kalıp önce bir sonraki lotu için
+            çalışmaya devam eder; böylece fazladan setup yapılmaz.
           </li>
           <li>
-            Every idle gap on the plan chart shows why it is there (setup team busy, die
-            on another work center, not allowed yet, …).
+            Plan grafiğindeki her boş aralık neden orada olduğunu gösterir (setup
+            ekibi meşgul, kalıp başka iş yerinde, henüz izin yok, …).
           </li>
           <li>
-            <b>Crane</b>: in one hall, mould setups are at least{' '}
-            {current.setupGap} min apart and at most {current.concurrent} at a
-            time; coil changes are at least {current.coilGap} min apart; a mould
-            setup and a coil change never overlap.
+            <b>Vinç</b>: bir holde kalıp setup’ları arasında en az{' '}
+            {current.setupGap} dk olur ve aynı anda en fazla {current.concurrent}{' '}
+            setup yapılır; rulo değişimleri arasında en az {current.coilGap} dk olur;
+            bir kalıp setup’ı ile bir rulo değişimi hiçbir zaman çakışmaz.
           </li>
-          <li>A mould cannot be on two work centers at the same time.</li>
+          <li>Bir kalıp aynı anda iki iş yerinde olamaz.</li>
           <li>
-            If the quantity needs more strokes than the mould's shot limit, it
-            is split into batches at <b>whole coils</b> — a coil is never split
-            between batches. If one coil alone is larger than the limit, the
-            batch is that coil and the job is flagged.
+            Miktar, kalıbın vuruş limitinden fazla vuruş gerektiriyorsa{' '}
+            <b>tam rulolarda</b> partilere bölünür — bir rulo hiçbir zaman partiler
+            arasında bölünmez. Tek bir rulo bile limitten büyükse parti o rulodur ve
+            iş işaretlenir.
           </li>
           <li>
-            A lot does not start before its safety date ({current.safety} working
-            day(s) before its stock runs out) minus the pull-forward window of{' '}
-            {current.pullForward} day(s).
+            Bir lot, emniyet tarihinden (stoku bitmeden {current.safety} iş günü
+            önce) eksi {current.pullForward} günlük öne çekme penceresinden önce
+            başlamaz.
           </li>
         </ul>
         <p>
-          <b>The work center that finishes the job earliest wins</b> — with one
-          exception: when nothing is urgent, continuing the die already mounted
-          (no setup) is preferred. For backlog, or a job that would otherwise
-          start after its stock runs out, the engine also tries the dynamic
-          setup rule and keeps whichever finishes sooner. The chosen work center
-          time, crane slots, setup slot and mould are then booked, and the
-          next requirement is placed.
+          <b>İşi en erken bitiren iş yeri kazanır</b> — tek bir istisnayla: acil bir
+          şey yoksa zaten bağlı olan kalıba (setupsız) devam etmek tercih edilir.
+          Birikmiş talep için ya da aksi hâlde stoku bittikten sonra başlayacak bir
+          iş için motor dinamik setup kuralını da dener ve hangisi daha erken
+          bitiyorsa onu tutar. Ardından seçilen iş yeri süresi, vinç aralıkları,
+          setup aralığı ve kalıp rezerve edilir ve bir sonraki ihtiyaç yerleştirilir.
         </p>
       </Step>
 
-      <Step n={7} id="check" title="Check and report">
+      <Step n={7} id="check" title="Kontrol et ve raporla">
         <ul>
           <li>
-            A part is <b>late</b> when the quantity the customer needs is not
-            ready by <b>{current.cutoff}</b> on the day it is needed — not when
-            the whole lot ends. Every day a lot covers is checked, not only the
-            first one. Backlog in ZPP and anything needed today are due
-            the <b>next day at {current.cutoff}</b>. Public holidays are not skipped: a customer
-            may want parts on a holiday. How late is shown in
-            hours and days. The engine does not leave it — see{' '}
+            Bir parça, müşterinin ihtiyaç duyduğu miktar ihtiyaç gününde saat{' '}
+            <b>{current.cutoff}</b>’a kadar hazır değilse <b>geç</b>tir — lotun
+            tamamı bittiğinde değil. Lotun kapsadığı her gün kontrol edilir, yalnız
+            ilki değil. ZPP’deki birikmiş talep ve bugün gereken her şey{' '}
+            <b>ertesi gün saat {current.cutoff}</b>’da vadelidir. Resmî tatiller
+            atlanmaz: müşteri tatilde de parça isteyebilir. Gecikme saat ve gün
+            olarak gösterilir. Motor bunu öyle bırakmaz — bkz.{' '}
             <a href="#late" className="underline">
-              Late jobs are re-planned
+              Geç işler yeniden planlanır
             </a>
             .
           </li>
           <li>
-            The <b>job window</b> (click a bar) shows the same check per job: the
-            <b> Req dates</b> the job covers and their quantity, start and end time,
-            and a <b>Status</b> per need day — how many pieces are ready how many
-            hours <b>before</b> or <b>late</b> against {current.cutoff} on that day.
-            What the lot makes beyond the need (rounding up to whole coils or the
-            Min. lot) is <b>overstock</b>. Example: 3,000 pcs of backlog, one coil
-            makes 6,000 → &ldquo;3,000 pcs (2 hours late) and 3,000 pcs
-            (overstock)&rdquo;. A job whose stock lasts the whole horizon has no
-            need day: all of it is overstock (stock build).
+            <b>İş penceresi</b> (bir çubuğa tıklayın) aynı kontrolü iş bazında
+            gösterir: işin kapsadığı <b>Req dates</b> ve miktarları, başlangıç ve
+            bitiş saati, ve her ihtiyaç günü için bir <b>Status</b> — o gün saat{' '}
+            {current.cutoff}’a göre kaç adetin kaç saat <b>önce</b> ya da{' '}
+            <b>geç</b> hazır olduğu. Lotun ihtiyacın ötesinde yaptığı miktar (tam
+            ruloya ya da Min. lot’a yuvarlama) <b>fazla stok</b>tur. Örnek: 3.000
+            adet birikmiş talep, bir rulo 6.000 yapar → &ldquo;3.000 adet (2 saat
+            geç) ve 3.000 adet (fazla stok)&rdquo;. Stoku ufkun tamamı boyunca yeten
+            bir işin ihtiyaç günü yoktur: tamamı fazla stoktur (stok oluşturma).
           </li>
           <li>
-            What does not fit anywhere goes to <b>Unplanned</b>, with the
-            reason and a link to the fix (no master data, no eligible work center, no
-            free capacity…).
+            Hiçbir yere sığmayan iş, nedeni ve çözüm bağlantısıyla birlikte{' '}
+            <b>Unplanned</b>’a gider (master data yok, uygun iş yeri yok, boş
+            kapasite yok…).
           </li>
           <li>
-            <b>Urgent raw material</b>: planned quantity × gross weight, walked in
-            the order the steel is <b>needed</b> against coil stock plus coils in
-            transit from their arrival day. A coil is urgent when the steel is
-            needed within the next {current.rawUrgent} working day(s); those are
-            listed on Overview. The need day of a job is its planned day — except a
-            job <b>pulled forward</b> only so its work center is not idle: while the
-            finished stock still covers the demand, its steel is needed on the day
-            the lot may start (stock runs out − safety stock days), not on the
-            pulled-forward day. Such a job can wait for the coil, so it shows as
-            &ldquo;runs short later&rdquo;, with the planned day and the day the steel is
-            needed. Co-products are not counted twice. The weekly requirement is
-            separate — see{' '}
+            <b>Acil hammadde</b>: planlanan miktar × brüt ağırlık; sacın{' '}
+            <b>gerektiği</b> sırayla, rulo stoku artı geliş gününden itibaren yoldaki
+            rulolara karşı yürütülür. Sac önümüzdeki {current.rawUrgent} iş günü
+            içinde gerekiyorsa rulo acildir; bunlar Overview’da listelenir. Bir işin
+            ihtiyaç günü planlandığı gündür — yalnız iş yeri boş kalmasın diye{' '}
+            <b>öne çekilen</b> bir iş hariç: mamul stok talebi hâlâ karşılarken onun
+            sacı, öne çekildiği günde değil, lotun başlayabileceği günde (stok bitişi
+            − emniyet stoku günleri) gerekir. Böyle bir iş ruloyu bekleyebilir; bu
+            yüzden planlanan gün ve sacın gerektiği günle birlikte &ldquo;runs short
+            later&rdquo; olarak görünür. Ortak ürünler iki kez sayılmaz. Haftalık
+            ihtiyaç ayrıdır — bkz.{' '}
             <a href="#raw-mrp" className="underline">
-              Raw material requirement
+              Hammadde ihtiyacı
             </a>
             .
           </li>
           <li>
-            Warnings list whatever changed the plan: moulds held out, work centers
-            in maintenance, missing data.
+            Uyarılar planı değiştiren her şeyi listeler: plan dışı tutulan kalıplar,
+            bakımdaki iş yerleri, eksik veriler.
           </li>
         </ul>
       </Step>
 
       <section id="late" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-amber-200 bg-amber-50 p-4">
-        <h2 className="text-sm font-semibold text-amber-950">Late jobs are re-planned</h2>
+        <h2 className="text-sm font-semibold text-amber-950">Geç işler yeniden planlanır</h2>
         <p className="mt-1 text-sm text-amber-900">
-          A job that starts after its stock runs out means the customer stops —
-          your own safety stock is the only margin. So a late job is never just
-          reported; the engine plans again, up to six rounds:
+          Stoku bittikten sonra başlayan bir iş, müşterinin durması demektir —
+          tek pay sizin emniyet stokunuzdur. Bu yüzden geç bir iş hiçbir zaman
+          yalnızca raporlanmaz; motor altı tura kadar yeniden planlar:
         </p>
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-amber-900">
           <li>
-            <b>Move the late lot forward</b> within its own group: a late fill lot
-            goes to the head of the fill lots, never ahead of backlog. It then
-            tries every eligible work center again, so an alternative work center that is
-            free earlier is found.
+            <b>Geç lotu öne al</b>, kendi grubu içinde: geç bir dolgu lotu dolgu
+            lotlarının başına geçer, hiçbir zaman birikmiş talebin önüne değil.
+            Sonra her uygun iş yerini yeniden dener; böylece daha erken boşalan
+            alternatif bir iş yeri bulunur.
           </li>
           <li>
-            <b>Let its setup overlap</b>: a late-risk job may set up while
-            another setup runs — also in the same hall — at most{' '}
-            {current.plantUrgent} at once in the whole plant, so production starts
-            sooner. As soon as no backlog or late-risk job is left, setups no
-            longer overlap (one per hall, {current.plantNormal} in the plant). Coil
-            changes never overlap.
+            <b>Setup’ının çakışmasına izin ver</b>: geç kalma riski olan bir iş,
+            başka bir setup sürerken — aynı holde de — setup yapabilir; bütün
+            fabrikada aynı anda en fazla {current.plantUrgent}; böylece üretim daha
+            erken başlar. Birikmiş ya da geç kalma riskli iş kalmayınca setup’lar
+            artık çakışmaz (hol başına bir, fabrikada {current.plantNormal}). Rulo
+            değişimleri hiçbir zaman çakışmaz.
           </li>
           <li>
-            <b>Keep the best plan</b>: fewest unplanned (daily lots), then fewest late
-            <b>parts</b> (three late lots of one part are one customer stop), then
-            fewest late hours, and only then the fewest unplanned long-term lots.
-            Long-term lots are never late and never moved forward. A round that does not improve does not stop the
-            search — the next round may — but the best plan so far is kept.
+            <b>En iyi planı tut</b>: en az plansız (günlük lotlar), sonra en az geç{' '}
+            <b>parça</b> (bir parçanın üç geç lotu tek müşteri duruşudur), sonra en
+            az geç saat ve ancak ondan sonra en az plansız uzun vadeli lot. Uzun
+            vadeli lotlar hiçbir zaman geç olmaz ve öne alınmaz. İyileştirmeyen bir
+            tur aramayı durdurmaz — sonraki tur iyileştirebilir — ama o ana kadarki
+            en iyi plan tutulur.
           </li>
         </ol>
         <p className="mt-2 text-sm text-amber-900">
-          <b>Coils are never cut to save a late job.</b> A mounted coil is run
-          to the end; cutting it would leave a half coil, a second setup and a
-          second coil mount later. If moving forward is not enough, the job stays
-          late and is reported.
+          <b>Geç bir işi kurtarmak için rulo hiçbir zaman kesilmez.</b> Takılan bir
+          rulo sonuna kadar çalışılır; kesmek yarım rulo, ikinci bir setup ve sonra
+          ikinci bir rulo takma demek olurdu. Öne almak yetmezse iş geç kalır ve
+          raporlanır.
         </p>
         <p className="mt-2 text-sm text-amber-900">
-          Whatever is still late is listed on the Overview in red, <b>once per
-          material</b> (its first late lot). <b>Late is a share, not a whole
-          order.</b> The ZPP daily need is the guide: every need day is a delivery
-          point, due at the delivery time ({current.cutoff}) with everything needed
-          up to that day (ZPP_DAILY on its own date; beyond it the weekly ZPP spread over
-          the working days; backlog and today's need are due the next day). At that moment
-          the engine counts what has already been pressed:
+          Hâlâ geç olan her şey Overview’da kırmızıyla, <b>malzeme başına bir
+          kez</b> (ilk geç lotu) listelenir. <b>Gecikme bütün sipariş değil, bir
+          paydır.</b> Yol gösterici ZPP günlük ihtiyacıdır: her ihtiyaç günü bir
+          teslim noktasıdır; o güne kadar gereken her şeyle birlikte teslim saatinde
+          ({current.cutoff}) vadelidir (ZPP_DAILY kendi tarihinde; ötesinde haftalık
+          ZPP çalışma günlerine dağıtılır; birikmiş talep ve bugünün ihtiyacı ertesi
+          gün vadelidir). O anda motor o ana kadar basılmış olanı sayar:
         </p>
         <ul className="mt-1 ml-5 list-disc space-y-1 text-sm text-amber-900">
           <li>
-            <b>Needed qty</b> — what the customer needs by the first missed delivery point
-            (cumulative ZPP need, not the lot size: a 40 000 pcs lot that covers 8 days owes
-            only the first day's need at the first point).
+            <b>Needed qty</b> — müşterinin kaçırılan ilk teslim noktasına kadar ihtiyaç
+            duyduğu miktar (lot büyüklüğü değil, kümülatif ZPP ihtiyacı: 8 günü kapsayan
+            40 000 adetlik bir lot, ilk noktada yalnız ilk günün ihtiyacını borçludur).
           </li>
           <li>
-            <b>On time</b> — the share of it already ready at the delivery time. Pieces come
-            out evenly while the press runs (setup and approval give none), so a job that
-            started before the deadline has delivered part of the need.
+            <b>On time</b> — bunun teslim saatinde zaten hazır olan payı. Pres çalıştığı
+            sürece parçalar eşit hızda çıkar (setup ve onay parça vermez); bu yüzden son
+            tarihten önce başlamış bir iş ihtiyacın bir kısmını teslim etmiştir.
           </li>
           <li>
-            <b>Late share</b> — the rest, with the <b>average</b> and the <b>last piece's</b>{' '}
-            delay: "15% (900 pcs) · avg 0.8 h, last 1.5 h". The last piece's delay is{' '}
-            <i>ready − delivery time</i>: if production starts 6 h after the delivery time and
-            takes j h, the whole need is complete 6 + j h late. The customer is fed from the
-            first pieces, so the average is closer to how long the line really waits.
+            <b>Late share</b> — geri kalanı, <b>ortalama</b> ve <b>son parçanın</b>{' '}
+            gecikmesiyle: "15% (900 pcs) · avg 0.8 h, last 1.5 h". Son parçanın gecikmesi{' '}
+            <i>hazır − teslim saati</i>dir: üretim teslim saatinden 6 sa sonra başlar ve
+            j sa sürerse, ihtiyacın tamamı 6 + j sa geç tamamlanır. Müşteri ilk
+            parçalardan beslenir; bu yüzden ortalama, hattın gerçekte ne kadar beklediğine daha yakındır.
           </li>
         </ul>
         <p className="mt-2 text-sm text-amber-900">
-          The independent plan check (below) replays the same ZPP need hour by hour and reports
-          the same shortfall and recovery time, so the two always agree.
+          Bağımsız plan kontrolü (aşağıda) aynı ZPP ihtiyacını saat saat yeniden oynatır ve
+          aynı eksik miktarı ve toparlanma süresini raporlar; bu yüzden ikisi her zaman uyuşur.
         </p>
         <p className="mt-2 text-sm text-amber-900">
-          <b>Why late</b> gives the reasons found in the plan itself, the
-          strongest first:
+          <b>Why late</b>, planın kendisinde bulunan nedenleri en güçlüsünden
+          başlayarak verir:
         </p>
         <ul className="mt-1 ml-5 list-disc space-y-1 text-sm text-amber-900">
-          <li>already due when the plan was calculated (backlog, or the stock did not cover today);</li>
+          <li>plan hesaplandığında zaten vadesi gelmişti (birikmiş talep ya da stok bugünü karşılamadı);</li>
           <li>
-            cannot be ready even if started now — the job alone needs more press time
-            (setup + approval + production) than is left until the deadline;
+            şimdi başlasa bile yetişemez — işin tek başına son tarihe kadar kalandan daha
+            fazla pres süresine (setup + onay + üretim) ihtiyacı var;
           </li>
           <li>
-            the work center is busy before it: how many jobs and hours, split into needed
-            earlier, frozen / approved and needed later, and which were placed first by a
-            plan override;
+            iş yeri ondan önce dolu: kaç iş ve kaç saat; daha önce gereken, dondurulmuş /
+            onaylı ve daha sonra gereken olarak ayrılmış; hangilerinin bir plan
+            müdahalesiyle önce yerleştirildiği;
           </li>
-          <li>the press waited before the setup (setup crew, mould on another press…);</li>
-          <li>hours between setup start and ready when the press does not work (no shift, weekend, breaks);</li>
-          <li>a capacity factor below 100%.</li>
+          <li>pres setup’tan önce bekledi (setup ekibi, kalıp başka preste…);</li>
+          <li>setup başlangıcı ile hazır olma arasında presin çalışmadığı saatler (vardiya yok, hafta sonu, molalar);</li>
+          <li>%100’ün altında bir kapasite faktörü.</li>
         </ul>
         <p className="mt-2 text-sm text-amber-900">
-          <b>How the hours are calculated</b> (tap the row): setup start → setup +
-          quality approval + production of the needed pieces at the part's speed
-          (pieces per hour = 60 ÷ cycle time × performance) → pieces ready at the
-          delivery time (on time share) → ready time of the last needed piece. Last
-          piece late = ready − needed by (delivery time on the need day). When the press
-          cannot make it, <i>Why late</i> compares the production time the press has between
-          the setup start and the deadline with the time the needed pieces take. Next to it are the inputs that decide it — demand and finished
-          stock, speed, setup and approval minutes, the shifts and delivery time —
-          with links to where they are set. If one of them is wrong (e.g. a setup
-          of 600 min instead of 60, a missing shift), the part only <i>looks</i> late:
-          correct it there and recalculate.
+          <b>Saatler nasıl hesaplanır</b> (satıra dokunun): setup başlangıcı → setup +
+          kalite onayı + gereken parçaların parçanın hızıyla üretimi (saatte adet =
+          60 ÷ çevrim süresi × performans) → teslim saatinde hazır olan adet (zamanında
+          pay) → gereken son parçanın hazır olma saati. Son parça gecikmesi = hazır −
+          gerektiği an (ihtiyaç günündeki teslim saati). Pres yetiştiremiyorsa{' '}
+          <i>Why late</i>, presin setup başlangıcı ile son tarih arasındaki üretim süresini
+          gereken parçaların aldığı süreyle karşılaştırır. Yanında bunu belirleyen girdiler
+          vardır — talep ve mamul stok, hız, setup ve onay dakikaları, vardiyalar ve teslim
+          saati — ayarlandıkları yerlere bağlantılarıyla. Bunlardan biri yanlışsa (ör. 60
+          yerine 600 dk setup, eksik bir vardiya) parça yalnızca geç <i>görünür</i>:
+          orada düzeltin ve yeniden hesaplayın.
         </p>
       </section>
 
       <section id="scenarios" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Scenarios — trying other plans</h2>
+        <h2 className="text-sm font-semibold text-foreground">Senaryolar — başka planları denemek</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          One order of placing jobs is not always the best. After the plan above
-          is built, the engine builds it again with other variations and keeps
-          the best one:
+          İşleri yerleştirmenin tek bir sırası her zaman en iyisi değildir. Yukarıdaki
+          plan kurulduktan sonra motor onu başka varyasyonlarla yeniden kurar ve en
+          iyisini tutar:
         </p>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            <b>Order</b> within the same urgency: stock-out day (standard),
-            shortest job first, longest job first, parts with the fewest work centers
-            first, and shuffled orders.
+            Aynı aciliyet içinde <b>sıra</b>: stok bitiş günü (standart), önce en kısa
+            iş, önce en uzun iş, önce en az iş yeri olan parçalar ve karıştırılmış
+            sıralar.
           </li>
           <li>
-            <b>Work center choice</b>: the work center that finishes first (standard), the
-            one that can start first, or the least loaded one.
+            <b>İş yeri seçimi</b>: önce bitiren iş yeri (standart), önce
+            başlayabilen ya da en az yüklü olan.
           </li>
           <li>
-            <b>Best</b> means: fewest unplanned daily lots, then fewest late parts, then
-            fewest late hours, then the fewest unplanned long-term lots, then the highest production time (setups do not
-            count as production), then the fewest setups. Utilisation never wins
-            over a late part.
+            <b>En iyi</b> şu demektir: en az plansız günlük lot, sonra en az geç parça,
+            sonra en az geç saat, sonra en az plansız uzun vadeli lot, sonra en yüksek
+            üretim süresi (setup üretim sayılmaz), sonra en az setup. Doluluk hiçbir
+            zaman geç bir parçanın önüne geçmez.
           </li>
           <li>
-            <b>Utilisation</b> = busy work center hours ÷ available hours (working
-            calendar minus maintenance) in the next 7 days, all work centers together.
+            <b>Doluluk</b> = önümüzdeki 7 günde dolu iş yeri saati ÷ kullanılabilir saat
+            (çalışma takvimi eksi bakım), bütün iş yerleri birlikte.
           </li>
           <li>
-            <b>It stops</b> as soon as {current.target}% is reached with nothing
-            late, after{' '}
-            {current.maxScenarios} scenarios, after 25 scenarios without an
-            improvement, or after two minutes. The Production Plan then shows
-            the level reached (e.g. "best of {current.maxScenarios} scenarios
-            reaches 90%"), the utilisation of each work center and the scenarios
-            compared.
+            <b>Arama durur</b>: hiçbir şey geç değilken %{current.target}’e ulaşılınca,{' '}
+            {current.maxScenarios} senaryodan sonra, iyileşmesiz 25 senaryodan sonra
+            ya da iki dakika sonra. Ardından Production Plan ulaşılan seviyeyi (ör.
+            "best of {current.maxScenarios} scenarios reaches 90%"), her iş yerinin
+            doluluğunu ve karşılaştırılan senaryoları gösterir.
           </li>
           <li>
-            <b>Local search</b> then works on each late part directly: move it
-            1, 2 or 4 days forward in its group, switch its "moved forward" mark,
-            or move a non-late part that runs before it on the same work center 2 days
-            back. Each move rebuilds the whole plan and is kept only if the plan
-            gets better (at most 150 moves or one minute).
+            Ardından <b>yerel arama</b> her geç parça üzerinde doğrudan çalışır: onu
+            grubunda 1, 2 ya da 4 gün öne alır, "moved forward" işaretini değiştirir ya
+            da aynı iş yerinde ondan önce çalışan geç olmayan bir parçayı 2 gün geri
+            alır. Her hamle bütün planı yeniden kurar ve yalnız plan iyileşirse tutulur
+            (en fazla 150 hamle ya da bir dakika).
           </li>
           <li>
-            <b>Lot split</b> (also local search): a long lot that runs before a late
-            part on the same work center — say 30,000 pcs — is cut in 2 or 3 parts so the late part
-            runs <i>between</i> them: 15,000, the late part, then the other 15,000.
-            Parts are always whole coils (a mounted coil is never cut), the first part covers
-            what is needed first (rounded up to whole coils), and a lot is not split if a part would
-            fall below the Min. lot. The part that covers no need is only coil surplus and
-            is planned as fill, so it no longer holds up urgent parts. The second part needs another
-            setup, so a split is kept only when it saves a late part; the plan marks the jobs{' '}
-            <i>"lot split 1/2"</i> and the plan check lists the lots that were split. A quantity
-            change on the chart applies to the whole lot.
+            <b>Lot bölme</b> (yine yerel arama): aynı iş yerinde geç bir parçadan önce
+            çalışan uzun bir lot — diyelim 30.000 adet — 2 ya da 3 parçaya kesilir, böylece
+            geç parça onların <i>arasında</i> çalışır: 15.000, geç parça, sonra diğer 15.000.
+            Parçalar her zaman tam ruloluktur (takılı rulo hiçbir zaman kesilmez), ilk parça
+            önce gerekeni karşılar (tam ruloya yuvarlanır) ve bir parça Min. lot’un altına
+            düşecekse lot bölünmez. Hiçbir ihtiyacı karşılamayan parça yalnızca rulo
+            fazlasıdır ve dolgu olarak planlanır; böylece artık acil parçaları
+            bekletmez. İkinci parça bir setup daha gerektirir; bu yüzden bölme yalnız geç
+            bir parçayı kurtarıyorsa tutulur; plan işleri{' '}
+            <i>"lot split 1/2"</i> olarak işaretler ve plan kontrolü bölünen lotları
+            listeler. Grafikte bir miktar değişikliği lotun tamamına uygulanır.
           </li>
         </ul>
       </section>
 
       <section id="press-start" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Planner's hand — closed periods and delays</h2>
+        <h2 className="text-sm font-semibold text-foreground">Planlamacının müdahalesi — kapalı dönemler ve gecikmeler</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Unless you say otherwise every work center is planned from now. At the top left of the
-          Production Plan (<b>Plan settings</b>) you can set, per work center, before recalculating:
+          Siz aksini söylemedikçe her iş yeri şu andan itibaren planlanır. Production
+          Plan’ın sol üstünde (<b>Plan settings</b>) yeniden hesaplamadan önce iş yeri
+          bazında şunları ayarlayabilirsiniz:
         </p>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            <b>Closed from – to</b> (date and time) with a reason — no operator, no raw material…
-            The work center takes no work between the two moments; the closed hours show on the
-            chart. Leave <i>from</i> empty to close it from now until <i>to</i>. Example: closed
-            Monday 07:30 – 10:00 on a 07:00 shift — a 60-minute job does not fit in the first half
-            hour, so it starts at 10:00; a job before a later closed period (12:00 – 14:00) is not
-            moved. Approved jobs that touch the closed period are released and planned again.
+            Bir nedenle birlikte <b>Closed from – to</b> (tarih ve saat) — operatör yok,
+            hammadde yok… İş yeri bu iki an arasında iş almaz; kapalı saatler grafikte
+            görünür. Şu andan <i>to</i>’ya kadar kapatmak için <i>from</i>’u boş bırakın.
+            Örnek: 07:00 vardiyasında pazartesi 07:30 – 10:00 kapalı — 60 dakikalık bir iş
+            ilk yarım saate sığmaz, bu yüzden 10:00’da başlar; daha sonraki bir kapalı
+            dönemden (12:00 – 14:00) önceki bir iş taşınmaz. Kapalı döneme dokunan onaylı
+            işler serbest bırakılır ve yeniden planlanır.
           </li>
           <li>
-            <b>A closed period — and an open breakdown that stops the press — is a planned stop, not a
-            wall.</b> Production runs up to it, the press
-            stops with the coil still in it and continues after it — like a shift that is not
-            worked. Setup, quality approval and coil changes do not cross it; if the stop comes right
-            after the setup (no stroke yet) the job starts after the stop instead. When the stop cuts
-            a coil, the job ends when that coil is finished; the remaining coils become a new lot
-            that is planned next (the die is still mounted, so no setup). Example: 1,000 pcs per
-            coil, 100 min per coil, 3 coils, stop 09:00 – 10:00 on a 07:00 shift: setup 07:00 – 07:30,
-            first coil 07:30 – 09:00 and 10:00 – 10:10 → a 1,000-piece job; the other 2,000 follow at
-            10:10. If the die should come off instead, cancel that lot by hand.
+            <b>Kapalı bir dönem — ve presi durduran açık bir arıza — duvar değil, planlı
+            bir duruştur.</b> Üretim ona kadar çalışır, pres rulo hâlâ içindeyken durur
+            ve ondan sonra devam eder — çalışılmayan bir vardiya gibi. Setup, kalite onayı
+            ve rulo değişimleri onu aşmaz; duruş setup’tan hemen sonra gelirse (henüz
+            vuruş yoksa) iş bunun yerine duruştan sonra başlar. Duruş bir ruloyu
+            kestiğinde iş o rulo bitince biter; kalan rulolar hemen ardından planlanan
+            yeni bir lot olur (kalıp hâlâ bağlı, bu yüzden setup yok). Örnek: rulo başına
+            1.000 adet, rulo başına 100 dk, 3 rulo, 07:00 vardiyasında 09:00 – 10:00
+            duruş: setup 07:00 – 07:30, ilk rulo 07:30 – 09:00 ve 10:00 – 10:10 → 1.000
+            adetlik bir iş; diğer 2.000 adet 10:10’da gelir. Kalıbın bunun yerine sökülmesi
+            gerekiyorsa o lotu elle iptal edin.
           </li>
           <li>
-            <b>Behind / ahead</b> (hours): the line did not keep to the approved plan. +3 h moves
-            the approved (frozen and running) jobs 3 hours later and closes the first 3 hours as
-            "Behind plan"; −2 h brings them forward, never before now. "All work centers" sets it for
-            the whole line at once.
+            <b>Behind / ahead</b> (saat): hat onaylı plana uymadı. +3 sa, onaylı
+            (dondurulmuş ve çalışan) işleri 3 saat ileri kaydırır ve ilk 3 saati "Behind
+            plan" olarak kapatır; −2 sa onları öne getirir, hiçbir zaman şu andan önceye
+            değil. "All work centers" bunu tek seferde bütün hat için ayarlar.
           </li>
         </ul>
         <p className="mt-2 text-sm text-muted-foreground">
-          Work that is not approved needs no correction: every Calculate plan rebuilds the plan from
-          the current moment.
+          Onaylanmamış işler düzeltme gerektirmez: her Calculate plan planı şu andan
+          itibaren yeniden kurar.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Next to it, <b>Work calendar</b> shows the chosen work center week by week: shifts 1–3 per
-          day as the plan uses them (Work Calendar, week exceptions, holidays, day records) and
-          overtime hours. It is read-only until you press <b>Edit</b>: then a click on a cell opens
-          or closes that shift — a day record (see <a href="#capacity">Build the capacity</a>) — and
-          the OT row adds or removes that day's overtime. Every day of the week can be edited,
-          including a Saturday or Sunday that is closed and therefore absent from the plan's days;
-          the OT row only offers the overtime that fits that day's free window and writes
-          <i>full (24 h)</i> when the day already works 24 hours. Nothing is written until
-          <b>Save</b>; a dashed cell is not in the plan until the next Calculate plan.
+          Yanında <b>Work calendar</b>, seçilen iş yerini hafta hafta gösterir: planın
+          kullandığı şekliyle günlük 1–3 vardiya (Work Calendar, hafta istisnaları, tatiller,
+          gün kayıtları) ve mesai saatleri. <b>Edit</b>’e basana kadar salt okunurdur: sonra
+          bir hücreye tıklamak o vardiyayı açar ya da kapatır — bir gün kaydı (bkz.{' '}
+          <a href="#capacity">Kapasiteyi kur</a>) — ve OT satırı o günün mesaisini ekler ya
+          da kaldırır. Kapalı olduğu için plan günlerinde bulunmayan cumartesi ya da pazar
+          dahil haftanın her günü düzenlenebilir; OT satırı yalnız o günün boş penceresine
+          sığan mesaiyi sunar ve gün zaten 24 saat çalışıyorsa <i>full (24 h)</i> yazar.{' '}
+          <b>Save</b>’e kadar hiçbir şey yazılmaz; kesikli bir hücre bir sonraki
+          Calculate plan’a kadar planda değildir.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          On the chart a job is drawn as <b>one bar per working stretch</b>. Planned stops do not
-          break the bar — they are small dots inside it — but a <b>closed shift does</b>: with the
-          1st and 3rd shift open and the 2nd closed, the work is drawn as 07:00–15:00 and
-          23:00–07:00 with 15:00–23:00 left empty, because the work center does not run then.
+          Grafikte bir iş <b>her çalışma aralığı için bir çubuk</b> olarak çizilir. Planlı
+          duruşlar çubuğu bölmez — içinde küçük noktalardır — ama <b>kapalı bir vardiya
+          böler</b>: 1. ve 3. vardiya açık, 2. vardiya kapalıyken iş 07:00–15:00 ve
+          23:00–07:00 olarak çizilir, 15:00–23:00 boş kalır, çünkü iş yeri o sırada çalışmaz.
         </p>
       </section>
 
       <section id="org-filter" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Department, cost center and work center filter — a view, not a rule</h2>
+        <h2 className="text-sm font-semibold text-foreground">Bölüm, masraf yeri ve iş yeri filtresi — kural değil, görünüm</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Three pages carry the same filter: <Link to="/planlama" className="underline">Production Plan</Link>,{' '}
-          <Link to="/referanslar" className="underline">Master Data</Link> and{' '}
-          <Link to="/capacity" className="underline">Capacity Dashboard</Link>. You pick a{' '}
-          <b>department</b>, then one or more of its <b>cost centers</b>, then — on Master Data and
-          the Capacity Dashboard — one or more <b>work centers</b>. Each level narrows the next, so
-          the work centers you can pick are exactly those of the cost centers of that department.
-          Each page remembers its own selection for the next time you open it.
+          Üç sayfa aynı filtreyi taşır: <Link to="/planlama" className="underline">Production Plan</Link>,{' '}
+          <Link to="/referanslar" className="underline">Master Data</Link> ve{' '}
+          <Link to="/capacity" className="underline">Capacity Dashboard</Link>. Önce bir{' '}
+          <b>bölüm</b>, sonra onun bir ya da birkaç <b>masraf yeri</b>ni, sonra — Master Data ve
+          Capacity Dashboard’da — bir ya da birkaç <b>iş yeri</b>ni seçersiniz. Her seviye bir
+          sonrakini daraltır; böylece seçebileceğiniz iş yerleri tam olarak o bölümün masraf
+          yerlerine ait olanlardır. Her sayfa kendi seçimini bir sonraki açılış için hatırlar.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          What each page narrows: on Production Plan the chart, the work center lists, the part list
-          of <b>Add job</b>, the <b>Pin to work center</b> list and the late-job count; on Master
-          Data the part list — a part stays while its main work center <i>or one of its
-          alternatives</i> is among the chosen ones, and a part with no work center at all belongs
-          to no department and shows only with the filter off; on the Capacity Dashboard the cards,
-          the chart and the work center list.
+          Her sayfanın daralttığı: Production Plan’da grafik, iş yeri listeleri, <b>Add job</b>{' '}
+          parça listesi, <b>Pin to work center</b> listesi ve geç iş sayısı; Master Data’da
+          parça listesi — bir parça, ana iş yeri <i>ya da alternatiflerinden biri</i> seçilenler
+          arasında olduğu sürece kalır; hiç iş yeri olmayan bir parça hiçbir bölüme ait değildir
+          ve yalnız filtre kapalıyken görünür; Capacity Dashboard’da kartlar, grafik ve iş yeri
+          listesi.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          <b>It does not change the plan or the numbers.</b> The plan and the capacity forecast are
-          always calculated for the whole plant — capacity, cranes, setup teams and mould limits are
-          only correct when every work center is seen at once — so filtering never moves a job,
-          never changes an hour on the Capacity Dashboard, and two planners looking at different
-          departments see the same plan. Nothing is hidden from the engine; it is hidden from the
-          screen.
+          <b>Planı ya da sayıları değiştirmez.</b> Plan ve kapasite tahmini her zaman bütün
+          fabrika için hesaplanır — kapasite, vinçler, setup ekipleri ve kalıp limitleri ancak
+          bütün iş yerleri aynı anda görüldüğünde doğrudur — bu yüzden filtreleme hiçbir işi
+          taşımaz, Capacity Dashboard’daki hiçbir saati değiştirmez ve farklı bölümlere bakan iki
+          planlamacı aynı planı görür. Motordan hiçbir şey gizlenmez; yalnız ekrandan gizlenir.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          <b>Calculate plan</b> therefore always calculates every work center together — presses and
-          operator-plan lines (nut welding, spot welding…) in one run, whatever the filter shows. The
-          calendar box follows the filter: work centers of a <i>Shift</i> cost center show the{' '}
-          <b>Work calendar</b> (shifts and overtime per work center), an <i>Operator</i> cost center
-          shows <b>Operators per shift</b> (people per day and shift); both appear only when the
-          selection holds both kinds. <b>Not yet linked:</b> a part made on a press and used on a
-          welding line is planned on each line on its own — the welding job does not wait for the
-          press job that makes its part. The independent check warns when it does not fit (see{' '}
-          <a href="#component-ready" className="underline">intermediate part not ready</a>).
+          Bu yüzden <b>Calculate plan</b> filtre ne gösterirse göstersin her zaman bütün iş
+          yerlerini birlikte hesaplar — presleri ve operatör planlı hatları (somun kaynağı, punta
+          kaynağı…) tek seferde. Takvim kutusu filtreyi izler: <i>Shift</i> masraf yerinin iş
+          yerleri <b>Work calendar</b>’ı (iş yeri bazında vardiya ve mesai), <i>Operator</i> masraf
+          yeri ise <b>Operators per shift</b>’i (gün ve vardiya bazında kişi) gösterir; seçim iki
+          türü de içeriyorsa ikisi birden görünür. <b>Henüz bağlı değil:</b> preste yapılıp bir
+          kaynak hattında kullanılan bir parça her hatta kendi başına planlanır — kaynak işi, parçasını
+          yapan pres işini beklemez. Bağımsız kontrol, bu uymadığında uyarır (bkz.{' '}
+          <a href="#component-ready" className="underline">ara mamul hazır değil</a>).
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          The link comes from the definitions: work center → cost center (
-          <Link to="/makineler" className="underline">Work Center Definitions</Link>) and cost center
-          → department (Company settings). A work center without a cost center is listed under{' '}
-          <i>Without a department</i> so it cannot get lost. Each option shows how many work centers
-          it holds. Every work center is in the plan — presses as well as nut welding, spot welding,
-          robot and assembly lines — because every part is timed by its cycle time (see{' '}
-          <a href="#inputs" className="underline">Collect the data</a>); there is no “not planned” work
-          center.
+          Bağlantı tanımlardan gelir: iş yeri → masraf yeri (
+          <Link to="/makineler" className="underline">Work Center Definitions</Link>) ve masraf yeri
+          → bölüm (Company settings). Masraf yeri olmayan bir iş yeri kaybolmasın diye{' '}
+          <i>Without a department</i> altında listelenir. Her seçenek kaç iş yeri içerdiğini
+          gösterir. Her iş yeri plandadır — presler kadar somun kaynağı, punta kaynağı, robot ve
+          montaj hatları da — çünkü her parça çevrim süresiyle süre alır (bkz.{' '}
+          <a href="#inputs" className="underline">Verileri topla</a>); “planlanmayan” iş yeri
+          yoktur.
         </p>
       </section>
 
       <section id="capacity-dashboard" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Capacity Dashboard — Prediction OEE and Accepted OEE</h2>
+        <h2 className="text-sm font-semibold text-foreground">Capacity Dashboard — Prediction OEE ve Accepted OEE</h2>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            <b>Capacity</b> is the same net hours the plan uses (step 3): one formula for the plan,
-            the Work Calendar, the Capacity Dashboard and Performance.
+            <b>Kapasite</b>, planın kullandığı net saatlerin aynısıdır (3. adım): plan, Work
+            Calendar, Capacity Dashboard ve Performance için tek formül.
           </li>
           <li>
-            <b>Demand hours</b> = pieces × cycle time ÷ 60 ÷ OEE, after finished stock, earliest week
-            first; this week carries the backlog. Groups are the work center <b>categories</b>.
+            <b>Talep saati</b> = adet × çevrim süresi ÷ 60 ÷ OEE; mamul stok düşüldükten sonra,
+            en erken hafta önce; bu hafta birikmiş talebi taşır. Gruplar iş yeri <b>kategorileri</b>dir.
           </li>
           <li>
-            <b>A) Prediction OEE</b> — one rate for every part ({current.predictionOee}%), set on the
-            dashboard. It is a what-if for that view only and never changes the plan.
+            <b>A) Prediction OEE</b> — dashboard’da ayarlanan, her parça için tek oran
+            (%{current.predictionOee}). Yalnız o görünüm için bir “ya olursa” hesabıdır ve planı
+            hiçbir zaman değiştirmez.
           </li>
           <li>
-            <b>B) Accepted OEE</b> — each part's value from Master Data, the same as the plan.
+            <b>B) Accepted OEE</b> — her parçanın Master Data’daki değeri, planla aynı.
           </li>
           <li>
-            Both use the same method: available hours as they are, production time = ideal time ÷
-            OEE. The <b>capacity factor</b> (Performance page) is a third, separate number: the
-            measured attainment against the approved plan, applied to the plan's capacity.
+            İkisi de aynı yöntemi kullanır: kullanılabilir saatler olduğu gibi, üretim süresi = ideal
+            süre ÷ OEE. <b>Kapasite faktörü</b> (Performance sayfası) üçüncü, ayrı bir sayıdır:
+            onaylı plana karşı ölçülen gerçekleşme; planın kapasitesine uygulanır.
           </li>
         </ul>
       </section>
 
       <section id="oee-short-stops" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">OEE — availability and performance, short stops</h2>
+        <h2 className="text-sm font-semibold text-foreground">OEE — kullanılabilirlik ve performans, kısa duruşlar</h2>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            Times are added first, then divided — never an average of percentages. <b>Availability</b> = Production ÷ Loading,{' '}
+            Önce süreler toplanır, sonra bölünür — hiçbir zaman yüzdelerin ortalaması alınmaz. <b>Availability</b> = Production ÷ Loading,{' '}
             <b>Performance</b> = Operation ÷ Production, <b>Quality</b> = Good ÷ (Good + Scrap + Reject), <b>OEE</b> = A × P × Q.
-            Loading already leaves out the planned stops (breaks, no work, try-out: Reason Code 1 set as a break in OEE Settings).
+            Loading planlı duruşları (molalar, iş yok, deneme: OEE Settings’te mola olarak ayarlanan Reason Code 1) zaten dışarıda bırakır.
           </li>
           <li>
-            <b>Short stops</b>: an unplanned stop shorter than {MES_SHORT_STOP_MIN} min is a <b>performance</b> (speed) loss; one of{' '}
-            {MES_SHORT_STOP_MIN} min or longer is an <b>availability</b> loss. The MES already works this way: its production time only
-            deducts the stops of {MES_SHORT_STOP_MIN} min and longer, so A and P are the MES values on every OEE page (Dashboard, trends,
-            weekly / monthly, Daily Report, Board, KPI).
+            <b>Kısa duruşlar</b>: {MES_SHORT_STOP_MIN} dk’dan kısa plansız bir duruş <b>performans</b> (hız) kaybıdır;{' '}
+            {MES_SHORT_STOP_MIN} dk ya da daha uzun olan <b>kullanılabilirlik</b> kaybıdır. MES zaten böyle çalışır: üretim süresinden
+            yalnız {MES_SHORT_STOP_MIN} dk ve daha uzun duruşları düşer; bu yüzden her OEE sayfasında (Dashboard, trendler, haftalık /
+            aylık, Daily Report, Board, KPI) A ve P, MES değerleridir.
           </li>
           <li>
-            The loss pages split the same reason code by the length of each stop. The Loss Bridge shows only the long stops (e.g.
-            “Machine”); the short ones are <b>not a bridge step</b> — they stay inside Speed loss = Production − Operation (the step
-            note gives their minutes) and are analysed in the duration buckets of MTTR &amp; MTBF. They never touch the availability
-            step: A, the availability loss and “Not explained” are the same with or without them. Losses Trend keeps a “Short
-            stops” column (Speed = Production − Operation − short stops). The totals and the OEE never change.
+            Kayıp sayfaları aynı neden kodunu her duruşun süresine göre ayırır. Loss Bridge yalnız uzun duruşları gösterir (ör.
+            “Machine”); kısa olanlar <b>bir köprü adımı değildir</b> — Speed loss = Production − Operation içinde kalır (adım notu
+            dakikalarını verir) ve MTTR &amp; MTBF’nin süre kovalarında analiz edilir. Kullanılabilirlik adımına hiç dokunmazlar:
+            A, kullanılabilirlik kaybı ve “Not explained” onlarla da onlarsız da aynıdır. Losses Trend bir “Short stops” sütunu
+            tutar (Speed = Production − Operation − kısa duruşlar). Toplamlar ve OEE hiçbir zaman değişmez.
           </li>
           <li>
-            The limit is set in OEE Settings → Numbers (default {MES_SHORT_STOP_MIN} min, whole minutes). Another value changes only the
-            loss split; A and P stay as in the MES and the bridge shows the difference.
+            Sınır OEE Settings → Numbers’ta ayarlanır (varsayılan {MES_SHORT_STOP_MIN} dk, tam dakika). Başka bir değer yalnız kayıp
+            ayrımını değiştirir; A ve P MES’teki gibi kalır ve köprü farkı gösterir.
           </li>
           <li>
-            Stop durations are stored from {dmy(SHORT_STOP_DATA_FROM)}; before that the stops are not split (all availability) and the
-            page says “duration split not available before {dmy(SHORT_STOP_DATA_FROM)}”.
+            Duruş süreleri {dmy(SHORT_STOP_DATA_FROM)} tarihinden itibaren saklanır; öncesinde duruşlar ayrılmaz (hepsi
+            kullanılabilirlik) ve sayfa “duration split not available before {dmy(SHORT_STOP_DATA_FROM)}” yazar.
           </li>
           <li>
-            <b>MTTR / MTBF</b> count only the stops of the limit and longer by default (breakdowns and setups are availability losses);
-            the short stops are the first duration bucket. Agent Report, Agent Insights and Open Topics read the long stops for die and
-            machine (availability) notes and the short stops for the micro-stop / speed notes.
+            <b>MTTR / MTBF</b> varsayılan olarak yalnız sınır ve daha uzun duruşları sayar (arızalar ve setup’lar kullanılabilirlik
+            kaybıdır); kısa duruşlar ilk süre kovasıdır. Agent Report, Agent Insights ve Open Topics kalıp ve makine
+            (kullanılabilirlik) notları için uzun duruşları, mikro duruş / hız notları için kısa duruşları okur.
           </li>
           <li>
-            Example (test): on 21.09 at PRS-105 shift 3, Loading − Production is 140.6 min = the stops of 2 min and longer; the 21.6
-            min of shorter stops are inside Production − Operation.
+            Örnek (test): 21.09’da PRS-105 3. vardiyada Loading − Production 140,6 dk = 2 dk ve daha uzun duruşlar; daha kısa
+            duruşların 21,6 dk’sı Production − Operation içindedir.
           </li>
           <li>
-            <b>Undefined stops</b>: Reason Code 1 or Reason Code 2 “{UNDEFINED_RC1}” (or an empty Reason Code 2) means the operator did
-            not define the stop. Reason Code 1 “{UNDEFINED_RC1}” is always a <b>loss</b> (even when it is not ticked as a loss in OEE
-            Settings → Reason Code 1) and never a planned break; Reason Code 2 “{UNDEFINED_RC1}” is a loss when its Reason Code 1 is. On
-            every OEE page (Losses Trend, Loss Bridge and Level 3, Asakai, Daily Report, Agent Report, Agent Insights, Open Topics) these
-            stops sit under <b>{UNASSIGNED}</b>; a “{UNDEFINED_RC1}” row in OEE Settings → Loss groups is not used. The short-stop split
-            works the same way: stops shorter than the limit go to Short stops (speed), the longer ones to {UNASSIGNED} (availability).
-            Planned breaks are not affected.
+            <b>Tanımsız duruşlar</b>: Reason Code 1 ya da Reason Code 2 “{UNDEFINED_RC1}” (ya da boş bir Reason Code 2), operatörün
+            duruşu tanımlamadığı anlamına gelir. Reason Code 1 “{UNDEFINED_RC1}” her zaman bir <b>kayıptır</b> (OEE Settings →
+            Reason Code 1’de kayıp olarak işaretli olmasa bile) ve hiçbir zaman planlı mola değildir; Reason Code 2 “{UNDEFINED_RC1}”,
+            Reason Code 1’i kayıpsa kayıptır. Her OEE sayfasında (Losses Trend, Loss Bridge ve Level 3, Asakai, Daily Report, Agent
+            Report, Agent Insights, Open Topics) bu duruşlar <b>{UNASSIGNED}</b> altında durur; OEE Settings → Loss groups’taki bir
+            “{UNDEFINED_RC1}” satırı kullanılmaz. Kısa duruş ayrımı da aynı şekilde çalışır: sınırdan kısa duruşlar Short stops’a
+            (hız), daha uzunları {UNASSIGNED}’a (kullanılabilirlik) gider. Planlı molalar etkilenmez.
           </li>
           <li>
-            Example (test): Reason Code 1 “{UNDEFINED_RC1}”, Reason Code 2 STP (Setup), 30 min → {UNASSIGNED} 30 min, Setup 0 min.
+            Örnek (test): Reason Code 1 “{UNDEFINED_RC1}”, Reason Code 2 STP (Setup), 30 dk → {UNASSIGNED} 30 dk, Setup 0 dk.
           </li>
           <li>
-            <b>Column order</b> is the same on every page: the loss groups in their OEE Settings order (↑ ↓ buttons), then{' '}
-            {SHORT_STOPS} (where shown), then {SPEED}, and last {UNASSIGNED}. Example (test): groups KLP, STP, ARZ → KLP, STP, ARZ,{' '}
+            <b>Sütun sırası</b> her sayfada aynıdır: OEE Settings sırasıyla kayıp grupları (↑ ↓ düğmeleri), sonra{' '}
+            {SHORT_STOPS} (gösterildiği yerde), sonra {SPEED} ve en son {UNASSIGNED}. Örnek (test): KLP, STP, ARZ grupları → KLP, STP, ARZ,{' '}
             {SHORT_STOPS}, {SPEED}, {UNASSIGNED}.
           </li>
           <li>
-            <b>Asakai pages</b> (Asakai weekly, Asakai detail) do not show <b>today</b>, the system&apos;s working day: the day is not
-            over, so the part-day data uploaded during it would make OEE and the loss shares wrong. The latest day on both pages is
-            yesterday (the date box cannot go further), and the running week and month are the sum of the days before today — an
-            uploaded Weekly / Monthly KPI row that covers today is not used. Each page also shows <b>every work center of the cost
-            center</b> (Machines → cost center), even one without data on the selected day or week: its row stays empty.
+            <b>Asakai sayfaları</b> (Asakai weekly, Asakai detail) sistemin çalışma günü olan <b>bugünü</b> göstermez: gün bitmedi;
+            gün içinde yüklenen kısmi gün verisi OEE’yi ve kayıp paylarını yanlış yapar. İki sayfada da en son gün dündür (tarih
+            kutusu daha ileri gidemez); içinde bulunulan hafta ve ay bugünden önceki günlerin toplamıdır — bugünü kapsayan yüklenmiş
+            bir Weekly / Monthly KPI satırı kullanılmaz. Her sayfa ayrıca seçilen gün ya da haftada verisi olmasa bile{' '}
+            <b>masraf yerinin her iş yerini</b> (Machines → cost center) gösterir: satırı boş kalır.
           </li>
           <li>
-            A loss share can pass 100 % of Loading when the MES Loading of a shift is shorter than shift time − planned stops (e.g.
-            21.09 PRS-104 shift 1: Loading 185.7 + planned 209.3 = 395 of 480 min, recorded unplanned stops 191.5 min = 103 %). The
-            stops are counted as recorded; the Loss Bridge shows the surplus as “{OVER_RECORDED}”.
+            Bir vardiyanın MES Loading’i vardiya süresi − planlı duruşlardan kısaysa bir kayıp payı Loading’in %100’ünü geçebilir
+            (ör. 21.09 PRS-104 1. vardiya: Loading 185,7 + planlı 209,3 = 480 dk’nın 395’i, kaydedilen plansız duruşlar 191,5 dk =
+            %103). Duruşlar kaydedildiği gibi sayılır; Loss Bridge fazlayı “{OVER_RECORDED}” olarak gösterir.
           </li>
         </ul>
       </section>
 
       <section id="raw-mrp" className="mt-8 max-w-5xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Raw material requirement (MRP) — independent of the plan</h2>
+        <h2 className="text-sm font-semibold text-foreground">Hammadde ihtiyacı (MRP) — plandan bağımsız</h2>
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
-          <li>Demand: ZPP up to its last week; backlog goes into this week.</li>
+          <li>Talep: son haftasına kadar ZPP; birikmiş talep bu haftaya girer.</li>
           <li>
-            Finished stock (locations ticked <i>Finished goods</i> on Storage Locations) is deducted
-            per part, earliest weeks first. What is left must be pressed: a part whose stock covers 3
-            weeks needs no steel in those 3 weeks.
+            Mamul stok (Storage Locations’ta <i>Finished goods</i> işaretli yerler) parça bazında,
+            en erken haftalardan başlayarak düşülür. Kalan basılmalıdır: stoku 3 haftayı karşılayan bir
+            parçanın o 3 haftada sac ihtiyacı yoktur.
           </li>
           <li>
-            Steel: pieces × gross weight per piece. A co-product pair is pressed once — strokes are the
-            larger of the two needs — and only the primary part's weight counts.
+            Sac: adet × parça başına brüt ağırlık. Ortak ürün çifti bir kez basılır — vuruş iki
+            ihtiyaçtan büyük olanıdır — ve yalnız ana parçanın ağırlığı sayılır.
           </li>
           <li>
-            The production plan is <b>not added</b>: its early production and whole-coil surplus are the
-            same demand, timed and rounded differently. Adding them would order the same steel twice.
-            The safety stock absorbs the difference.
+            Üretim planı <b>eklenmez</b>: erken üretimi ve tam rulo fazlası aynı talebin farklı
+            zamanlanmış ve yuvarlanmış hâlidir. Onları eklemek aynı sacı iki kez sipariş ettirirdi.
+            Farkı emniyet stoku karşılar.
           </li>
           <li>
-            Supply: coil stock on hand in the locations ticked <i>Raw material</i>
-            plus the in-transit list, each quantity in its ETA week (no ETA or a past ETA = this week).
+            Arz: <i>Raw material</i> işaretli yerlerdeki eldeki rulo stoku artı yoldaki malzeme
+            listesi; her miktar ETA haftasında (ETA yoksa ya da geçmişse = bu hafta).
           </li>
           <li>
-            Week by week: stock at the start of the week + arrivals + an order must cover that week's
-            use <b>and</b> the use of the N <b>working days</b> after the week ends — with 10 days every
-            week end holds the next 2 weeks. Otherwise an order is due that week: the shortfall + the
-            standard extra (500 kg by default).
+            Hafta hafta: hafta başındaki stok + gelişler + bir sipariş o haftanın tüketimini{' '}
+            <b>ve</b> hafta bittikten sonraki N <b>iş gününün</b> tüketimini karşılamalıdır — 10
+            günle her hafta sonu sonraki 2 haftayı tutar. Aksi hâlde o hafta bir sipariş gerekir:
+            eksik miktar + standart ek miktar (varsayılan 500 kg).
           </li>
-          <li>No demand, no order: after the last ZPP week the need is zero; nothing is forecast (kanban comes later).</li>
+          <li>Talep yoksa sipariş yok: son ZPP haftasından sonra ihtiyaç sıfırdır; hiçbir şey tahmin edilmez (kanban daha sonra gelecek).</li>
           <li>
-            One row is one <b>coil</b>, not one part: every part pressed from it adds its need, and a
-            co-product pair needs steel when either side does. Open a row to see it <b>by finished
-            product</b> — each part's finished stock, the weeks it covers and the week its steel is first
-            needed — and why the first order falls in its week. An order in a week with no use of its own
-            is the safety window: the use of the next N working days (a holiday week reaches further).
-          </li>
-          <li>
-            <b>Order by</b>: an order must be in by the Monday of its delivery week, so it is placed at
-            the latest on that Monday − the coil's <b>lead time in calendar days</b> (weekends and
-            holidays count — the supplier quotes calendar days). Each coil has its own lead time on Raw
-            Material Coverage → Lead times; a coil without one uses the default and is marked{' '}
-            <i>not entered</i>. A date already passed is <b>late</b> (red), a date in this week is
-            amber. The lead time only dates the order: it does not move the delivery week, the safety
-            stock or the production plan.
+            Bir satır bir parça değil, bir <b>rulodur</b>: ondan basılan her parça kendi ihtiyacını
+            ekler ve bir ortak ürün çifti, iki taraftan biri ihtiyaç duyduğunda sac ister. Satırı{' '}
+            <b>mamul bazında</b> görmek için açın — her parçanın mamul stoku, karşıladığı haftalar ve
+            sacının ilk gerektiği hafta — ve ilk siparişin neden o haftaya düştüğünü görün. Kendi
+            tüketimi olmayan bir haftadaki sipariş emniyet penceresidir: sonraki N iş gününün
+            tüketimi (tatilli bir hafta daha ileriye uzanır).
           </li>
           <li>
-            Now: N = {current.rawCoverage} working days, extra = {current.rawExtra.toLocaleString('en-GB')} kg, default
-            lead time {current.rawLeadDefault} calendar days ({current.rawLeadEntered} coil(s) with their own). Working
-            days are the plant's working days (not a holiday, at least one work center with normal shifts).
+            <b>Order by</b>: bir sipariş teslim haftasının pazartesisine kadar gelmiş olmalıdır; bu
+            yüzden en geç o pazartesi − rulonun <b>takvim günü olarak tedarik süresi</b> tarihinde
+            verilir (hafta sonları ve tatiller sayılır — tedarikçi takvim günü verir). Her rulonun Raw
+            Material Coverage → Lead times’ta kendi tedarik süresi vardır; olmayan rulo varsayılanı
+            kullanır ve <i>not entered</i> olarak işaretlenir. Geçmiş bir tarih <b>geç</b>tir
+            (kırmızı), bu haftaki bir tarih sarıdır. Tedarik süresi yalnız siparişe tarih verir:
+            teslim haftasını, emniyet stokunu ya da üretim planını değiştirmez.
+          </li>
+          <li>
+            Şu an: N = {current.rawCoverage} iş günü, ek miktar = {current.rawExtra.toLocaleString('en-GB')} kg,
+            varsayılan tedarik süresi {current.rawLeadDefault} takvim günü ({current.rawLeadEntered} rulonun
+            kendi süresi var). İş günleri fabrikanın çalışma günleridir (tatil olmayan, en az bir iş
+            yerinin normal vardiyası olan günler).
           </li>
         </ol>
-        <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">FMEA — what can go wrong and how the method guards it</h3>
+        <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">FMEA — neler ters gidebilir ve yöntem buna karşı nasıl korur</h3>
         <div className="mt-2 overflow-x-auto rounded-md border border-border">
           <table className="w-full text-left text-xs">
             <thead className="bg-muted text-muted-foreground">
               <tr>
-                <th className="px-2 py-1.5 font-medium">Failure mode</th>
-                <th className="px-2 py-1.5 font-medium">Effect</th>
+                <th className="px-2 py-1.5 font-medium">Hata türü</th>
+                <th className="px-2 py-1.5 font-medium">Etki</th>
                 <th className="px-2 py-1.5 font-medium">S</th>
                 <th className="px-2 py-1.5 font-medium">O</th>
                 <th className="px-2 py-1.5 font-medium">D</th>
                 <th className="px-2 py-1.5 font-medium">RPN</th>
-                <th className="px-2 py-1.5 font-medium">Guard in the method</th>
+                <th className="px-2 py-1.5 font-medium">Yöntemdeki önlem</th>
               </tr>
             </thead>
             <tbody>
@@ -1156,113 +1158,111 @@ export function PlanLogicTr() {
           </table>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          S = severity, O = occurrence, D = detection (1–10); the ratings are those before the guard.
-          Steel already ordered but not yet shipped is only known when it is on the in-transit list;
-          keep that list up to date.
+          S = şiddet, O = olasılık, D = tespit edilebilirlik (1–10); puanlar önlemden önceki puanlardır.
+          Sipariş edilmiş ama henüz sevk edilmemiş sac yalnız yoldaki malzeme listesindeyse bilinir;
+          bu listeyi güncel tutun.
         </p>
       </section>
 
       <section id="check" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-sky-200 bg-sky-50/60 p-4">
-        <h2 className="text-sm font-semibold text-foreground">Independent check — is the plan really right?</h2>
+        <h2 className="text-sm font-semibold text-foreground">Bağımsız kontrol — plan gerçekten doğru mu?</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          The plan check above re-counts the engine's own numbers. The{' '}
-          <b>independent check</b> is separate code that shares nothing with the
-          planner. After every calculation it:
+          Yukarıdaki plan kontrolü motorun kendi sayılarını yeniden sayar.{' '}
+          <b>Bağımsız kontrol</b> ise planlayıcıyla hiçbir şey paylaşmayan ayrı bir
+          koddur. Her hesaplamadan sonra:
         </p>
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
           <li>
-            <b>Replays stock hour by hour</b> from the SAP files (ZPP, ZPP_DAILY,
-            MB52 in the Finished goods locations) and the planned jobs: every need day is due at{' '}
-            {current.cutoff}, production arrives as it is pressed. Every moment
-            stock goes below zero is a real customer stop. The late list must
-            match it exactly — a part the engine missed, or a false alarm, is
-            shown. Its own rule for ZPP_DAILY: when only weekly-ZPP (long-term)
-            quantity is short, it is counted as a long-term shortage, not a
-            customer stop.
+            SAP dosyalarından (ZPP, ZPP_DAILY, Finished goods yerlerindeki MB52) ve
+            planlanan işlerden <b>stoku saat saat yeniden oynatır</b>: her ihtiyaç günü
+            saat {current.cutoff}’da vadelidir, üretim basıldıkça gelir. Stokun sıfırın
+            altına düştüğü her an gerçek bir müşteri duruşudur. Geç listesi bununla tam
+            olarak uyuşmalıdır — motorun kaçırdığı bir parça ya da yanlış bir alarm
+            gösterilir. ZPP_DAILY için kendi kuralı: yalnız haftalık ZPP (uzun vadeli)
+            miktarı eksikse bu müşteri duruşu değil, uzun vadeli eksik sayılır.
           </li>
           <li>
-            <b>Asks "could any plan have avoided it?"</b> for each short part: is
-            there enough work center time before the deadline on its work centers, even
-            alone? Can the setup team and hall cranes do all setups needed by
-            then? The answer is "No" (proven by capacity), "Yes" (a free slot
-            existed) or "not proven". It also gives the proven minimum number of
-            short parts that no plan can go below.
+            Her eksik parça için <b>"hangi plan olsa bundan kaçınabilir miydi?" diye
+            sorar</b>: parçanın iş yerlerinde son tarihten önce, tek başına bile yeterli
+            iş yeri süresi var mı? Setup ekibi ve hol vinçleri o zamana kadar gereken
+            bütün setup’ları yapabilir mi? Cevap "Hayır" (kapasiteyle kanıtlanmış), "Evet"
+            (boş bir aralık vardı) ya da "kanıtlanmadı"dır. Ayrıca hiçbir planın altına
+            inemeyeceği, kanıtlanmış en az eksik parça sayısını verir.
           </li>
           <li>
-            <b>Re-checks every rule</b> on the real clock: two jobs on one work center,
-            one die on two work centers (also overnight), two setups in one hall (also
-            across 07:00), plant-wide setups, eligible work center, working time and
-            maintenance, whole coils / Min. lot, pull-forward window, a die change
-            without a setup, backlog before urgent, and on an operator-plan cost center that
-            the crews of the running lines fit the operators entered for that shift.
+            <b>Her kuralı</b> gerçek saat üzerinde <b>yeniden kontrol eder</b>: bir iş yerinde
+            iki iş, iki iş yerinde bir kalıp (gece boyunca da), bir holde iki setup (07:00’ı
+            aşarken de), fabrika genelindeki setup’lar, uygun iş yeri, çalışma süresi ve bakım,
+            tam rulo / Min. lot, öne çekme penceresi, setupsız kalıp değişimi, aciden önce
+            birikmiş talep ve operatör planlı bir masraf yerinde çalışan hatların ekiplerinin o
+            vardiya için girilen operatörlere sığması.
           </li>
           <li id="component-ready">
-            <b>Warns when an intermediate part is not ready</b> (advisory — not a broken rule, the
-            plan stays “OK”): when a part&apos;s <i>raw material</i> code is another part&apos;s code
-            (nut welding ← the stamped part it welds on), that stamped part is its component, 1 pc per
-            pc. At the end of each run of the nut welding job the component&apos;s stock (all
-            locations) plus what is produced by then must cover what has been used by then. Example:
-            100 in stock, 100 pressed by 09:00, nut welding uses 300 by 11:00 → “needs 300 pcs, 200
-            available”. The engine does <b>not</b> plan this link: each line is still planned on its
-            own and the component&apos;s own customer demand is not part of this count.
+            <b>Ara mamul hazır değilse uyarır</b> (bilgi amaçlı — bozulan bir kural değildir, plan
+            “OK” kalır): bir parçanın <i>hammadde</i> kodu başka bir parçanın koduysa (somun kaynağı ←
+            üzerine kaynak yaptığı pres parçası), o pres parçası onun bileşenidir, adet başına 1 adet.
+            Somun kaynağı işinin her çalışmasının sonunda bileşenin stoku (bütün yerler) artı o ana kadar
+            üretilen, o ana kadar kullanılanı karşılamalıdır. Örnek: stokta 100, saat 09:00’a kadar 100
+            basıldı, somun kaynağı saat 11:00’e kadar 300 kullanıyor → “needs 300 pcs, 200 available”.
+            Motor bu bağlantıyı <b>planlamaz</b>: her hat hâlâ kendi başına planlanır ve bileşenin kendi
+            müşteri talebi bu sayıma girmez.
           </li>
           <li>
-            <b>Measures efficiency</b>: setups against the minimum possible,
-            production time against the maximum possible, and where idle time
-            comes from — no work, not yet allowed, or waiting for the setup team.
+            <b>Verimliliği ölçer</b>: mümkün olan en aza karşı setup’lar, mümkün olan en
+            fazlaya karşı üretim süresi ve boş zamanın nereden geldiği — iş yok, henüz izin
+            yok ya da setup ekibi bekleniyor.
           </li>
           <li>
-            <b>Flags data to check</b> for short parts: stock in other locations
-            (not ticked Finished goods), positive values in ZPP, backlog smaller than stock, an old
-            stock file, missing master data.
+            Eksik parçalar için <b>kontrol edilecek verileri işaretler</b>: başka yerlerdeki
+            stok (Finished goods işaretli olmayan), ZPP’de pozitif değerler, stoktan küçük
+            birikmiş talep, eski bir stok dosyası, eksik master data.
           </li>
         </ol>
       </section>
 
       <section id="alarms" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Alarms — dies and machines</h2>
+        <h2 className="text-sm font-semibold text-foreground">Alarmlar — kalıplar ve makineler</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Die and machine follow-up live in their own modules. PlanningExpert
-          keeps only what matters to the plan, on the{' '}
+          Kalıp ve makine takibi kendi modüllerinde yapılır. PlanningExpert yalnız plan
+          için önemli olanı,{' '}
           <Link to="/alarms" className="underline">
             Alarms
           </Link>{' '}
-          page, in two lists:
+          sayfasında iki listede tutar:
         </p>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            <b className="text-foreground">Holding up the plan</b> — a die is not
-            ready, has no ready date, has a shot-limit alarm or is in
-            maintenance, or a work center is down or in maintenance, <b className="text-foreground">and</b>{' '}
-            a part's stock runs out before it is available (or its job is late
-            or cannot be planned). Example: die ready the day after tomorrow at
-            10:00, 1 000 parts to ship tomorrow.
+            <b className="text-foreground">Holding up the plan</b> — bir kalıp hazır değil,
+            hazır olma tarihi yok, vuruş limiti alarmı var ya da bakımda; veya bir iş yeri
+            arızalı ya da bakımda; <b className="text-foreground">ve</b>{' '}
+            bir parçanın stoku o kullanılabilir olmadan biter (ya da işi geç kalır veya
+            planlanamaz). Örnek: kalıp yarından sonraki gün saat 10:00’da hazır, yarın
+            1 000 parça sevk edilecek.
           </li>
           <li>
-            <b className="text-foreground">For information</b> — not available,
-            but the stock lasts until it is back, or there is no demand in the
-            horizon. The planner should know; nothing is late.
+            <b className="text-foreground">For information</b> — kullanılabilir değil,
+            ama stok o geri gelene kadar yetiyor ya da ufukta talep yok. Planlamacı
+            bilmeli; hiçbir şey geç değil.
           </li>
         </ul>
       </section>
 
       <section className="mt-8 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">When is it recalculated?</h2>
+        <h2 className="text-sm font-semibold text-foreground">Ne zaman yeniden hesaplanır?</h2>
         <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-muted-foreground">
-          <li>A few seconds after any change to its data (an upload, a setting, a rule).</li>
-          <li>Every hour, because the hours that pass come off today's capacity.</li>
+          <li>Verilerinden herhangi biri değiştikten (bir yükleme, bir ayar, bir kural) birkaç saniye sonra.</li>
+          <li>Her saat, çünkü geçen saatler bugünün kapasitesinden düşer.</li>
           <li>
-            Whenever you press <b>Recalculate now</b> on the{' '}
             <Link to="/planlama" className="underline hover:no-underline">
               Production Plan
             </Link>
-            .
+            {' '}sayfasında <b>Recalculate now</b>’a her bastığınızda.
           </li>
         </ul>
         <p className="mt-2 text-sm text-muted-foreground">
-          <b className="text-foreground">Approve plan</b> stores the plan as it is.
-          The approved plan is the basis for the frozen days and for the
-          "changes since the approved plan" list.
+          <b className="text-foreground">Approve plan</b> planı olduğu gibi saklar.
+          Onaylı plan, dondurulmuş günlerin ve "changes since the approved plan"
+          listesinin temelidir.
         </p>
       </section>
     </div>
@@ -1272,34 +1272,34 @@ export function PlanLogicTr() {
 // ---- Tek kaynak: her bilgi nerede tanımlanır -------------------------------
 
 const SOURCES: [string, string, string, string][] = [
-  ['Work centers, halls, categories', 'Work Center Definitions', '/makineler', 'Work Calendar, Capacity Dashboard, overtime, Gantt, setup and crane rules'],
-  ['Work center calendar and overtime', 'Work Calendar', '/takvim', 'Plan, Capacity Dashboard (same record), Performance'],
-  ['Planned stops, holidays, settings', 'Work Calendar', '/takvim', 'Plan, capacity, raw material working days'],
-  ['Parts, work centers per part, Accepted OEE', 'Master Data', '/referanslar', 'Plan, Capacity Dashboard B, raw material'],
-  ['Which stock counts', 'Storage Locations', '/depolar', 'Plan, raw material, Capacity Dashboard, MB51 production'],
-  ['Demand, stock, movements, in transit', 'SAP Data', '/sapdata', 'Plan, raw material, Actuals, Performance'],
-  ['Prediction OEE', 'Capacity Dashboard', '/capacity', 'That dashboard view only'],
-  ['Capacity factor', 'Performance', '/performans', 'Plan capacity'],
-  ['Die readiness and maintenance', 'Die Follow-up', '/die-followup/maintenance', 'Plan, Alarms'],
-  ['Breakdowns and work center maintenance', 'Machine Follow-up', '/machine-followup/breakdowns', 'Plan, Alarms'],
+  ['İş yerleri, holler, kategoriler', 'Work Center Definitions', '/makineler', 'Work Calendar, Capacity Dashboard, mesai, Gantt, setup ve vinç kuralları'],
+  ['İş yeri takvimi ve mesai', 'Work Calendar', '/takvim', 'Plan, Capacity Dashboard (aynı kayıt), Performance'],
+  ['Planlı duruşlar, tatiller, ayarlar', 'Work Calendar', '/takvim', 'Plan, kapasite, hammadde iş günleri'],
+  ['Parçalar, parça başına iş yerleri, Accepted OEE', 'Master Data', '/referanslar', 'Plan, Capacity Dashboard B, hammadde'],
+  ['Hangi stok sayılır', 'Storage Locations', '/depolar', 'Plan, hammadde, Capacity Dashboard, MB51 üretimi'],
+  ['Talep, stok, hareketler, yoldaki malzeme', 'SAP Data', '/sapdata', 'Plan, hammadde, Actuals, Performance'],
+  ['Prediction OEE', 'Capacity Dashboard', '/capacity', 'Yalnız o dashboard görünümü'],
+  ['Kapasite faktörü', 'Performance', '/performans', 'Plan kapasitesi'],
+  ['Kalıp hazırlığı ve bakımı', 'Die Follow-up', '/die-followup/maintenance', 'Plan, Alarms'],
+  ['Arızalar ve iş yeri bakımı', 'Machine Follow-up', '/machine-followup/breakdowns', 'Plan, Alarms'],
 ]
 
 function SingleSource() {
   return (
     <section className="mt-6 max-w-5xl rounded-lg border border-border p-4">
-      <h2 className="text-sm font-semibold text-foreground">One source for every input</h2>
+      <h2 className="text-sm font-semibold text-foreground">Her girdi için tek kaynak</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Each value is entered in one place only; every page and the plan read that same record, so
-        the same number never differs between pages. Nothing is hard-coded — groups, for example,
-        come from the work center category.
+        Her değer yalnız tek bir yerde girilir; her sayfa ve plan aynı kaydı okur, böylece aynı
+        sayı sayfalar arasında hiçbir zaman farklı çıkmaz. Hiçbir şey koda gömülü değildir —
+        örneğin gruplar iş yeri kategorisinden gelir.
       </p>
       <div className="mt-2 overflow-x-auto rounded-md border border-border">
         <table className="w-full text-left text-xs">
           <thead className="bg-muted text-muted-foreground">
             <tr>
-              <th className="px-2 py-1.5 font-medium">What</th>
-              <th className="px-2 py-1.5 font-medium">Defined on</th>
-              <th className="px-2 py-1.5 font-medium">Used by</th>
+              <th className="px-2 py-1.5 font-medium">Ne</th>
+              <th className="px-2 py-1.5 font-medium">Tanımlandığı yer</th>
+              <th className="px-2 py-1.5 font-medium">Kullanan</th>
             </tr>
           </thead>
           <tbody>
@@ -1377,8 +1377,8 @@ function Lane({
       <span
         className={`w-44 shrink-0 ${chosen ? 'font-semibold text-emerald-700' : 'text-muted-foreground'}`}
       >
-        {note ?? `would finish ${finish}`}
-        {chosen && ' ✓ chosen'}
+        {note ?? `bitiş: ${finish}`}
+        {chosen && ' ✓ seçildi'}
       </span>
     </div>
   )
@@ -1387,97 +1387,95 @@ function Lane({
 function Synoptic({ safetyDays }: { safetyDays: number }) {
   return (
     <section className="mt-6">
-      <h2 className="text-lg font-semibold text-foreground">Planning algorithm — at a glance</h2>
+      <h2 className="text-lg font-semibold text-foreground">Planlama algoritması — tek bakışta</h2>
       <div className="mt-3 grid gap-6 lg:grid-cols-2">
         <div>
-          <Box tone="border-border bg-muted/50 text-foreground" title="1 · One list of every lot to produce">
-            Demand minus stock, rounded to whole coils (or up to the Min. lot, when
-            one is set; never less); a co-product
-            pair is one lot. Each lot gets two dates
-            from the projected stock: the day the stock would run out, and{' '}
-            {safetyDays} working day(s) before it — the earliest it may start.
+          <Box tone="border-border bg-muted/50 text-foreground" title="1 · Üretilecek her lotun tek listesi">
+            Talep eksi stok, tam rulolara yuvarlanır (ya da tanımlıysa Min. lot’a kadar
+            yukarı; hiçbir zaman daha az değil); bir ortak ürün çifti tek lottur. Her lot
+            öngörülen stoktan iki tarih alır: stokun biteceği gün ve ondan{' '}
+            {safetyDays} iş günü önce — başlayabileceği en erken gün.
           </Box>
-          <Down label="sorted once" />
-          <Box tone="border-border bg-muted/50 text-foreground" title="2 · Sort the list">
-            Moved to front → Backlog → Urgent (already below safety stock) →
-            Fill. Same group: the stock that runs out first goes first. Still
-            equal → the part with the fewest eligible work centers goes first.
+          <Down label="bir kez sıralanır" />
+          <Box tone="border-border bg-muted/50 text-foreground" title="2 · Listeyi sırala">
+            Öne alınan → Birikmiş → Acil (zaten emniyet stokunun altında) → Dolgu.
+            Aynı grup: stoku önce biten önce gider. Hâlâ eşitse → en az uygun iş
+            yeri olan parça önce gider.
           </Box>
-          <Down label="take the next item from the top" />
-          <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · Try EVERY work center it is allowed on">
-            Not ticked Flexible work center → only the main work center (quality). Ticked →
-            main work center and all alternatives (e.g. 104, 105, 108, 110). On each
-            one, find the earliest free slot that respects all the rules: shift
-            ends, crane, mould, maintenance.
+          <Down label="sıradaki kalemi en üstten al" />
+          <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · İzin verilen HER iş yerini dene">
+            Flexible work center işaretli değil → yalnız ana iş yeri (kalite). İşaretli →
+            ana iş yeri ve bütün alternatifler (ör. 104, 105, 108, 110). Her birinde
+            bütün kurallara uyan en erken boş aralığı bul: vardiya sonları, vinç,
+            kalıp, bakım.
           </Box>
-          <Down label="each work center gives a finish time" />
-          <Box tone="border-emerald-300 bg-emerald-50 text-emerald-950" title="4 · Choose the work center that finishes first">
-            Not "the first work center in the list" and not "the main work center" — the
-            one where the job is done soonest. When nothing is urgent, keeping
-            the mounted die running (no setup) wins.
+          <Down label="her iş yeri bir bitiş saati verir" />
+          <Box tone="border-emerald-300 bg-emerald-50 text-emerald-950" title="4 · Önce bitiren iş yerini seç">
+            "Listedeki ilk iş yeri" değil, "ana iş yeri" de değil — işin en erken
+            bittiği iş yeri. Acil bir şey yoksa bağlı kalıbı (setupsız) çalıştırmaya
+            devam etmek kazanır.
           </Box>
-          <Down label="book it" />
-          <Box tone="border-border bg-muted/50 text-foreground" title="5 · Book the slot">
-            That work center time, the crane slots and the mould are now taken for
-            all the items that follow.
+          <Down label="rezerve et" />
+          <Box tone="border-border bg-muted/50 text-foreground" title="5 · Aralığı rezerve et">
+            O iş yeri süresi, vinç aralıkları ve kalıp artık sonraki bütün kalemler
+            için dolu.
           </Box>
-          <Down label="back to 3 with the next item, until the list is empty" />
-          <Box tone="border-amber-300 bg-amber-50 text-amber-950" title="6 · Anything late? → plan again">
-            A job that starts after its stock runs out stops the customer. Late
-            lots are moved to the front (they try every work center again) and may
-            overlap their setup with another one. Coils are never cut. Up to 6
-            rounds; the best plan is kept.
+          <Down label="liste boşalana kadar sıradaki kalemle 3’e dön" />
+          <Box tone="border-amber-300 bg-amber-50 text-amber-950" title="6 · Geç iş var mı? → yeniden planla">
+            Stoku bittikten sonra başlayan bir iş müşteriyi durdurur. Geç lotlar öne
+            alınır (her iş yerini yeniden denerler) ve setup’ları başka bir setup’la
+            çakışabilir. Rulolar hiçbir zaman kesilmez. En fazla 6 tur; en iyi plan
+            tutulur.
           </Box>
-          <Down label="whatever is still late or does not fit" />
+          <Down label="hâlâ geç olan ya da sığmayan" />
           <Box tone="border-destructive/40 bg-destructive/10 text-foreground" title="Late jobs / Unplanned">
-            Shown in red on the Production Plan with the work centers tried and
-            what would fix it.
+            Production Plan’da denenen iş yerleri ve çözümüyle birlikte kırmızı
+            gösterilir.
           </Box>
         </div>
 
         <div className="rounded-lg border border-border p-4">
-          <p className="text-sm font-semibold text-foreground">Example — decision #12</p>
+          <p className="text-sm font-semibold text-foreground">Örnek — 12 numaralı karar</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Part A has a backlog, is ticked Flexible work center and can run on 104
-            (main), 105 and 108. Eleven
-            jobs are already booked. Grey = already booked, coloured = where A
-            would go.
+            A parçasının birikmiş talebi var, Flexible work center işaretli ve 104
+            (ana), 105 ve 108’de çalışabiliyor. On bir iş zaten rezerve edilmiş.
+            Gri = zaten rezerve, renkli = A’nın gideceği yer.
           </p>
           <div className="mt-3 space-y-2">
             <Lane press="104" busy={58} job={22} finish="Tue 11:30" />
             <Lane press="105" busy={30} job={22} finish="Mon 23:30" chosen />
-            <Lane press="108" busy={100} note="full until the end of the horizon" />
+            <Lane press="108" busy={100} note="ufkun sonuna kadar dolu" />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            A goes to <b className="text-foreground">105</b>, even though 104 is
-            its main work center, because 105 finishes it a shift and a half
-            earlier. On the Production Plan, the job list shows exactly this
-            line for every job in the <b className="text-foreground">Why this work center</b>{' '}
-            column:
+            104 ana iş yeri olduğu hâlde A <b className="text-foreground">105</b>’e
+            gider, çünkü 105 işi bir buçuk vardiya daha erken bitirir. Production
+            Plan’da iş listesi her iş için tam olarak bu satırı{' '}
+            <b className="text-foreground">Why this work center</b> sütununda
+            gösterir:
           </p>
           <p className="mt-2 rounded bg-muted px-2 py-1 font-mono text-[11px] text-foreground">
             #12 104 Tue 11:30 · <span className="font-semibold text-emerald-700">105 ✓ Mon 23:30</span> · 108 (full until the end of the horizon)
           </p>
 
-          <p className="mt-4 text-sm font-semibold text-foreground">What this means for your question</p>
+          <p className="mt-4 text-sm font-semibold text-foreground">Bu, sorunuz için ne anlama gelir</p>
           <ul className="mt-1 ml-5 list-disc space-y-1 text-xs text-muted-foreground">
             <li>
-              A part is never written onto a work center just because it is first in a
-              list. Each job is compared on all of its work centers at the moment
-              it is placed.
+              Bir parça, bir listede ilk sırada diye hiçbir zaman bir iş yerine
+              yazılmaz. Her iş, yerleştirildiği anda bütün iş yerlerinde
+              karşılaştırılır.
             </li>
             <li>
-              A backlog part can only end up 4th on 104 if at that moment 105,
-              108 and 110 could not finish it earlier. The job's line proves
-              it.
+              Birikmiş talebi olan bir parça 104’te ancak o anda 105, 108 ve 110
+              onu daha erken bitiremiyorsa 4. sıraya düşebilir. İşin satırı bunu
+              kanıtlar.
             </li>
             <li>
-              The engine decides one job at a time and never moves a job it has
-              already booked. Two consequences are listed below under{' '}
+              Motor her seferinde tek bir iş için karar verir ve rezerve ettiği bir
+              işi hiçbir zaman taşımaz. Bunun iki sonucu aşağıda{' '}
               <a href="#limits" className="underline">
-                Known limits
-              </a>
-              .
+                Bilinen sınırlar
+              </a>{' '}
+              altında listelenmiştir.
             </li>
           </ul>
         </div>
@@ -1485,71 +1483,69 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-border p-4">
-          <h3 className="text-sm font-semibold text-foreground">How to check the plan without recounting it</h3>
+          <h3 className="text-sm font-semibold text-foreground">Planı yeniden saymadan nasıl kontrol edersiniz</h3>
           <ol className="mt-2 ml-5 list-decimal space-y-1 text-xs text-muted-foreground">
             <li>
-              <b className="text-foreground">Plan check</b> (Production Plan page): after
-              every calculation, checking code that is separate from the engine goes
-              through every job again and checks each rule — parts that are not
-              flexible only on their main work center, one job per work center
-              at a time, earliest work center chosen, crane gaps, setups at once in the
-              plant, whole coils only, one mould on one work center, maintenance, no lot
-              before its pull-forward window, nothing in the past. A broken rule
-              shows in red with the job named.
+              <b className="text-foreground">Plan check</b> (Production Plan sayfası): her
+              hesaplamadan sonra motordan ayrı bir kontrol kodu her işi yeniden
+              gözden geçirir ve her kuralı kontrol eder — esnek olmayan parçalar
+              yalnız ana iş yerinde, bir iş yerinde aynı anda tek iş, en erken iş
+              yeri seçilmiş, vinç aralıkları, fabrikada aynı anda setup’lar, yalnız
+              tam rulo, bir kalıp tek iş yerinde, bakım, öne çekme penceresinden önce
+              lot yok, geçmişte hiçbir şey yok. Bozulan bir kural, işin adıyla
+              kırmızı gösterilir.
             </li>
             <li>
-              <b className="text-foreground">Why this work center</b> (job list): pick any job
-              you doubt and read its decision: its order number and the
-              finish time on every eligible work center.
+              <b className="text-foreground">Why this work center</b> (iş listesi): şüphelendiğiniz
+              herhangi bir işi seçin ve kararını okuyun: sıra numarası ve her uygun iş
+              yerindeki bitiş saati.
             </li>
             <li>
-              <b className="text-foreground">Automatic tests</b>: before any change goes live,
-              the engine plans 40 randomly generated plants (progressive and
-              transfer halls, single and shared parts, maintenance, stops) and
-              the same checks must find zero broken rules. Your 104/105 case and
-              your 1 000 / 2 000 / 6 000 coil case, the Wednesday sales day and
-              the late-job repairs are tests too.
+              <b className="text-foreground">Otomatik testler</b>: herhangi bir değişiklik canlıya
+              geçmeden önce motor rastgele üretilmiş 40 fabrikayı (progresif ve transfer
+              holler, tekil ve ortak parçalar, bakım, duruşlar) planlar ve aynı kontroller
+              sıfır bozuk kural bulmalıdır. Sizin 104/105 vakanız, 1 000 / 2 000 / 6 000
+              rulo vakanız, çarşamba satış günü ve geç iş onarımları da birer testtir.
             </li>
           </ol>
         </div>
 
         <div id="limits" className="scroll-mt-20 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <h3 className="text-sm font-semibold text-amber-950">Known limits</h3>
+          <h3 className="text-sm font-semibold text-amber-950">Bilinen sınırlar</h3>
           <p className="mt-1 text-xs text-amber-900">
-            The engine places jobs one after the other. That makes every decision
-            explainable, but it is not a search over every possible plan:
+            Motor işleri birbiri ardına yerleştirir. Bu her kararı açıklanabilir
+            kılar, ama olası her plan üzerinde bir arama değildir:
           </p>
           <ul className="mt-2 ml-5 list-disc space-y-1 text-xs text-amber-900">
             <li>
-              A booked job is never moved. Placing parts with fewer eligible
-              work centers first when the priority is equal prevents most cases
-              where a flexible part takes a single-work center part's slot, but not
-              every one.
+              Rezerve edilmiş bir iş hiçbir zaman taşınmaz. Öncelik eşitken daha az
+              uygun iş yeri olan parçaları önce yerleştirmek, esnek bir parçanın tek iş
+              yerli bir parçanın yerini aldığı durumların çoğunu önler, ama hepsini değil.
             </li>
             <li>
-              Items equal in everything — group, stock-out day and number of
-              work centers — keep the row order of the ZPP file.
+              Her şeyde — grup, stok bitiş günü ve iş yeri sayısı — eşit olan kalemler
+              ZPP dosyasındaki satır sırasını korur.
             </li>
             <li>
-              Because a coil is never cut, an overloaded week can end with a late
-              job that a half coil would have saved. That is deliberate: the fix
-              is capacity (overtime on the Capacity Dashboard) or another work center.
+              Rulo hiçbir zaman kesilmediği için aşırı yüklü bir hafta, yarım rulonun
+              kurtaracağı geç bir işle bitebilir. Bu bilinçli bir tercihtir: çözüm
+              kapasitedir (Capacity Dashboard’da mesai) ya da başka bir iş yeridir.
             </li>
             <li>
-              After the last day in ZPP_DAILY, only weekly totals exist, so
-              those weeks are spread evenly over the plant's working days (not a holiday and at
-              least one work center has normal shifts). With ZPP_DAILY loaded they are
-              long-term lots: if the capacity is used up by daily lots they stay
-              unplanned rather than delay a daily lot.
+              ZPP_DAILY’deki son günden sonra yalnız haftalık toplamlar vardır; bu yüzden
+              o haftalar fabrikanın çalışma günlerine (tatil olmayan ve en az bir iş yerinin
+              normal vardiyası olan günler) eşit dağıtılır. ZPP_DAILY yüklüyken bunlar uzun
+              vadeli lotlardır: kapasite günlük lotlarca tükenmişse bir günlük lotu
+              geciktirmek yerine plansız kalırlar.
             </li>
             <li>
-              Re-planning to remove late jobs is a set of trials, not a full
-              search: if 6 rounds cannot remove a late job, the fix is capacity
-              (overtime, another work center) — the plan says so.
+              Geç işleri gidermek için yeniden planlama tam bir arama değil, bir dizi
+              denemedir: 6 tur bir geç işi gideremiyorsa çözüm kapasitedir (mesai, başka
+              bir iş yeri) — plan bunu söyler.
             </li>
             <li>
-              Between an approved plan and the next MB52 upload, the engine
-              assumes the approved jobs were produced as planned.
+              Onaylı bir plan ile bir sonraki MB52 yüklemesi arasında motor, onaylı
+              işlerin planlandığı gibi üretildiğini varsayar.
             </li>
           </ul>
         </div>
@@ -1563,7 +1559,7 @@ function StockExample({ safetyDays }: { safetyDays: number }) {
   // 1000 bakiye, haftada 2000 (günde 400), Pazartesi 6000'lik rulo.
   const days: { label: string; stock: number }[] = []
   let stock = 6000 - 1000
-  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  const names = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum']
   for (let w = 0; w < 3; w++) {
     for (let d = 0; d < 5; d++) {
       stock -= 400
@@ -1576,12 +1572,12 @@ function StockExample({ safetyDays }: { safetyDays: number }) {
   return (
     <div className="rounded-lg border border-border p-4">
       <p className="text-sm font-semibold text-foreground">
-        Example — when is the next coil made?
+        Örnek — sonraki rulo ne zaman basılır?
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
-        Backlog 1 000, 2 000 per week, no stock, one coil = 6 000 pcs. The
-        first coil is pressed on Monday 14 September. Bars = projected stock at
-        the end of each day.
+        Birikmiş talep 1 000, haftada 2 000, stok yok, bir rulo = 6 000 adet. İlk
+        rulo 14 Eylül pazartesi basılır. Çubuklar = her günün sonundaki öngörülen
+        stok.
       </p>
       <div className="mt-3 flex h-28 items-end gap-1">
         {days.map((d, i) => (
@@ -1595,7 +1591,7 @@ function StockExample({ safetyDays }: { safetyDays: number }) {
                     : 'bg-slate-400/70'
               }`}
               style={{ height: `${Math.max(3, (Math.max(0, d.stock) / max) * 100)}%` }}
-              title={`${d.stock} pcs`}
+              title={`${d.stock} adet`}
             />
           </div>
         ))}
@@ -1609,18 +1605,18 @@ function StockExample({ safetyDays }: { safetyDays: number }) {
       </div>
       <ul className="mt-3 ml-5 list-disc space-y-1 text-xs text-muted-foreground">
         <li>
-          The first coil covers the backlog, this week, next week and 1 000 of
-          the week after.
+          İlk rulo birikmiş talebi, bu haftayı, gelecek haftayı ve ondan sonraki
+          haftanın 1 000’ini karşılar.
         </li>
         <li>
-          The stock runs out on <b className="text-destructive">{days[stockout].label}</b>{' '}
-          (red). With {safetyDays} day(s) of safety stock the next coil may start
-          from <b className="text-amber-700">{days[start].label}</b> (amber) — not
-          straight after the first coil, and not after the stock is gone.
+          Stok <b className="text-destructive">{days[stockout].label}</b>{' '}
+          günü biter (kırmızı). {safetyDays} günlük emniyet stokuyla sonraki rulo{' '}
+          <b className="text-amber-700">{days[start].label}</b> gününden (sarı)
+          itibaren başlayabilir — ne ilk rulonun hemen ardından ne de stok bittikten sonra.
         </li>
         <li>
-          If the work center is busy then, the job moves later; if it starts after{' '}
-          {days[stockout].label} it is marked late.
+          İş yeri o sırada doluysa iş daha sonraya kayar; {days[stockout].label}{' '}
+          gününden sonra başlarsa geç olarak işaretlenir.
         </li>
       </ul>
     </div>
@@ -1671,7 +1667,7 @@ function Formula({ children }: { children: ReactNode }) {
 function Example({ children }: { children: ReactNode }) {
   return (
     <p className="rounded-md border-l-4 border-emerald-500 bg-emerald-50 px-3 py-2 text-emerald-900">
-      <b className="!text-emerald-900">Example. </b>
+      <b className="!text-emerald-900">Örnek. </b>
       {children}
     </p>
   )
@@ -1720,44 +1716,44 @@ function OperatorPlanItem() {
   }
   return (
     <li>
-      <b>Operator plan</b> (a second planning model per cost center, e.g. APR, spot and nut welding
-      lines; chosen on Company settings → cost center → <b>Planning model</b>). The lines of such a
-      cost center are not run by their calendar alone: on the Production Plan, <b>Operators per
-      shift</b> takes how many operators work each day and shift, and each line has a <b>crew</b>{' '}
-      (operators it needs to run one shift, 1 if not set; entered on the Work Calendar → Capacity
-      overview, not on the Production Plan). Before the capacity is built, for every
-      day and shift in turn the lines that still have work due this week (up to Sunday) are sorted
-      by the <b>earliest due date</b> (equal: the larger remaining minutes first) and opened while
-      their crew fits the operators left. Work = net lot quantity × minutes per piece on the
-      part's main work center, the same lots the engine plans. Every shift that runs (opened or
-      from the calendar) takes its net minutes off the line's work, so a line whose work is done —
-      or whose remaining work is only for next week — gets no operator. A day and shift without
-      an operator count keeps the calendar; a holiday keeps the calendar; a <b>day record set by
-      hand always wins</b> and its crew is taken from the operator count first. The result goes to
-      the engine as day records, so sequencing, setups and late-job rules are unchanged. Example:{' '}
-      {decision.operators} operators, {lines.length} lines with a crew of 1, {noWork.join(', ')}{' '}
-      without work: {decision.open.join(', ')} run ({ex.workload.find((w) => w.press === decision.open[1])?.minutes} and{' '}
-      {ex.workload.find((w) => w.press === decision.open[2])?.minutes} min are due the same day, so the larger goes first),{' '}
-      {closed.join(', ')} waits (no operator left) and {noWork.join(', ')} stays closed.
+      <b>Operatör planı</b> (masraf yeri bazında ikinci bir planlama modeli, ör. APR, punta ve somun
+      kaynağı hatları; Company settings → cost center → <b>Planning model</b>’de seçilir). Böyle bir
+      masraf yerinin hatları yalnız takvimleriyle çalışmaz: Production Plan’da <b>Operators per
+      shift</b> her gün ve vardiyada kaç operatörün çalıştığını alır ve her hattın bir <b>ekibi</b>{' '}
+      vardır (bir vardiya çalışmak için gereken operatör sayısı, girilmemişse 1; Production Plan’da
+      değil, Work Calendar → Capacity overview’da girilir). Kapasite kurulmadan önce, sırayla her gün
+      ve vardiya için, bu hafta (pazara kadar) vadeli işi kalan hatlar <b>en erken vade tarihine</b>{' '}
+      göre sıralanır (eşitse kalan dakikası büyük olan önce) ve ekipleri kalan operatörlere sığdığı
+      sürece açılır. İş = net lot miktarı × parçanın ana iş yerindeki adet başına dakika; motorun
+      planladığı lotların aynısı. Çalışan her vardiya (açılan ya da takvimden gelen) net dakikasını
+      hattın işinden düşer; bu yüzden işi biten — ya da kalan işi yalnız gelecek haftaya ait olan —
+      bir hat operatör almaz. Operatör sayısı girilmemiş bir gün ve vardiya takvimi korur; tatil
+      takvimi korur; <b>elle girilen bir gün kaydı her zaman kazanır</b> ve ekibi önce operatör
+      sayısından alınır. Sonuç motora gün kayıtları olarak gider; böylece sıralama, setup’lar ve
+      geç iş kuralları değişmez. Örnek:{' '}
+      {decision.operators} operatör, ekibi 1 olan {lines.length} hat, {noWork.join(', ')}{' '}
+      işsiz: {decision.open.join(', ')} çalışır ({ex.workload.find((w) => w.press === decision.open[1])?.minutes} ve{' '}
+      {ex.workload.find((w) => w.press === decision.open[2])?.minutes} dk aynı gün vadeli, bu yüzden büyük olan önce gider),{' '}
+      {closed.join(', ')} bekler (operatör kalmadı) ve {noWork.join(', ')} kapalı kalır.
       <br />
-      <b>Machines count {OPERATOR_SHIFTS_PER_DAY} shifts every working day.</b> For a line of an
-      operator-plan cost center the work center template and exception weeks are not read: every
-      working day of the Work Calendar is {OPERATOR_SHIFTS_PER_DAY} shifts (plan, Work Calendar,
-      Capacity dashboard, Performance and plan check alike); the operators decide which lines run.
-      Day records and dated overtime still apply.
+      <b>Makineler her çalışma günü {OPERATOR_SHIFTS_PER_DAY} vardiya sayar.</b> Operatör planlı bir
+      masraf yerinin hattı için iş yeri şablonu ve istisna haftaları okunmaz: Work Calendar’ın her
+      çalışma günü {OPERATOR_SHIFTS_PER_DAY} vardiyadır (plan, Work Calendar, Capacity dashboard,
+      Performance ve plan kontrolünde aynı şekilde); hangi hatların çalışacağına operatörler karar
+      verir. Gün kayıtları ve tarihli mesai yine geçerlidir.
       <br />
-      <b>Operators per week</b> (Work Calendar → Capacity overview, pick the cost center): how many
-      people work in the week, not per shift. On a working day with no per-shift operator count the
-      plan uses ⌊weekly ÷ {OPERATOR_SHIFTS_PER_DAY}⌋ operators on each of the{' '}
-      {OPERATOR_SHIFTS_PER_DAY} shifts (the per-shift grid, for the first two weeks, always wins).
-      The Capacity dashboard caps the week at min(machines × {OPERATOR_SHIFTS_PER_DAY} × working
-      days, weekly operators ÷ average crew × working days) shifts; without a weekly count it is
-      machines × {OPERATOR_SHIFTS_PER_DAY} × working days. Example: {weekly.machines} lines with crews{' '}
-      {OPERATOR_WEEKLY_EXAMPLE.crewSizes.join(', ')} (average {weekly.avgCrew}),{' '}
-      {OPERATOR_WEEKLY_EXAMPLE.workingDays} working days, {OPERATOR_WEEKLY_EXAMPLE.weeklyOperators} operators:
-      machine limit {weekly.cap.machineShifts}, operator limit {weekly.cap.operatorShifts} → capacity{' '}
-      {weekly.cap.shifts} shifts; on a day without a per-shift count{' '}
-      {shiftHeadcountFromWeekly(OPERATOR_WEEKLY_EXAMPLE.weeklyOperators)} operators per shift.
+      <b>Operators per week</b> (Work Calendar → Capacity overview, masraf yerini seçin): vardiya
+      başına değil, haftada kaç kişinin çalıştığı. Vardiya başına operatör sayısı olmayan bir çalışma
+      gününde plan, {OPERATOR_SHIFTS_PER_DAY} vardiyanın her birinde ⌊haftalık ÷ {OPERATOR_SHIFTS_PER_DAY}⌋{' '}
+      operatör kullanır (ilk iki hafta için vardiya bazlı tablo her zaman kazanır). Capacity
+      dashboard haftayı min(makine × {OPERATOR_SHIFTS_PER_DAY} × çalışma günü, haftalık operatör ÷
+      ortalama ekip × çalışma günü) vardiyayla sınırlar; haftalık sayı yoksa makine ×{' '}
+      {OPERATOR_SHIFTS_PER_DAY} × çalışma günüdür. Örnek: ekipleri{' '}
+      {OPERATOR_WEEKLY_EXAMPLE.crewSizes.join(', ')} olan {weekly.machines} hat (ortalama {weekly.avgCrew}),{' '}
+      {OPERATOR_WEEKLY_EXAMPLE.workingDays} çalışma günü, {OPERATOR_WEEKLY_EXAMPLE.weeklyOperators} operatör:
+      makine sınırı {weekly.cap.machineShifts}, operatör sınırı {weekly.cap.operatorShifts} → kapasite{' '}
+      {weekly.cap.shifts} vardiya; vardiya bazlı sayısı olmayan bir günde vardiya başına{' '}
+      {shiftHeadcountFromWeekly(OPERATOR_WEEKLY_EXAMPLE.weeklyOperators)} operatör.
     </li>
   )
 }
