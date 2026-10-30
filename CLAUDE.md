@@ -24,6 +24,14 @@ Bu dosya depoda çalışan her Claude oturumu (bulut ya da sunucu) için geçerl
     **dar ve tek paragraflık** bir görevle (ajan bağlamı sıfırdan kurar; gereksiz çağrı tokeni artırır).
   Kullanıcıdan model değiştirmesi istenmez; yalnız `derin` de çözemezse kullanıcıya söylenir.
 
+## Kodu Qwen yazar, Claude denetler (zorunlu — kullanıcı kararı 2026-10-30)
+
+- Kod yazma işi **Qwen görev modu**na verilir: dal aç → `gh workflow run qwen-yesil.yml -f dal=<dal> -f gorev="<dar görev>"`
+  → `qwen/<dal>` diff'ini oku (`--stat` + gerekirse tek dosya) → uygunsa al, PR, birleştir; değilse düzeltme göreviyle tekrar.
+- Görev metni dar ve tek paragraf olur (dosya, beklenen davranış, kabul şartı). Claude kodu kendisi yazmaz;
+  yalnız korunan dosyalar (motor, doğrulayıcı, OEE, Planning Logic, şema, belge/wiki) ya da Qwen iki denemede başaramazsa yazar.
+- Kullanıcıya sonunda kısa "çözdüm" özeti verilir; kopyala-yapıştır istenmez.
+
 ## Her talimattan önce: mimari etki kontrolü (zorunlu)
 
 Yeni bir talimata **başlamadan önce** `docs/wiki/07-calisma-sozlesmesi.md` → *Yeni talimat geldiğinde* listesi

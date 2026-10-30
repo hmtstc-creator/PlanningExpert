@@ -21,6 +21,10 @@ on:
         description: "Düzeltilecek dal (main olamaz)"
         required: true
         type: string
+      gorev:
+        description: "Görev modu: Claude'un yazdığı kodlama görevi (boşsa yalnız verify düzeltme)"
+        required: false
+        type: string
 
 concurrency:
   group: qwen-${{ github.event.pull_request.number || inputs.dal }}
@@ -68,6 +72,7 @@ jobs:
           OPENAI_BASE_URL: ${{ vars.QWEN_BASE_URL || 'https://openrouter.ai/api/v1' }}
           OPENAI_MODEL: ${{ vars.QWEN_MODEL || 'qwen/qwen3-coder:free' }}
           QWEN_TUR: "4"
+          QWEN_GOREV: ${{ inputs.gorev }}
         run: bash scripts/qwen-yesil.sh
 
       - name: Raporu iş özetine yaz

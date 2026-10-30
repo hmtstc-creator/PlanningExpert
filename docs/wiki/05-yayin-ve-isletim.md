@@ -1,6 +1,6 @@
 # 05 · Yayın ve işletim
 
-> Son güncelleme: 2026-10-30 (sunucu oturumu gizli değer alamaz; sop-worker yayınla kurulur) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
+> Son güncelleme: 2026-10-30 (Qwen görev modu) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
 
 ## Çalışma şekli (özet)
 
@@ -49,6 +49,10 @@ Geri yükleme provası ayda bir (`deploy/README.md`). Şirket bazında dışa ak
 
 ## Güvenlik notları
 
+- **Qwen görev modu** (2026-10-30, kullanıcı kararı): kod yazma işinin tamamı Qwen'e verilir, Claude görev yazar,
+  denetler ve birleştirir. Claude bir dal açar, Run workflow'u `dal` + `gorev` ile tetikler; Qwen ilk turda görevi kodlar,
+  sonraki turlarda verify'ı yeşile çevirir. Aynı üç sınır geçerlidir; sonuç `qwen/<dal>` dalına gelir, Claude diff'i okur.
+  Korunan dosyalar (motor, doğrulayıcı, OEE, Planning Logic, şema, belge) gerektiren işi Claude kendisi yapar.
 - Yayın otomatik olduğu için `main` **ruleset ile korunur** (2026-10-22, *Settings → Rules → Rulesets → `main koruması`*, bypass listesi boş): silme ve force push yasak, doğrusal geçmiş, PR zorunlu (0 onay — tek kişi kendi PR'ını onaylayamaz), yalnız **squash**, `verify` yeşil olmalı (*up to date* zorunlu değil). Doğrudan `main`'e push reddedilir; her şey dal → PR → CI yoluyla girer.
 - Sunucudaki Claude oturumunun kalıcı izni yalnızca `deploy.sh` ve ilgili mesajlaşma içindir. Bulut oturumu sunucu oturumuna mesaj **gönderemez**
   (güvenilmeyen cihaz kuralı); sunucu bulut oturumuna yazabilir. Bu yüzden yayın zamanlayıcıya bırakıldı.
