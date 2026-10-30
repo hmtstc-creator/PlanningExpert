@@ -26,8 +26,12 @@ Bu dosya depoda çalışan her Claude oturumu (bulut ya da sunucu) için geçerl
 
 ## Kodu Qwen yazar, Claude denetler (zorunlu — kullanıcı kararı 2026-10-30)
 
-- Kod yazma işi **Qwen görev modu**na verilir: dal aç → `gh workflow run qwen-yesil.yml -f dal=<dal> -f gorev="<dar görev>"`
-  → `qwen/<dal>` diff'ini oku (`--stat` + gerekirse tek dosya) → uygunsa al, PR, birleştir; değilse düzeltme göreviyle tekrar.
+- Kod yazma işi **Qwen görev modu**na verilir, **önce Gemini** (`gemini-2.5-flash`; kullanıcı kararı 2026-10-30 —
+  OpenRouter modeli görevi uygulamadı, Gemini ilk denemede doğru yazdı). İş akışının varsayılanı `model: gemini`,
+  OpenRouter yalnız yedek. Dal aç → push → tetikle (bulutta `gh workflow run` GraphQL 403 verir, REST kullan):
+  `gh api -X POST repos/hmtstc-creator/PlanningExpert/actions/workflows/qwen-yesil.yml/dispatches -f ref=main -f "inputs[dal]=<dal>" -F "inputs[gorev]=@<görev dosyası>"`
+  → `qwen/<dal>` diff'ini oku (rapor: `qwen-rapor/<dal>` dalındaki `qwen-rapor.md`) → uygunsa al, PR, birleştir;
+  değilse düzeltme göreviyle tekrar.
 - Görev metni dar ve tek paragraf olur (dosya, beklenen davranış, kabul şartı). Claude kodu kendisi yazmaz;
   yalnız korunan dosyalar (motor, doğrulayıcı, OEE, Planning Logic, şema, belge/wiki) ya da Qwen iki denemede başaramazsa yazar.
 - Kullanıcıya sonunda kısa "çözdüm" özeti verilir; kopyala-yapıştır istenmez.

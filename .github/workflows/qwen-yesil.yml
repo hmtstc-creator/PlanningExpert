@@ -26,11 +26,11 @@ on:
         required: false
         type: string
       model:
-        description: "İlk denenecek sağlayıcı: varsayilan (OpenRouter, Gemini yedek) ya da gemini (önce Gemini)"
+        description: "İlk denenecek sağlayıcı: gemini (varsayılan, OpenRouter yedek) ya da varsayilan (önce OpenRouter, Gemini yedek)"
         required: false
         type: choice
-        options: [varsayilan, gemini]
-        default: varsayilan
+        options: [gemini, varsayilan]
+        default: gemini
 
 concurrency:
   group: qwen-${{ github.event.pull_request.number || inputs.dal }}
@@ -82,7 +82,7 @@ jobs:
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
           QWEN_TUR: "4"
           QWEN_GOREV: ${{ inputs.gorev }}
-          QWEN_ONCE: ${{ inputs.model }}
+          QWEN_ONCE: ${{ inputs.model || 'gemini' }}
         run: bash scripts/qwen-yesil.sh
 
       - name: Raporu iş özetine yaz

@@ -25,8 +25,8 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
   raporladı (görevi uygulamadan bitti; rapor "Başlangıç: verify kırmızı, 0 hata satırı" diyor), tur 2 40 dk takıldı ve
   iptal edildi. `gh workflow run` bulut oturumunda GraphQL 403 verir; tetikleme
   `gh api -X POST repos/<sahip>/<depo>/actions/workflows/qwen-yesil.yml/dispatches -f ref=main -f "inputs[dal]=…" -F "inputs[gorev]=@dosya"` ile.
-  **Gemini ile denendi (2026-10-30):** `model: gemini` girdisiyle tek satırlık görev tek turda doğru yapıldı. Sıradaki
-  adım: kod görevlerinde `-f "inputs[model]=gemini"` kullanmak; OpenRouter varsayılanı (`vars.QWEN_MODEL`) değiştirilebilir.
+  **Gemini ile denendi (2026-10-30):** `model: gemini` girdisiyle tek satırlık görev tek turda doğru yapıldı. Artık
+  varsayılan Gemini (kalıcı karar, wiki 11); ek girdi gerekmez.
 - **SOP Builder — ilk gerçek video** (2026-10-30): kod yayında (#121, #123), worker çalışıyor, Gemini anahtarı
   *Setup*'ta kayıtlı. Açık PR / dal yok. Sıradaki adım: kullanıcı gerçek bir videoyu yükler, sonuç birlikte okunur
   (adımlar, kare anları, kırmızı işaret, metin dili) ve gerekirse `sop-worker/prompt.md` / `prompt-verify.md`
