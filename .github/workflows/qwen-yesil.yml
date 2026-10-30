@@ -70,7 +70,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.QWEN_API_KEY }}
           OPENAI_BASE_URL: ${{ vars.QWEN_BASE_URL || 'https://openrouter.ai/api/v1' }}
-          OPENAI_MODEL: ${{ vars.QWEN_MODEL || 'qwen/qwen3-coder:free' }}
+          OPENAI_MODEL: ${{ vars.QWEN_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free' }}
           QWEN_TUR: "4"
           QWEN_GOREV: ${{ inputs.gorev }}
         run: bash scripts/qwen-yesil.sh
