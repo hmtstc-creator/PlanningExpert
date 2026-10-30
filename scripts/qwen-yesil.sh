@@ -197,6 +197,8 @@ done
 yaz ""
 
 # --------------------------------------------------------------- korumalar
+# Yeni dosyalar da sınırlara sayılsın: git diff izlenmeyen dosyaları görmez.
+git add -N . 2> /dev/null || true
 dur() {  # dur BAŞLIK AÇIKLAMA : her şeyi geri al, kırmızı bit
     yaz "## Durduruldu: $1"
     yaz ""
