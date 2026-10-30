@@ -5,7 +5,8 @@
 // Yalnız Node yerleşikleri: npm paketi yok.
 
 import { spawn } from 'node:child_process'
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, extname, join } from 'node:path'
@@ -17,10 +18,27 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const env = (k, d = '') => (process.env[k] ?? d).trim()
 const SITE = env('SOP_CONVEX_SITE', 'http://backend:3211')
 const CLOUD = env('SOP_CONVEX_URL', 'http://backend:3210')
-const TOKEN = env('SOP_WORKER_TOKEN')
-const AI_KEY = env('SOP_AI_KEY') || env('AI_API_KEY')
 const MODEL = env('SOP_AI_MODEL', 'gemini-flash-latest')
 const DATA = env('SOP_DATA_DIR', '/data')
+/** Ortamdaki anahtar yalnız yedek: asıl anahtar sayfadan girilir ve işle birlikte gelir. */
+const ENV_AI_KEY = env('SOP_AI_KEY') || env('AI_API_KEY')
+let AI_KEY = ENV_AI_KEY
+
+/**
+ * Worker jetonu: ortamda yoksa ilk açılışta üretilir ve diskte saklanır;
+ * Convex ilk gelen jetonu eşler (convex/sopQueue.ts → authWorker). Böylece
+ * sunucuda elle gizli değer yazılmaz.
+ */
+function workerToken() {
+  if (env('SOP_WORKER_TOKEN')) return env('SOP_WORKER_TOKEN')
+  const file = join(DATA, 'worker-token')
+  if (existsSync(file)) return readFileSync(file, 'utf8').trim()
+  mkdirSync(DATA, { recursive: true })
+  const t = randomBytes(32).toString('hex')
+  writeFileSync(file, t, { mode: 0o600 })
+  return t
+}
+const TOKEN = workerToken()
 const VERIFY = env('SOP_VERIFY', '1') !== '0'
 /** deploy/README.md: kullanılabilir bellek 1 GB altına düşecekse durulur. */
 const MIN_FREE_MB = Number(env('SOP_MIN_FREE_MB', '900'))
@@ -194,6 +212,11 @@ const VERIFY_SCHEMA = {
 // ---------- İşler ----------
 
 async function analyze(task) {
+  AI_KEY = task.aiKey || ENV_AI_KEY
+  if (!AI_KEY) {
+    await convex('fail', { jobId: task.jobId, error: 'No Gemini key — enter it on the SOP Builder page', retryable: false })
+    return
+  }
   let progress = 'Started'
   const beat = async (p, extra = {}) => {
     progress = p
@@ -331,15 +354,7 @@ async function frames(task) {
 
 async function main() {
   log(`SOP worker: ${SITE}, model ${MODEL}, data ${DATA}`)
-  let warned = ''
   for (;;) {
-    const missing = !TOKEN ? 'SOP_WORKER_TOKEN' : !AI_KEY ? 'SOP_AI_KEY' : ''
-    if (missing) {
-      if (warned !== missing) log(`${missing} is not set — waiting (deploy/README.md → SOP Builder)`)
-      warned = missing
-      await sleep(60_000)
-      continue
-    }
     if (freeMb() < MIN_FREE_MB) {
       log(`only ${Math.round(freeMb())} MB free — waiting`)
       await sleep(60_000)

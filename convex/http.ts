@@ -5,7 +5,7 @@ import { httpAction } from './_generated/server'
 
 /**
  * SOP işleyicisinin (`sop-worker`) uçları — yalnız Docker ağının içinden
- * (http://backend:3211) ve `SOP_WORKER_TOKEN` ile. Kuyruk mantığı
+ * (http://backend:3211) ve worker jetonuyla (ilk gelen eşleşir ya da `SOP_WORKER_TOKEN`). Kuyruk mantığı
  * convex/sopQueue.ts; burada yalnız kimlik denetimi ve JSON.
  */
 
@@ -24,18 +24,29 @@ function sameToken(a: string, b: string): boolean {
   return diff === 0
 }
 
-function authorized(req: Request): Response | null {
-  const token = process.env.SOP_WORKER_TOKEN
-  if (!token) return json({ error: 'SOP_WORKER_TOKEN is not set' }, 503)
+async function sha256(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Worker jetonu: Convex ortamında `SOP_WORKER_TOKEN` varsa o; yoksa ilk gelen
+ * jeton eşleşir (convex/sopQueue.ts → authWorker).
+ */
+async function authorized(ctx: Any, req: Request): Promise<Response | null> {
   const got = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
-  return sameToken(got, token) ? null : json({ error: 'unauthorized' }, 401)
+  if (got.length < 32) return json({ error: 'unauthorized' }, 401)
+  const fixed = process.env.SOP_WORKER_TOKEN
+  if (fixed) return sameToken(got, fixed) ? null : json({ error: 'unauthorized' }, 401)
+  const r = await ctx.runMutation(internal.sopQueue.authWorker, { hash: await sha256(got) })
+  return r.ok ? null : json({ error: 'unauthorized' }, 401)
 }
 
 const route = (path: string, run: (ctx: Any, req: Request) => Promise<Response>) =>
   http.route({
     path: `/sop/worker/${path}`,
     method: 'POST',
-    handler: httpAction(async (ctx, req) => authorized(req) ?? run(ctx, req)),
+    handler: httpAction(async (ctx, req) => (await authorized(ctx, req)) ?? run(ctx, req)),
   })
 
 route('claim', async (ctx) => json(await ctx.runMutation(internal.sopQueue.claim, {})))

@@ -38,7 +38,8 @@ Arama motorları: `robots.txt` her yolu kapatır ve başlık dizine almayı yasa
 - Fotoğraf: yalnızca JPEG / PNG / WebP / GIF / HEIC, en çok 15 MB ve 10 adet; uymayan depodan silinir (convex/uploads.ts).
 - Sahipsiz yükleme: yükleme adresi alınıp hiçbir arıza / kalıp problemine bağlanmayan dosya 24 saat sonra her gece silinir (depoyu doldurma denemesi ve vazgeçilen raporlar). Tablo taranamayacak kadar büyükse hiçbir şey silinmez; bir gecede en çok 200 dosya (convex/tenancy.ts `purgeOrphanUploads`).
 - SOP videosu: yalnız şirket creator'ı yükler; video olmayan dosya reddedilir, bağlanmadığı için gece silinir. Video worker'ın diskine geçince Convex deposundan silinir; kareler ve bekleyen video sahipsiz temizliğinde korunur (convex/sop.ts, `purgeOrphanUploads`).
-- SOP işleyicisi (`sop-worker`) Convex'e yalnız Docker ağının içinden, `SOP_WORKER_TOKEN` ile girer (`/sop/worker/*`, convex/http.ts; jeton sabit sürede karşılaştırılır, yoksa uç 503). Kuyruk işlevleri yalnız `sopJobs`'a dokunur (convex/authGuard.test.ts'te listeli istisna).
+- SOP işleyicisi (`sop-worker`) Convex'e yalnız Docker ağının içinden (3211, dışarıya açık değil) jetonla girer (`/sop/worker/*`, convex/http.ts). Jetonu worker üretir; Convex ilk gelenin SHA-256'sını eşler, başka jeton 401; creator sayfadan eşleşmeyi sıfırlayabilir. Kuyruk işlevleri yalnız `sopJobs`'a dokunur (convex/authGuard.test.ts'te listeli istisna).
+- Gemini anahtarı şirket başına `platformState`'te (gece yedeğinde, yedekler `chmod 600`); yalnız worker'a işle birlikte gider, tarayıcıya yalnız son 4 karakteri.
 - Excel: yalnızca kullanıcının tarayıcısında okunur; 25 MB sınırı, formül / HTML / makro okunmaz (src/lib/safeExcel.ts).
 
 ## Güvenlik ekranı

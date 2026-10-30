@@ -74,7 +74,7 @@ services:
   # SOP işleyicisi (docs/wiki/12-sop-olusturma.md): sıradaki SOP videosunu Gemini'ye
   # gösterir, kareleri ffmpeg ile çıkarır. Aynı anda tek iş, düşük öncelik (nice),
   # tek çekirdek; videolar `sop-data` volume'ünde saklanır (gece yedeğine girmez).
-  # Yalnız SOP_WORKER_TOKEN tanımlıysa kurulur (scripts/deploy.sh).
+  # deploy.sh kurar; gizli değer gerekmez (jeton kendiliğinden, Gemini anahtarı sayfadan).
   sop-worker:
     build:
       context: .

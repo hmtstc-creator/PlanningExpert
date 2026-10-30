@@ -154,16 +154,13 @@ ve dakikalar) kendi geliştirmesi için kullanabilir.
 
 ## SOP Builder — işleyici ve yapay zekâ (Machine Follow-up → SOP Builder)
 
-Video analizi ayrı kapsayıcıda çalışır (`sop-worker`, `deploy/compose.yml`): ffmpeg + Gemini
-Files API. Anahtarlar **worker'ın** ortamındadır (`deploy/.env`), OEE'nin `AI_API_KEY`'inden
-ayrı; Convex'e yalnız worker jetonu yazılır. Kurulum adımları: `deploy/README.md` → *SOP Builder*.
+Video analizi ayrı kapsayıcıda çalışır (`sop-worker`, `deploy/compose.yml`): ffmpeg + Gemini Files API.
+`deploy.sh` kurar; ortam değişkeni gerekmez. Gemini anahtarı sayfadan girilir (**SOP Builder → Setup**,
+yalnız creator; şirket başına, `platformState`'te; tarayıcıya yalnız son 4 karakteri gider). Worker
+jetonunu kendisi üretir ve ilk soruda eşleşir. İsteğe bağlı (yalnız gerekirse, `deploy/.env`):
+`SOP_AI_MODEL` (varsayılan `gemini-flash-latest`), `SOP_WORKER_TOKEN` (sabit jeton istenirse; o zaman
+Convex'e de aynı değer `npx convex env set` ile yazılır).
 
-| Değişken | Nerede | Ne |
-|---|---|---|
-| `SOP_WORKER_TOKEN` | `deploy/.env` **ve** Convex (`npx convex env set`) | Worker ↔ Convex jetonu (ikisinde aynı; `openssl rand -hex 32`) |
-| `SOP_AI_KEY` | `deploy/.env` | Gemini anahtarı (Google AI Studio `AIza…`); yoksa `AI_API_KEY` denenir |
-| `SOP_AI_MODEL` | `deploy/.env` (isteğe bağlı) | Varsayılan `gemini-flash-latest`; videoyu anlayan bir Gemini modeli olmalı |
-
-Ücretsiz katmanda Google gönderilen videoyu kendi geliştirmesi için kullanabilir; gizli bir
-operasyon için ücretli katman (faturalandırma açık proje) kullanılmalı.
-
+Ücret (2026-10-30, ai.google.dev/gemini-api/docs/pricing): 80 sn'lik video Gemini 2.5 Flash ile ~0,03 $,
+3.8 Flash ile ~0,10 $; günde 2–3 videoda ayda ~2–25 $. Ücretli katmanda Google Cloud'da bütçe sınırı
+konur. Ücretsiz katmanda Google gönderilen videoyu kendi geliştirmesi için kullanabilir.

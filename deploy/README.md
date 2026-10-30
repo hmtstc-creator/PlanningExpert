@@ -160,25 +160,17 @@ docs/deployment.md → Günlük özet e-postası ve OEE açık konular — yapay
 
 ## SOP Builder (sop-worker)
 
-Videodan SOP çıkaran işleyici (docs/wiki/12-sop-olusturma.md). Kurulmadıkça hiçbir şey çalışmaz;
-sayfada işler "In the queue" bekler. Bir kez yapılır (anahtar sohbete, git'e, mesaja yazılmaz):
+Videodan SOP çıkaran işleyici (docs/wiki/12-sop-olusturma.md). **Elle kurulum yok:** `deploy.sh` ilk
+yayında imajı kurar (node + ffmpeg) ve her yayında yeniden başlatır. Gizli değer yazılmaz:
 
-```bash
-cd /opt/planningexpert
-free -m                                   # kullanılabilir bellek 1 GB'ın altına düşmeyecek mi? (worker sınırı 384 MB)
-TOKEN=$(openssl rand -hex 32)
-printf 'SOP_WORKER_TOKEN=%s\nSOP_AI_KEY=%s\n' "$TOKEN" '<Gemini anahtarı>' >> deploy/.env
-chmod 600 deploy/.env
-set -a; . /etc/planningexpert/portal.env; set +a
-npx convex env set SOP_WORKER_TOKEN "$TOKEN"
-unset TOKEN
-docker compose -f deploy/compose.yml up -d --build sop-worker
-docker compose -f deploy/compose.yml logs --tail 20 sop-worker   # "SOP worker: http://backend:3211 …"
-```
+- Worker jetonunu ilk açılışta kendisi üretir (`sop-data` volume'ünde `worker-token`), Convex ilk gelen
+  jetonu eşler. Uçlar yalnız Docker ağından erişilir (3211 dışarıya açık değil). Worker yeniden kurulursa
+  sayfada *Setup → Reset connection*.
+- Gemini anahtarını şirket creator'ı **SOP Builder → Setup** kutusuna yapıştırır (sohbete / terminale değil).
 
-Sonraki yayınlarda `deploy.sh` worker'ı kendisi yeniden başlatır. Videolar `sop-data` volume'ünde
-saklanır, **gece yedeğine girmez** (disk: `docker system df -v | grep sop-data`). Worker durursa
-işi 10 dakika sonra sıraya geri koyar (`convex/sopQueue.ts`, en çok 2 deneme). Durdurmak:
+Bakış: `docker compose -f deploy/compose.yml logs --tail 20 sop-worker` ("SOP worker: http://backend:3211 …").
+Bellek sınırı 384 MB, tek çekirdek; kullanılabilir bellek 900 MB'ın altındaysa iş almaz. Videolar `sop-data`
+volume'ünde saklanır, **gece yedeğine girmez** (disk: `docker system df -v | grep sop-data`). Durdurmak:
 `docker compose -f deploy/compose.yml stop sop-worker`.
 
 ## Parola sıfırlama (site sahibi parolasını unutursa)

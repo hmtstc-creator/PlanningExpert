@@ -1,7 +1,7 @@
 # 12 · SOP oluşturma (videodan standart operasyon prosedürü)
 
-> Son güncelleme: 2026-10-29 · Durum: **ilk sürüm kodda** (Machine Follow-up → SOP Builder); sunucuda
-> `sop-worker` kurulunca çalışır ([05](05-yayin-ve-isletim.md), `deploy/README.md` → SOP Builder).
+> Son güncelleme: 2026-10-30 · Durum: **ilk sürüm yayında** (Machine Follow-up → SOP Builder). `sop-worker`'ı
+> `deploy.sh` kendisi kurar; Gemini anahtarı sayfadaki *Setup* kutusundan girilir — sunucuda elle adım yok.
 > Kaynak: kullanıcıyla 2026-10-28 / 29 konuşması, şablon `docs/sop/sop-sablon.xlsx`.
 
 Yetkili kullanıcı bir operasyon videosu yükler; yapay zekâ videoyu izleyip operasyonu adımlara böler,
@@ -130,11 +130,15 @@ sopJobs: review ─▶ /machine-followup/sop/<id>: form ekranda düzeltilir ─�
   Dosya adı `GGAAYY SOP <SOP no | referans | operasyon>`.
 - **Kilit anlar** (isteğe bağlı): yükleme formunda saniyeler yazılır; prompt adımları bu anlardan böler.
 - **Prompt** kod dışında: `sop-worker/prompt.md`, `sop-worker/prompt-verify.md` (worker her işte okur).
-- **Worker uçları:** `POST /sop/worker/{claim,heartbeat,check,frame,done,fail,frames-done}` (convex/http.ts,
-  `SOP_WORKER_TOKEN`), kuyruk convex/sopQueue.ts. Kısa video (≤ 3 dk) saniyede 2 kare izlenir, uzun (> 15 dk)
+- **Worker uçları:** `POST /sop/worker/{claim,heartbeat,check,frame,done,fail,frames-done}` (convex/http.ts),
+  kuyruk convex/sopQueue.ts. Jetonu worker ilk açılışta üretir (`/data/worker-token`); Convex ilk gelenin
+  SHA-256'sını eşler (`platformState` → `sopWorker`), başkasına 401. *Setup → Reset connection* eşleşmeyi siler.
+- **Gemini anahtarı** şirket başına sayfadan (*Setup*, yalnız creator) → `platformState` → `sopAiKey:<şirket>`;
+  işle birlikte worker'a gider, tarayıcıya yalnız son 4 karakteri. (2026-10-30: sunucuda `read -s` ile anahtar
+  yazmak sunucu oturumunda çalışmadı — oturumun klavye girişi yok, `.env` yazma izni de engelli. Bu yüzden.) Kısa video (≤ 3 dk) saniyede 2 kare izlenir, uzun (> 15 dk)
   düşük çözünürlükte.
-- **Kurulmadan yükleme kapalı:** Convex'te `SOP_WORKER_TOKEN` yoksa sayfa yüklemeyi açmaz (video Convex deposunda
-  bekleyip 30 gece yedeğine girmesin).
+- **Hazır olmadan yükleme kapalı:** worker son 5 dakikada sormadıysa ya da anahtar girilmediyse sayfa yüklemeyi
+  açmaz (video Convex deposunda bekleyip 30 gece yedeğine girmesin).
 - **Bellek:** worker 384 MB sınırlı, tek çekirdek, `nice`; kullanılabilir bellek 900 MB'ın altındaysa iş almaz.
 - **Gece temizliği** (`purgeOrphanUploads`) SOP'un bekleyen videosunu ve karelerini tanır, silmez.
 
@@ -152,7 +156,7 @@ sopJobs: review ─▶ /machine-followup/sop/<id>: form ekranda düzeltilir ─�
   deposuna konmaz: 30 yedek × video diski doldurur); kareler Convex deposunda önbellek (video durdukça yeniden
   çıkarılır); metinler + seçilen saniyeler veritabanında.
 - **İşleyici:** ayrı kapsayıcı `sop-worker` (`node:22-slim` + ffmpeg, depoyu salt okunur bağlar), aynı anda 1 iş,
-  yavaş olabilir (günde 2–3 video). Gemini Files API ile video gönderilir; anahtar `SOP_AI_KEY` worker'ın ortamında.
+  yavaş olabilir (günde 2–3 video). Gemini Files API ile video gönderilir; anahtar sayfadan girilir (2026-10-30).
 - Logo şablonun içinden alınır (kullanıcı isterse `public/`'e PNG koyar).
 
 ## Kullanıcının cevapları (2026-10-29)
@@ -164,7 +168,7 @@ ekranda elle yazılır · künye ve form kodu sabit · `NR. SOP` elle · revizyo
 
 ## Açık / sonraki adımlar
 
-- Sunucuda kurulum (`SOP_WORKER_TOKEN`, `SOP_AI_KEY`) ve **gerçek bir videoyla** ilk deneme; sonucun okunması.
+- *Setup*'ta anahtarın girilmesi ve **gerçek bir videoyla** ilk deneme; sonucun okunması.
 - Kareler Convex deposundan geliyor; PDF görüntüsü için deponun CORS izni gerekir — ilk denemede *Save PDF*'te
   fotoğraflar çıkıyor mu bakılacak.
 - Videoyu ekranda oynatıp kaydırarak kare seçmek (şimdilik saniye yazılıyor) — video sunucunun diskinde; site

@@ -169,7 +169,7 @@ function NewSop({ ready }: { ready: boolean }) {
       </div>
       {!ready && (
         <p className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
-          The SOP worker is not set up on the server yet — uploads open when it is (deploy/README.md → SOP Builder).
+          Uploads open when the worker is running and the Gemini key is entered (Setup above).
         </p>
       )}
       <div className="mt-3 flex items-center gap-3">
@@ -183,10 +183,101 @@ function NewSop({ ready }: { ready: boolean }) {
   )
 }
 
+interface Readiness {
+  workerConnected: boolean
+  workerPaired: boolean
+  aiKeySet: boolean
+  aiKeyHint: string
+  aiKeySetBy: string
+  ready: boolean
+}
+
+/** Kurulum: Gemini anahtarı burada girilir (sohbete / sunucuya yazılmaz), worker durumu. */
+function Setup({ status }: { status: Readiness | undefined }) {
+  const setKey = useSafeMutation(api.sop.setAiKey)
+  const clearKey = useSafeMutation(api.sop.clearAiKey)
+  const reset = useSafeMutation(api.sop.resetWorker)
+  const [key, setKeyText] = useState('')
+  const [editing, setEditing] = useState(false)
+  if (!status) return null
+  const dot = (ok: boolean) => <span className={`inline-block h-2 w-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+  return (
+    <div className="mt-6 rounded-xl border border-border bg-card p-4 text-sm shadow-sm">
+      <h2 className="text-base font-semibold">Setup</h2>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {dot(status.workerConnected)}
+        <span>
+          {status.workerConnected
+            ? 'The SOP worker on the server is running.'
+            : 'The SOP worker is not running yet — it starts with the next site update (about 5 minutes).'}
+        </span>
+        {status.workerPaired && !status.workerConnected && (
+          <button
+            type="button"
+            className="text-xs text-primary hover:underline"
+            title="Use this only if the worker was reinstalled and cannot connect"
+            onClick={() => window.confirm('Forget the connected worker? The next worker that asks will be connected.') && void reset.run({})}
+          >
+            Reset connection
+          </button>
+        )}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {dot(status.aiKeySet)}
+        {status.aiKeySet && !editing ? (
+          <>
+            <span>
+              Gemini key is set ({status.aiKeyHint}
+              {status.aiKeySetBy && `, by ${status.aiKeySetBy}`}).
+            </span>
+            <button type="button" className="text-xs text-primary hover:underline" onClick={() => setEditing(true)}>
+              Change
+            </button>
+            <button type="button" className="text-xs text-destructive hover:underline" onClick={() => window.confirm('Remove the Gemini key?') && void clearKey.run({})}>
+              Remove
+            </button>
+          </>
+        ) : (
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (await setKey.run({ key })) {
+                setKeyText('')
+                setEditing(false)
+              }
+            }}
+          >
+            <span>Gemini key:</span>
+            <input
+              type="password"
+              autoComplete="off"
+              className="w-72 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+              placeholder="AIza… (from aistudio.google.com)"
+              value={key}
+              onChange={(e) => setKeyText(e.target.value)}
+            />
+            <button type="submit" disabled={!key.trim() || setKey.pending} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50">
+              Save key
+            </button>
+            {editing && (
+              <button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            )}
+          </form>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">The key is kept on our own server; the page only shows its last 4 characters.</p>
+      <ErrorBanner message={setKey.error ?? clearKey.error ?? reset.error} onDismiss={() => (setKey.clearError(), clearKey.clearError(), reset.clearError())} />
+    </div>
+  )
+}
+
 function SopListPage() {
   const { canManage } = usePlant()
   const rows = useQuery(api.sop.list, canManage ? {} : 'skip') as Row[] | undefined
-  const status = useQuery(api.sop.status, canManage ? {} : 'skip') as { workerReady: boolean } | undefined
+  const status = useQuery(api.sop.status, canManage ? {} : 'skip') as Readiness | undefined
   const retry = useSafeMutation(api.sop.retry)
   const remove = useSafeMutation(api.sop.remove)
   if (!canManage) {
@@ -207,7 +298,8 @@ function SopListPage() {
         Standard operating procedures in the company form (PAȘI DE BAZĂ · PUNCTE CHEIE · CAUZE) from a video of the
         operation. The form never changes; more than 6 steps continue on a copy of the page.
       </p>
-      <NewSop ready={status?.workerReady ?? false} />
+      <Setup status={status} />
+      <NewSop ready={status?.ready ?? false} />
       <ErrorBanner message={retry.error ?? remove.error} onDismiss={() => (retry.clearError(), remove.clearError())} />
       <div className="mt-6 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full text-sm">
