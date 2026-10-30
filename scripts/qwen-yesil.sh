@@ -28,6 +28,7 @@
 #   QWEN_YEDEK_MODELLER  OpenRouter'da sırayla denenecek ek ücretsiz modeller (boşlukla)
 #   GEMINI_API_KEY       OpenRouter tükenince Google Gemini ücretsiz API'sine geçilir
 #   GEMINI_MODEL         varsayılan gemini-2.5-flash
+#   QWEN_ONCE        "gemini" ise önce Gemini denenir, OpenRouter yedek kalır
 #   QWEN_TUR         en fazla kaç düzeltme turu (varsayılan 4)
 #   QWEN_GOREV       GÖREV MODU: Claude'un yazdığı kodlama görevi. Doluysa ilk
 #                    turda Qwen bu görevi kodlar, sonraki turlarda verify'ı
@@ -124,6 +125,9 @@ fi
 ADAYLAR=()
 for m in "$OPENAI_MODEL" ${QWEN_YEDEK_MODELLER:-}; do ADAYLAR+=("openrouter|$m"); done
 [ -n "${GEMINI_API_KEY:-}" ] && ADAYLAR+=("gemini|${GEMINI_MODEL:-gemini-2.5-flash}")
+if [ "${QWEN_ONCE:-}" = gemini ] && [ -n "${GEMINI_API_KEY:-}" ]; then
+    ADAYLAR=("gemini|${GEMINI_MODEL:-gemini-2.5-flash}" "${ADAYLAR[@]:0:${#ADAYLAR[@]}-1}")
+fi
 ADAY_NO=0
 OR_ANAHTAR="$OPENAI_API_KEY"; OR_URL="$OPENAI_BASE_URL"
 qwen_cagir() {  # qwen_cagir GÖREV ÇIKTI
