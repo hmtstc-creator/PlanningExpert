@@ -17,39 +17,39 @@ import { PageHeader } from '../PageHeader'
 import { relatedPages } from '../../lib/navigation'
 
 /**
- * Motorun nasıl plan yaptığının açıklaması.
+ * Planning Logic sayfasının Romence çevirisi.
  *
- * Kod `src/lib/planPipeline.ts`, `planning.ts` ve `scheduler.ts` içinde;
- * burası onun planlamacının dilindeki karşılığı. Kurallardan biri
- * değişirse bu sayfa da değişmeli.
+ * Kaynak: `src/routes/planlogic.tsx` (İngilizce asıl sayfa). O sayfadaki her
+ * değişiklik aynı PR'da bu dosyaya da işlenmelidir; ikisi birlikte güncellenir.
+ * Program arayüzündeki sayfa, düğme, alan ve sütun adları İngilizce bırakılır.
  */
 
 /** Hammadde MRP'sinin FMEA'sı: hata türü, etkisi, S, O, D, yöntemdeki önlem. */
 const FMEA_ROWS: [string, string, number, number, number, string][] = [
-  ['Plan and demand both counted', 'Same steel ordered twice', 8, 8, 3, 'Plan-independent: demand only; the safety stock absorbs plan timing and coil surplus'],
-  ['Finished stock not deducted', 'Over-ordering', 7, 5, 4, 'Locations ticked “Finished goods” on Storage Locations deducted first-in-first-out, the same as the plan; the row breaks the need down per finished product'],
-  ['Need of a part with stock read from its coil row', 'Steel seems needed while the part’s stock still covers', 5, 6, 6, 'Per-product breakdown: weeks covered by finished stock and the week steel is first needed, per part on the coil'],
-  ['Coil stock on hand not deducted', 'Steel already in the plant is ordered again', 8, 6, 5, 'Coil stock in the locations ticked “Raw material” is the opening stock'],
-  ['Co-product counted twice', 'Over-ordering on pairs', 6, 6, 5, 'Pair pressed once: strokes = larger need, steel on the primary part only'],
-  ['Part without raw code / gross weight', 'Its steel silently missing → line stops', 10, 5, 8, 'Listed in red on the page with pieces; never silently dropped'],
-  ['Gross weight in wrong unit (g / t)', 'Order 1000× off', 9, 3, 6, 'Weights above 50 kg or below 1 g per piece are flagged'],
-  ['Weekly buckets: safety checked only at week start', 'Below safety at the end of the week', 7, 7, 7, 'Every week end must hold the next N working days (10 = the next 2 weeks)'],
-  ['Steel ordered with no demand behind it', 'Dead stock, cash tied up', 6, 6, 5, 'No demand, no order: nothing is forecast beyond the last ZPP week (kanban comes later)'],
-  ['Backlog (overdue) ignored', 'Urgent steel missing now', 8, 4, 5, 'Backlog counted in the current week'],
-  ['Blocked / quality stock counted as available', 'Stock overstated', 7, 4, 6, 'Only unrestricted stock, and only in locations ticked on Storage Locations'],
-  ['Scrap, coil ends, setup loss', 'Slightly too little', 5, 8, 7, 'Standard extra per order (500 kg, adjustable)'],
-  ['Steel in transit unknown', 'Steel already on the way is ordered again', 7, 7, 8, 'In-transit Excel list: each quantity is a receipt in its ETA week (no ETA = this week)'],
-  ['In-transit ETA wrong or missing', 'Order a week too late or too early', 6, 5, 6, 'No ETA counts as this week; each arrival shows its ETA and PO on the page to check'],
+  ['Planul și cererea sunt numărate amândouă', 'Același oțel este comandat de două ori', 8, 8, 3, 'Independent de plan: doar cererea; stocul de siguranță absoarbe decalajele planului și surplusul de bobină'],
+  ['Stocul de produse finite nu este scăzut', 'Comandă în exces', 7, 5, 4, 'Locațiile bifate „Finished goods” în Storage Locations sunt scăzute primul intrat – primul ieșit, la fel ca în plan; rândul defalcă necesarul pe fiecare produs finit'],
+  ['Necesarul unei piese cu stoc, citit din rândul bobinei', 'Oțelul pare necesar, deși stocul piesei încă acoperă', 5, 6, 6, 'Defalcare pe produs: săptămânile acoperite de stocul de produse finite și săptămâna în care oțelul este necesar prima dată, pentru fiecare piesă de pe bobină'],
+  ['Stocul de bobine existent nu este scăzut', 'Oțelul aflat deja în fabrică este comandat din nou', 8, 6, 5, 'Stocul de bobine din locațiile bifate „Raw material” este stocul inițial'],
+  ['Coprodus numărat de două ori', 'Comandă în exces la perechi', 6, 6, 5, 'Perechea se ștanțează o singură dată: curse = necesarul mai mare, oțelul doar pe piesa principală'],
+  ['Piesă fără cod de materie primă / greutate brută', 'Oțelul ei lipsește fără avertizare → linia se oprește', 10, 5, 8, 'Listată cu roșu pe pagină, cu bucățile; nu este eliminată niciodată în tăcere'],
+  ['Greutate brută în unitate greșită (g / t)', 'Comandă greșită de 1000×', 9, 3, 6, 'Greutățile peste 50 kg sau sub 1 g pe bucată sunt semnalate'],
+  ['Intervale săptămânale: siguranța verificată doar la începutul săptămânii', 'Sub nivelul de siguranță la sfârșitul săptămânii', 7, 7, 7, 'Fiecare sfârșit de săptămână trebuie să acopere următoarele N zile lucrătoare (10 = următoarele 2 săptămâni)'],
+  ['Oțel comandat fără cerere în spate', 'Stoc mort, bani imobilizați', 6, 6, 5, 'Fără cerere, fără comandă: nu se prognozează nimic după ultima săptămână din ZPP (kanbanul vine mai târziu)'],
+  ['Restanța (întârzierile) ignorată', 'Oțelul urgent lipsește acum', 8, 4, 5, 'Restanța este numărată în săptămâna curentă'],
+  ['Stoc blocat / în carantină de calitate numărat ca disponibil', 'Stoc supraevaluat', 7, 4, 6, 'Doar stocul nerestricționat și doar în locațiile bifate în Storage Locations'],
+  ['Rebut, capete de bobină, pierderi la setup', 'Puțin prea puțin', 5, 8, 7, 'Supliment standard pe comandă (500 kg, reglabil)'],
+  ['Oțelul în tranzit necunoscut', 'Oțelul aflat deja pe drum este comandat din nou', 7, 7, 8, 'Lista Excel de tranzit: fiecare cantitate este o recepție în săptămâna ETA (fără ETA = săptămâna aceasta)'],
+  ['ETA în tranzit greșit sau lipsă', 'Comandă cu o săptămână prea târziu sau prea devreme', 6, 5, 6, 'Fără ETA se consideră săptămâna aceasta; fiecare sosire își arată ETA și PO pe pagină, pentru verificare'],
 ]
 
 const STEPS = [
-  { id: 'inputs', title: 'Collect the data' },
-  { id: 'demand', title: 'Net the demand' },
-  { id: 'capacity', title: 'Build the capacity' },
-  { id: 'blocks', title: 'Block what cannot run' },
-  { id: 'order', title: 'Put the work in order' },
-  { id: 'place', title: 'Place each job' },
-  { id: 'check', title: 'Check and report' },
+  { id: 'inputs', title: 'Colectarea datelor' },
+  { id: 'demand', title: 'Calculul cererii nete' },
+  { id: 'capacity', title: 'Construirea capacității' },
+  { id: 'blocks', title: 'Blocarea a ceea ce nu poate rula' },
+  { id: 'order', title: 'Ordonarea lucrărilor' },
+  { id: 'place', title: 'Plasarea fiecărei lucrări' },
+  { id: 'check', title: 'Verificare și raportare' },
 ]
 
 function hhmm(minute: number): string {
@@ -133,13 +133,13 @@ export function PlanLogicRo() {
     <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
       <PageHeader
         title="Planning Logic"
-        summary="How the plan is calculated — the same rules, applied the same way every time."
+        summary="Cum se calculează planul — aceleași reguli, aplicate de fiecare dată în același fel."
         links={relatedPages('/planlogic')}
         info={
           <p>
-            Nobody places jobs by hand. The plan is calculated on the server from the data you
-            maintain, in the seven steps below, every time that data changes. To change the plan,
-            change its inputs.
+            Nimeni nu plasează lucrările manual. Planul este calculat pe server din datele pe care
+            le întrețineți, în cei șapte pași de mai jos, de fiecare dată când aceste date se schimbă.
+            Pentru a schimba planul, schimbați datele de intrare.
           </p>
         }
       />
@@ -148,7 +148,7 @@ export function PlanLogicRo() {
 
       <Synoptic safetyDays={current.safety} />
 
-      <h2 className="mt-10 text-lg font-semibold text-foreground">The seven steps in detail</h2>
+      <h2 className="mt-10 text-lg font-semibold text-foreground">Cei șapte pași în detaliu</h2>
       <ol className="mt-3 flex flex-wrap gap-2 text-xs">
         {STEPS.map((step, i) => (
           <li key={step.id} className="flex items-center gap-2">
@@ -167,42 +167,42 @@ export function PlanLogicRo() {
       </ol>
 
       <div className="mt-6 rounded-lg border border-border bg-muted/40 p-4">
-        <h2 className="text-sm font-semibold text-foreground">Your current settings</h2>
+        <h2 className="text-sm font-semibold text-foreground">Setările dumneavoastră actuale</h2>
         <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-5">
-          <Setting label="Planning horizon" value={`${current.horizon} weeks`} />
-          <Setting label="First shift starts" value={`${current.shiftStart} (${current.timeZone})`} />
-          <Setting label="Shift length" value={`${current.shiftMinutes} min`} />
-          <Setting label="Gap between mould setups (same hall)" value={`${current.setupGap} min`} />
-          <Setting label="Gap between coil changes (same hall)" value={`${current.coilGap} min`} />
-          <Setting label="Setups at the same time per hall" value={String(current.concurrent)} />
-          <Setting label="Setups at once in the plant (normal)" value={String(current.plantNormal)} />
-          <Setting label="Setups at once with backlog / late risk" value={String(current.plantUrgent)} />
-          <Setting label="Pull work forward" value={`${current.pullForward} days`} />
-          <Setting label="Setup over a shift change" value={current.crossShifts ? 'allowed' : 'not allowed'} />
-          <Setting label="Capacity factor" value={`${current.factor}%`} />
+          <Setting label="Planning horizon" value={`${current.horizon} săptămâni`} />
+          <Setting label="Începutul primei ture" value={`${current.shiftStart} (${current.timeZone})`} />
+          <Setting label="Durata turei" value={`${current.shiftMinutes} min`} />
+          <Setting label="Interval între schimbările de matriță (aceeași hală)" value={`${current.setupGap} min`} />
+          <Setting label="Interval între schimbările de bobină (aceeași hală)" value={`${current.coilGap} min`} />
+          <Setting label="Setup-uri simultane pe hală" value={String(current.concurrent)} />
+          <Setting label="Setup-uri simultane în fabrică (normal)" value={String(current.plantNormal)} />
+          <Setting label="Setup-uri simultane cu restanță / risc de întârziere" value={String(current.plantUrgent)} />
+          <Setting label="Pull work forward" value={`${current.pullForward} zile`} />
+          <Setting label="Setup peste schimbarea de tură" value={current.crossShifts ? 'permis' : 'nepermis'} />
+          <Setting label="Factor de capacitate" value={`${current.factor}%`} />
           <Setting
             label="Frozen days"
-            value={current.frozen > 0 ? `${current.frozen} days` : 'off'}
+            value={current.frozen > 0 ? `${current.frozen} zile` : 'dezactivat'}
           />
-          <Setting label="Safety stock" value={`${current.safety} working days`} />
-          <Setting label="Delivery time on the need day" value={current.cutoff} />
-          <Setting label="Utilisation target" value={`${current.target}% (next 7 days)`} />
-          <Setting label="Scenarios tried at most" value={String(current.maxScenarios)} />
-          <Setting label="Raw material safety" value={`${current.rawCoverage} working days`} />
-          <Setting label="Raw order extra" value={`${current.rawExtra.toLocaleString('en-GB')} kg`} />
-          <Setting label="Urgent raw material" value={`${current.rawUrgent} working days`} />
-          <Setting label="Prediction OEE (dashboard only)" value={`${current.predictionOee}%`} />
+          <Setting label="Safety stock" value={`${current.safety} zile lucrătoare`} />
+          <Setting label="Ora de livrare în ziua necesarului" value={current.cutoff} />
+          <Setting label="Utilisation target" value={`${current.target}% (următoarele 7 zile)`} />
+          <Setting label="Număr maxim de scenarii încercate" value={String(current.maxScenarios)} />
+          <Setting label="Siguranță materie primă" value={`${current.rawCoverage} zile lucrătoare`} />
+          <Setting label="Supliment la comanda de materie primă" value={`${current.rawExtra.toLocaleString('en-GB')} kg`} />
+          <Setting label="Urgent raw material" value={`${current.rawUrgent} zile lucrătoare`} />
+          <Setting label="Prediction OEE (doar în dashboard)" value={`${current.predictionOee}%`} />
         </dl>
         <p className="mt-3 text-xs text-muted-foreground">
-          Change these on the{' '}
+          Le puteți modifica în pagina{' '}
           <Link to="/takvim" className="underline hover:no-underline">
             Work Calendar
-          </Link>{' '}
-          page; the capacity factor comes from the{' '}
+          </Link>
+          ; factorul de capacitate vine din pagina{' '}
           <Link to="/performans" className="underline hover:no-underline">
             Performance
-          </Link>{' '}
-          page; Prediction OEE from the{' '}
+          </Link>
+          ; Prediction OEE din pagina{' '}
           <Link to="/capacity" className="underline hover:no-underline">
             Capacity Dashboard
           </Link>
@@ -210,134 +210,134 @@ export function PlanLogicRo() {
         </p>
       </div>
 
-      <Step n={1} id="inputs" title="Collect the data">
-        <p>The engine reads everything the plan depends on:</p>
+      <Step n={1} id="inputs" title="Colectarea datelor">
+        <p>Motorul citește tot ce influențează planul:</p>
         <Table
           rows={[
-            ['Demand', 'ZPP weekly net requirements and the overdue quantity', '/sapdata'],
-            ['Sales days', 'ZPP_DAILY: one column per day — the day each quantity is sold', '/sapdata'],
+            ['Cerere', 'Necesarul net săptămânal din ZPP și cantitatea restantă', '/sapdata'],
+            ['Zile de vânzare', 'ZPP_DAILY: o coloană pe zi — ziua în care se vinde fiecare cantitate', '/sapdata'],
             [
-              'Stock',
-              'MB52 unrestricted stock, counted per cost center: a part counts the locations of its main work center\'s cost center (Storage Locations → Locations per cost center) — its production (WIP) location and its finished goods locations for the plan, the validator, Demand and the Capacity Dashboard; a raw material code counts the raw material locations of the cost centers that consume it. Example: 171 and 173 have WIP 2009, raw and finished 1009; 172 has WIP 2010, raw and finished 1009 — stock of a 172 part lying in 2009 is not counted. Intermediate parts: a code that the plant itself makes (a product card or a co-product) and another part uses as raw material — e.g. 172 makes it, 171 consumes it — counts once, as finished stock of its maker; it never counts as raw material stock, never gets a coil need and is never suggested for purchase, because 171\'s draw is already in 172\'s ZPP demand. So 1009 being raw for 171 and finished for 172 does not count the same pieces twice. MB51 production of a part is a 101/102 into its cost center\'s WIP location. A cost center without a definition (or a part without a cost center) uses the location ticks: Finished goods, Raw material, Production receipt',
+              'Stoc',
+              'Stocul nerestricționat din MB52, numărat pe centru de cost: o piesă numără locațiile centrului de cost al centrului ei de lucru principal (Storage Locations → Locations per cost center) — locația de producție (WIP) și locațiile de produse finite, pentru plan, validator, Demand și Capacity Dashboard; un cod de materie primă numără locațiile de materie primă ale centrelor de cost care îl consumă. Exemplu: 171 și 173 au WIP 2009, materie primă și produse finite 1009; 172 are WIP 2010, materie primă și produse finite 1009 — stocul unei piese 172 aflat în 2009 nu este numărat. Piese intermediare: un cod pe care fabrica îl produce singură (o fișă de produs sau un coprodus) și pe care altă piesă îl folosește ca materie primă — de ex. 172 îl produce, 171 îl consumă — se numără o singură dată, ca stoc de produs finit al producătorului; nu se numără niciodată ca stoc de materie primă, nu primește niciodată necesar de bobină și nu este propus niciodată pentru achiziție, deoarece consumul lui 171 este deja în cererea ZPP a lui 172. Astfel, faptul că 1009 este materie primă pentru 171 și produs finit pentru 172 nu numără aceleași bucăți de două ori. Producția MB51 a unei piese este o mișcare 101/102 în locația WIP a centrului ei de cost. Un centru de cost fără definiție (sau o piesă fără centru de cost) folosește bifele locațiilor: Finished goods, Raw material, Production receipt',
               '/depolar',
             ],
-            ['Coils in transit', 'In-transit Excel list: each quantity arrives in its ETA week (no ETA = this week)', '/sapdata'],
+            ['Bobine în tranzit', 'Lista Excel de tranzit: fiecare cantitate sosește în săptămâna ETA (fără ETA = săptămâna aceasta)', '/sapdata'],
             [
               'Master data',
-              'Cycle time (minutes per piece) — the speed of every part on every work center; setup and frequency stop (coil change) times, quality approval time, coil and gross weight, mould shot limit, main and alternative work centers, Flexible work center tick, co-product, Accepted OEE. A part loaded earlier with SPM and cavities but no cycle time runs 1 ÷ (SPM × cavities) min/piece; cavities, where still entered, only count strokes (mould limit)',
+              'Timpul de ciclu (minute pe bucată) — viteza fiecărei piese pe fiecare centru de lucru; timpii de setup și de oprire de frecvență (schimbare de bobină), timpul de aprobare a calității, greutatea bobinei și greutatea brută, limita de lovituri a matriței, centrele de lucru principale și alternative, bifa Flexible work center, coprodus, Accepted OEE. O piesă încărcată anterior cu SPM și cavități, dar fără timp de ciclu, rulează cu 1 ÷ (SPM × cavități) min/buc; cavitățile, acolo unde mai sunt introduse, numără doar cursele (limita matriței)',
               '/referanslar',
             ],
-            ['Work Centers', 'The single work center list: cost center, hall (crane and setup team), category (Gantt and Capacity Dashboard groups), frequency stop (coil setup, fixture setup … or none), frozen days', '/makineler'],
-            ['Work calendar', 'Per work center: weekly pattern (days from Monday × shifts), exception weeks, overtime (dated or recurring, from an overtime type); planned stops; public and manual holidays; planning settings', '/takvim'],
-            ['Dies', 'Readiness (date and time), maintenance days, shot-limit alarms — from Die Follow-up', '/die-followup/maintenance'],
-            ['Machines', 'Planned work center maintenance hours and open breakdowns that stop a work center — from Machine Follow-up', '/machine-followup/breakdowns'],
-            ['Your rules', 'Exclude, pin to a work center/day, or move to the front', '/planlama'],
-            ['Approved plan', 'The last approved plan, for the frozen days', '/planlama'],
+            ['Work Centers', 'Lista unică a centrelor de lucru: centru de cost, hală (pod rulant și echipă de setup), categorie (grupele din Gantt și Capacity Dashboard), oprire de frecvență (setup de bobină, setup de dispozitiv … sau niciuna), zile înghețate', '/makineler'],
+            ['Work calendar', 'Pe centru de lucru: modelul săptămânal (zile de luni încolo × ture), săptămâni de excepție, ore suplimentare (cu dată sau recurente, dintr-un tip de ore suplimentare); opriri planificate; sărbători legale și zile libere introduse manual; setări de planificare', '/takvim'],
+            ['Matrițe', 'Disponibilitate (dată și oră), zile de mentenanță, alarme de limită de lovituri — din Die Follow-up', '/die-followup/maintenance'],
+            ['Utilaje', 'Orele planificate de mentenanță ale centrelor de lucru și defecțiunile deschise care opresc un centru de lucru — din Machine Follow-up', '/machine-followup/breakdowns'],
+            ['Regulile dumneavoastră', 'Excludere, fixare pe un centru de lucru / o zi sau mutare în față', '/planlama'],
+            ['Plan aprobat', 'Ultimul plan aprobat, pentru zilele înghețate', '/planlama'],
           ]}
         />
       </Step>
 
-      <Step n={2} id="demand" title="Net the demand">
+      <Step n={2} id="demand" title="Calculul cererii nete">
         <ul>
           <li>
-            Every ZPP column is one calendar week, starting with the current
-            week. Only the weeks inside the planning horizon are planned.
+            Fiecare coloană ZPP este o săptămână calendaristică, începând cu săptămâna
+            curentă. Se planifică doar săptămânile din orizontul de planificare.
           </li>
           <li>
-            The overdue quantity becomes a <b>backlog</b> item due this week.
+            Cantitatea restantă devine un element de <b>restanță</b> cu termen în această săptămână.
           </li>
           <li>
-            Stock is deducted from the earliest need first: backlog, then this
-            week, then next week, and so on. What remains is what must be
-            produced.
+            Stocul se scade întâi din cel mai apropiat necesar: restanța, apoi săptămâna
+            aceasta, apoi săptămâna viitoare și așa mai departe. Ce rămâne trebuie
+            produs.
           </li>
           <li>
-            <b>Sales days — ZPP_DAILY.</b> For every day the ZPP_DAILY file
-            covers, demand falls on the exact date in the file: 5 000 shipped
-            on Wednesday is 5 000 on Wednesday, not 1 000 a day. Beyond the
-            file's last day, the weekly ZPP is spread evenly over the plant's
-            working days — not a holiday and at least one work center has normal
-            shifts; overtime does not make a working day (a partly covered week
-            gets the rest of its weekly total on the uncovered days). The backlog
-            is due today.
+            <b>Zile de vânzare — ZPP_DAILY.</b> Pentru fiecare zi acoperită de fișierul
+            ZPP_DAILY, cererea cade exact la data din fișier: 5 000 livrate
+            miercuri înseamnă 5 000 miercuri, nu 1 000 pe zi. După ultima zi
+            a fișierului, ZPP-ul săptămânal se distribuie uniform pe zilele lucrătoare
+            ale fabricii — zile care nu sunt sărbători și în care cel puțin un centru de lucru are
+            ture normale; orele suplimentare nu fac dintr-o zi o zi lucrătoare (o săptămână acoperită
+            parțial primește restul totalului săptămânal în zilele neacoperite). Restanța
+            are termen astăzi.
           </li>
           <li>
-            <b>ZPP_DAILY first — weekly ZPP is long-term.</b> When ZPP_DAILY is
-            loaded (and reaches today), it is SAP's commitment for the days it
-            covers. Demand that comes from the weekly ZPP — the days after
-            ZPP_DAILY's last day, and every part that has no ZPP_DAILY row — becomes a
-            separate <b>long-term</b> lot. Long-term lots are placed only{' '}
-            <b>after every daily lot</b> (backlog, urgent, fill and lots moved to the
-            front), only into the capacity that is left, never in front of a daily job
-            that continues its die without a setup, and they are <b>never late</b>. A
-            week only partly covered by ZPP_DAILY is <b>split</b>, never mixed: the
-            covered days make the daily lot, the rest is a long-term lot labelled{' '}
-            <code>W38 LT</code>. Whole coils still apply: the daily lot's spare pieces
-            reduce the long-term lot. Example: ZPP_DAILY up to Wednesday with 1 000
-            on Monday and 1 000 on Wednesday, weekly W38 = 5 000, a coil gives 2 500
-            pcs → daily lot 2 500 (one coil, checked only on Monday and Wednesday) +
-            long-term lot 2 500 (3 000 on Thursday–Friday − 500 spare). Without
-            ZPP_DAILY nothing is long-term and the weekly ZPP is planned as before.
+            <b>Întâi ZPP_DAILY — ZPP-ul săptămânal este pe termen lung.</b> Când ZPP_DAILY este
+            încărcat (și ajunge până astăzi), el este angajamentul SAP pentru zilele pe care le
+            acoperă. Cererea care vine din ZPP-ul săptămânal — zilele de după ultima zi din
+            ZPP_DAILY și fiecare piesă care nu are rând în ZPP_DAILY — devine un lot
+            separat <b>pe termen lung</b>. Loturile pe termen lung sunt plasate doar{' '}
+            <b>după toate loturile zilnice</b> (restanță, urgente, de umplere și loturile mutate
+            în față), doar în capacitatea rămasă, niciodată înaintea unei lucrări zilnice
+            care continuă pe matrița ei fără setup, și <b>nu sunt niciodată întârziate</b>. O
+            săptămână acoperită doar parțial de ZPP_DAILY este <b>împărțită</b>, niciodată amestecată:
+            zilele acoperite formează lotul zilnic, restul este un lot pe termen lung etichetat{' '}
+            <code>W38 LT</code>. Bobinele întregi se aplică în continuare: bucățile în plus ale lotului
+            zilnic reduc lotul pe termen lung. Exemplu: ZPP_DAILY până miercuri, cu 1 000
+            luni și 1 000 miercuri, W38 săptămânal = 5 000, o bobină dă 2 500
+            buc → lot zilnic 2 500 (o bobină, verificată doar luni și miercuri) +
+            lot pe termen lung 2 500 (3 000 joi–vineri − 500 în plus). Fără
+            ZPP_DAILY nimic nu este pe termen lung, iar ZPP-ul săptămânal se planifică la fel ca înainte.
           </li>
           <li>
-            <b>Timing — projected stock.</b> Walking day by day, the engine
-            finds the day the stock — plus every lot planned before — would
-            drop below zero. That is the lot's <b>stock-out day</b>.
+            <b>Momentul — stocul proiectat.</b> Parcurgând zi cu zi, motorul
+            găsește ziua în care stocul — plus fiecare lot planificat înainte — ar
+            scădea sub zero. Aceasta este <b>ziua de epuizare a stocului</b> pentru lot.
           </li>
           <li>
-            <b>Safety stock.</b> The lot may start{' '}
-            <b>{current.safety} working day(s)</b> before its stock-out day, and
-            not earlier, so stock does not pile up and the work center stays free
-            for parts that need it. If that day is already today or past, the
-            lot is <b>urgent</b>; otherwise it is <b>fill</b>.
+            <b>Stocul de siguranță.</b> Lotul poate începe cu{' '}
+            <b>{current.safety} zi(le) lucrătoare</b> înainte de ziua de epuizare, și
+            nu mai devreme, ca stocul să nu se acumuleze și centrul de lucru să rămână liber
+            pentru piesele care au nevoie de el. Dacă acea zi este deja astăzi sau a trecut,
+            lotul este <b>urgent</b>; altfel este <b>de umplere</b> (fill).
           </li>
           <li>
-            <b>Produced but not yet in the stock file.</b> Approved jobs that
-            ran after the last MB52 upload count as stock until the next
-            upload. Example: 6 000 pcs pressed on Monday, stock uploaded again
-            on Tuesday morning — in between, the 6 000 are not planned a
-            second time. The Production Plan says when this assumption is in
-            use.
+            <b>Produs, dar încă nu în fișierul de stoc.</b> Lucrările aprobate care
+            au rulat după ultima încărcare MB52 contează ca stoc până la următoarea
+            încărcare. Exemplu: 6 000 buc ștanțate luni, stocul încărcat din nou
+            marți dimineață — între timp, cele 6 000 nu sunt planificate a doua
+            oară. Production Plan arată când se folosește această
+            ipoteză.
           </li>
           <li>
-            <b>Co-products</b> come out of the same stroke, so they cannot be
-            made separately. For each week, the pair is made for the larger of
-            the two requirements, and the pair is <b>one lot and one job</b> —
-            on the part that names the other as its co-product. The job shows
-            both quantities; work center time and setup are counted once.
+            <b>Coprodusele</b> ies din aceeași cursă, deci nu pot fi
+            produse separat. Pentru fiecare săptămână, perechea se produce pentru cel mai mare dintre
+            cele două necesare, iar perechea este <b>un singur lot și o singură lucrare</b> —
+            pe piesa care o numește pe cealaltă drept coprodus. Lucrarea arată
+            ambele cantități; timpul centrului de lucru și setup-ul se numără o singură dată.
           </li>
           <li>
-            <b>Whole coils — always.</b> A mounted coil is run to the end, so
-            every coil-fed lot is a whole number of coils (strokes per coil ×
-            cavities). The surplus covers the following weeks and does not
-            trigger another coil; backlog and this week's need share the same
-            coil and the same setup. A coil is <b>never cut short</b> — not to
-            fit a gap and not to save a late job.
+            <b>Bobine întregi — întotdeauna.</b> O bobină montată se rulează până la capăt, deci
+            fiecare lot alimentat din bobină este un număr întreg de bobine (curse pe bobină ×
+            cavități). Surplusul acoperă săptămânile următoare și nu
+            declanșează o altă bobină; restanța și necesarul săptămânii curente împart aceeași
+            bobină și același setup. O bobină nu este <b>niciodată scurtată</b> — nici ca să
+            încapă într-un gol, nici ca să salveze o lucrare întârziată.
           </li>
           <li>
-            <b>Min. lot instead of the coil.</b> Where the coil quantity is
-            flexible (transfer work centers 106/107), a <b>Min. lot (pcs)</b> is entered
-            in master data. It replaces the coil: the lot is at least that many
-            pieces, and above it exactly the need (need 300, min. lot 2 000 → 2 000;
-            need 2 500 → 2 500). The surplus covers the following weeks. The coil
-            weight is then ignored and may stay empty.
+            <b>Lot minim în loc de bobină.</b> Acolo unde cantitatea pe bobină este
+            flexibilă (centrele de lucru transfer 106/107), în master data se introduce
+            un <b>Min. lot (pcs)</b>. Acesta înlocuiește bobina: lotul are cel puțin atâtea
+            bucăți, iar peste acest prag exact necesarul (necesar 300, lot minim 2 000 → 2 000;
+            necesar 2 500 → 2 500). Surplusul acoperă săptămânile următoare. Greutatea
+            bobinei este atunci ignorată și poate rămâne goală.
           </li>
           <li>
-            <b>Neither?</b> A part with no Min. lot and no real coil weight (empty,
-            or 1 kg as a placeholder) is a master data error: it is planned at
-            exactly the need, and the plan and the Master Data page warn about it.
+            <b>Niciunul?</b> O piesă fără Min. lot și fără o greutate reală de bobină (goală
+            sau 1 kg ca valoare de umplutură) este o eroare de master data: se planifică
+            exact necesarul, iar planul și pagina Master Data avertizează în privința ei.
           </li>
           <li>
-            <b>No coil at all</b> (nut welding, spot welding, assembly …): a part with a
-            cycle time and no coil or sheet is planned at exactly the need (or its Min.
-            lot) <b>without</b> a warning, and the Raw Material page does not ask for its
-            steel.
+            <b>Fără bobină deloc</b> (sudură de piulițe, sudură în puncte, asamblare …): o piesă cu
+            timp de ciclu și fără bobină sau tablă se planifică exact la necesar (sau la Min.
+            lot) <b>fără</b> avertisment, iar pagina Raw Material nu cere
+            oțel pentru ea.
           </li>
         </ul>
         <Example>
-          Backlog 200 pcs, next week 2 000 pcs, no stock. One coil gives 5 000
-          pcs. The backlog needs a coil, so 5 000 pcs are pressed now; the 4
-          800 surplus covers next week. Result: one job, one setup — not two.
+          Restanță 200 buc, săptămâna viitoare 2 000 buc, fără stoc. O bobină dă 5 000
+          buc. Restanța are nevoie de o bobină, deci se ștanțează acum 5 000 buc; surplusul de
+          4 800 acoperă săptămâna viitoare. Rezultat: o lucrare, un setup — nu două.
         </Example>
       </Step>
 
@@ -345,799 +345,799 @@ export function PlanLogicRo() {
         <StockExample safetyDays={2} />
       </div>
 
-      <Step n={3} id="capacity" title="Build the capacity">
-        <p>For every work center and every day of the horizon:</p>
+      <Step n={3} id="capacity" title="Construirea capacității">
+        <p>Pentru fiecare centru de lucru și fiecare zi din orizont:</p>
         <Formula>
-          net minutes = normal shifts × shift length + overtime windows − planned stops → × capacity factor
+          minute nete = ture normale × durata turei + ferestre de ore suplimentare − opriri planificate → × factor de capacitate
         </Formula>
         <ul>
           <li>
-            Each work center has <b>one calendar</b>: its standard week ("N days" are filled from
-            Monday: 5 = Mon–Fri, 6 = Mon–Sat; shifts per day), a <b>week exception</b> when
-            there is one, and the <b>overtime</b> opened on dates (or every week on the pattern)
-            with an overtime definition — start time and length. Overtime opened on the
-            Capacity Dashboard is the same record.
+            Fiecare centru de lucru are <b>un singur calendar</b>: săptămâna lui standard („N zile” se completează de
+            luni: 5 = Lu–Vi, 6 = Lu–Sâ; ture pe zi), o <b>excepție de săptămână</b> când
+            există una și <b>orele suplimentare</b> deschise la anumite date (sau în fiecare săptămână, pe model)
+            cu o definiție de ore suplimentare — ora de început și durata. Orele suplimentare deschise în
+            Capacity Dashboard sunt aceeași înregistrare.
           </li>
           <li>
-            A <b>day record</b> is the final word for one work center and one day: on the Production
-            Plan, <b>Work calendar</b> box, press <b>Edit</b>, then a click on a cell opens or closes
-            that shift and <b>Save</b> writes the whole week at once (Cancel drops it). It wins over
-            the week exception, the pattern and a holiday (order: day record → week exception →
-            pattern). The shifts do not have to follow each other: only the 3rd shift (with 8 h
-            shifts from 07:00: 23:00–07:00) is 480 min, 450 net with a 30 min 3rd-shift meal. A shift
-            that overlaps that day's overtime is refused; ↺ removes the record. In the same Edit
-            mode the OT row adds or removes that day's dated overtime; Save applies the overtime
-            removals first, then the day records, then the new overtime. It reaches the plan
-            on the next Calculate plan.
+            O <b>înregistrare de zi</b> are ultimul cuvânt pentru un centru de lucru și o zi: în Production
+            Plan, caseta <b>Work calendar</b>, apăsați <b>Edit</b>, apoi un clic pe o celulă deschide sau închide
+            acea tură, iar <b>Save</b> scrie toată săptămâna deodată (Cancel o anulează). Ea are prioritate față de
+            excepția de săptămână, model și sărbătoare (ordinea: înregistrare de zi → excepție de săptămână →
+            model). Turele nu trebuie să fie consecutive: doar tura a 3-a (cu ture de 8 h
+            de la 07:00: 23:00–07:00) înseamnă 480 min, 450 nete cu o masă de 30 min în tura a 3-a. O tură
+            care se suprapune cu orele suplimentare din acea zi este refuzată; ↺ șterge înregistrarea. În același mod
+            Edit, rândul OT adaugă sau șterge orele suplimentare cu dată din acea zi; Save aplică întâi
+            ștergerile de ore suplimentare, apoi înregistrările de zi, apoi noile ore suplimentare. Modificarea ajunge în plan
+            la următorul Calculate plan.
           </li>
           <li>
-            A public holiday is a day off: its shifts are lost, never moved to another day.
-            Overtime opened on the holiday is planned. Recurring overtime does not run on a
-            holiday — open it on the date.
+            O sărbătoare legală este o zi liberă: turele ei se pierd și nu sunt mutate niciodată în altă zi.
+            Orele suplimentare deschise în ziua de sărbătoare sunt planificate. Orele suplimentare recurente nu rulează
+            într-o zi de sărbătoare — deschideți-le la acea dată.
           </li>
           <li>
-            Shifts have the same length and follow each other from the first shift start (e.g. 2 ×
-            9 h from 07:00: 07:00–16:00, 16:00–01:00). Overtime may not overlap the normal shifts
-            or another overtime.
+            Turele au aceeași durată și se succed de la începutul primei ture (de ex. 2 ×
+            9 h de la 07:00: 07:00–16:00, 16:00–01:00). Orele suplimentare nu se pot suprapune cu turele normale
+            sau cu alte ore suplimentare.
           </li>
           <li>
-            <b>Overtime is opened outside the shift grid, not inside it.</b> On a day the work
-            center works, the shifts are the day's grid: a shift that is closed is reopened on the
-            work calendar, not as overtime. Overtime therefore only fits between the end of the
-            grid and the end of the production day. A work center with <b>8 h</b> shifts fits
-            3 of them in a day, the grid covers all 24 h, and <b>no overtime can be opened on a
-            working day</b> — it is opened on a day the work center does not work, normally
-            <b>Saturday or Sunday</b>. A work center with <b>9 h 40</b> shifts fits 2 of them
-            (06:30–16:10 and 16:10–01:50 = 19 h 20), so 01:50–06:30 is outside the grid and a
-            night overtime of at most 4 h 40 is opened there. A day with no normal shift at all
-            (Saturday, Sunday, a holiday) is entirely outside the normal pattern: the whole day
-            takes overtime.
+            <b>Orele suplimentare se deschid în afara grilei de ture, nu în interiorul ei.</b> Într-o zi în care
+            centrul de lucru lucrează, turele formează grila zilei: o tură închisă se redeschide în
+            calendarul de lucru, nu ca ore suplimentare. De aceea, orele suplimentare încap doar între sfârșitul
+            grilei și sfârșitul zilei de producție. Un centru de lucru cu ture de <b>8 h</b> are
+            3 ture pe zi, grila acoperă toate cele 24 h și <b>nu se pot deschide ore suplimentare într-o
+            zi lucrătoare</b> — ele se deschid într-o zi în care centrul de lucru nu lucrează, de obicei
+            <b>sâmbăta sau duminica</b>. Un centru de lucru cu ture de <b>9 h 40</b> are 2 ture
+            (06:30–16:10 și 16:10–01:50 = 19 h 20), deci 01:50–06:30 este în afara grilei și acolo se
+            deschid ore suplimentare de noapte de cel mult 4 h 40. O zi fără nicio tură normală
+            (sâmbătă, duminică, sărbătoare) este în întregime în afara modelului normal: toată ziua
+            poate primi ore suplimentare.
           </li>
           <li>
-            The overtime still has to fit in time that is actually free: the production day
-            (24 h from the first shift start) minus the open shifts and the overtime already
-            opened. The Production Plan <b>Work calendar</b> box writes the result on the OT row of
-            every day — <i>free 01:50–06:30</i>, <i>full</i> when the window is taken, or
-            <i>shifts cover 24 h</i> when the grid leaves no window; an overtime that does not fit
-            cannot be chosen. The whole displayed week can be edited, closed Saturday and Sunday
-            included — that is how weekend work is opened, either as overtime or as a day record
-            that opens the shifts themselves.
+            Orele suplimentare trebuie totuși să încapă într-un timp efectiv liber: ziua de producție
+            (24 h de la începutul primei ture) minus turele deschise și orele suplimentare deja
+            deschise. Caseta <b>Work calendar</b> din Production Plan scrie rezultatul pe rândul OT al
+            fiecărei zile — <i>liber 01:50–06:30</i>, <i>plin</i> când fereastra este ocupată sau
+            <i>turele acoperă 24 h</i> când grila nu lasă nicio fereastră; orele suplimentare care nu încap
+            nu pot fi alese. Toată săptămâna afișată poate fi editată, inclusiv sâmbăta și duminica
+            închise — așa se deschide lucrul în weekend, fie ca ore suplimentare, fie ca înregistrare de zi
+            care deschide turele propriu-zise.
           </li>
           <li>
-            A work center without a Work Calendar pattern has no capacity; the Production Plan shows
-            a red alarm. A day never exceeds 24 hours (planned stops included), so a work center week
-            never exceeds 168 hours — longer entries are refused when saved.
+            Un centru de lucru fără model în Work Calendar nu are capacitate; Production Plan afișează
+            o alarmă roșie. O zi nu depășește niciodată 24 de ore (inclusiv opririle planificate), deci săptămâna unui
+            centru de lucru nu depășește niciodată 168 de ore — introducerile mai lungi sunt refuzate la salvare.
           </li>
-          <li>Planned stops falling inside overtime are deducted too.</li>
+          <li>Opririle planificate care cad în timpul orelor suplimentare sunt și ele scăzute.</li>
           <OperatorPlanItem />
           <li>
-            Days that have passed are skipped, and today starts at the current
-            time — nothing is planned in the past. The plan day begins with the
-            first shift ({current.shiftStart}), so at 02:00 the night shift
-            still belongs to the previous day.
+            Zilele trecute sunt sărite, iar ziua de azi începe de la ora
+            curentă — nimic nu se planifică în trecut. Ziua de plan începe cu
+            prima tură ({current.shiftStart}), deci la 02:00 tura de noapte
+            aparține încă zilei precedente.
           </li>
           <li>
-            Each work center is one continuous timeline: a job that does not finish
-            before the shift or day ends simply continues in the next shift.
+            Fiecare centru de lucru este o singură axă de timp continuă: o lucrare care nu se termină
+            înainte de sfârșitul turei sau al zilei continuă pur și simplu în tura următoare.
           </li>
         </ul>
       </Step>
 
-      <Step n={4} id="blocks" title="Block what cannot run">
+      <Step n={4} id="blocks" title="Blocarea a ceea ce nu poate rula">
         <ul>
           <li>
-            <b>Frozen days</b>: jobs from the approved plan in the first days
-            are kept exactly where they are, and what they produce is deducted
-            from demand. The engine plans only the free time around them.
+            <b>Zilele înghețate (Frozen days)</b>: lucrările din planul aprobat din primele zile
+            sunt păstrate exact unde sunt, iar ce produc ele se scade
+            din cerere. Motorul planifică doar timpul liber din jurul lor.
           </li>
           <li>
-            <b>Approved and moved jobs</b>: a job approved on its own (click it → Approve this job), or
-            dragged on the Gantt to another work center, day or time (on a phone: hold, then drag; or
-            click it → Move…), is locked there the same way — kept in place, its quantity deducted from
-            that part's demand, the other jobs planned around it. A move keeps the job's setup,
-            approval, production and frequency-stop minutes in order and pours them into the target
-            work center's working minutes from the drop point; when a day is full it carries on the
-            next working day (e.g. 120 min setup + 600 min production dropped at minute 1200 of a
-            1350-minute day: setup 1200–1320, 30 min production that day, the other 570 min the next
-            working day). It cannot start before now, must fit before the end of the plan, and cannot
-            overlap another approved or frozen job or maintenance on that work center.
+            <b>Lucrări aprobate și mutate</b>: o lucrare aprobată individual (clic pe ea → Approve this job) sau
+            trasă în Gantt pe alt centru de lucru, altă zi sau altă oră (pe telefon: țineți apăsat, apoi trageți; sau
+            clic pe ea → Move…) este blocată acolo în același fel — păstrată pe loc, cantitatea ei scăzută din
+            cererea acelei piese, celelalte lucrări planificate în jurul ei. O mutare păstrează în ordine minutele de setup,
+            aprobare, producție și oprire de frecvență ale lucrării și le revarsă în minutele de lucru ale centrului de
+            lucru țintă, din punctul unde a fost lăsată; când o zi este plină, continuă în
+            următoarea zi lucrătoare (de ex. 120 min setup + 600 min producție lăsate la minutul 1200 al unei
+            zile de 1350 de minute: setup 1200–1320, 30 min producție în acea zi, celelalte 570 min în următoarea
+            zi lucrătoare). Nu poate începe înainte de momentul actual, trebuie să se încadreze înainte de sfârșitul planului și nu se poate
+            suprapune cu altă lucrare aprobată sau înghețată ori cu o mentenanță pe acel centru de lucru.
           </li>
           <li>
-            <b>Jobs added by hand</b> (Plan → + Add job, e.g. a part run for stock): part, quantity, work
-            center, day and start time. Clicking an idle gap on the chart (the dashed orange line) opens the
-            same form with that work center, day and the gap's start time filled in. The duration is the engine's own calculation for that part and
-            quantity, in the engine's order — setup (none if the die is already mounted), quality
-            approval, production per coil with a coil change between coils on a coil-fed work center
-            (e.g. 90 min setup + 15 min approval + coils of 200 and 150 min with a 20-min coil change =
-            475 min). The job is locked at that time like a moved job: its quantity comes off the part's
-            future demand, so later lots of that part shrink or disappear, and the work center's other
-            jobs move behind it. Same limits as a move; a part not defined for that work center is
-            allowed with a warning.
+            <b>Lucrări adăugate manual</b> (Plan → + Add job, de ex. o piesă rulată pe stoc): piesă, cantitate, centru
+            de lucru, zi și oră de început. Un clic pe un gol neocupat din grafic (linia portocalie întreruptă) deschide
+            același formular cu centrul de lucru, ziua și ora de început a golului completate. Durata este calculul propriu al motorului pentru acea piesă și
+            cantitate, în ordinea motorului — setup (niciunul dacă matrița este deja montată), aprobarea
+            calității, producția pe bobină cu schimbare de bobină între bobine pe un centru de lucru alimentat din bobină
+            (de ex. 90 min setup + 15 min aprobare + bobine de 200 și 150 min cu o schimbare de bobină de 20 min =
+            475 min). Lucrarea este blocată la acea oră ca o lucrare mutată: cantitatea ei se scade din
+            cererea viitoare a piesei, astfel că loturile ulterioare ale acelei piese se micșorează sau dispar, iar celelalte
+            lucrări ale centrului de lucru se mută în spatele ei. Aceleași limite ca la o mutare; o piesă nedefinită pentru acel centru de lucru este
+            permisă, cu avertisment.
           </li>
           <li>
-            <b>Deleting</b> (click a job): a job added by hand → <i>Delete job</i>, it leaves the plan and its
-            quantity is no longer deducted from demand; an approved or moved job → <i>Remove approval</i>, it goes
-            back to the engine, which plans it again; an engine job → <i>Delete this lot</i>, the lot is set to 0
-            pieces and its demand moves to the next lots of that part (the same as typing 0 as the lot quantity).
+            <b>Ștergerea</b> (clic pe o lucrare): o lucrare adăugată manual → <i>Delete job</i>, iese din plan și
+            cantitatea ei nu se mai scade din cerere; o lucrare aprobată sau mutată → <i>Remove approval</i>, se întoarce
+            la motor, care o planifică din nou; o lucrare a motorului → <i>Delete this lot</i>, lotul este setat la 0
+            bucăți, iar cererea lui trece la următoarele loturi ale acelei piese (la fel ca atunci când tastați 0 drept cantitate a lotului).
           </li>
           <li>
-            <b>Work center maintenance</b> takes those clock hours out of that
-            work center's day; jobs flow around it.
+            <b>Mentenanța centrului de lucru</b> scoate acele ore din ziua acelui
+            centru de lucru; lucrările se așază în jurul ei.
           </li>
           <li>
-            <b>Machine breakdown</b> (reported in Machine Follow-up with "the
-            work center is stopped"): the work center is closed from the breakdown until
-            the expected time it is back — or, with no expected time, until
-            the breakdown is solved. Like a closed period it is a planned stop: production runs up
-            to it and continues after it, the cut coil is finished and the remaining coils follow as
-            a new lot (see <i>Planner's hand</i>). A fault that does not stop the work center does
-            not change the plan.
+            <b>Defecțiunea utilajului</b> (raportată în Machine Follow-up cu „the
+            work center is stopped”): centrul de lucru este închis de la momentul defecțiunii până
+            la ora estimată de repunere în funcțiune — sau, fără oră estimată, până
+            la rezolvarea defecțiunii. Ca o perioadă închisă, este o oprire planificată: producția rulează până
+            la ea și continuă după ea, bobina întreruptă se termină, iar bobinele rămase urmează ca
+            un lot nou (vezi <i>Intervenția planificatorului</i>). O defecțiune care nu oprește centrul de lucru nu
+            schimbă planul.
           </li>
           <li>
-            <b>Mould maintenance</b> days: no part of a job with that mould may
-            fall on them.
+            Zilele de <b>mentenanță a matriței</b>: nicio parte a unei lucrări cu acea matriță nu poate
+            cădea în ele.
           </li>
           <li>
-            <b>Mould not ready</b>: with a ready date (and time), the mould is
-            blocked until that moment — ready at 10:00 means that day's
-            earlier hours are closed too; without a date, it is held out of
-            the plan entirely.
+            <b>Matrița nu este gata</b>: cu o dată (și oră) de disponibilitate, matrița este
+            blocată până în acel moment — gata la 10:00 înseamnă că și orele
+            anterioare ale acelei zile sunt închise; fără dată, este scoasă complet
+            din plan.
           </li>
           <li>
-            <b>Shot-limit alarm</b>: once a mould passes its periodic
-            maintenance limit, it is held out of the plan until the alarm is
-            closed.
+            <b>Alarmă de limită de lovituri</b>: odată ce o matriță își depășește limita de
+            mentenanță periodică, este scoasă din plan până când alarma este
+            închisă.
           </li>
           <li>
-            <b>Excluded</b> materials (your rule) are not planned.
+            Materialele <b>excluse</b> (regula dumneavoastră) nu sunt planificate.
           </li>
         </ul>
       </Step>
 
-      <Step n={5} id="order" title="Put the work in order">
-        <p>The requirements are planned one by one, in this order:</p>
+      <Step n={5} id="order" title="Ordonarea lucrărilor">
+        <p>Necesarele sunt planificate unul câte unul, în această ordine:</p>
         <ol className="list-decimal">
-          <li>Materials you moved to the front (and lots moved forward so they are not late)</li>
+          <li>Materialele pe care le-ați mutat în față (și loturile aduse înainte ca să nu întârzie)</li>
           <li>
-            <b>Backlog</b> — the ZPP overdue quantity left after stock. Due the next
-            day at {current.cutoff}.
+            <b>Restanța (Backlog)</b> — cantitatea restantă din ZPP rămasă după stoc. Termen: ziua
+            următoare la {current.cutoff}.
           </li>
           <li>
-            <b>Urgent</b> — a lot whose stock falls to the safety level now: it runs
-            out within {current.safety} working day(s). Due at {current.cutoff} on the
-            day the stock runs out.
+            <b>Urgent</b> — un lot al cărui stoc scade acum la nivelul de siguranță: se
+            epuizează în {current.safety} zi(le) lucrătoare. Termen: {current.cutoff} în
+            ziua în care se epuizează stocul.
           </li>
           <li>
-            <b>Fill</b> — every other lot: future days and weeks. It may start{' '}
-            {current.safety} working day(s) before its stock runs out, or up to{' '}
-            {current.pullForward} days earlier when a work center would stand idle.
+            <b>Umplere (Fill)</b> — toate celelalte loturi: zilele și săptămânile viitoare. Poate începe cu{' '}
+            {current.safety} zi(le) lucrătoare înainte de epuizarea stocului sau cu până la{' '}
+            {current.pullForward} zile mai devreme când un centru de lucru ar sta nefolosit.
           </li>
           <li>
-            <b>Long-term</b> (only when ZPP_DAILY is loaded) — lots from the weekly
-            ZPP. They come after all of the above, even after materials moved to the
-            front, and only fill the free capacity that is left. Example: one work
-            center, one shift; part D needs 7 000 pcs on Wednesday in ZPP_DAILY
-            (700 min + 30 min setup), part L has only a weekly 4 000. D runs first
-            on Monday and is on time; L follows on Tuesday as a long-term lot and is
-            not late. Had L gone first, D would have been ready too late.
+            <b>Termen lung (Long-term)</b> (doar când ZPP_DAILY este încărcat) — loturile din ZPP-ul
+            săptămânal. Vin după toate cele de mai sus, chiar și după materialele mutate în
+            față, și umplu doar capacitatea liberă rămasă. Exemplu: un centru
+            de lucru, o tură; piesa D are nevoie de 7 000 buc miercuri în ZPP_DAILY
+            (700 min + 30 min setup), piesa L are doar 4 000 săptămânal. D rulează prima,
+            luni, și este la timp; L urmează marți ca lot pe termen lung și
+            nu este întârziată. Dacă L ar fi mers prima, D ar fi fost gata prea târziu.
           </li>
         </ol>
         <p>
-          Backlog always goes before urgent, even when both are due at the same
-          moment. <b>One exception — the mounted die:</b> when an urgent job would
-          need a setup on a work center whose mounted die still has a fill lot waiting,
-          that fill lot runs on first without a setup, as long as the urgent job
-          is still ready by its delivery time. Otherwise the die would be taken
-          off for the urgent job and mounted again later — two setups instead of
-          one. If the urgent job would be late, it goes first.
+          Restanța trece întotdeauna înaintea urgentelor, chiar și atunci când ambele au termen în același
+          moment. <b>O excepție — matrița montată:</b> când o lucrare urgentă ar
+          necesita un setup pe un centru de lucru a cărui matriță montată mai are un lot de umplere în așteptare,
+          acel lot de umplere rulează întâi, fără setup, atâta timp cât lucrarea urgentă
+          este încă gata la ora de livrare. Altfel, matrița ar fi demontată
+          pentru lucrarea urgentă și montată din nou mai târziu — două setup-uri în loc de
+          unul. Dacă lucrarea urgentă ar întârzia, ea merge prima.
         </p>
         <p>
-          Within each group, the lot whose stock runs out first goes first.
-          When that is equal too, the part that can run on the <b>fewest
-          work centers</b> goes first: a single-work center part takes its slot before a
-          part with alternatives, which then spreads to the work centers that are
-          left. Whoever is placed first gets the best slots.
+          În cadrul fiecărui grup, lotul al cărui stoc se epuizează primul merge primul.
+          Când și acesta este egal, merge prima piesa care poate rula pe <b>cele mai puține
+          centre de lucru</b>: o piesă cu un singur centru de lucru își ia locul înaintea unei
+          piese cu alternative, care se distribuie apoi pe centrele de lucru
+          rămase. Cine este plasat primul primește cele mai bune locuri.
         </p>
       </Step>
 
-      <Step n={6} id="place" title="Place each job">
+      <Step n={6} id="place" title="Plasarea fiecărei lucrări">
         <p>
-          The candidates are the material's main work center — plus its
-          alternatives <b>only if the part is ticked Flexible work center</b> in
-          master data (or only the pinned work center). A part that is not flexible
-          always runs on its main work center, even if that makes it late: its
-          quality approval belongs to that work center. On each candidate the engine looks for
-          the earliest free time — also in gaps left earlier — and builds the
-          job:
+          Candidații sunt centrul de lucru principal al materialului — plus
+          alternativele lui <b>doar dacă piesa are bifa Flexible work center</b> în
+          master data (sau doar centrul de lucru fixat). O piesă care nu este flexibilă
+          rulează întotdeauna pe centrul ei de lucru principal, chiar dacă astfel întârzie: aprobarea
+          ei de calitate aparține acelui centru de lucru. Pe fiecare candidat, motorul caută
+          cel mai devreme timp liber — inclusiv în golurile lăsate anterior — și construiește
+          lucrarea:
         </p>
         <div className="my-3 flex flex-wrap items-center gap-2 text-xs">
-          <Block tone="bg-slate-200 text-slate-900">Mould setup</Block>
+          <Block tone="bg-slate-200 text-slate-900">Schimbare de matriță</Block>
           <span aria-hidden>→</span>
-          <Block tone="bg-amber-100 text-amber-900">Quality approval</Block>
+          <Block tone="bg-amber-100 text-amber-900">Aprobarea calității</Block>
           <span aria-hidden>→</span>
-          <Block tone="bg-emerald-100 text-emerald-900">Production (coil 1)</Block>
+          <Block tone="bg-emerald-100 text-emerald-900">Producție (bobina 1)</Block>
           <span aria-hidden>→</span>
-          <Block tone="bg-sky-100 text-sky-900">Frequency stop (e.g. coil change)</Block>
+          <Block tone="bg-sky-100 text-sky-900">Oprire de frecvență (de ex. schimbare de bobină)</Block>
           <span aria-hidden>→</span>
-          <Block tone="bg-emerald-100 text-emerald-900">Production (coil 2)</Block>
+          <Block tone="bg-emerald-100 text-emerald-900">Producție (bobina 2)</Block>
           <span aria-hidden>→ …</span>
         </div>
         <Formula>
-          pure time = pieces × cycle time (min/piece) · job time = max(pure time ÷ Accepted OEE, pure time + setup +
-          frequency stops + approval)
+          timp pur = bucăți × timp de ciclu (min/buc) · durata lucrării = max(timp pur ÷ Accepted OEE, timp pur + setup +
+          opriri de frecvență + aprobare)
         </Formula>
         <p className="text-xs text-muted-foreground">
-          Every part on every work center — press, nut welding, spot welding, assembly — is timed this way;
-          no work center is left out of the plan. Example: {cycleExample.qty.toLocaleString('en-GB')} pieces ×{' '}
-          {cycleExample.minutes.toFixed(CYCLE_DECIMALS)} min = {Math.round(cycleRun.theoreticalRunMinutes)} min of pure time; at a{' '}
-          {Math.round(cycleExample.oee * 100)} % Accepted OEE the job is {Math.round(cycleRunOee.totalMinutes)} min.
-          A part without a cycle time but with the old SPM and cavities runs 1 ÷ (SPM × cavities) min/piece — its
-          time is exactly what it was (strokes ÷ SPM). With neither, the part has no speed and the plan check flags
-          it (“no cycle time in master data”). A master data file may give the time in seconds instead — the
-          presses, spot welding and assembly lines are all measured that way (a <b>Saturasyon</b> or{' '}
-          <b>Birim süre saniye</b> column) — and the upload divides it by 60:{' '}
-          {cycleSecondsExample} s = {cycleFromSeconds?.toFixed(CYCLE_DECIMALS)} min/piece. Cycle times are
-          kept to {CYCLE_STORE_DECIMALS} decimals and shown with {CYCLE_DECIMALS}, because a press part can
-          run under a second: {pressSecondsExample.toFixed(CYCLE_DECIMALS)} s is{' '}
-          {formatCycleInput(pressCycle)} min/piece, and at {CYCLE_DECIMALS} decimals it would be{' '}
-          {pressCycle.toFixed(CYCLE_DECIMALS)} — 2.6 % more time on every job of that part
-          ({(10_000 * pressCycle).toFixed(1)} min for 10,000 pieces against{' '}
+          Fiecare piesă pe fiecare centru de lucru — presă, sudură de piulițe, sudură în puncte, asamblare — este temporizată astfel;
+          niciun centru de lucru nu este lăsat în afara planului. Exemplu: {cycleExample.qty.toLocaleString('en-GB')} bucăți ×{' '}
+          {cycleExample.minutes.toFixed(CYCLE_DECIMALS)} min = {Math.round(cycleRun.theoreticalRunMinutes)} min de timp pur; la un{' '}
+          Accepted OEE de {Math.round(cycleExample.oee * 100)} %, lucrarea durează {Math.round(cycleRunOee.totalMinutes)} min.
+          O piesă fără timp de ciclu, dar cu vechile SPM și cavități, rulează cu 1 ÷ (SPM × cavități) min/buc — timpul
+          ei este exact cel de dinainte (curse ÷ SPM). Fără niciunul dintre ele, piesa nu are viteză, iar verificarea planului
+          o semnalează („no cycle time in master data”). Un fișier de master data poate da timpul în secunde — așa
+          sunt măsurate presele, sudura în puncte și liniile de asamblare (o coloană <b>Saturasyon</b> sau{' '}
+          <b>Birim süre saniye</b>) — iar încărcarea îl împarte la 60:{' '}
+          {cycleSecondsExample} s = {cycleFromSeconds?.toFixed(CYCLE_DECIMALS)} min/buc. Timpii de ciclu sunt
+          păstrați cu {CYCLE_STORE_DECIMALS} zecimale și afișați cu {CYCLE_DECIMALS}, deoarece o piesă de presă poate
+          rula sub o secundă: {pressSecondsExample.toFixed(CYCLE_DECIMALS)} s înseamnă{' '}
+          {formatCycleInput(pressCycle)} min/buc, iar cu {CYCLE_DECIMALS} zecimale ar fi{' '}
+          {pressCycle.toFixed(CYCLE_DECIMALS)} — cu 2,6 % mai mult timp la fiecare lucrare a acelei piese
+          ({(10_000 * pressCycle).toFixed(1)} min pentru 10.000 de bucăți față de{' '}
           {(10_000 * Number(pressCycle.toFixed(CYCLE_DECIMALS))).toFixed(1)} min).
-          Strokes = ⌈pieces ÷ cavities⌉ (= pieces when no cavities are
-          entered) count only for the mould shot limit and strokes per coil.
-          Setup, frequency stops (coil changes …) and quality approval sit inside that time; when they do not fit, the job is the pure
-          time plus those stops. Frequency stops = coils − 1 (coils = ⌈quantity ÷ pieces per coil⌉, pieces per coil = ⌊coil weight ÷
-          gross weight⌋); a work center whose frequency stop is — none — never stops for it. A co-product comes from the same strokes:
-          strokes × its own cavities.
+          Cursele = ⌈bucăți ÷ cavități⌉ (= bucăți când nu sunt introduse
+          cavități) contează doar pentru limita de lovituri a matriței și pentru cursele pe bobină.
+          Setup-ul, opririle de frecvență (schimbări de bobină …) și aprobarea calității sunt cuprinse în acest timp; când nu încap, lucrarea este timpul
+          pur plus aceste opriri. Opriri de frecvență = bobine − 1 (bobine = ⌈cantitate ÷ bucăți pe bobină⌉, bucăți pe bobină = ⌊greutatea bobinei ÷
+          greutatea brută⌋); un centru de lucru a cărui oprire de frecvență este — none — nu se oprește niciodată pentru ea. Un coprodus provine din aceleași curse:
+          curse × propriile lui cavități.
         </p>
-        <p>It has to respect every rule at once:</p>
+        <p>Lucrarea trebuie să respecte toate regulile deodată:</p>
         <ul>
           <li>
-            If the same mould is already on the work center, the setup is skipped.
+            Dacă aceeași matriță este deja pe centrul de lucru, setup-ul este omis.
           </li>
           <li>
             {current.crossShifts
-              ? 'A setup may start near the end of a shift and be finished by the next shift; it never runs past the last working minute of the day. Production can.'
-              : 'A setup or coil change never crosses the end of a shift — no crew starts a setup it cannot finish. Production can.'}
+              ? 'Un setup poate începe aproape de sfârșitul unei ture și poate fi terminat de tura următoare; nu depășește niciodată ultimul minut lucrător al zilei. Producția poate.'
+              : 'Un setup sau o schimbare de bobină nu depășește niciodată sfârșitul unei ture — nicio echipă nu începe un setup pe care nu îl poate termina. Producția poate.'}
           </li>
           <li>
-            <b>Setups run on through tea and meal breaks.</b> The setup team is
-            indirect and takes its break after the setup. A 30-minute setup that
-            meets a 15-minute tea break after 15 minutes still takes 30 minutes;
-            production starts right after the break, and the break costs the work center
-            nothing. Shift handover and maintenance stops do pause a setup.
+            <b>Setup-urile continuă în timpul pauzelor de ceai și de masă.</b> Echipa de setup este
+            indirectă și își ia pauza după setup. Un setup de 30 de minute care
+            întâlnește o pauză de ceai de 15 minute după 15 minute durează tot 30 de minute;
+            producția începe imediat după pauză, iar pauza nu costă nimic centrului
+            de lucru. Predarea turei și opririle de mentenanță întrerup însă un setup.
           </li>
           <li>
-            <b>Setup team</b>: normally at most {current.plantNormal} mould setup(s) run at
-            the same time anywhere in the plant. <b>Dynamic rule:</b> for backlog, or for a
-            job that would otherwise start after its stock runs out, up to{' '}
-            {current.plantUrgent} setups may overlap so production starts sooner. Once the
-            urgent work is placed, setups go back to one after the other.
+            <b>Echipa de setup</b>: în mod normal, cel mult {current.plantNormal} schimbare(i) de matriță rulează
+            simultan oriunde în fabrică. <b>Regula dinamică:</b> pentru restanță sau pentru o
+            lucrare care altfel ar începe după epuizarea stocului, până la{' '}
+            {current.plantUrgent} setup-uri se pot suprapune, ca producția să înceapă mai repede. Odată ce
+            lucrările urgente sunt plasate, setup-urile revin la unul după altul.
           </li>
           <li>
-            <b>No idle work center while work is waiting</b>: a lot may start up to{' '}
-            {current.pullForward} day(s) before it is needed when its work center would
-            otherwise stand idle, so the plan fills the working days you opened on the
-            Work Calendar — the same hours the Capacity Dashboard counts. If nothing is
-            urgent, the die already on the work center keeps running for its next lot first, so
-            no extra setup is made.
+            <b>Niciun centru de lucru nefolosit cât timp lucrările așteaptă</b>: un lot poate începe cu până la{' '}
+            {current.pullForward} zi(le) înainte de a fi necesar, când centrul lui de lucru ar
+            sta altfel nefolosit, astfel încât planul umple zilele lucrătoare pe care le-ați deschis în
+            Work Calendar — aceleași ore pe care le numără Capacity Dashboard. Dacă nimic nu este
+            urgent, matrița aflată deja pe centrul de lucru continuă întâi cu următorul ei lot, astfel încât
+            nu se face niciun setup în plus.
           </li>
           <li>
-            Every idle gap on the plan chart shows why it is there (setup team busy, die
-            on another work center, not allowed yet, …).
+            Fiecare gol neocupat din graficul planului arată de ce există (echipa de setup ocupată, matrița
+            pe alt centru de lucru, încă nepermis, …).
           </li>
           <li>
-            <b>Crane</b>: in one hall, mould setups are at least{' '}
-            {current.setupGap} min apart and at most {current.concurrent} at a
-            time; coil changes are at least {current.coilGap} min apart; a mould
-            setup and a coil change never overlap.
+            <b>Podul rulant</b>: într-o hală, schimbările de matriță sunt la cel puțin{' '}
+            {current.setupGap} min distanță și cel mult {current.concurrent}
+            simultan; schimbările de bobină sunt la cel puțin {current.coilGap} min distanță; o schimbare
+            de matriță și o schimbare de bobină nu se suprapun niciodată.
           </li>
-          <li>A mould cannot be on two work centers at the same time.</li>
+          <li>O matriță nu poate fi pe două centre de lucru în același timp.</li>
           <li>
-            If the quantity needs more strokes than the mould's shot limit, it
-            is split into batches at <b>whole coils</b> — a coil is never split
-            between batches. If one coil alone is larger than the limit, the
-            batch is that coil and the job is flagged.
+            Dacă cantitatea necesită mai multe curse decât limita de lovituri a matriței, ea
+            se împarte în tranșe la nivel de <b>bobine întregi</b> — o bobină nu se împarte niciodată
+            între tranșe. Dacă o singură bobină depășește limita,
+            tranșa este acea bobină, iar lucrarea este semnalată.
           </li>
           <li>
-            A lot does not start before its safety date ({current.safety} working
-            day(s) before its stock runs out) minus the pull-forward window of{' '}
-            {current.pullForward} day(s).
+            Un lot nu începe înainte de data lui de siguranță ({current.safety} zi(le)
+            lucrătoare înainte de epuizarea stocului) minus fereastra de aducere înainte de{' '}
+            {current.pullForward} zi(le).
           </li>
         </ul>
         <p>
-          <b>The work center that finishes the job earliest wins</b> — with one
-          exception: when nothing is urgent, continuing the die already mounted
-          (no setup) is preferred. For backlog, or a job that would otherwise
-          start after its stock runs out, the engine also tries the dynamic
-          setup rule and keeps whichever finishes sooner. The chosen work center
-          time, crane slots, setup slot and mould are then booked, and the
-          next requirement is placed.
+          <b>Câștigă centrul de lucru care termină lucrarea cel mai devreme</b> — cu o
+          excepție: când nimic nu este urgent, se preferă continuarea matriței deja montate
+          (fără setup). Pentru restanță sau pentru o lucrare care altfel ar
+          începe după epuizarea stocului, motorul încearcă și regula dinamică de
+          setup și o păstrează pe cea care termină mai repede. Apoi se rezervă timpul
+          centrului de lucru ales, intervalele podului rulant, intervalul de setup și matrița, iar
+          următorul necesar este plasat.
         </p>
       </Step>
 
-      <Step n={7} id="check" title="Check and report">
+      <Step n={7} id="check" title="Verificare și raportare">
         <ul>
           <li>
-            A part is <b>late</b> when the quantity the customer needs is not
-            ready by <b>{current.cutoff}</b> on the day it is needed — not when
-            the whole lot ends. Every day a lot covers is checked, not only the
-            first one. Backlog in ZPP and anything needed today are due
-            the <b>next day at {current.cutoff}</b>. Public holidays are not skipped: a customer
-            may want parts on a holiday. How late is shown in
-            hours and days. The engine does not leave it — see{' '}
+            O piesă este <b>întârziată</b> când cantitatea de care clientul are nevoie nu este
+            gata până la <b>{current.cutoff}</b> în ziua în care este necesară — nu când
+            se termină tot lotul. Este verificată fiecare zi acoperită de un lot, nu doar
+            prima. Restanța din ZPP și tot ce este necesar astăzi au termen
+            <b> a doua zi la {current.cutoff}</b>. Sărbătorile legale nu sunt sărite: un client
+            poate dori piese într-o zi de sărbătoare. Întârzierea este afișată în
+            ore și zile. Motorul nu o lasă așa — vezi{' '}
             <a href="#late" className="underline">
-              Late jobs are re-planned
+              Lucrările întârziate sunt replanificate
             </a>
             .
           </li>
           <li>
-            The <b>job window</b> (click a bar) shows the same check per job: the
-            <b> Req dates</b> the job covers and their quantity, start and end time,
-            and a <b>Status</b> per need day — how many pieces are ready how many
-            hours <b>before</b> or <b>late</b> against {current.cutoff} on that day.
-            What the lot makes beyond the need (rounding up to whole coils or the
-            Min. lot) is <b>overstock</b>. Example: 3,000 pcs of backlog, one coil
-            makes 6,000 → &ldquo;3,000 pcs (2 hours late) and 3,000 pcs
-            (overstock)&rdquo;. A job whose stock lasts the whole horizon has no
-            need day: all of it is overstock (stock build).
+            <b>Fereastra lucrării</b> (clic pe o bară) arată aceeași verificare pentru fiecare lucrare: zilele
+            <b> Req dates</b> acoperite de lucrare și cantitatea lor, ora de început și de sfârșit
+            și un <b>Status</b> pe fiecare zi de necesar — câte bucăți sunt gata cu câte
+            ore <b>înainte</b> sau cu câte ore <b>întârziere</b> față de {current.cutoff} în acea zi.
+            Ce produce lotul peste necesar (rotunjirea la bobine întregi sau la
+            Min. lot) este <b>suprastoc</b>. Exemplu: 3.000 buc restanță, o bobină
+            produce 6.000 → &ldquo;3.000 buc (2 ore întârziere) și 3.000 buc
+            (suprastoc)&rdquo;. O lucrare al cărei stoc ține tot orizontul nu are
+            zi de necesar: totul este suprastoc (constituire de stoc).
           </li>
           <li>
-            What does not fit anywhere goes to <b>Unplanned</b>, with the
-            reason and a link to the fix (no master data, no eligible work center, no
-            free capacity…).
+            Ce nu încape nicăieri ajunge în <b>Unplanned</b>, cu
+            motivul și un link spre corectare (fără master data, fără centru de lucru eligibil, fără
+            capacitate liberă…).
           </li>
           <li>
-            <b>Urgent raw material</b>: planned quantity × gross weight, walked in
-            the order the steel is <b>needed</b> against coil stock plus coils in
-            transit from their arrival day. A coil is urgent when the steel is
-            needed within the next {current.rawUrgent} working day(s); those are
-            listed on Overview. The need day of a job is its planned day — except a
-            job <b>pulled forward</b> only so its work center is not idle: while the
-            finished stock still covers the demand, its steel is needed on the day
-            the lot may start (stock runs out − safety stock days), not on the
-            pulled-forward day. Such a job can wait for the coil, so it shows as
-            &ldquo;runs short later&rdquo;, with the planned day and the day the steel is
-            needed. Co-products are not counted twice. The weekly requirement is
-            separate — see{' '}
+            <b>Materie primă urgentă (Urgent raw material)</b>: cantitatea planificată × greutatea brută, parcursă în
+            ordinea în care oțelul este <b>necesar</b>, față de stocul de bobine plus bobinele în
+            tranzit din ziua sosirii lor. O bobină este urgentă când oțelul este
+            necesar în următoarele {current.rawUrgent} zi(le) lucrătoare; acestea sunt
+            listate în Overview. Ziua de necesar a unei lucrări este ziua ei planificată — cu excepția unei
+            lucrări <b>aduse înainte</b> doar pentru ca centrul ei de lucru să nu stea: cât timp
+            stocul de produse finite încă acoperă cererea, oțelul ei este necesar în ziua
+            în care lotul poate începe (epuizarea stocului − zilele de stoc de siguranță), nu în
+            ziua adusă înainte. O astfel de lucrare poate aștepta bobina, de aceea apare ca
+            &ldquo;lipsește mai târziu&rdquo;, cu ziua planificată și ziua în care oțelul este
+            necesar. Coprodusele nu sunt numărate de două ori. Necesarul săptămânal este
+            separat — vezi{' '}
             <a href="#raw-mrp" className="underline">
-              Raw material requirement
+              Necesarul de materie primă
             </a>
             .
           </li>
           <li>
-            Warnings list whatever changed the plan: moulds held out, work centers
-            in maintenance, missing data.
+            Avertismentele listează tot ce a schimbat planul: matrițe scoase din plan, centre de lucru
+            în mentenanță, date lipsă.
           </li>
         </ul>
       </Step>
 
       <section id="late" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-amber-200 bg-amber-50 p-4">
-        <h2 className="text-sm font-semibold text-amber-950">Late jobs are re-planned</h2>
+        <h2 className="text-sm font-semibold text-amber-950">Lucrările întârziate sunt replanificate</h2>
         <p className="mt-1 text-sm text-amber-900">
-          A job that starts after its stock runs out means the customer stops —
-          your own safety stock is the only margin. So a late job is never just
-          reported; the engine plans again, up to six rounds:
+          O lucrare care începe după epuizarea stocului înseamnă că clientul se oprește —
+          propriul stoc de siguranță este singura marjă. De aceea, o lucrare întârziată nu este niciodată doar
+          raportată; motorul planifică din nou, în până la șase runde:
         </p>
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-amber-900">
           <li>
-            <b>Move the late lot forward</b> within its own group: a late fill lot
-            goes to the head of the fill lots, never ahead of backlog. It then
-            tries every eligible work center again, so an alternative work center that is
-            free earlier is found.
+            <b>Mutarea lotului întârziat în față</b> în cadrul propriului grup: un lot de umplere întârziat
+            trece în fruntea loturilor de umplere, niciodată înaintea restanței. Apoi
+            încearcă din nou fiecare centru de lucru eligibil, astfel încât este găsit un centru de lucru alternativ care este
+            liber mai devreme.
           </li>
           <li>
-            <b>Let its setup overlap</b>: a late-risk job may set up while
-            another setup runs — also in the same hall — at most{' '}
-            {current.plantUrgent} at once in the whole plant, so production starts
-            sooner. As soon as no backlog or late-risk job is left, setups no
-            longer overlap (one per hall, {current.plantNormal} in the plant). Coil
-            changes never overlap.
+            <b>Permiterea suprapunerii setup-ului</b>: o lucrare cu risc de întârziere poate face setup în timp ce
+            rulează alt setup — inclusiv în aceeași hală — cel mult{' '}
+            {current.plantUrgent} simultan în toată fabrica, ca producția să înceapă
+            mai repede. De îndată ce nu mai rămâne nicio lucrare restantă sau cu risc de întârziere, setup-urile nu
+            se mai suprapun (unul pe hală, {current.plantNormal} în fabrică). Schimbările de
+            bobină nu se suprapun niciodată.
           </li>
           <li>
-            <b>Keep the best plan</b>: fewest unplanned (daily lots), then fewest late
-            <b>parts</b> (three late lots of one part are one customer stop), then
-            fewest late hours, and only then the fewest unplanned long-term lots.
-            Long-term lots are never late and never moved forward. A round that does not improve does not stop the
-            search — the next round may — but the best plan so far is kept.
+            <b>Păstrarea celui mai bun plan</b>: cele mai puține neplanificate (loturi zilnice), apoi cele mai puține
+            <b> piese</b> întârziate (trei loturi întârziate ale unei piese înseamnă o singură oprire la client), apoi
+            cele mai puține ore de întârziere și abia apoi cele mai puține loturi pe termen lung neplanificate.
+            Loturile pe termen lung nu sunt niciodată întârziate și nu sunt niciodată mutate în față. O rundă care nu aduce îmbunătățiri nu oprește
+            căutarea — runda următoare poate aduce — dar cel mai bun plan de până atunci este păstrat.
           </li>
         </ol>
         <p className="mt-2 text-sm text-amber-900">
-          <b>Coils are never cut to save a late job.</b> A mounted coil is run
-          to the end; cutting it would leave a half coil, a second setup and a
-          second coil mount later. If moving forward is not enough, the job stays
-          late and is reported.
+          <b>Bobinele nu sunt niciodată tăiate pentru a salva o lucrare întârziată.</b> O bobină montată se rulează
+          până la capăt; tăierea ei ar lăsa o jumătate de bobină, un al doilea setup și o
+          a doua montare de bobină mai târziu. Dacă mutarea în față nu ajunge, lucrarea rămâne
+          întârziată și este raportată.
         </p>
         <p className="mt-2 text-sm text-amber-900">
-          Whatever is still late is listed on the Overview in red, <b>once per
-          material</b> (its first late lot). <b>Late is a share, not a whole
-          order.</b> The ZPP daily need is the guide: every need day is a delivery
-          point, due at the delivery time ({current.cutoff}) with everything needed
-          up to that day (ZPP_DAILY on its own date; beyond it the weekly ZPP spread over
-          the working days; backlog and today's need are due the next day). At that moment
-          the engine counts what has already been pressed:
+          Ce este încă întârziat apare în Overview cu roșu, <b>o singură dată pe
+          material</b> (primul lui lot întârziat). <b>Întârzierea este o cotă, nu o comandă
+          întreagă.</b> Ghidul este necesarul zilnic din ZPP: fiecare zi de necesar este un punct
+          de livrare, cu termen la ora de livrare ({current.cutoff}), cu tot ce este necesar
+          până în acea zi (ZPP_DAILY la propria dată; după el, ZPP-ul săptămânal distribuit pe
+          zilele lucrătoare; restanța și necesarul de azi au termen a doua zi). În acel moment,
+          motorul numără ce a fost deja ștanțat:
         </p>
         <ul className="mt-1 ml-5 list-disc space-y-1 text-sm text-amber-900">
           <li>
-            <b>Needed qty</b> — what the customer needs by the first missed delivery point
-            (cumulative ZPP need, not the lot size: a 40 000 pcs lot that covers 8 days owes
-            only the first day's need at the first point).
+            <b>Needed qty</b> — de ce are nevoie clientul până la primul punct de livrare ratat
+            (necesarul ZPP cumulat, nu mărimea lotului: un lot de 40 000 buc care acoperă 8 zile datorează
+            la primul punct doar necesarul primei zile).
           </li>
           <li>
-            <b>On time</b> — the share of it already ready at the delivery time. Pieces come
-            out evenly while the press runs (setup and approval give none), so a job that
-            started before the deadline has delivered part of the need.
+            <b>On time</b> — partea din acesta deja gata la ora de livrare. Bucățile ies
+            uniform cât timp presa rulează (setup-ul și aprobarea nu dau nimic), deci o lucrare care
+            a început înainte de termen a livrat deja o parte din necesar.
           </li>
           <li>
-            <b>Late share</b> — the rest, with the <b>average</b> and the <b>last piece's</b>{' '}
-            delay: "15% (900 pcs) · avg 0.8 h, last 1.5 h". The last piece's delay is{' '}
-            <i>ready − delivery time</i>: if production starts 6 h after the delivery time and
-            takes j h, the whole need is complete 6 + j h late. The customer is fed from the
-            first pieces, so the average is closer to how long the line really waits.
+            <b>Late share</b> — restul, cu întârzierea <b>medie</b> și cea a <b>ultimei bucăți</b>:{' '}
+            „15% (900 buc) · medie 0,8 h, ultima 1,5 h”. Întârzierea ultimei bucăți este{' '}
+            <i>gata − ora de livrare</i>: dacă producția începe la 6 h după ora de livrare și
+            durează j h, întregul necesar este complet cu 6 + j h întârziere. Clientul este alimentat din
+            primele bucăți, așa că media este mai aproape de cât așteaptă de fapt linia.
           </li>
         </ul>
         <p className="mt-2 text-sm text-amber-900">
-          The independent plan check (below) replays the same ZPP need hour by hour and reports
-          the same shortfall and recovery time, so the two always agree.
+          Verificarea independentă a planului (mai jos) reia același necesar ZPP oră cu oră și raportează
+          același deficit și același timp de recuperare, astfel încât cele două concordă întotdeauna.
         </p>
         <p className="mt-2 text-sm text-amber-900">
-          <b>Why late</b> gives the reasons found in the plan itself, the
-          strongest first:
+          <b>Why late</b> dă motivele găsite în planul însuși, de la
+          cel mai puternic:
         </p>
         <ul className="mt-1 ml-5 list-disc space-y-1 text-sm text-amber-900">
-          <li>already due when the plan was calculated (backlog, or the stock did not cover today);</li>
+          <li>avea deja termenul depășit când a fost calculat planul (restanță sau stocul nu a acoperit ziua de azi);</li>
           <li>
-            cannot be ready even if started now — the job alone needs more press time
-            (setup + approval + production) than is left until the deadline;
+            nu poate fi gata nici dacă ar începe acum — lucrarea singură necesită mai mult timp de presă
+            (setup + aprobare + producție) decât a rămas până la termen;
           </li>
           <li>
-            the work center is busy before it: how many jobs and hours, split into needed
-            earlier, frozen / approved and needed later, and which were placed first by a
-            plan override;
+            centrul de lucru este ocupat înaintea ei: câte lucrări și câte ore, împărțite în necesare
+            mai devreme, înghețate / aprobate și necesare mai târziu, și care au fost plasate primele printr-o
+            intervenție în plan;
           </li>
-          <li>the press waited before the setup (setup crew, mould on another press…);</li>
-          <li>hours between setup start and ready when the press does not work (no shift, weekend, breaks);</li>
-          <li>a capacity factor below 100%.</li>
+          <li>presa a așteptat înainte de setup (echipa de setup, matrița pe altă presă…);</li>
+          <li>ore între începutul setup-ului și momentul în care piesa e gata, în care presa nu lucrează (fără tură, weekend, pauze);</li>
+          <li>un factor de capacitate sub 100%.</li>
         </ul>
         <p className="mt-2 text-sm text-amber-900">
-          <b>How the hours are calculated</b> (tap the row): setup start → setup +
-          quality approval + production of the needed pieces at the part's speed
-          (pieces per hour = 60 ÷ cycle time × performance) → pieces ready at the
-          delivery time (on time share) → ready time of the last needed piece. Last
-          piece late = ready − needed by (delivery time on the need day). When the press
-          cannot make it, <i>Why late</i> compares the production time the press has between
-          the setup start and the deadline with the time the needed pieces take. Next to it are the inputs that decide it — demand and finished
-          stock, speed, setup and approval minutes, the shifts and delivery time —
-          with links to where they are set. If one of them is wrong (e.g. a setup
-          of 600 min instead of 60, a missing shift), the part only <i>looks</i> late:
-          correct it there and recalculate.
+          <b>Cum se calculează orele</b> (atingeți rândul): începutul setup-ului → setup +
+          aprobarea calității + producția bucăților necesare la viteza piesei
+          (bucăți pe oră = 60 ÷ timp de ciclu × performanță) → bucăți gata la
+          ora de livrare (partea la timp) → ora la care e gata ultima bucată necesară. Întârzierea
+          ultimei bucăți = gata − necesar până la (ora de livrare în ziua necesarului). Când presa
+          nu poate reuși, <i>Why late</i> compară timpul de producție pe care presa îl are între
+          începutul setup-ului și termen cu timpul necesar bucăților cerute. Alături sunt datele de intrare care decid — cererea și stocul
+          de produse finite, viteza, minutele de setup și de aprobare, turele și ora de livrare —
+          cu linkuri spre locul unde se setează. Dacă una dintre ele este greșită (de ex. un setup
+          de 600 min în loc de 60, o tură lipsă), piesa doar <i>pare</i> întârziată:
+          corectați acolo și recalculați.
         </p>
       </section>
 
       <section id="scenarios" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Scenarios — trying other plans</h2>
+        <h2 className="text-sm font-semibold text-foreground">Scenarii — încercarea altor planuri</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          One order of placing jobs is not always the best. After the plan above
-          is built, the engine builds it again with other variations and keeps
-          the best one:
+          O singură ordine de plasare a lucrărilor nu este întotdeauna cea mai bună. După ce planul de mai sus
+          este construit, motorul îl construiește din nou cu alte variante și îl păstrează
+          pe cel mai bun:
         </p>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            <b>Order</b> within the same urgency: stock-out day (standard),
-            shortest job first, longest job first, parts with the fewest work centers
-            first, and shuffled orders.
+            <b>Ordinea</b> în cadrul aceleiași urgențe: ziua de epuizare a stocului (standard),
+            întâi lucrarea cea mai scurtă, întâi lucrarea cea mai lungă, întâi piesele cu cele mai puține centre de lucru
+            și ordini amestecate aleatoriu.
           </li>
           <li>
-            <b>Work center choice</b>: the work center that finishes first (standard), the
-            one that can start first, or the least loaded one.
+            <b>Alegerea centrului de lucru</b>: centrul de lucru care termină primul (standard),
+            cel care poate începe primul sau cel mai puțin încărcat.
           </li>
           <li>
-            <b>Best</b> means: fewest unplanned daily lots, then fewest late parts, then
-            fewest late hours, then the fewest unplanned long-term lots, then the highest production time (setups do not
-            count as production), then the fewest setups. Utilisation never wins
-            over a late part.
+            <b>Cel mai bun</b> înseamnă: cele mai puține loturi zilnice neplanificate, apoi cele mai puține piese întârziate, apoi
+            cele mai puține ore de întârziere, apoi cele mai puține loturi pe termen lung neplanificate, apoi cel mai mare timp de producție (setup-urile nu
+            contează ca producție), apoi cele mai puține setup-uri. Gradul de utilizare nu câștigă niciodată
+            în fața unei piese întârziate.
           </li>
           <li>
-            <b>Utilisation</b> = busy work center hours ÷ available hours (working
-            calendar minus maintenance) in the next 7 days, all work centers together.
+            <b>Gradul de utilizare</b> = orele ocupate ale centrelor de lucru ÷ orele disponibile (calendarul
+            de lucru minus mentenanța) în următoarele 7 zile, toate centrele de lucru împreună.
           </li>
           <li>
-            <b>It stops</b> as soon as {current.target}% is reached with nothing
-            late, after{' '}
-            {current.maxScenarios} scenarios, after 25 scenarios without an
-            improvement, or after two minutes. The Production Plan then shows
-            the level reached (e.g. "best of {current.maxScenarios} scenarios
-            reaches 90%"), the utilisation of each work center and the scenarios
-            compared.
+            <b>Căutarea se oprește</b> de îndată ce se atinge {current.target}% fără nimic
+            întârziat, după{' '}
+            {current.maxScenarios} scenarii, după 25 de scenarii fără
+            îmbunătățire sau după două minute. Production Plan arată atunci
+            nivelul atins (de ex. „best of {current.maxScenarios} scenarios
+            reaches 90%”), gradul de utilizare al fiecărui centru de lucru și scenariile
+            comparate.
           </li>
           <li>
-            <b>Local search</b> then works on each late part directly: move it
-            1, 2 or 4 days forward in its group, switch its "moved forward" mark,
-            or move a non-late part that runs before it on the same work center 2 days
-            back. Each move rebuilds the whole plan and is kept only if the plan
-            gets better (at most 150 moves or one minute).
+            <b>Căutarea locală</b> lucrează apoi direct pe fiecare piesă întârziată: o mută
+            cu 1, 2 sau 4 zile în față în grupul ei, îi comută marcajul „moved forward”
+            sau mută cu 2 zile înapoi o piesă neîntârziată care rulează înaintea ei pe același centru de lucru.
+            Fiecare mutare reconstruiește tot planul și este păstrată doar dacă planul
+            devine mai bun (cel mult 150 de mutări sau un minut).
           </li>
           <li>
-            <b>Lot split</b> (also local search): a long lot that runs before a late
-            part on the same work center — say 30,000 pcs — is cut in 2 or 3 parts so the late part
-            runs <i>between</i> them: 15,000, the late part, then the other 15,000.
-            Parts are always whole coils (a mounted coil is never cut), the first part covers
-            what is needed first (rounded up to whole coils), and a lot is not split if a part would
-            fall below the Min. lot. The part that covers no need is only coil surplus and
-            is planned as fill, so it no longer holds up urgent parts. The second part needs another
-            setup, so a split is kept only when it saves a late part; the plan marks the jobs{' '}
-            <i>"lot split 1/2"</i> and the plan check lists the lots that were split. A quantity
-            change on the chart applies to the whole lot.
+            <b>Împărțirea lotului</b> (tot căutare locală): un lot lung care rulează înaintea unei piese
+            întârziate pe același centru de lucru — să zicem 30.000 buc — este tăiat în 2 sau 3 părți, astfel încât piesa întârziată
+            să ruleze <i>între</i> ele: 15.000, piesa întârziată, apoi celelalte 15.000.
+            Părțile sunt întotdeauna bobine întregi (o bobină montată nu este tăiată niciodată), prima parte acoperă
+            ce este necesar mai întâi (rotunjit în sus la bobine întregi), iar un lot nu se împarte dacă o parte ar
+            scădea sub Min. lot. Partea care nu acoperă niciun necesar este doar surplus de bobină și
+            se planifică drept umplere, astfel încât nu mai blochează piesele urgente. A doua parte necesită încă un
+            setup, de aceea o împărțire este păstrată doar când salvează o piesă întârziată; planul marchează lucrările{' '}
+            <i>„lot split 1/2”</i>, iar verificarea planului listează loturile care au fost împărțite. O modificare
+            de cantitate în grafic se aplică întregului lot.
           </li>
         </ul>
       </section>
 
       <section id="press-start" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Planner's hand — closed periods and delays</h2>
+        <h2 className="text-sm font-semibold text-foreground">Intervenția planificatorului — perioade închise și întârzieri</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Unless you say otherwise every work center is planned from now. At the top left of the
-          Production Plan (<b>Plan settings</b>) you can set, per work center, before recalculating:
+          Dacă nu specificați altfel, fiecare centru de lucru este planificat de acum înainte. În stânga sus, în
+          Production Plan (<b>Plan settings</b>), puteți seta, pe centru de lucru, înainte de recalculare:
         </p>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            <b>Closed from – to</b> (date and time) with a reason — no operator, no raw material…
-            The work center takes no work between the two moments; the closed hours show on the
-            chart. Leave <i>from</i> empty to close it from now until <i>to</i>. Example: closed
-            Monday 07:30 – 10:00 on a 07:00 shift — a 60-minute job does not fit in the first half
-            hour, so it starts at 10:00; a job before a later closed period (12:00 – 14:00) is not
-            moved. Approved jobs that touch the closed period are released and planned again.
+            <b>Închis de la – până la</b> (dată și oră), cu un motiv — fără operator, fără materie primă…
+            Centrul de lucru nu primește lucrări între cele două momente; orele închise apar în
+            grafic. Lăsați <i>de la</i> gol pentru a-l închide de acum până la <i>până la</i>. Exemplu: închis
+            luni 07:30 – 10:00 la o tură de la 07:00 — o lucrare de 60 de minute nu încape în prima jumătate
+            de oră, așa că începe la 10:00; o lucrare dinaintea unei perioade închise ulterioare (12:00 – 14:00) nu este
+            mutată. Lucrările aprobate care ating perioada închisă sunt eliberate și planificate din nou.
           </li>
           <li>
-            <b>A closed period — and an open breakdown that stops the press — is a planned stop, not a
-            wall.</b> Production runs up to it, the press
-            stops with the coil still in it and continues after it — like a shift that is not
-            worked. Setup, quality approval and coil changes do not cross it; if the stop comes right
-            after the setup (no stroke yet) the job starts after the stop instead. When the stop cuts
-            a coil, the job ends when that coil is finished; the remaining coils become a new lot
-            that is planned next (the die is still mounted, so no setup). Example: 1,000 pcs per
-            coil, 100 min per coil, 3 coils, stop 09:00 – 10:00 on a 07:00 shift: setup 07:00 – 07:30,
-            first coil 07:30 – 09:00 and 10:00 – 10:10 → a 1,000-piece job; the other 2,000 follow at
-            10:10. If the die should come off instead, cancel that lot by hand.
+            <b>O perioadă închisă — și o defecțiune deschisă care oprește presa — este o oprire planificată, nu un
+            zid.</b> Producția rulează până la ea, presa
+            se oprește cu bobina încă în ea și continuă după ea — ca o tură care nu este
+            lucrată. Setup-ul, aprobarea calității și schimbările de bobină nu o traversează; dacă oprirea vine imediat
+            după setup (încă nicio cursă), lucrarea începe în schimb după oprire. Când oprirea întrerupe
+            o bobină, lucrarea se termină când acea bobină este terminată; bobinele rămase devin un lot nou
+            care se planifică imediat după (matrița este încă montată, deci fără setup). Exemplu: 1.000 buc pe
+            bobină, 100 min pe bobină, 3 bobine, oprire 09:00 – 10:00 la o tură de la 07:00: setup 07:00 – 07:30,
+            prima bobină 07:30 – 09:00 și 10:00 – 10:10 → o lucrare de 1.000 de bucăți; celelalte 2.000 urmează la
+            10:10. Dacă matrița ar trebui în schimb demontată, anulați manual acel lot.
           </li>
           <li>
-            <b>Behind / ahead</b> (hours): the line did not keep to the approved plan. +3 h moves
-            the approved (frozen and running) jobs 3 hours later and closes the first 3 hours as
-            "Behind plan"; −2 h brings them forward, never before now. "All work centers" sets it for
-            the whole line at once.
+            <b>În urmă / înainte</b> (ore): linia nu a respectat planul aprobat. +3 h mută
+            lucrările aprobate (înghețate și în curs) cu 3 ore mai târziu și închide primele 3 ore ca
+            „Behind plan”; −2 h le aduce înainte, niciodată înainte de momentul actual. „All work centers” setează valoarea pentru
+            toată linia deodată.
           </li>
         </ul>
         <p className="mt-2 text-sm text-muted-foreground">
-          Work that is not approved needs no correction: every Calculate plan rebuilds the plan from
-          the current moment.
+          Lucrările neaprobate nu necesită corecție: fiecare Calculate plan reconstruiește planul de la
+          momentul actual.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Next to it, <b>Work calendar</b> shows the chosen work center week by week: shifts 1–3 per
-          day as the plan uses them (Work Calendar, week exceptions, holidays, day records) and
-          overtime hours. It is read-only until you press <b>Edit</b>: then a click on a cell opens
-          or closes that shift — a day record (see <a href="#capacity">Build the capacity</a>) — and
-          the OT row adds or removes that day's overtime. Every day of the week can be edited,
-          including a Saturday or Sunday that is closed and therefore absent from the plan's days;
-          the OT row only offers the overtime that fits that day's free window and writes
-          <i>full (24 h)</i> when the day already works 24 hours. Nothing is written until
-          <b>Save</b>; a dashed cell is not in the plan until the next Calculate plan.
+          Alături, <b>Work calendar</b> arată centrul de lucru ales, săptămână cu săptămână: turele 1–3 pe
+          zi așa cum le folosește planul (Work Calendar, excepții de săptămână, sărbători, înregistrări de zi) și
+          orele suplimentare. Este doar pentru citire până când apăsați <b>Edit</b>: atunci un clic pe o celulă deschide
+          sau închide acea tură — o înregistrare de zi (vezi <a href="#capacity">Construirea capacității</a>) — iar
+          rândul OT adaugă sau șterge orele suplimentare ale acelei zile. Fiecare zi a săptămânii poate fi editată,
+          inclusiv o sâmbătă sau o duminică închisă și, prin urmare, absentă din zilele planului;
+          rândul OT oferă doar orele suplimentare care încap în fereastra liberă a acelei zile și scrie
+          <i> plin (24 h)</i> când ziua se lucrează deja 24 de ore. Nimic nu se scrie până la
+          <b> Save</b>; o celulă cu linie întreruptă nu este în plan până la următorul Calculate plan.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          On the chart a job is drawn as <b>one bar per working stretch</b>. Planned stops do not
-          break the bar — they are small dots inside it — but a <b>closed shift does</b>: with the
-          1st and 3rd shift open and the 2nd closed, the work is drawn as 07:00–15:00 and
-          23:00–07:00 with 15:00–23:00 left empty, because the work center does not run then.
+          În grafic, o lucrare este desenată ca <b>o bară pe fiecare interval de lucru</b>. Opririle planificate nu
+          rup bara — sunt puncte mici în interiorul ei — dar o <b>tură închisă o rupe</b>: cu
+          tura 1 și tura 3 deschise și tura 2 închisă, lucrarea este desenată ca 07:00–15:00 și
+          23:00–07:00, cu 15:00–23:00 lăsat gol, pentru că centrul de lucru nu rulează atunci.
         </p>
       </section>
 
       <section id="org-filter" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Department, cost center and work center filter — a view, not a rule</h2>
+        <h2 className="text-sm font-semibold text-foreground">Filtrul de departament, centru de cost și centru de lucru — o vedere, nu o regulă</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Three pages carry the same filter: <Link to="/planlama" className="underline">Production Plan</Link>,{' '}
-          <Link to="/referanslar" className="underline">Master Data</Link> and{' '}
-          <Link to="/capacity" className="underline">Capacity Dashboard</Link>. You pick a{' '}
-          <b>department</b>, then one or more of its <b>cost centers</b>, then — on Master Data and
-          the Capacity Dashboard — one or more <b>work centers</b>. Each level narrows the next, so
-          the work centers you can pick are exactly those of the cost centers of that department.
-          Each page remembers its own selection for the next time you open it.
+          Trei pagini au același filtru: <Link to="/planlama" className="underline">Production Plan</Link>,{' '}
+          <Link to="/referanslar" className="underline">Master Data</Link> și{' '}
+          <Link to="/capacity" className="underline">Capacity Dashboard</Link>. Alegeți un{' '}
+          <b>departament</b>, apoi unul sau mai multe dintre <b>centrele lui de cost</b>, apoi — în Master Data și
+          în Capacity Dashboard — unul sau mai multe <b>centre de lucru</b>. Fiecare nivel îl restrânge pe următorul, astfel încât
+          centrele de lucru pe care le puteți alege sunt exact cele ale centrelor de cost din acel departament.
+          Fiecare pagină își reține propria selecție pentru data viitoare când o deschideți.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          What each page narrows: on Production Plan the chart, the work center lists, the part list
-          of <b>Add job</b>, the <b>Pin to work center</b> list and the late-job count; on Master
-          Data the part list — a part stays while its main work center <i>or one of its
-          alternatives</i> is among the chosen ones, and a part with no work center at all belongs
-          to no department and shows only with the filter off; on the Capacity Dashboard the cards,
-          the chart and the work center list.
+          Ce restrânge fiecare pagină: în Production Plan, graficul, listele de centre de lucru, lista de piese
+          din <b>Add job</b>, lista <b>Pin to work center</b> și numărul de lucrări întârziate; în Master
+          Data, lista de piese — o piesă rămâne cât timp centrul ei de lucru principal <i>sau una dintre
+          alternativele lui</i> se află printre cele alese, iar o piesă fără niciun centru de lucru nu aparține
+          niciunui departament și apare doar cu filtrul dezactivat; în Capacity Dashboard, cardurile,
+          graficul și lista de centre de lucru.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          <b>It does not change the plan or the numbers.</b> The plan and the capacity forecast are
-          always calculated for the whole plant — capacity, cranes, setup teams and mould limits are
-          only correct when every work center is seen at once — so filtering never moves a job,
-          never changes an hour on the Capacity Dashboard, and two planners looking at different
-          departments see the same plan. Nothing is hidden from the engine; it is hidden from the
-          screen.
+          <b>Filtrul nu schimbă planul sau cifrele.</b> Planul și prognoza de capacitate sunt
+          calculate întotdeauna pentru toată fabrica — capacitatea, podurile rulante, echipele de setup și limitele matrițelor sunt
+          corecte doar când toate centrele de lucru sunt văzute deodată — astfel încât filtrarea nu mută niciodată o lucrare,
+          nu schimbă niciodată o oră în Capacity Dashboard, iar doi planificatori care se uită la departamente
+          diferite văd același plan. Nimic nu este ascuns de motor; este ascuns doar de pe
+          ecran.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          <b>Calculate plan</b> therefore always calculates every work center together — presses and
-          operator-plan lines (nut welding, spot welding…) in one run, whatever the filter shows. The
-          calendar box follows the filter: work centers of a <i>Shift</i> cost center show the{' '}
-          <b>Work calendar</b> (shifts and overtime per work center), an <i>Operator</i> cost center
-          shows <b>Operators per shift</b> (people per day and shift); both appear only when the
-          selection holds both kinds. <b>Not yet linked:</b> a part made on a press and used on a
-          welding line is planned on each line on its own — the welding job does not wait for the
-          press job that makes its part. The independent check warns when it does not fit (see{' '}
-          <a href="#component-ready" className="underline">intermediate part not ready</a>).
+          De aceea, <b>Calculate plan</b> calculează întotdeauna toate centrele de lucru împreună — presele și
+          liniile cu plan de operatori (sudură de piulițe, sudură în puncte…) într-o singură rulare, indiferent ce arată filtrul.
+          Caseta de calendar urmează filtrul: centrele de lucru ale unui centru de cost <i>Shift</i> arată{' '}
+          <b>Work calendar</b> (ture și ore suplimentare pe centru de lucru), un centru de cost <i>Operator</i>
+          arată <b>Operators per shift</b> (persoane pe zi și pe tură); ambele apar doar când
+          selecția le conține pe amândouă. <b>Încă nelegate:</b> o piesă produsă pe o presă și folosită pe o
+          linie de sudură este planificată separat pe fiecare linie — lucrarea de sudură nu așteaptă
+          lucrarea de presă care îi produce piesa. Verificarea independentă avertizează când nu se potrivește (vezi{' '}
+          <a href="#component-ready" className="underline">piesa intermediară nu este gata</a>).
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          The link comes from the definitions: work center → cost center (
-          <Link to="/makineler" className="underline">Work Center Definitions</Link>) and cost center
-          → department (Company settings). A work center without a cost center is listed under{' '}
-          <i>Without a department</i> so it cannot get lost. Each option shows how many work centers
-          it holds. Every work center is in the plan — presses as well as nut welding, spot welding,
-          robot and assembly lines — because every part is timed by its cycle time (see{' '}
-          <a href="#inputs" className="underline">Collect the data</a>); there is no “not planned” work
-          center.
+          Legătura vine din definiții: centru de lucru → centru de cost (
+          <Link to="/makineler" className="underline">Work Center Definitions</Link>) și centru de cost
+          → departament (Company settings). Un centru de lucru fără centru de cost este listat la{' '}
+          <i>Without a department</i>, ca să nu se piardă. Fiecare opțiune arată câte centre de lucru
+          conține. Fiecare centru de lucru este în plan — presele, dar și sudura de piulițe, sudura în puncte,
+          liniile robotizate și de asamblare — pentru că fiecare piesă este temporizată după timpul ei de ciclu (vezi{' '}
+          <a href="#inputs" className="underline">Colectarea datelor</a>); nu există centru de lucru
+          „neplanificat”.
         </p>
       </section>
 
       <section id="capacity-dashboard" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Capacity Dashboard — Prediction OEE and Accepted OEE</h2>
+        <h2 className="text-sm font-semibold text-foreground">Capacity Dashboard — Prediction OEE și Accepted OEE</h2>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            <b>Capacity</b> is the same net hours the plan uses (step 3): one formula for the plan,
-            the Work Calendar, the Capacity Dashboard and Performance.
+            <b>Capacitatea</b> reprezintă aceleași ore nete pe care le folosește planul (pasul 3): o singură formulă pentru plan,
+            Work Calendar, Capacity Dashboard și Performance.
           </li>
           <li>
-            <b>Demand hours</b> = pieces × cycle time ÷ 60 ÷ OEE, after finished stock, earliest week
-            first; this week carries the backlog. Groups are the work center <b>categories</b>.
+            <b>Orele de cerere</b> = bucăți × timp de ciclu ÷ 60 ÷ OEE, după scăderea stocului de produse finite, începând cu cea mai
+            apropiată săptămână; săptămâna curentă poartă restanța. Grupele sunt <b>categoriile</b> centrelor de lucru.
           </li>
           <li>
-            <b>A) Prediction OEE</b> — one rate for every part ({current.predictionOee}%), set on the
-            dashboard. It is a what-if for that view only and never changes the plan.
+            <b>A) Prediction OEE</b> — o singură rată pentru toate piesele ({current.predictionOee}%), setată în
+            dashboard. Este o simulare doar pentru acea vedere și nu schimbă niciodată planul.
           </li>
           <li>
-            <b>B) Accepted OEE</b> — each part's value from Master Data, the same as the plan.
+            <b>B) Accepted OEE</b> — valoarea fiecărei piese din Master Data, la fel ca în plan.
           </li>
           <li>
-            Both use the same method: available hours as they are, production time = ideal time ÷
-            OEE. The <b>capacity factor</b> (Performance page) is a third, separate number: the
-            measured attainment against the approved plan, applied to the plan's capacity.
+            Ambele folosesc aceeași metodă: orele disponibile așa cum sunt, timp de producție = timp ideal ÷
+            OEE. <b>Factorul de capacitate</b> (pagina Performance) este un al treilea număr, separat: gradul
+            de realizare măsurat față de planul aprobat, aplicat capacității planului.
           </li>
         </ul>
       </section>
 
       <section id="oee-short-stops" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">OEE — availability and performance, short stops</h2>
+        <h2 className="text-sm font-semibold text-foreground">OEE — disponibilitate și performanță, opriri scurte</h2>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            Times are added first, then divided — never an average of percentages. <b>Availability</b> = Production ÷ Loading,{' '}
-            <b>Performance</b> = Operation ÷ Production, <b>Quality</b> = Good ÷ (Good + Scrap + Reject), <b>OEE</b> = A × P × Q.
-            Loading already leaves out the planned stops (breaks, no work, try-out: Reason Code 1 set as a break in OEE Settings).
+            Timpii se adună întâi, apoi se împart — niciodată o medie de procente. <b>Disponibilitatea (Availability)</b> = Production ÷ Loading,{' '}
+            <b>Performanța (Performance)</b> = Operation ÷ Production, <b>Calitatea (Quality)</b> = Good ÷ (Good + Scrap + Reject), <b>OEE</b> = A × P × Q.
+            Loading exclude deja opririle planificate (pauze, lipsă de lucru, probe: Reason Code 1 setat ca pauză în OEE Settings).
           </li>
           <li>
-            <b>Short stops</b>: an unplanned stop shorter than {MES_SHORT_STOP_MIN} min is a <b>performance</b> (speed) loss; one of{' '}
-            {MES_SHORT_STOP_MIN} min or longer is an <b>availability</b> loss. The MES already works this way: its production time only
-            deducts the stops of {MES_SHORT_STOP_MIN} min and longer, so A and P are the MES values on every OEE page (Dashboard, trends,
+            <b>Opriri scurte</b>: o oprire neplanificată mai scurtă de {MES_SHORT_STOP_MIN} min este o pierdere de <b>performanță</b> (viteză); una de{' '}
+            {MES_SHORT_STOP_MIN} min sau mai lungă este o pierdere de <b>disponibilitate</b>. MES-ul funcționează deja așa: timpul lui de producție
+            scade doar opririle de {MES_SHORT_STOP_MIN} min și mai lungi, deci A și P sunt valorile din MES pe fiecare pagină OEE (Dashboard, trends,
             weekly / monthly, Daily Report, Board, KPI).
           </li>
           <li>
-            The loss pages split the same reason code by the length of each stop. The Loss Bridge shows only the long stops (e.g.
-            “Machine”); the short ones are <b>not a bridge step</b> — they stay inside Speed loss = Production − Operation (the step
-            note gives their minutes) and are analysed in the duration buckets of MTTR &amp; MTBF. They never touch the availability
-            step: A, the availability loss and “Not explained” are the same with or without them. Losses Trend keeps a “Short
-            stops” column (Speed = Production − Operation − short stops). The totals and the OEE never change.
+            Paginile de pierderi împart același cod de motiv după durata fiecărei opriri. Loss Bridge arată doar opririle lungi (de ex.
+            „Machine”); cele scurte <b>nu sunt o treaptă a punții</b> — rămân în Speed loss = Production − Operation (nota
+            treptei le dă minutele) și sunt analizate în intervalele de durată din MTTR &amp; MTBF. Nu ating niciodată treapta de
+            disponibilitate: A, pierderea de disponibilitate și „Not explained” sunt aceleași cu sau fără ele. Losses Trend păstrează o coloană „Short
+            stops” (Speed = Production − Operation − opriri scurte). Totalurile și OEE-ul nu se schimbă niciodată.
           </li>
           <li>
-            The limit is set in OEE Settings → Numbers (default {MES_SHORT_STOP_MIN} min, whole minutes). Another value changes only the
-            loss split; A and P stay as in the MES and the bridge shows the difference.
+            Limita se setează în OEE Settings → Numbers (implicit {MES_SHORT_STOP_MIN} min, minute întregi). O altă valoare schimbă doar
+            împărțirea pierderilor; A și P rămân ca în MES, iar puntea arată diferența.
           </li>
           <li>
-            Stop durations are stored from {dmy(SHORT_STOP_DATA_FROM)}; before that the stops are not split (all availability) and the
-            page says “duration split not available before {dmy(SHORT_STOP_DATA_FROM)}”.
+            Duratele opririlor sunt stocate începând cu {dmy(SHORT_STOP_DATA_FROM)}; înainte de această dată opririle nu sunt împărțite (toate sunt disponibilitate), iar
+            pagina afișează „duration split not available before {dmy(SHORT_STOP_DATA_FROM)}”.
           </li>
           <li>
-            <b>MTTR / MTBF</b> count only the stops of the limit and longer by default (breakdowns and setups are availability losses);
-            the short stops are the first duration bucket. Agent Report, Agent Insights and Open Topics read the long stops for die and
-            machine (availability) notes and the short stops for the micro-stop / speed notes.
+            <b>MTTR / MTBF</b> numără implicit doar opririle egale cu limita sau mai lungi (defecțiunile și setup-urile sunt pierderi de disponibilitate);
+            opririle scurte sunt primul interval de durată. Agent Report, Agent Insights și Open Topics citesc opririle lungi pentru notele despre matriță și
+            utilaj (disponibilitate) și opririle scurte pentru notele despre micro-opriri / viteză.
           </li>
           <li>
-            Example (test): on 21.09 at PRS-105 shift 3, Loading − Production is 140.6 min = the stops of 2 min and longer; the 21.6
-            min of shorter stops are inside Production − Operation.
+            Exemplu (test): pe 21.09 la PRS-105, tura 3, Loading − Production este 140,6 min = opririle de 2 min și mai lungi; cele 21,6
+            min de opriri mai scurte sunt în Production − Operation.
           </li>
           <li>
-            <b>Undefined stops</b>: Reason Code 1 or Reason Code 2 “{UNDEFINED_RC1}” (or an empty Reason Code 2) means the operator did
-            not define the stop. Reason Code 1 “{UNDEFINED_RC1}” is always a <b>loss</b> (even when it is not ticked as a loss in OEE
-            Settings → Reason Code 1) and never a planned break; Reason Code 2 “{UNDEFINED_RC1}” is a loss when its Reason Code 1 is. On
-            every OEE page (Losses Trend, Loss Bridge and Level 3, Asakai, Daily Report, Agent Report, Agent Insights, Open Topics) these
-            stops sit under <b>{UNASSIGNED}</b>; a “{UNDEFINED_RC1}” row in OEE Settings → Loss groups is not used. The short-stop split
-            works the same way: stops shorter than the limit go to Short stops (speed), the longer ones to {UNASSIGNED} (availability).
-            Planned breaks are not affected.
+            <b>Opriri nedefinite</b>: Reason Code 1 sau Reason Code 2 „{UNDEFINED_RC1}” (ori un Reason Code 2 gol) înseamnă că operatorul nu
+            a definit oprirea. Reason Code 1 „{UNDEFINED_RC1}” este întotdeauna o <b>pierdere</b> (chiar și când nu este bifat ca pierdere în OEE
+            Settings → Reason Code 1) și niciodată o pauză planificată; Reason Code 2 „{UNDEFINED_RC1}” este o pierdere când Reason Code 1 al lui este pierdere. Pe
+            fiecare pagină OEE (Losses Trend, Loss Bridge și Level 3, Asakai, Daily Report, Agent Report, Agent Insights, Open Topics), aceste
+            opriri stau la <b>{UNASSIGNED}</b>; un rând „{UNDEFINED_RC1}” din OEE Settings → Loss groups nu este folosit. Împărțirea opririlor scurte
+            funcționează la fel: opririle mai scurte decât limita merg la Short stops (viteză), cele mai lungi la {UNASSIGNED} (disponibilitate).
+            Pauzele planificate nu sunt afectate.
           </li>
           <li>
-            Example (test): Reason Code 1 “{UNDEFINED_RC1}”, Reason Code 2 STP (Setup), 30 min → {UNASSIGNED} 30 min, Setup 0 min.
+            Exemplu (test): Reason Code 1 „{UNDEFINED_RC1}”, Reason Code 2 STP (Setup), 30 min → {UNASSIGNED} 30 min, Setup 0 min.
           </li>
           <li>
-            <b>Column order</b> is the same on every page: the loss groups in their OEE Settings order (↑ ↓ buttons), then{' '}
-            {SHORT_STOPS} (where shown), then {SPEED}, and last {UNASSIGNED}. Example (test): groups KLP, STP, ARZ → KLP, STP, ARZ,{' '}
+            <b>Ordinea coloanelor</b> este aceeași pe fiecare pagină: grupele de pierderi în ordinea lor din OEE Settings (butoanele ↑ ↓), apoi{' '}
+            {SHORT_STOPS} (unde este afișat), apoi {SPEED} și la final {UNASSIGNED}. Exemplu (test): grupele KLP, STP, ARZ → KLP, STP, ARZ,{' '}
             {SHORT_STOPS}, {SPEED}, {UNASSIGNED}.
           </li>
           <li>
-            <b>Asakai pages</b> (Asakai weekly, Asakai detail) do not show <b>today</b>, the system&apos;s working day: the day is not
-            over, so the part-day data uploaded during it would make OEE and the loss shares wrong. The latest day on both pages is
-            yesterday (the date box cannot go further), and the running week and month are the sum of the days before today — an
-            uploaded Weekly / Monthly KPI row that covers today is not used. Each page also shows <b>every work center of the cost
-            center</b> (Machines → cost center), even one without data on the selected day or week: its row stays empty.
+            <b>Paginile Asakai</b> (Asakai weekly, Asakai detail) nu arată ziua de <b>azi</b>, ziua lucrătoare a sistemului: ziua nu s-a
+            încheiat, așa că datele parțiale încărcate în timpul ei ar face greșite OEE-ul și ponderile pierderilor. Ultima zi pe ambele pagini este
+            ieri (caseta de dată nu poate merge mai departe), iar săptămâna și luna în curs sunt suma zilelor dinaintea zilei de azi — un
+            rând Weekly / Monthly KPI încărcat care acoperă ziua de azi nu este folosit. Fiecare pagină arată și <b>toate centrele de lucru ale centrului
+            de cost</b> (Machines → cost center), chiar și unul fără date în ziua sau săptămâna selectată: rândul lui rămâne gol.
           </li>
           <li>
-            A loss share can pass 100 % of Loading when the MES Loading of a shift is shorter than shift time − planned stops (e.g.
-            21.09 PRS-104 shift 1: Loading 185.7 + planned 209.3 = 395 of 480 min, recorded unplanned stops 191.5 min = 103 %). The
-            stops are counted as recorded; the Loss Bridge shows the surplus as “{OVER_RECORDED}”.
+            O pondere a pierderilor poate depăși 100 % din Loading când Loading-ul din MES al unei ture este mai scurt decât timpul turei − opririle planificate (de ex.
+            21.09 PRS-104 tura 1: Loading 185,7 + planificat 209,3 = 395 din 480 min, opriri neplanificate înregistrate 191,5 min = 103 %).
+            Opririle sunt numărate așa cum au fost înregistrate; Loss Bridge arată surplusul ca „{OVER_RECORDED}”.
           </li>
         </ul>
       </section>
 
       <section id="raw-mrp" className="mt-8 max-w-5xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Raw material requirement (MRP) — independent of the plan</h2>
+        <h2 className="text-sm font-semibold text-foreground">Necesarul de materie primă (MRP) — independent de plan</h2>
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
-          <li>Demand: ZPP up to its last week; backlog goes into this week.</li>
+          <li>Cererea: ZPP până la ultima lui săptămână; restanța intră în săptămâna curentă.</li>
           <li>
-            Finished stock (locations ticked <i>Finished goods</i> on Storage Locations) is deducted
-            per part, earliest weeks first. What is left must be pressed: a part whose stock covers 3
-            weeks needs no steel in those 3 weeks.
+            Stocul de produse finite (locațiile bifate <i>Finished goods</i> în Storage Locations) se scade
+            pe piesă, începând cu cele mai apropiate săptămâni. Ce rămâne trebuie ștanțat: o piesă al cărei stoc acoperă 3
+            săptămâni nu are nevoie de oțel în acele 3 săptămâni.
           </li>
           <li>
-            Steel: pieces × gross weight per piece. A co-product pair is pressed once — strokes are the
-            larger of the two needs — and only the primary part's weight counts.
+            Oțelul: bucăți × greutatea brută pe bucată. O pereche de coproduse se ștanțează o singură dată — cursele sunt
+            cel mai mare dintre cele două necesare — și contează doar greutatea piesei principale.
           </li>
           <li>
-            The production plan is <b>not added</b>: its early production and whole-coil surplus are the
-            same demand, timed and rounded differently. Adding them would order the same steel twice.
-            The safety stock absorbs the difference.
+            Planul de producție <b>nu se adaugă</b>: producția lui anticipată și surplusul de bobine întregi sunt
+            aceeași cerere, doar programată și rotunjită diferit. Adunarea lor ar comanda același oțel de două ori.
+            Stocul de siguranță absoarbe diferența.
           </li>
           <li>
-            Supply: coil stock on hand in the locations ticked <i>Raw material</i>
-            plus the in-transit list, each quantity in its ETA week (no ETA or a past ETA = this week).
+            Aprovizionarea: stocul de bobine existent în locațiile bifate <i>Raw material</i>
+            plus lista de tranzit, fiecare cantitate în săptămâna ei ETA (fără ETA sau cu ETA trecut = săptămâna aceasta).
           </li>
           <li>
-            Week by week: stock at the start of the week + arrivals + an order must cover that week's
-            use <b>and</b> the use of the N <b>working days</b> after the week ends — with 10 days every
-            week end holds the next 2 weeks. Otherwise an order is due that week: the shortfall + the
-            standard extra (500 kg by default).
+            Săptămână cu săptămână: stocul de la începutul săptămânii + sosirile + o comandă trebuie să acopere consumul
+            acelei săptămâni <b>și</b> consumul celor N <b>zile lucrătoare</b> de după sfârșitul săptămânii — cu 10 zile, fiecare
+            sfârșit de săptămână acoperă următoarele 2 săptămâni. Altfel, în acea săptămână este necesară o comandă: deficitul +
+            suplimentul standard (implicit 500 kg).
           </li>
-          <li>No demand, no order: after the last ZPP week the need is zero; nothing is forecast (kanban comes later).</li>
+          <li>Fără cerere, fără comandă: după ultima săptămână din ZPP necesarul este zero; nu se prognozează nimic (kanbanul vine mai târziu).</li>
           <li>
-            One row is one <b>coil</b>, not one part: every part pressed from it adds its need, and a
-            co-product pair needs steel when either side does. Open a row to see it <b>by finished
-            product</b> — each part's finished stock, the weeks it covers and the week its steel is first
-            needed — and why the first order falls in its week. An order in a week with no use of its own
-            is the safety window: the use of the next N working days (a holiday week reaches further).
-          </li>
-          <li>
-            <b>Order by</b>: an order must be in by the Monday of its delivery week, so it is placed at
-            the latest on that Monday − the coil's <b>lead time in calendar days</b> (weekends and
-            holidays count — the supplier quotes calendar days). Each coil has its own lead time on Raw
-            Material Coverage → Lead times; a coil without one uses the default and is marked{' '}
-            <i>not entered</i>. A date already passed is <b>late</b> (red), a date in this week is
-            amber. The lead time only dates the order: it does not move the delivery week, the safety
-            stock or the production plan.
+            Un rând este o <b>bobină</b>, nu o piesă: fiecare piesă ștanțată din ea își adaugă necesarul, iar o
+            pereche de coproduse are nevoie de oțel când oricare dintre părți are nevoie. Deschideți un rând pentru a-l vedea <b>pe produs
+            finit</b> — stocul de produse finite al fiecărei piese, săptămânile pe care le acoperă și săptămâna în care oțelul ei este necesar
+            prima dată — și de ce prima comandă cade în săptămâna ei. O comandă într-o săptămână fără consum propriu
+            este fereastra de siguranță: consumul următoarelor N zile lucrătoare (o săptămână cu sărbători ajunge mai departe).
           </li>
           <li>
-            Now: N = {current.rawCoverage} working days, extra = {current.rawExtra.toLocaleString('en-GB')} kg, default
-            lead time {current.rawLeadDefault} calendar days ({current.rawLeadEntered} coil(s) with their own). Working
-            days are the plant's working days (not a holiday, at least one work center with normal shifts).
+            <b>Order by</b>: o comandă trebuie să sosească până în lunea săptămânii de livrare, deci se plasează
+            cel târziu în acea zi de luni − <b>termenul de aprovizionare în zile calendaristice</b> al bobinei (weekendurile și
+            sărbătorile se numără — furnizorul indică zile calendaristice). Fiecare bobină are propriul termen de aprovizionare în Raw
+            Material Coverage → Lead times; o bobină fără termen folosește valoarea implicită și este marcată{' '}
+            <i>not entered</i>. O dată deja trecută este <b>întârziată</b> (roșu), o dată din săptămâna curentă este
+            galben-portocalie. Termenul de aprovizionare doar datează comanda: nu mută săptămâna de livrare, stocul de
+            siguranță sau planul de producție.
+          </li>
+          <li>
+            Acum: N = {current.rawCoverage} zile lucrătoare, supliment = {current.rawExtra.toLocaleString('en-GB')} kg, termen
+            de aprovizionare implicit {current.rawLeadDefault} zile calendaristice ({current.rawLeadEntered} bobină(e) cu termen propriu). Zilele
+            lucrătoare sunt zilele lucrătoare ale fabricii (nu sărbători, cel puțin un centru de lucru cu ture normale).
           </li>
         </ol>
-        <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">FMEA — what can go wrong and how the method guards it</h3>
+        <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">FMEA — ce poate merge prost și cum protejează metoda</h3>
         <div className="mt-2 overflow-x-auto rounded-md border border-border">
           <table className="w-full text-left text-xs">
             <thead className="bg-muted text-muted-foreground">
               <tr>
-                <th className="px-2 py-1.5 font-medium">Failure mode</th>
-                <th className="px-2 py-1.5 font-medium">Effect</th>
+                <th className="px-2 py-1.5 font-medium">Mod de defectare</th>
+                <th className="px-2 py-1.5 font-medium">Efect</th>
                 <th className="px-2 py-1.5 font-medium">S</th>
                 <th className="px-2 py-1.5 font-medium">O</th>
                 <th className="px-2 py-1.5 font-medium">D</th>
                 <th className="px-2 py-1.5 font-medium">RPN</th>
-                <th className="px-2 py-1.5 font-medium">Guard in the method</th>
+                <th className="px-2 py-1.5 font-medium">Măsura din metodă</th>
               </tr>
             </thead>
             <tbody>
@@ -1156,103 +1156,103 @@ export function PlanLogicRo() {
           </table>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          S = severity, O = occurrence, D = detection (1–10); the ratings are those before the guard.
-          Steel already ordered but not yet shipped is only known when it is on the in-transit list;
-          keep that list up to date.
+          S = severitate, O = apariție, D = detecție (1–10); evaluările sunt cele dinaintea măsurii.
+          Oțelul deja comandat, dar încă neexpediat este cunoscut doar când se află pe lista de tranzit;
+          țineți această listă la zi.
         </p>
       </section>
 
       <section id="check" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-sky-200 bg-sky-50/60 p-4">
-        <h2 className="text-sm font-semibold text-foreground">Independent check — is the plan really right?</h2>
+        <h2 className="text-sm font-semibold text-foreground">Verificarea independentă — este planul cu adevărat corect?</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          The plan check above re-counts the engine's own numbers. The{' '}
-          <b>independent check</b> is separate code that shares nothing with the
-          planner. After every calculation it:
+          Verificarea planului de mai sus renumără cifrele proprii ale motorului.{' '}
+          <b>Verificarea independentă</b> este un cod separat care nu are nimic în comun cu
+          planificatorul. După fiecare calcul, ea:
         </p>
         <ol className="mt-2 ml-5 list-decimal space-y-1 text-sm text-muted-foreground">
           <li>
-            <b>Replays stock hour by hour</b> from the SAP files (ZPP, ZPP_DAILY,
-            MB52 in the Finished goods locations) and the planned jobs: every need day is due at{' '}
-            {current.cutoff}, production arrives as it is pressed. Every moment
-            stock goes below zero is a real customer stop. The late list must
-            match it exactly — a part the engine missed, or a false alarm, is
-            shown. Its own rule for ZPP_DAILY: when only weekly-ZPP (long-term)
-            quantity is short, it is counted as a long-term shortage, not a
-            customer stop.
+            <b>Reia stocul oră cu oră</b> din fișierele SAP (ZPP, ZPP_DAILY,
+            MB52 în locațiile Finished goods) și din lucrările planificate: fiecare zi de necesar are termen la{' '}
+            {current.cutoff}, producția sosește pe măsură ce este ștanțată. Fiecare moment în care
+            stocul scade sub zero este o oprire reală la client. Lista de întârzieri trebuie
+            să corespundă exact — o piesă ratată de motor sau o alarmă falsă este
+            afișată. Regula ei proprie pentru ZPP_DAILY: când lipsește doar cantitate din ZPP-ul săptămânal (pe termen lung),
+            aceasta este numărată ca deficit pe termen lung, nu ca oprire
+            la client.
           </li>
           <li>
-            <b>Asks "could any plan have avoided it?"</b> for each short part: is
-            there enough work center time before the deadline on its work centers, even
-            alone? Can the setup team and hall cranes do all setups needed by
-            then? The answer is "No" (proven by capacity), "Yes" (a free slot
-            existed) or "not proven". It also gives the proven minimum number of
-            short parts that no plan can go below.
+            <b>Întreabă „ar fi putut vreun plan să o evite?”</b> pentru fiecare piesă deficitară: există
+            suficient timp de centru de lucru înainte de termen pe centrele ei de lucru, chiar
+            singură? Pot echipa de setup și podurile rulante din hală să facă până atunci toate setup-urile
+            necesare? Răspunsul este „Nu” (dovedit prin capacitate), „Da” (a existat un interval
+            liber) sau „nedovedit”. Dă și numărul minim dovedit de
+            piese deficitare sub care niciun plan nu poate coborî.
           </li>
           <li>
-            <b>Re-checks every rule</b> on the real clock: two jobs on one work center,
-            one die on two work centers (also overnight), two setups in one hall (also
-            across 07:00), plant-wide setups, eligible work center, working time and
-            maintenance, whole coils / Min. lot, pull-forward window, a die change
-            without a setup, backlog before urgent, and on an operator-plan cost center that
-            the crews of the running lines fit the operators entered for that shift.
+            <b>Reverifică fiecare regulă</b> pe ceasul real: două lucrări pe un centru de lucru,
+            o matriță pe două centre de lucru (și peste noapte), două setup-uri într-o hală (și
+            peste ora 07:00), setup-urile la nivelul fabricii, centrul de lucru eligibil, timpul de lucru și
+            mentenanța, bobine întregi / Min. lot, fereastra de aducere înainte, o schimbare de matriță
+            fără setup, restanța înaintea urgentelor și, pe un centru de cost cu plan de operatori, faptul că
+            echipele liniilor în funcțiune se încadrează în operatorii introduși pentru acea tură.
           </li>
           <li id="component-ready">
-            <b>Warns when an intermediate part is not ready</b> (advisory — not a broken rule, the
-            plan stays “OK”): when a part&apos;s <i>raw material</i> code is another part&apos;s code
-            (nut welding ← the stamped part it welds on), that stamped part is its component, 1 pc per
-            pc. At the end of each run of the nut welding job the component&apos;s stock (all
-            locations) plus what is produced by then must cover what has been used by then. Example:
-            100 in stock, 100 pressed by 09:00, nut welding uses 300 by 11:00 → “needs 300 pcs, 200
-            available”. The engine does <b>not</b> plan this link: each line is still planned on its
-            own and the component&apos;s own customer demand is not part of this count.
+            <b>Avertizează când o piesă intermediară nu este gata</b> (informativ — nu este o regulă încălcată,
+            planul rămâne „OK”): când codul de <i>materie primă</i> al unei piese este codul altei piese
+            (sudură de piulițe ← piesa ștanțată pe care se sudează), acea piesă ștanțată este componenta ei, 1 buc pe
+            buc. La sfârșitul fiecărei rulări a lucrării de sudură de piulițe, stocul componentei (toate
+            locațiile) plus ce s-a produs până atunci trebuie să acopere ce s-a consumat până atunci. Exemplu:
+            100 în stoc, 100 ștanțate până la 09:00, sudura de piulițe consumă 300 până la 11:00 → „necesită 300 buc, 200
+            disponibile”. Motorul <b>nu</b> planifică această legătură: fiecare linie este încă planificată
+            separat, iar cererea proprie a clientului pentru componentă nu face parte din acest calcul.
           </li>
           <li>
-            <b>Measures efficiency</b>: setups against the minimum possible,
-            production time against the maximum possible, and where idle time
-            comes from — no work, not yet allowed, or waiting for the setup team.
+            <b>Măsoară eficiența</b>: setup-urile față de minimul posibil,
+            timpul de producție față de maximul posibil și de unde vine timpul
+            nefolosit — lipsă de lucru, încă nepermis sau așteptarea echipei de setup.
           </li>
           <li>
-            <b>Flags data to check</b> for short parts: stock in other locations
-            (not ticked Finished goods), positive values in ZPP, backlog smaller than stock, an old
-            stock file, missing master data.
+            <b>Semnalează datele de verificat</b> pentru piesele deficitare: stoc în alte locații
+            (nebifate Finished goods), valori pozitive în ZPP, restanță mai mică decât stocul, un fișier de stoc
+            vechi, master data lipsă.
           </li>
         </ol>
       </section>
 
       <section id="alarms" className="mt-8 max-w-4xl scroll-mt-20 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">Alarms — dies and machines</h2>
+        <h2 className="text-sm font-semibold text-foreground">Alarme — matrițe și utilaje</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Die and machine follow-up live in their own modules. PlanningExpert
-          keeps only what matters to the plan, on the{' '}
+          Urmărirea matrițelor și a utilajelor are propriile module. PlanningExpert
+          păstrează doar ce contează pentru plan, în pagina{' '}
           <Link to="/alarms" className="underline">
             Alarms
-          </Link>{' '}
-          page, in two lists:
+          </Link>
+          , în două liste:
         </p>
         <ul className="mt-2 ml-5 list-disc space-y-1 text-sm text-muted-foreground">
           <li>
-            <b className="text-foreground">Holding up the plan</b> — a die is not
-            ready, has no ready date, has a shot-limit alarm or is in
-            maintenance, or a work center is down or in maintenance, <b className="text-foreground">and</b>{' '}
-            a part's stock runs out before it is available (or its job is late
-            or cannot be planned). Example: die ready the day after tomorrow at
-            10:00, 1 000 parts to ship tomorrow.
+            <b className="text-foreground">Holding up the plan</b> — o matriță nu este
+            gata, nu are dată de disponibilitate, are o alarmă de limită de lovituri sau este în
+            mentenanță, ori un centru de lucru este oprit sau în mentenanță, <b className="text-foreground">și</b>{' '}
+            stocul unei piese se epuizează înainte ca acestea să fie disponibile (sau lucrarea ei este întârziată
+            ori nu poate fi planificată). Exemplu: matrița gata poimâine la
+            10:00, 1 000 de piese de livrat mâine.
           </li>
           <li>
-            <b className="text-foreground">For information</b> — not available,
-            but the stock lasts until it is back, or there is no demand in the
-            horizon. The planner should know; nothing is late.
+            <b className="text-foreground">For information</b> — indisponibil,
+            dar stocul ține până la revenire sau nu există cerere în
+            orizont. Planificatorul trebuie să știe; nimic nu este întârziat.
           </li>
         </ul>
       </section>
 
       <section className="mt-8 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold text-foreground">When is it recalculated?</h2>
+        <h2 className="text-sm font-semibold text-foreground">Când se recalculează?</h2>
         <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-muted-foreground">
-          <li>A few seconds after any change to its data (an upload, a setting, a rule).</li>
-          <li>Every hour, because the hours that pass come off today's capacity.</li>
+          <li>La câteva secunde după orice modificare a datelor lui (o încărcare, o setare, o regulă).</li>
+          <li>În fiecare oră, pentru că orele care trec se scad din capacitatea zilei de azi.</li>
           <li>
-            Whenever you press <b>Recalculate now</b> on the{' '}
+            De fiecare dată când apăsați <b>Recalculate now</b> în{' '}
             <Link to="/planlama" className="underline hover:no-underline">
               Production Plan
             </Link>
@@ -1260,9 +1260,9 @@ export function PlanLogicRo() {
           </li>
         </ul>
         <p className="mt-2 text-sm text-muted-foreground">
-          <b className="text-foreground">Approve plan</b> stores the plan as it is.
-          The approved plan is the basis for the frozen days and for the
-          "changes since the approved plan" list.
+          <b className="text-foreground">Approve plan</b> salvează planul așa cum este.
+          Planul aprobat este baza pentru zilele înghețate și pentru
+          lista „changes since the approved plan”.
         </p>
       </section>
     </div>
@@ -1272,34 +1272,34 @@ export function PlanLogicRo() {
 // ---- Tek kaynak: her bilgi nerede tanımlanır -------------------------------
 
 const SOURCES: [string, string, string, string][] = [
-  ['Work centers, halls, categories', 'Work Center Definitions', '/makineler', 'Work Calendar, Capacity Dashboard, overtime, Gantt, setup and crane rules'],
-  ['Work center calendar and overtime', 'Work Calendar', '/takvim', 'Plan, Capacity Dashboard (same record), Performance'],
-  ['Planned stops, holidays, settings', 'Work Calendar', '/takvim', 'Plan, capacity, raw material working days'],
-  ['Parts, work centers per part, Accepted OEE', 'Master Data', '/referanslar', 'Plan, Capacity Dashboard B, raw material'],
-  ['Which stock counts', 'Storage Locations', '/depolar', 'Plan, raw material, Capacity Dashboard, MB51 production'],
-  ['Demand, stock, movements, in transit', 'SAP Data', '/sapdata', 'Plan, raw material, Actuals, Performance'],
-  ['Prediction OEE', 'Capacity Dashboard', '/capacity', 'That dashboard view only'],
-  ['Capacity factor', 'Performance', '/performans', 'Plan capacity'],
-  ['Die readiness and maintenance', 'Die Follow-up', '/die-followup/maintenance', 'Plan, Alarms'],
-  ['Breakdowns and work center maintenance', 'Machine Follow-up', '/machine-followup/breakdowns', 'Plan, Alarms'],
+  ['Centre de lucru, hale, categorii', 'Work Center Definitions', '/makineler', 'Work Calendar, Capacity Dashboard, ore suplimentare, Gantt, regulile de setup și de pod rulant'],
+  ['Calendarul centrului de lucru și orele suplimentare', 'Work Calendar', '/takvim', 'Planul, Capacity Dashboard (aceeași înregistrare), Performance'],
+  ['Opriri planificate, sărbători, setări', 'Work Calendar', '/takvim', 'Planul, capacitatea, zilele lucrătoare pentru materia primă'],
+  ['Piese, centre de lucru pe piesă, Accepted OEE', 'Master Data', '/referanslar', 'Planul, Capacity Dashboard B, materia primă'],
+  ['Ce stoc se numără', 'Storage Locations', '/depolar', 'Planul, materia primă, Capacity Dashboard, producția MB51'],
+  ['Cerere, stoc, mișcări, în tranzit', 'SAP Data', '/sapdata', 'Planul, materia primă, Actuals, Performance'],
+  ['Prediction OEE', 'Capacity Dashboard', '/capacity', 'Doar acea vedere din dashboard'],
+  ['Factor de capacitate', 'Performance', '/performans', 'Capacitatea planului'],
+  ['Disponibilitatea și mentenanța matrițelor', 'Die Follow-up', '/die-followup/maintenance', 'Planul, Alarms'],
+  ['Defecțiuni și mentenanța centrelor de lucru', 'Machine Follow-up', '/machine-followup/breakdowns', 'Planul, Alarms'],
 ]
 
 function SingleSource() {
   return (
     <section className="mt-6 max-w-5xl rounded-lg border border-border p-4">
-      <h2 className="text-sm font-semibold text-foreground">One source for every input</h2>
+      <h2 className="text-sm font-semibold text-foreground">O singură sursă pentru fiecare dată de intrare</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Each value is entered in one place only; every page and the plan read that same record, so
-        the same number never differs between pages. Nothing is hard-coded — groups, for example,
-        come from the work center category.
+        Fiecare valoare se introduce într-un singur loc; fiecare pagină și planul citesc aceeași înregistrare, așa că
+        același număr nu diferă niciodată între pagini. Nimic nu este scris direct în cod — grupele, de exemplu,
+        vin din categoria centrului de lucru.
       </p>
       <div className="mt-2 overflow-x-auto rounded-md border border-border">
         <table className="w-full text-left text-xs">
           <thead className="bg-muted text-muted-foreground">
             <tr>
-              <th className="px-2 py-1.5 font-medium">What</th>
-              <th className="px-2 py-1.5 font-medium">Defined on</th>
-              <th className="px-2 py-1.5 font-medium">Used by</th>
+              <th className="px-2 py-1.5 font-medium">Ce</th>
+              <th className="px-2 py-1.5 font-medium">Definit în</th>
+              <th className="px-2 py-1.5 font-medium">Folosit de</th>
             </tr>
           </thead>
           <tbody>
@@ -1377,8 +1377,8 @@ function Lane({
       <span
         className={`w-44 shrink-0 ${chosen ? 'font-semibold text-emerald-700' : 'text-muted-foreground'}`}
       >
-        {note ?? `would finish ${finish}`}
-        {chosen && ' ✓ chosen'}
+        {note ?? `ar termina la ${finish}`}
+        {chosen && ' ✓ ales'}
       </span>
     </div>
   )
@@ -1387,95 +1387,95 @@ function Lane({
 function Synoptic({ safetyDays }: { safetyDays: number }) {
   return (
     <section className="mt-6">
-      <h2 className="text-lg font-semibold text-foreground">Planning algorithm — at a glance</h2>
+      <h2 className="text-lg font-semibold text-foreground">Algoritmul de planificare — dintr-o privire</h2>
       <div className="mt-3 grid gap-6 lg:grid-cols-2">
         <div>
-          <Box tone="border-border bg-muted/50 text-foreground" title="1 · One list of every lot to produce">
-            Demand minus stock, rounded to whole coils (or up to the Min. lot, when
-            one is set; never less); a co-product
-            pair is one lot. Each lot gets two dates
-            from the projected stock: the day the stock would run out, and{' '}
-            {safetyDays} working day(s) before it — the earliest it may start.
+          <Box tone="border-border bg-muted/50 text-foreground" title="1 · O singură listă cu toate loturile de produs">
+            Cererea minus stocul, rotunjită la bobine întregi (sau până la Min. lot, când
+            acesta este setat; niciodată mai puțin); o pereche
+            de coproduse este un singur lot. Fiecare lot primește două date
+            din stocul proiectat: ziua în care stocul s-ar epuiza și cu{' '}
+            {safetyDays} zi(le) lucrătoare înainte — cel mai devreme moment în care poate începe.
           </Box>
-          <Down label="sorted once" />
-          <Box tone="border-border bg-muted/50 text-foreground" title="2 · Sort the list">
-            Moved to front → Backlog → Urgent (already below safety stock) →
-            Fill. Same group: the stock that runs out first goes first. Still
-            equal → the part with the fewest eligible work centers goes first.
+          <Down label="sortată o singură dată" />
+          <Box tone="border-border bg-muted/50 text-foreground" title="2 · Sortarea listei">
+            Mutate în față → Restanță → Urgente (deja sub stocul de siguranță) →
+            Umplere. Același grup: stocul care se epuizează primul merge primul. Tot
+            egal → merge prima piesa cu cele mai puține centre de lucru eligibile.
           </Box>
-          <Down label="take the next item from the top" />
-          <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · Try EVERY work center it is allowed on">
-            Not ticked Flexible work center → only the main work center (quality). Ticked →
-            main work center and all alternatives (e.g. 104, 105, 108, 110). On each
-            one, find the earliest free slot that respects all the rules: shift
-            ends, crane, mould, maintenance.
+          <Down label="se ia următorul element de sus" />
+          <Box tone="border-sky-300 bg-sky-50 text-sky-950" title="3 · Se încearcă FIECARE centru de lucru permis">
+            Fără bifa Flexible work center → doar centrul de lucru principal (calitate). Cu bifă →
+            centrul de lucru principal și toate alternativele (de ex. 104, 105, 108, 110). Pe fiecare
+            dintre ele se caută cel mai devreme interval liber care respectă toate regulile: sfârșitul
+            turelor, podul rulant, matrița, mentenanța.
           </Box>
-          <Down label="each work center gives a finish time" />
-          <Box tone="border-emerald-300 bg-emerald-50 text-emerald-950" title="4 · Choose the work center that finishes first">
-            Not "the first work center in the list" and not "the main work center" — the
-            one where the job is done soonest. When nothing is urgent, keeping
-            the mounted die running (no setup) wins.
+          <Down label="fiecare centru de lucru dă o oră de terminare" />
+          <Box tone="border-emerald-300 bg-emerald-50 text-emerald-950" title="4 · Se alege centrul de lucru care termină primul">
+            Nu „primul centru de lucru din listă” și nu „centrul de lucru principal” — ci
+            cel pe care lucrarea este gata cel mai repede. Când nimic nu este urgent, câștigă
+            continuarea matriței montate (fără setup).
           </Box>
-          <Down label="book it" />
-          <Box tone="border-border bg-muted/50 text-foreground" title="5 · Book the slot">
-            That work center time, the crane slots and the mould are now taken for
-            all the items that follow.
+          <Down label="se rezervă" />
+          <Box tone="border-border bg-muted/50 text-foreground" title="5 · Rezervarea intervalului">
+            Timpul acelui centru de lucru, intervalele podului rulant și matrița sunt acum ocupate pentru
+            toate elementele care urmează.
           </Box>
-          <Down label="back to 3 with the next item, until the list is empty" />
-          <Box tone="border-amber-300 bg-amber-50 text-amber-950" title="6 · Anything late? → plan again">
-            A job that starts after its stock runs out stops the customer. Late
-            lots are moved to the front (they try every work center again) and may
-            overlap their setup with another one. Coils are never cut. Up to 6
-            rounds; the best plan is kept.
+          <Down label="înapoi la 3 cu următorul element, până se golește lista" />
+          <Box tone="border-amber-300 bg-amber-50 text-amber-950" title="6 · Ceva întârziat? → se planifică din nou">
+            O lucrare care începe după epuizarea stocului oprește clientul. Loturile
+            întârziate sunt mutate în față (încearcă din nou fiecare centru de lucru) și își pot
+            suprapune setup-ul cu altul. Bobinele nu sunt niciodată tăiate. Până la 6
+            runde; se păstrează cel mai bun plan.
           </Box>
-          <Down label="whatever is still late or does not fit" />
+          <Down label="ce este încă întârziat sau nu încape" />
           <Box tone="border-destructive/40 bg-destructive/10 text-foreground" title="Late jobs / Unplanned">
-            Shown in red on the Production Plan with the work centers tried and
-            what would fix it.
+            Afișate cu roșu în Production Plan, cu centrele de lucru încercate și
+            ce ar rezolva problema.
           </Box>
         </div>
 
         <div className="rounded-lg border border-border p-4">
-          <p className="text-sm font-semibold text-foreground">Example — decision #12</p>
+          <p className="text-sm font-semibold text-foreground">Exemplu — decizia #12</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Part A has a backlog, is ticked Flexible work center and can run on 104
-            (main), 105 and 108. Eleven
-            jobs are already booked. Grey = already booked, coloured = where A
-            would go.
+            Piesa A are restanță, are bifa Flexible work center și poate rula pe 104
+            (principal), 105 și 108. Unsprezece
+            lucrări sunt deja rezervate. Gri = deja rezervat, colorat = unde ar
+            merge A.
           </p>
           <div className="mt-3 space-y-2">
-            <Lane press="104" busy={58} job={22} finish="Tue 11:30" />
-            <Lane press="105" busy={30} job={22} finish="Mon 23:30" chosen />
-            <Lane press="108" busy={100} note="full until the end of the horizon" />
+            <Lane press="104" busy={58} job={22} finish="Ma 11:30" />
+            <Lane press="105" busy={30} job={22} finish="Lu 23:30" chosen />
+            <Lane press="108" busy={100} note="plin până la sfârșitul orizontului" />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            A goes to <b className="text-foreground">105</b>, even though 104 is
-            its main work center, because 105 finishes it a shift and a half
-            earlier. On the Production Plan, the job list shows exactly this
-            line for every job in the <b className="text-foreground">Why this work center</b>{' '}
-            column:
+            A merge pe <b className="text-foreground">105</b>, deși 104 este
+            centrul ei de lucru principal, pentru că 105 o termină cu o tură și jumătate
+            mai devreme. În Production Plan, lista de lucrări arată exact acest
+            rând pentru fiecare lucrare, în coloana <b className="text-foreground">Why this work center</b>
+            :
           </p>
           <p className="mt-2 rounded bg-muted px-2 py-1 font-mono text-[11px] text-foreground">
-            #12 104 Tue 11:30 · <span className="font-semibold text-emerald-700">105 ✓ Mon 23:30</span> · 108 (full until the end of the horizon)
+            #12 104 Ma 11:30 · <span className="font-semibold text-emerald-700">105 ✓ Lu 23:30</span> · 108 (plin până la sfârșitul orizontului)
           </p>
 
-          <p className="mt-4 text-sm font-semibold text-foreground">What this means for your question</p>
+          <p className="mt-4 text-sm font-semibold text-foreground">Ce înseamnă asta pentru întrebarea dumneavoastră</p>
           <ul className="mt-1 ml-5 list-disc space-y-1 text-xs text-muted-foreground">
             <li>
-              A part is never written onto a work center just because it is first in a
-              list. Each job is compared on all of its work centers at the moment
-              it is placed.
+              O piesă nu este niciodată trecută pe un centru de lucru doar pentru că este prima într-o
+              listă. Fiecare lucrare este comparată pe toate centrele ei de lucru în momentul
+              în care este plasată.
             </li>
             <li>
-              A backlog part can only end up 4th on 104 if at that moment 105,
-              108 and 110 could not finish it earlier. The job's line proves
-              it.
+              O piesă restantă poate ajunge a 4-a pe 104 doar dacă în acel moment 105,
+              108 și 110 nu ar fi putut-o termina mai devreme. Rândul lucrării o
+              dovedește.
             </li>
             <li>
-              The engine decides one job at a time and never moves a job it has
-              already booked. Two consequences are listed below under{' '}
+              Motorul decide o lucrare pe rând și nu mută niciodată o lucrare pe care a
+              rezervat-o deja. Două consecințe sunt listate mai jos, la{' '}
               <a href="#limits" className="underline">
-                Known limits
+                Limite cunoscute
               </a>
               .
             </li>
@@ -1485,71 +1485,71 @@ function Synoptic({ safetyDays }: { safetyDays: number }) {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-border p-4">
-          <h3 className="text-sm font-semibold text-foreground">How to check the plan without recounting it</h3>
+          <h3 className="text-sm font-semibold text-foreground">Cum verificați planul fără să-l renumărați</h3>
           <ol className="mt-2 ml-5 list-decimal space-y-1 text-xs text-muted-foreground">
             <li>
-              <b className="text-foreground">Plan check</b> (Production Plan page): after
-              every calculation, checking code that is separate from the engine goes
-              through every job again and checks each rule — parts that are not
-              flexible only on their main work center, one job per work center
-              at a time, earliest work center chosen, crane gaps, setups at once in the
-              plant, whole coils only, one mould on one work center, maintenance, no lot
-              before its pull-forward window, nothing in the past. A broken rule
-              shows in red with the job named.
+              <b className="text-foreground">Plan check</b> (pagina Production Plan): după
+              fiecare calcul, un cod de verificare separat de motor parcurge
+              din nou fiecare lucrare și verifică fiecare regulă — piesele care nu sunt
+              flexibile doar pe centrul lor de lucru principal, o singură lucrare pe centru de lucru
+              la un moment dat, alegerea celui mai devreme centru de lucru, intervalele podului rulant, setup-urile simultane în
+              fabrică, doar bobine întregi, o matriță pe un singur centru de lucru, mentenanța, niciun lot
+              înaintea ferestrei lui de aducere înainte, nimic în trecut. O regulă încălcată
+              apare cu roșu, cu numele lucrării.
             </li>
             <li>
-              <b className="text-foreground">Why this work center</b> (job list): pick any job
-              you doubt and read its decision: its order number and the
-              finish time on every eligible work center.
+              <b className="text-foreground">Why this work center</b> (lista de lucrări): alegeți orice lucrare
+              de care vă îndoiți și citiți-i decizia: numărul ei de ordine și
+              ora de terminare pe fiecare centru de lucru eligibil.
             </li>
             <li>
-              <b className="text-foreground">Automatic tests</b>: before any change goes live,
-              the engine plans 40 randomly generated plants (progressive and
-              transfer halls, single and shared parts, maintenance, stops) and
-              the same checks must find zero broken rules. Your 104/105 case and
-              your 1 000 / 2 000 / 6 000 coil case, the Wednesday sales day and
-              the late-job repairs are tests too.
+              <b className="text-foreground">Teste automate</b>: înainte ca orice modificare să intre în producție,
+              motorul planifică 40 de fabrici generate aleatoriu (hale progresive și
+              transfer, piese unice și comune, mentenanță, opriri), iar
+              aceleași verificări trebuie să găsească zero reguli încălcate. Cazul dumneavoastră 104/105 și
+              cazul de bobine 1 000 / 2 000 / 6 000, ziua de vânzare de miercuri și
+              reparațiile lucrărilor întârziate sunt și ele teste.
             </li>
           </ol>
         </div>
 
         <div id="limits" className="scroll-mt-20 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <h3 className="text-sm font-semibold text-amber-950">Known limits</h3>
+          <h3 className="text-sm font-semibold text-amber-950">Limite cunoscute</h3>
           <p className="mt-1 text-xs text-amber-900">
-            The engine places jobs one after the other. That makes every decision
-            explainable, but it is not a search over every possible plan:
+            Motorul plasează lucrările una după alta. Astfel, fiecare decizie poate fi
+            explicată, dar nu este o căutare prin toate planurile posibile:
           </p>
           <ul className="mt-2 ml-5 list-disc space-y-1 text-xs text-amber-900">
             <li>
-              A booked job is never moved. Placing parts with fewer eligible
-              work centers first when the priority is equal prevents most cases
-              where a flexible part takes a single-work center part's slot, but not
-              every one.
+              O lucrare rezervată nu este niciodată mutată. Plasarea întâi a pieselor cu mai puține centre de lucru
+              eligibile, la prioritate egală, previne majoritatea cazurilor
+              în care o piesă flexibilă ia locul unei piese cu un singur centru de lucru, dar nu
+              pe toate.
             </li>
             <li>
-              Items equal in everything — group, stock-out day and number of
-              work centers — keep the row order of the ZPP file.
+              Elementele egale în toate privințele — grup, zi de epuizare a stocului și număr de
+              centre de lucru — păstrează ordinea rândurilor din fișierul ZPP.
             </li>
             <li>
-              Because a coil is never cut, an overloaded week can end with a late
-              job that a half coil would have saved. That is deliberate: the fix
-              is capacity (overtime on the Capacity Dashboard) or another work center.
+              Pentru că o bobină nu este niciodată tăiată, o săptămână supraîncărcată se poate încheia cu o lucrare
+              întârziată pe care o jumătate de bobină ar fi salvat-o. Acest lucru este intenționat: soluția
+              este capacitatea (ore suplimentare în Capacity Dashboard) sau alt centru de lucru.
             </li>
             <li>
-              After the last day in ZPP_DAILY, only weekly totals exist, so
-              those weeks are spread evenly over the plant's working days (not a holiday and at
-              least one work center has normal shifts). With ZPP_DAILY loaded they are
-              long-term lots: if the capacity is used up by daily lots they stay
-              unplanned rather than delay a daily lot.
+              După ultima zi din ZPP_DAILY există doar totaluri săptămânale, așa că
+              acele săptămâni sunt distribuite uniform pe zilele lucrătoare ale fabricii (nu sărbători și cu cel
+              puțin un centru de lucru cu ture normale). Cu ZPP_DAILY încărcat, ele sunt
+              loturi pe termen lung: dacă capacitatea este consumată de loturile zilnice, ele rămân
+              neplanificate, în loc să întârzie un lot zilnic.
             </li>
             <li>
-              Re-planning to remove late jobs is a set of trials, not a full
-              search: if 6 rounds cannot remove a late job, the fix is capacity
-              (overtime, another work center) — the plan says so.
+              Replanificarea pentru eliminarea întârzierilor este un set de încercări, nu o căutare
+              completă: dacă 6 runde nu pot elimina o lucrare întârziată, soluția este capacitatea
+              (ore suplimentare, alt centru de lucru) — planul o spune.
             </li>
             <li>
-              Between an approved plan and the next MB52 upload, the engine
-              assumes the approved jobs were produced as planned.
+              Între un plan aprobat și următoarea încărcare MB52, motorul
+              presupune că lucrările aprobate au fost produse conform planului.
             </li>
           </ul>
         </div>
@@ -1563,7 +1563,7 @@ function StockExample({ safetyDays }: { safetyDays: number }) {
   // 1000 bakiye, haftada 2000 (günde 400), Pazartesi 6000'lik rulo.
   const days: { label: string; stock: number }[] = []
   let stock = 6000 - 1000
-  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+  const names = ['Lu', 'Ma', 'Mi', 'Jo', 'Vi']
   for (let w = 0; w < 3; w++) {
     for (let d = 0; d < 5; d++) {
       stock -= 400
@@ -1576,12 +1576,12 @@ function StockExample({ safetyDays }: { safetyDays: number }) {
   return (
     <div className="rounded-lg border border-border p-4">
       <p className="text-sm font-semibold text-foreground">
-        Example — when is the next coil made?
+        Exemplu — când se produce următoarea bobină?
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
-        Backlog 1 000, 2 000 per week, no stock, one coil = 6 000 pcs. The
-        first coil is pressed on Monday 14 September. Bars = projected stock at
-        the end of each day.
+        Restanță 1 000, 2 000 pe săptămână, fără stoc, o bobină = 6 000 buc. Prima
+        bobină se ștanțează luni, 14 septembrie. Barele = stocul proiectat la
+        sfârșitul fiecărei zile.
       </p>
       <div className="mt-3 flex h-28 items-end gap-1">
         {days.map((d, i) => (
@@ -1595,7 +1595,7 @@ function StockExample({ safetyDays }: { safetyDays: number }) {
                     : 'bg-slate-400/70'
               }`}
               style={{ height: `${Math.max(3, (Math.max(0, d.stock) / max) * 100)}%` }}
-              title={`${d.stock} pcs`}
+              title={`${d.stock} buc`}
             />
           </div>
         ))}
@@ -1609,18 +1609,18 @@ function StockExample({ safetyDays }: { safetyDays: number }) {
       </div>
       <ul className="mt-3 ml-5 list-disc space-y-1 text-xs text-muted-foreground">
         <li>
-          The first coil covers the backlog, this week, next week and 1 000 of
-          the week after.
+          Prima bobină acoperă restanța, săptămâna aceasta, săptămâna viitoare și 1 000 din
+          săptămâna de după.
         </li>
         <li>
-          The stock runs out on <b className="text-destructive">{days[stockout].label}</b>{' '}
-          (red). With {safetyDays} day(s) of safety stock the next coil may start
-          from <b className="text-amber-700">{days[start].label}</b> (amber) — not
-          straight after the first coil, and not after the stock is gone.
+          Stocul se epuizează în <b className="text-destructive">{days[stockout].label}</b>{' '}
+          (roșu). Cu {safetyDays} zi(le) de stoc de siguranță, următoarea bobină poate începe
+          de la <b className="text-amber-700">{days[start].label}</b> (galben-portocaliu) — nu
+          imediat după prima bobină și nu după ce stocul s-a terminat.
         </li>
         <li>
-          If the work center is busy then, the job moves later; if it starts after{' '}
-          {days[stockout].label} it is marked late.
+          Dacă centrul de lucru este ocupat atunci, lucrarea se mută mai târziu; dacă începe după{' '}
+          {days[stockout].label}, este marcată ca întârziată.
         </li>
       </ul>
     </div>
@@ -1671,7 +1671,7 @@ function Formula({ children }: { children: ReactNode }) {
 function Example({ children }: { children: ReactNode }) {
   return (
     <p className="rounded-md border-l-4 border-emerald-500 bg-emerald-50 px-3 py-2 text-emerald-900">
-      <b className="!text-emerald-900">Example. </b>
+      <b className="!text-emerald-900">Exemplu. </b>
       {children}
     </p>
   )
@@ -1720,44 +1720,44 @@ function OperatorPlanItem() {
   }
   return (
     <li>
-      <b>Operator plan</b> (a second planning model per cost center, e.g. APR, spot and nut welding
-      lines; chosen on Company settings → cost center → <b>Planning model</b>). The lines of such a
-      cost center are not run by their calendar alone: on the Production Plan, <b>Operators per
-      shift</b> takes how many operators work each day and shift, and each line has a <b>crew</b>{' '}
-      (operators it needs to run one shift, 1 if not set; entered on the Work Calendar → Capacity
-      overview, not on the Production Plan). Before the capacity is built, for every
-      day and shift in turn the lines that still have work due this week (up to Sunday) are sorted
-      by the <b>earliest due date</b> (equal: the larger remaining minutes first) and opened while
-      their crew fits the operators left. Work = net lot quantity × minutes per piece on the
-      part's main work center, the same lots the engine plans. Every shift that runs (opened or
-      from the calendar) takes its net minutes off the line's work, so a line whose work is done —
-      or whose remaining work is only for next week — gets no operator. A day and shift without
-      an operator count keeps the calendar; a holiday keeps the calendar; a <b>day record set by
-      hand always wins</b> and its crew is taken from the operator count first. The result goes to
-      the engine as day records, so sequencing, setups and late-job rules are unchanged. Example:{' '}
-      {decision.operators} operators, {lines.length} lines with a crew of 1, {noWork.join(', ')}{' '}
-      without work: {decision.open.join(', ')} run ({ex.workload.find((w) => w.press === decision.open[1])?.minutes} and{' '}
-      {ex.workload.find((w) => w.press === decision.open[2])?.minutes} min are due the same day, so the larger goes first),{' '}
-      {closed.join(', ')} waits (no operator left) and {noWork.join(', ')} stays closed.
+      <b>Planul de operatori</b> (un al doilea model de planificare pe centru de cost, de ex. liniile APR, de sudură în puncte și de sudură
+      de piulițe; ales în Company settings → cost center → <b>Planning model</b>). Liniile unui astfel de
+      centru de cost nu rulează doar după calendarul lor: în Production Plan, <b>Operators per
+      shift</b> preia câți operatori lucrează în fiecare zi și tură, iar fiecare linie are o <b>echipă</b>{' '}
+      (operatorii necesari pentru a o rula o tură, 1 dacă nu este setat; se introduce în Work Calendar → Capacity
+      overview, nu în Production Plan). Înainte de construirea capacității, pentru fiecare
+      zi și tură pe rând, liniile care mai au de lucru cu termen în această săptămână (până duminică) sunt sortate
+      după <b>cel mai apropiat termen</b> (la egalitate: întâi cele cu mai multe minute rămase) și deschise cât timp
+      echipa lor încape în operatorii rămași. Lucrul = cantitatea netă a lotului × minute pe bucată pe
+      centrul de lucru principal al piesei, aceleași loturi pe care le planifică motorul. Fiecare tură care rulează (deschisă sau
+      din calendar) își scade minutele nete din lucrul liniei, deci o linie al cărei lucru este terminat —
+      sau al cărei lucru rămas este doar pentru săptămâna viitoare — nu primește operator. O zi și o tură fără
+      număr de operatori păstrează calendarul; o sărbătoare păstrează calendarul; o <b>înregistrare de zi setată
+      manual are întotdeauna prioritate</b>, iar echipa ei se ia întâi din numărul de operatori. Rezultatul ajunge la
+      motor ca înregistrări de zi, deci secvențierea, setup-urile și regulile pentru lucrările întârziate rămân neschimbate. Exemplu:{' '}
+      {decision.operators} operatori, {lines.length} linii cu echipă de 1, {noWork.join(', ')}{' '}
+      fără lucru: {decision.open.join(', ')} rulează ({ex.workload.find((w) => w.press === decision.open[1])?.minutes} și{' '}
+      {ex.workload.find((w) => w.press === decision.open[2])?.minutes} min au termen în aceeași zi, deci cea mai mare merge prima),{' '}
+      {closed.join(', ')} așteaptă (nu a mai rămas niciun operator), iar {noWork.join(', ')} rămâne închisă.
       <br />
-      <b>Machines count {OPERATOR_SHIFTS_PER_DAY} shifts every working day.</b> For a line of an
-      operator-plan cost center the work center template and exception weeks are not read: every
-      working day of the Work Calendar is {OPERATOR_SHIFTS_PER_DAY} shifts (plan, Work Calendar,
-      Capacity dashboard, Performance and plan check alike); the operators decide which lines run.
-      Day records and dated overtime still apply.
+      <b>Utilajele numără {OPERATOR_SHIFTS_PER_DAY} ture în fiecare zi lucrătoare.</b> Pentru o linie a unui
+      centru de cost cu plan de operatori nu se citesc șablonul centrului de lucru și săptămânile de excepție: fiecare
+      zi lucrătoare din Work Calendar înseamnă {OPERATOR_SHIFTS_PER_DAY} ture (la fel în plan, Work Calendar,
+      Capacity dashboard, Performance și Plan check); operatorii decid ce linii rulează.
+      Înregistrările de zi și orele suplimentare cu dată se aplică în continuare.
       <br />
-      <b>Operators per week</b> (Work Calendar → Capacity overview, pick the cost center): how many
-      people work in the week, not per shift. On a working day with no per-shift operator count the
-      plan uses ⌊weekly ÷ {OPERATOR_SHIFTS_PER_DAY}⌋ operators on each of the{' '}
-      {OPERATOR_SHIFTS_PER_DAY} shifts (the per-shift grid, for the first two weeks, always wins).
-      The Capacity dashboard caps the week at min(machines × {OPERATOR_SHIFTS_PER_DAY} × working
-      days, weekly operators ÷ average crew × working days) shifts; without a weekly count it is
-      machines × {OPERATOR_SHIFTS_PER_DAY} × working days. Example: {weekly.machines} lines with crews{' '}
-      {OPERATOR_WEEKLY_EXAMPLE.crewSizes.join(', ')} (average {weekly.avgCrew}),{' '}
-      {OPERATOR_WEEKLY_EXAMPLE.workingDays} working days, {OPERATOR_WEEKLY_EXAMPLE.weeklyOperators} operators:
-      machine limit {weekly.cap.machineShifts}, operator limit {weekly.cap.operatorShifts} → capacity{' '}
-      {weekly.cap.shifts} shifts; on a day without a per-shift count{' '}
-      {shiftHeadcountFromWeekly(OPERATOR_WEEKLY_EXAMPLE.weeklyOperators)} operators per shift.
+      <b>Operators per week</b> (Work Calendar → Capacity overview, alegeți centrul de cost): câte
+      persoane lucrează în săptămână, nu pe tură. Într-o zi lucrătoare fără număr de operatori pe tură,
+      planul folosește ⌊săptămânal ÷ {OPERATOR_SHIFTS_PER_DAY}⌋ operatori în fiecare dintre cele{' '}
+      {OPERATOR_SHIFTS_PER_DAY} ture (grila pe tură, pentru primele două săptămâni, are întotdeauna prioritate).
+      Capacity dashboard plafonează săptămâna la min(utilaje × {OPERATOR_SHIFTS_PER_DAY} × zile
+      lucrătoare, operatori săptămânali ÷ echipa medie × zile lucrătoare) ture; fără un număr săptămânal, capacitatea este
+      utilaje × {OPERATOR_SHIFTS_PER_DAY} × zile lucrătoare. Exemplu: {weekly.machines} linii cu echipe de{' '}
+      {OPERATOR_WEEKLY_EXAMPLE.crewSizes.join(', ')} (medie {weekly.avgCrew}),{' '}
+      {OPERATOR_WEEKLY_EXAMPLE.workingDays} zile lucrătoare, {OPERATOR_WEEKLY_EXAMPLE.weeklyOperators} operatori:
+      limita utilajelor {weekly.cap.machineShifts}, limita operatorilor {weekly.cap.operatorShifts} → capacitate{' '}
+      {weekly.cap.shifts} ture; într-o zi fără număr pe tură,{' '}
+      {shiftHeadcountFromWeekly(OPERATOR_WEEKLY_EXAMPLE.weeklyOperators)} operatori pe tură.
     </li>
   )
 }
