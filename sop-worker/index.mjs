@@ -209,6 +209,20 @@ const VERIFY_SCHEMA = {
   },
 }
 
+const TEXT_SCHEMA = {
+  type: 'ARRAY',
+  items: {
+    type: 'OBJECT',
+    properties: {
+      adim: { type: 'INTEGER' },
+      temel_adim: { type: 'STRING', nullable: true },
+      puf_noktasi: { type: 'STRING', nullable: true },
+      nedeni: { type: 'STRING', nullable: true },
+    },
+    required: ['adim'],
+  },
+}
+
 // ---------- İşler ----------
 
 async function analyze(task) {
@@ -306,6 +320,38 @@ async function analyze(task) {
         }
       } catch (e) {
         log(task.jobId, 'photo check skipped:', e.message)
+      }
+    }
+
+    if (VERIFY) {
+      // Metin / çeviri kontrolü: aynı model kontrolör rolüyle kendi yazdığını denetler, hatalıyı düzeltir.
+      try {
+        await beat('Checking the wording and the translation')
+        const list = result.adimlar
+          .map((a, i) => `Adım ${i + 1}\n- temel_adim: ${a.temel_adim}\n- puf_noktasi: ${a.puf_noktasi || '(boş)'}\n- nedeni: ${a.nedeni || '(boş)'}`)
+          .join('\n\n')
+        const fixes = JSON.parse(
+          await generate(
+            [{ role: 'user', parts: [{ text: template('prompt-dil-kontrol.md', { dil: LANG[task.language] ?? 'Türkçe', adimlar: list }) }] }],
+            TEXT_SCHEMA,
+          ),
+        )
+        const cut = (t, n) => (t.length > n ? t.slice(0, n).trimEnd() : t)
+        let fixed = 0
+        for (const f of Array.isArray(fixes) ? fixes : []) {
+          const a = result.adimlar[f.adim - 1]
+          if (!a) continue
+          for (const [alan, limit] of [['temel_adim', 120], ['puf_noktasi', 160], ['nedeni', 160]]) {
+            const yeni = typeof f[alan] === 'string' ? f[alan].trim() : ''
+            // Boş alanı doldurma, yalnız dolu alanı düzelt (kontrolör anlam eklemez).
+            if (!yeni || !a[alan] || yeni === a[alan]) continue
+            a[alan] = cut(yeni, limit)
+            fixed++
+          }
+        }
+        log(task.jobId, `wording check: ${fixed} field(s) corrected`)
+      } catch (e) {
+        log(task.jobId, 'wording check skipped:', e.message)
       }
     }
 

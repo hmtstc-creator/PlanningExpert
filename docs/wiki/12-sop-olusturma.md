@@ -1,6 +1,6 @@
 # 12 · SOP oluşturma (videodan standart operasyon prosedürü)
 
-> Son güncelleme: 2026-10-30 · Durum: **ilk sürüm yayında** (Machine Follow-up → SOP Builder). `sop-worker`'ı
+> Son güncelleme: 2026-10-30 (yazım dili kuralları + kontrolör turu) · Durum: **ilk sürüm yayında** (Machine Follow-up → SOP Builder). `sop-worker`'ı
 > `deploy.sh` kendisi kurar; Gemini anahtarı sayfadaki *Setup* kutusundan girilir — sunucuda elle adım yok.
 > Kaynak: kullanıcıyla 2026-10-28 / 29 konuşması, şablon `docs/sop/sop-sablon.xlsx`.
 
@@ -111,7 +111,9 @@ sop-worker: claim ─▶ video diske (sop-data) ─▶ Convex kopyası silinir �
             ─▶ Gemini Files API (resumable) ─▶ generateContent (prompt.md + responseSchema)
             ─▶ /check (Convex şemayla denetler; uymazsa hata metniyle 1 kez daha sorar, yine olmazsa error)
             ─▶ ffmpeg: her adımın kare saniyesinden JPEG ─▶ doğrulama turu (prompt-verify.md: kare adımı
-               gösteriyor mu? değilse adım aralığında yeni saniye, işaret kutusu) ─▶ kareler depoya ─▶ /done
+               gösteriyor mu? değilse adım aralığında yeni saniye, işaret kutusu)
+            ─▶ metin kontrol turu (prompt-dil-kontrol.md: aynı model kontrolör rolüyle dili, terimi,
+               emir kipini, riskin netliğini denetler; hatalı alanı düzeltir) ─▶ kareler depoya ─▶ /done
 sopJobs: review ─▶ /machine-followup/sop/<id>: form ekranda düzeltilir ─▶ Save / Approve / Save PDF
 ```
 
@@ -129,7 +131,28 @@ sopJobs: review ─▶ /machine-followup/sop/<id>: form ekranda düzeltilir ─�
   fotoğraf eklenir. *Save PDF* her sayfayı ayrı A3 yatay sayfa olarak, kenarsız ve ortalı basar (`sheetsToPdf`).
   Dosya adı `GGAAYY SOP <SOP no | referans | operasyon>`.
 - **Kilit anlar** (isteğe bağlı): yükleme formunda saniyeler yazılır; prompt adımları bu anlardan böler.
-- **Prompt** kod dışında: `sop-worker/prompt.md`, `sop-worker/prompt-verify.md` (worker her işte okur).
+- **Prompt** kod dışında: `sop-worker/prompt.md`, `sop-worker/prompt-verify.md`,
+  `sop-worker/prompt-dil-kontrol.md` (worker her işte okur).
+
+### Yazım dili: otomotiv sahası dili (kullanıcı kuralı 2026-10-30)
+
+Metnin nasıl yazılacağı `prompt.md`'de kuraldır, kodda değil:
+
+| Alan | Kural | Örnek |
+|---|---|---|
+| `temel_adim` | **emir kipi**, tek cümle, ≤ 120 karakter | "Sacı fikstüre yerleştir" |
+| `puf_noktasi` | **emir kipi**; "dikkat edilmeli / önemlidir" kalıpları yasak; ≤ 160 | "Tork anahtarını klik sesi gelene kadar çevir" |
+| `nedeni` | sonuç cümlesi; **riski somut** anlat (hangi hata, hurda, şikâyet, yaralanma, duruş); belirsiz cümle yasak; ≤ 160 | "Pim oturmazsa kaynak noktası kayar, parça hurda olur" |
+
+Terimler otomotiv sahasının dilidir (fikstür, kalıp, pim, dayama, tork, çift el butonu, sensör, poka-yoke,
+hurda, rework, konveyör, KKD). Çeviride terim birebir çevrilmez, hedef dilde sahada kullanılan karşılığı
+yazılır (RO: dispozitiv, matriță, cuplu, buton cu două mâini, rebut, bandă, palet).
+
+**Her SOP bitince kontrolör turu:** adımlar yazıldıktan sonra *aynı model* kontrolör rolüyle kendi metnini
+okur (`prompt-dil-kontrol.md`): dil tamamen seçilen dilde mi, terim saha dili mi, iki alan emir kipinde mi,
+`nedeni` riski net anlatıyor mu. Yalnız **düzelttiği** alanları döndürür; worker dolu alanın üzerine yazar,
+boş alanı doldurmaz, adım eklemez / silmez (anlam değişmez). Tur kare doğrulamasıyla aynı anahtara bağlıdır:
+`SOP_VERIFY=0` ikisini birden kapatır.
 - **Worker uçları:** `POST /sop/worker/{claim,heartbeat,check,frame,done,fail,frames-done}` (convex/http.ts),
   kuyruk convex/sopQueue.ts. Jetonu worker ilk açılışta üretir (`/data/worker-token`); Convex ilk gelenin
   SHA-256'sını eşler (`platformState` → `sopWorker`), başkasına 401. *Setup → Reset connection* eşleşmeyi siler.
