@@ -17,7 +17,6 @@ otonom_acik_mi() {
   if [ -e "$OTONOM_ETC/DURDUR" ]; then log "kapalı: $OTONOM_ETC/DURDUR var"; return 1; fi
   if [ ! -f "$OTONOM_ETC/env" ]; then log "kapalı: $OTONOM_ETC/env yok"; return 1; fi
   set -a; . "$OTONOM_ETC/env"; set +a
-  if [ -z "${GEMINI_API_KEY:-}" ]; then log "kapalı: GEMINI_API_KEY boş"; return 1; fi
   command -v claude >/dev/null || { log "kapalı: claude CLI yok"; return 1; }
   command -v gh >/dev/null || { log "kapalı: gh CLI yok"; return 1; }
   gh auth status >/dev/null 2>&1 || { log "kapalı: gh oturumu yok (gh auth login)"; return 1; }
@@ -48,6 +47,36 @@ repo_esitle() {
 claude_sor() { # $1 model
   timeout 600 claude -p --model "$1" --output-format text --max-turns 1 \
     --disallowedTools "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,Agent"
+}
+
+# Gemini görevi yazar ve verify'ı yeşile çevirir (scripts/qwen-yesil.sh, aynı sınırlar).
+# $1 dal (o anki çalışma dalı), $2 görev metni. Sonuç: değişiklikler çalışma kopyasında.
+# GEMINI_API_KEY varsa yerelde; yoksa GitHub iş akışında (anahtar orada, sunucuda gizli
+# değer gerekmez): dal itilir, qwen-yesil.yml tetiklenir, qwen/<dal> farkı uygulanır.
+gemini_yaz() {
+  local dal=$1 gorev=$2 run rc
+  if [ -n "${GEMINI_API_KEY:-}" ]; then
+    QWEN_ONCE=gemini QWEN_TUR=4 QWEN_GOREV="$gorev" timeout 1500 ./scripts/qwen-yesil.sh > "$OTONOM_STATE/son-gemini.txt" 2>&1
+    rc=$?
+    git checkout -q -- qwen-rapor.md 2>/dev/null; git clean -qf -- qwen-rapor.md .qwen-verify.txt
+    return $rc
+  fi
+  git push -q -f origin "HEAD:refs/heads/$dal" || return 1
+  gh api -X POST "repos/$REPO_SLUG/actions/workflows/qwen-yesil.yml/dispatches" \
+    -f ref=main -f "inputs[dal]=$dal" -f "inputs[gorev]=$gorev" || return 1
+  sleep 20
+  run=$(gh run list -R "$REPO_SLUG" -w qwen-yesil.yml -L 5 --json databaseId,displayTitle,createdAt \
+    -q "[.[] | select(.displayTitle | contains(\"$dal\"))][0].databaseId // empty")
+  [ -n "$run" ] || run=$(gh run list -R "$REPO_SLUG" -w qwen-yesil.yml -L 1 --json databaseId -q '.[0].databaseId')
+  timeout 1800 gh run watch "$run" -R "$REPO_SLUG" --exit-status > "$OTONOM_STATE/son-gemini.txt" 2>&1
+  rc=$?
+  if git fetch -q origin "qwen/$dal" 2>/dev/null; then
+    git diff HEAD FETCH_HEAD -- . ':!qwen-rapor.md' | git apply --index || rc=1
+    git push -q origin --delete "qwen/$dal" 2>/dev/null
+  else
+    rc=1
+  fi
+  return $rc
 }
 
 mkdir -p "$KUYRUK" "$HAZIR" "$BITEN" 2>/dev/null || true

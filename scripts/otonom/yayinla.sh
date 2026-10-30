@@ -52,9 +52,7 @@ for tur in 1 2 3 4; do
   run=$(gh run list -R "$REPO_SLUG" -b "$DAL" -L 1 --json databaseId -q '.[0].databaseId')
   hata=$(gh run view "$run" -R "$REPO_SLUG" --log-failed 2>/dev/null | tail -n 40)
   log "CI kırmızı (tur $tur) — Gemini düzeltiyor"
-  QWEN_ONCE=gemini QWEN_TUR=3 QWEN_GOREV="CI failed on this branch. Fix the root cause; never skip or disable a test. Last log lines: $hata" \
-    timeout 1500 ./scripts/qwen-yesil.sh > "$OTONOM_STATE/son-ci-duzeltme.txt" 2>&1
-  git checkout -q -- qwen-rapor.md 2>/dev/null; git clean -qf -- qwen-rapor.md .qwen-verify.txt
+  gemini_yaz "$DAL" "CI failed on this branch. Fix the root cause; never skip or disable a test. Last log lines: $hata"
   git add -A && git -c user.name="otonom" -c user.email="otonom@planningexpert" commit -qm "Otonom: CI düzeltmesi (tur $tur)" && git push -q
 done
 # 4 turda yeşil olmadı: PR kapanır, görevler başarısız kaydına düşer, main hiç bozulmaz.

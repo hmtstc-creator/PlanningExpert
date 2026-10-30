@@ -13,10 +13,12 @@ for f in "$KUYRUK"/*.json; do
   id=$(basename "$f" .json)
   log "görev $id"
   temizle
+  git checkout -q -b "otonom/gorev-$id"
   gorev=$(node -e 'const g=require(process.argv[1]);console.log(g.gorev+"\nFiles: "+(g.dosyalar||[]).join(", "))' "$f")
-  QWEN_ONCE=gemini QWEN_TUR=4 QWEN_GOREV="$gorev" timeout 1500 ./scripts/qwen-yesil.sh > "$OTONOM_STATE/son-uygula.txt" 2>&1
+  gemini_yaz "otonom/gorev-$id" "$gorev"
   rc=$?
-  git add -A && git reset -q -- qwen-rapor.md .qwen-verify.txt 2>/dev/null
+  git push -q origin --delete "otonom/gorev-$id" 2>/dev/null
+  git add -A
   if [ "$rc" != 0 ] || git diff --cached --quiet; then
     log "görev $id: başarısız (rc=$rc)"; mv "$f" "$BITEN/$id.basarisiz.json"; continue
   fi
@@ -31,3 +33,4 @@ for f in "$KUYRUK"/*.json; do
   fi
 done
 temizle
+git branch | grep -o 'otonom/gorev-.*' | xargs -r git branch -qD

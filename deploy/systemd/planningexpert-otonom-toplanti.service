@@ -10,5 +10,8 @@ Type=oneshot
 User=otonom
 Nice=19
 IOSchedulingClass=idle
-ExecStart=/opt/planningexpert/scripts/otonom/toplanti.sh
+WorkingDirectory=/home/otonom/PlanningExpert
+# Betik kendi klonundan geçici klasöre kopyalanıp çalışır: klon çalışırken sıfırlansa da
+# bash yarım okunan dosyadan devam etmez; /opt'taki root dosyalarına izin gerekmez.
+ExecStart=/bin/bash -c 'd=$$(mktemp -d); cp /home/otonom/PlanningExpert/scripts/otonom/* "$$d"/; exec bash "$$d/toplanti.sh"'
 TimeoutStartSec=30min

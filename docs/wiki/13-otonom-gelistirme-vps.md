@@ -111,8 +111,8 @@ toplantı kalitesi düşerse yeniden değerlendirilir.
 | Sayfa ilişki haritası | `harita.mjs` → `docs/otonom/harita.md` | :00, :40 |
 | Yayında mı? değilse `planningexpert-autodeploy` hemen | `dogrula.sh` (root) | :50 |
 
-Zamanlayıcıları `deploy.sh` (`install_units`) kendisi kurar; elle iş yok. Betikler `/opt/planningexpert`'ten
-çalışır, işi `/home/otonom/PlanningExpert` klonunda yapar (canlı kopyaya dokunmaz). Durum: `/var/lib/otonom/`
+Zamanlayıcıları `deploy.sh` (`install_units`) kendisi kurar; elle iş yok. `otonom` betikleri kendi klonundan (`/home/otonom/PlanningExpert`) geçici klasöre kopyalanıp çalışır;
+`/opt/planningexpert`'teki root dosyalarına izin gerekmez, canlı kopyaya dokunmaz. `dogrula.sh` root'tur, `/opt`'tan çalışır. Durum: `/var/lib/otonom/`
 (`kuyruk`, `hazir`, `biten`, `toplantilar.jsonl`, `dogrula.log`). Günlük: `journalctl -u planningexpert-otonom-<ad>`.
 
 Sayfa: **Administration → Autonomous development** (yalnız site sahibi): saat, odak sayfa, toplantı özeti,
@@ -122,7 +122,9 @@ her iyileştirme için *Before / After*, bekleyen öneriler.
 
 1. `sudo -iu otonom claude` → giriş yap (abonelik), çık.
 2. `sudo -iu otonom gh auth login` → GitHub (repo + workflow yetkisi).
-3. `/etc/otonom/env` içine `GEMINI_API_KEY=...` yaz.
-4. `rm /etc/otonom/DURDUR` → bir sonraki :00'da ilk toplantı.
+3. `/etc/otonom/env` var olsun (boş `GEMINI_API_KEY=` yeter). Anahtar **boşsa** Gemini GitHub iş akışında
+   çalışır (anahtar GitHub secret'ında; sunucuya gizli değer girmek gerekmez, Actions dakikası harcar);
+   doluysa sunucuda yerelde (ucuz). 2026-10-30 kurulumu: anahtar boş, `otonom` claude + gh girişi yapıldı.
+4. `/etc/otonom/DURDUR` yoksa döngü açıktır (env hazır kurulduğu için kur.sh DURDUR oluşturmaz).
 
 Herhangi biri eksikse betikler `kapalı: <neden>` yazıp çıkar (`journalctl -u planningexpert-otonom-toplanti`).
