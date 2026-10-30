@@ -105,6 +105,8 @@ describe('sunucu tarafı yetki denetimi', () => {
       // Yalnızca platform tablosu errorLog'a yazar / okur.
       'errors.ts': /./,
       'authInternal.ts': /internal(Query|Mutation)\(/,
+      // SOP worker kuyruğu: tek worker bütün fabrikaların işini sırayla alır; yalnız sopJobs, http.ts jetonla korur.
+      'sopQueue.ts': /internal(Query|Mutation)\(/,
     }
     for (const { name, source } of convexFiles()) {
       const hit = /= (userQuery|userMutation|internalQuery|internalMutation)\(/.exec(source)

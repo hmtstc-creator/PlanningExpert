@@ -250,6 +250,10 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - İçerik tek dilli: Türkçe ya da Romence. Video süre / boyut sınırı yok; video saklanabilir.
 - Kareleri ve açıklamaları sistem kendisi çıkarır; kullanıcı yalnız düzeltir.
 - Yetki yalnız creator. Makine serbest metin, hazırlayan elle yazılır, vardiya yok.
+- Form (2026-10-29): formun tamamı basılır; üretim birimi, TÜT kutuları, proje, referans, SOP no ekranda elle
+  yazılır; künye ve form kodu sabit; revizyon alanları ilk sürümde boş; etiketler Türkçe içerikte de Romence;
+  adım başına en çok 2 fotoğraf; fotoğrafa otomatik kırmızı işaret; CAUZE siyah; boş kutuda numara yok;
+  KKD'yi model işaretler, kullanıcı düzeltir.
 - Ayrıntı: `docs/wiki/12-sop-olusturma.md`.
 
 ## Aksiyon listesi

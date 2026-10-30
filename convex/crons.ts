@@ -19,4 +19,7 @@ crons.daily('purge expired sessions', { hourUTC: 2, minuteUTC: 17 }, internal.te
 // Hiçbir kayda bağlanmamış, 24 saatten eski yüklemeler (tenancy.purgeOrphanUploads).
 crons.daily('purge orphan uploads', { hourUTC: 2, minuteUTC: 47 }, internal.tenancy.purgeOrphanUploads, {})
 
+// SOP işleyicisi durursa (yeniden başlama, çökme) iş takılı kalmasın (convex/sopQueue.ts).
+crons.interval('sop stuck jobs', { minutes: 15 }, internal.sopQueue.recoverStuck, {})
+
 export default crons

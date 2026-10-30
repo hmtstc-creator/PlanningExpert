@@ -1152,4 +1152,52 @@ export default defineSchema({
     createdAt: v.number(),
   }).index('by_created', ['plantId', 'createdAt'])
     .index('by_plant', ['plantId']),
+
+  /**
+   * SOP oluşturma işleri (docs/wiki/12-sop-olusturma.md). Video yüklenir,
+   * `sop-worker` sırayla (aynı anda bir iş) videoyu Gemini'ye gösterip adımları
+   * ve kareleri çıkarır; taslak ekranda düzeltilir, PDF tarayıcıda üretilir.
+   * status: 'queued' | 'processing' | 'review' | 'approved' | 'error'.
+   */
+  sopJobs: defineTable({
+    ...plantField,
+    status: v.string(),
+    /** İçerik dili: 'tr' | 'ro' (etiketler şablondaki gibi Romence kalır). */
+    language: v.string(),
+    /** Yalnız modele bağlam: makine (serbest), parça adı, not. */
+    machine: v.optional(v.string()),
+    partName: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    /** Kullanıcının işaretlediği kilit anlar (sn): adımlar bunlardan bölünür. */
+    keyMoments: v.optional(v.array(v.number())),
+    /** Yüklenen video; worker kendi diskine taşıyınca silinir. */
+    videoStorageId: v.optional(v.id('_storage')),
+    videoName: v.optional(v.string()),
+    videoBytes: v.optional(v.number()),
+    videoSeconds: v.optional(v.number()),
+    /** Worker diskindeki kopya (video saklanır, yedeğe girmez). */
+    videoPath: v.optional(v.string()),
+    /** Formun taslağı (JSON, src/lib/sop/sopSchema.ts → Draft). */
+    draftJson: v.optional(v.string()),
+    /** Ekrandan istenen yeni kareler: adım, fotoğraf sırası, saniye. */
+    pendingFrames: v.optional(v.array(v.object({ step: v.number(), photo: v.number(), second: v.number() }))),
+    /** Bekleyen kare isteği var (worker bütün SOP'ları taramadan bulsun). */
+    framesPending: v.optional(v.boolean()),
+    attempts: v.number(),
+    progress: v.optional(v.string()),
+    error: v.optional(v.string()),
+    aiModel: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
+    createdAt: v.number(),
+    claimedAt: v.optional(v.number()),
+    heartbeatAt: v.optional(v.number()),
+    finishedAt: v.optional(v.number()),
+    updatedAt: v.optional(v.number()),
+    approvedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.string()),
+  })
+    .index('by_status', ['plantId', 'status', 'createdAt'])
+    .index('by_created', ['plantId', 'createdAt'])
+    .index('by_frames', ['plantId', 'framesPending'])
+    .index('by_plant', ['plantId']),
 })

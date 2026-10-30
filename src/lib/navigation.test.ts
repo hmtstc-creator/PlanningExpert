@@ -73,3 +73,15 @@ describe('menü ağacı', () => {
   })
 })
 
+
+describe('creator sayfaları', () => {
+  it('SOP Builder creator olmayanın menüsünden düşer', async () => {
+    const { MODULE_AREAS, withoutCreatorOnly, isCreatorOnly } = await import('./navigation')
+    const machine = MODULE_AREAS.find((a) => a.key === 'machine')!
+    const links = (nodes: typeof machine.nav): string[] => nodes.flatMap((n) => [...(n.to ? [n.to] : []), ...links(n.children ?? [])])
+    expect(links(machine.nav)).toContain('/machine-followup/sop')
+    expect(links(withoutCreatorOnly(machine.nav))).not.toContain('/machine-followup/sop')
+    expect(isCreatorOnly('/machine-followup/sop/abc')).toBe(true)
+    expect(isCreatorOnly('/machine-followup/sopx')).toBe(false)
+  })
+})

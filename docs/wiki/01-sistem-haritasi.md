@@ -57,6 +57,7 @@ Hetzner VPS. Dış barındırma yok (Vercel / Convex Cloud kaldırıldı, 2026-1
 | Organizasyon ağacı ve haritası (`/admin`, `/admin/map`) | `src/lib/orgTree.ts`, `src/lib/orgMap.ts` (`nodeEdits`), `src/components/org/OrgMapEditor.tsx`, `convex/platform.ts`, `convex/users.ts` |
 | İstemci taşıma (WebSocket / HTTPS) | `src/lib/convexTransport.tsx` |
 | Yayın | `scripts/deploy.sh`, `scripts/release.sh`, `deploy/systemd/` |
+| SOP oluşturma (videodan SOP, şablona %100 uyan PDF) | `src/lib/sop/` (yerleşim, şema, taslak — saf), `src/components/sop/SopSheet.tsx`, `src/routes/machine-followup/sop/`, `convex/sop.ts`, `convex/sopQueue.ts`, `convex/http.ts`, `sop-worker/` ([12](12-sop-olusturma.md)) |
 
 ## Değişmezler (bozulmaması gerekenler)
 

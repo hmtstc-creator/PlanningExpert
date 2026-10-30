@@ -12,6 +12,7 @@ import {
   PORTAL_AREA,
   areaFor,
   nodeHas,
+  withoutCreatorOnly,
   type Area,
   type NavItem,
   type NavNode,
@@ -378,6 +379,7 @@ const isHere = (to: string, pathname: string, home: string) =>
  * tam genişlik açılır.
  */
 function SubNav({ area, pathname }: { area: Area; pathname: string }) {
+  const { canManage } = usePlant()
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   // Açılan grubun düğmesinin soldan uzaklığı (kısa menü düğmenin altında açılır).
   const [anchor, setAnchor] = useState(0)
@@ -395,7 +397,7 @@ function SubNav({ area, pathname }: { area: Area; pathname: string }) {
       document.removeEventListener('keydown', key)
     }
   }, [openGroup])
-  const nav = area.key === 'portal' ? [{ to: '/', label: 'Home', icon: 'home' as const }] : area.nav
+  const nav = area.key === 'portal' ? [{ to: '/', label: 'Home', icon: 'home' as const }] : canManage ? area.nav : withoutCreatorOnly(area.nav)
   const openNode = nav.find((n) => !n.to && n.label === openGroup)
   return (
     <div ref={ref} className="relative border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
@@ -766,9 +768,11 @@ function Drawer({ area, modules, onClose }: { area: Area; modules: Area[]; onClo
  */
 function DrawerNav({ area, onClose }: { area: Area; onClose: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  if (!area.nav.length) return null
+  const { canManage } = usePlant()
+  const areaNav = canManage ? area.nav : withoutCreatorOnly(area.nav)
+  if (!areaNav.length) return null
   // Çubuktaki grup başlığı ("Menu") çekmecede tekrar etmez: içi düzleşir.
-  const nodes = area.nav.flatMap((n) => (n.to ? [n] : (n.children ?? [])))
+  const nodes = areaNav.flatMap((n) => (n.to ? [n] : (n.children ?? [])))
   const leaves = nodes.filter((n) => n.to)
   const groups = nodes.filter((n) => !n.to && n.children?.length)
   return (

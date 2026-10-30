@@ -24,6 +24,7 @@ Ayrıntı kodda; her maddenin dosyası yanında.
 - Her sunucu işlevi oturumu kendisi denetler; muaf olanlar listelidir ve testle korunur (convex/authGuard.test.ts).
 - Veri plant'e kilitlidir: işlev yalnızca oturumun seçili plant'inin kayıtlarını görür (convex/plantDb.ts).
 - İzin **alan** bazında: modül → alan (Plan & rules, Master data, Work calendar …); her yazma işlevi alanını söyler (testle zorunlu).
+- SOP Builder yalnız şirket creator'ına (ve platforma) açıktır: menü, arama ve sayfa gizlenir (src/lib/navigation.ts `CREATOR_ONLY_PAGES`), sunucu da reddeder (convex/sop.ts).
 - "Kim yaptı" alanları (`reportedBy`, `solvedBy`, `createdBy`, `author` …) sunucuda oturumdan yazılır; tarayıcının gönderdiği ad yok sayılır (src/lib/authorFields.ts).
 
 ## Tarayıcı ve sunucu başlıkları
@@ -36,6 +37,8 @@ Arama motorları: `robots.txt` her yolu kapatır ve başlık dizine almayı yasa
 
 - Fotoğraf: yalnızca JPEG / PNG / WebP / GIF / HEIC, en çok 15 MB ve 10 adet; uymayan depodan silinir (convex/uploads.ts).
 - Sahipsiz yükleme: yükleme adresi alınıp hiçbir arıza / kalıp problemine bağlanmayan dosya 24 saat sonra her gece silinir (depoyu doldurma denemesi ve vazgeçilen raporlar). Tablo taranamayacak kadar büyükse hiçbir şey silinmez; bir gecede en çok 200 dosya (convex/tenancy.ts `purgeOrphanUploads`).
+- SOP videosu: yalnız şirket creator'ı yükler; video olmayan dosya reddedilir, bağlanmadığı için gece silinir. Video worker'ın diskine geçince Convex deposundan silinir; kareler ve bekleyen video sahipsiz temizliğinde korunur (convex/sop.ts, `purgeOrphanUploads`).
+- SOP işleyicisi (`sop-worker`) Convex'e yalnız Docker ağının içinden, `SOP_WORKER_TOKEN` ile girer (`/sop/worker/*`, convex/http.ts; jeton sabit sürede karşılaştırılır, yoksa uç 503). Kuyruk işlevleri yalnız `sopJobs`'a dokunur (convex/authGuard.test.ts'te listeli istisna).
 - Excel: yalnızca kullanıcının tarayıcısında okunur; 25 MB sınırı, formül / HTML / makro okunmaz (src/lib/safeExcel.ts).
 
 ## Güvenlik ekranı

@@ -59,6 +59,7 @@ export const PAGE_KEYWORDS: Record<string, string> = {
   '/machine-followup/breakdowns': 'arıza makine duruş breakdown bozuk',
   '/machine-followup/maintenance': 'makine bakım planlı periyodik',
   '/machine-followup/reports': 'makine arıza rapor pareto',
+  '/machine-followup/sop': 'sop standart operasyon prosedürü talimat video iş öğretimi',
   '/kpi': 'kpi gösterge hedef',
   '/kpi/monthly/entry': 'kpi aylık giriş veri',
   '/kpi/weekly/entry': 'kpi haftalık giriş veri',

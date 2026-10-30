@@ -2,6 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 
 import { api } from '../../convex/_generated/api'
 import { useQuery } from './convexTransport'
+import { isCreatorOnly } from './navigation'
 import { setDisplayTimeZone } from './sapUploads'
 import { NO_ACCESS, NO_AREAS, atLeast, type Access, type AreaAccess, type AreaKey, type Level, type Module } from './tenancy'
 
@@ -133,6 +134,7 @@ export function useCanOpen(): (path: string) => boolean {
     if (ctx.isBoard && !boardAllows(p)) return false
     if (p === '/settings' || p.startsWith('/settings/') || p === '/users') return canManage
     if (p === '/admin' || p.startsWith('/admin/')) return isPlatform
+    if (isCreatorOnly(p)) return canManage
     const m = moduleOfPath(p)
     return !m || can(m)
   }

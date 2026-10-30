@@ -119,6 +119,12 @@ main() {
   fi
 
   docker compose -f deploy/compose.yml restart web >/dev/null 2>&1
+  # SOP işleyicisi yalnız kurulduysa (deploy/.env → SOP_WORKER_TOKEN): yeni kodla yeniden başlar.
+  if grep -q '^SOP_WORKER_TOKEN=.' deploy/.env 2>/dev/null; then
+    docker compose -f deploy/compose.yml up -d --build sop-worker >/dev/null 2>&1 &&
+      docker compose -f deploy/compose.yml restart sop-worker >/dev/null 2>&1 &&
+      echo "sop-worker: restarted" || echo "sop-worker: could not start (docker compose logs sop-worker)"
+  fi
   local code=000 i
   for i in $(seq 1 20); do
     code=$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/ 2>/dev/null || true)
