@@ -5,7 +5,7 @@ gelince ilk bakılan yer burasıdır. Burası dağınık belgelerin (`docs/*.md`
 sitedeki *Planning Logic*) yerine geçmez; hepsine **yön gösterir** ve konuşmalarda alınan
 kararları, öğrenilenleri ve sürüm geçmişini tek yerde toplar.
 
-> Son güncelleme: 2026-10-29 (12 SOP oluşturma eklendi)
+> Son güncelleme: 2026-10-30 (13 Otonom geliştirme (VPS) eklendi)
 
 ## Nereden başlamalı
 
@@ -23,6 +23,7 @@ kararları, öğrenilenleri ve sürüm geçmişini tek yerde toplar.
 | Bu kelime ne demek? (lot, kova, kontrol noktası…) | [10 Sözlük](10-sozluk.md) |
 | Neden böyle yapıldı? | [11 Karar günlüğü](11-karar-gunlugu.md) |
 | **SOP oluşturma**: videodan SOP, şablon formatı (%100 uyum kuralı) | [12 SOP oluşturma](12-sop-olusturma.md) |
+| **Otonom geliştirme**: saatlik 5 rollü toplantı, VPS mimarisi, token aksiyonları | [13 Otonom geliştirme (VPS)](13-otonom-gelistirme-vps.md) |
 
 ## Belge haritası (wiki dışındakiler)
 
