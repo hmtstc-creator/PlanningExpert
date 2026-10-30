@@ -431,6 +431,11 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
   const tplBy = new Map(inputs.templates.map((t) => [t.press, t]))
   const ovBy = new Map((inputs.weekOverrides ?? []).map((o) => [`${o.press}|${o.weekStart}`, o]))
   const dayRecBy = new Map((inputs.pressDayShifts ?? []).map((d) => [`${d.press}|${d.date}`, d.shifts]))
+  // Operatör planının gün kayıtları motorun takvim kararıdır (adam sayısının
+  // dağıtımı); elle kayıt her zaman önce gelir. Dağıtımın adam sayısını
+  // aşmadığı aşağıda R14'te bağımsız denetlenir.
+  const operatorRecs = (run.operatorDayShifts ?? []).filter((d) => !dayRecBy.has(`${d.press}|${d.date}`))
+  for (const d of operatorRecs) dayRecBy.set(`${d.press}|${d.date}`, d.shifts)
   const firstN = (n: number) => Array.from({ length: Math.max(0, n) }, (_, i) => i + 1)
   /** O günün çalışan normal vardiya numaraları (1'den). */
   const normalShiftsOn = (press: string, iso: string): number[] => {
@@ -1985,6 +1990,24 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
           dieAvailable(b, u.start, u.start + duration),
       )
       if (before) r13.fail(`${press}: urgent ${before.id} runs before backlog ${b.id}, which could have started at ${at(before.start)}.`)
+    }
+  }
+
+  // R14 operatör planı: 'operator' modelli cost center'da adam sayısı girilmiş
+  // her gün × vardiyada çalışan hatların ekip toplamı adam sayısını aşmaz
+  // (elle gün kaydı bu sayıya dahildir ama o kaydın kendisi kural dışıdır).
+  const r14 = rule('operator-headcount', 'Operator plan: on a day × shift with a headcount, the crews of the running lines fit the operators (manual day records excepted)')
+  const operatorCcs = new Set(inputs.operatorCostCenters ?? [])
+  const manualKeys = new Set((inputs.pressDayShifts ?? []).map((d) => `${d.press}|${d.date}`))
+  for (const h of inputs.operatorHeadcount ?? []) {
+    if (!operatorCcs.has(h.costCenter) || h.date < today || h.date > horizonEnd || holidays.has(h.date)) continue
+    const lines = inputs.presses.filter((p) => p.costCenter === h.costCenter && tplBy.has(p.name))
+    const running = lines.filter((p) => normalShiftsOn(p.name, h.date).includes(h.shift))
+    const manualCrew = running.filter((p) => manualKeys.has(`${p.name}|${h.date}`)).reduce((x, p) => x + Math.max(1, Math.round(p.crewSize ?? 1)), 0)
+    const crew = running.reduce((x, p) => x + Math.max(1, Math.round(p.crewSize ?? 1)), 0)
+    r14.check()
+    if (crew > Math.max(h.operators, manualCrew)) {
+      r14.fail(`${h.costCenter} ${h.date} shift ${h.shift}: ${crew} operators needed (${running.map((p) => p.name).join(', ')}), ${h.operators} available.`)
     }
   }
 

@@ -235,3 +235,36 @@ describe('capacity forecast and week overrides', () => {
     expect(run.capacity!.presses.find((p) => p.press === 'PRS-1')!.demand[0]).toBe(1.67)
   })
 })
+
+describe('operator plan (stage in front of the engine)', () => {
+  it('gives the operator to the line with work; the idle line is closed and the validator agrees', () => {
+    const run = computePlan(
+      inputs({
+        presses: [
+          { name: 'PRS-1', hall: 'H1', costCenter: 'W' },
+          { name: 'PRS-2', hall: 'H1', costCenter: 'W' },
+        ],
+        // 30 000 adet ÷ 20 vuruş/dk = 1500 dk: bugünün iki vardiyasından sonra yarına iş kalır.
+        weeklyDemand: [{ material: 'MAM-A', overdue: 0, periods: [{ label: 'W38', qty: 30_000 }] }],
+        operatorCostCenters: ['W'],
+        operatorHeadcount: [
+          { costCenter: 'W', date: '2026-09-17', shift: 1, operators: 1 },
+          { costCenter: 'W', date: '2026-09-17', shift: 2, operators: 1 },
+        ],
+      }),
+      NOW,
+    )
+    // PRS-2'nin işi yok → o gün kapalı; PRS-1 takvimdeki gibi (kayıt yok).
+    expect(run.operatorDayShifts).toEqual([{ press: 'PRS-2', date: '2026-09-17', shifts: [] }])
+    const rule = run.validation?.rules.find((r) => r.id === 'operator-headcount')
+    expect(rule).toMatchObject({ checked: 2, broken: 0 })
+  })
+
+  it('a shift-plan cost center ignores headcount rows', () => {
+    const run = computePlan(
+      inputs({ operatorHeadcount: [{ costCenter: 'W', date: '2026-09-17', shift: 1, operators: 0 }] }),
+      NOW,
+    )
+    expect(run.operatorDayShifts).toBeUndefined()
+  })
+})

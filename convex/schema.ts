@@ -78,7 +78,18 @@ export default defineSchema({
      * kaynak: OEE ve diğer modüller adı buradan okur. Bölümsüz olanlar eski
      * kayıtlar (ekranda "Unassigned").
      */
-    costCenters: v.optional(v.array(v.object({ code: v.string(), name: v.string(), department: v.optional(v.string()) }))),
+    // planningModel: 'shift' (yok = shift) → takvim + motor; 'operator' → gün ×
+    // vardiya adam sayısı hatlara dağıtılır (src/lib/operatorAllocation.ts).
+    costCenters: v.optional(
+      v.array(
+        v.object({
+          code: v.string(),
+          name: v.string(),
+          department: v.optional(v.string()),
+          planningModel: v.optional(v.union(v.literal('shift'), v.literal('operator'))),
+        }),
+      ),
+    ),
     /** Plant'in kendi vardiyaları; yoksa şirket standardı geçerli. */
     shifts: v.optional(v.array(shiftDefV)),
     createdAt: v.number(),
@@ -289,6 +300,9 @@ export default defineSchema({
      * Work center. Boş olan eski kayıtlar düzeltilene kadar uyarı verir.
      */
     costCenter: v.optional(v.string()),
+    // Operatör planı: hattın bir vardiyada çalışması için gereken adam sayısı
+    // (yok = 1). Yalnız 'operator' modelli cost center'larda okunur.
+    crewSize: v.optional(v.number()),
   }).index('by_name', ['plantId', 'name'])
     .index('by_plant', ['plantId']),
 
@@ -528,6 +542,19 @@ export default defineSchema({
     shifts: v.array(v.number()),
   })
     .index('by_press_date', ['plantId', 'press', 'date'])
+    .index('by_plant', ['plantId']),
+
+  // Operatör planı: 'operator' modelli bir cost center'da üretim günü ×
+  // vardiya (1'den) için sahadaki adam sayısı. Girilmeyen gün × vardiyada
+  // takvim geçerlidir (src/lib/operatorAllocation.ts).
+  operatorHeadcount: defineTable({
+    ...plantField,
+    costCenter: v.string(),
+    date: v.string(),
+    shift: v.number(),
+    operators: v.number(),
+  })
+    .index('by_cc_date', ['plantId', 'costCenter', 'date'])
     .index('by_plant', ['plantId']),
 
   // İstisna haftalar: plan değişikliği olan belirli bir hafta için

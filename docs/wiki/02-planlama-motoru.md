@@ -1,6 +1,6 @@
 # 02 · Planlama motoru
 
-> Son güncelleme: 2026-10-29 (bütün parçalar ve iş yerleri çevrim süresiyle: süre = adet × dk/adet, nut welding de planda; presi durduran arıza da planlı duruş gibi; kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
+> Son güncelleme: 2026-10-30 (operatör planı: cost center bazında ikinci model, motorun önünde saf dağıtım aşaması; bütün parçalar ve iş yerleri çevrim süresiyle: süre = adet × dk/adet, nut welding de planda; presi durduran arıza da planlı duruş gibi; kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
 > Kullanıcıya dönük anlatım: sitede **Planning Logic**
 
 Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Aynı girdi aynı planı verir
@@ -16,6 +16,21 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
      olmak zorunda değildir (ör. yalnız 3. vardiya): `DayShape.activeShifts` / `DayBucket.activeShifts` taşır, zaman
      çizelgesi (`buildDayTimeline`), kova net dakikası, zamanlayıcının vardiya sınırı (`DayBucket.shiftNetMinutes`) ve
      bağımsız doğrulayıcı (kendi `normalShiftsOn`'u) bunu okur. `activeShifts` yalnız 1..n değilse doludur.
+   - **Operatör planı** (2026-10-30, `src/lib/operatorAllocation.ts`): `plants.costCenters[].planningModel` =
+     `'operator'` olan cost center'larda (APR / punta / somun kaynağı hatları) takvim tek başına karar vermez.
+     Production Plan → *Operators per shift* ızgarası `operatorHeadcount` (cost center × üretim günü × vardiya →
+     adam) yazar; hattın ekibi `presses.crewSize` (yok = 1). Pipeline, kapasite kovalarından **önce** talebi
+     (`buildDemandSchedule`, motorun aynı lotları) iş yüküne çevirir (lot adedi × `minutesPerPiece`, ana hat,
+     vade = `dueDate`) ve `allocateOperators` her gün × vardiyada bakiyesi olan hatları en erken vade (eşitlikte
+     kalan dakika büyük) sırasıyla ekip sığdıkça açar. Bakiye = vadesi o günün haftasının Pazar'ına kadar olan
+     iş; çalışan her vardiyanın net dakikası (`shiftMinutes − o vardiyanın planlı duruşu`) × kapasite faktörü
+     bakiyeden düşer. Adam sayısı girilmemiş gün × vardiya ve tatil → takvim; elle gün kaydı her zaman önce gelir
+     (ekibi adam sayısından önce düşülür). Çıktı yalnız takvimden farklı hat × günlerdir; elle kayıtlarla
+     birleştirilip ikinci `capacityModel`'e gider (`run.operatorDayShifts`). Talebin iş günlerine dağıtımı
+     (`isPlantWorkingDate`) dağıtımdan **önceki** takvimle yapılır (döngü olmasın). Doğrulayıcı
+     `run.operatorDayShifts`'i gün kaydı gibi okur ve **R14 `operator-headcount`** ile çalışan hatların ekip
+     toplamının adam sayısını aşmadığını bağımsız denetler. Örnek (test + Planning Logic, `OPERATOR_EXAMPLE`):
+     3 adam, 5 hat, L5 bakiyesiz → L1, L3, L2 açık (L3 900 dk > L2 600 dk, aynı vade), L4 adam kalmadı, L5 kapalı.
    - **Mesai vardiya ızgarasının dışına açılır** (2026-10-29): çalışılan günde vardiyalar günün ızgarasıdır
      (kapalı vardiya takvimden açılır, mesaiyle değil); mesai penceresi ızgaranın bitiminden üretim gününün
      sonuna kadardır (`pressCalendar.overtimeWindows`). 8 saatlik vardiyada günde 3 vardiya sığar → hafta içi
@@ -108,4 +123,5 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
 
 `planPipeline.test.ts`, `scheduler*.test.ts`, `lateRepair.test.ts`, `lotSplit.test.ts` (Y 6000 → 3000 + Z + 3000), `coilLots.test.ts`,
 `minLot.test.ts`, `deliveryLateness.test.ts`, `lotQuantityOverride.test.ts`, `jobLocks.test.ts`,
-`zppDailyPriority.test.ts` (D 7000 günlük önce, L 4000 uzun vade ardından; kısmi hafta 2500 + 2500 LT).
+`zppDailyPriority.test.ts` (D 7000 günlük önce, L 4000 uzun vade ardından; kısmi hafta 2500 + 2500 LT),
+`operatorAllocation.test.ts` (3 adam, 5 hat → L1, L3, L2; L4 ve L5 kapalı).

@@ -2888,6 +2888,39 @@
       "optional": false
     }
   },
+  "operatorHeadcount": {
+    "costCenter": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "date": {
+      "fieldType": {
+        "type": "string"
+      },
+      "optional": false
+    },
+    "operators": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    },
+    "plantId": {
+      "fieldType": {
+        "type": "id",
+        "tableName": "plants"
+      },
+      "optional": true
+    },
+    "shift": {
+      "fieldType": {
+        "type": "number"
+      },
+      "optional": false
+    }
+  },
   "overtimeDefinitions": {
     "description": {
       "fieldType": {
@@ -3493,6 +3526,22 @@
                 "type": "string"
               },
               "optional": true
+            },
+            "planningModel": {
+              "fieldType": {
+                "type": "union",
+                "value": [
+                  {
+                    "type": "literal",
+                    "value": "shift"
+                  },
+                  {
+                    "type": "literal",
+                    "value": "operator"
+                  }
+                ]
+              },
+              "optional": true
             }
           }
         }
@@ -3950,6 +3999,12 @@
     "costCenter": {
       "fieldType": {
         "type": "string"
+      },
+      "optional": true
+    },
+    "crewSize": {
+      "fieldType": {
+        "type": "number"
       },
       "optional": true
     },

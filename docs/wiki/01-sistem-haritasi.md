@@ -1,6 +1,6 @@
 # 01 · Sistem haritası
 
-> Son güncelleme: 2026-10-29 (bütün iş yerleri çevrim süresiyle planlanır; master data Excel'i süreyi saniye de okur, çevrim süresi 5 haneyle saklanır; bölüm / masraf yeri / iş yeri süzgeci üç sayfada: plan, Master Data, Capacity) · Kaynak: `docs/architecture.md` (ayrıntı ve **tek kaynak haritası** orada)
+> Son güncelleme: 2026-10-30 (operatör planı tek motorun önünde bir aşama, ikinci motor yok; bütün iş yerleri çevrim süresiyle planlanır; master data Excel'i süreyi saniye de okur, çevrim süresi 5 haneyle saklanır; bölüm / masraf yeri / iş yeri süzgeci üç sayfada: plan, Master Data, Capacity) · Kaynak: `docs/architecture.md` (ayrıntı ve **tek kaynak haritası** orada)
 
 ## Ne bu?
 
@@ -74,3 +74,8 @@ Hetzner VPS. Dış barındırma yok (Vercel / Convex Cloud kaldırıldı, 2026-1
    elenmez** (2026-10-29): pres, nut welding, punta, robot, montaj — hepsinin süresi parçanın çevrim
    süresinden (dakika / adet, `rateModel.ts` `minutesPerPiece`) gelir; "plan dışı" iş yeri yoktur.
    `presses.rateModel` şemada eski kayıtlar için durur, motor okumaz.
+9. **Tek motor, iki planlama modeli** (2026-10-30): cost center'ın `planningModel`'i (`shift` / `operator`) ayrı bir
+   motor açmaz. Operatör planı (`src/lib/operatorAllocation.ts`) motorun **önünde** saf bir aşamadır: adam
+   sayısını hatlara dağıtır, sonucu gün kaydı (`pressDayShifts` biçimi) olarak takvime ekler; motor, sıralama,
+   setup ve geç iş kuralları aynıdır. Elle gün kaydı her zaman önce gelir. Yeni bir model eklenecekse yine
+   takvimi üreten bir aşama olarak eklenir, ikinci bir zamanlayıcı yazılmaz.

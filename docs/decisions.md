@@ -123,6 +123,25 @@ planlamacı yeni bir karar verirse yapılır. Tarih: 2026-09-26.
 - Resmi tatil tatildir: o günün normal vardiyaları başka güne kaymaz.
   Çalışılacaksa mesai açılır.
 
+### Operatör planı (2026-10-30)
+- Cost center'ın planlama modeli seçilir: **Shift plan** (varsayılan: hatlar
+  takvimle çalışır) ya da **Operator plan** (APR, punta, somun kaynağı hatları:
+  sahadaki adam sayısı hatlara dağıtılır).
+- **İki motor yerine operatör dağıtım aşaması.** Operatör planı ayrı bir
+  zamanlayıcı değildir; mevcut motorun önünde saf bir aşamadır
+  (`src/lib/operatorAllocation.ts`). Gün × vardiya adam sayısını hatlara
+  dağıtır ve sonucu gün kaydı olarak takvime ekler. Neden: sıralama, setup,
+  rulo, geç iş, senaryo araması ve bağımsız doğrulama tek yerde kalır; ikinci
+  bir motor bu kuralların hepsini kopyalar ve zamanla ayrışırdı. Operatör
+  modelinin asıl sorusu "bu vardiyada hangi hat çalışsın?" bir takvim
+  sorusudur; motor zaten takvimden okur.
+- Kural: her gün × vardiyada bu hafta (Pazar'a kadar vadeli) bakiyesi olan
+  hatlar en erken vadeye, eşitlikte kalan dakikası büyük olana göre sıralanır;
+  hattın ekibi (crew, yok = 1) sığdıkça açılır. Bakiyesi bitmiş ya da yalnız
+  sonraki haftanın işi kalmış hat adam almaz. Adam sayısı girilmeyen gün ×
+  vardiyada ve tatilde takvim geçerlidir; elle girilmiş gün kaydı her zaman
+  önce gelir.
+
 ### İş günü (presler dışındaki hesaplar)
 - Teslim hesabında resmi tatiller kullanılmaz: müşteri tatil günü mal
   isteyebilir; o gün hazır değilse gecikme görünür.

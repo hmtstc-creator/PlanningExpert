@@ -48,6 +48,8 @@ import { buildRawRequirements, type RawRequirementPlan } from './rawMrp'
 import { readDailyDemand } from './dailyDemand'
 import { buildCapacityForecast, type CapacityForecast } from './capacityForecast'
 import { capacityModel } from './capacityModel'
+import { allocateOperators, type LineWorkItem, type OperatorHeadcountRow } from './operatorAllocation'
+import type { DayShifts } from './pressCalendar'
 import { isFinishedStockRowFor, isRawStockRowFor, stockScope, type CostCenterLocations } from './stockLocations'
 import {
   buildPlanAlarms,
@@ -84,6 +86,8 @@ export interface PlanPress {
   frozenDays?: number
   /** Work center'ın cost center'ı — parçanın stoğu o cost center'ın depolarıyla sayılır. */
   costCenter?: string
+  /** Operatör planı: hattın bir vardiyada gereken adamı (yok = 1). */
+  crewSize?: number
 }
 
 export interface SnapshotJob {
@@ -189,6 +193,10 @@ export interface PlanInputs {
    * vardiya numaraları. İstisna hafta ve şablonun önüne geçer.
    */
   pressDayShifts?: { press: string; date: string; shifts: number[] }[]
+  /** Planlama modeli 'operator' olan cost center kodları (Company settings). */
+  operatorCostCenters?: string[]
+  /** Operatör planı: cost center × gün × vardiya adam sayısı. */
+  operatorHeadcount?: OperatorHeadcountRow[]
   settings: PlanSettings | null
   workCalendar: { workingDays?: string[]; holidays?: string[] } | null
   officialHolidays: { date: string; name: string }[]
@@ -418,6 +426,11 @@ export interface PlanRun {
   rawUrgentDays?: number
   /** Work Calendar düzeni olmayan presler (kapasite 0, kırmızı alarm). */
   pressesWithoutCalendar?: string[]
+  /**
+   * Operatör planının motora verdiği gün kayıtları (src/lib/operatorAllocation.ts):
+   * yalnız takvimden farklı olan hat × günler. Elle kayıtlar burada yoktur.
+   */
+  operatorDayShifts?: DayShifts[]
   warnings: string[]
   truncatedInputs: string[]
   /** Kapasite öngörüsü: pres ve grup bazında haftalık kapasite ve talep saati. */
@@ -507,7 +520,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
   // ---- Pres takvimi (tek formül: capacityModel + pressCalendar) -----------
   // Her presin tek takvimi: haftalık düzeni (Pazartesiden sırayla gün),
   // istisna haftaları ve tarihli / tekrarlayan mesaileri. Tatil günü kaybolur.
-  const capModel = capacityModel({
+  const calendarSources = {
     shiftMinutes,
     shiftStartMinute,
     plannedStops,
@@ -515,12 +528,15 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     weekOverrides: inputs.weekOverrides,
     overtimeDefinitions: inputs.overtimeDefinitions,
     pressOvertime: inputs.pressOvertime,
-    dayShifts: inputs.pressDayShifts,
     holidays,
-  })
-  const patternOf = capModel.patternOf
+  }
+  // Operatör planından ÖNCEKİ takvim (elle gün kayıtları dahil). Talebin iş
+  // günlerine dağıtımı bununla yapılır; presin kapasitesi aşağıdaki
+  // `capModel`den (operatör dağıtımı eklenmiş) gelir.
+  const calendarModel = capacityModel({ ...calendarSources, dayShifts: inputs.pressDayShifts })
+  const patternOf = calendarModel.patternOf
   // Fabrikanın iş günü: tatil değil ve en az bir presin normal vardiyası var.
-  const isWorkingDate = capModel.isPlantWorkingDate
+  const isWorkingDate = calendarModel.isPlantWorkingDate
 
   // Tesis saatiyle "şimdi". Sunucu UTC'de çalışır; yerel alanlar tesisin
   // duvar saatini göstermezse gün yanlış yerde değişir.
@@ -677,6 +693,53 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
           .map((o) => [`${o.material}|${o.bucket}`, o.qty!]),
       ),
     }
+
+  // ---- Operatör planı (motorun önünde saf aşama) ----------------------------
+  // 'operator' modelli cost center'larda gün × vardiya adam sayısı hatlara
+  // dağıtılır; sonuç gün kaydı olarak takvime eklenir (elle kayıt önce gelir).
+  // İş yükü motorun kendi talebinden: net lot adedi × dakika/adet, ana hat.
+  const operatorDayShifts = (() => {
+    const codes = new Set(inputs.operatorCostCenters ?? [])
+    const headcount = (inputs.operatorHeadcount ?? []).filter((h) => codes.has(h.costCenter))
+    if (codes.size === 0 || headcount.length === 0) return [] as DayShifts[]
+    const costCenters = Array.from(codes).map((code) => ({
+      code,
+      lines: presses
+        .filter((p) => p.costCenter === code && calendarModel.hasCalendar(p.name))
+        .map((p) => ({ press: p.name, crewSize: p.crewSize })),
+    }))
+    const lineSet = new Set(costCenters.flatMap((c) => c.lines.map((l) => l.press)))
+    const workload: LineWorkItem[] = []
+    for (const entry of buildDemandSchedule(demandRows, productByCode, demandOptions)) {
+      const product = productByCode.get(entry.material)
+      const press = eligiblePressesOf(product)[0]
+      if (!press || !lineSet.has(press)) continue
+      workload.push({ press, minutes: entry.qty * minutesPerPiece(product), dueDate: entry.dueDate })
+    }
+    const dates = Array.from({ length: horizonWeeks * 7 }, (_, i) => isoDate(addDays(horizonMonday, i))).filter((d) => d >= todayIso)
+    const weekCache = new Map<string, DayBucket[]>()
+    const shiftsOf = (press: string, date: string) => {
+      const monday = mondayOf(new Date(`${date}T00:00:00`))
+      const key = `${press}|${isoDate(monday)}`
+      if (!weekCache.has(key)) weekCache.set(key, calendarModel.weekBuckets(press, monday))
+      const b = weekCache.get(key)!.find((x) => x.date === date)
+      if (!b || b.shifts <= 0) return []
+      return b.activeShifts ?? Array.from({ length: b.shifts }, (_, i) => i + 1)
+    }
+    return allocateOperators({
+      costCenters,
+      headcount,
+      workload,
+      dates,
+      calendarShifts: shiftsOf,
+      manualDayShifts: inputs.pressDayShifts ?? [],
+      shiftNetMinutes: (n) => Math.max(1, shiftMinutes - (stopMinutesByShift[n - 1] ?? 0)) * capacityFactor,
+      skipDate: (d) => holidays.has(d),
+    }).dayShifts
+  })()
+  const capModel = operatorDayShifts.length
+    ? capacityModel({ ...calendarSources, dayShifts: [...(inputs.pressDayShifts ?? []), ...operatorDayShifts] })
+    : calendarModel
 
   // ---- Kapasite kovaları ---------------------------------------------------
   const buckets = new Map<string, DayBucket[]>()
@@ -2061,6 +2124,7 @@ export function computePlan(inputs: PlanInputs, nowMs: number): PlanRun {
     rawUrgentUntil,
     rawUrgentDays,
     pressesWithoutCalendar,
+    ...(operatorDayShifts.length ? { operatorDayShifts } : {}),
     warnings,
     truncatedInputs: inputs.truncatedInputs,
     frozenCount: frozenJobs.length,

@@ -967,7 +967,7 @@ function DepartmentPanel({ plant: p, department, onSelect }: { plant: OrgPlant; 
       {department !== null && <DepartmentOwnerSelect plant={p} department={department} />}
 
       <div className="mt-3">
-        <Table head={[<LevelChip key="c" level="costCenter" />, 'Code', 'Name', 'Department', 'Work centers', '']} empty={!list.length && (department === null ? 'Nothing left here.' : 'No cost center yet — add the first one below.')}>
+        <Table head={[<LevelChip key="c" level="costCenter" />, 'Code', 'Name', 'Department', 'Planning model', 'Work centers', '']} empty={!list.length && (department === null ? 'Nothing left here.' : 'No cost center yet — add the first one below.')}>
           {list.map((cc) => (
             <CostCenterRow
               key={cc.code}
@@ -982,6 +982,7 @@ function DepartmentPanel({ plant: p, department, onSelect }: { plant: OrgPlant; 
               onEdit={(name) => drafts.edit(cc.code, { name })}
               onSave={() => void drafts.commit(cc.code, (d) => structure.save(editCostCenter(p, cc.code, { name: d.name.trim() || cc.code })))}
               onMove={(d) => structure.save(editCostCenter(p, cc.code, { department: d }))}
+              onModel={(m) => structure.save(editCostCenter(p, cc.code, { planningModel: m }))}
               onRemove={() => window.confirm(`Remove cost center ${cc.code} from ${p.name}? Its uploaded data stays but no longer counts.`) && void structure.save(removeCostCenter(p, cc.code))}
             />
           ))}
@@ -1018,6 +1019,7 @@ function CostCenterRow({
   onEdit,
   onSave,
   onMove,
+  onModel,
   onRemove,
 }: {
   cc: OrgCostCenter
@@ -1032,6 +1034,8 @@ function CostCenterRow({
   onEdit: (name: string) => void
   onSave: () => void
   onMove: (department: string) => void
+  /** Planlama modeli: vardiya planı (takvim) ya da operatör planı (adam sayısı dağıtılır). */
+  onModel: (model: 'shift' | 'operator') => void
   onRemove: () => void
 }) {
   const assigned = !!cc.department && departments.includes(cc.department)
@@ -1063,6 +1067,19 @@ function CostCenterRow({
               {d}
             </option>
           ))}
+        </select>
+      </td>
+      <td className={td}>
+        <select
+          className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+          aria-label={`Planning model of ${cc.code}`}
+          title="Shift plan: lines run on their Work Calendar. Operator plan: the operators entered per shift on Production Plan go to the most urgent lines."
+          value={cc.planningModel ?? 'shift'}
+          disabled={busy}
+          onChange={(e) => onModel(e.target.value === 'operator' ? 'operator' : 'shift')}
+        >
+          <option value="shift">Shift plan</option>
+          <option value="operator">Operator plan</option>
         </select>
       </td>
       <td className={td}>

@@ -29,9 +29,12 @@ type Any = any
 export const DELETE_AFTER_DAYS = 90
 
 const moduleList = v.array(v.union(...MODULES.map((m) => v.literal(m))))
-const costCenterList = v.array(v.object({ code: v.string(), name: v.string(), department: v.optional(v.string()) }))
+const planningModelV = v.union(v.literal('shift'), v.literal('operator'))
+const costCenterList = v.array(
+  v.object({ code: v.string(), name: v.string(), department: v.optional(v.string()), planningModel: v.optional(planningModelV) }),
+)
 
-type CostCenter = { code: string; name: string; department?: string }
+type CostCenter = { code: string; name: string; department?: string; planningModel?: 'shift' | 'operator' }
 
 /** Bölümler: ad zorunlu ve fabrikada tek (büyük/küçük harf fark etmez). */
 function checkDepartments(list: string[]) {
@@ -61,7 +64,9 @@ function checkCostCenters(list: CostCenter[], departments: string[], before: Cos
     const department = cc.department?.trim() || undefined
     if (department && !departments.includes(department)) throw new ConvexError(`Cost center ${code}: department ${department} is not a department of this plant`)
     if (!department && !known.has(code)) throw new ConvexError(`Cost center ${code}: choose its department`)
-    out.push({ code, name: cc.name.trim() || code, ...(department ? { department } : {}) })
+    // Planlama modeli gönderilmezse eskisi korunur; 'shift' varsayılandır, saklanmaz.
+    const planningModel = cc.planningModel ?? before.find((b) => b.code === code)?.planningModel
+    out.push({ code, name: cc.name.trim() || code, ...(department ? { department } : {}), ...(planningModel === 'operator' ? { planningModel } : {}) })
   }
   return out
 }
@@ -118,7 +123,7 @@ function plantSummary(p: Any) {
     timeZone: p.timeZone,
     modulesOff: [...(p.disabledModules ?? [])].sort(),
     departments: p.departments ?? [],
-    costCenters: (p.costCenters ?? []).map((c: CostCenter) => `${c.code} ${c.name}${c.department ? ` (${c.department})` : ''}`),
+    costCenters: (p.costCenters ?? []).map((c: CostCenter) => `${c.code} ${c.name}${c.department ? ` (${c.department})` : ''}${c.planningModel === 'operator' ? ' [operator plan]' : ''}`),
   }
 }
 

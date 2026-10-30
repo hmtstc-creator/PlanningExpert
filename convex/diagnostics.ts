@@ -27,6 +27,7 @@ const TABLES = [
   'overtimeDefinitions',
   'pressOvertime',
   'pressDayShifts',
+  'operatorHeadcount',
   'planSnapshots',
   'changeLog',
   'moldMaintenance',

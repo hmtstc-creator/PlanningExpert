@@ -159,6 +159,12 @@ yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
     bütün parçaları ve iş yerlerini çevrim süresiyle (dk/adet, `rateModel.ts` `minutesPerPiece`)
     planlar; `pressPlanScope` ve süzgeçteki "not planned" kalktı. Açık: pres parçası → punta hattı
     bağı (ara mamul akışı) ve "Stop every N pcs" frekansiyel duruşu motorda yok.
+  - [x] **Operatör planı** (APR / punta / somun kaynağı) — 2026-10-30: cost center'a *Planning model*
+    (Shift / Operator); operatör modelinde gün × vardiya adam sayısı (*Operators per shift*) ve hat ekibi
+    (crew) en acil hatlara dağıtılır (`src/lib/operatorAllocation.ts`, motorun önünde aşama; wiki 02).
+    Açık: dağıtım setup süresini iş yüküne katmaz; iş yükü yalnız ana hatta sayılır (esnek parçanın
+    alternatifi yok); talebin iş günü dağıtımı dağıtımdan önceki takvimle; Gantt'ta "operatör kararı" ayrı
+    işaretlenmez (yalnız kapalı / açık vardiya).
 
 ### Organizasyon teyidi (2026-10-03)
 

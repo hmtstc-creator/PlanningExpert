@@ -100,6 +100,16 @@ export const smallInputs = plantInternalQuery({
         date: d.date,
         shifts: d.shifts,
       })),
+      // Operatör planı: 'operator' modelli cost center'lar ve gün × vardiya adam sayısı.
+      operatorCostCenters: (((await ctx.db.get(ctx.plantId))?.costCenters ?? []) as { code: string; planningModel?: string }[])
+        .filter((c) => c.planningModel === 'operator')
+        .map((c) => c.code),
+      operatorHeadcount: (await ctx.db.query('operatorHeadcount').collect()).map((h: Ctx) => ({
+        costCenter: h.costCenter,
+        date: h.date,
+        shift: h.shift,
+        operators: h.operators,
+      })),
       // Planlamacının pres başlangıcı / gecikme müdahaleleri.
       pressStarts: await ctx.db.query('pressPlanStarts').collect(),
       // Yoldaki hammadde — MRP'de varış haftasında giriş.
