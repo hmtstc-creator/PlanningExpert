@@ -65,6 +65,12 @@ export function IndependentCheck({ v }: { v: PlanValidation }) {
           warn={!engineOk}
         />
         <CheckStat label="Rules broken" value={sm.rulesBroken} warn={!rulesOk} hint={sm.rulesFailed.join(', ') || 'none'} />
+        <CheckStat
+          label="Intermediate part not ready (warning)"
+          value={sm.componentShort ?? 0}
+          warn={(sm.componentShort ?? 0) > 0}
+          hint="nut welding ← stamped part; the engine does not plan this link"
+        />
         <CheckStat label="Setups (plan / minimum)" value={`${sm.setups.plan} / ${sm.setups.lowerBound}`} />
         <CheckStat label="Production time (plan / max possible)" value={`${sm.utilisation.plan}% / ${sm.utilisation.upperBound}%`} />
         <CheckStat
@@ -131,15 +137,31 @@ export function IndependentCheck({ v }: { v: PlanValidation }) {
           <ul className="grid gap-1 text-sm sm:grid-cols-2">
             {v.rules.map((r) => (
               <li key={r.id}>
-                <span className={r.broken === 0 ? 'text-emerald-700' : 'text-destructive'}>
-                  {r.broken === 0 ? '✓' : '✗'}
+                <span
+                  className={
+                    r.broken === 0
+                      ? 'text-emerald-700'
+                      : r.advisory && r.broken > 0
+                        ? 'text-amber-600'
+                        : 'text-destructive'
+                  }
+                >
+                  {r.broken === 0 ? '✓' : r.advisory && r.broken > 0 ? '⚠' : '✗'}
                 </span>{' '}
                 <span className="text-foreground">{r.label}</span>{' '}
                 <span className="text-xs text-muted-foreground">
-                  ({r.checked.toLocaleString('en-GB')} checked{r.broken > 0 ? `, ${r.broken} broken` : ''})
+                  ({r.checked.toLocaleString('en-GB')} checked
+                  {r.broken > 0
+                    ? `, ${r.broken} ${r.advisory ? 'warnings' : 'broken'}`
+                    : ''}
+                  )
                 </span>
                 {r.examples.length > 0 && r.broken > 0 && (
-                  <ul className="ml-5 list-disc text-xs text-destructive">
+                  <ul
+                    className={`ml-5 list-disc text-xs ${
+                      r.advisory ? 'text-amber-700' : 'text-destructive'
+                    }`}
+                  >
                     {r.examples.slice(0, 5).map((x) => (
                       <li key={x}>{x}</li>
                     ))}

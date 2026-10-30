@@ -87,6 +87,8 @@ export interface RuleCheck {
   checked: number
   broken: number
   examples: string[]
+  /** Yalnız uyarı: motorun planlamadığı bir bağ; `rulesBroken` ve `ok`'a girmez. */
+  advisory?: boolean
 }
 
 export interface PressEfficiency {
@@ -137,6 +139,8 @@ export interface ValidationSummary {
   dataSuspect: number
   rulesBroken: number
   rulesFailed: string[]
+  /** R15 (uyarı): bileşeni (pres parçası) zamanında hazır olmayan iş sayısı. */
+  componentShort?: number
   setups: { plan: number; lowerBound: number }
   utilisation: { plan: number; upperBound: number }
   ok: boolean
@@ -1648,8 +1652,8 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
 
   // ---- 4) kesin kurallar ----------------------------------------------------
   const rules: RuleCheck[] = []
-  const rule = (id: string, label: string) => {
-    const r: RuleCheck = { id, label, checked: 0, broken: 0, examples: [] }
+  const rule = (id: string, label: string, advisory = false) => {
+    const r: RuleCheck = { id, label, checked: 0, broken: 0, examples: [], ...(advisory ? { advisory } : {}) }
     rules.push(r)
     return {
       check: (n = 1) => {
@@ -2033,10 +2037,55 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     }
   }
 
+  // R15 ara mamul (yalnız uyarı): bir parçanın sacı (rawMaterialCode) başka bir
+  // parçanın kodu ise o parça bileşendir (nut welding'in pres parçası), adet
+  // başına 1. İşin her çalışma parçasının sonunda bileşenin stoku (bütün
+  // depolar) + o ana kadar üretilen adet ≥ o ana kadar tüketilen adet olmalı.
+  // Bileşenin kendi müşteri talebi bu sayıma girmez. Motor bu bağa bakmaz;
+  // kural plan `ok`'unu ve `rulesBroken`'ı bozmaz.
+  const r15 = rule(
+    'component-ready',
+    'Intermediate part: a job whose raw material is another part (e.g. nut welding ← stamped part) runs only while that part is in stock or already produced, 1 pc per pc (advisory — the engine does not plan this link)',
+    true,
+  )
+  const componentOf = (m: string) => {
+    const c = productBy.get(m)?.rawMaterialCode?.trim()
+    return c && c !== m && productBy.has(c) ? c : null
+  }
+  const uses = new Map<string, { at: number; qty: number; a: AJob }[]>()
+  for (const a of jobs) {
+    if (a.running || pastSet.has(a) || !(a.quantity > 0)) continue
+    const c = componentOf(a.material)
+    if (!c) continue
+    const runs = a.runSegs.length ? a.runSegs : a.segs.length ? [{ start: a.start, end: a.end }] : []
+    const total = runs.reduce((x, b) => x + (b.end - b.start), 0)
+    const list = uses.get(c) ?? []
+    for (const b of runs) {
+      list.push({ at: Math.max(b.end, nowAbs), qty: total > 0 ? (a.quantity * (b.end - b.start)) / total : a.quantity / runs.length, a })
+    }
+    uses.set(c, list)
+  }
+  const componentShort = new Set<AJob>()
+  for (const [c, list] of uses) {
+    list.sort((x, y) => x.at - y.at)
+    const base = (stock0.get(c) ?? 0) + Array.from(otherStock.get(c)?.values() ?? []).reduce((x, q) => x + q, 0)
+    const made = pieces.get(c) ?? []
+    let used = 0
+    for (const u of list) {
+      used += u.qty
+      r15.check()
+      const have = base + producedBy(made, u.at)
+      if (have < used - QTY_TOL && !componentShort.has(u.a)) {
+        componentShort.add(u.a)
+        r15.fail(`${u.a.id}: needs ${Math.round(used)} pcs of ${c} by ${at(u.at)}, ${Math.round(have)} available (stock ${Math.round(base)} + produced).`)
+      }
+    }
+  }
+
   // ---- özet -----------------------------------------------------------------
   const count = (k: MaterialVerdictKind) => verdicts.filter((v) => v.verdict === k).length
   const fcount = (k: FeasibilityKind) => verdicts.filter((v) => v.feasibility?.verdict === k).length
-  const rulesBroken = rules.reduce((x, r) => x + r.broken, 0)
+  const rulesBroken = rules.reduce((x, r) => x + (r.advisory ? 0 : r.broken), 0)
   const summary: ValidationSummary = {
     verdicts: {
       agree: count('agree'),
@@ -2056,7 +2105,8 @@ export function validatePlan(inputs: PlanInputs, run: PlanRun, nowMs: number): P
     undecided: fcount('undecided'),
     dataSuspect: verdicts.filter((v) => v.dataFlags.length > 0).length,
     rulesBroken,
-    rulesFailed: rules.filter((r) => r.broken > 0).map((r) => r.id),
+    rulesFailed: rules.filter((r) => r.broken > 0 && !r.advisory).map((r) => r.id),
+    componentShort: componentShort.size,
     setups: efficiency.setups,
     utilisation: { plan: efficiency.utilisation.plan, upperBound: efficiency.utilisation.upperBound },
     ok: count('engine-missed') === 0 && count('engine-false-late') === 0 && rulesBroken === 0 && fcount('avoidable') === 0,
