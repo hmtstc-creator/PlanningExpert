@@ -27,7 +27,7 @@ dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
   `architecture.test.ts`, `planlogic.tsx`, `package*.json`, `tsconfig`, `vite`/`vitest` ayarları, `.github/`, `scripts/`,
   `deploy/`, `docs/`, `CLAUDE.md`, `QWEN.md`), **dosya silme / yeniden adlandırma**, **boyut** (en çok 10 dosya, 300 satır).
   Kurallar `QWEN.md`'de; anahtar `QWEN_API_KEY` gizli değeri, sağlayıcı `QWEN_BASE_URL` / `QWEN_MODEL` değişkenleri
-  (varsayılan OpenRouter + `qwen/qwen3-coder:free`). Betiği denerken ayrı worktree kullan: koruma adımı
+  (varsayılan OpenRouter + `nvidia/nemotron-3-ultra-550b-a55b:free` (qwen3-coder ücretsizlikten çıktı, 2026-10-30)). Betiği denerken ayrı worktree kullan: koruma adımı
   `git checkout -- .` ve `git clean -fd` çalıştırır.
 
 ## `scripts/deploy.sh` ne yapar
