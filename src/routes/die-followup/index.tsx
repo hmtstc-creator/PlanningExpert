@@ -14,7 +14,18 @@ export const Route = createFileRoute('/die-followup/')({
 })
 
 function DieOverview() {
-  const problems = (useQuery(api.moldProblems.list) ?? []) as {
+  const rawProblems = useQuery(api.moldProblems.list)
+  const rawReadiness = useQuery(api.moldReadiness.list)
+  const rawAlarms = useQuery(api.moldAlarms.list)
+  const rawMaintenance = useQuery(api.moldMaintenance.list)
+
+  const loading =
+    rawProblems === undefined ||
+    rawReadiness === undefined ||
+    rawAlarms === undefined ||
+    rawMaintenance === undefined
+
+  const problems = (rawProblems ?? []) as {
     _id: string
     material: string
     operation: string
@@ -22,9 +33,9 @@ function DieOverview() {
     occurredAt: string
     status: string
   }[]
-  const readiness = (useQuery(api.moldReadiness.list) ?? []) as { material: string; ready: boolean }[]
-  const alarms = (useQuery(api.moldAlarms.list) ?? []) as { material: string; status: string }[]
-  const maintenance = (useQuery(api.moldMaintenance.list) ?? []) as {
+  const readiness = (rawReadiness ?? []) as { material: string; ready: boolean }[]
+  const alarms = (rawAlarms ?? []) as { material: string; status: string }[]
+  const maintenance = (rawMaintenance ?? []) as {
     material: string
     date: string
     dateTo?: string
@@ -52,30 +63,30 @@ function DieOverview() {
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <ModuleStat
           label="Holding up the plan"
-          value={critical.length}
+          value={loading ? '…' : critical.length}
           tone={critical.length > 0 ? 'critical' : 'neutral'}
           to="/alarms"
           hint="Customer would wait"
         />
         <ModuleStat
           label="Open problems"
-          value={open.length}
+          value={loading ? '…' : open.length}
           tone={open.length > 0 ? 'warn' : 'neutral'}
           to="/die-followup/problems"
         />
         <ModuleStat
           label="Dies not ready"
-          value={notReady.length}
+          value={loading ? '…' : notReady.length}
           tone={notReady.length > 0 ? 'warn' : 'neutral'}
           to="/die-followup/maintenance"
         />
         <ModuleStat
           label="Shot-limit alarms"
-          value={shotAlarms.length}
+          value={loading ? '…' : shotAlarms.length}
           tone={shotAlarms.length > 0 ? 'warn' : 'neutral'}
           to="/die-followup/maintenance"
         />
-        <ModuleStat label="Maintenance, next 14 days" value={upcoming.length} to="/die-followup/maintenance" />
+        <ModuleStat label="Maintenance, next 14 days" value={loading ? '…' : upcoming.length} to="/die-followup/maintenance" />
       </div>
 
       {critical.length > 0 && (
@@ -104,7 +115,9 @@ function DieOverview() {
             Report or solve →
           </Link>
         </div>
-        {open.length === 0 ? (
+        {loading ? (
+          <p className="mt-2 text-sm text-muted-foreground">Loading…</p>
+        ) : open.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">No open die problems.</p>
         ) : (
           <ul className="mt-2 divide-y divide-border text-sm">

@@ -1,5 +1,27 @@
 [
  {
+  "zaman": "20261031-0840",
+  "odak": "src/routes/die-followup/index.tsx",
+  "ozet": "Odak sayfa Die Follow-up özet ekranı (/die-followup) incelendi. Veri sunucu sorgularından geliyor ve sayfa yalnız görüntülüyor, bu yüzden katman ihlali yok. Vardiya amiri açısından iki eksik bulundu. Veri yüklenirken sayfa '0' ve 'No open die problems.' gösteriyor, bu yanlış bir güvence veriyor. Açık sorun listesi sessizce 8 kayıtla kesiliyor. İki küçük, tek dosyalık görev yazıldı. Alarms rozeti ve yönlendirme fikirleri öneri olarak kaldı.",
+  "durum": "yayinda",
+  "gorevler": [
+   {
+    "baslik": "Die Follow-up yükleniyor durumu",
+    "once": "Veri gelene kadar sayfa 0 sayaç ve 'No open die problems.' gösteriyor; amir sorun yok sanabilir.",
+    "sonra": "Yüklenirken '…' ve 'Loading…' görünür, 'sorun yok' mesajı yalnız veri gerçekten boşken çıkar.",
+    "dosyalar": [
+     "src/routes/die-followup/index.tsx"
+    ]
+   }
+  ],
+  "oneriler": [
+   "Alarms rozeti (kritik alarm sayısı, üst menü ve Cockpit) vardiya amirinin 30 saniye hedefi için hâlâ en değerli iş; navigasyona dokunduğu için ayrı tasarım gerekiyor.",
+   "Die Follow-up özetinde 'Dies not ready' ve 'Shot-limit alarms' kutuları aynı sayfaya (/die-followup/maintenance) gidiyor; sayfada süzgeç parametresi (URL arama) ile doğrudan ilgili sekmeye/süzgece götürmek daha doğru olur. Bu bakım sayfasının yapısına bağlı, ayrı tasarım gerekir.",
+   "Machine Follow-up özeti ile Die Follow-up özeti aynı kalıbı (ModuleStat + liste) tekrarlıyor; ortak bir özet iskeleti bileşeni çıkarılabilir (mimari sadeleştirme, büyük iş).",
+   "/die-followup için ilişki haritasında Bağlantı sütunu /alarms, /die-followup/maintenance, /die-followup/problems gösteriyor ama /die-followup/reports (Pareto raporu) özetten bağlanmıyor; navigasyon tasarımıyla birlikte ele alınmalı."
+  ]
+ },
+ {
   "zaman": "20261031-0740",
   "odak": "src/routes/depolar.tsx",
   "ozet": "Odak sayfa Storage Locations (/depolar) incelendi. Veri sunucu sorgularından geliyor, sayfa yalnız tanım yazıyor ve stok toplamlarını görüntülüyor; katman ihlali görülmedi. İlişki haritasında /depolar'dan başka sayfaya giden bağlantı yok (PageHeader'daki relatedPages dışında), oysa depo tanımsız MB52 stoku varken kullanıcının /sapdata'ya gitmesi gerekiyor. Gösterilen ilk 220 satırda doğrulanabilir, %100 emin olunan küçük bir hata yok; sayfanın devamı (tablo, kaydet düğmeleri) görülmeden görev yazılmadı. Bekleyen öneriler korunuyor.",
