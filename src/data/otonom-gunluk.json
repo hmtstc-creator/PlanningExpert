@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261031-0440",
+  "odak": "src/routes/board.tsx",
+  "ozet": "Odak sayfa Board (/board) incelendi. Sayfa 8 satırlık ince bir sarmalayıcı: tüm içerik BoardDashboard bileşeninde, sayfa kendi başına veri okumuyor ya da yazmıyor. Bu yüzden katman ve tek kaynak açısından sayfada sorun yok. Ancak ilişki haritasında /board'a yalnızca Cockpit'ten (/) bağlantı var, Board'dan başka sayfaya çıkış görünmüyor. BoardDashboard'un kaynak kodu bu toplantıya verilmediği için içerik hakkında %100 emin olunabilecek bir bulgu yok. Bu yüzden görev yazılmadı, öneriler bir sonraki turlar için bırakıldı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Board sayfasının asıl mantığı src/components/BoardDashboard içinde. Bir sonraki turda odak dosyası olarak bu bileşen verilmeli. Hangi sorguları okuduğu ve alarm ya da plan verisini usePlanAlarms ve usePlanState gibi ortak kancalardan mı yoksa kendi hesabından mı aldığı doğrulanmalı (tek kaynak).",
+   "İlişki haritasında /board satırında Okur, Yazar ve Bağlantı sütunları boş. Veri bileşen içinde okunuyorsa harita betiği (scripts/otonom/harita.mjs) bileşen içindeki sorguları da taramalı. Aksi halde toplantı bu sayfanın ilişkilerini göremiyor. Betik korunan alanda olduğu için Claude ya da kullanıcı yapmalı.",
+   "Board panosundaki kartlardan ilgili ayrıntı sayfalarına (/alarms, /planlama, /oee) tıklanabilir bağlantı olup olmadığı kontrol edilmeli. Yoksa vardiya amiri panoda sorunu görüp ilgili sayfaya gitmek için menüden elle arar. Bileşen okunmadan görev yazılamaz.",
+   "Board için 'son güncelleme zamanı' ve veri yoksa boş durum mesajı olup olmadığı BoardDashboard içinde doğrulanmalı. Vardiya başında amirin panonun eski veriyi gösterip göstermediğini anlaması gerekir.",
+   "Önceki turlarda biriken Alarms rozeti önerisi (üst menü ve Cockpit'te kritik alarm sayısı) Board sayfasıyla birlikte tasarlanmalı. Board, amirin vardiya başı giriş ekranı olacaksa kritik alarm özeti burada da tek kaynaktan gösterilmeli."
+  ]
+ },
+ {
   "zaman": "20261031-0340",
   "odak": "src/routes/alarms.tsx",
   "ozet": "Toplantı odak sayfa Alarms (/alarms) üzerineydi. Sayfa tek kaynak ilkesine uyuyor: veriyi usePlanAlarms kancasından alıyor, kalıp ve makine düzenleme işini kendi modüllerine bağlantıyla yönlendiriyor, katman ihlali görünmüyor. Planlama uzmanı kritik ve bilgi ayrımını doğru buldu. Vardiya amiri tarafında iki eksik görüldü: kritik alarm sayısı sayfa açılmadan görünmüyor ve etkilenen parça listesi 8 ile kesiliyor olabilir. Dosyanın kalanı (220. satırdan sonrası) görünmediği için kesme göstergesinden emin olunamadı. Bu yüzden bu saat güvenle yazılabilecek bir görev çıkmadı.",
