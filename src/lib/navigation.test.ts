@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { BOARD_AREA, MODULE_AREAS, RELATED_PAGE_MAP, areaFor, areaLinks, type NavNode } from './navigation'
+import { BOARD_AREA, MODULE_AREAS, RELATED_PAGE_MAP, areaFor, areaLinks, nodeHas, type NavNode } from './navigation'
 
 const depth = (n: NavNode): number => 1 + Math.max(0, ...(n.children ?? []).map(depth))
 const routeFile = (to: string) =>
@@ -34,8 +34,11 @@ describe('menü ağacı', () => {
     }
   })
 
-  it('PlanningExpert alanında üst sekme barı (menü) yok', () => {
-    expect(areaFor('/stoklar').nav).toEqual([])
+  it('alt menüdeki sayfa üst grubu işaretler', () => {
+    const planning = areaFor('/stoklar')
+    const menu = planning.nav.find((n) => n.children)!
+    expect(nodeHas(menu, '/stoklar')).toBe(true)
+    expect(nodeHas(menu, '/planlama')).toBe(false)
   })
 
   it('kısayol haritasındaki her sayfa ve hedef var', () => {

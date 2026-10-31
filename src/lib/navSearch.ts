@@ -102,7 +102,7 @@ function walk(nodes: NavNode[], a: Area, group: string | undefined, out: PageEnt
 /** Bütün sayfalar, her biri bir kez (modül menüsündeki yeri önce gelir). */
 export function pageIndex(): PageEntry[] {
   const out: PageEntry[] = []
-  for (const a of [...MODULE_AREAS, BOARD_AREA, SETTINGS_AREA]) walk([...a.nav, ...(a.pages ?? [])], a, undefined, out)
+  for (const a of [...MODULE_AREAS, BOARD_AREA, SETTINGS_AREA]) walk(a.nav, a, undefined, out)
   for (const l of ACCOUNT_LINKS)
     out.push({ to: l.to, label: l.label, hint: l.hint, icon: l.icon ?? 'user', accent: 'slate', section: 'Account' })
   const seen = new Set<string>()
