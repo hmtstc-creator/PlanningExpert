@@ -200,7 +200,7 @@ function LossesPage() {
     () => paretoView(isSpeed || !activeSub ? [] : subLossMachines(weekAll, config, loss, activeSub)),
     [weekAll, config, loss, isSpeed, activeSub],
   )
-  const mats = useMemo(() => topMaterials(weekLoss, config, 3), [weekLoss, config])
+  const mats = useMemo(() => (isSpeed ? [] : topMaterials(weekLoss, config, loss, 3)), [weekLoss, config, loss, isSpeed])
   const fmt = minutes
 
   return (
@@ -322,7 +322,7 @@ function LossesPage() {
           </div>
 
           <div className="mt-3 flex items-start gap-4">
-            <div className="min-w-0 basis-[70%]">
+            <div className="min-w-0 basis-[60%]">
               <Legend
               items={[
                 { key: loss, label: loss, slot: lossIndex + 1 },
@@ -429,11 +429,13 @@ function LossesPage() {
         </div>
         <section className="print-avoid-break mt-3 rounded-lg border border-border p-3">
           <p className="text-xs font-semibold text-foreground">
-            Top 3 materials — W{sel.week.week} · {label}
+            Top 3 materials of {loss} — W{sel.week.week} · {label}
             {machine ? ` · ${machine}` : ''}
           </p>
           {mats.length === 0 ? (
-            <p className="mt-1 text-xs text-muted-foreground">No material downtime data this week.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {isSpeed ? 'Speed has no material breakdown.' : `No ${loss} material downtime this week (or the summary predates material data).`}
+            </p>
           ) : (
             <ol className="mt-1.5 grid grid-cols-3 gap-3 text-xs">
               {mats.map((m, i) => (
@@ -442,7 +444,7 @@ function LossesPage() {
                     {i + 1}. {m.material}
                   </span>
                   <span className="block tabular-nums text-muted-foreground">
-                    {minutes(m.minutes)} · top loss {m.loss} ({pct(m.lossShare)})
+                    {minutes(m.minutes)} · {pct(m.share)} of its downtime
                   </span>
                 </li>
               ))}

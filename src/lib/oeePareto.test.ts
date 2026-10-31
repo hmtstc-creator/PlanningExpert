@@ -66,26 +66,31 @@ describe('makine dağılımı', () => {
 })
 
 describe('topMaterials', () => {
-  it('malzemeleri dakikaya göre sıralar, her malzemenin en büyük duruş sütununu verir', () => {
-    const d: LossDay = {
-      date: '2026-10-26',
-      costCenter: 'C',
-      workCenter: 'W1',
-      codes: {},
-      reasons: {},
-      parts: {
-        'UNSCD_DOWN|STP|MAT-A': [30, 1],
-        'UNSCD_DOWN|STP|MAT-B': [10, 1],
-        'UNSCD_DOWN|STP|MAT-A|X': [5, 1],
-      },
-    }
-    const rows = topMaterials([d], cfg)
+  const d: LossDay = {
+    date: '2026-10-26',
+    costCenter: 'C',
+    workCenter: 'W1',
+    codes: {},
+    reasons: {},
+    parts: {
+      'UNSCD_DOWN|STP|MAT-A': [30, 1],
+      'UNSCD_DOWN|STP|MAT-B': [10, 1],
+      'UNSCD_DOWN|STP|MAT-A|X': [5, 1],
+    },
+  }
+
+  it('seçili duruş sütununda en çok duruşlu malzemeleri dakikaya göre sıralar', () => {
+    const rows = topMaterials([d], cfg, 'STP')
     expect(rows.map((r) => r.material)).toEqual(['MAT-A', 'MAT-B', 'MAT-A|X'])
-    expect(rows[0]).toMatchObject({ material: 'MAT-A', minutes: 30, loss: 'STP' })
-    expect(rows[0].lossShare).toBeCloseTo(1)
+    expect(rows[0]).toMatchObject({ material: 'MAT-A', minutes: 30 })
+    expect(rows[0].share).toBeCloseTo(1)
+  })
+
+  it('başka bir duruş sütunu seçilince o sütunun malzemeleri (yoksa boş)', () => {
+    expect(topMaterials([d], cfg, 'OTHER')).toEqual([])
   })
 
   it('parça kırılımı yoksa boş döner', () => {
-    expect(topMaterials([day('W1', { 'UNSCD_DOWN|STP': [10, 1] }, {})], cfg)).toEqual([])
+    expect(topMaterials([day('W1', { 'UNSCD_DOWN|STP': [10, 1] }, {})], cfg, 'STP')).toEqual([])
   })
 })

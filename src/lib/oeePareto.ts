@@ -82,35 +82,33 @@ export function subLossMachines(lossDays: LossDay[], c: OeeConfig, column: strin
 
 export interface MaterialRow {
   material: string
+  /** Seçili duruş sütunundaki dakika. */
   minutes: number
-  /** Malzemenin en çok duruş süren sütunu (kayıp grubu). */
-  loss: string
-  /** O sütunun malzemenin dakikalarındaki payı (0–1). */
-  lossShare: number
+  /** Bu dakikanın malzemenin bütün duruşları içindeki payı (0–1). */
+  share: number
 }
 
 /**
- * En çok duruş süren malzemeler (seçili iş merkezi kapsamında). Parça kırılımı
- * (`LossDay.parts`, anahtar `rc1|rc2|malzeme`) yalnız yeni özetlerde var; eski
- * özetlerde boş döner.
+ * Seçili duruş sütununda en çok duruş süren malzemeler (seçili iş merkezi
+ * kapsamında). Parça kırılımı (`LossDay.parts`, anahtar `rc1|rc2|malzeme`) yalnız
+ * yeni özetlerde var; eski özetlerde boş döner. Alt kayıp kırılımı yok: süzgeç
+ * duruş sütununa göre.
  */
-export function topMaterials(lossDays: LossDay[], c: OeeConfig, top = 3): MaterialRow[] {
-  const byMaterial = new Map<string, { minutes: number; columns: Map<string, number> }>()
+export function topMaterials(lossDays: LossDay[], c: OeeConfig, column: string, top = 3): MaterialRow[] {
+  const byMaterial = new Map<string, { minutes: number; total: number }>()
   for (const d of lossDays) {
     for (const [key, [m]] of Object.entries(d.parts ?? {})) {
       const cls = classifyLossKey(key, c)
       if (!cls || !cls.rest) continue
-      const row = byMaterial.get(cls.rest) ?? { minutes: 0, columns: new Map<string, number>() }
-      row.minutes += m
-      row.columns.set(cls.column, (row.columns.get(cls.column) ?? 0) + m)
+      const row = byMaterial.get(cls.rest) ?? { minutes: 0, total: 0 }
+      row.total += m
+      if (cls.column === column) row.minutes += m
       byMaterial.set(cls.rest, row)
     }
   }
   return [...byMaterial]
-    .map(([material, r]) => {
-      const [loss, lossMin] = [...r.columns].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]
-      return { material, minutes: r.minutes, loss, lossShare: r.minutes > 0 ? lossMin / r.minutes : 0 }
-    })
+    .filter(([, r]) => r.minutes > 0)
+    .map(([material, r]) => ({ material, minutes: r.minutes, share: r.total > 0 ? r.minutes / r.total : 0 }))
     .sort((a, b) => b.minutes - a.minutes || a.material.localeCompare(b.material))
     .slice(0, top)
 }
