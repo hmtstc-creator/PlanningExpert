@@ -3,7 +3,10 @@ import { usePaginatedQuery, useQuery } from '../lib/convexTransport'
 import { useEffect, useMemo, useState } from 'react'
 
 import { api } from '../../convex/_generated/api'
+import { PlanOrgFilter, usePlanOrgFilter } from '../components/plan/PlanOrgFilter'
 import { PageHeader } from '../components/PageHeader'
+import { usePlant } from '../lib/plantContext'
+import { type OrgCostCenter, type OrgPress } from '../lib/planOrgFilter'
 import { relatedPages } from '../lib/navigation'
 import { stockCoverage } from '../lib/stockCoverage'
 
@@ -25,18 +28,41 @@ function SiparislerPage() {
 
   const [view, setView] = useState<'weekly' | 'daily'>('weekly')
 
+  // Bölüm / masraf yeri / iş yeri süzgeci (src/lib/planOrgFilter.ts). Malzeme,
+  // ana iş yeri (mainMachine) süzgeçteki iş yerlerinden biriyse görünür.
+  // Alternatif iş yerleri sayılmaz: "ana iş yerine ait" malzemeler.
+  const { ctx } = usePlant()
+  const workCenterRows = useQuery(api.presses.list) as OrgPress[] | undefined
+  const allWorkCenters = useMemo(() => workCenterRows ?? [], [workCenterRows])
+  const orgCostCenters = useMemo(() => (ctx?.active?.costCenters ?? []) as OrgCostCenter[], [ctx])
+  const orgDepartments = useMemo(() => ctx?.active?.departments ?? [], [ctx])
+  const org = usePlanOrgFilter(allWorkCenters, orgCostCenters, orgDepartments, 'planningexpert.demand.orgFilter')
+  const productsResult = useQuery(api.products.listAll)
+  const mainMachineOf = useMemo(
+    () => new Map<string, string>((productsResult?.rows ?? []).map((p) => [p.code, p.mainMachine ?? ''] as [string, string])),
+    [productsResult],
+  )
+  const visibleWorkCenterCount = useMemo(
+    () => allWorkCenters.filter((w) => org.shows(w.name)).length,
+    [allWorkCenters, org],
+  )
+
   const [search, setSearch] = useState('')
   const term = search.trim().toLowerCase()
   // Sayfa ilk 200 satırı yükler; filtre yazılınca kalan sayfalar da yüklenir ki eşleşme kaçmasın.
   const status = view === 'weekly' ? weeklyStatus : dailyStatus
+  const narrowing = term !== '' || org.active
   useEffect(() => {
-    if (!term || status !== 'CanLoadMore') return
+    if (!narrowing || status !== 'CanLoadMore') return
     if (view === 'weekly') loadMoreWeekly(200)
     else loadMoreDaily(200)
-  }, [term, status, view, loadMoreWeekly, loadMoreDaily])
+  }, [narrowing, status, view, loadMoreWeekly, loadMoreDaily])
 
   const allRows = view === 'weekly' ? weekly : daily
-  const rows = term ? allRows.filter((r) => r.material.toLowerCase().includes(term)) : allRows
+  const orgMatches = (material: string) => !org.active || org.shows(mainMachineOf.get(material) ?? '')
+  const rows = allRows.filter(
+    (r) => (!term || r.material.toLowerCase().includes(term)) && orgMatches(r.material),
+  )
   // Stok sütunu planın kullandığı stok: MB52, parçanın cost center'ının
   // depoları (tanımı yoksa "Finished goods" tikli depolar). ZPP'nin kendi
   // "Stock in storage" değeri farklı bir kaynaktır ve planda kullanılmaz;
@@ -91,6 +117,25 @@ function SiparislerPage() {
           aria-label="Filter material"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      <div className="mt-4">
+        <PlanOrgFilter
+          options={org.options}
+          selection={org.selection}
+          onChange={org.setSelection}
+          planned={visibleWorkCenterCount}
+          total={allWorkCenters.length}
+          subject="in the demand"
+          showWorkCenters
+          info={
+            <p>
+              Narrows this list to the materials whose <strong>main work center</strong> is in the
+              chosen department, cost center or work center. Alternative work centers do not count.
+              Materials with no main work center show only with the filter off.
+            </p>
+          }
         />
       </div>
 
