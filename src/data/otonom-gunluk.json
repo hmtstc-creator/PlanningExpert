@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261031-0540",
+  "odak": "src/routes/capacity.tsx",
+  "ozet": "Toplantı odak sayfa Capacity Dashboard (/capacity) üzerineydi. Sayfa tek kaynak ilkesine uyuyor: öngörü sunucuda planla birlikte hesaplanıyor, süzgeç yalnız görünümü daraltıyor, takvim ve duraklama verisi ortak modüllerden geliyor. Eski veri uyarısı için `stale` ve `recalculating` durumları var, bu iyi. Gösterilen ilk 220 satırda kesin ve küçük bir hata bulunmadı. Sayfanın devamı (tablo, düzenleme penceresi, hata gösterimi) görülmeden görev yazılmadı, bu yüzden görev listesi boş.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Kabul edilen OEE alanı 5% ile 200% arasında geçerli. Aralık dışı bir değer yazılınca tablo sessizce kayıtlı değere dönüyor. Sayfanın devamında bu durum için görünür bir uyarı olup olmadığı doğrulanmalı. Yoksa 'Enter 5–200 %' mesajı eklenmeli.",
+   "İlişki haritasında /capacity yalnızca /referanslar ve /takvim'e bağlanıyor. Kapasite açığı olan haftadan ilgili pres için /planlama sayfasına doğrudan bağlantı yok. Planlamacı açığı görünce planı elle arıyor. Tablo kodu görüldükten sonra bağlantı eklenebilir.",
+   "Seçili görünüm (hat ya da pres), performans kaynağı ve süzgeç tarayıcıda localStorage'da tutuluyor. Başka cihazda ya da vardiya devrinde aynı bakış gelmiyor. Bu bir tasarım kararı. Gerekirse URL arama parametresine taşınabilir. Bu, Administration sekmesi önerisiyle birlikte ele alınmalı.",
+   "Board (/board) için BoardDashboard bileşeni bir sonraki turlarda odak dosyası olmalı. Harita betiği (scripts/otonom/harita.mjs) bileşen içindeki sorguları da taramalı. Aksi halde /board, /admin ve /kpi sayfalarının okuma ve yazma ilişkileri haritada boş görünüyor. Betik korunan alanda, Claude ya da kullanıcı yapmalı.",
+   "Alarms rozeti (üst menü ve Cockpit'te kritik alarm sayısı, usePlanAlarms'tan tek kaynak) birkaç turdır bekliyor. Vardiya amirinin 30 saniye hedefi için en değerli iş bu. Navigasyon ve Cockpit'e dokunduğu için ayrı tasarım gerekiyor."
+  ]
+ },
+ {
   "zaman": "20261031-0440",
   "odak": "src/routes/board.tsx",
   "ozet": "Odak sayfa Board (/board) incelendi. Sayfa 8 satırlık ince bir sarmalayıcı: tüm içerik BoardDashboard bileşeninde, sayfa kendi başına veri okumuyor ya da yazmıyor. Bu yüzden katman ve tek kaynak açısından sayfada sorun yok. Ancak ilişki haritasında /board'a yalnızca Cockpit'ten (/) bağlantı var, Board'dan başka sayfaya çıkış görünmüyor. BoardDashboard'un kaynak kodu bu toplantıya verilmediği için içerik hakkında %100 emin olunabilecek bir bulgu yok. Bu yüzden görev yazılmadı, öneriler bir sonraki turlar için bırakıldı.",
