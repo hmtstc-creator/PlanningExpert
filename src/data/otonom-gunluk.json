@@ -1,5 +1,17 @@
 [
  {
+  "zaman": "20261031-0240",
+  "odak": "src/routes/admin.tsx",
+  "ozet": "Odak sayfa Administration (/admin) incelendi. Sayfa tek kaynak ilkesine uyuyor: veriyi alt bileşenler okuyor, sayfa yalnız sekme ve rol kapısı yönetiyor. Katman ihlali yok. Planlama akışı açısından bulgu çıkmadı. Sahada tek somut eksik: sekme seçimi sayfa yenilenince veya haritadan geri dönünce hep 'Holdings & companies'e sıfırlanıyor; bu, haritadan dönen kullanıcı için ek tıklama demek ve güvenle küçük bir görevle çözülebilir, ancak rota arama parametresi (search param) tanımı router tipini etkilediği için bu saatte yazılmadı, öneri olarak bırakıldı. Haritaya geri dönüş bağlantısı zaten bekleyen önerilerde.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Administration sekmesi (tab) yalnızca useState'te tutuluyor; haritadan /admin'e dönünce veya sayfa yenilenince hep 'Holdings & companies' açılıyor. Sekmeyi rota arama parametresine (validateSearch ile ?tab=) taşımak ve haritadaki geri dönüş bağlantısını ?tab=organization ile vermek tıklama sayısını azaltır; rota tipini değiştirdiği için önce router kullanımı gözden geçirilmeli.",
+   "Administration sayfasında 'System errors' sekmesi için okunmamış/son 24 saat hata sayısını gösteren bir rozet (Tabs etiketinde) vardiya amirine ve General'e sorunu sekmeyi açmadan gösterir; sayı SystemErrors verisinden tek kaynaktan üretilmeli, bu yüzden OrgAdmin bileşenine dokunan ayrı bir tasarım kararı gerektirir.",
+   "'Security' ve 'Platform history' sekmeleri /users ve /settings sayfalarındaki SecurityPanel/PlantChangeLog ile aynı bileşenleri kullanıyor; hangi sayfanın hangi kapsamı (tüm platform mi, tek plant mı) gösterdiği başlıkta belirtilmiyor. Her sekmenin başına tek cümlelik kapsam açıklaması eklenmesi karışıklığı azaltır (bileşen içi değişiklik, yetki gözden geçirmesiyle birlikte)."
+  ]
+ },
+ {
   "zaman": "20261031-0140",
   "odak": "src/routes/admin_.map.tsx",
   "ozet": "Odak sayfa Organization map (/admin_/map) incelendi. Sayfa ince bir sarmalayıcı: tüm mantık OrgMap bileşeninde, sayfa kendi başına veri okumuyor/yazmıyor, tek kaynak ve katman açısından sorun yok. Haritada /admin_/map sayfasından geri dönüş bağlantısı yok (/admin'den harita açılıyor ama harita sayfasında 'Administration'a dön' yolu yok); ancak bu küçük bir gezinme iyileştirmesi ve yalnızca sayfa dosyasını görerek %100 emin olunamayan yetki/başlık yapısına bağlı. OrgMap bileşeninin içi görülmediği için güvenle yazılabilir bir görev çıkmadı; yanlış görev yazmaktansa öneriye bırakıldı.",
