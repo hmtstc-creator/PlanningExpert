@@ -240,7 +240,7 @@ function LossesPage() {
         rows={dayRows}
         config={config}
         actions={
-          <SavePdfButton fileName={fileName} make={() => sheetToPdf(sheetRef.current!, { size: 'A4', orientation: 'landscape', pages: 'fit' })} />
+          <SavePdfButton fileName={fileName} make={() => sheetToPdf(sheetRef.current!, { size: 'A4', orientation: 'portrait', pages: 'fit' })} />
         }
       />
       <OeeDataNotice items={coverageNotes} />
