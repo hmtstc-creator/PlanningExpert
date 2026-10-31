@@ -231,3 +231,10 @@ systemctl daemon-reload && systemctl enable --now planningexpert-backup.timer
 - 2026-10-19: gece yedeği timer'ı kuruldu (o güne dek kurulmamıştı), ilk `daily-*.zip`
   denendi. Vercel GitHub uygulaması, Vercel projesi ve Convex Cloud deployment'ı
   silindi; sunucudan `/etc/planningexpert/cloud.env` silindi.
+
+## Bulut oturumundan sunucuya erişim (kalıcı not, 2026-10-31)
+
+- Bulut oturumunun sunucuya **kalıcı bir erişimi yok**: SSH anahtarı ve sunucu adresi oturuma verilmez, Claude Code Remote'ta bağlı bir sunucu klasörü de yoktur.
+- Erişim açmanın yolu sunucu sahibinin kararıdır: sunucuda `cd /opt/planningexpert && claude remote-control` çalıştırılır; oturum klasörü listede görünür ve her kullanımda onay istenir (`list_computer_folders` / `request_computer_folder`). Bu gerçekleşince kontroller oturumdan yapılabilir.
+- Gizli değerler (jeton, anahtar, parola) oturumlar arasında aranmaz ve bu nota yazılmaz.
+- Erişim yoksa bulut oturumu yayını kendisi çalıştıramaz; yapılacak iş sunucu çıktısı (`deployed-commit`, `failed-commit`, `journalctl`, `/version`) ile sunucu tarafında teşhistir.
