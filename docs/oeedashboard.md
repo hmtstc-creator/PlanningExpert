@@ -820,3 +820,12 @@ Excel hatası olduğunu doğruladı (site doğru). Karar **önleme amaçlı**:
   yeniler); iki günde aynı duruş varsa sonraki günün kaydı kalır.
 - Kod: kural `src/lib/oeeDedup.ts` (testli: 3 kez yüklenmiş 115 dk KLP → 1 satır, 115 dk), sunucu
   `convex/oee.ts` (`upsertDowntimeDays`, `upsertShifts`, `duplicates`). Şema değişmedi.
+
+### Losses Trend — iş merkezi ve pareto (2026-10-31)
+
+25. Losses Trend'de **iş merkezi (Work Center)** seçilebilir; ortak OEE filtresinin `machine`
+    alanıdır (sayfalar arası kalır). Trend ve duruş paretoları seçili makineye göre daralır.
+26. Seçili hafta için dört dikey pareto (çubuk = toplamın %'si, çizgi = kümülatif %, tek ölçek
+    0–100): **duruşlar**; **duruş → iş merkezleri**; **duruş → alt duruşlar**; **alt duruş →
+    iş merkezleri**. Duruşa ya da makineye tıklamak seçer. Speed bir duruş değildir, paretoda yok.
+27. Bütün sayfa (trend + 4 pareto + filtre özeti) tek A4 yatay sayfaya sığar (PDF: fit).
