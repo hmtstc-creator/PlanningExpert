@@ -1,6 +1,6 @@
 # 01 · Sistem haritası
 
-> Son güncelleme: 2026-10-30 (operatör planı tek motorun önünde bir aşama, ikinci motor yok; bütün iş yerleri çevrim süresiyle planlanır; master data Excel'i süreyi saniye de okur, çevrim süresi 5 haneyle saklanır; bölüm / masraf yeri / iş yeri süzgeci üç sayfada: plan, Master Data, Capacity) · Kaynak: `docs/architecture.md` (ayrıntı ve **tek kaynak haritası** orada)
+> Son güncelleme: 2026-10-31 (Demand süzgeci; operatör planı tek motorun önünde bir aşama, ikinci motor yok; bütün iş yerleri çevrim süresiyle planlanır; master data Excel'i süreyi saniye de okur, çevrim süresi 5 haneyle saklanır; bölüm / masraf yeri / iş yeri süzgeci üç sayfada: plan, Master Data, Capacity) · Kaynak: `docs/architecture.md` (ayrıntı ve **tek kaynak haritası** orada)
 
 ## Ne bu?
 
@@ -51,7 +51,7 @@ Hetzner VPS. Dış barındırma yok (Vercel / Convex Cloud kaldırıldı, 2026-1
 | Hammadde MRP, tedarik süresi | `src/lib/rawMrp.ts`, `src/lib/rawLeadTime.ts`, `convex/rawLeadTimes.ts` |
 | Bağımsız doğrulama | `src/lib/planValidator.ts` (motorla kod paylaşmaz) |
 | Plan müdahaleleri | `convex/planOverrides.ts`, `convex/planJobLocks.ts` |
-| Bölüm / masraf yeri / iş yeri süzgeci — Production Plan, Master Data, Capacity Dashboard (yalnız görünüm) | `src/lib/planOrgFilter.ts` (saf), `src/components/plan/PlanOrgFilter.tsx` (her sayfanın kendi saklama anahtarı) |
+| Bölüm / masraf yeri / iş yeri süzgeci — Production Plan, Master Data, Capacity Dashboard, Demand (yalnız görünüm; Demand'de malzeme *ana* iş yerine göre) | `src/lib/planOrgFilter.ts` (saf), `src/components/plan/PlanOrgFilter.tsx` (her sayfanın kendi saklama anahtarı) |
 | Üretim hızı: çevrim süresi dakika / adet (bütün parçalar, bütün iş yerleri; geri uyum 1 ÷ (SPM × göz)) | `src/lib/rateModel.ts` (`minutesPerPiece`, `runMinutesFor`, saniyeli dosya için `cycleMinutesFromSeconds`, hassasiyet `CYCLE_STORE_DECIMALS` = 5 kayıt / `CYCLE_DECIMALS` = 3 gösterim); doğrulayıcıda bağımsız kopya (`planValidator.ts` `strokeMinutes`) |
 | Yetki | `convex/guarded.ts`, `convex/tenancy.ts` |
 | Organizasyon ağacı ve haritası (`/admin`, `/admin/map`) | `src/lib/orgTree.ts`, `src/lib/orgMap.ts` (`nodeEdits`), `src/components/org/OrgMapEditor.tsx`, `convex/platform.ts`, `convex/users.ts` |
