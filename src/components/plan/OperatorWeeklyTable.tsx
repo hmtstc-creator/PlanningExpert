@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "../../lib/convexTransport";
 import { serverErrorText } from "../../lib/pressCalendar";
 import {
   OPERATOR_SHIFTS_PER_DAY,
-  operatorWeekCapacity,
+  operatorWeekHours,
   shiftHeadcountFromWeekly,
 } from "../../lib/operatorCapacity";
 
@@ -21,8 +21,8 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 /**
  * Operatör planı, uzun vade (Work Calendar → Capacity overview): 'operator'
  * modelli bir cost center için hafta × operatör sayısı. Haftalık sayı o hafta
- * sahadaki kişidir (vardiyalara bölünmez). Kapasite =
- * min(makine × 3 × iş günü, haftalık ÷ ortalama ekip × iş günü) vardiya;
+ * sahadaki kişidir (vardiyalara bölünmez). Kapasite saat olarak =
+ * min(makine × 3 × iş günü, haftalık ÷ ortalama ekip × iş günü) × vardiya saati;
  * gün × vardiya girilmemiş günlerde motor vardiya başına floor(haftalık ÷ 3)
  * adam kullanır (src/lib/operatorCapacity.ts).
  */
@@ -31,6 +31,7 @@ export function OperatorWeeklyTable({
   lines,
   weekStarts,
   workingDaysOf,
+  shiftMinutes,
 }: {
   costCenter: string;
   /** Cost center'ın hatları ve ekip büyüklükleri. */
@@ -39,6 +40,8 @@ export function OperatorWeeklyTable({
   weekStarts: string[];
   /** O haftanın iş günü sayısı (tatiller düşülmüş). */
   workingDaysOf: (weekStart: string) => number;
+  /** Vardiya süresi (dakika), Work Calendar'daki vardiya ayarı. */
+  shiftMinutes: number;
 }) {
   const rows = useQuery(api.operatorWeekly.list) as WeeklyRow[] | undefined;
   const upsert = useMutation(api.operatorWeekly.upsert);
@@ -129,19 +132,20 @@ export function OperatorWeeklyTable({
               <th className="border border-border px-2 py-1 font-medium">Week</th>
               <th className="border border-border px-2 py-1 font-medium">Operators</th>
               <th className="border border-border px-2 py-1 font-medium">Per shift</th>
-              <th className="border border-border px-2 py-1 font-medium">Machine limit</th>
-              <th className="border border-border px-2 py-1 font-medium">Operator limit</th>
-              <th className="border border-border px-2 py-1 font-medium">Capacity (shifts)</th>
+              <th className="border border-border px-2 py-1 font-medium">Machine limit (h)</th>
+              <th className="border border-border px-2 py-1 font-medium">Operator limit (h)</th>
+              <th className="border border-border px-2 py-1 font-medium">Capacity (h)</th>
             </tr>
           </thead>
           <tbody>
             {weekStarts.map((w) => {
               const text = drafts[w] ?? (saved.has(w) ? String(saved.get(w)) : "");
               const operators = text.trim() === "" ? undefined : Number(text);
-              const cap = operatorWeekCapacity({
+              const cap = operatorWeekHours({
                 crewSizes,
                 workingDays: workingDaysOf(w),
                 weeklyOperators: operators,
+                shiftMinutes,
               });
               return (
                 <tr key={w} className={w in drafts ? "bg-amber-50" : ""}>
@@ -161,11 +165,11 @@ export function OperatorWeeklyTable({
                   <td className="border border-border px-2 py-1">
                     {operators === undefined ? "—" : shiftHeadcountFromWeekly(operators)}
                   </td>
-                  <td className="border border-border px-2 py-1">{fmt(cap.machineShifts)}</td>
+                  <td className="border border-border px-2 py-1">{fmt(cap.machineHours)}</td>
                   <td className="border border-border px-2 py-1">
-                    {cap.operatorShifts === null ? "—" : fmt(cap.operatorShifts)}
+                    {cap.operatorHours === null ? "—" : fmt(cap.operatorHours)}
                   </td>
-                  <td className="border border-border px-2 py-1 font-medium">{fmt(cap.shifts)}</td>
+                  <td className="border border-border px-2 py-1 font-medium">{fmt(cap.hours)}</td>
                 </tr>
               );
             })}

@@ -198,6 +198,13 @@ function CapacityPage() {
         }
       />
 
+      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+        <InfoTip label="How the Capacity Dashboard works (Türkçe, English, Română)">
+          <CapacityHowItWorks />
+        </InfoTip>
+        <span>How it works · Nasıl çalışır · Cum funcționează</span>
+      </div>
+
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <span className="font-medium text-foreground">Performance based on:</span>
         {(
@@ -780,5 +787,71 @@ function Unassigned({ forecast }: { forecast: CapacityForecast }) {
         ))}
       </ul>
     </section>
+  )
+}
+
+/**
+ * Capacity Dashboard'un nasıl çalıştığı — üç dilde (Türkçe, English, Română).
+ * Sayılar sabit yazılmaz: vardiya saati ve operatör örneği ayarlardan okunur
+ * (SETTINGS_DEFAULTS); metin ile hesap çelişmez.
+ */
+function CapacityHowItWorks() {
+  const shiftHours = SETTINGS_DEFAULTS.shiftMinutes / 60
+  const machineHours = 3 * 5 * shiftHours
+  return (
+    <div className="space-y-3 text-sm">
+      <section>
+        <h4 className="font-semibold">Türkçe</h4>
+        <p>
+          Her hafta için <b>kapasite</b>, Work Calendar'daki net çalışma saatidir: tatiller düşülmüş
+          iş günleri × vardiya saati × vardiya sayısı; planlı duruşlar düşülür, bu hafta için yalnız
+          kalan saatler sayılır. <b>Talep</b> o haftanın ZPP ihtiyacının saat karşılığıdır; geçmiş
+          bakiye (overdue) bu haftaya eklenir ve stok en erken ihtiyaçtan düşülür. <b>Fazla</b> =
+          talep − kapasite, <b>boş</b> = kapasite − talep. Kümülatif sütun öne üretilebilecek ya da
+          müşteriyi bekletecek toplam saati gösterir.
+        </p>
+        <p>
+          Operatör planı olan cost center'da iki sınır vardır: <b>makine sınırı</b> = hat sayısı × 3
+          vardiya × iş günü × vardiya saati (ör. 1 hat, 5 iş günü, {shiftHours} saatlik vardiya →{' '}
+          {machineHours} saat); <b>operatör sınırı</b> = haftalık operatör ÷ ortalama ekip × iş günü ×
+          vardiya saati. Kapasite ikisinin küçüğüdür.
+        </p>
+      </section>
+      <section>
+        <h4 className="font-semibold">English</h4>
+        <p>
+          For each week, <b>capacity</b> is the net working time in the Work Calendar: working days
+          (holidays removed) × shift length × shifts per day, minus planned stops; only the hours still
+          ahead count for this week. <b>Demand</b> is that week's ZPP requirement converted to hours;
+          any overdue balance is added to this week, and stock is used from the earliest need onward.
+          <b> Excess</b> = demand − capacity, <b>free</b> = capacity − demand. The cumulative column
+          shows the total hours that could be built ahead or that would keep the customer waiting.
+        </p>
+        <p>
+          A cost center on the operator plan has two limits: the <b>machine limit</b> = lines × 3 shifts
+          × working days × shift hours (e.g. 1 line, 5 days, {shiftHours}-hour shifts →{' '}
+          {machineHours} hours); the <b>operator limit</b> = weekly operators ÷ average crew × working
+          days × shift hours. Capacity is the smaller of the two.
+        </p>
+      </section>
+      <section>
+        <h4 className="font-semibold">Română</h4>
+        <p>
+          Pentru fiecare săptămână, <b>capacitatea</b> este timpul net de lucru din Work Calendar: zile
+          lucrătoare (fără sărbători) × durata schimbului × schimburi pe zi, minus opririle planificate;
+          pentru săptămâna curentă se numără doar orele care urmează. <b>Cererea</b> este necesarul ZPP al
+          săptămânii, convertit în ore; soldul restant (overdue) se adaugă acestei săptămâni, iar stocul se
+          scade de la cea mai devreme necesitate. <b>Excedent</b> = cerere − capacitate, <b>liber</b> =
+          capacitate − cerere. Coloana cumulată arată totalul orelor care pot fi produse în avans sau care
+          ar face clientul să aștepte.
+        </p>
+        <p>
+          Un cost center cu plan de operatori are două limite: <b>limita mașinilor</b> = linii × 3 schimburi
+          × zile lucrătoare × durata schimbului (ex. 1 linie, 5 zile, schimburi de {shiftHours} ore →{' '}
+          {machineHours} ore); <b>limita operatorilor</b> = operatori pe săptămână ÷ echipa medie × zile
+          lucrătoare × durata schimbului. Capacitatea este cea mai mică dintre cele două.
+        </p>
+      </section>
+    </div>
   )
 }

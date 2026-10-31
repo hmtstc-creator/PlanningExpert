@@ -9,7 +9,7 @@ import { OVER_RECORDED } from '../lib/oeeBridge'
 import { SHORT_STOP_DATA_FROM } from '../lib/oeeShortStops'
 import { computeRunPlan } from '../lib/planning'
 import { allocateOperators, OPERATOR_EXAMPLE } from '../lib/operatorAllocation'
-import { OPERATOR_SHIFTS_PER_DAY, OPERATOR_WEEKLY_EXAMPLE, operatorWeekCapacity, shiftHeadcountFromWeekly } from '../lib/operatorCapacity'
+import { OPERATOR_SHIFTS_PER_DAY, OPERATOR_WEEKLY_EXAMPLE, operatorWeekCapacity, operatorWeekHours, shiftHeadcountFromWeekly } from '../lib/operatorCapacity'
 import { leadTimeLookup, type LeadTimeRow } from '../lib/rawLeadTime'
 import { CYCLE_DECIMALS, CYCLE_STORE_DECIMALS, cycleMinutesFromSeconds, formatCycleInput } from '../lib/rateModel'
 import { SETTINGS_DEFAULTS } from '../lib/settingsDefaults'
@@ -1721,6 +1721,8 @@ function OperatorPlanItem() {
     machines: OPERATOR_WEEKLY_EXAMPLE.crewSizes.length,
     avgCrew: OPERATOR_WEEKLY_EXAMPLE.crewSizes.reduce<number>((x, c) => x + c, 0) / OPERATOR_WEEKLY_EXAMPLE.crewSizes.length,
     cap: operatorWeekCapacity(OPERATOR_WEEKLY_EXAMPLE),
+    hours: operatorWeekHours({ ...OPERATOR_WEEKLY_EXAMPLE, shiftMinutes: SETTINGS_DEFAULTS.shiftMinutes }),
+    shiftHours: SETTINGS_DEFAULTS.shiftMinutes / 60,
   }
   return (
     <li>
@@ -1754,13 +1756,15 @@ function OperatorPlanItem() {
       people work in the week, not per shift. On a working day with no per-shift operator count the
       plan uses ⌊weekly ÷ {OPERATOR_SHIFTS_PER_DAY}⌋ operators on each of the{' '}
       {OPERATOR_SHIFTS_PER_DAY} shifts (the per-shift grid, for the first two weeks, always wins).
-      The Capacity dashboard caps the week at min(machines × {OPERATOR_SHIFTS_PER_DAY} × working
-      days, weekly operators ÷ average crew × working days) shifts; without a weekly count it is
-      machines × {OPERATOR_SHIFTS_PER_DAY} × working days. Example: {weekly.machines} lines with crews{' '}
+      The Capacity dashboard works in hours: each shift is the Work Calendar shift length
+      ({weekly.shiftHours} h here). The week's machine limit is machines × {OPERATOR_SHIFTS_PER_DAY} ×
+      working days × shift hours; the operator limit is weekly operators ÷ average crew × working
+      days × shift hours; the capacity is the smaller of the two. Without a weekly count it is the
+      machine limit. Example: {weekly.machines} lines with crews{' '}
       {OPERATOR_WEEKLY_EXAMPLE.crewSizes.join(', ')} (average {weekly.avgCrew}),{' '}
       {OPERATOR_WEEKLY_EXAMPLE.workingDays} working days, {OPERATOR_WEEKLY_EXAMPLE.weeklyOperators} operators:
-      machine limit {weekly.cap.machineShifts}, operator limit {weekly.cap.operatorShifts} → capacity{' '}
-      {weekly.cap.shifts} shifts; on a day without a per-shift count{' '}
+      machine limit {weekly.hours.machineHours} h, operator limit {weekly.hours.operatorHours} h →
+      capacity {weekly.hours.hours} h ({weekly.cap.shifts} shifts); on a day without a per-shift count{' '}
       {shiftHeadcountFromWeekly(OPERATOR_WEEKLY_EXAMPLE.weeklyOperators)} operators per shift.
     </li>
   )

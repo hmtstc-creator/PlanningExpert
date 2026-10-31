@@ -716,6 +716,7 @@ function PressCalendarSection() {
       {selectedCc?.planningModel === 'operator' ? (
         <>
           <OperatorWeeklyTable
+            shiftMinutes={shiftMinutes}
             costCenter={selectedCc.code}
             lines={gridPresses}
             weekStarts={currentWeeks}

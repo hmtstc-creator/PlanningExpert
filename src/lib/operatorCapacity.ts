@@ -125,3 +125,31 @@ export const OPERATOR_WEEKLY_EXAMPLE = {
   workingDays: 5,
   weeklyOperators: 12,
 } as const
+
+export interface OperatorWeekHours {
+  /** Makine sınırı (saat): makine × 3 vardiya × iş günü × vardiya saati. */
+  machineHours: number
+  /** Operatör sınırı (saat); haftalık yoksa null. */
+  operatorHours: number | null
+  /** Haftanın kapasitesi (saat): ikisinin küçüğü. */
+  hours: number
+}
+
+/**
+ * Aynı hafta, saat cinsinden. Vardiya saati Work Calendar'daki vardiya
+ * süresinden gelir (`shiftMinutes`). Örnek: 1 hat, 3 vardiya, 5 iş günü,
+ * vardiya 7,5 saat → makine sınırı 3 × 5 × 7,5 = 112,5 saat.
+ */
+export function operatorWeekHours(input: {
+  crewSizes: readonly (number | undefined)[]
+  workingDays: number
+  weeklyOperators?: number
+  shiftMinutes: number
+}): OperatorWeekHours {
+  const shifts = operatorWeekCapacity(input)
+  const shiftHours = Math.max(0, input.shiftMinutes) / 60
+  const machineHours = round2(shifts.machineShifts * shiftHours)
+  if (shifts.operatorShifts === null) return { machineHours, operatorHours: null, hours: machineHours }
+  const operatorHours = round2(shifts.operatorShifts * shiftHours)
+  return { machineHours, operatorHours, hours: Math.min(machineHours, operatorHours) }
+}
