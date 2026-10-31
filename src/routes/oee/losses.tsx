@@ -4,12 +4,15 @@ import { useMemo, useRef, useState } from 'react'
 import { api } from '../../../convex/_generated/api'
 import { Legend, LineTrendChart, pct } from '../../components/OeeCharts'
 import { OeeControls, OeeDataNotice, effectiveScope, useOeeConfig, useOeeSelection } from '../../components/OeePanel'
+import { OeeParetoChart } from '../../components/OeeParetoChart'
 import { PageHeader } from '../../components/PageHeader'
 import { PrintFilterHeader } from '../../components/OeePrint'
 import { dm } from '../../components/OeePeriodControl'
 import { SavePdfButton } from '../../components/SavePdfButton'
 import { pdfFileName } from '../../lib/pdfFile'
 import { sheetToPdf } from '../../lib/pdfSheet'
+import { useOeeFilters } from '../../lib/oeeFilters'
+import { columnMinutes, machineMinutes, paretoView, subLossMachines, subLossMinutes } from '../../lib/oeePareto'
 import { useQuery } from '../../lib/convexTransport'
 import {
   SPEED,
@@ -78,10 +81,23 @@ function LossesPage() {
   // Kısa duruşlar (< eşik) "Short stops" sütununa, hız kaybından ayrı (src/lib/oeeShortStops.ts).
   const stopRaw = (useQuery(api.oee.stopDays, { from: trendFrom, to: sel.sunday }) ?? []) as StoredStopDay[]
   const split = useMemo(() => splitShortStops(fromStoredLosses(lossRaw), fromStoredStops(stopRaw), config), [lossRaw, stopRaw, config])
-  const lossDays = split.lossDays
+  const allLoss = split.lossDays
   const scope = effectiveScope(sel.scope, areaNames(dayRows, config))
   const label = scopeLabel(scope, config)
-  const columns = useMemo(() => chartGroups(config, lossDays), [config, lossDays])
+  const columns = useMemo(() => chartGroups(config, allLoss), [config, allLoss])
+  // İş merkezi (Work Center) filtresi: ortak OEE filtresinin machine alanı. Trend ve
+  // paretolar seçili iş merkezine göre daralır; "" = kapsamdaki bütün iş merkezleri.
+  const [shared, setFilters] = useOeeFilters()
+  const machines = useMemo(() => {
+    const names = new Set<string>()
+    for (const r of dayRows) if (r.workCenter && inScope(r, scope, config)) names.add(r.workCenter)
+    for (const d of allLoss) if (d.workCenter && inScope(d, scope, config)) names.add(d.workCenter)
+    return [...names].sort()
+  }, [dayRows, allLoss, scope, config])
+  const machine = machines.includes(shared.machine) ? shared.machine : ''
+  const setMachine = (m: string) => setFilters({ machine: m })
+  const days = machine ? dayRows.filter((r) => r.workCenter === machine) : dayRows
+  const lossDays = machine ? allLoss.filter((d) => d.workCenter === machine) : allLoss
 
   const [view, setView] = useState<'weeks' | 'days'>('weeks')
   const [picked, setPicked] = useState<string | null>(null)
@@ -93,7 +109,7 @@ function LossesPage() {
   }
 
   const coverageNotes = useMemo(() => {
-    const cov = lossCoverage(dayRows, lossDays, scope, config, sel.monday, sel.sunday)
+    const cov = lossCoverage(dayRows, allLoss, scope, config, sel.monday, sel.sunday)
     const d2 = (d: string) => `${d.slice(8)}.${d.slice(5, 7)}`
     const out: string[] = []
     if (cov.noDowntimes.length) out.push(`No downtimes uploaded for ${cov.noDowntimes.map(d2).join(', ')} — losses of these days are missing from the percentages.`)
@@ -101,10 +117,10 @@ function LossesPage() {
     const note = shortStopNote(split, config)
     if (note) out.push(note)
     return out
-  }, [dayRows, lossDays, split, scope, config, sel.monday, sel.sunday])
+  }, [dayRows, allLoss, split, scope, config, sel.monday, sel.sunday])
 
   // Haftalar: süreler OEE Dashboard ile aynı kaynaktan (günler ya da yüklenen hafta).
-  const perWeek = useMemo(() => weekTimes(dayRows, periods?.weekly ?? []), [dayRows, periods])
+  const perWeek = useMemo(() => weekTimes(days, periods?.weekly ?? []), [days, periods])
   const weekPeriods = useMemo<Period[]>(
     () =>
       Array.from({ length: weeksN }, (_, i) => {
@@ -123,11 +139,11 @@ function LossesPage() {
     () =>
       DAY_LABELS.map((d, i) => {
         const date = addDaysIso(sel.monday, i)
-        const b = lossForPeriod(dayRows, lossDays, scope, config, date, date)
+        const b = lossForPeriod(days, lossDays, scope, config, date, date)
         const lds = lossDays.filter((x) => x.date === date && inScope(x, scope, config))
         return { key: date, label: `${d} ${date.slice(8)}`, loadingMin: b.loadingMin, lossDays: lds, hasDowntime: lds.length > 0, share: (col) => chartShare(b, col) }
       }),
-    [dayRows, lossDays, scope, config, sel.monday],
+    [days, lossDays, scope, config, sel.monday],
   )
   const shown = view === 'weeks' ? weekPeriods : dayPeriods
 
@@ -171,8 +187,32 @@ function LossesPage() {
   // A4 PDF: adı seçili günle "GGAAYY LOSSES TREND".
   const sheetRef = useRef<HTMLDivElement>(null)
   const fileName = pdfFileName(sel.date, 'LOSSES TREND')
-  const filters = [label, `Loss ${loss}${subLabel ? ` → ${subLabel}` : ''}`, `Week W${sel.week.week} (${dm(sel.monday)} – ${dm(sel.sunday)})`]
-  const noData = dayRows.length === 0 && lossDays.length === 0
+  const filters = [
+    label,
+    `Work center ${machine || 'all'}`,
+    `Loss ${loss}${subLabel ? ` → ${subLabel}` : ''}`,
+    `Week W${sel.week.week} (${dm(sel.monday)} – ${dm(sel.sunday)})`,
+  ]
+  const noData = dayRows.length === 0 && allLoss.length === 0
+
+  // Paretolar (seçili hafta). Duruş ve alt duruş grafikleri seçili iş merkezine göre
+  // daralır; makine dağılımları (duruş → makine, alt duruş → makine) kapsamdaki tüm
+  // iş merkezlerini gösterir, böylece hangi makinenin payı büyük görülür.
+  const weekAll = useMemo(
+    () => allLoss.filter((d) => d.date >= sel.monday && d.date <= sel.sunday && inScope(d, scope, config)),
+    [allLoss, sel.monday, sel.sunday, scope, config],
+  )
+  const weekLoss = useMemo(() => (machine ? weekAll.filter((d) => d.workCenter === machine) : weekAll), [weekAll, machine])
+  const isSpeed = loss === SPEED
+  const pColumns = useMemo(() => paretoView(columnMinutes(weekLoss, config)), [weekLoss, config])
+  const pMachines = useMemo(() => paretoView(isSpeed ? [] : machineMinutes(weekAll, config, loss)), [weekAll, config, loss, isSpeed])
+  const pSubs = useMemo(() => paretoView(isSpeed ? [] : subLossMinutes(weekLoss, config, loss)), [weekLoss, config, loss, isSpeed])
+  const activeSub = subLabel || pSubs.bars[0]?.key || ''
+  const pSubMachines = useMemo(
+    () => paretoView(isSpeed || !activeSub ? [] : subLossMachines(weekAll, config, loss, activeSub)),
+    [weekAll, config, loss, isSpeed, activeSub],
+  )
+  const fmt = minutes
 
   return (
     <div className="mx-auto w-full max-w-[297mm] px-4 py-6 sm:px-6 sm:py-8">
@@ -200,7 +240,7 @@ function LossesPage() {
         rows={dayRows}
         config={config}
         actions={
-          <SavePdfButton fileName={fileName} make={() => sheetToPdf(sheetRef.current!, { size: 'A4', orientation: 'landscape', pages: 'flow' })} />
+          <SavePdfButton fileName={fileName} make={() => sheetToPdf(sheetRef.current!, { size: 'A4', orientation: 'landscape', pages: 'fit' })} />
         }
       />
       <OeeDataNotice items={coverageNotes} />
@@ -247,6 +287,21 @@ function LossesPage() {
             </select>
           </label>
         )}
+        <label className="block max-w-md">
+          <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Work center</span>
+          <select
+            value={machine}
+            onChange={(e) => setMachine(e.target.value)}
+            className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+          >
+            <option value="">All work centers</option>
+            {machines.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <div ref={sheetRef} className="oee-viz bg-background">
@@ -293,7 +348,7 @@ function LossesPage() {
               ]}
             />
             <LineTrendChart
-              height={280}
+              height={190}
               labels={shown.map((p) => p.label)}
               series={[
                 { key: loss, label: loss, slot: lossIndex + 1, values: shown.map((p) => valueOf(p)) },
@@ -308,7 +363,7 @@ function LossesPage() {
 
           {/* Alt kayıplar: bu hafta ve geçen hafta; satıra tıklamak seçer. */}
           {loss !== SPEED && (
-            <div className="mt-4">
+            <div className="mt-4 print:hidden">
               <p className="text-xs font-medium text-muted-foreground">
                 Sub-losses of {loss} — W{sel.week.week} vs W{isoWeek(prevMonday).week}
               </p>
@@ -353,6 +408,48 @@ function LossesPage() {
             </div>
           )}
         </section>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <OeeParetoChart
+            title="Downtime losses"
+            subtitle={`W${sel.week.week} · ${label}${machine ? ` · ${machine}` : ''}`}
+            view={pColumns}
+            selected={loss}
+            onSelect={pickLoss}
+            format={fmt}
+            unit="min"
+            emptyText="No downtimes in this week."
+          />
+          <OeeParetoChart
+            title={`${loss} — by work center`}
+            subtitle={`W${sel.week.week} · all work centers in ${label}`}
+            view={pMachines}
+            selected={machine}
+            onSelect={(m) => setMachine(m === machine ? '' : m)}
+            format={fmt}
+            unit="min"
+            emptyText={isSpeed ? 'Speed has no downtimes or work-center breakdown.' : `No ${loss} downtimes this week.`}
+          />
+          <OeeParetoChart
+            title={`${loss} — by sub-loss`}
+            subtitle={`W${sel.week.week} · ${machine || label}`}
+            view={pSubs}
+            selected={subLabel}
+            onSelect={(t) => setSub(t === subLabel ? '' : t)}
+            format={fmt}
+            unit="min"
+            emptyText={isSpeed ? 'Speed has no sub-losses.' : `No ${loss} sub-losses this week.`}
+          />
+          <OeeParetoChart
+            title={activeSub ? `${activeSub} — by work center` : 'Sub-loss — by work center'}
+            subtitle={`W${sel.week.week} · ${loss}${subLabel ? '' : ' · top sub-loss'}`}
+            view={pSubMachines}
+            selected={machine}
+            onSelect={(m) => setMachine(m === machine ? '' : m)}
+            format={fmt}
+            unit="min"
+            emptyText="No sub-loss downtimes this week."
+          />
+        </div>
       </div>
     </div>
   )
