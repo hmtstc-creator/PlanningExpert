@@ -64,6 +64,7 @@ function ComparePage() {
           <input type="number" min={1} max={26} className="mt-1 block w-20 rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground" value={weeks} onChange={(e) => setWeeks(Math.max(1, Math.min(26, Number(e.target.value) || 1)))} />
         </label>
       </div>
+      {data === undefined && <p className="mt-6 text-sm text-muted-foreground">Loading plants…</p>}
       {data && data.plants.length === 0 && <p className="mt-6 text-sm text-muted-foreground">No plant with OEE permission.</p>}
       {data && data.plants.length > 0 && (
         <div className="mt-4 overflow-x-auto rounded-lg border border-border">
