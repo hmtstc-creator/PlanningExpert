@@ -828,4 +828,4 @@ Excel hatası olduğunu doğruladı (site doğru). Karar **önleme amaçlı**:
 26. Seçili hafta için dört dikey pareto (çubuk = toplamın %'si, çizgi = kümülatif %, tek ölçek
     0–100): **duruşlar**; **duruş → iş merkezleri**; **duruş → alt duruşlar**; **alt duruş →
     iş merkezleri**. Duruşa ya da makineye tıklamak seçer. Speed bir duruş değildir, paretoda yok.
-27. Bütün sayfa (trend + 4 pareto + filtre özeti) tek A4 yatay sayfaya sığar (PDF: fit).
+27. Bütün sayfa (trend + 4 pareto + filtre özeti) tek A4 dikey sayfaya sığar (PDF: fit, portrait).
