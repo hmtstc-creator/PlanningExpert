@@ -49,34 +49,30 @@ claude_sor() { # $1 model
     --disallowedTools "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,Agent"
 }
 
-# Gemini görevi yazar ve verify'ı yeşile çevirir (scripts/qwen-yesil.sh, aynı sınırlar).
-# $1 dal (o anki çalışma dalı), $2 görev metni. Sonuç: değişiklikler çalışma kopyasında.
-# GEMINI_API_KEY varsa yerelde; yoksa GitHub iş akışında (anahtar orada, sunucuda gizli
-# değer gerekmez): dal itilir, qwen-yesil.yml tetiklenir, qwen/<dal> farkı uygulanır.
-gemini_yaz() {
-  local dal=$1 gorev=$2 run rc
-  if [ -n "${GEMINI_API_KEY:-}" ]; then
-    QWEN_ONCE=gemini QWEN_TUR=4 QWEN_GOREV="$gorev" timeout 1500 ./scripts/qwen-yesil.sh > "$OTONOM_STATE/son-gemini.txt" 2>&1
-    rc=$?
-    git checkout -q -- qwen-rapor.md 2>/dev/null; git clean -qf -- qwen-rapor.md .qwen-verify.txt
-    return $rc
-  fi
-  git push -q -f origin "HEAD:refs/heads/$dal" || return 1
-  gh api -X POST "repos/$REPO_SLUG/actions/workflows/qwen-yesil.yml/dispatches" \
-    -f ref=main -f "inputs[dal]=$dal" -f "inputs[model]=gemini" -f "inputs[gorev]=$gorev" || return 1
-  sleep 20
-  run=$(gh run list -R "$REPO_SLUG" -w qwen-yesil.yml -L 5 --json databaseId,displayTitle,createdAt \
-    -q "[.[] | select(.displayTitle | contains(\"$dal\"))][0].databaseId // empty")
-  [ -n "$run" ] || run=$(gh run list -R "$REPO_SLUG" -w qwen-yesil.yml -L 1 --json databaseId -q '.[0].databaseId')
-  timeout 1800 gh run watch "$run" -R "$REPO_SLUG" --exit-status > "$OTONOM_STATE/son-gemini.txt" 2>&1
-  rc=$?
-  if git fetch -q origin "qwen/$dal" 2>/dev/null; then
-    git diff HEAD FETCH_HEAD -- . ':!qwen-rapor.md' | git apply --index || rc=1
-    git push -q origin --delete "qwen/$dal" 2>/dev/null
-  else
-    rc=1
-  fi
-  return $rc
+# Görevi Claude yazar (kullanıcı kararı 2026-10-31: Gemini / Qwen kaldırıldı). En küçük modelden
+# başlar, verify kırmızıysa ya da korunan dosyaya dokunduysa bir üst modelle baştan dener:
+# haiku → sonnet → opus. Her deneme o anki HEAD'den başlar (görev dalı ya da yayın dalı).
+# $1 görev metni. Sonuç: değişiklikler çalışma kopyasında; yazan model $OTONOM_STATE/son-model.
+KORUNAN_RE='planPipeline|scheduler|planValidator|src/lib/planning\.ts|oee|rawMrp|rawLeadTime|convex/schema\.ts|convex/otonom\.ts|planlogic|package(-lock)?\.json|tsconfig|vite\.config|^deploy/|^scripts/|^\.github/|^docs/|CLAUDE\.md|^\.claude/'
+claude_yaz() {
+  local gorev=$1 m
+  for m in haiku sonnet opus; do
+    git checkout -q -- . && git clean -qfd -e node_modules
+    { cat scripts/otonom/kod-prompt.md; echo; echo "## Görev"; echo "$gorev"; } |
+      timeout 1500 claude -p --model "$m" --max-turns 40 --permission-mode acceptEdits \
+        --allowedTools "Read,Edit,Write,Glob,Grep,Bash(npm run verify),Bash(npx vitest run *),Bash(git diff *),Bash(git status)" \
+        --disallowedTools "WebFetch,WebSearch,Agent" > "$OTONOM_STATE/son-kod-$m.txt" 2>&1
+    git add -A
+    if [ -n "$(git diff --cached --name-only --diff-filter=DR)" ] || git diff --cached --name-only | grep -Eq "$KORUNAN_RE"; then
+      log "  $m: korunan dosya / silme — sonraki model"; git reset -q; continue
+    fi
+    git reset -q
+    if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then log "  $m: değişiklik yok"; continue; fi
+    if npm run verify > "$OTONOM_STATE/son-verify.txt" 2>&1; then echo "$m" > "$OTONOM_STATE/son-model"; log "  $m: verify yeşil"; return 0; fi
+    log "  $m: verify kırmızı — sonraki model"
+  done
+  git checkout -q -- . && git clean -qfd -e node_modules
+  return 1
 }
 
 mkdir -p "$KUYRUK" "$HAZIR" "$BITEN" 2>/dev/null || true

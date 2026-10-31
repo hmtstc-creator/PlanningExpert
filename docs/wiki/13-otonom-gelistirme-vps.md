@@ -1,7 +1,7 @@
 # 13 · Otonom geliştirme (VPS) — mimari
 
-> Son güncelleme: 2026-10-30 (kuruldu: `scripts/otonom/*`, `planningexpert-otonom-*` zamanlayıcıları, Administration → *Autonomous development*). **Durum: KURULU, KAPALI** — aşağıdaki *Açma* adımları bitince çalışır.
-> Kullanıcı 2026-10-30 "başla" dedi. Kapatmak için tek komut: `touch /etc/otonom/DURDUR`.
+> Son güncelleme: 2026-10-31 (kodu Claude yazar: haiku → sonnet → opus; Gemini / Qwen kaldırıldı; sitede aç / kapat düğmesi). **Durum: KURULU, KAPALI** — site sahibi Administration → *Autonomous development* → *Start* ile açar.
+> Acil durdurma sunucuda: `touch /etc/otonom/DURDUR` (düğme kapalıyken de konur).
 
 ## Amaç
 
@@ -98,15 +98,25 @@ toplantı kalitesi düşerse yeniden değerlendirilir.
 4. Otonom Gelişim sayfası + Convex tablosu.
 5. İlk tur elle çalıştırılır, sonuç kullanıcıya gösterilir; sonra timer'lar açılır.
 
+## Güncel durum (2026-10-31) — aşağıdaki tarihçeyi geçersiz kılar
+
+- **Kodu Claude yazar** (`ortak.sh` → `claude_yaz`): haiku ile başlar; verify kırmızıysa ya da korunan dosyaya / silmeye
+  dokunduysa sonnet, sonra opus ile baştan dener. Toplantı da haiku'dan başlar, geçersiz JSON'da büyür (`toplanti.sh`).
+  Kurallar: `scripts/otonom/kod-prompt.md`. Gemini / Qwen / GitHub iş akışı **yok**; sunucuda gizli anahtar gerekmez.
+- **Aç / kapat:** `convex/otonom.ts` (`durum`, `ayarla` yalnız site sahibi; `aktifMi` iç sorgu, `platformState`
+  anahtarı `otonomAktif`, şema değişmedi). `planningexpert-otonom-anahtar` (root, 5 dakikada bir, `anahtar.sh`)
+  okur ve `/etc/otonom/DURDUR`'u koyar / kaldırır. İlk kurulumda DURDUR konur (varsayılan kapalı).
+- Sunucuda hazır: `otonom` kullanıcısı, `claude` (npm, girişli) ve `gh` (girişli). `/etc/otonom/env` yalnız `OTONOM_GUNLUK_PR`.
+
 ## Kurulum (kodda)
 
 | Parça | Dosya | Saat |
 |---|---|---|
 | Ortak ayar, açık/kapalı kontrolü, kilit | `scripts/otonom/ortak.sh` | — |
 | Kullanıcı `otonom`, `/etc/otonom/env`, klon, `claude` + `gh` CLI (idempotent, root) | `scripts/otonom/kur.sh` | :50 öncesi |
-| Toplantı (sonnet, araçsız) → `kuyruk/` | `toplanti.sh` + `toplanti-prompt.md` | :00 |
-| Gemini yazar (`qwen-yesil.sh`, aynı sınırlar) → verify → haiku onayı → `hazir/` | `uygula.sh` + `onay-prompt.md` | :05 |
-| Toplu dal → verify → tek PR → CI yeşil (Gemini ≤3 düzeltme) → squash merge | `yayinla.sh` | :40 |
+| Toplantı (haiku'dan başlar, araçsız) → `kuyruk/` | `toplanti.sh` + `toplanti-prompt.md` | :00 |
+| Claude yazar (`claude_yaz`, haiku → sonnet → opus) → verify → haiku onayı → `hazir/` | `uygula.sh` + `onay-prompt.md` | :05 |
+| Toplu dal → verify → tek PR → CI yeşil (Claude ≤3 düzeltme) → squash merge | `yayinla.sh` | :40 |
 | Kayıt kartı + `docs/otonom/durum.md` | `gunluk.mjs` → `src/data/otonom-gunluk.json` | :40 |
 | Sayfa ilişki haritası | `harita.mjs` → `docs/otonom/harita.md` | :00, :40 |
 | Yayında mı? değilse `planningexpert-autodeploy` hemen | `dogrula.sh` (root) | :50 |

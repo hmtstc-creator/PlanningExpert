@@ -21,7 +21,12 @@ log "toplantı $ZAMAN — odak: $ODAK"
   echo; echo "## Odak sayfa: $ODAK (ilk 220 satır)"; head -n 220 "$ODAK"
 } > "$OTONOM_STATE/son-toplanti-girdi.md"
 
-claude_sor sonnet < "$OTONOM_STATE/son-toplanti-girdi.md" > "$OTONOM_STATE/son-toplanti.txt" || { log "claude hata"; exit 1; }
+# En küçük modelden başla; geçerli JSON gelmezse bir üst model (kullanıcı kuralı, CLAUDE.md).
+for m in haiku sonnet opus; do
+  claude_sor "$m" < "$OTONOM_STATE/son-toplanti-girdi.md" > "$OTONOM_STATE/son-toplanti.txt" 2>&1
+  node -e 'const t=require("fs").readFileSync(process.argv[1],"utf8");JSON.parse(t.slice(t.indexOf("{"),t.lastIndexOf("}")+1))' "$OTONOM_STATE/son-toplanti.txt" 2>/dev/null && { log "toplantı modeli: $m"; break; }
+  [ "$m" = opus ] && { log "toplantı çıktısı okunamadı"; exit 1; }
+done
 
 node - "$OTONOM_STATE/son-toplanti.txt" "$KUYRUK" "$ZAMAN" "$ODAK" "$OTONOM_STATE/toplantilar.jsonl" <<'JS'
 const fs = require('fs')

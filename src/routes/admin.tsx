@@ -1,7 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { AutonomousLog } from '../components/AutonomousLog'
+import { AutonomousLog, AutonomousSwitch } from '../components/AutonomousLog'
 import { CompanyUsers } from '../components/CompanyAdmin'
 import { PageHeader } from '../components/PageHeader'
 import { SecurityPanel } from '../components/security/SecurityPanel'
@@ -76,7 +76,12 @@ function AdminPage() {
         {tab === 'security' && <SecurityPanel />}
         {tab === 'history' && <AuditList />}
         {tab === 'errors' && <SystemErrors />}
-        {tab === 'autonomous' && owner && <AutonomousLog />}
+        {tab === 'autonomous' && owner && (
+          <>
+            <AutonomousSwitch />
+            <AutonomousLog />
+          </>
+        )}
       </div>
     </div>
   )

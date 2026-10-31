@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# :40 — hazır görevler tek dalda toplanır, tam verify, tek PR, CI yeşile dönene kadar (Gemini
-# düzeltir, en çok 3 tur; olmazsa PR kapanır, main bozulmaz), squash merge. Otonom Gelişim
+# :40 — hazır görevler tek dalda toplanır, tam verify, tek PR, CI yeşile dönene kadar (Claude
+# düzeltir, haiku → sonnet → opus; en çok 3 tur; olmazsa PR kapanır, main bozulmaz), squash merge. Otonom Gelişim
 # kaydı (src/data/otonom-gunluk.json) ve durum.md aynı PR'da güncellenir.
 . "$(dirname "$0")/ortak.sh"
 otonom_acik_mi || exit 0
@@ -51,8 +51,8 @@ for tur in 1 2 3 4; do
   [ "$tur" = 4 ] && break
   run=$(gh run list -R "$REPO_SLUG" -b "$DAL" -L 1 --json databaseId -q '.[0].databaseId')
   hata=$(gh run view "$run" -R "$REPO_SLUG" --log-failed 2>/dev/null | tail -n 40)
-  log "CI kırmızı (tur $tur) — Gemini düzeltiyor"
-  gemini_yaz "$DAL" "CI failed on this branch. Fix the root cause; never skip or disable a test. Last log lines: $hata"
+  log "CI kırmızı (tur $tur) — Claude düzeltiyor"
+  claude_yaz "CI failed on this branch. Fix the root cause; never skip or disable a test. Last log lines: $hata"
   git add -A && git -c user.name="otonom" -c user.email="otonom@planningexpert" commit -qm "Otonom: CI düzeltmesi (tur $tur)" && git push -q
 done
 # 4 turda yeşil olmadı: PR kapanır, görevler başarısız kaydına düşer, main hiç bozulmaz.

@@ -16,25 +16,29 @@ Bu dosya depoda çalışan her Claude oturumu (bulut ya da sunucu) için geçerl
   yalnız sonuç gelir.
 - **Kısa yanıt:** yapılanı özetlemek için dosyayı tekrar okuma; Edit hata vermediyse değişiklik yapılmıştır.
   Kullanıcıya 3–6 madde, kod dökümü yok.
-- **Model seçimi otomatiktir** (kullanıcı kararı 2026-10-25): oturum varsayılan olarak `sonnet` ile açılır
-  (`.claude/settings.json`). Ana oturum işin derinliğine kendisi karar verir:
-  - basit / tek dosya / metin / küçük hata → kendisi yapar;
-  - mekanik çok dosyalı tarama, yeniden adlandırma → `hizli` ajanı (haiku);
-  - motor, doğrulayıcı, OEE mantığı, mimari karar, iki denemede çözülemeyen hata → `derin` ajanı (opus, yüksek çaba),
-    **dar ve tek paragraflık** bir görevle (ajan bağlamı sıfırdan kurar; gereksiz çağrı tokeni artırır).
+- **Model: en küçükten başla, gerekince büyüt, sonra geri in** (kullanıcı kararı 2026-10-31 — "acelemiz yok,
+  yavaş ama doğru yazması yeterli"). Hem kullanıcı talimatlarında hem otonom gelişimde geçerli:
+  - oturum `haiku` ile açılır (`.claude/settings.json`); iş önce en küçük modelle denenir;
+  - zorluk artarsa bir basamak çıkılır: mekanik / çok dosyalı tarama → `hizli` (haiku), orta iş → sonnet,
+    motor / doğrulayıcı / OEE mantığı, mimari karar, iki denemede çözülemeyen hata → `derin` (opus, yüksek çaba),
+    **dar ve tek paragraflık** bir görevle;
+  - zor parça bitince yeniden en küçük modele inilir (bir sonraki iş yine haiku'dan başlar).
+  - Otonom döngü aynı kuralı kodda uygular: `scripts/otonom/ortak.sh` → `claude_yaz` (haiku → sonnet → opus),
+    toplantı da haiku'dan başlar (`toplanti.sh`).
   Kullanıcıdan model değiştirmesi istenmez; yalnız `derin` de çözemezse kullanıcıya söylenir.
 
-## Kodu Qwen yazar, Claude denetler (zorunlu — kullanıcı kararı 2026-10-30)
+## Kodu Claude yazar (kullanıcı kararı 2026-10-31)
 
-- Kod yazma işi **Qwen görev modu**na verilir, **önce Gemini** (`gemini-2.5-flash`; kullanıcı kararı 2026-10-30 —
-  OpenRouter modeli görevi uygulamadı, Gemini ilk denemede doğru yazdı). İş akışının varsayılanı `model: gemini`,
-  OpenRouter yalnız yedek. Dal aç → push → tetikle (bulutta `gh workflow run` GraphQL 403 verir, REST kullan):
-  `gh api -X POST repos/hmtstc-creator/PlanningExpert/actions/workflows/qwen-yesil.yml/dispatches -f ref=main -f "inputs[dal]=<dal>" -F "inputs[gorev]=@<görev dosyası>"`
-  → `qwen/<dal>` diff'ini oku (rapor: `qwen-rapor/<dal>` dalındaki `qwen-rapor.md`) → uygunsa al, PR, birleştir;
-  değilse düzeltme göreviyle tekrar.
-- Görev metni dar ve tek paragraf olur (dosya, beklenen davranış, kabul şartı). Claude kodu kendisi yazmaz;
-  yalnız korunan dosyalar (motor, doğrulayıcı, OEE, Planning Logic, şema, belge/wiki) ya da Qwen iki denemede başaramazsa yazar.
+- Qwen / OpenRouter ve Gemini ile kod yazma **kaldırıldı** (ücretsiz kotalar doldu, kazanç sağlamadı). Kodu Claude
+  yazar, yukarıdaki model kuralıyla. **SOP Builder'ın Gemini kullanımı ayrıdır ve dokunulmaz** (video → SOP).
 - Kullanıcıya sonunda kısa "çözdüm" özeti verilir; kopyala-yapıştır istenmez.
+
+## Otonom geliştirme (wiki 13)
+
+- VPS'te saatlik döngü (`scripts/otonom/*`, `planningexpert-otonom-*`). **Varsayılan kapalı**; yalnız site sahibi
+  Administration → *Autonomous development* sekmesindeki düğmeyle açar / kapatır (5 dakikada sunucuya geçer).
+- Claude döngüyü kendisi açmaz; korunan dosyalara (motor, doğrulayıcı, OEE, şema, Planning Logic, deploy, belge)
+  otonom döngü dokunmaz, yalnız öneri yazar.
 
 ## Her talimattan önce: mimari etki kontrolü (zorunlu)
 

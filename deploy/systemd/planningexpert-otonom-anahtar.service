@@ -1,0 +1,14 @@
+# Otonom geliştirme (wiki 13): sitedeki Administration → Autonomous development düğmesini /etc/otonom/DURDUR olarak uygular (root, 5 dakikada bir).
+#   journalctl -u planningexpert-otonom-anahtar -n 50
+[Unit]
+Description=PlanningExpert otonom — Sitedeki aç / kapat düğmesini uygula
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Nice=19
+IOSchedulingClass=idle
+ExecStart=/opt/planningexpert/scripts/otonom/anahtar.sh
+TimeoutStartSec=5min

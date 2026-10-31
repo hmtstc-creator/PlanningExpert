@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# :05 — kuyruktaki her görevi Gemini yazar, yerelde verify yeşile çevrilir (scripts/qwen-yesil.sh,
-# aynı korunan dosya / boyut sınırları), ucuz Claude (haiku) diff'i onaylar (T5–T7).
+# :05 — kuyruktaki her görevi Claude yazar (claude_yaz: haiku → sonnet → opus, verify yeşil olana kadar),
+# ayrı bir haiku turu diff'i onaylar (T5–T7).
 # Onaylanan görev hazir/<id>.patch olur. 32 dakikada durur, kalan sonraki saate.
 . "$(dirname "$0")/ortak.sh"
 otonom_acik_mi || exit 0
@@ -13,11 +13,9 @@ for f in "$KUYRUK"/*.json; do
   id=$(basename "$f" .json)
   log "görev $id"
   temizle
-  git checkout -q -b "otonom/gorev-$id"
   gorev=$(node -e 'const g=require(process.argv[1]);console.log(g.gorev+"\nFiles: "+(g.dosyalar||[]).join(", "))' "$f")
-  gemini_yaz "otonom/gorev-$id" "$gorev"
+  claude_yaz "$gorev"
   rc=$?
-  git push -q origin --delete "otonom/gorev-$id" 2>/dev/null
   git add -A
   if [ "$rc" != 0 ] || git diff --cached --quiet; then
     log "görev $id: başarısız (rc=$rc)"; mv "$f" "$BITEN/$id.basarisiz.json"; continue
@@ -33,4 +31,3 @@ for f in "$KUYRUK"/*.json; do
   fi
 done
 temizle
-git branch | grep -o 'otonom/gorev-.*' | xargs -r git branch -qD

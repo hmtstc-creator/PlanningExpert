@@ -1,6 +1,6 @@
 # 05 · Yayın ve işletim
 
-> Son güncelleme: 2026-10-30 (Qwen görev modu) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
+> Son güncelleme: 2026-10-31 (Qwen / Gemini kod yazma kaldırıldı; otonom birimleri) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
 
 ## Çalışma şekli (özet)
 
@@ -18,17 +18,9 @@ dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
 - **CI başlamadıysa çakışmaya bak** (2026-10-23, #46): main'le çakışan PR'da (`mergeable_state: dirty`) `verify` hiç çalışmaz; main dala birleştirilir (aynı gün birden çok oturum main'e yazıyor, en sık `08-surum-gunlugu.md` tablosunun ilk satırı çakışır — iki satır da kalır).
 - **Birleşen PR'ın dalı otomatik silinir** (`.github/workflows/delete-merged-branches.yml`; `workflow_dispatch` ile eskiler tek seferde temizlenir).
 - **Yayın otomatiktir** (2026-10-22): `planningexpert-autodeploy.timer` → `scripts/deploy.sh`. Elle çalıştırmak gerekmez.
-- **Qwen: verify yeşile çevir** (2026-10-28, kullanıcı kararı): mekanik hataların düzeltme döngüsü Claude'un bağlamında
-  değil, ücretsiz bir modelde döner (`.github/workflows/qwen-yesil.yml` → `scripts/qwen-yesil.sh`). Tetikleme: PR'a `qwen`
-  etiketi ya da Actions → Run workflow (dal adı). `main`'de çalışmaz, en çok 4 tur.
-  **Çalışma dalına hiçbir şey itilmez:** yeşil olursa düzeltmeler ayrı bir dala (`qwen/<dal>`) iter, oradan çalışma dalına
-  yalnız Claude okuyup karar vererek alır (kullanıcı kararı 2026-10-28: "sen final kontrolcü ol"). Üç sınırdan biri
-  çiğnenirse her şey geri alınır ve iş kırmızı biter: **korunan yollar** (motor, doğrulayıcı, OEE, şema,
-  `architecture.test.ts`, `planlogic.tsx`, `package*.json`, `tsconfig`, `vite`/`vitest` ayarları, `.github/`, `scripts/`,
-  `deploy/`, `docs/`, `CLAUDE.md`, `QWEN.md`), **dosya silme / yeniden adlandırma**, **boyut** (en çok 10 dosya, 300 satır).
-  Kurallar `QWEN.md`'de; anahtar `QWEN_API_KEY` gizli değeri, sağlayıcı `QWEN_BASE_URL` / `QWEN_MODEL` değişkenleri
-  (varsayılan OpenRouter + `nvidia/nemotron-3-ultra-550b-a55b:free` (qwen3-coder ücretsizlikten çıktı, 2026-10-30)). Betiği denerken ayrı worktree kullan: koruma adımı
-  `git checkout -- .` ve `git clean -fd` çalıştırır.
+- **Qwen / Gemini ile kod yazma kaldırıldı** (2026-10-31, kullanıcı kararı): `qwen-yesil.yml`, `scripts/qwen-yesil.sh`,
+  `QWEN.md` silindi; kodu Claude yazar (CLAUDE.md → *Model*). SOP Builder'ın Gemini'si ayrıdır, yerinde.
+- **Otonom geliştirme** (wiki 13): `planningexpert-otonom-*` birimleri; aç / kapat sitedeki düğmeyle.
 
 ## `scripts/deploy.sh` ne yapar
 
@@ -49,12 +41,6 @@ Geri yükleme provası ayda bir (`deploy/README.md`). Şirket bazında dışa ak
 
 ## Güvenlik notları
 
-- **Qwen görev modu** (2026-10-30, kullanıcı kararı): kod yazma işinin tamamı Qwen'e verilir, Claude görev yazar,
-  denetler ve birleştirir. Claude bir dal açar, Run workflow'u `dal` + `gorev` ile tetikler; Qwen ilk turda görevi kodlar,
-  sonraki turlarda verify'ı yeşile çevirir. Aynı üç sınır geçerlidir; sonuç `qwen/<dal>` dalına gelir, Claude diff'i okur.
-  **Yedek modeller:** limit / model yok hatasında sırayla `QWEN_YEDEK_MODELLER` (varsayılan `openrouter/free`), sonra
-  `GEMINI_API_KEY` varsa Gemini ücretsiz API'si denenir; raporda turu yazan model görünür. Final kontrol her zaman Claude'da.
-  Korunan dosyalar (motor, doğrulayıcı, OEE, Planning Logic, şema, belge) gerektiren işi Claude kendisi yapar.
 - Yayın otomatik olduğu için `main` **ruleset ile korunur** (2026-10-22, *Settings → Rules → Rulesets → `main koruması`*, bypass listesi boş): silme ve force push yasak, doğrusal geçmiş, PR zorunlu (0 onay — tek kişi kendi PR'ını onaylayamaz), yalnız **squash**, `verify` yeşil olmalı (*up to date* zorunlu değil). Doğrudan `main`'e push reddedilir; her şey dal → PR → CI yoluyla girer.
 - Sunucudaki Claude oturumunun kalıcı izni yalnızca `deploy.sh` ve ilgili mesajlaşma içindir. Bulut oturumu sunucu oturumuna mesaj **gönderemez**
   (güvenilmeyen cihaz kuralı); sunucu bulut oturumuna yazabilir. Bu yüzden yayın zamanlayıcıya bırakıldı.

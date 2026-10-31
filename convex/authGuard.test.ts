@@ -104,6 +104,8 @@ describe('sunucu tarafı yetki denetimi', () => {
       'board.ts': /./,
       // Yalnızca platform tablosu errorLog'a yazar / okur.
       'errors.ts': /./,
+      // Yalnızca platformState'teki otonomAktif anahtarı; site sahibi denetimi işlevin içinde.
+      'otonom.ts': /./,
       'authInternal.ts': /internal(Query|Mutation)\(/,
       // SOP worker kuyruğu: tek worker bütün fabrikaların işini sırayla alır; yalnız sopJobs, http.ts jetonla korur.
       'sopQueue.ts': /internal(Query|Mutation)\(/,
