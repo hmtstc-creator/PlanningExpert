@@ -15,17 +15,31 @@ import {
   insertStep,
   mergeFrames,
   moveStep,
+  moveStepTo,
   patchStep,
   removePhoto,
   removeStep,
+  setApproval,
   setMark,
   setSecond,
   sopTitle,
   togglePpe,
 } from '../../../lib/sop/sopDraft'
-import { SHEET_H, SHEET_W, paginate } from '../../../lib/sop/sopLayout'
-import { LANGUAGE_NAMES, MAX_PHOTOS_PER_STEP, type Draft, type Language } from '../../../lib/sop/sopSchema'
+import { PRINT_MARGIN_MM, SHEET_H, SHEET_W, paginate } from '../../../lib/sop/sopLayout'
+import { APPROVAL_LABELS, APPROVAL_ROLES, LANGUAGE_NAMES, MAX_PHOTOS_PER_STEP, type Draft, type Language } from '../../../lib/sop/sopSchema'
+import {
+  addVersion,
+  clearAutosave,
+  readAutosave,
+  readVersions,
+  sameDraft,
+  writeAutosave,
+  writeVersions,
+  type SopVersion,
+} from '../../../lib/sop/sopVersions'
 import { useSafeMutation } from '../../../lib/useSafeMutation'
+
+const inputClass = 'w-full rounded-md border border-input bg-background px-2 py-1 text-sm'
 
 export const Route = createFileRoute('/machine-followup/sop/$id')({
   component: SopEditorPage,
@@ -203,6 +217,29 @@ function SopEditorPage() {
   const [drawing, setDrawing] = useState<{ step: number; photo: number } | null>(null)
   const sheets = useRef<(HTMLDivElement | null)[]>([])
   const { ref, k } = useFitScale()
+  const [versions, setVersions] = useState<SopVersion[]>([])
+  const [showVersions, setShowVersions] = useState(false)
+  const [preview, setPreview] = useState<SopVersion | null>(null)
+  /** En son ekrandaki taslak nesnesi: kayıt bitince yerel kopya yalnız değişmemişse silinir. */
+  const latest = useRef<Draft | null>(null)
+  const restored = useRef(false)
+
+  // Yerel taslak (B1): sayfa yeniden açılınca sunucudakinden farklıysa sor.
+  useEffect(() => {
+    if (!job || restored.current) return
+    restored.current = true
+    setVersions(readVersions(localStorage, id))
+    const local = readAutosave(localStorage, id)
+    if (!local) return
+    if (!sameDraft(local.draft, job.draft) && window.confirm('Kaydedilmemiş taslak bulundu, geri yüklensin mi?')) {
+      latest.current = local.draft
+      setDraft(local.draft)
+      setDirty(true)
+    } else {
+      clearAutosave(localStorage, id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job, id])
 
   // Sunucudaki taslak değişince (yeni kare geldi): kaydedilmemiş yazı varsa yalnız kareler alınır.
   const serverJson = job ? JSON.stringify(job.draft) : ''
@@ -214,13 +251,26 @@ function SopEditorPage() {
 
   const pending = useMemo(() => new Set((job?.pendingFrames ?? []).map((f) => `${f.step}:${f.photo}`)), [job?.pendingFrames])
   const change = (d: Draft) => {
+    latest.current = d
     setDraft(d)
     setDirty(true)
+    writeAutosave(localStorage, id, d, Date.now())
   }
   const persist = async (d: Draft) => {
     const ok = await save.run({ id, draftJson: JSON.stringify(d) })
-    if (ok) setDirty(false)
+    if (ok) {
+      setDirty(false)
+      if (latest.current === d) clearAutosave(localStorage, id)
+    }
     return ok
+  }
+  /** Elle kayıt (B2): her kayıt yeni bir sürüm olur; not isteğe bağlı. */
+  const saveNow = async (d: Draft) => {
+    const note = window.prompt('Version note (short, optional):', '') ?? ''
+    if (!(await persist(d))) return
+    const next = addVersion(versions, d, note, Date.now())
+    setVersions(next)
+    writeVersions(localStorage, id, next)
   }
 
   if (!canManage) return <div className="p-6 text-muted-foreground">Only a company creator can use SOP Builder.</div>
@@ -229,7 +279,9 @@ function SopEditorPage() {
 
   const editable = job.status === 'review' || job.status === 'approved'
   const d = draft ?? job.draft
-  const pages = paginate(d.steps)
+  // Önizleme (B2): seçilen eski sürüm salt okunur gösterilir; düzenleme kapalı.
+  const shown = preview ? preview.draft : d
+  const pages = paginate(shown.steps)
   const edit: SheetEdit | undefined = editable
     ? {
         setHeader: (f, value) => change({ ...d, header: { ...d.header, [f]: value } }),
@@ -240,6 +292,10 @@ function SopEditorPage() {
         setMark: (i, p, mark) => {
           change(setMark(d, i, p, mark))
           setDrawing(null)
+        },
+        moveTo: (from, to) => {
+          change(moveStepTo(d, from, to))
+          setSelected(to)
         },
       }
     : undefined
@@ -272,11 +328,14 @@ function SopEditorPage() {
             <button type="button" className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted" onClick={() => change(insertStep(d, d.steps.length - 1))}>
               + Step
             </button>
+            <button type="button" className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted" onClick={() => setShowVersions((x) => !x)}>
+              Versions ({versions.length})
+            </button>
             <button
               type="button"
               disabled={!dirty || save.pending}
               className="rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-              onClick={() => void persist(d)}
+              onClick={() => void saveNow(d)}
             >
               {save.pending ? 'Saving…' : dirty ? 'Save' : 'Saved'}
             </button>
@@ -291,10 +350,12 @@ function SopEditorPage() {
             >
               {job.status === 'approved' ? 'Approved ✓' : 'Approve'}
             </button>
-            <SavePdfButton
-              fileName={pdfFileName(isoDate(new Date()), sopTitle(d))}
-              make={() => sheetsToPdf(sheets.current.slice(0, pages.length).filter((x): x is HTMLDivElement => !!x), { size: 'A3', orientation: 'landscape', marginMm: 0 })}
-            />
+            {!preview && (
+              <SavePdfButton
+                fileName={pdfFileName(isoDate(new Date()), sopTitle(d))}
+                make={() => sheetsToPdf(sheets.current.slice(0, pages.length).filter((x): x is HTMLDivElement => !!x), { size: 'A3', orientation: 'landscape', marginMm: PRINT_MARGIN_MM })}
+              />
+            )}
           </div>
         )}
       </div>
@@ -320,12 +381,77 @@ function SopEditorPage() {
       )}
 
       {editable && (
-        <div className="mt-4 flex flex-col gap-4 xl:flex-row xl:items-start">
+        <div className="mt-4 space-y-4">
+          {showVersions && (
+            <div className="rounded-xl border border-border bg-card p-4 text-sm print:hidden">
+              <p className="mb-2 font-semibold">Versions (this browser only; newest first)</p>
+              {versions.length === 0 && <p className="text-muted-foreground">No versions yet. Each Save creates a new version.</p>}
+              <ul className="divide-y divide-border">
+                {[...versions].reverse().map((v) => (
+                  <li key={v.v} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <span>
+                      <strong>v{v.v}</strong> · {new Date(v.at).toLocaleString()} · {v.note || '—'}
+                    </span>
+                    <span className="flex gap-2">
+                      <button type="button" className="rounded-md border border-border px-2 py-1 hover:bg-muted" onClick={() => setPreview(v)}>
+                        Preview
+                      </button>
+                      <button type="button" disabled={!edit} className="rounded-md border border-border px-2 py-1 hover:bg-muted disabled:opacity-50" onClick={() => change(v.draft)}>
+                        Restore
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {preview && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 print:hidden">
+              <span>v{preview.v} is previewed — read only.</span>
+              <span className="flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground"
+                  onClick={() => {
+                    change(preview.draft)
+                    setPreview(null)
+                  }}
+                >
+                  Restore this version
+                </button>
+                <button type="button" className="rounded-md border border-border px-3 py-1.5 hover:bg-muted" onClick={() => setPreview(null)}>
+                  Close
+                </button>
+              </span>
+            </div>
+          )}
+          <div className="grid gap-3 rounded-xl border border-border bg-card p-4 text-sm print:hidden sm:grid-cols-3">
+            {APPROVAL_ROLES.map((role) => (
+              <div key={role} className="space-y-1.5">
+                <p className="font-semibold">{APPROVAL_LABELS[role]}</p>
+                <input
+                  className={inputClass}
+                  placeholder="Ad Soyad"
+                  disabled={!edit}
+                  value={d.approvals?.[role].name ?? ''}
+                  onChange={(e) => change(setApproval(d, role, { name: e.target.value }))}
+                />
+                <input
+                  className={inputClass}
+                  placeholder="GG.AA.YYYY"
+                  disabled={!edit}
+                  value={d.approvals?.[role].date ?? ''}
+                  onChange={(e) => change(setApproval(d, role, { date: e.target.value }))}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
           <div ref={ref} className="min-w-0 flex-1">
             {pages.map((_, p) => (
               <div key={p} className="mb-4 shadow-sm" style={{ width: SHEET_W * k, height: SHEET_H * k }}>
                 <div ref={(el) => void (sheets.current[p] = el)} style={{ width: SHEET_W, transform: `scale(${k})`, transformOrigin: '0 0' }}>
-                  <SopSheet draft={d} page={p} pages={pages.length} urls={job.urls} edit={edit} selected={selected} pending={pending} />
+                  <SopSheet draft={shown} page={p} pages={pages.length} urls={job.urls} edit={preview ? undefined : edit} selected={selected} pending={pending} />
                 </div>
               </div>
             ))}
@@ -349,6 +475,7 @@ function SopEditorPage() {
                 correct the text. Tick the protective equipment at the bottom.
               </div>
             )}
+          </div>
           </div>
         </div>
       )}

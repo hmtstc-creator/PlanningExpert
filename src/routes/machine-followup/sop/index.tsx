@@ -4,9 +4,11 @@ import { useState, type FormEvent } from 'react'
 import { api } from '../../../../convex/_generated/api'
 import { ErrorBanner } from '../../../components/ErrorBanner'
 import { PageLinks } from '../../../components/PageHeader'
+import { GUIDE_LANGS, GUIDE_LANGUAGE_NAMES, SopGuide, type GuideLang } from '../../../components/sop/SopGuide'
 import { useMutation, useQuery } from '../../../lib/convexTransport'
 import { relatedPages } from '../../../lib/navigation'
 import { usePlant } from '../../../lib/plantContext'
+import { filterSops } from '../../../lib/sop/sopSearch'
 import { LANGUAGES, LANGUAGE_NAMES, type Language } from '../../../lib/sop/sopSchema'
 import { useSafeMutation } from '../../../lib/useSafeMutation'
 
@@ -280,6 +282,10 @@ function SopListPage() {
   const status = useQuery(api.sop.status, canManage ? {} : 'skip') as Readiness | undefined
   const retry = useSafeMutation(api.sop.retry)
   const remove = useSafeMutation(api.sop.remove)
+  const [query, setQuery] = useState('')
+  /** Sayfanın kılavuz dili (tek state; kılavuz bu dille gösterilir). */
+  const [guideLang, setGuideLang] = useState<GuideLang>('tr')
+  const shownRows = rows ? filterSops(rows, query) : rows
   if (!canManage) {
     return (
       <div className="w-full px-4 py-6 sm:px-6 sm:py-8">
@@ -301,7 +307,21 @@ function SopListPage() {
       <Setup status={status} />
       <NewSop ready={status?.ready ?? false} />
       <ErrorBanner message={retry.error ?? remove.error} onDismiss={() => (retry.clearError(), remove.clearError())} />
-      <div className="mt-6 overflow-x-auto rounded-xl border border-border bg-card">
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <input
+          className={`${inputClass} max-w-md`}
+          placeholder="Search by title or code…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search SOPs"
+        />
+        {query && rows && (
+          <span className="text-xs text-muted-foreground">
+            {shownRows?.length ?? 0} / {rows.length}
+          </span>
+        )}
+      </div>
+      <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
             <tr>
@@ -321,12 +341,17 @@ function SopListPage() {
                 <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">Loading…</td>
               </tr>
             )}
+            {rows && rows.length > 0 && shownRows?.length === 0 && (
+              <tr>
+                <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No SOP matches “{query}”.</td>
+              </tr>
+            )}
             {rows?.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No SOP yet — upload the first video above.</td>
               </tr>
             )}
-            {rows?.map((r) => {
+            {shownRows?.map((r) => {
               const st = STATUS[r.status] ?? { label: r.status, cls: 'bg-slate-100' }
               return (
                 <tr key={r._id} className="border-t border-border align-top">
@@ -371,6 +396,19 @@ function SopListPage() {
           </tbody>
         </table>
       </div>
+      <div className="mt-6 flex justify-end">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          Guide language
+          <select className={inputClass} value={guideLang} onChange={(e) => setGuideLang(e.target.value as GuideLang)}>
+            {GUIDE_LANGS.map((l) => (
+              <option key={l} value={l}>
+                {GUIDE_LANGUAGE_NAMES[l]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <SopGuide lang={guideLang} />
     </div>
   )
 }

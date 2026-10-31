@@ -7,6 +7,7 @@ import {
   COLS,
   REGIONS,
   ROWS,
+  SHEET_H,
   SHEET_W,
   STEPS_PER_PAGE,
   colPx,
@@ -32,8 +33,14 @@ const slotRanges = Array.from({ length: STEPS_PER_PAGE }, (_, s) => slotRefs(s))
 const ours = [...REGIONS.map((r) => r.ref), ...slotRanges]
 
 describe('SOP yerleşimi = şablon', () => {
-  it('sütun genişlikleri şablonla aynı', () => {
-    for (let c = 1; c <= COLS; c++) expect(Math.round((ws['!cols']?.[c - 1]?.width ?? 0) * 7), `sütun ${c}`).toBe(colPx(c))
+  it('B…BC sütunları şablonla aynı oranda büyür; A sütunu şablondaki gibi', () => {
+    const tplA = (ws['!cols']?.[0]?.width ?? 0) * 7
+    const tplB = (ws['!cols']?.[1]?.width ?? 0) * 7
+    for (let c = 2; c <= COLS; c++) {
+      expect(colPx(c), `sütun ${c}`).toBeCloseTo(colPx(2), 6)
+      expect((ws['!cols']?.[c - 1]?.width ?? 0) * 7, `şablon sütun ${c}`).toBeCloseTo(tplB, 6)
+    }
+    expect(colPx(1)).toBeCloseTo(tplA, 6) // A sütunu şablonda kalır (etiket sütunu)
   })
 
   it('satır yükseklikleri şablonla aynı', () => {
@@ -61,9 +68,12 @@ describe('SOP yerleşimi = şablon', () => {
     }
   })
 
-  it('sayfa genişliği: A 109 px + 54 × 33 px', () => {
-    expect(SHEET_W).toBe(1891)
-    expect(rect('B12:S30')).toEqual({ left: 109, top: rect('A12').top, width: 18 * 33, height: (19 * 15 * 4) / 3 })
+  it('sayfa oranı A3 yatay içeriği (her yanda 5 mm) tam doldurur', () => {
+    expect(SHEET_W / SHEET_H).toBeCloseTo((410 / 287), 3)
+    const r = rect('B12:S30')
+    expect(r.left).toBeCloseTo(109, 6)
+    expect(r.width).toBeCloseTo(18 * colPx(2), 6)
+    expect(r.height).toBeCloseTo((19 * 15 * 4) / 3, 6)
   })
 })
 

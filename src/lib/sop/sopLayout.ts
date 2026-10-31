@@ -4,15 +4,30 @@
 // çoğaltılır (docs/wiki/12-sop-olusturma.md). sopLayout.test.ts ölçüleri ve
 // birleştirmeleri şablon dosyasının kendisiyle karşılaştırır.
 
-/** Sütun genişliği (px): A = 109, B…BC = 33 (şablonda genişlik × 7). */
 export const COLS = 55
-export const colPx = (col: number): number => (col === 1 ? 109 : 33)
 
 /** Satır yüksekliği (pt); yazılmayanlar 15. */
 export const ROWS = 86
 const ROW_PT: Record<number, number> = { 8: 28.5, 10: 26, 11: 54, 34: 39, 68: 41.25 }
 export const rowPt = (row: number): number => ROW_PT[row] ?? 15
 export const rowPx = (row: number): number => (rowPt(row) * 4) / 3
+
+/**
+ * A3 yatay baskı (420 × 297 mm), her yanda sabit kenar boşluğu. Formun oranı
+ * (şablonda ≈ 1,01) A3 yatayın (≈ 1,41) çok altındaydı: sayfanın iki yanında
+ * boşluk kalıyordu. Sütun genişliği (B…BC, şablonun 33 px'i) bu oranı dolduracak
+ * şekilde tek yerden büyütülür; A sütunu ve satırlar şablondaki gibi kalır.
+ * Sapma kararı: docs/wiki/12-sop-olusturma.md (2026-10-31).
+ */
+export const PRINT_MARGIN_MM = 5
+const A3_LANDSCAPE_MM = { w: 420, h: 297 }
+const COL_A_PX = 109
+const sheetHeightPx = Array.from({ length: ROWS }, (_, r) => rowPx(r + 1)).reduce((a, b) => a + b, 0)
+const targetWidthPx = sheetHeightPx * ((A3_LANDSCAPE_MM.w - 2 * PRINT_MARGIN_MM) / (A3_LANDSCAPE_MM.h - 2 * PRINT_MARGIN_MM))
+const COL_PX = (targetWidthPx - COL_A_PX) / (COLS - 1)
+
+/** Sütun genişliği (px): A = 109, B…BC = türetilmiş (≈ 47,5). */
+export const colPx = (col: number): number => (col === 1 ? COL_A_PX : COL_PX)
 
 /** `BC` → 55 */
 export function colIndex(letters: string): number {
@@ -111,6 +126,8 @@ export type Region =
   | { ref: string; kind: 'field'; field: HeaderField; font: Font; border: Border }
   | { ref: string; kind: 'page'; font: Font; border: Border }
   | { ref: string; kind: 'blank'; border: Border; fill?: string }
+  /** Başlık altı şerit: şablonda boş; onay alanları (hazırlayan / kontrol / onaylayan) burada. */
+  | { ref: string; kind: 'approval'; border: Border }
 
 /** Kenarlık kalınlığı: şablonda başlık iç çizgileri ince, bloklar orta. */
 export type Border = 'thin' | 'medium'
@@ -159,7 +176,7 @@ export const DISCLAIMER =
 export const REGIONS: Region[] = [
   { ref: 'A1:H7', kind: 'logo' },
   { ref: 'I1:AQ5', kind: 'text', text: TITLE, font: { size: 20, bold: true, family: 'arial' }, border: 'medium' },
-  { ref: 'I6:AW7', kind: 'blank', border: 'medium' },
+  { ref: 'I6:AW7', kind: 'approval', border: 'medium' },
   ...meta(1, 'Issued Date:  ', '10.02.2011'),
   ...meta(2, 'Revision Date:', '26.02.2024'),
   ...meta(3, 'Revision No:', '1'),
