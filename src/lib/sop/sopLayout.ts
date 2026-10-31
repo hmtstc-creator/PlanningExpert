@@ -248,19 +248,19 @@ export function slotRefs(slot: number) {
  * `icon`: public/sop/ppe/ altındaki basit görsel; kullanıcı kendi fotoğrafını yükleyebilir.
  */
 export const PPE_ITEMS = [
-  { key: 'shoes', ro: 'FOLOSIȚI PANTOFI DE PROTECȚIE', tr: 'İş ayakkabısı (çelik burunlu)', icon: 'shoes.svg' },
-  { key: 'gloves', ro: 'FOLOSIȚI MĂNUȘI DE PROTECȚIE', tr: 'İş eldiveni', icon: 'gloves.svg' },
-  { key: 'clothes', ro: 'FOLOSIȚI TRICOUL ȘI PANTALONII', tr: 'İş kıyafeti (tişört ve pantolon)', icon: 'clothes.svg' },
-  { key: 'short_sleeve', ro: 'MÂNECI SCURTE ADMISE', tr: 'Kısa kol uygunluğu', icon: 'short_sleeve.svg' },
-  { key: 'ear', ro: 'FOLOSIȚI PROTECȚIE AUDITIVĂ', tr: 'İşitme koruyucu (kulaklık)', icon: 'ear.svg' },
-  { key: 'glasses', ro: 'FOLOSIȚI OCHELARI DE PROTECȚIE', tr: 'İş güvenliği gözlüğü', icon: 'glasses.svg' },
-  { key: 'welding_mask', ro: 'FOLOSIȚI MASCĂ DE SUDURĂ', tr: 'Kaynak maskesi', icon: 'welding_mask.svg' },
-  { key: 'welding_goggles', ro: 'FOLOSIȚI OCHELARI DE SUDURĂ', tr: 'Kaynak gözlüğü', icon: 'welding_goggles.svg' },
-  { key: 'helmet', ro: 'FOLOSIȚI CASCĂ DE PROTECȚIE', tr: 'Baret', icon: 'helmet.svg' },
-  { key: 'harness', ro: 'FOLOSIȚI HAM DE SIGURANȚĂ', tr: 'Tam vücut emniyet kemeri (yüksekte çalışma, vinç)', icon: 'harness.svg' },
-  { key: 'respirator', ro: 'FOLOSIȚI MASCĂ RESPIRATORIE', tr: 'Solunum koruyucu maske (filtreli)', icon: 'respirator.svg' },
-  { key: 'face_shield', ro: 'FOLOSIȚI VIZIERĂ DE PROTECȚIE', tr: 'Yüz siperliği', icon: 'face_shield.svg' },
-  { key: 'vest', ro: 'FOLOSIȚI VESTĂ REFLECTORIZANTĂ', tr: 'Reflektörlü yelek', icon: 'vest.svg' },
+  { key: 'shoes', ro: 'FOLOSIȚI PANTOFI DE PROTECȚIE', tr: 'İş ayakkabısı (çelik burunlu)', icon: 'shoes.jpg' },
+  { key: 'gloves', ro: 'FOLOSIȚI MĂNUȘI DE PROTECȚIE', tr: 'İş eldiveni', icon: 'gloves.jpg' },
+  { key: 'clothes', ro: 'FOLOSIȚI TRICOUL ȘI PANTALONII', tr: 'İş kıyafeti (tişört ve pantolon)', icon: 'clothes.jpg' },
+  { key: 'short_sleeve', ro: 'MÂNECI SCURTE ADMISE', tr: 'Kısa kol uygunluğu', icon: 'short_sleeve.jpg' },
+  { key: 'ear', ro: 'FOLOSIȚI PROTECȚIE AUDITIVĂ', tr: 'İşitme koruyucu (kulaklık)', icon: 'ear.jpg' },
+  { key: 'glasses', ro: 'FOLOSIȚI OCHELARI DE PROTECȚIE', tr: 'İş güvenliği gözlüğü', icon: 'glasses.jpg' },
+  { key: 'welding_mask', ro: 'FOLOSIȚI MASCĂ DE SUDURĂ', tr: 'Kaynak maskesi', icon: 'welding_mask.jpg' },
+  { key: 'welding_goggles', ro: 'FOLOSIȚI OCHELARI DE SUDURĂ', tr: 'Kaynak gözlüğü', icon: 'welding_goggles.jpg' },
+  { key: 'helmet', ro: 'FOLOSIȚI CASCĂ DE PROTECȚIE', tr: 'Baret', icon: 'helmet.jpg' },
+  { key: 'harness', ro: 'FOLOSIȚI HAM DE SIGURANȚĂ', tr: 'Tam vücut emniyet kemeri (yüksekte çalışma, vinç)', icon: 'harness.jpg' },
+  { key: 'respirator', ro: 'FOLOSIȚI MASCĂ RESPIRATORIE', tr: 'Solunum koruyucu maske (filtreli)', icon: 'respirator.jpg' },
+  { key: 'face_shield', ro: 'FOLOSIȚI VIZIERĂ DE PROTECȚIE', tr: 'Yüz siperliği', icon: 'face_shield.jpg' },
+  { key: 'vest', ro: 'FOLOSIȚI VESTĂ REFLECTORIZANTĂ', tr: 'Reflektörlü yelek', icon: 'vest.jpg' },
 ] as const
 export type PpeKey = (typeof PPE_ITEMS)[number]['key']
 export const PPE_KEYS = PPE_ITEMS.map((i) => i.key) as PpeKey[]

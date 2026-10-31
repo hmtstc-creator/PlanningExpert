@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
@@ -111,12 +111,11 @@ describe('KKD satırı (seçime göre)', () => {
 })
 
 describe('KKD kalemleri', () => {
-  it('her kalemin Türkçe ve Rumence adı var; simge dosyası mevcut ve SVG', () => {
+  it('her kalemin Türkçe ve Rumence adı var; görsel dosyası mevcut', () => {
     for (const item of PPE_ITEMS) {
       expect(item.tr.trim(), item.key).not.toBe('')
       expect(item.ro.trim(), item.key).not.toBe('')
-      const svg = readFileSync(`public/sop/ppe/${item.icon}`, 'utf8')
-      expect(svg.startsWith('<svg'), item.key).toBe(true)
+      expect(statSync(`public/sop/ppe/${item.icon}`).size, item.key).toBeGreaterThan(1000)
     }
   })
 
