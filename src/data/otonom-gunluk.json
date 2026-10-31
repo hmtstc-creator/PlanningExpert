@@ -1,5 +1,18 @@
 [
  {
+  "zaman": "20261031-0340",
+  "odak": "src/routes/alarms.tsx",
+  "ozet": "Toplantı odak sayfa Alarms (/alarms) üzerineydi. Sayfa tek kaynak ilkesine uyuyor: veriyi usePlanAlarms kancasından alıyor, kalıp ve makine düzenleme işini kendi modüllerine bağlantıyla yönlendiriyor, katman ihlali görünmüyor. Planlama uzmanı kritik ve bilgi ayrımını doğru buldu. Vardiya amiri tarafında iki eksik görüldü: kritik alarm sayısı sayfa açılmadan görünmüyor ve etkilenen parça listesi 8 ile kesiliyor olabilir. Dosyanın kalanı (220. satırdan sonrası) görünmediği için kesme göstergesinden emin olunamadı. Bu yüzden bu saat güvenle yazılabilecek bir görev çıkmadı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Üst menüde ve Cockpit'te Alarms girişine kritik alarm sayısı rozeti eklenebilir (usePlanAlarms'tan tek kaynak). Vardiya amiri sayfayı açmadan sorunu görür. Navigasyon ve Cockpit dosyalarına dokunur, ayrı tasarım gerekir.",
+   "Alarms makine tablosunda 'Parts affected' hücresi slice(0, 8) ile kesiliyor. Kesilen parça sayısı için '+N more' göstergesi olup olmadığı dosyanın sonu okunarak doğrulanmalı. Yoksa eklenmeli.",
+   "Kritik kalıp ve makine satırlarından ilgili işin planına (/planlama) doğrudan bağlantı verilebilir. Şu an bağlantılar yalnızca takip modüllerine gidiyor, planlamacı etkilenen işi bulmak için elle arıyor.",
+   "Alarm satırlarına önem sırası eklenebilir. Örneğin en erken stok bitiş tarihine göre sıralama, amirin 30 saniyede en acil kalıbı bulmasını sağlar. Sıralama usePlanAlarms çıktısında yapılmalı (tek kaynak)."
+  ]
+ },
+ {
   "zaman": "20261031-0240",
   "odak": "src/routes/admin.tsx",
   "ozet": "Odak sayfa Administration (/admin) incelendi. Sayfa tek kaynak ilkesine uyuyor: veriyi alt bileşenler okuyor, sayfa yalnız sekme ve rol kapısı yönetiyor. Katman ihlali yok. Planlama akışı açısından bulgu çıkmadı. Sahada tek somut eksik: sekme seçimi sayfa yenilenince veya haritadan geri dönünce hep 'Holdings & companies'e sıfırlanıyor; bu, haritadan dönen kullanıcı için ek tıklama demek ve güvenle küçük bir görevle çözülebilir, ancak rota arama parametresi (search param) tanımı router tipini etkilediği için bu saatte yazılmadı, öneri olarak bırakıldı. Haritaya geri dönüş bağlantısı zaten bekleyen önerilerde.",
