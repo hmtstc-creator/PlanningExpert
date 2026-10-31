@@ -16,7 +16,7 @@ import {
   type HeaderField,
   type PpeKey,
 } from '../../lib/sop/sopLayout'
-import type { Draft, Mark, Photo, Step } from '../../lib/sop/sopSchema'
+import { APPROVAL_LABELS, APPROVAL_ROLES, type Approvals, type Draft, type Mark, type Photo, type Step } from '../../lib/sop/sopSchema'
 
 /**
  * SOP formunun bir sayfası — şablonun (docs/sop/sop-sablon.xlsx) birebir
@@ -38,6 +38,8 @@ export interface SheetEdit {
   /** Seçili adımın fotoğrafına kırmızı işaret çizme kipi. */
   drawing: { step: number; photo: number } | null
   setMark: (i: number, p: number, mark: Mark) => void
+  /** Sürükle-bırak: adım `from` konumundan `to` konumuna taşınır (içeriğiyle birlikte). */
+  moveTo: (from: number, to: number) => void
 }
 
 interface Props {
@@ -50,6 +52,8 @@ interface Props {
   selected?: number | null
   pending?: ReadonlySet<string>
 }
+
+const DRAG_MIME = 'application/x-sop-step'
 
 const boxStyle = (ref: string, border: Border): CSSProperties => {
   const r = rect(ref)
@@ -129,6 +133,26 @@ function FitText({
 }
 
 /** Fotoğraf: kutuya oranı korunarak sığar; kırmızı işaret görüntünün üstünde. */
+/** Başlık altı şerit: üç onay alanı (ad + tarih). Düzenleme `SopEditor` panelinden. */
+function ApprovalStrip({ approvals }: { approvals: Approvals | undefined }) {
+  return (
+    <div style={{ display: 'flex', width: '100%', height: '100%' }}>
+      {APPROVAL_ROLES.map((role) => {
+        const a = approvals?.[role]
+        return (
+          <div key={role} style={{ flex: 1, minWidth: 0, borderRight: '1px solid #000', padding: '2px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'center', fontFamily: FONT }}>
+            <div style={{ fontSize: px(9), fontWeight: 700, lineHeight: 1.15 }}>{APPROVAL_LABELS[role]}</div>
+            <div style={{ fontSize: px(13), lineHeight: 1.25, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+              {a?.name ?? ''}
+              {a?.date ? `   ${a.date}` : ''}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function PhotoView({
   photo,
   url,
@@ -150,8 +174,9 @@ function PhotoView({
     const el = box.current
     if (el) setSize({ w: el.clientWidth, h: el.clientHeight })
   }, [])
+  // Kapak (cover): fotoğraf hücreyi tamamen doldurur, taşan kısım kırpılır (kullanıcı 2026-10-31).
   const fitted = natural && size ? (() => {
-    const k = Math.min(size.w / natural.w, size.h / natural.h)
+    const k = Math.max(size.w / natural.w, size.h / natural.h)
     const w = natural.w * k
     const h = natural.h * k
     return { left: (size.w - w) / 2, top: (size.h - h) / 2, w, h }
@@ -164,7 +189,7 @@ function PhotoView({
     ? { x: Math.min(drag.x0, drag.x1), y: Math.min(drag.y0, drag.y1), w: Math.abs(drag.x1 - drag.x0), h: Math.abs(drag.y1 - drag.y0) }
     : photo.mark
   return (
-    <div ref={box} style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div ref={box} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
       {url ? (
         <div
           style={fitted ? { position: 'absolute', left: fitted.left, top: fitted.top, width: fitted.w, height: fitted.h } : { position: 'absolute', inset: 0 }}
@@ -186,7 +211,7 @@ function PhotoView({
             alt=""
             draggable={false}
             onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', userSelect: 'none' }}
           />
           {mark && (
             <div
@@ -231,6 +256,12 @@ export function SopSheet({ draft, page, pages, urls, edit, selected, pending }: 
             </div>
           )
         if (r.kind === 'blank') return <div key={r.ref} style={{ ...boxStyle(r.ref, r.border), background: r.fill }} />
+        if (r.kind === 'approval')
+          return (
+            <div key={r.ref} style={boxStyle(r.ref, r.border)}>
+              <ApprovalStrip approvals={draft.approvals} />
+            </div>
+          )
         if (r.kind === 'page')
           return (
             <div key={r.ref} style={boxStyle(r.ref, r.border)}>
@@ -255,7 +286,33 @@ export function SopSheet({ draft, page, pages, urls, edit, selected, pending }: 
         const isSel = edit && selected === index && step
         const photos = step?.photos ?? []
         return (
-          <div key={s}>
+          <div
+            key={s}
+            onDragOver={step && edit ? (e) => e.preventDefault() : undefined}
+            onDrop={
+              step && edit
+                ? (e) => {
+                    e.preventDefault()
+                    const from = Number(e.dataTransfer.getData(DRAG_MIME))
+                    if (Number.isInteger(from) && from !== index) edit.moveTo(from, index)
+                  }
+                : undefined
+            }
+          >
+            {step && edit && (
+              <div
+                draggable
+                title="Sürükleyerek taşı"
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(DRAG_MIME, String(index))
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                className="cursor-grab rounded-sm bg-white/90 px-1 text-xs leading-none print:hidden"
+                style={{ position: 'absolute', left: rect(refs.photo).left + 4, top: rect(refs.photo).top + 4, border: '1px solid #000', zIndex: 2, userSelect: 'none' }}
+              >
+                ⠿
+              </div>
+            )}
             <div
               style={{ ...boxStyle(refs.photo, 'medium'), padding: 6, display: 'flex', gap: 6 }}
               className={isSel ? 'outline outline-4 -outline-offset-4 outline-sky-500 print:outline-none' : edit && step ? 'cursor-pointer' : undefined}

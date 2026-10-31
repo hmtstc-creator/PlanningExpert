@@ -109,10 +109,31 @@ export interface Step {
   photos: Photo[]
 }
 
+/** Onay akışı (kullanıcı 2026-10-31): hazırlayan, kontrol eden, onaylayan — her biri ad + tarih. */
+export const APPROVAL_ROLES = ['prepared', 'checked', 'approved'] as const
+export type ApprovalRole = (typeof APPROVAL_ROLES)[number]
+export const APPROVAL_LABELS: Record<ApprovalRole, string> = {
+  prepared: 'HAZIRLAYAN · EMIS DE',
+  checked: 'KONTROL EDEN · VERIFICAT DE',
+  approved: 'ONAYLAYAN · APROBAT DE',
+}
+export interface Approval {
+  name: string
+  date: string
+}
+export type Approvals = Record<ApprovalRole, Approval>
+export const emptyApprovals = (): Approvals => ({
+  prepared: { name: '', date: '' },
+  checked: { name: '', date: '' },
+  approved: { name: '', date: '' },
+})
+
 export interface Draft {
   header: Header
   steps: Step[]
   ppe: Record<PpeKey, boolean>
+  /** Eski taslaklarda yok; ekran yokmuş gibi boş okur. */
+  approvals?: Approvals
 }
 
 export const emptyDraft = (header: Partial<Header> = {}): Draft => ({
@@ -202,4 +223,11 @@ export const draftSchema = z.object({
     )
     .max(MAX_STEPS),
   ppe: z.object({ shoes: z.boolean(), gloves: z.boolean(), clothes: z.boolean() }),
+  approvals: z
+    .object({
+      prepared: z.object({ name: z.string().max(120), date: z.string().max(40) }),
+      checked: z.object({ name: z.string().max(120), date: z.string().max(40) }),
+      approved: z.object({ name: z.string().max(120), date: z.string().max(40) }),
+    })
+    .optional(),
 })

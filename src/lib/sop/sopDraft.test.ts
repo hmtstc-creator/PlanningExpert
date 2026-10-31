@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { addPhoto, insertStep, mergeFrames, moveStep, removeStep, setSecond, sopTitle } from './sopDraft'
+import { addPhoto, insertStep, mergeFrames, moveStep, moveStepTo, removeStep, setApproval, setSecond, sopTitle } from './sopDraft'
 import { emptyDraft, type Draft } from './sopSchema'
 
 const draft = (): Draft => ({
@@ -37,5 +37,32 @@ describe('SOP taslağı', () => {
   it('dosya adı SOP no, yoksa referans, yoksa operasyon', () => {
     expect(sopTitle(draft())).toBe('SOP Sac yükleme')
     expect(sopTitle({ ...draft(), header: { ...draft().header, sopNo: 'SOP-7' } })).toBe('SOP SOP-7')
+  })
+})
+
+describe('sürükle-bırak ve onay', () => {
+  const mk = (...texts: string[]) => ({ ...emptyDraft(), steps: texts.map((t) => ({ text: t, key: t + 'k', reason: t + 'r', photos: [{ second: 1 }] })) })
+
+  it('adım içeriğiyle birlikte öne taşınır; numaralar konuma göre (1..n)', () => {
+    const d = moveStepTo(mk('a', 'b', 'c', 'd'), 3, 0)
+    expect(d.steps.map((s) => s.text)).toEqual(['d', 'a', 'b', 'c'])
+    expect(d.steps[0]).toEqual({ text: 'd', key: 'dk', reason: 'dr', photos: [{ second: 1 }] })
+  })
+
+  it('geriye taşıma ve aynı yere bırakma', () => {
+    expect(moveStepTo(mk('a', 'b', 'c'), 0, 2).steps.map((s) => s.text)).toEqual(['b', 'c', 'a'])
+    expect(moveStepTo(mk('a', 'b'), 1, 1).steps.map((s) => s.text)).toEqual(['a', 'b'])
+  })
+
+  it('sınır dışı konum sona kırpılır; girdi değişmez', () => {
+    const d = mk('a', 'b', 'c')
+    expect(moveStepTo(d, 0, 99).steps.map((s) => s.text)).toEqual(['b', 'c', 'a'])
+    expect(d.steps.map((s) => s.text)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('onay: ad ve tarih ayrı ayrı yazılır', () => {
+    const d = setApproval(setApproval(mk('a'), 'checked', { name: 'Ali' }), 'checked', { date: '2026-10-31' })
+    expect(d.approvals?.checked).toEqual({ name: 'Ali', date: '2026-10-31' })
+    expect(d.approvals?.prepared).toEqual({ name: '', date: '' })
   })
 })

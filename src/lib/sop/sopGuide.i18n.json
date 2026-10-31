@@ -1,0 +1,305 @@
+{
+  "tr": {
+    "title": "Kullanıcı Kılavuzu",
+    "languageLabel": "Kılavuz dili",
+    "sections": [
+      {
+        "title": "Kurulum (yalnız şirket yöneticisi)",
+        "steps": [
+          "Setup kutusuna Gemini anahtarını girin ve kaydedin.",
+          "Anahtar yalnız sunucuya gider; tarayıcıda yalnız son 4 karakteri görünür.",
+          "Sunucu hazır değilse video yükleme kapalıdır; hazır olunca açılır."
+        ]
+      },
+      {
+        "title": "Yeni SOP (videodan)",
+        "steps": [
+          "Operasyonun video dosyasını seçin.",
+          "Operasyon adını yazın (zorunlu); diğer alanları doldurun.",
+          "İsterseniz önemli anları saniye olarak yazın, örneğin 4, 11, 27. Model adımları bu anlardan böler.",
+          "SOP dilini seçin (Türkçe ya da Rumence). Metin bu dilde yazılır.",
+          "Analiz kendiliğinden başlar. Sayfayı kapatabilirsiniz; iş arka planda sürer."
+        ]
+      },
+      {
+        "title": "Arama",
+        "steps": [
+          "Üstteki arama kutusuna operasyon adını (başlık) ya da parça kodunu, SOP numarasını yazın.",
+          "Liste yazdıkça filtrelenir; temizlemek için kutuyu boşaltın."
+        ]
+      },
+      {
+        "title": "Düzenleme ekranı",
+        "steps": [
+          "Durumu «review» olan satıra tıklayın; form açılır.",
+          "Form, PDF sayfasının birebir kopyasıdır. Yazılar üzerine tıklanarak düzenlenir.",
+          "Uzun yazı kutuya sığmazsa küçülür; kutu büyümez."
+        ]
+      },
+      {
+        "title": "Metin düzenleme",
+        "steps": [
+          "Temel adım, püf noktası ve neden kutularına tıklayıp yazın.",
+          "Kutudan çıkınca değişiklik alınır.",
+          "Metin emir kipinde ve tek cümle olmalıdır (saha dili)."
+        ]
+      },
+      {
+        "title": "Fotoğraflar",
+        "steps": [
+          "Fotoğrafa tıklayın; sağdaki panelde kare saniyesini −1, −0,2, +0,2, +1 ile ya da kutuya yazıp «Use this second» ile değiştirin.",
+          "Kırmızı işaret için «Draw red mark» düğmesine basın ve fotoğrafın üstünde sürükleyin. «Remove mark» ile silin.",
+          "Bir adıma en çok iki fotoğraf eklenir («Add photo»); «Remove photo» ile çıkarılır.",
+          "Fotoğraf hücreyi tamamen doldurur; taşan kenarlar kırpılır.",
+          "Yeni kare hazırlanırken «new frame…» yazısı görünür; kare gelene kadar eski görüntü kalır."
+        ]
+      },
+      {
+        "title": "Adımlar ve sıralama",
+        "steps": [
+          "Düzenlemek istediğiniz adıma tıklayın; panelde «Move ◀», «Move ▶», «Delete step» ve «+ Step» düğmeleri vardır.",
+          "Sürükleyerek sıralamak için adımın sol üstündeki ⠿ tutamağını tutun ve hedef adımın üstüne bırakın.",
+          "Metin, fotoğraflar ve alt bilgiler birlikte taşınır. Numaralar kendiliğinden güncellenir."
+        ]
+      },
+      {
+        "title": "Zorunlu koruyucu ekipman (KKD)",
+        "steps": [
+          "Formun altındaki kutulardan gerekenleri işaretleyin: pantolon ve tişört, eldiven, ayakkabı.",
+          "İşaretli kalemler PDF'te «Zorunlu KKD» satırında fotoğraflı görünür."
+        ]
+      },
+      {
+        "title": "Onay alanları",
+        "steps": [
+          "Sayfanın üstündeki panelde Hazırlayan, Kontrol Eden ve Onaylayan için ad ve tarih yazın.",
+          "Bu alanlar başlığın altında hem ekranda hem PDF'te görünür."
+        ]
+      },
+      {
+        "title": "Otomatik kayıt",
+        "steps": [
+          "Yaptığınız değişiklikler bu tarayıcıya otomatik kaydedilir.",
+          "Sayfayı yeniden açınca kaydedilmemiş taslak varsa «geri yüklensin mi?» diye sorulur."
+        ]
+      },
+      {
+        "title": "Kaydetme ve sürümler",
+        "steps": [
+          "«Save» her seferinde yeni bir sürüm oluşturur (v1, v2, …) ve kısa bir not sorar.",
+          "«Versions» düğmesiyle eski sürümleri listeleyin: «Preview» ile görün, «Restore» ile taslağa alın.",
+          "Sürümler yalnız bu tarayıcıda tutulur; dosya olarak dışa aktarılmaz."
+        ]
+      },
+      {
+        "title": "Onay ve PDF",
+        "steps": [
+          "«Approve» SOP'u onaylar; onaydan sonra düzenlemeye devam edebilirsiniz.",
+          "«Save PDF» A3 yatay bir PDF üretir. Formun her sayfası ayrı bir sayfadır; kenar boşlukları ince ve sabittir."
+        ]
+      }
+    ]
+  },
+  "en": {
+    "title": "User Guide",
+    "languageLabel": "Guide language",
+    "sections": [
+      {
+        "title": "Setup (company creator only)",
+        "steps": [
+          "Enter the Gemini key in the Setup box and save it.",
+          "The key goes only to the server; the browser shows only its last 4 characters.",
+          "While the server is not ready, video upload stays closed; it opens when the server is ready."
+        ]
+      },
+      {
+        "title": "New SOP from a video",
+        "steps": [
+          "Choose the video file of the operation.",
+          "Enter the operation name (required) and fill in the other fields.",
+          "Optionally enter key moments in seconds, for example 4, 11, 27. The model splits the steps at those moments.",
+          "Choose the SOP language (Turkish or Romanian). The text is written in that language.",
+          "The analysis starts by itself. You can close the page; the work continues in the background."
+        ]
+      },
+      {
+        "title": "Search",
+        "steps": [
+          "In the search box at the top, type the operation name (title), the part code or the SOP number.",
+          "The list filters as you type; clear the box to show everything again."
+        ]
+      },
+      {
+        "title": "Editing screen",
+        "steps": [
+          "Click a row whose status is «review»; the form opens.",
+          "The form is an exact copy of the PDF page. Click any text to edit it.",
+          "Long text shrinks to fit its box; the box does not grow."
+        ]
+      },
+      {
+        "title": "Editing text",
+        "steps": [
+          "Click the basic step, key point or reason box and type.",
+          "The change is kept when you leave the box.",
+          "Write the text as a short imperative sentence (shop-floor language)."
+        ]
+      },
+      {
+        "title": "Photos",
+        "steps": [
+          "Click a photo; in the right-hand panel change the frame second with −1, −0.2, +0.2, +1 or type a second and press «Use this second».",
+          "For a red mark press «Draw red mark» and drag on the photo. «Remove mark» deletes it.",
+          "At most two photos per step («Add photo»); «Remove photo» takes one out.",
+          "The photo fills its cell completely; the edges that do not fit are cropped.",
+          "While a new frame is being prepared «new frame…» appears; the old picture stays until the new one arrives."
+        ]
+      },
+      {
+        "title": "Steps and ordering",
+        "steps": [
+          "Click the step you want to edit; the panel offers «Move ◀», «Move ▶», «Delete step» and «+ Step».",
+          "To reorder by dragging, hold the ⠿ handle at the top-left of a step and drop it on the target step.",
+          "Text, photos and notes move together. The numbers update automatically."
+        ]
+      },
+      {
+        "title": "Required protective equipment (PPE)",
+        "steps": [
+          "Tick the required items in the boxes below the form: trousers and T-shirt, gloves, shoes.",
+          "Ticked items appear with their photo in the «Required PPE» line of the PDF."
+        ]
+      },
+      {
+        "title": "Approval fields",
+        "steps": [
+          "In the panel above the form, enter a name and a date for Prepared by, Checked by and Approved by.",
+          "These fields appear under the header, both on screen and in the PDF."
+        ]
+      },
+      {
+        "title": "Automatic saving",
+        "steps": [
+          "Your changes are saved automatically in this browser.",
+          "When you reopen the page and an unsaved draft exists, you are asked whether to restore it."
+        ]
+      },
+      {
+        "title": "Saving and versions",
+        "steps": [
+          "«Save» creates a new version (v1, v2, …) and asks for a short note.",
+          "The «Versions» button lists them: «Preview» shows one, «Restore» brings it back into the form.",
+          "Versions are kept only in this browser; they are not exported as a file."
+        ]
+      },
+      {
+        "title": "Approval and PDF",
+        "steps": [
+          "«Approve» approves the SOP; you can still keep editing it afterwards.",
+          "«Save PDF» creates an A3 landscape PDF. Each form page is a separate page; the margins are thin and fixed."
+        ]
+      }
+    ]
+  },
+  "ro": {
+    "title": "Manual de utilizare",
+    "languageLabel": "Limba manualului",
+    "sections": [
+      {
+        "title": "Configurare (doar creatorul companiei)",
+        "steps": [
+          "Introduceți cheia Gemini în caseta Setup și salvați.",
+          "Cheia ajunge doar la server; în browser se văd doar ultimele 4 caractere.",
+          "Cât timp serverul nu este pregătit, încărcarea video este închisă; se deschide când serverul este gata."
+        ]
+      },
+      {
+        "title": "SOP nou dintr-un video",
+        "steps": [
+          "Alegeți fișierul video al operației.",
+          "Scrieți numele operației (obligatoriu) și completați celelalte câmpuri.",
+          "Opțional, scrieți momentele importante în secunde, de exemplu 4, 11, 27. Modelul împarte pașii în funcție de ele.",
+          "Alegeți limba SOP-ului (turcă sau română). Textul se scrie în această limbă.",
+          "Analiza pornește automat. Puteți închide pagina; lucrul continuă în fundal."
+        ]
+      },
+      {
+        "title": "Căutare",
+        "steps": [
+          "În caseta de căutare de sus scrieți numele operației (titlul), codul piesei sau numărul SOP.",
+          "Lista se filtrează pe măsură ce scrieți; goliți caseta pentru a vedea din nou tot."
+        ]
+      },
+      {
+        "title": "Ecranul de editare",
+        "steps": [
+          "Faceți clic pe rândul cu starea «review»; formularul se deschide.",
+          "Formularul este copia exactă a paginii PDF. Faceți clic pe orice text pentru a-l edita.",
+          "Textul lung se micșorează ca să încapă în casetă; caseta nu crește."
+        ]
+      },
+      {
+        "title": "Editarea textului",
+        "steps": [
+          "Faceți clic pe caseta pasului de bază, a punctului cheie sau a cauzei și scrieți.",
+          "Modificarea se păstrează când ieșiți din casetă.",
+          "Scrieți textul ca o propoziție scurtă la imperativ (limbajul din secție)."
+        ]
+      },
+      {
+        "title": "Fotografii",
+        "steps": [
+          "Faceți clic pe o fotografie; în panoul din dreapta schimbați secunda cadrului cu −1, −0,2, +0,2, +1 sau scrieți o secundă și apăsați «Use this second».",
+          "Pentru marcajul roșu apăsați «Draw red mark» și trageți peste fotografie. «Remove mark» îl șterge.",
+          "Un pas poate avea cel mult două fotografii («Add photo»); «Remove photo» scoate una.",
+          "Fotografia umple complet celula; marginile care nu încap sunt tăiate.",
+          "Cât timp se pregătește un cadru nou apare «new frame…»; imaginea veche rămâne până sosește cea nouă."
+        ]
+      },
+      {
+        "title": "Pași și ordinea lor",
+        "steps": [
+          "Faceți clic pe pasul pe care vreți să-l editați; panoul are butoanele «Move ◀», «Move ▶», «Delete step» și «+ Step».",
+          "Pentru a trage pasul în altă poziție, țineți apăsat mânerul ⠿ din colțul stânga-sus și lăsați-l peste pasul țintă.",
+          "Textul, fotografiile și notele se mută împreună. Numerele se actualizează automat."
+        ]
+      },
+      {
+        "title": "Echipament de protecție obligatoriu (KKD)",
+        "steps": [
+          "Bifați sub formular articolele necesare: pantaloni și tricou, mănuși, pantofi.",
+          "Articolele bifate apar cu fotografia lor pe rândul «Required PPE» din PDF."
+        ]
+      },
+      {
+        "title": "Câmpuri de aprobare",
+        "steps": [
+          "În panoul de deasupra formularului scrieți numele și data pentru Hazırlayan / Kontrol Eden / Onaylayan.",
+          "Aceste câmpuri apar sub antet, atât pe ecran, cât și în PDF."
+        ]
+      },
+      {
+        "title": "Salvare automată",
+        "steps": [
+          "Modificările sunt salvate automat în acest browser.",
+          "Când redeschideți pagina și există o ciornă nesalvată, aplicația vă întreabă dacă să fie restaurată."
+        ]
+      },
+      {
+        "title": "Salvare și versiuni",
+        "steps": [
+          "«Save» creează o versiune nouă (v1, v2, …) și cere o notă scurtă.",
+          "Butonul «Versions» listează versiunile: «Preview» o arată, «Restore» o readuce în formular.",
+          "Versiunile se păstrează doar în acest browser; nu se exportă ca fișier."
+        ]
+      },
+      {
+        "title": "Aprobare și PDF",
+        "steps": [
+          "«Approve» aprobă SOP-ul; după aprobare puteți continua editarea.",
+          "«Save PDF» creează un PDF A3 orizontal. Fiecare pagină a formularului este o pagină separată; marginile sunt subțiri și fixe."
+        ]
+      }
+    ]
+  }
+}

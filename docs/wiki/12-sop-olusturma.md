@@ -1,6 +1,6 @@
 # 12 · SOP oluşturma (videodan standart operasyon prosedürü)
 
-> Son güncelleme: 2026-10-30 (yazım dili kuralları + kontrolör turu) · Durum: **ilk sürüm yayında** (Machine Follow-up → SOP Builder). `sop-worker`'ı
+> Son güncelleme: 2026-10-31 (düzenleme ekranı: A3 doldurma, kılavuz, otomatik kayıt, sürümler, onay, sürükle-bırak, arama) · Durum: **ilk sürüm yayında** (Machine Follow-up → SOP Builder). `sop-worker`'ı
 > `deploy.sh` kendisi kurar; Gemini anahtarı sayfadaki *Setup* kutusundan girilir — sunucuda elle adım yok.
 > Kaynak: kullanıcıyla 2026-10-28 / 29 konuşması, şablon `docs/sop/sop-sablon.xlsx`.
 
@@ -27,6 +27,7 @@ her adımı en iyi gösteren kareyi seçer ve açıklamaları yazar; kullanıcı
 | Özellik | Değer |
 |---|---|
 | Kâğıt | **A3 yatay** (`paperSize 8`), kenar boşlukları 0, yatay + dikey ortalı, tek sayfaya sığdır (ölçek 65) |
+| **Sapma (2026-10-31, kullanıcı isteği):** formun oranı ≈ 1,01 idi, A3 yatay ≈ 1,41: iki yanda boşluk kalıyordu. `sopLayout.ts` sütun genişliğini (B…BC) tek yerden büyütür; A3 yatay içeriği her yanda **5 mm** kenar boşluğuyla doldurur. Satırlar, birleştirmeler ve sabit yazılar şablonla aynı kalır; `sopLayout.test.ts` bu orantıyı denetler. Geri alınırsa `PRINT_MARGIN_MM` ve `colPx` tek yerden eski hâline döner (33 px). |
 | Yazdırma alanı | Şablonda `A6:BC85` (logo ve künye dışarıda kalıyor) — **kullanıcı 2026-10-29: formun tamamı** (`A1:BC86`) basılır |
 | Sütunlar | `A` = 15,57 · `B`…`BC` = 54 sütun × 4,714 (eşit) → üç adım sütunu eşit genişlikte (18'er sütun) |
 | Satır yükseklikleri (pt) | 1–7: 15 (toplam 105) · 8: 28,5 · 9: 15 · 10: 26 · 11: 54 · gövde 15; istisnalar 34: 39, 68: 41,25 |
@@ -188,6 +189,25 @@ Yazdırma alanı: formun tamamı · `UNITATEA DE PRODUCȚIE`, `TÜT` kutuları, 
 ekranda elle yazılır · künye ve form kodu sabit · `NR. SOP` elle · revizyon alanları ilk sürümde boş · başlık altı
 şerit boş · TR seçilince de etiketler Romence · KKD: model işaretler, kullanıcı düzeltir (şablon gerekirse güncellenir)
 · adım başına en çok 2 fotoğraf · fotoğrafa otomatik kırmızı işaret: evet · CAUZE siyah · boş kutuda numara yok.
+
+## Düzenleme ekranı (2026-10-31)
+
+- **Fotoğraf:** hücreyi tamamen doldurur (cover); taşan kenar kırpılır, kırmızı işaret kırpılmış görüntüye göre çizilir.
+- **Onay alanları** (`approvals`, şemada isteğe bağlı): Hazırlayan / Kontrol Eden / Onaylayan, her biri ad + tarih.
+  Ekranda üst paneldan yazılır; PDF'te başlık şeridinde (`I6:AW7`, şablonda boştu) görünür.
+- **Sürükle-bırak:** adımın sol üstündeki ⠿ tutamağı; metin, fotoğraf ve alt bilgiler birlikte taşınır; numaralar konuma göre yeniden verilir.
+- **Otomatik kayıt (B1):** her değişiklik `localStorage` (`sop-autosave:<id>`) içine yazılır; sayfa açılınca farklıysa
+  "Kaydedilmemiş taslak bulundu, geri yüklensin mi?" sorulur; sunucuya kayıt olunca silinir.
+- **Sürümler (B2):** *Save* her seferinde yeni sürüm (v1, v2 …) yapar, kısa not sorar; *Versions* listesinden Preview (salt okunur)
+  ya da Restore. En çok 50 sürüm, yalnız tarayıcıda (`sop-versions:<id>`); dosya çıktısı yok.
+- **Arama (B7):** liste başlık (operasyon) ve kod (parça kodu, SOP no) üzerinde arar (`sopSearch.ts`).
+- **Kullanıcı kılavuzu (A3):** liste sayfasının sonunda; metinler `src/lib/sop/sopGuide.i18n.json` (tr / en / ro), dil
+  seçicisi sayfa state'i. Yeni işlev eklenince üç dile de madde eklenir (`sopGuide.test.ts` bölüm sayısını denetler).
+- **Kaydedilen alanlar:** `approvals` Convex'te `draftSchema` ile saklanır (şema dışı alan sunucuda silinirdi).
+
+**Açık (sonraki iş):** A2 kamera (4:3 yatay, döndürme, kırpma; bugün SOP'ta kamera akışı yok, yükleme yalnız video);
+B6 şablondan başlatma (yeni Convex mutasyonu: video olmadan SOP kaydı); B8 beş kalemli KKD paneli (şablonda üç KKD
+yeri var; beş kalem için yer, görsel ve AI şeması gerekir — şablon kararı kullanıcıdan).
 
 ## Açık / sonraki adımlar
 

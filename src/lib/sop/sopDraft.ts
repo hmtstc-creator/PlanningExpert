@@ -1,7 +1,7 @@
 // SOP taslağında ekrandan yapılan değişiklikler (saf; sopDraft.test.ts).
 // Her işlev yeni bir taslak döner, girdiyi değiştirmez.
 
-import { MAX_PHOTOS_PER_STEP, type Draft, type Mark, type Photo, type Step } from './sopSchema'
+import { MAX_PHOTOS_PER_STEP, emptyApprovals, type Approval, type ApprovalRole, type Draft, type Mark, type Photo, type Step } from './sopSchema'
 
 const withSteps = (d: Draft, steps: Step[]): Draft => ({ ...d, steps })
 
@@ -18,6 +18,26 @@ export function moveStep(d: Draft, i: number, dir: -1 | 1): Draft {
   const steps = [...d.steps]
   ;[steps[i], steps[j]] = [steps[j], steps[i]]
   return withSteps(d, steps)
+}
+
+/**
+ * Adımı `from` konumundan `to` konumuna taşır (sürükle-bırak). Adımın metni,
+ * kutuları ve fotoğrafları birlikte gider; numaralar konuma göre kendiliğinden
+ * değişir (paginate / stepNumber).
+ */
+export function moveStepTo(d: Draft, from: number, to: number): Draft {
+  if (from < 0 || from >= d.steps.length || from === to) return d
+  const target = Math.min(Math.max(0, to), d.steps.length - 1)
+  const steps = [...d.steps]
+  const [item] = steps.splice(from, 1)
+  steps.splice(target, 0, item)
+  return withSteps(d, steps)
+}
+
+/** Onay alanından bir kişinin adını ya da tarihini değiştirir. */
+export function setApproval(d: Draft, role: ApprovalRole, patch: Partial<Approval>): Draft {
+  const current = d.approvals ?? emptyApprovals()
+  return { ...d, approvals: { ...current, [role]: { ...current[role], ...patch } } }
 }
 
 export const removeStep = (d: Draft, i: number): Draft => withSteps(d, d.steps.filter((_, k) => k !== i))
