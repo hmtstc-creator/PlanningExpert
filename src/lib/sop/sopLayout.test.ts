@@ -13,6 +13,7 @@ import {
   colPx,
   pageLabel,
   paginate,
+  ppeCellRects,
   parseRange,
   rect,
   rowPt,
@@ -88,5 +89,22 @@ describe('sayfa çoğaltma', () => {
 
   it('adımsız form da bir sayfa', () => {
     expect(paginate([])).toEqual([[null, null, null, null, null, null]])
+  })
+})
+
+describe('KKD satırı (seçime göre)', () => {
+  it('seçili kalem yok → çizim yok; üç kalem → eşit genişlik, satır içinde', () => {
+    expect(ppeCellRects(0)).toEqual([])
+    const cells = ppeCellRects(3)
+    expect(cells).toHaveLength(3)
+    expect(cells[0].width).toBeCloseTo(cells[2].width, 6)
+    const row = rect('H81:BC83')
+    expect(cells[0].left).toBeCloseTo(row.left, 6)
+    expect(cells[2].left + cells[2].width).toBeLessThanOrEqual(row.left + row.width + 0.001)
+  })
+
+  it('en çok 380 px; kalem sayısı artınca genişlik küçülür', () => {
+    expect(ppeCellRects(1)[0].width).toBe(380)
+    expect(ppeCellRects(13)[0].width).toBeLessThan(ppeCellRects(2)[0].width)
   })
 })

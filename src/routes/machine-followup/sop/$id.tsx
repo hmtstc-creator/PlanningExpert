@@ -14,6 +14,7 @@ import { usePlant } from '../../../lib/plantContext'
 import {
   addPhoto,
   insertStep,
+  setPpeImage,
   mergeFrames,
   moveStep,
   moveStepTo,
@@ -27,7 +28,7 @@ import {
   sopTitle,
   togglePpe,
 } from '../../../lib/sop/sopDraft'
-import { PRINT_MARGIN_MM, SHEET_H, SHEET_W, paginate } from '../../../lib/sop/sopLayout'
+import { PPE_ITEMS, PRINT_MARGIN_MM, SHEET_H, SHEET_W, paginate, ppeIconUrl, type PpeKey } from '../../../lib/sop/sopLayout'
 import { APPROVAL_LABELS, APPROVAL_ROLES, LANGUAGE_NAMES, MAX_PHOTOS_PER_STEP, type Draft, type Language } from '../../../lib/sop/sopSchema'
 import {
   addVersion,
@@ -228,6 +229,7 @@ function SopEditorPage() {
   const [showVersions, setShowVersions] = useState(false)
   const [preview, setPreview] = useState<SopVersion | null>(null)
   const [cameraFor, setCameraFor] = useState<{ step: number; photo: number } | null>(null)
+  const [ppeError, setPpeError] = useState('')
   const genUploadUrl = useMutation(api.sop.generateUploadUrl)
   /** En son ekrandaki taslak nesnesi: kayıt bitince yerel kopya yalnız değişmemişse silinir. */
   const latest = useRef<Draft | null>(null)
@@ -318,6 +320,27 @@ function SopEditorPage() {
     const next = setPhotoStorage(latest.current ?? d, cameraFor.step, cameraFor.photo, storageId)
     change(next)
     await persist(next)
+  }
+  /** KKD kartına kendi fotoğrafını yükler (depoya; yoksa varsayılan simge). */
+  const uploadPpe = async (key: PpeKey, file: File) => {
+    setPpeError('')
+    try {
+      const url = await genUploadUrl({})
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': file.type || 'image/jpeg' }, body: file })
+      if (!res.ok) throw new Error(`Upload failed (${res.status})`)
+      const { storageId } = (await res.json()) as { storageId: string }
+      const next = setPpeImage(latest.current ?? d, key, storageId)
+      change(next)
+      await persist(next)
+    } catch (e) {
+      setPpeError(e instanceof Error ? e.message : 'The picture could not be saved.')
+    }
+  }
+  const resetPpe = (key: PpeKey) => {
+    const base = latest.current ?? d
+    const { [key]: _gone, ...rest } = base.ppeImages ?? {}
+    void _gone
+    change({ ...base, ppeImages: rest })
   }
   const onFrame = async (next: Draft, photo: number, second: number) => {
     setDraft(next)
@@ -499,6 +522,51 @@ function SopEditorPage() {
             )}
           </div>
           </div>
+          <section className="rounded-xl border border-border bg-card p-4 print:hidden" aria-labelledby="ppe-title">
+            <h2 id="ppe-title" className="font-semibold text-foreground">
+              Protective equipment (PPE)
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Tick the required items. Only the ticked items appear in the PPE row of the PDF. Upload replaces the picture with your own photo; "Default picture" brings back the drawing.
+            </p>
+            {ppeError && <p className="mt-2 text-xs text-red-700">{ppeError}</p>}
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+              {PPE_ITEMS.map((item) => {
+                const custom = d.ppeImages?.[item.key]
+                const src = (custom && job.urls[custom]) || ppeIconUrl(item.key)
+                const on = !!d.ppe[item.key]
+                return (
+                  <div key={item.key} className={`flex flex-col gap-2 rounded-lg border p-2 ${on ? 'border-emerald-500 bg-emerald-50/60' : 'border-border'}`}>
+                    <img src={src} alt="" className="h-24 w-full rounded bg-white object-contain" />
+                    <p className="text-xs font-medium leading-tight">{item.tr}</p>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input type="checkbox" disabled={!edit} checked={on} onChange={() => change(togglePpe(d, item.key))} />
+                      Required
+                    </label>
+                    <label className={`${btn} cursor-pointer text-center ${edit ? '' : 'pointer-events-none opacity-40'}`}>
+                      Upload photo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={!edit}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0]
+                          e.target.value = ''
+                          if (f) void uploadPpe(item.key, f)
+                        }}
+                      />
+                    </label>
+                    {custom && (
+                      <button type="button" className={btn} disabled={!edit} onClick={() => resetPpe(item.key)}>
+                        Default picture
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
         </div>
       )}
     </div>

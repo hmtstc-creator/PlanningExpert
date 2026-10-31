@@ -36,7 +36,8 @@ async function jobOf(ctx: Any, id: string) {
 
 export const readDraft = (job: { draftJson?: string }): Draft => (job.draftJson ? (JSON.parse(job.draftJson) as Draft) : emptyDraft())
 
-const photoIds = (d: Draft) => new Set(d.steps.flatMap((s) => s.photos.map((p) => p.storageId).filter(Boolean) as string[]))
+const photoIds = (d: Draft) =>
+  new Set([...d.steps.flatMap((s) => s.photos.map((p) => p.storageId)), ...Object.values(d.ppeImages ?? {})].filter(Boolean) as string[])
 
 /** Bir SOP'un bütün dosyaları (kareler + henüz taşınmamış video). */
 async function deleteFiles(ctx: Any, job: Any) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { addPhoto, insertStep, mergeFrames, moveStep, moveStepTo, removeStep, setApproval, setPhotoStorage, setSecond, sopTitle } from './sopDraft'
+import { addPhoto, insertStep, mergeFrames, moveStep, moveStepTo, removeStep, setApproval, setPhotoStorage, setPpeImage, setSecond, sopTitle } from './sopDraft'
 import { emptyDraft, type Draft } from './sopSchema'
 
 const draft = (): Draft => ({
@@ -76,5 +76,13 @@ describe('kamera fotoğrafı', () => {
       'new',
     )
     expect(d.steps[0].photos[0]).toEqual({ storageId: 'new', second: 5 })
+  })
+})
+
+describe('KKD görseli', () => {
+  it('kullanıcı görseli kalemin depo kimliğini tutar; diğer kalemler değişmez', () => {
+    const d = setPpeImage(emptyDraft(), 'welding_mask', 'img-1')
+    expect(d.ppeImages).toEqual({ welding_mask: 'img-1' })
+    expect(d.ppe.welding_mask).toBe(false)
   })
 })

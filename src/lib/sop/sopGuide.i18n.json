@@ -66,8 +66,9 @@
       {
         "title": "Zorunlu koruyucu ekipman (KKD)",
         "steps": [
-          "Formun altındaki kutulardan gerekenleri işaretleyin: pantolon ve tişört, eldiven, ayakkabı.",
-          "İşaretli kalemler PDF'te «Zorunlu KKD» satırında fotoğraflı görünür."
+          "KKD panelinde (formun altında) gerekli kalemleri «Required» ile işaretleyin. 13 kalem var: iş ayakkabısı, eldiven, iş kıyafeti, kısa kol uygunluğu, kulaklık, iş güvenliği gözlüğü, kaynak maskesi, kaynak gözlüğü, baret, emniyet kemeri, solunum maskesi, yüz siperliği, reflektörlü yelek.",
+          "Yalnız işaretlenen kalemler çıktının KKD satırında, görselleriyle yanyana görünür.",
+          "«Upload photo» ile kendi fotoğrafınızı yükleyebilirsiniz; «Default picture» çizime geri döndürür."
         ]
       },
       {
@@ -168,8 +169,9 @@
       {
         "title": "Required protective equipment (PPE)",
         "steps": [
-          "Tick the required items in the boxes below the form: trousers and T-shirt, gloves, shoes.",
-          "Ticked items appear with their photo in the «Required PPE» line of the PDF."
+          "In the PPE panel (below the form), tick the required items with «Required». There are 13 items: safety shoes, gloves, work clothes, short-sleeve suitability, ear protection, safety goggles, welding mask, welding goggles, helmet, safety harness, respirator, face shield, high-visibility vest.",
+          "Only the ticked items appear side by side, with their pictures, in the PPE row of the printout.",
+          "«Upload photo» lets you use your own picture; «Default picture» brings back the drawing."
         ]
       },
       {
@@ -270,8 +272,9 @@
       {
         "title": "Echipament de protecție obligatoriu (KKD)",
         "steps": [
-          "Bifați sub formular articolele necesare: pantaloni și tricou, mănuși, pantofi.",
-          "Articolele bifate apar cu fotografia lor pe rândul «Required PPE» din PDF."
+          "În panoul EPI (sub formular) bifați articolele necesare cu «Required». Sunt 13 articole: pantofi de protecție, mănuși, îmbrăcăminte de lucru, mâneci scurte admise, protecție auditivă, ochelari de protecție, mască de sudură, ochelari de sudură, cască, centură de siguranță, mască respiratorie, vizieră de protecție, vestă reflectorizantă.",
+          "Doar articolele bifate apar, unul lângă altul, cu imaginile lor, pe rândul EPI din tipăritură.",
+          "«Upload photo» vă permite să folosiți propria fotografie; «Default picture» readuce desenul."
         ]
       },
       {
