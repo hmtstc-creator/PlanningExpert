@@ -1,11 +1,12 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-10-31 (Qwen / Gemini kod yazma kaldırıldı, model en küçükten başlar, otonom düğme; kod görevleri önce Gemini; Production Plan takvim kutusu cost center modeline göre, ekip Work Calendar'da; SOP: PDF + düzenleme ekranı, kare adımdan, video volume'de; plan süzgeci yalnız görünüm; Loading time dosyadan olduğu gibi; Asakai: bugün gizli, bütün iş yerleri; Work calendar Edit / Save; Asakai kırmızı = en büyük 2 duruş, vardiyalar da; gün kaydı, ZPP_DAILY önceliği, kapalı aralık, iş penceresi durumu) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-10-31 (PDF yönü sayfaya özel; Qwen / Gemini kod yazma kaldırıldı, model en küçükten başlar, otonom düğme; kod görevleri önce Gemini; Production Plan takvim kutusu cost center modeline göre, ekip Work Calendar'da; SOP: PDF + düzenleme ekranı, kare adımdan, video volume'de; plan süzgeci yalnız görünüm; Loading time dosyadan olduğu gibi; Asakai: bugün gizli, bütün iş yerleri; Work calendar Edit / Save; Asakai kırmızı = en büyük 2 duruş, vardiyalar da; gün kaydı, ZPP_DAILY önceliği, kapalı aralık, iş penceresi durumu) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 
 ## Çalışma düzeni
 
+- **Her PDF düğmesinin sayfa boyutu ve yönü kendi sayfasına aittir** (2026-10-31, kullanıcı kararı) — Losses Trend yalnız A4 dikey (`pages: fit`); öbür sayfalar (Trend Analysis, Loss Bridge, Daily Report, Dashboard, SOP) kendi ayarıyla kalır. Bir sayfanın PDF yönü değişince diğerlerine dokunulmaz; her düğmenin `sheetToPdf` çağrısındaki `size` / `orientation` / `pages` ayrı ayrı okunur.
 - **Kodu Claude yazar; model en küçükten başlar** (2026-10-31, kullanıcı kararı) — Qwen / OpenRouter ve Gemini ile kod
   yazma kaldırıldı (ücretsiz kotalar doldu, kazanç yok). Model haiku'dan başlar, zorluk artınca sonnet / opus, iş bitince
   geri haiku ("acelemiz yok, yavaş ama doğru"). Otonom geliştirme Claude'a bağlandı, varsayılan kapalı; yalnız site sahibi
