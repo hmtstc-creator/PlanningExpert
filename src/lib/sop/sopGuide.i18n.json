@@ -66,7 +66,7 @@
       {
         "title": "Zorunlu koruyucu ekipman (KKD)",
         "steps": [
-          "KKD panelinde (formun altında) gerekli kalemleri «Required» ile işaretleyin. 13 kalem var: iş ayakkabısı, eldiven, iş kıyafeti, kısa kol uygunluğu, kulaklık, iş güvenliği gözlüğü, kaynak maskesi, kaynak gözlüğü, baret, emniyet kemeri, solunum maskesi, yüz siperliği, reflektörlü yelek.",
+          "KKD panelinde (formun altında) gerekli kalemleri «Required» ile işaretleyin. 13 kalem var: iş ayakkabısı, iş eldiveni, iş kıyafeti, kısa kol uygunluğu, işitme koruyucu (kulaklık), iş güvenliği gözlüğü, kaynak maskesi, kaynak gözlüğü, baret, tam vücut emniyet kemeri, solunum koruyucu maske, yüz siperliği, reflektörlü yelek.",
           "Yalnız işaretlenen kalemler çıktının KKD satırında, görselleriyle yanyana görünür.",
           "«Upload photo» ile kendi fotoğrafınızı yükleyebilirsiniz; «Default picture» çizime geri döndürür."
         ]
@@ -169,7 +169,7 @@
       {
         "title": "Required protective equipment (PPE)",
         "steps": [
-          "In the PPE panel (below the form), tick the required items with «Required». There are 13 items: safety shoes, gloves, work clothes, short-sleeve suitability, ear protection, safety goggles, welding mask, welding goggles, helmet, safety harness, respirator, face shield, high-visibility vest.",
+          "In the PPE panel (below the form), tick the required items with «Required». There are 13 items: safety shoes, work gloves, work clothes, short-sleeve suitability, hearing protection (ear muffs), safety goggles, welding mask, welding goggles, helmet, full-body safety harness, respirator, face shield, high-visibility vest.",
           "Only the ticked items appear side by side, with their pictures, in the PPE row of the printout.",
           "«Upload photo» lets you use your own picture; «Default picture» brings back the drawing."
         ]
@@ -272,7 +272,7 @@
       {
         "title": "Echipament de protecție obligatoriu (KKD)",
         "steps": [
-          "În panoul EPI (sub formular) bifați articolele necesare cu «Required». Sunt 13 articole: pantofi de protecție, mănuși, îmbrăcăminte de lucru, mâneci scurte admise, protecție auditivă, ochelari de protecție, mască de sudură, ochelari de sudură, cască, centură de siguranță, mască respiratorie, vizieră de protecție, vestă reflectorizantă.",
+          "În panoul EPI (sub formular) bifați articolele necesare cu «Required». Sunt 13 articole: pantofi de protecție, mănuși de protecție, îmbrăcăminte de lucru, mâneci scurte admise, protecție auditivă, ochelari de protecție, mască de sudură, ochelari de sudură, cască, ham de siguranță, mască respiratorie, vizieră de protecție, vestă reflectorizantă.",
           "Doar articolele bifate apar, unul lângă altul, cu imaginile lor, pe rândul EPI din tipăritură.",
           "«Upload photo» vă permite să folosiți propria fotografie; «Default picture» readuce desenul."
         ]

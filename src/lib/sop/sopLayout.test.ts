@@ -13,6 +13,7 @@ import {
   colPx,
   pageLabel,
   paginate,
+  PPE_ITEMS,
   ppeCellRects,
   parseRange,
   rect,
@@ -106,5 +107,21 @@ describe('KKD satırı (seçime göre)', () => {
   it('en çok 380 px; kalem sayısı artınca genişlik küçülür', () => {
     expect(ppeCellRects(1)[0].width).toBe(380)
     expect(ppeCellRects(13)[0].width).toBeLessThan(ppeCellRects(2)[0].width)
+  })
+})
+
+describe('KKD kalemleri', () => {
+  it('her kalemin Türkçe ve Rumence adı var; simge dosyası mevcut ve SVG', () => {
+    for (const item of PPE_ITEMS) {
+      expect(item.tr.trim(), item.key).not.toBe('')
+      expect(item.ro.trim(), item.key).not.toBe('')
+      const svg = readFileSync(`public/sop/ppe/${item.icon}`, 'utf8')
+      expect(svg.startsWith('<svg'), item.key).toBe(true)
+    }
+  })
+
+  it('anahtarlar benzersiz', () => {
+    const keys = PPE_ITEMS.map((i) => i.key)
+    expect(new Set(keys).size).toBe(keys.length)
   })
 })
