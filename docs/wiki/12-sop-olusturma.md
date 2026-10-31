@@ -212,7 +212,7 @@ ekranda elle yazılır · künye ve form kodu sabit · `NR. SOP` elle · revizyo
 - **KKD (B8, kullanıcı 2026-10-31):** 13 kalem (`PPE_ITEMS`, `sopLayout.ts`): iş ayakkabısı, iş eldiveni, iş kıyafeti, kısa kol
   uygunluğu, işitme koruyucu (kulaklık), iş güvenliği gözlüğü, kaynak maskesi, kaynak gözlüğü, baret, tam vücut emniyet kemeri (ham), solunum koruyucu maske,
   yüz siperliği, reflektörlü yelek. Formun altındaki KKD panelinde kart olarak işaretlenir; her kartta varsayılan basit
-  renkli çizim (`public/sop/ppe/*.svg`) ya da yüklenen fotoğraf (`ppeImages`, depoda). Çıktıda yalnız işaretli kalemler
+  görsel (`public/sop/ppe/*.jpg`; kullanıcının verdiği tek bir ekipman tablosundan 13 kırpma, 2026-10-31 — ürün kullanımında görselin kaynak ve izin sorumluluğu kullanıcıdadır) ya da yüklenen fotoğraf (`ppeImages`, depoda). Çıktıda yalnız işaretli kalemler
   KKD satırında (H81:BC83) yanyana durur. Şablonun geri kalanı değişmedi; yalnız bu satır seçime göre çizilir.
 - B6 şablondan başlatma iptal edildi (kullanıcı 2026-10-31).
 
