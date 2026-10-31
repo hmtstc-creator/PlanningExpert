@@ -1,6 +1,6 @@
 # 09 · Açık konular ve riskler
 
-> Son güncelleme: 2026-10-30 (pres → nut welding: R15 uyarısı yapıldı, motor kısıtı sıradaki; Qwen görev modu sorunu; SOP Builder: ilk gerçek video denemesi bekleniyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
+> Son güncelleme: 2026-10-31 (Qwen maddesi kapandı: kaldırıldı; pres → nut welding: R15 uyarısı yapıldı, motor kısıtı sıradaki; Qwen görev modu sorunu; SOP Builder: ilk gerçek video denemesi bekleniyor) · Kaynak: bu sohbetler; **bütün açık işlerin tek listesi `todolist.md`** (burası yalnızca son dönemin özeti)
 
 ## Kullanıcının yapması gerekenler
 
@@ -22,12 +22,6 @@ Kullanıcı 2026-10-22'de doğruladı: gerçek veride lot bölme ve geç iş mes
   `#component-ready`). Sınırlar: bileşenin kendi müşteri talebi sayılmaz; bileşen stoku bütün depolardan; Gantt'ta
   işaret yok. **Sıradaki adım (ayrı oturum, `derin`):** motor kısıtı — nut welding işi bileşen hazır olmadan
   başlamasın (bileşen talebi zaten ZPP'de, wiki 04 *ara mamul*). Adet / adet 1 değilse alan gerekir (kullanıcıya sor).
-- **Qwen görev modu çalışmadı** (2026-10-30, #133 sırasında): `qwen-yesil.yml` tur 1'de "verify yeşil, 0 dosya"
-  raporladı (görevi uygulamadan bitti; rapor "Başlangıç: verify kırmızı, 0 hata satırı" diyor), tur 2 40 dk takıldı ve
-  iptal edildi. `gh workflow run` bulut oturumunda GraphQL 403 verir; tetikleme
-  `gh api -X POST repos/<sahip>/<depo>/actions/workflows/qwen-yesil.yml/dispatches -f ref=main -f "inputs[dal]=…" -F "inputs[gorev]=@dosya"` ile.
-  **Gemini ile denendi (2026-10-30):** `model: gemini` girdisiyle tek satırlık görev tek turda doğru yapıldı. Artık
-  varsayılan Gemini (kalıcı karar, wiki 11); ek girdi gerekmez.
 - **SOP Builder — ilk gerçek video** (2026-10-30): kod yayında (#121, #123), worker çalışıyor, Gemini anahtarı
   *Setup*'ta kayıtlı. Açık PR / dal yok. Sıradaki adım: kullanıcı gerçek bir videoyu yükler, sonuç birlikte okunur
   (adımlar, kare anları, kırmızı işaret, metin dili) ve gerekirse `sop-worker/prompt.md` / `prompt-verify.md`

@@ -12,6 +12,6 @@ description: Yeni bir oturumda yeni bir işe en az token ile başlamak için. Ot
    aralığı `Read` (offset/limit ≤150). `CLAUDE.md`'deki büyük dosyaları asla bütün okuma.
 4. Birçok dosyaya yayılan "nerede kullanılıyor" sorusu → `Explore` ajanı (medium), sonucu 5 satırda iste.
 5. Kullanıcıya planı **3–5 madde** ile yaz ve başla (`07`: onay beklemeden ilerle; geri alınamaz işte sor).
-6. Kodu kendin yazma: uygulamayı **Qwen görev modu**na ver — önce Gemini, iş akışının varsayılanı (`CLAUDE.md` → *Kodu Qwen yazar, Claude denetler*); sen görev yaz, diff'i denetle, birleştir.
+6. Kodu Claude yazar: en küçük modelden başla, zorlanınca büyüt, bitince geri in (`CLAUDE.md` → *Model*).
 7. Dal aç: `git checkout -b claude/<konu>`. Test: önce yalnız ilgili test dosyası
    (`npx vitest run <dosya> 2>&1 | tail -25`), en sonda bir kez `npm run verify 2>&1 | tail -40`.

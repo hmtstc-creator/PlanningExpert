@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AutonomousLog, zamanYaz } from './AutonomousLog'
+
+vi.mock('../lib/convexTransport', () => ({ useQuery: () => undefined }))
+vi.mock('../lib/useSafeMutation', () => ({ useSafeMutation: () => ({ run: async () => true, error: null, pending: false }) }))
 
 afterEach(cleanup)
 
