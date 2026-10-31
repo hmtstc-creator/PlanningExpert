@@ -11,7 +11,7 @@
 | /alarms | 235 |  |  | /die-followup/maintenance, /machine-followup/breakdowns, /machine-followup/maintenance | EntityLinks, PageHeader |
 | /board | 8 |  |  |  | BoardDashboard |
 | /capacity | 785 | holidays.listByCountry, planRuns.latestCapacity, planRuns.status, plannedStops.list, pressCalendar.getGlobalSettings, pressCalendar.listAllOverrides, pressCalendar.listTemplates, presses.list, workCalendar.get | pressCalendar.clearOverride, pressCalendar.saveAcceptedPerformanceRate, pressCalendar.saveOverride | /referanslar, /takvim | CapacityChart, OvertimePanels, PageHeader, plan/PlanOrgFilter |
-| /compare | 103 | compare.oeeWeeks |  |  | OeeCharts, PageHeader |
+| /compare | 104 | compare.oeeWeeks |  |  | OeeCharts, PageHeader |
 | /depolar | 377 |  |  |  | CostCenterLocations, ErrorBanner, PageHeader, SaveStatus, UnsavedBar |
 | /die-followup/ | 128 | moldAlarms.list, moldMaintenance.list, moldProblems.list, moldReadiness.list |  | /alarms, /die-followup/maintenance, /die-followup/problems | EntityLinks, ModuleStat, PageHeader |
 | /die-followup/maintenance | 835 | actualProduction.listAll, moldAlarms.list, moldMaintenance.list, moldReadiness.list, products.listAll | moldAlarms.sync |  | EntityLinks, ErrorBanner, MaterialPicker, PageHeader |

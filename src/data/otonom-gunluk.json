@@ -1,5 +1,27 @@
 [
  {
+  "zaman": "20261031-0644",
+  "odak": "src/routes/compare.tsx",
+  "ozet": "Odak sayfa Compare plants (/compare) incelendi. Sayfa tek kaynak ilkesine uyuyor: veri compare.oeeWeeks sorgusundan geliyor, sayfa yalnız görüntülüyor, katman ihlali yok. Vardiya amiri ve mühendis tarafında iki eksik görüldü: veri gelene kadar sayfa boş kalıyor (yükleniyor mesajı yok), 26 haftaya çıkınca fabrika adı yatay kaydırmada kayboluyor. İkisi de küçük, güvenli, tek dosyalık arayüz düzeltmesi. Sayfanın diğer sayfalara hiç bağlantısı yok, bu öneriler bölümüne yazıldı.",
+  "durum": "yayinda",
+  "gorevler": [
+   {
+    "baslik": "Compare: yükleniyor durumu",
+    "once": "Veri gelene kadar sayfada filtre dışında hiçbir şey görünmüyor, kullanıcı sayfanın bozuk olup olmadığını anlayamıyor.",
+    "sonra": "Yüklenirken 'Loading plants…' yazısı görünecek, veri gelince tablo ya da boş durum mesajı çıkacak.",
+    "dosyalar": [
+     "src/routes/compare.tsx"
+    ]
+   }
+  ],
+  "oneriler": [
+   "Compare sayfası ilişki haritasında hiçbir sayfaya bağlanmıyor. Bir fabrikanın OEE'si düşükse ilgili /oee sayfasına geçiş yok; fabrika seçimi çok fabrikalı oturum modeline bağlı olduğu için ayrı tasarım gerekiyor.",
+   "Compare sorgusu için hata durumu (query hata verirse mesaj) ortak useQuery sarmalayıcısına bağlı; sarmalayıcı davranışı doğrulanmadan sayfa içinde ele alınmamalı.",
+   "Tarih ve hafta sayısı süzgeci sayfa yenilenince sıfırlanıyor. URL arama parametresine taşımak vardiya devrinde aynı bakışı paylaşmayı sağlar; Capacity süzgeç önerisiyle birlikte ele alınmalı.",
+   "Alarms rozeti (kritik alarm sayısı, üst menü ve Cockpit) hâlâ vardiya amirinin 30 saniye hedefi için en değerli iş; navigasyona dokunduğu için ayrı tasarım gerekiyor."
+  ]
+ },
+ {
   "zaman": "20261031-0540",
   "odak": "src/routes/capacity.tsx",
   "ozet": "Toplantı odak sayfa Capacity Dashboard (/capacity) üzerineydi. Sayfa tek kaynak ilkesine uyuyor: öngörü sunucuda planla birlikte hesaplanıyor, süzgeç yalnız görünümü daraltıyor, takvim ve duraklama verisi ortak modüllerden geliyor. Eski veri uyarısı için `stale` ve `recalculating` durumları var, bu iyi. Gösterilen ilk 220 satırda kesin ve küçük bir hata bulunmadı. Sayfanın devamı (tablo, düzenleme penceresi, hata gösterimi) görülmeden görev yazılmadı, bu yüzden görev listesi boş.",
