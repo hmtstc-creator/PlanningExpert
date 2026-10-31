@@ -56,6 +56,10 @@ function patchPhotos(d: Draft, i: number, f: (photos: Photo[]) => Photo[]): Draf
 export const setMark = (d: Draft, i: number, p: number, mark: Mark | undefined): Draft =>
   patchPhotos(d, i, (ph) => ph.map((x, k) => (k === p ? { ...x, mark } : x)))
 
+/** Elle çekilen (kamera) fotoğraf: karenin yerine yeni dosya; eski kırmızı işaret yeni görüntüye ait değildir. */
+export const setPhotoStorage = (d: Draft, i: number, p: number, storageId: string): Draft =>
+  patchPhotos(d, i, (ph) => ph.map((x, k) => (k === p ? { second: x.second, storageId } : x)))
+
 export const removePhoto = (d: Draft, i: number, p: number): Draft => patchPhotos(d, i, (ph) => ph.filter((_, k) => k !== p))
 
 /** İkinci fotoğraf (en çok 2): karesi worker'dan istenir, gelene kadar boş. */

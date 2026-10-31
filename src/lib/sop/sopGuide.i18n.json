@@ -48,6 +48,7 @@
         "title": "Fotoğraflar",
         "steps": [
           "Fotoğrafa tıklayın; sağdaki panelde kare saniyesini −1, −0,2, +0,2, +1 ile ya da kutuya yazıp «Use this second» ile değiştirin.",
+          "«Camera» düğmesiyle fotoğrafı telefondan çekin. Önce açıklama çıkar; kamera «Open camera» ile açılır. Telefonu yatay tutun (4:3 yatay çekilir); dik tutarsanız görüntü otomatik döndürülüp kırpılır.",
           "Kırmızı işaret için «Draw red mark» düğmesine basın ve fotoğrafın üstünde sürükleyin. «Remove mark» ile silin.",
           "Bir adıma en çok iki fotoğraf eklenir («Add photo»); «Remove photo» ile çıkarılır.",
           "Fotoğraf hücreyi tamamen doldurur; taşan kenarlar kırpılır.",
@@ -149,6 +150,7 @@
         "title": "Photos",
         "steps": [
           "Click a photo; in the right-hand panel change the frame second with −1, −0.2, +0.2, +1 or type a second and press «Use this second».",
+          "Use «Camera» to take the photo with the phone. A short note appears first; the camera opens with «Open camera». Hold the phone sideways (the photo is 4:3 landscape); if you hold it upright, the image is turned and cropped automatically.",
           "For a red mark press «Draw red mark» and drag on the photo. «Remove mark» deletes it.",
           "At most two photos per step («Add photo»); «Remove photo» takes one out.",
           "The photo fills its cell completely; the edges that do not fit are cropped.",
@@ -250,6 +252,7 @@
         "title": "Fotografii",
         "steps": [
           "Faceți clic pe o fotografie; în panoul din dreapta schimbați secunda cadrului cu −1, −0,2, +0,2, +1 sau scrieți o secundă și apăsați «Use this second».",
+          "Folosiți «Camera» pentru a face fotografia cu telefonul. Mai întâi apare o scurtă notă; camera se deschide cu «Open camera». Țineți telefonul culcat (fotografia are 4:3 orizontal); dacă îl țineți vertical, imaginea se rotește și se decupează automat.",
           "Pentru marcajul roșu apăsați «Draw red mark» și trageți peste fotografie. «Remove mark» îl șterge.",
           "Un pas poate avea cel mult două fotografii («Add photo»); «Remove photo» scoate una.",
           "Fotografia umple complet celula; marginile care nu încap sunt tăiate.",

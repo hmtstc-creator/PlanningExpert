@@ -1,6 +1,6 @@
 # 12 · SOP oluşturma (videodan standart operasyon prosedürü)
 
-> Son güncelleme: 2026-10-31 (düzenleme ekranı: A3 doldurma, kılavuz, otomatik kayıt, sürümler, onay, sürükle-bırak, arama) · Durum: **ilk sürüm yayında** (Machine Follow-up → SOP Builder). `sop-worker`'ı
+> Son güncelleme: 2026-10-31 (kamera 4:3 + açıklama penceresi; düzenleme ekranı: A3 doldurma, kılavuz, otomatik kayıt, sürümler, onay, sürükle-bırak, arama) · Durum: **ilk sürüm yayında** (Machine Follow-up → SOP Builder). `sop-worker`'ı
 > `deploy.sh` kendisi kurar; Gemini anahtarı sayfadaki *Setup* kutusundan girilir — sunucuda elle adım yok.
 > Kaynak: kullanıcıyla 2026-10-28 / 29 konuşması, şablon `docs/sop/sop-sablon.xlsx`.
 
@@ -205,9 +205,12 @@ ekranda elle yazılır · künye ve form kodu sabit · `NR. SOP` elle · revizyo
   seçicisi sayfa state'i. Yeni işlev eklenince üç dile de madde eklenir (`sopGuide.test.ts` bölüm sayısını denetler).
 - **Kaydedilen alanlar:** `approvals` Convex'te `draftSchema` ile saklanır (şema dışı alan sunucuda silinirdi).
 
-**Açık (sonraki iş):** A2 kamera (4:3 yatay, döndürme, kırpma; bugün SOP'ta kamera akışı yok, yükleme yalnız video);
-B6 şablondan başlatma (yeni Convex mutasyonu: video olmadan SOP kaydı); B8 beş kalemli KKD paneli (şablonda üç KKD
-yeri var; beş kalem için yer, görsel ve AI şeması gerekir — şablon kararı kullanıcıdan).
+- **Kamera (A2):** fotoğraf hücresindeki *Camera* düğmesi önce açıklama penceresi gösterir; *Open camera* ile arka kamera
+  4:3 yatay (1600 × 1200 ideal) istenir. Dik tutulan çekim canvas'ta 90° döndürülüp 4:3'e kırpılır (`photoCapture.ts`).
+  Çekilen JPEG depoya yüklenir, o karenin yerine geçer ve taslak hemen kaydedilir.
+
+**Açık (sonraki iş):** B8 beş kalemli KKD paneli (şablonda üç KKD yeri var; beş kalem için yer, görsel ve AI şeması
+gerekir — şablon kararı kullanıcıdan). B6 şablondan başlatma iptal edildi (kullanıcı 2026-10-31).
 
 ## Açık / sonraki adımlar
 

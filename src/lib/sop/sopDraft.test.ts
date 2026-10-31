@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { addPhoto, insertStep, mergeFrames, moveStep, moveStepTo, removeStep, setApproval, setSecond, sopTitle } from './sopDraft'
+import { addPhoto, insertStep, mergeFrames, moveStep, moveStepTo, removeStep, setApproval, setPhotoStorage, setSecond, sopTitle } from './sopDraft'
 import { emptyDraft, type Draft } from './sopSchema'
 
 const draft = (): Draft => ({
@@ -64,5 +64,17 @@ describe('sürükle-bırak ve onay', () => {
     const d = setApproval(setApproval(mk('a'), 'checked', { name: 'Ali' }), 'checked', { date: '2026-10-31' })
     expect(d.approvals?.checked).toEqual({ name: 'Ali', date: '2026-10-31' })
     expect(d.approvals?.prepared).toEqual({ name: '', date: '' })
+  })
+})
+
+describe('kamera fotoğrafı', () => {
+  it('kare yerine yeni dosya; saniye korunur, kırmızı işaret kalkar', () => {
+    const d = setPhotoStorage(
+      { ...emptyDraft(), steps: [{ text: 'a', key: '', reason: '', photos: [{ storageId: 'old', second: 5, mark: { x: 0, y: 0, w: 0.5, h: 0.5 } }] }] },
+      0,
+      0,
+      'new',
+    )
+    expect(d.steps[0].photos[0]).toEqual({ storageId: 'new', second: 5 })
   })
 })
