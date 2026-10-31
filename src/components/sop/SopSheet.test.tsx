@@ -8,7 +8,7 @@ import { SopSheet } from './SopSheet'
 const draft = (n: number): Draft => ({
   ...emptyDraft({ operation: 'Sac yükleme', reference: 'P-1' }),
   steps: Array.from({ length: n }, (_, i) => ({ text: `Adım ${i + 1}`, key: 'Dikkat', reason: 'Çünkü', photos: [{ storageId: `s${i}`, second: i, mark: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 } }] })),
-  ppe: { shoes: true, gloves: false, clothes: true },
+  ppe: { ...emptyDraft().ppe, shoes: true, clothes: true },
 })
 
 afterEach(cleanup)
@@ -29,11 +29,12 @@ describe('SOP sayfası', () => {
     expect(getByText('Adım 7')).toBeTruthy()
   })
 
-  it('KKD işaretleri taslaktan; salt okunurda düzenlenemez', () => {
-    const { container } = render(<SopSheet draft={draft(1)} page={0} pages={1} urls={{}} />)
-    const boxes = [...container.querySelectorAll('button')]
-    expect(boxes.map((b) => b.textContent)).toEqual(['✓', '', '✓'])
-    expect(boxes.every((b) => b.disabled)).toBe(true)
+  it('KKD satırı: yalnız işaretli kalemler, düzenleme düğmesi yok (seçim formun altındaki panelde)', () => {
+    const { getByText, queryByText, container } = render(<SopSheet draft={draft(1)} page={0} pages={1} urls={{}} />)
+    expect(getByText('FOLOSIȚI PANTOFI DE PROTECȚIE')).toBeTruthy()
+    expect(getByText('FOLOSIȚI TRICOUL ȘI PANTALONII')).toBeTruthy()
+    expect(queryByText('FOLOSIȚI MĂNUȘI')).toBeNull()
+    expect(container.querySelectorAll('button')).toHaveLength(0)
     expect(container.querySelector('[contenteditable]')).toBeNull()
   })
 })

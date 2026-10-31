@@ -80,7 +80,7 @@ her adımı en iyi gösteren kareyi seçer ve açıklamaları yazar; kullanıcı
 | 84–86 | `A84:AT86` "Toate versiunile tipărite … COPII NECONTROLATE … / Tüm çıktı alınmış versiyonları KONTROLSÜZ KOPYAdır …" (RO + TR); `AU84:BC86` `S1-P1F12/Rev.01` |
 
 **Şablondaki artıklar** (çizilmez): `K46` ve `AC80`'de 2 px yüksekliğe çökmüş "UZUN KOLLU İŞ ELBİSESİ" grupları,
-`AL27` / `T61`'de üst üste ikinci numara kutusu, `CN36`'da boşluk. KKD satırı şablondaki üç kalemdir; başka ekipman
+`AL27` / `T61`'de üst üste ikinci numara kutusu, `CN36`'da boşluk. KKD satırı artık seçimle çalışır (2026-10-31); başka ekipman
 gerekirse şablon güncellenir (kullanıcı 2026-10-29), kod `PPE_ITEMS`'ı izler.
 
 ## İçerik kuralları (TWI iş öğretimi)
@@ -100,7 +100,7 @@ Püf noktası ve neden boş kalabilir. Örnekte sayfa dolunca sayfa kopyalanmı�
 **Yapay zekâdan istenen JSON** formun alanlarına indirgenmiştir (`src/lib/sop/sopSchema.ts`, tek kaynak; worker aynı
 şemayı Gemini'ye `responseSchema` olarak gönderir): adım başına `temel_adim`, `puf_noktasi`, `nedeni`,
 `baslangic_sn` / `bitis_sn`, `kareler` (1–2 tane: `saniye` + isteğe bağlı `isaret` kutusu [ymin, xmin, ymax, xmax] 0–1000);
-`kkd` için üç evet / hayır. İlk taslaktaki `operasyon_ozeti`, `genel_riskler`, `kalite_kontrol_noktalari` formda
+`kkd` için üç evet / hayır (kalan 10 kalem yalnız elle işaretlenir). İlk taslaktaki `operasyon_ozeti`, `genel_riskler`, `kalite_kontrol_noktalari` formda
 yer olmadığı için istenmez.
 
 ## Nasıl çalışır
@@ -126,7 +126,7 @@ sopJobs: review ─▶ /machine-followup/sop/<id>: form ekranda düzeltilir ─�
 | `approved` | onaylandı (kim, ne zaman); düzenleme sürer. Onaylı SOP'lar aynı fabrika + dildeki yeni işlere **örnek** olur (son 3, 8'er adım) |
 | `error` | hata metni; *Try again* sıraya koyar |
 
-- **Düzenleme ekranı = PDF:** `SopSheet` şablonu 1891 × 1872 px çizer, ekranda küçültülür; yazılar yerinde
+- **Düzenleme ekranı = PDF:** `SopSheet` şablonu `SHEET_W` × `SHEET_H` px (A3 oranı) çizer, ekranda küçültülür; yazılar yerinde
   düzenlenir (contentEditable), fotoğrafa tıklanınca sağdaki panelden kare saniyesi (−1 / −0,2 / +0,2 / +1, elle) →
   worker o kareyi çıkarır; kırmızı işaret sürükleyerek çizilir / kaldırılır; adım taşınır, eklenir, silinir; ikinci
   fotoğraf eklenir. *Save PDF* her sayfayı ayrı A3 yatay sayfa olarak, kenarsız ve ortalı basar (`sheetsToPdf`).
@@ -209,8 +209,12 @@ ekranda elle yazılır · künye ve form kodu sabit · `NR. SOP` elle · revizyo
   4:3 yatay (1600 × 1200 ideal) istenir. Dik tutulan çekim canvas'ta 90° döndürülüp 4:3'e kırpılır (`photoCapture.ts`).
   Çekilen JPEG depoya yüklenir, o karenin yerine geçer ve taslak hemen kaydedilir.
 
-**Açık (sonraki iş):** B8 beş kalemli KKD paneli (şablonda üç KKD yeri var; beş kalem için yer, görsel ve AI şeması
-gerekir — şablon kararı kullanıcıdan). B6 şablondan başlatma iptal edildi (kullanıcı 2026-10-31).
+- **KKD (B8, kullanıcı 2026-10-31):** 13 kalem (`PPE_ITEMS`, `sopLayout.ts`): iş ayakkabısı, eldiven, iş kıyafeti, kısa kol
+  uygunluğu, kulaklık, iş güvenliği gözlüğü, kaynak maskesi, kaynak gözlüğü, baret, emniyet kemeri, solunum maskesi,
+  yüz siperliği, reflektörlü yelek. Formun altındaki KKD panelinde kart olarak işaretlenir; her kartta varsayılan basit
+  görsel (`public/sop/ppe/*.svg`) ya da yüklenen fotoğraf (`ppeImages`, depoda). Çıktıda yalnız işaretli kalemler
+  KKD satırında (H81:BC83) yanyana durur. Şablonun geri kalanı değişmedi; yalnız bu satır seçime göre çizilir.
+- B6 şablondan başlatma iptal edildi (kullanıcı 2026-10-31).
 
 ## Açık / sonraki adımlar
 

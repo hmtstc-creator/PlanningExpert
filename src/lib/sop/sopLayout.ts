@@ -242,13 +242,37 @@ export function slotRefs(slot: number) {
   }
 }
 
-/** KKD kutuları (şablonda üç tane, H81:BC83 içinde). */
+/**
+ * KKD kalemleri (kullanıcı 2026-10-31). Formun altındaki seçim panelinde her biri
+ * bir kart; çıktıda yalnız işaretlenenler KKD satırında (H81:BC83) yanyana durur.
+ * `icon`: public/sop/ppe/ altındaki basit görsel; kullanıcı kendi fotoğrafını yükleyebilir.
+ */
 export const PPE_ITEMS = [
-  { key: 'shoes', label: 'FOLOSIȚI PANTOFI DE PROTECȚIE', sign: 'ppe-shoes-sign.png', photo: 'ppe-shoes.png', ref: 'H81:R83' },
-  { key: 'gloves', label: 'FOLOSIȚI MĂNUȘI', sign: 'ppe-gloves-sign.png', photo: 'ppe-gloves.png', ref: 'T81:AB83' },
-  { key: 'clothes', label: 'FOLOSIȚI TRICOUL ȘI PANTALONII', sign: 'ppe-clothes-sign.png', photo: 'ppe-clothes.png', ref: 'AD81:AP83' },
+  { key: 'shoes', ro: 'FOLOSIȚI PANTOFI DE PROTECȚIE', tr: 'İş ayakkabısı', icon: 'shoes.svg' },
+  { key: 'gloves', ro: 'FOLOSIȚI MĂNUȘI', tr: 'Eldiven', icon: 'gloves.svg' },
+  { key: 'clothes', ro: 'FOLOSIȚI TRICOUL ȘI PANTALONII', tr: 'İş kıyafeti (tişört ve pantolon)', icon: 'clothes.svg' },
+  { key: 'short_sleeve', ro: 'MÂNECI SCURTE ADMISE', tr: 'Kısa kol uygunluğu', icon: 'short_sleeve.svg' },
+  { key: 'ear', ro: 'FOLOSIȚI PROTECȚIE AUDITIVĂ', tr: 'Kulaklık', icon: 'ear.svg' },
+  { key: 'glasses', ro: 'FOLOSIȚI OCHELARI DE PROTECȚIE', tr: 'İş güvenliği gözlüğü', icon: 'glasses.svg' },
+  { key: 'welding_mask', ro: 'FOLOSIȚI MASCĂ DE SUDURĂ', tr: 'Kaynak maskesi', icon: 'welding_mask.svg' },
+  { key: 'welding_goggles', ro: 'FOLOSIȚI OCHELARI DE SUDURĂ', tr: 'Kaynak gözlüğü', icon: 'welding_goggles.svg' },
+  { key: 'helmet', ro: 'FOLOSIȚI CASCĂ DE PROTECȚIE', tr: 'Baret', icon: 'helmet.svg' },
+  { key: 'harness', ro: 'FOLOSIȚI CENTURĂ DE SIGURANȚĂ', tr: 'Emniyet kemeri (yüksekte çalışma, vinç)', icon: 'harness.svg' },
+  { key: 'respirator', ro: 'FOLOSIȚI MASCĂ RESPIRATORIE', tr: 'Solunum maskesi', icon: 'respirator.svg' },
+  { key: 'face_shield', ro: 'FOLOSIȚI VIZIERĂ DE PROTECȚIE', tr: 'Yüz siperliği', icon: 'face_shield.svg' },
+  { key: 'vest', ro: 'FOLOSIȚI VESTĂ REFLECTORIZANTĂ', tr: 'Reflektörlü yelek', icon: 'vest.svg' },
 ] as const
 export type PpeKey = (typeof PPE_ITEMS)[number]['key']
+export const PPE_KEYS = PPE_ITEMS.map((i) => i.key) as PpeKey[]
+export const ppeIconUrl = (key: PpeKey): string => `/sop/ppe/${PPE_ITEMS.find((i) => i.key === key)?.icon ?? ''}`
+
+/** KKD satırı H81:BC83: seçili `count` kalem eşit aralıklı, en çok 380 px genişlikte. */
+export function ppeCellRects(count: number): { left: number; width: number }[] {
+  const row = rect('H81:BC83')
+  if (count <= 0) return []
+  const width = Math.min(380, row.width / count)
+  return Array.from({ length: count }, (_, i) => ({ left: row.left + i * width, width }))
+}
 
 /** Adımları sayfalara böler: her sayfa 6 kutu, boş kutu `null` (en az bir sayfa). */
 export function paginate<T>(steps: readonly T[]): (T | null)[][] {

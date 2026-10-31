@@ -28,7 +28,7 @@ describe('Gemini cevabı', () => {
       { second: 7, mark: { x: 0.2, y: 0.1, w: 0.4, h: 0.4 } },
       { second: 80, mark: undefined },
     ])
-    expect(d.ppe).toEqual({ shoes: true, gloves: true, clothes: false })
+    expect(d.ppe).toMatchObject({ shoes: true, gloves: true, clothes: false, ear: false, vest: false })
   })
 
   it('bozuk cevap: hata yolu ile birlikte döner (tekrar denemede modele gider)', () => {

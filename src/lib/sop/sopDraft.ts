@@ -72,6 +72,12 @@ export const setSecond = (d: Draft, i: number, p: number, second: number): Draft
 
 export const togglePpe = (d: Draft, key: keyof Draft['ppe']): Draft => ({ ...d, ppe: { ...d.ppe, [key]: !d.ppe[key] } })
 
+/** KKD kalemine kullanıcının yüklediği görsel (depo kimliği). */
+export const setPpeImage = (d: Draft, key: keyof Draft['ppe'], storageId: string): Draft => ({
+  ...d,
+  ppeImages: { ...d.ppeImages, [key]: storageId },
+})
+
 /**
  * Ekranda kaydedilmemiş değişiklik varken sunucudan yeni kare gelirse: yalnız
  * aynı saniyedeki fotoğrafın karesi alınır, yazılanlar kaybolmaz.

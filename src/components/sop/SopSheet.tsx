@@ -2,6 +2,8 @@ import { useCallback, useLayoutEffect, useRef, useState, type CSSProperties, typ
 
 import {
   PPE_ITEMS,
+  ppeCellRects,
+  ppeIconUrl,
   REGIONS,
   SHEET_H,
   SHEET_W,
@@ -366,29 +368,21 @@ export function SopSheet({ draft, page, pages, urls, edit, selected, pending }: 
         )
       })}
 
-      {PPE_ITEMS.map((item) => {
-        const r = rect(item.ref)
-        const on = draft.ppe[item.key]
-        return (
-          <div
-            key={item.key}
-            style={{ position: 'absolute', left: r.left + 4, top: r.top + 4, width: r.width - 8, height: r.height - 10, display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <img src={`/sop/${item.sign}`} alt="" style={{ height: '100%', objectFit: 'contain' }} />
-            <img src={`/sop/${item.photo}`} alt="" style={{ height: '100%', objectFit: 'contain' }} />
-            <button
-              type="button"
-              disabled={!edit}
-              onClick={() => edit?.togglePpe(item.key)}
-              style={{ width: 18, height: 18, border: '1.5px solid #000', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, lineHeight: 1, flexShrink: 0, cursor: edit ? 'pointer' : 'default' }}
-              title={edit ? 'Required protective equipment — click to change' : undefined}
-            >
-              {on ? '✓' : ''}
-            </button>
-            <span style={{ fontFamily: FONT, fontSize: px(9), fontWeight: 400 }}>{item.label}</span>
-          </div>
-        )
-      })}
+      {/* KKD satırı: yalnız işaretli kalemler, yanyana (kullanıcı 2026-10-31). Seçim formun altındaki panelde. */}
+      {(() => {
+        const chosen = PPE_ITEMS.filter((i) => draft.ppe[i.key])
+        const row = rect('H81:BC83')
+        return ppeCellRects(chosen.length).map((cell, n) => {
+          const item = chosen[n]
+          const img = draft.ppeImages?.[item.key]
+          return (
+            <div key={item.key} style={{ position: 'absolute', left: cell.left + 4, top: row.top + 2, width: cell.width - 8, height: row.height - 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <img src={(img && urls[img]) || ppeIconUrl(item.key)} alt="" style={{ height: '100%', width: row.height - 4, objectFit: 'contain', flexShrink: 0 }} />
+              <span style={{ fontFamily: FONT, fontSize: px(10), fontWeight: 700, lineHeight: 1.15 }}>{item.ro}</span>
+            </div>
+          )
+        })
+      })()}
     </div>
   )
 }

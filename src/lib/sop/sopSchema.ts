@@ -6,7 +6,7 @@
 
 import { z } from 'zod'
 
-import { HEADER_DEFAULTS, type Header, type PpeKey } from './sopLayout'
+import { HEADER_DEFAULTS, PPE_KEYS, type Header, type PpeKey } from './sopLayout'
 
 /** Adım başına en çok fotoğraf (kullanıcı 2026-10-29: daha iyi anlatıyorsa 2). */
 export const MAX_PHOTOS_PER_STEP = 2
@@ -132,14 +132,18 @@ export interface Draft {
   header: Header
   steps: Step[]
   ppe: Record<PpeKey, boolean>
+  /** Kullanıcının yüklediği KKD görseli (depo kimliği); yoksa varsayılan simge. */
+  ppeImages?: Partial<Record<PpeKey, string>>
   /** Eski taslaklarda yok; ekran yokmuş gibi boş okur. */
   approvals?: Approvals
 }
 
+export const emptyPpe = (): Record<PpeKey, boolean> => Object.fromEntries(PPE_KEYS.map((k) => [k, false])) as Record<PpeKey, boolean>
+
 export const emptyDraft = (header: Partial<Header> = {}): Draft => ({
   header: { ...HEADER_DEFAULTS, ...header },
   steps: [],
-  ppe: { shoes: false, gloves: false, clothes: false },
+  ppe: emptyPpe(),
 })
 
 const round = (n: number) => Math.round(n * 10) / 10
@@ -168,7 +172,7 @@ export function aiToDraft(ai: AiResult, duration: number, header: Partial<Header
       end: clamp(Math.max(a.baslangic_sn, a.bitis_sn)),
       photos: a.kareler.slice(0, MAX_PHOTOS_PER_STEP).map((k) => ({ second: clamp(k.saniye), mark: boxToMark(k.isaret) })),
     })),
-    ppe: { shoes: ai.kkd.is_ayakkabisi, gloves: ai.kkd.eldiven, clothes: ai.kkd.tisort_pantolon },
+    ppe: { ...emptyPpe(), shoes: ai.kkd.is_ayakkabisi, gloves: ai.kkd.eldiven, clothes: ai.kkd.tisort_pantolon },
   }
 }
 
@@ -222,7 +226,8 @@ export const draftSchema = z.object({
       }),
     )
     .max(MAX_STEPS),
-  ppe: z.object({ shoes: z.boolean(), gloves: z.boolean(), clothes: z.boolean() }),
+  ppe: z.object(Object.fromEntries(PPE_KEYS.map((k) => [k, z.boolean().optional()]))),
+  ppeImages: z.object(Object.fromEntries(PPE_KEYS.map((k) => [k, z.string().max(200).optional()]))).optional(),
   approvals: z
     .object({
       prepared: z.object({ name: z.string().max(120), date: z.string().max(40) }),
