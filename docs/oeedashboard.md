@@ -829,7 +829,7 @@ Excel hatası olduğunu doğruladı (site doğru). Karar **önleme amaçlı**:
     0–100): **duruşlar**; **duruş → iş merkezleri**; **duruş → alt duruşlar**; **alt duruş →
     iş merkezleri**. Duruşa ya da makineye tıklamak seçer. Speed bir duruş değildir, paretoda yok.
 27. Bütün sayfa (trend + 4 pareto + filtre özeti) tek A4 dikey sayfaya sığar (PDF: fit, portrait).
-28. Filtreler tek satırda (kayıp düğmeleri, alt kayıp, iş merkezi). Trend solda %70, alt duruş tablosu sağda %30;
+28. Filtreler tek satırda (kayıp düğmeleri, alt kayıp, iş merkezi). Trend solda %60, alt duruş tablosu sağda %40;
     tabloda yalnız Count ve Time.
-29. Dört paretonun altında seçili haftada en çok duruş süren 3 malzeme ve her birinin en büyük duruş sütunu
-    (parça kırılımı yalnız yeni özetlerde).
+29. Dört paretonun altında, seçili duruş sütununun en çok duruşlu 3 malzemesi ve bu duruşun malzemenin
+    bütün duruşuna payı (parça kırılımı yalnız yeni özetlerde; alt kayıp kırılımı malzemede yok).
