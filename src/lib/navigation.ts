@@ -62,67 +62,9 @@ export interface Area {
   module?: Module
   /** Çubuğun menüsü (ağaç). */
   nav: NavNode[]
-  /** Menüde gösterilmeyen ama arama ve ilgili sayfa adlarında kullanılan sayfalar. */
-  pages?: NavNode[]
 }
 
 const link = (to: string, label: string, hint?: string, icon?: IconKey): NavNode => ({ to, label, hint, icon })
-
-// Planlama sayfalarının adları ve yerleri: üst menüde gösterilmez (sekme barı
-// kaldırıldı, yalnız adresle açılır); Ctrl+K araması ve ilgili sayfa adları
-// bu listeden okur.
-const PLANNING_PAGES: NavNode[] = [
-  link('/planlama', 'Plan', 'The weekly production plan', 'gantt'),
-  link('/planningexpert', 'Overview', 'Daily status and warnings', 'dashboard'),
-  {
-    label: 'Menu',
-    icon: 'grid',
-    children: [
-      {
-        label: 'Analysis',
-        hint: 'Capacity, raw material, alarms, performance',
-        icon: 'chart',
-        children: [
-          link('/capacity', 'Capacity Dashboard', 'Weekly capacity vs demand by work center group', 'gauge'),
-          link('/hammadde', 'Raw Material Coverage', 'Steel requirement and orders per week', 'layers'),
-          link('/alarms', 'Alarms', 'Dies and machines that hold up the plan', 'siren'),
-          link('/performans', 'Performance', 'Plan versus actual', 'trending'),
-        ],
-      },
-      {
-        label: 'SAP data',
-        hint: 'Uploads and what they contain',
-        icon: 'database',
-        children: [
-          link('/sapdata', 'SAP Data', 'Upload ZPP, ZPP_DAILY, MB52 and MB51', 'upload'),
-          link('/siparisler', 'Demand', 'Weekly and daily net requirements', 'clipboard'),
-          link('/stoklar', 'Stock', 'Stock by material and location', 'boxes'),
-          link('/gerceklesen', 'Actuals', 'Posted production movements', 'check'),
-        ],
-      },
-      {
-        label: 'Master data',
-        hint: 'Parts, work centers, calendar, locations',
-        icon: 'package',
-        children: [
-          link('/referanslar', 'Master Data', 'Cavities, SPM, weights, machines', 'package'),
-          link('/makineler', 'Work Centers', 'Cost center, hall, category, coil feed', 'factory'),
-          link('/takvim', 'Work Calendar', 'Shifts, stops, capacity', 'calendar'),
-          link('/depolar', 'Storage Locations', 'Which stock counts', 'warehouse'),
-        ],
-      },
-      {
-        label: 'Help',
-        hint: 'How the plan works, decisions of the plant',
-        icon: 'book',
-        children: [
-          link('/planlogic', 'Planning Logic', 'How the plan is calculated', 'book'),
-          link('/kayitlar', 'Decision Log', 'Decisions, rules and open issues of the plant', 'scroll'),
-        ],
-      },
-    ],
-  },
-]
 
 const PLANNING: Area = {
   key: 'planning',
@@ -133,9 +75,58 @@ const PLANNING: Area = {
   icon: 'gantt',
   accent: 'indigo',
   module: 'planning',
-  // Üst sekme barı yok: sayfalar adresle açılır (/planlama, /capacity …).
-  nav: [],
-  pages: PLANNING_PAGES,
+  nav: [
+    link('/planlama', 'Plan', 'The weekly production plan', 'gantt'),
+    link('/planningexpert', 'Overview', 'Daily status and warnings', 'dashboard'),
+    {
+      label: 'Menu',
+      icon: 'grid',
+      children: [
+        {
+          label: 'Analysis',
+          hint: 'Capacity, raw material, alarms, performance',
+          icon: 'chart',
+          children: [
+            link('/capacity', 'Capacity Dashboard', 'Weekly capacity vs demand by work center group', 'gauge'),
+            link('/hammadde', 'Raw Material Coverage', 'Steel requirement and orders per week', 'layers'),
+            link('/alarms', 'Alarms', 'Dies and machines that hold up the plan', 'siren'),
+            link('/performans', 'Performance', 'Plan versus actual', 'trending'),
+          ],
+        },
+        {
+          label: 'SAP data',
+          hint: 'Uploads and what they contain',
+          icon: 'database',
+          children: [
+            link('/sapdata', 'SAP Data', 'Upload ZPP, ZPP_DAILY, MB52 and MB51', 'upload'),
+            link('/siparisler', 'Demand', 'Weekly and daily net requirements', 'clipboard'),
+            link('/stoklar', 'Stock', 'Stock by material and location', 'boxes'),
+            link('/gerceklesen', 'Actuals', 'Posted production movements', 'check'),
+          ],
+        },
+        {
+          label: 'Master data',
+          hint: 'Parts, work centers, calendar, locations',
+          icon: 'package',
+          children: [
+            link('/referanslar', 'Master Data', 'Cavities, SPM, weights, machines', 'package'),
+            link('/makineler', 'Work Centers', 'Cost center, hall, category, coil feed', 'factory'),
+            link('/takvim', 'Work Calendar', 'Shifts, stops, capacity', 'calendar'),
+            link('/depolar', 'Storage Locations', 'Which stock counts', 'warehouse'),
+          ],
+        },
+        {
+          label: 'Help',
+          hint: 'How the plan works, decisions of the plant',
+          icon: 'book',
+          children: [
+            link('/planlogic', 'Planning Logic', 'How the plan is calculated', 'book'),
+            link('/kayitlar', 'Decision Log', 'Decisions, rules and open issues of the plant', 'scroll'),
+          ],
+        },
+      ],
+    },
+  ],
 }
 
 const area = (key: AreaKey, title: string, short: string, home: string, icon: IconKey, accent: AccentKey, module: Module | undefined, nav: NavNode[]): Area => ({
@@ -377,7 +368,7 @@ const LABELS: Record<string, string> = {
 }
 
 export function pageLabel(to: string): string {
-  return LABELS[to] ?? linksOf(PLANNING_PAGES).find((i) => i.to === to)?.label ?? to
+  return LABELS[to] ?? areaLinks(PLANNING).find((i) => i.to === to)?.label ?? to
 }
 
 /** Bir sayfanın kısayolları: { to, label }. */
