@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|
 | __root.tsx | 63 |  |  |  | ConnectionBanner, ErrorReporter, Header, LoginGate, MutationErrorToast, TenancyGate |
 | /account | 158 | users.mySessions | auth.changePassword |  | Header, PageHeader |
-| /admin | 81 |  |  | /admin/map | CompanyAdmin, PageHeader, Tabs, org/OrgAdmin, security/SecurityPanel |
+| /admin | 84 |  |  | /admin/map | AutonomousLog, CompanyAdmin, PageHeader, Tabs, org/OrgAdmin, security/SecurityPanel |
 | /admin_/map | 47 |  |  |  | PageHeader, org/OrgMap |
 | /alarms | 235 |  |  | /die-followup/maintenance, /machine-followup/breakdowns, /machine-followup/maintenance | EntityLinks, PageHeader |
 | /board | 8 |  |  |  | BoardDashboard |
