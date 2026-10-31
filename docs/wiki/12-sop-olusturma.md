@@ -209,10 +209,10 @@ ekranda elle yazılır · künye ve form kodu sabit · `NR. SOP` elle · revizyo
   4:3 yatay (1600 × 1200 ideal) istenir. Dik tutulan çekim canvas'ta 90° döndürülüp 4:3'e kırpılır (`photoCapture.ts`).
   Çekilen JPEG depoya yüklenir, o karenin yerine geçer ve taslak hemen kaydedilir.
 
-- **KKD (B8, kullanıcı 2026-10-31):** 13 kalem (`PPE_ITEMS`, `sopLayout.ts`): iş ayakkabısı, eldiven, iş kıyafeti, kısa kol
-  uygunluğu, kulaklık, iş güvenliği gözlüğü, kaynak maskesi, kaynak gözlüğü, baret, emniyet kemeri, solunum maskesi,
+- **KKD (B8, kullanıcı 2026-10-31):** 13 kalem (`PPE_ITEMS`, `sopLayout.ts`): iş ayakkabısı, iş eldiveni, iş kıyafeti, kısa kol
+  uygunluğu, işitme koruyucu (kulaklık), iş güvenliği gözlüğü, kaynak maskesi, kaynak gözlüğü, baret, tam vücut emniyet kemeri (ham), solunum koruyucu maske,
   yüz siperliği, reflektörlü yelek. Formun altındaki KKD panelinde kart olarak işaretlenir; her kartta varsayılan basit
-  görsel (`public/sop/ppe/*.svg`) ya da yüklenen fotoğraf (`ppeImages`, depoda). Çıktıda yalnız işaretli kalemler
+  renkli çizim (`public/sop/ppe/*.svg`) ya da yüklenen fotoğraf (`ppeImages`, depoda). Çıktıda yalnız işaretli kalemler
   KKD satırında (H81:BC83) yanyana durur. Şablonun geri kalanı değişmedi; yalnız bu satır seçime göre çizilir.
 - B6 şablondan başlatma iptal edildi (kullanıcı 2026-10-31).
 
