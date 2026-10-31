@@ -1,5 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import { ChevronDown, ChevronRight, Factory, LogOut, Menu, Search, Star, X } from 'lucide-react'
+import { Bell, ChevronDown, ChevronRight, Factory, LogOut, Menu, Search, Star, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { api } from '../../convex/_generated/api'
@@ -20,8 +20,10 @@ import {
 import { pageIndex } from '../lib/navSearch'
 import { useCanOpen, usePlant } from '../lib/plantContext'
 import { useShortcuts } from '../lib/shortcuts'
+import { countNew } from '../lib/updates'
 import { CommandPalette, SearchButton, modKey, openCommandPalette } from './nav/CommandPalette'
 import { ACCENTS, IconTile, Kbd, NavIcon } from './nav/NavIcon'
+import { NotificationsList, useUpdates } from './UpdatesPanel'
 
 /**
  * Üst çubuk — iki kat (docs/architecture.md → Arayüz):
@@ -77,6 +79,7 @@ export function Header() {
             <span className="lg:hidden">
               <SearchButton variant="icon" />
             </span>
+            <NotificationsButton />
             <ContextSwitch />
             <UserMenu />
           </div>
@@ -305,6 +308,52 @@ function Avatar({ name, size = 'h-8 w-8 text-sm' }: { name: string | null | unde
 }
 
 /** Kullanıcı menüsü: hesap, yönetim (yetkiye göre), teşhis, çıkış. */
+/**
+ * Bildirim zili: son ziyaretten beri yeni olay sayısı kırmızı rozetle; açılınca
+ * aynı liste bir panelde çıkar. Yalnızca aktif bir plant'te (Board'da yok).
+ */
+function NotificationsButton() {
+  const { ctx } = usePlant()
+  const { name } = useCurrentUser()
+  const plantId = ctx?.isBoard ? undefined : ctx?.active?.plantId
+  const { data, seen, markRead } = useUpdates(name, plantId)
+  const { open, setOpen, ref } = usePopover()
+  // Panel açılırken önceki ziyaret anı: o açılışta "New" işaretleri görünür kalsın.
+  const [since, setSince] = useState<number | null>(null)
+  if (!plantId) return null
+  const count = data ? countNew(data.feed, seen ?? null) : 0
+  const toggle = () => {
+    if (!open) {
+      setSince(seen ?? null)
+      markRead()
+    }
+    setOpen(!open)
+  }
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={toggle}
+        aria-expanded={open}
+        aria-label={count > 0 ? `Notifications, ${count} new` : 'Notifications'}
+        title="Notifications"
+        className="relative rounded-xl p-2 text-white/90 hover:bg-white/10"
+      >
+        <Bell className="h-5 w-5" aria-hidden />
+        {count > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 grid h-[1.125rem] min-w-[1.125rem] place-items-center rounded-full bg-red-600 px-1 text-[10px] leading-none font-bold text-white ring-2 ring-indigo-950">
+            {count > 99 ? '99+' : count}
+          </span>
+        )}
+      </button>
+      {open && (
+        <Panel width="w-96">
+          <NotificationsList data={data} since={since} />
+        </Panel>
+      )}
+    </div>
+  )
+}
+
 function UserMenu() {
   const { name, setToken } = useCurrentUser()
   const { ctx } = usePlant()
