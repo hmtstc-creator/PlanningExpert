@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { EMPTY_CONFIG, type LossDay, type OeeConfig } from './oee'
-import { columnMinutes, machineMinutes, paretoView, subLossMachines, subLossMinutes } from './oeePareto'
+import { columnMinutes, machineMinutes, paretoView, subLossMachines, subLossMinutes, topMaterials } from './oeePareto'
 
 const cfg: OeeConfig = {
   ...EMPTY_CONFIG,
@@ -62,5 +62,30 @@ describe('makine dağılımı', () => {
     expect(subLossMinutes(days, cfg, 'STP').map((r) => r.key).sort()).toEqual(['DIE SETUP', 'GRIPPER SETUP'])
     expect(subLossMachines(days, cfg, 'STP', 'DIE SETUP')).toEqual([{ key: 'W1', value: 30 }])
     expect(subLossMachines(days, cfg, 'STP', 'GRIPPER SETUP')).toEqual([{ key: 'W2', value: 10 }])
+  })
+})
+
+describe('topMaterials', () => {
+  it('malzemeleri dakikaya göre sıralar, her malzemenin en büyük duruş sütununu verir', () => {
+    const d: LossDay = {
+      date: '2026-10-26',
+      costCenter: 'C',
+      workCenter: 'W1',
+      codes: {},
+      reasons: {},
+      parts: {
+        'UNSCD_DOWN|STP|MAT-A': [30, 1],
+        'UNSCD_DOWN|STP|MAT-B': [10, 1],
+        'UNSCD_DOWN|STP|MAT-A|X': [5, 1],
+      },
+    }
+    const rows = topMaterials([d], cfg)
+    expect(rows.map((r) => r.material)).toEqual(['MAT-A', 'MAT-B', 'MAT-A|X'])
+    expect(rows[0]).toMatchObject({ material: 'MAT-A', minutes: 30, loss: 'STP' })
+    expect(rows[0].lossShare).toBeCloseTo(1)
+  })
+
+  it('parça kırılımı yoksa boş döner', () => {
+    expect(topMaterials([day('W1', { 'UNSCD_DOWN|STP': [10, 1] }, {})], cfg)).toEqual([])
   })
 })

@@ -12,7 +12,7 @@ import { SavePdfButton } from '../../components/SavePdfButton'
 import { pdfFileName } from '../../lib/pdfFile'
 import { sheetToPdf } from '../../lib/pdfSheet'
 import { useOeeFilters } from '../../lib/oeeFilters'
-import { columnMinutes, machineMinutes, paretoView, subLossMachines, subLossMinutes } from '../../lib/oeePareto'
+import { columnMinutes, machineMinutes, paretoView, subLossMachines, subLossMinutes, topMaterials } from '../../lib/oeePareto'
 import { useQuery } from '../../lib/convexTransport'
 import {
   SPEED,
@@ -161,22 +161,10 @@ function LossesPage() {
   const subRows = useMemo(() => {
     if (!cur || loss === SPEED) return []
     const now = subLosses(cur.lossDays, config, loss)
-    const before = prev ? subLosses(prev.lossDays, config, loss) : new Map()
-    const texts = new Set([...now.keys(), ...before.keys()])
-    return [...texts]
-      .map((text) => {
-        const a = now.get(text) ?? { minutes: 0, count: 0 }
-        const b = before.get(text) ?? { minutes: 0, count: 0 }
-        return {
-          text,
-          count: a.count,
-          minutes: a.minutes,
-          share: cur.loadingMin > 0 ? a.minutes / cur.loadingMin : 0,
-          prevShare: prev && prev.loadingMin > 0 ? b.minutes / prev.loadingMin : 0,
-        }
-      })
-      .sort((x, y) => y.minutes - x.minutes || y.prevShare - x.prevShare)
-  }, [cur, prev, loss, config])
+    return [...now]
+      .map(([text, a]) => ({ text, count: a.count, minutes: a.minutes, share: cur.loadingMin > 0 ? a.minutes / cur.loadingMin : 0 }))
+      .sort((x, y) => y.minutes - x.minutes)
+  }, [cur, loss, config])
   const subLabel = sub && subRows.some((r) => r.text === sub) ? sub : ''
 
   const curValue = cur ? valueOf(cur, subLabel || undefined) : null
@@ -212,6 +200,7 @@ function LossesPage() {
     () => paretoView(isSpeed || !activeSub ? [] : subLossMachines(weekAll, config, loss, activeSub)),
     [weekAll, config, loss, isSpeed, activeSub],
   )
+  const mats = useMemo(() => topMaterials(weekLoss, config, 3), [weekLoss, config])
   const fmt = minutes
 
   return (
@@ -251,57 +240,49 @@ function LossesPage() {
         </p>
       )}
 
-      {/* Seçim */}
-      <div className="mt-6 space-y-3 print:hidden">
-        <div>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Loss</p>
-          <div className="mt-1.5 flex flex-wrap gap-2">
-            {columns.map((col) => (
-              <button
-                key={col}
-                type="button"
-                onClick={() => pickLoss(col)}
-                className={`h-10 rounded-lg px-3.5 text-sm font-semibold shadow-sm transition-colors ${
-                  col === loss ? 'bg-foreground text-background' : 'border border-border bg-background text-foreground hover:bg-muted'
-                }`}
-              >
-                {col}
-              </button>
-            ))}
-          </div>
-        </div>
-        {loss !== SPEED && (
-          <label className="block max-w-md">
-            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Sub-loss</span>
-            <select
-              value={subLabel}
-              onChange={(e) => setSub(e.target.value)}
-              className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
-            >
-              <option value="">All of {loss}</option>
-              {subRows.map((r) => (
-                <option key={r.text} value={r.text}>
-                  {r.text} — {pct(r.share)} this week
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label className="block max-w-md">
-          <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Work center</span>
-          <select
-            value={machine}
-            onChange={(e) => setMachine(e.target.value)}
-            className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+      {/* Seçim: tek satır — kayıp düğmeleri, alt kayıp, iş merkezi. */}
+      <div className="mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 print:hidden">
+        {columns.map((col) => (
+          <button
+            key={col}
+            type="button"
+            onClick={() => pickLoss(col)}
+            className={`h-8 shrink-0 rounded-md px-2.5 text-xs font-semibold transition-colors ${
+              col === loss ? 'bg-foreground text-background' : 'border border-border bg-background text-foreground hover:bg-muted'
+            }`}
           >
-            <option value="">All work centers</option>
-            {machines.map((m) => (
-              <option key={m} value={m}>
-                {m}
+            {col}
+          </button>
+        ))}
+        <span className="mx-1 h-5 w-px shrink-0 bg-border" />
+        {loss !== SPEED && (
+          <select
+            aria-label="Sub-loss"
+            value={subLabel}
+            onChange={(e) => setSub(e.target.value)}
+            className="h-8 w-56 shrink-0 rounded-md border border-input bg-background px-2 text-xs"
+          >
+            <option value="">All of {loss}</option>
+            {subRows.map((r) => (
+              <option key={r.text} value={r.text}>
+                {r.text} — {pct(r.share)}
               </option>
             ))}
           </select>
-        </label>
+        )}
+        <select
+          aria-label="Work center"
+          value={machine}
+          onChange={(e) => setMachine(e.target.value)}
+          className="h-8 w-44 shrink-0 rounded-md border border-input bg-background px-2 text-xs"
+        >
+          <option value="">All work centers</option>
+          {machines.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div ref={sheetRef} className="oee-viz bg-background">
@@ -340,8 +321,9 @@ function LossesPage() {
             </div>
           </div>
 
-          <div className="mt-3">
-            <Legend
+          <div className="mt-3 flex items-start gap-4">
+            <div className="min-w-0 basis-[70%]">
+              <Legend
               items={[
                 { key: loss, label: loss, slot: lossIndex + 1 },
                 ...(subLabel ? [{ key: 'sub', label: subLabel, slot: lossIndex + 2 }] : []),
@@ -359,32 +341,28 @@ function LossesPage() {
             {loss !== SPEED && shown.some((p) => p.loadingMin > 0 && !p.hasDowntime) && (
               <p className="mt-1 text-xs text-muted-foreground">Periods without uploaded downtimes are left empty.</p>
             )}
-          </div>
+            </div>
 
-          {/* Alt kayıplar: bu hafta ve geçen hafta; satıra tıklamak seçer. */}
+            <div className="min-w-0 flex-1">
           {loss !== SPEED && (
-            <div className="mt-4 print:hidden">
+            <div>
               <p className="text-xs font-medium text-muted-foreground">
-                Sub-losses of {loss} — W{sel.week.week} vs W{isoWeek(prevMonday).week}
+                Sub-losses of {loss} — W{sel.week.week}
               </p>
               {subRows.length === 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground">No {loss} downtimes in these two weeks.</p>
+                <p className="mt-2 text-sm text-muted-foreground">No {loss} downtimes this week.</p>
               ) : (
-                <div className="mt-2 max-h-[22rem] overflow-auto rounded-lg border border-border">
-                  <table className="w-full min-w-[32rem] text-sm">
-                    <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
+                <div className="mt-2 max-h-[20rem] overflow-auto rounded-lg border border-border">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-muted text-muted-foreground">
                       <tr>
-                        <th className="px-3 py-2 text-left font-medium">Sub-loss</th>
-                        <th className="px-3 py-2 text-right font-medium">Count</th>
-                        <th className="px-3 py-2 text-right font-medium">Time</th>
-                        <th className="px-3 py-2 text-right font-medium">W{sel.week.week}</th>
-                        <th className="px-3 py-2 text-right font-medium">W{isoWeek(prevMonday).week}</th>
-                        <th className="px-3 py-2 text-right font-medium">Change</th>
+                        <th className="px-2 py-1.5 text-left font-medium">Sub-loss</th>
+                        <th className="px-2 py-1.5 text-right font-medium">Count</th>
+                        <th className="px-2 py-1.5 text-right font-medium">Time</th>
                       </tr>
                     </thead>
                     <tbody>
                       {subRows.map((r) => {
-                        const g = gapText(r.share, r.prevShare)
                         const active = r.text === subLabel
                         return (
                           <tr
@@ -392,12 +370,9 @@ function LossesPage() {
                             onClick={() => setSub(active ? '' : r.text)}
                             className={`cursor-pointer border-t border-border hover:bg-muted/50 ${active ? 'bg-muted font-semibold' : ''}`}
                           >
-                            <td className="px-3 py-1.5 text-foreground">{r.text}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums">{r.count}</td>
-                            <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-muted-foreground">{minutes(r.minutes)}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums">{pct(r.share)}</td>
-                            <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{pct(r.prevShare)}</td>
-                            <td className={`whitespace-nowrap px-3 py-1.5 text-right tabular-nums ${g.tone}`}>{g.text}</td>
+                            <td className="px-2 py-1 text-foreground">{r.text}</td>
+                            <td className="px-2 py-1 text-right tabular-nums">{r.count}</td>
+                            <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-muted-foreground">{minutes(r.minutes)}</td>
                           </tr>
                         )
                       })}
@@ -407,6 +382,8 @@ function LossesPage() {
               )}
             </div>
           )}
+            </div>
+          </div>
         </section>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <OeeParetoChart
@@ -450,6 +427,28 @@ function LossesPage() {
             emptyText="No sub-loss downtimes this week."
           />
         </div>
+        <section className="print-avoid-break mt-3 rounded-lg border border-border p-3">
+          <p className="text-xs font-semibold text-foreground">
+            Top 3 materials — W{sel.week.week} · {label}
+            {machine ? ` · ${machine}` : ''}
+          </p>
+          {mats.length === 0 ? (
+            <p className="mt-1 text-xs text-muted-foreground">No material downtime data this week.</p>
+          ) : (
+            <ol className="mt-1.5 grid grid-cols-3 gap-3 text-xs">
+              {mats.map((m, i) => (
+                <li key={m.material} className="min-w-0">
+                  <span className="block truncate font-semibold text-foreground">
+                    {i + 1}. {m.material}
+                  </span>
+                  <span className="block tabular-nums text-muted-foreground">
+                    {minutes(m.minutes)} · top loss {m.loss} ({pct(m.lossShare)})
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       </div>
     </div>
   )
