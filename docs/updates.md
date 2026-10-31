@@ -1,4 +1,6 @@
-# Updates — ana sayfada son gelişmeler (2026-10-19, planlamacı)
+# Updates — son gelişmeler ve veri tazeliği (2026-10-19, planlamacı)
+
+> **2026-10-31 güncellemesi:** Bildirimler artık üst çubukta bir zil düğmesinde (kırmızı sayaç = son ziyaretten beri yeni olay). Ana sayfadan Updates paneli, *Latest data* ve *Today* kaldırıldı; veri tazeliği Planning sayfasında görülür. Aşağıdaki "ana sayfa" ifadeleri bu anlamdadır: bildirim paneli = üst çubuk zili.
 
 İstek: "Ana ekrana, hoşgeldin ekranına bir bildirim alanı ekle; son
 güncellemeleri insanlar takip edebilmeli — Die Follow-up konuları, OEE ve
@@ -7,7 +9,7 @@ gelişmeleri görmeli, son dataların ne zaman yayınlandığını görmeli."
 
 ## 1. Kavram
 
-Portal ana sayfasında karşılamanın hemen altında **Updates** paneli. Oturum
+Üst çubukta **zil** düğmesi (bildirim paneli). Oturum
 açan kişi ilk bakışta iki soruya cevap alır:
 
 1. **Ne oldu?** (*What's new*) — son 7 günün olayları, yeniden eskiye:
@@ -26,9 +28,9 @@ açan kişi ilk bakışta iki soruya cevap alır:
      uyarı. Diğer dosyalar yalnızca bilgi (eşikleri yok).
    - OEE: son yükleme ve verinin son günü ("data through").
 
-**Son ziyaretten beri yeni**: kişinin bu cihazda ana sayfayı son açtığı andan
-sonraki olaylar "New" işaretlidir; sayısı karşılamada (*N new since your last
-visit*) ve panel başlığında görünür. Kayıt kısayollar gibi bu cihazda,
+**Son ziyaretten beri yeni**: kişinin bu cihazda bildirim panelini son açtığı
+andan sonraki olaylar sayılır; sayı zilin üstünde kırmızı rozet olarak görünür,
+panel açılınca sıfırlanır ve o açılışta "New" işaretleri kalır. Kayıt bu cihazda,
 kullanıcı × plant başına (localStorage) — sunucuya gitmez; ilk ziyarette hiçbir
 şey "yeni" sayılmaz.
 
@@ -48,8 +50,8 @@ Kurallar:
 ## 2. Mimari eşleştirme
 
 ```
-src/routes/index.tsx            Hero: "N new since your last visit" → #updates
-  └ src/components/UpdatesPanel.tsx   What's new + Latest data; "New" işareti
+src/components/Header.tsx        NotificationsButton: zil + kırmızı sayaç + panel
+  └ src/components/UpdatesPanel.tsx   NotificationsList (What's new); "New" işareti
         │ useQuery(api.updates.feed)        │ useLastSeen (bu cihaz, localStorage)
         ▼                                   ▼
 convex/updates.ts  guardedQuery (ALL_MODULES; modül izni kaynak başına; test: updates.test.ts)
