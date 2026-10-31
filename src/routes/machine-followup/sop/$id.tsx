@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../../../../convex/_generated/api'
 import { ErrorBanner } from '../../../components/ErrorBanner'
 import { SavePdfButton } from '../../../components/SavePdfButton'
+import { CameraCapture } from '../../../components/sop/CameraCapture'
 import { SopSheet, type SheetEdit } from '../../../components/sop/SopSheet'
-import { useQuery } from '../../../lib/convexTransport'
+import { useMutation, useQuery } from '../../../lib/convexTransport'
 import { isoDate } from '../../../lib/dates'
 import { pdfFileName } from '../../../lib/pdfFile'
 import { sheetsToPdf } from '../../../lib/pdfSheet'
@@ -21,6 +22,7 @@ import {
   removeStep,
   setApproval,
   setMark,
+  setPhotoStorage,
   setSecond,
   sopTitle,
   togglePpe,
@@ -89,6 +91,7 @@ function StepPanel({
   onFrame,
   drawing,
   setDrawing,
+  onCamera,
 }: {
   draft: Draft
   index: number
@@ -99,6 +102,7 @@ function StepPanel({
   onFrame: (d: Draft, photo: number, second: number) => void
   drawing: { step: number; photo: number } | null
   setDrawing: (d: { step: number; photo: number } | null) => void
+  onCamera: (photo: number) => void
 }) {
   const step = draft.steps[index]
   const [seconds, setSeconds] = useState<string[]>([])
@@ -171,6 +175,9 @@ function StepPanel({
               </button>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1">
+              <button type="button" disabled={busy} className={btn} onClick={() => onCamera(k)}>
+                Camera
+              </button>
               <button type="button" className={`${btn} ${isDrawing ? 'border-red-500 text-red-700' : ''}`} onClick={() => setDrawing(isDrawing ? null : { step: index, photo: k })}>
                 {isDrawing ? 'Drag on the photo… (click to stop)' : 'Draw red mark'}
               </button>
@@ -220,6 +227,8 @@ function SopEditorPage() {
   const [versions, setVersions] = useState<SopVersion[]>([])
   const [showVersions, setShowVersions] = useState(false)
   const [preview, setPreview] = useState<SopVersion | null>(null)
+  const [cameraFor, setCameraFor] = useState<{ step: number; photo: number } | null>(null)
+  const genUploadUrl = useMutation(api.sop.generateUploadUrl)
   /** En son ekrandaki taslak nesnesi: kayıt bitince yerel kopya yalnız değişmemişse silinir. */
   const latest = useRef<Draft | null>(null)
   const restored = useRef(false)
@@ -299,6 +308,17 @@ function SopEditorPage() {
         },
       }
     : undefined
+  /** Kamera fotoğrafı: dosya depoya yüklenir, o karenin yerine geçer, taslak hemen kaydedilir. */
+  const savePhoto = async (blob: Blob) => {
+    if (!cameraFor) return
+    const url = await genUploadUrl({})
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob })
+    if (!res.ok) throw new Error(`Upload failed (${res.status})`)
+    const { storageId } = (await res.json()) as { storageId: string }
+    const next = setPhotoStorage(latest.current ?? d, cameraFor.step, cameraFor.photo, storageId)
+    change(next)
+    await persist(next)
+  }
   const onFrame = async (next: Draft, photo: number, second: number) => {
     setDraft(next)
     if (!(await persist(next)) || selected === null) return
@@ -359,6 +379,7 @@ function SopEditorPage() {
           </div>
         )}
       </div>
+      {cameraFor && <CameraCapture onCapture={savePhoto} onClose={() => setCameraFor(null)} />}
       <ErrorBanner message={error} onDismiss={() => (save.clearError(), requestFrame.clearError(), approve.clearError(), retry.clearError())} />
 
       {!editable && (
@@ -468,6 +489,7 @@ function SopEditorPage() {
                 onFrame={(next, photo, second) => void onFrame(next, photo, second)}
                 drawing={drawing}
                 setDrawing={setDrawing}
+                onCamera={(photo) => setCameraFor({ step: selected, photo })}
               />
             ) : (
               <div className="rounded-xl border border-dashed border-border p-3 text-sm text-muted-foreground">
