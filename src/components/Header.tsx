@@ -56,7 +56,8 @@ export function Header() {
 
   // İzinli modüller (Board: KPI ya da OEE izni).
   const modules = isBoard ? [] : MODULE_AREAS.filter((a) => (a.key === 'board' ? can('kpi') || can('oee') : !a.module || can(a.module)))
-  const showSubNav = !(area.key === 'portal' && pathname === '/')
+  // Menüsü olmayan alanda (ör. PlanningExpert) ikinci sekme barı çizilmez.
+  const showSubNav = !(area.key === 'portal' && pathname === '/') && area.nav.length > 0
 
   return (
     <>
