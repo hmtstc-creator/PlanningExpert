@@ -1,6 +1,6 @@
 # 02 · Planlama motoru
 
-> Son güncelleme: 2026-10-30 (ara mamul uyarısı R15; Production Plan takvim kutusu cost center modeline göre, ekip Work Calendar'da; operatör planı: haftalık operatör sayısı, operatör hattı her iş günü 3 vardiya, Capacity dashboard'da operatör sınırı; cost center bazında ikinci model, motorun önünde saf dağıtım aşaması; bütün parçalar ve iş yerleri çevrim süresiyle: süre = adet × dk/adet, nut welding de planda; presi durduran arıza da planlı duruş gibi; kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
+> Son güncelleme: 2026-10-31 (Capacity dashboard operatör sınırları saat; ara mamul uyarısı R15; Production Plan takvim kutusu cost center modeline göre, ekip Work Calendar'da; operatör planı: haftalık operatör sayısı, operatör hattı her iş günü 3 vardiya, Capacity dashboard'da operatör sınırı; cost center bazında ikinci model, motorun önünde saf dağıtım aşaması; bütün parçalar ve iş yerleri çevrim süresiyle: süre = adet × dk/adet, nut welding de planda; presi durduran arıza da planlı duruş gibi; kapalı aralık planlı duruştur: üretim üstünden atlar, kesilen rulo bitince iş biter; mesai vardiya ızgarasının dışına; Gantt kapalı vardiyayı boyamaz; hafta sonu mesaisi; gün kaydı: pres × gün vardiyaları; Work calendar kutusu Edit / Save) · Kaynak: `src/lib/planPipeline.ts`, `scheduler.ts`, `planning.ts` ·
 > Kullanıcıya dönük anlatım: sitede **Planning Logic**
 
 Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Aynı girdi aynı planı verir
@@ -46,8 +46,10 @@ Motor **saf fonksiyondur** (`computePlan(girdiler, şimdi)` → `PlanRun`). Ayn�
      günlerinde 1..3. vardiyaya ⌊haftalık ÷ 3⌋ adam (ızgara önce gelir); motor ve R14 bu birleşik girdiyi okur
      (doğrulayıcı bağımsız kopya). Capacity dashboard: operatör hattının haftası dağıtımdan **önceki** 3 vardiya
      takviminden × `operatorWeekCapacity().factor` = min(makine × 3 × iş günü, haftalık ÷ ortalama ekip × iş günü)
-     ÷ makine sınırı; haftalık yoksa makine × 3. Örnek (`OPERATOR_WEEKLY_EXAMPLE`): 4 hat, ekip 1-1-2-2, 5 gün,
-     12 kişi → 60 / 40 → 40 vardiya; vardiya başına 4 adam. Work Calendar'da *All* seçiliyken operatör hatları
+     ÷ makine sınırı; haftalık yoksa makine × 3. Tablo ve Capacity dashboard bunu **saat** olarak gösterir
+     (`operatorWeekHours`: vardiya saati = `shiftMinutes`; 1 hat, 5 gün, 7,5 saatlik vardiya → 112,5 saat).
+     Örnek (`OPERATOR_WEEKLY_EXAMPLE`): 4 hat, ekip 1-1-2-2, 5 gün,
+     12 kişi → 60 / 40 vardiya (saat: ×vardiya saati); vardiya başına 4 adam. Work Calendar'da *All* seçiliyken operatör hatları
      sabit 3 vardiya, tıklanmaz ("operator plan" etiketi); gün × vardiya ızgarası yalnız ilk 2 hafta.
    - **Mesai vardiya ızgarasının dışına açılır** (2026-10-29): çalışılan günde vardiyalar günün ızgarasıdır
      (kapalı vardiya takvimden açılır, mesaiyle değil); mesai penceresi ızgaranın bitiminden üretim gününün

@@ -7,6 +7,7 @@ import {
   mergeWeeklyHeadcount,
   operatorPattern,
   operatorWeekCapacity,
+  operatorWeekHours,
   shiftHeadcountFromWeekly,
 } from './operatorCapacity'
 
@@ -78,5 +79,22 @@ describe('operator plan: 3 shifts a day in the capacity model', () => {
     const shifts = (press: string) => model.weekBuckets(press, monday).reduce((s, b) => s + b.shifts, 0)
     expect(shifts('L1')).toBe(4 * 3)
     expect(shifts('P1')).toBe(5)
+  })
+})
+
+describe('operator plan: weekly capacity in hours', () => {
+  it('1 line, 3 shifts, 5 working days, 7,5 h shifts → 112,5 h machine limit', () => {
+    const h = operatorWeekHours({ crewSizes: [1], workingDays: 5, shiftMinutes: 450 })
+    expect(h).toEqual({ machineHours: 112.5, operatorHours: null, hours: 112.5 })
+  })
+
+  it('operator limit caps the hours: 26 operators, 15 lines, 5 days, 7,5 h → 975 h of 1687,5 h', () => {
+    const h = operatorWeekHours({
+      crewSizes: Array(15).fill(1),
+      workingDays: 5,
+      weeklyOperators: 26,
+      shiftMinutes: 450,
+    })
+    expect(h).toEqual({ machineHours: 1687.5, operatorHours: 975, hours: 975 })
   })
 })
