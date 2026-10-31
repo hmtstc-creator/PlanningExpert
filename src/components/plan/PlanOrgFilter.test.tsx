@@ -42,7 +42,7 @@ describe('PlanOrgFilter', () => {
 
   it('bölüm seçenekleri sayılarıyla gelir; seçim masraf yeri seçimini sıfırlar', () => {
     const onChange = view(NO_ORG_FILTER, 4)
-    const select = screen.getByRole('combobox') as HTMLSelectElement
+    const select = screen.getAllByRole('combobox')[0] as HTMLSelectElement
     expect([...select.options].map((o) => o.text)).toEqual([
       'All departments',
       'Press · 3 WC',
@@ -52,9 +52,9 @@ describe('PlanOrgFilter', () => {
     expect(onChange).toHaveBeenCalledWith({ department: 'Press', costCenters: [], workCenters: [] })
   })
 
-  it('masraf yeri rozeti çoklu seçer / bırakır', () => {
+  it('masraf yeri açılır listesi tek seçer; "hepsi" seçimi temizler', () => {
     const onChange = view({ department: 'Press', costCenters: [], workCenters: [] }, 3)
-    fireEvent.click(screen.getByRole('button', { name: /1100 — Press line/ }))
+    fireEvent.change(screen.getByLabelText('Cost center'), { target: { value: '1100' } })
     expect(onChange).toHaveBeenCalledWith({ department: 'Press', costCenters: ['1100'], workCenters: [] })
   })
 
