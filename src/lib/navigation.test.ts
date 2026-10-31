@@ -36,7 +36,7 @@ describe('menü ağacı', () => {
 
   it('alt menüdeki sayfa üst grubu işaretler', () => {
     const planning = areaFor('/stoklar')
-    const menu = planning.nav.find((n) => n.children)!
+    const menu = planning.nav.find((n) => n.label === 'SAP data')!
     expect(nodeHas(menu, '/stoklar')).toBe(true)
     expect(nodeHas(menu, '/planlama')).toBe(false)
   })
