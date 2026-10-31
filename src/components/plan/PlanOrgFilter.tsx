@@ -116,23 +116,17 @@ export function PlanOrgFilter({
 }) {
   const active = orgFilterActive(selection)
 
-  const toggle = (code: string) =>
+  // Tek seçim: masraf yeri ve iş yeri birer açılır listedir. Veri modeli
+  // (çoklu dizi) aynı kalır; burada en fazla bir eleman seçilir.
+  const pickCostCenter = (code: string) =>
     onChange({
       ...selection,
-      costCenters: selection.costCenters.includes(code)
-        ? selection.costCenters.filter((c) => c !== code)
-        : [...selection.costCenters, code],
+      costCenters: code ? [code] : [],
       // Masraf yeri değişince iş yeri seçimi o masraf yerinin dışında kalabilir.
       workCenters: [],
     })
 
-  const toggleWorkCenter = (name: string) =>
-    onChange({
-      ...selection,
-      workCenters: selection.workCenters.includes(name)
-        ? selection.workCenters.filter((w) => w !== name)
-        : [...selection.workCenters, name],
-    })
+  const pickWorkCenter = (name: string) => onChange({ ...selection, workCenters: name ? [name] : [] })
 
   return (
     <div className={`mt-4 rounded-lg border p-3 text-sm ${active ? 'border-sky-300 bg-sky-50/60 dark:bg-sky-950/20' : 'border-border'}`}>
@@ -169,6 +163,42 @@ export function PlanOrgFilter({
           </select>
         </label>
 
+        {options.costCenters.length > 1 && (
+          <label className="text-sm">
+            <span className="block text-xs text-muted-foreground">Cost center</span>
+            <select
+              className="mt-1 w-56 rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={selection.costCenters[0] ?? ''}
+              onChange={(e) => pickCostCenter(e.target.value)}
+            >
+              <option value="">All cost centers</option>
+              {options.costCenters.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label} · {countLabel(o.count)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {showWorkCenters && options.workCenters.length > 1 && (
+          <label className="text-sm">
+            <span className="block text-xs text-muted-foreground">Work center</span>
+            <select
+              className="mt-1 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={selection.workCenters[0] ?? ''}
+              onChange={(e) => pickWorkCenter(e.target.value)}
+            >
+              <option value="">All work centers</option>
+              {options.workCenters.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <span className="py-2 text-muted-foreground">
           {active
             ? `Showing ${planned} of ${total} work centers ${subject}`
@@ -185,68 +215,6 @@ export function PlanOrgFilter({
           </button>
         )}
       </div>
-
-      {options.costCenters.length > 1 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs text-muted-foreground">Cost centers:</span>
-          {options.costCenters.map((o) => {
-            const on = selection.costCenters.includes(o.value)
-            return (
-              <button
-                key={o.value}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggle(o.value)}
-                className={`rounded-full border px-2.5 py-1 text-xs ${
-                  on ? 'border-sky-600 bg-sky-600 text-white' : 'border-input hover:bg-muted'
-                }`}
-              >
-                {o.label} <span className={on ? 'opacity-80' : 'text-muted-foreground'}>· {countLabel(o.count)}</span>
-              </button>
-            )
-          })}
-          {selection.costCenters.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onChange({ ...selection, costCenters: [], workCenters: [] })}
-              className="ml-1 text-xs text-muted-foreground hover:underline"
-            >
-              all
-            </button>
-          )}
-        </div>
-      )}
-
-      {showWorkCenters && options.workCenters.length > 1 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs text-muted-foreground">Work centers:</span>
-          {options.workCenters.map((name) => {
-            const on = selection.workCenters.includes(name)
-            return (
-              <button
-                key={name}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleWorkCenter(name)}
-                className={`rounded-full border px-2.5 py-1 text-xs ${
-                  on ? 'border-sky-600 bg-sky-600 text-white' : 'border-input hover:bg-muted'
-                }`}
-              >
-                {name}
-              </button>
-            )
-          })}
-          {selection.workCenters.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onChange({ ...selection, workCenters: [] })}
-              className="ml-1 text-xs text-muted-foreground hover:underline"
-            >
-              all
-            </button>
-          )}
-        </div>
-      )}
 
       {active && planned === 0 && (
         <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
