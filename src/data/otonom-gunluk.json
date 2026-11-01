@@ -1,5 +1,13 @@
 [
  {
+  "zaman": "20261101-1240",
+  "odak": "src/routes/kalipproblem.tsx",
+  "ozet": "Odak sayfa src/routes/kalipproblem.tsx incelendi. Dosya 10 satırlık bir yönlendirme: eski /kalipproblem adresi /die-followup/problems sayfasına taşınıyor, veri sorgusu ya da arayüz yok. Planlama uzmanı, AI uzmanı, mimari uzmanı, vardiya mühendisi ve vardiya amiri açısından ciddi bir sorun görülmedi; sayfa ilişki haritasıyla tutarlı. Ciddi bulgu olmadığı için görev yazılmadı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": []
+ },
+ {
   "zaman": "20261101-1140",
   "odak": "src/routes/kaliplar.tsx",
   "ozet": "Odak sayfa src/routes/kaliplar.tsx incelendi. Dosya yalnızca eski /kaliplar adresini /die-followup/maintenance sayfasına yönlendiren 10 satırlık bir redirect; veri sorgusu, arayüz ya da planlama mantığı içermiyor. Sayfa ilişki haritasıyla tutarlı. Ciddi bir hata ya da katman ihlali bulunmadığı için somut bir görev yazılmadı.",
