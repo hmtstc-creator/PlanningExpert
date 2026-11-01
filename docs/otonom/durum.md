@@ -3,10 +3,9 @@
 > Üreten: `scripts/otonom/gunluk.mjs` (her yayında). Toplantı yalnız bunu okur.
 
 ## Son kararlar
+- 20261101-0640 · src/routes/die-followup/problems.tsx · degisiklik-yok: Odak sayfa Die Problems (/die-followup/problems) için yalnız ilk 220 satır görüldü. Veri sunucu sorgularından geliyor ve katman ihlali yok. Kalıp seçimi MaterialPicker ile yapılıyor, bu iyi bir koruma. Vardiya mühendisi bir sorun buldu: seçim listeleri (lookups) yüklenirken sayfa 'liste boş, sorun bildirilemez' uyarısını yanl
 - 20261031-1040 · src/routes/die-followup/problems.tsx · degisiklik-yok: Odak sayfa Die Problems (/die-followup/problems) için yalnız ilk 220 satır görüldü. Veri sunucu sorgularından geliyor ve katman ihlali yok. Kalıp seçimi MaterialPicker ile yapılıyor, bu iyi bir koruma. Vardiya mühendisi bir sorun buldu: seçim listeleri (lookups) yüklenirken sayfa 'liste boş, sorun bildirilemez' uyarısını yanl
 - 20261031-0940 · src/routes/die-followup/maintenance.tsx · degisiklik-yok: Odak sayfa Die Maintenance (/die-followup/maintenance) için yalnız ilk 220 satır görüldü. Veri sunucu sorgularından geliyor ve hesap lib/moldLife ile lib/maintenance içinde, bu yüzden katman ihlali yok. Planlama uzmanı, hazır değil kalıp kaydının plana gittiğini ve periyodik bakımın sayacı sıfırladığını, arıza onarımının s
-- 20261031-0840 · src/routes/die-followup/index.tsx · yayinda: Odak sayfa Die Follow-up özet ekranı (/die-followup) incelendi. Veri sunucu sorgularından geliyor ve sayfa yalnız görüntülüyor, bu yüzden katman ihlali yok. Vardiya amiri açısından iki eksik bulundu. Veri yüklenirken sayfa '0' ve 'No open die problems.' gösteriyor, bu yanlış bir güvence veriyor. Açık sorun listesi sessizce 8 kayıtla ke
-  - Die Follow-up yükleniyor durumu
 
 ## Bekleyen öneriler (korunan alan / büyük iş — Claude ya da kullanıcı)
 - Gönderme (submit) işlevi malzeme, operasyon veya sorun tipi eksikse sessizce dönüyor; satır 220 sonrasındaki düğme devre dışı değilse eksik alanı belirten bir mesaj gösterilmeli (sayfanın devamı görüldükten sonra küçük görev).
