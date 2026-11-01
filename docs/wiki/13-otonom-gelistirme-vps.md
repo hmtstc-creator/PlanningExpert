@@ -1,6 +1,6 @@
 # 13 · Otonom geliştirme (VPS) — mimari
 
-> Son güncelleme: 2026-11-01 (kart saatleri Bükreş saatine çevrildi, EET / EEST; kodu Claude yazar: haiku → sonnet → opus; Gemini / Qwen kaldırıldı; sitede aç / kapat düğmesi). **Durum: KURULU, KAPALI** — site sahibi Administration → *Autonomous development* → *Start* ile açar.
+> Son güncelleme: 2026-11-01 (görüş pilotu eklendi: roller gerçek sayfayı tarayıcıda görüp ölçüm + ekran görüntüsüyle rapor yazar, yalnız okur; bkz. *Görüş pilotu*; kart saatleri Bükreş saatine çevrildi, EET / EEST; kodu Claude yazar: haiku → sonnet → opus; Gemini / Qwen kaldırıldı; sitede aç / kapat düğmesi). **Durum: KURULU, KAPALI** — site sahibi Administration → *Autonomous development* → *Start* ile açar.
 > Acil durdurma sunucuda: `touch /etc/otonom/DURDUR` (düğme kapalıyken de konur).
 
 ## Amaç
@@ -139,3 +139,31 @@ her iyileştirme için *Before / After*, bekleyen öneriler.
 4. `/etc/otonom/DURDUR` yoksa döngü açıktır (env hazır kurulduğu için kur.sh DURDUR oluşturmaz).
 
 Herhangi biri eksikse betikler `kapalı: <neden>` yazıp çıkar (`journalctl -u planningexpert-otonom-toplanti`).
+
+## Görüş pilotu (2026-11-01, elle çalışır)
+
+Sorun: eski toplantı yalnız kod metnini okuyordu. Sonuç: görsel ve kullanım geri bildirimi yoktu, öneriler kanıtsızdı.
+Pilot bunu şöyle çözer: roller **gerçek sayfayı tarayıcıda açar**, görev yapmaya çalışır, ölçüm + ekran görüntüsü
+toplanır, model yalnız bu kanıta dayanarak rapor yazar.
+
+| Parça | Dosya | Ne yapar |
+|---|---|---|
+| Senaryo | `scripts/otonom/gorus-senaryo.json` | Rol, sayfa, görev. Pilot: planlama uzmanı (`/planlama`), vardiya amiri (`/board`) |
+| Ölçüm | `scripts/otonom/gorus.mjs` | Playwright: giriş, sayfa açma, ekran görüntüsü, en küçük yazı px, kısa yazı sayısı, etkileşim öğesi sayısı, başlıklar, metin özeti. Yalnız okur |
+| Rapor kuralları | `scripts/otonom/gorus-prompt.md` | Her bulgu kanıt ister (ölçüm değeri ya da alıntı); kod önerisi yok; uydurma bulgu yok |
+| Çalıştırıcı | `scripts/otonom/gorus.sh` | Ölçüm → rol başına rapor (haiku → sonnet → opus) → `ozet.md`. PR açmaz, kod yazmaz |
+| Kurulum | `kur.sh` (son adım) | `/home/otonom/gorus-araclar`'a Playwright ve Chromium (`/opt/pw-browsers`). Hata olursa döngü etkilenmez |
+
+**Çıktı:** `/var/lib/otonom/gorus/<zaman>/` → `ozet.md`, her rol için `.png` + `.json` + `.rapor.txt`.
+
+**Ön koşul (elle):** test ortamında bir test hesabı; `/etc/otonom/env` içine `OTONOM_BASE_URL`,
+`OTONOM_TEST_KULLANICI`, `OTONOM_TEST_PAROLA`. Parola repoda ya da sohbette tutulmaz.
+
+**Çalıştırma:** `sudo -u otonom bash /home/otonom/PlanningExpert/scripts/otonom/gorus.sh`
+
+**Bilinen sınırlar (pilot):**
+- Model yalnız ölçüm ve metin görür, ekran görüntüsünü görmez. Görsel yargı ölçümlerle (px, sayı) yapılır. Görüntüyü modele vermek bir sonraki adım, CLI'nin görsel girdi desteği doğrulandıktan sonra.
+- Otomatik zamanlayıcı ve moderatör yok. Pilot sonucu sizin okuyup değerlendirmeniz için.
+- Roller ve senaryolar pilotta iki tane; diğer roller (AI, mimari, vardiya mühendisi) sonra eklenir.
+
+**Sonraki adım (pilot onaylanırsa):** senaryo ve kuralları iyileştirmek, sonra bulguları *Otonom Gelişim* kayıtlarına bağlamak.
