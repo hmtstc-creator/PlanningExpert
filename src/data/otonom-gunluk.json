@@ -1,5 +1,16 @@
 [
  {
+  "zaman": "20261101-2340",
+  "odak": "src/routes/machine-followup/sop/$id.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/machine-followup/sop/$id.tsx'in ilk 220 satırı incelendi. Sayfa veriyi sop.get üzerinden tek kaynaktan okuyor ve planlama ya da katman ihlali bulunmadı. Saniye giriş kutusunda boş değerin 0 olarak kabul edildiği ve '+ Second photo' akışında saniyenin video süresine sınırlanmadığı tespit edildi; ikisi de küçük, tek dosyalık düzeltmeler olarak görevlendirildi.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "convex/sop.ts içindeki requestFrame ve saveDraft, second değerini 0 ile videoSeconds arasında doğruluyor mu kontrol edilmeli; sunucu tarafı doğrulama yoksa istemci düzeltmesi yetmez (salt okuma incelemesi, kullanıcı onayı gerekir).",
+   "Saniye kutusunda sınır dışı ya da boş değer için form yanında kısa İngilizce uyarı metni eklenmesi, kullanıcının neden kare alınamadığını görmesini sağlar (arayüz kararı, önce kullanıcı onayı)."
+  ]
+ },
+ {
   "zaman": "20261101-2240",
   "odak": "src/routes/machine-followup/reports.tsx",
   "ozet": "Toplantıda odak sayfa machine-followup/reports.tsx incelendi. Tarih ve tezgâh filtreleri, dört özet kutusu ve Pareto/matris grafikleri veriyi tek kaynaktan (machineProblems.list, presses.list) okuyor; planlama ya da katman ihlali bulunmadı. Tespit edilen somut eksik: filtre sonucu boş olduğunda sayfa sıfır değerler ve boş grafikler gösteriyor, kullanıcı bunun 'veri yok' mu yoksa 'filtre dar' mı olduğunu anlayamıyor. Bu küçük arayüz görevi kararlaştırıldı; korunan alanlara dokunulmayacak.",
