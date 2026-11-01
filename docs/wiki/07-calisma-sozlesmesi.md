@@ -1,6 +1,6 @@
 # 07 · Çalışma sözleşmesi ve mimari etki kontrolü
 
-> Son güncelleme: 2026-10-28 (Convex kancaları yalnız convexTransport) · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
+> Son güncelleme: 2026-11-01 (yanıt üslubu kuralı; Convex kancaları yalnız convexTransport) · Kaynak: `CLAUDE.md`, `docs/architecture.md` §4, `src/lib/architecture.test.ts`
 
 Hafıza wiki'de olduğu için her iş yeni bir oturumda başlayabilir; bu sayfa her oturumun **ilk okuyacağı yerdir**.
 
@@ -41,6 +41,8 @@ Bir madde "hayır" ise **uygulama**; nedenini ve alternatifi kullanıcıya yaz. 
 - **Gereken işi sormadan yap:** kullanıcının "önce sor" dediği iş (ör. şema anlık görüntüsü) için sorarken neden gerekli
   olduğunu da yaz; gereksiz soru turu açma.
 - **Dil:** kullanıcıya Türkçe, kısa, madde madde; commit ve PR metinleri Türkçe.
+- **Yanıt üslubu** (2026-11-01, kullanıcı kuralı): uzun, destan gibi mesaj yazılmaz. Sonuç en fazla 1–2 cümle; gerekirse
+  2–3 madde. Kalıcı bilgi sohbete değil wiki'ye yazılır; kullanıcıya yalnız özet verilir. Her talimat sonunda "bir şey ister misin?" sorusu gereksizse yazılmaz.
 - **Token tasarrufu** (2026-10-22, güncellendi): tek uzun sohbet 500k+ token'a çıktı (her tur bütün geçmiş yeniden
   okunur). Kural artık: **bir iş = bir oturum**; iş bitince ya da bağlam ~%40'ı geçince `/devir` skill'i ile wiki
   güncellenir ve yeni oturum açılır. Büyük dosyalar `grep` + parça parça okunur, test / build çıktısı `tail` ile
