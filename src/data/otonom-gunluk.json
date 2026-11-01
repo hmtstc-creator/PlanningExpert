@@ -1,5 +1,15 @@
 [
  {
+  "zaman": "20261101-1040",
+  "odak": "src/routes/index.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/index.tsx (portal ana sayfası, ilk 220 satır) incelendi. Modül kartlarındaki bağlantılar ve yetki filtreleri tutarlı görüldü, sayfa planlama motoruna dokunmuyor ve katman ihlali bulunmadı. Küçük bir arayüz tutarsızlığı var: bölümün aria-label'ı 'Administration' iken görünen başlık 'Manage'. Ciddi bir hata çıkmadığı için bu saat görev yazılmadı. Vardiya amiri için ana sayfada günlük özet fikri tartışıldı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Ana sayfaya vardiya başı özeti eklenmesi: bugünkü plan durumu, geç işler ve veri tazeliği tek kartta gösterilirse amir 30 saniyede bilgi alabilir. Bu veri ve navigasyon kararı gerektirdiği için kullanıcı onayı beklenmeli."
+  ]
+ },
+ {
   "zaman": "20261101-0940",
   "odak": "src/routes/hammadde.tsx",
   "ozet": "Toplantıda Hammadde (Raw Material Coverage) sayfasının ilk 220 satırı incelendi. Veri tek bir sorgudan ve kurallar src/lib/rawMrp.ts içinden geliyor, sayfa planlama motoruna dokunmuyor, katman ihlali görülmedi. Planlama uzmanı ve vardiya amiri için sayfanın hesap ayarları iyi çalışıyor. Vardiya mühendisi ise Safety stock alanına 0 yazıldığında sayfanın sessizce kayıtlı değeri kullandığını, alanda ise 0'ın görünmeye devam ettiğini belirtti. Karar: bu yalnız giriş doğrulama hatası olduğu için küçük bir düzeltme yapılacak, hesap mantığına dokunulmayacak.",
