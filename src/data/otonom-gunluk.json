@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261101-1640",
+  "odak": "src/routes/kpi/monthly/entry.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/kpi/monthly/entry.tsx incelendi. Dosya 8 satırlık bir sarmalayıcı: KpiSeriesEntry bileşenini period=\"month\" ile çağırıyor, kendi veri sorgusu ya da yazma işlemi yok. Bu, önceki toplantıdaki 'alt sayfalar yalnız 8 satır, yönlendirme mi eksik bileşen mi' sorusunu yanıtlıyor: sayfa eksik değil, bileşene bağlı bir giriş noktası. Planlama, vardiya ve amir açısından ciddi bir hata ya da katman ihlali bulunmadı; korunan alanlara dokunan iş de olmadığı için görev yazılmadı. Haritadaki boş Okur/Yazar sütunları bileşen takibinin eksik olmasından kaynaklanıyor.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Durum özetindeki 'alt sayfalar yalnız 8 satır, doğrulanmalı' maddesi kapatılabilir: entry.tsx ve dashboard.tsx gerçek sayfa sarmalayıcısı, eksik bileşen değil. Bu, durum özetini üreten gunluk.mjs tarafında güncellenmeli.",
+   "Haritanın (scripts/otonom/harita.mjs, korunan alan) import edilen bileşenleri de izlemesi gerekiyor. Böylece KpiSeriesEntry ve KpiDashboard üzerinden gerçek query/mutation bağlantıları görünür ve /kpi/* sayfaları 'veri yok' gibi kalmaz. Kullanıcı onayı ve scripts/ değişikliği gerektirir.",
+   "KPI giriş ekranında (KpiSeriesEntry) kaydetme sonrası ya da girişte 'son girilen dönem' göstergesi, vardiya amirinin 30 saniyelik bilgi ihtiyacını karşılar. Bu, kpi/monthly ve kpi/weekly sorgularına dokunduğu için kullanıcı onayı gerektirir.",
+   "KPI verileri ile planlama ve OEE ekranları (/performans, /oee/mttr, /oee/losses) arasında açık bir bağlantı yok. Bağlantı eklemek navigasyon kararı olduğu için kullanıcı onayı beklenmeli.",
+   "KpiSeriesEntry ve KpiDashboard bileşenlerinin ortak veri sorgusu ve tazelik bilgisini tek yerde tutup tutmadığı bir sonraki toplantının odağı olabilir; bileşen dosyası bu toplantıda okunmadı."
+  ]
+ },
+ {
   "zaman": "20261101-1540",
   "odak": "src/routes/kpi/monthly/dashboard.tsx",
   "ozet": "Odak sayfa src/routes/kpi/monthly/dashboard.tsx incelendi. Dosya 8 satırlık bir sarmalayıcı: KpiDashboardPage'i period=\"month\" ile çağırıyor, veri sorgusu ya da yazma işlemi içermiyor. Önceki toplantının açık sorusu olan 'alt sayfalar yönlendirme mi, eksik bileşen mi' bu okumayla yanıtlandı: yönlendirme ya da eksik değil, ortak bileşene bağlı ince sarmalayıcılar. Planlama, vardiya ve amir açısından bu dosyada ciddi bir hata ya da katman ihlali görülmedi, bu yüzden görev yazılmadı. Asıl eksik, sayfa ilişki haritasının bileşen zincirini izlememesi nedeniyle KPI alt sayfalarının Okur/Yazar sütunlarının boş görünmesi.",
