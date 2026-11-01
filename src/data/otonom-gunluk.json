@@ -1,5 +1,17 @@
 [
  {
+  "zaman": "20261101-1540",
+  "odak": "src/routes/kpi/monthly/dashboard.tsx",
+  "ozet": "Odak sayfa src/routes/kpi/monthly/dashboard.tsx incelendi. Dosya 8 satırlık bir sarmalayıcı: KpiDashboardPage'i period=\"month\" ile çağırıyor, veri sorgusu ya da yazma işlemi içermiyor. Önceki toplantının açık sorusu olan 'alt sayfalar yönlendirme mi, eksik bileşen mi' bu okumayla yanıtlandı: yönlendirme ya da eksik değil, ortak bileşene bağlı ince sarmalayıcılar. Planlama, vardiya ve amir açısından bu dosyada ciddi bir hata ya da katman ihlali görülmedi, bu yüzden görev yazılmadı. Asıl eksik, sayfa ilişki haritasının bileşen zincirini izlememesi nedeniyle KPI alt sayfalarının Okur/Yazar sütunlarının boş görünmesi.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Sayfa ilişki haritası (scripts/otonom/harita.mjs) yalnız route dosyasını tarıyor. /kpi/monthly/* ve /kpi/weekly/* sayfaları components/KpiDashboard bileşenine bağlı olduğu için Okur/Yazar sütunları boş kalıyor ve harita KPI akışını yanlış 'veri yok' gibi gösteriyor. Haritanın import edilen bileşenleri de izlemesi gerekir; scripts/ korunan alan olduğu için Claude yazmaz, kullanıcı onayı gerekir.",
+   "Bekleyen öneri listesindeki 'alt sayfalar yalnız 8 satır, doğrulanmalı' maddesi kapatılabilir: dosyalar gerçek sayfa, yönlendirme değil. Durum özetinin güncellenmesi gerekir.",
+   "KPI ana sayfası, aylık ve haftalık dashboard'lar için ortak KpiDashboard bileşeninin veri sorgusu ve tazelik bilgisi tek yerde tutuluyor mu, bu bileşen incelenmeli (sonraki toplantının odağı olabilir)."
+  ]
+ },
+ {
   "zaman": "20261101-1440",
   "odak": "src/routes/kpi/index.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/kpi/index.tsx (KPI ana sayfası) incelendi. Sayfa yalnızca aylık ve haftalık KPI veri girişi ile dashboard sayfalarına giden dört bağlantı içeriyor; veri sorgusu, yazma işlemi ve planlama mantığı yok. Planlama, vardiya ve amir açısından ciddi bir hata ya da katman ihlali bulunmadı, bu yüzden görev yazılmadı. Sayfa ilişki haritasıyla tutarlı.",
