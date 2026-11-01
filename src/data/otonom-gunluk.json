@@ -1,5 +1,15 @@
 [
  {
+  "zaman": "20261101-1140",
+  "odak": "src/routes/kaliplar.tsx",
+  "ozet": "Odak sayfa src/routes/kaliplar.tsx incelendi. Dosya yalnızca eski /kaliplar adresini /die-followup/maintenance sayfasına yönlendiren 10 satırlık bir redirect; veri sorgusu, arayüz ya da planlama mantığı içermiyor. Sayfa ilişki haritasıyla tutarlı. Ciddi bir hata ya da katman ihlali bulunmadığı için somut bir görev yazılmadı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Eski /kaliplar yönlendirmesinin ne kadar kullanıldığı izlenebilir. Kullanım bittikten sonra kaldırılması, yer imi ve dış bağlantılar kontrol edildikten sonra kullanıcı kararıyla yapılmalı (dosya silme bu otonom döngünün görev kapsamında değil)."
+  ]
+ },
+ {
   "zaman": "20261101-1040",
   "odak": "src/routes/index.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/index.tsx (portal ana sayfası, ilk 220 satır) incelendi. Modül kartlarındaki bağlantılar ve yetki filtreleri tutarlı görüldü, sayfa planlama motoruna dokunmuyor ve katman ihlali bulunmadı. Küçük bir arayüz tutarsızlığı var: bölümün aria-label'ı 'Administration' iken görünen başlık 'Manage'. Ciddi bir hata çıkmadığı için bu saat görev yazılmadı. Vardiya amiri için ana sayfada günlük özet fikri tartışıldı.",
