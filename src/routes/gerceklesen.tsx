@@ -87,7 +87,9 @@ function GerceklesenPage() {
             {status !== 'LoadingFirstPage' && filtered.length === 0 && (
               <tr>
                 <td className="px-3 py-3 text-muted-foreground" colSpan={3}>
-                  No MB51 data uploaded yet.
+                  {rows.length === 0
+                    ? 'No MB51 data uploaded yet.'
+                    : `No materials match "${search}".`}
                 </td>
               </tr>
             )}

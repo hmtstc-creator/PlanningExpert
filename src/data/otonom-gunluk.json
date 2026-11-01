@@ -1,5 +1,27 @@
 [
  {
+  "zaman": "20261101-0840",
+  "odak": "src/routes/gerceklesen.tsx",
+  "ozet": "Odak sayfa Actual Production (/gerceklesen) incelendi. Veri tek bir sorgudan geliyor, katman ihlali yok ve sayfa planlama mantığına dokunmuyor. Bulunan asıl sorunlar arayüzde: arama sonucu boş olduğunda da 'No MB51 data uploaded yet.' mesajı gösteriliyor, bu da kullanıcıyı yanlış yönlendiriyor. Tablo başlıklarında Türkçe etiketler kalmış ('Materyal', 'Son hareket'), oysa arayüz İngilizce olmalı. Karar: bu iki küçük düzeltme tek dosyada yapılacak; sorgunun 'complete' bayrağının kullanılmaması ise önce doğrulanmalı.",
+  "durum": "yayinda",
+  "gorevler": [
+   {
+    "baslik": "Arama boş sonucu için doğru mesaj",
+    "once": "Arama kutusunda eşleşme yokken sayfa, veri hiç yüklenmemiş gibi 'No MB51 data uploaded yet.' yazıyor.",
+    "sonra": "Vardiya amiri ve mühendis, veri olduğunu bilerek arama sonucunun boş olduğunu net görür.",
+    "dosyalar": [
+     "src/routes/gerceklesen.tsx"
+    ]
+   }
+  ],
+  "oneriler": [
+   "Sorgu sonucundaki 'complete' bayrağı sayfada hiç kullanılmıyor. complete false ise toplamlar eksik olabilir; sunucu anlamı doğrulanıp, false iken 'partial data' uyarısı gösterilmesi düşünülmeli (convex tarafı ayrı karar gerektirir).",
+   "Sayfada tarih aralığı filtresi yok; vardiya amiri için son 30 gün varsayılanı ve tarih seçimi hızlı bilgi verir. Bu varsayılan veri davranışını değiştirdiği için kullanıcı onayı gerekir.",
+   "Üretim toplamı ile plan karşılaştırması bu sayfadan yapılamıyor; plan-gerçekleşen karşılaştırması için /planningexpert veya /performans bağlantısı eklenebilir (navigasyon kararı gerektirir).",
+   "Arama kutusunda aria-label yok; ekran okuyucu ve test için etiket eklenmesi düşük öncelikli bir erişilebilirlik iyileştirmesi."
+  ]
+ },
+ {
   "zaman": "20261101-0740",
   "odak": "src/routes/die-followup/reports.tsx",
   "ozet": "Toplantıda Die Reports sayfasının ilk 220 satırı incelendi. Veri moldProblems.list'ten geliyor, filtreleme istemci tarafında yapılıyor ve katman ihlali yok. Vardiya mühendisi ile amir için asıl sorun, veri yüklenirken 'Problems' ve 'Dies affected' kutularının 0 göstermesi; bu, 'sorun yok' diye okunabilir. Karar: yalnız yükleme durumunu düzelten küçük bir görev yazılacak. Tarih varsayılanı, kalıptan bakım ve sorun sayfalarına geçiş ile filtre kalıcılığı ise ayrı tasarım gerektirdiği için öneri olarak kaldı.",
