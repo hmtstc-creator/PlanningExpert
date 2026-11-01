@@ -13,10 +13,31 @@ export type OtonomKart = {
   oneriler: string[]
 }
 
-/** "20261030-2300" → "2026-10-30 23:00" */
+const SAAT_DILIMI = 'Europe/Bucharest'
+
+/**
+ * Sunucu saati UTC'dir (`date +%Y%m%d-%H%M`). "20261101-0740" (UTC) → "2026-11-01 09:40 EET".
+ * Yaz / kış saati Intl'den otomatik gelir: Bükreş'te +02:00 EET, yaz saatinde +03:00 EEST.
+ */
 export function zamanYaz(z: string): string {
   const m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})$/.exec(z)
-  return m ? `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}` : z
+  if (!m) return z
+  const utcMs = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]))
+  const parca = new Intl.DateTimeFormat('en-GB', {
+    timeZone: SAAT_DILIMI,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(new Date(utcMs))
+  const al = (tip: string) => Number(parca.find((p) => p.type === tip)?.value)
+  const yerelMs = Date.UTC(al('year'), al('month') - 1, al('day'), al('hour'), al('minute'))
+  const ofsetDk = (yerelMs - utcMs) / 60000
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const tarih = `${al('year')}-${pad(al('month'))}-${pad(al('day'))} ${pad(al('hour'))}:${pad(al('minute'))}`
+  return `${tarih} ${ofsetDk === 180 ? 'EEST' : 'EET'}`
 }
 
 /** Aç / kapat düğmesi (yalnız site sahibi). Sunucu 5 dakika içinde uygular (scripts/otonom/anahtar.sh). */

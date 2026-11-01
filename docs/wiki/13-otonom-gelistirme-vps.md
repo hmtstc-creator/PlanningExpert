@@ -1,6 +1,6 @@
 # 13 · Otonom geliştirme (VPS) — mimari
 
-> Son güncelleme: 2026-11-01 (görüş pilotu eklendi: roller gerçek sayfayı tarayıcıda görüp ölçüm + ekran görüntüsüyle rapor yazar, yalnız okur; bkz. *Görüş pilotu*). 2026-10-31: kodu Claude yazar: haiku → sonnet → opus; Gemini / Qwen kaldırıldı; sitede aç / kapat düğmesi. **Durum: KURULU, KAPALI** — site sahibi Administration → *Autonomous development* → *Start* ile açar.
+> Son güncelleme: 2026-11-01 (görüş pilotu eklendi: roller gerçek sayfayı tarayıcıda görüp ölçüm + ekran görüntüsüyle rapor yazar, yalnız okur; bkz. *Görüş pilotu*; kart saatleri Bükreş saatine çevrildi, EET / EEST; kodu Claude yazar: haiku → sonnet → opus; Gemini / Qwen kaldırıldı; sitede aç / kapat düğmesi). **Durum: KURULU, KAPALI** — site sahibi Administration → *Autonomous development* → *Start* ile açar.
 > Acil durdurma sunucuda: `touch /etc/otonom/DURDUR` (düğme kapalıyken de konur).
 
 ## Amaç
@@ -106,6 +106,7 @@ toplantı kalitesi düşerse yeniden değerlendirilir.
 - **Aç / kapat:** `convex/otonom.ts` (`durum`, `ayarla` yalnız site sahibi; `aktifMi` iç sorgu, `platformState`
   anahtarı `otonomAktif`, şema değişmedi). `planningexpert-otonom-anahtar` (root, 5 dakikada bir, `anahtar.sh`)
   okur ve `/etc/otonom/DURDUR`'u koyar / kaldırır. İlk kurulumda DURDUR konur (varsayılan kapalı).
+- **Saat dilimi (site):** kayıt dosyası ve sunucu saati UTC kalır (`yayinla.sh`, `toplanti.sh` `date +%Y%m%d-%H%M`); Administration → *Autonomous development* kartlarında `zamanYaz()` bu UTC değeri Europe/Bucharest saatine çevirir (`Intl`, yaz / kış saati otomatik), sonuna `EET` / `EEST` yazar. Örnek: `20261101-0740` → `2026-11-01 09:40 EET`.
 - Sunucuda hazır: `otonom` kullanıcısı, `claude` (npm, girişli) ve `gh` (girişli). `/etc/otonom/env` yalnız `OTONOM_GUNLUK_PR`.
 
 ## Kurulum (kodda)

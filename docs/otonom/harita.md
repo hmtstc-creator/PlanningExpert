@@ -17,7 +17,7 @@
 | /die-followup/maintenance | 835 | actualProduction.listAll, moldAlarms.list, moldMaintenance.list, moldReadiness.list, products.listAll | moldAlarms.sync |  | EntityLinks, ErrorBanner, MaterialPicker, PageHeader |
 | /die-followup/problems | 456 | lookups.list, moldProblems.list, products.listAll | moldProblems.generateUploadUrl | /die-followup/reports | EntityLinks, ErrorBanner, MaterialPicker, PageHeader |
 | /die-followup/reports | 130 | moldProblems.list |  |  | MaterialPicker, ModuleStat, PageHeader, ParetoChart, ProblemMatrix |
-| /gerceklesen | 111 | actualProduction.listAll |  | /depolar, /sapdata | PageHeader |
+| /gerceklesen | 113 | actualProduction.listAll |  | /depolar, /sapdata | PageHeader |
 | /hammadde | 726 | planRuns.latestRawCoverage, pressCalendar.getGlobalSettings, rawLeadTimes.list | pressCalendar.saveRawCoverageSettings, pressCalendar.saveRawOrderRecipients | /depolar, /planlogic, /referanslar | PageHeader, raw/LeadTimePanel |
 | / | 282 | setup.checklist |  | /board | nav/CommandPalette, nav/NavIcon |
 | /kaliplar | 10 |  |  | /die-followup/maintenance |  |
