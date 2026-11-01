@@ -1,5 +1,17 @@
 [
  {
+  "zaman": "20261101-1440",
+  "odak": "src/routes/kpi/index.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/kpi/index.tsx (KPI ana sayfası) incelendi. Sayfa yalnızca aylık ve haftalık KPI veri girişi ile dashboard sayfalarına giden dört bağlantı içeriyor; veri sorgusu, yazma işlemi ve planlama mantığı yok. Planlama, vardiya ve amir açısından ciddi bir hata ya da katman ihlali bulunmadı, bu yüzden görev yazılmadı. Sayfa ilişki haritasıyla tutarlı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "KPI ana sayfasında veri tazeliği ya da son girilen dönem bilgisi yok. Vardiya amiri için her grubun yanında 'son giriş: tarih' gibi bir gösterge eklenmesi 30 saniyelik bilgi ihtiyacını karşılar. Bu, kpi/monthly ve kpi/weekly sorgularına dokunduğu için kullanıcı onayı gerektirir.",
+   "Ana sayfada, KPI'nin planlama ve OEE ekranlarıyla (ör. /performans, /oee/mttr) ilişkisi gösterilmiyor. Bu bağlantılar navigasyon kararı olduğu için kullanıcı onayı beklenmeli.",
+   "Haftalık ve aylık alt sayfaların (src/routes/kpi/monthly/*, weekly/*) yalnızca 8 satır olduğu haritada görünüyor. Bunların gerçekten yönlendirme mi, yoksa eksik bir bileşen mi olduğu ayrıca doğrulanmalı."
+  ]
+ },
+ {
   "zaman": "20261101-1340",
   "odak": "src/routes/kayitlar.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/kayitlar.tsx (Karar Günlüğü) incelendi. Kayıt ekleme, kategori filtreleri ve silme akışı tutarlı bulundu. Ciddi sorun olarak, sayfa usePaginatedQuery ile yalnızca ilk 100 kaydı yüklüyor ama 'Load more' düğmesi yok. Bu yüzden 100'den eski kararlar hiçbir ekranda görünmüyor ve 'All (n)' ile kategori sayıları yalnızca yüklenen kayıtları sayıyor. Karar: bu tek dosyalık düzeltme yapılacak, planlama ve korunan alanlara dokunulmayacak.",
