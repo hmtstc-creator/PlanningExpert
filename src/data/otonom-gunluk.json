@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261101-2040",
+  "odak": "src/routes/machine-followup/index.tsx",
+  "ozet": "Toplantıda odak sayfa machine-followup/index.tsx incelendi. Dört üst kutu (plana engel, duran tezgâh, açık arıza, 14 gün bakım) ve açık arıza listesi, veriyi doğru kaynaklardan okuyup doğru sayfalara bağlıyor; planlama ve vardiya açısından yanlış veri ya da kırık bağlantı bulunmadı. Bulgular düşük öncelikli: tipler inline cast ile tanımlanıyor, renkler tema token'ı yerine sabit sınıflarla yazılıyor ve arıza satırından ilgili arıza kaydına gidilemiyor. Ciddi bir hata olmadığı için yazılacak görev yok; konular öneri olarak bırakıldı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Inline tip cast'leri (breakdowns, maintenance) convex/schema.ts ile çakışabilir; ortak tip kullanımı şema korunan alanı olduğu için kullanıcı onayı gerektirir.",
+   "Açık arıza satırındaki 'running' ve 'down' metinleri text-amber-700 ve text-destructive gibi sabit renk sınıfları kullanıyor; tema token'ına taşınması görsel tutarlılığı artırır (küçük, ama genel stil kararı).",
+   "Açık arıza satırı sayfadan ilgili arıza kaydına gitmiyor; vardiya amiri için breakdowns sayfasında ilgili kayda odaklanan bir bağlantı ya da filtre, 30 saniyelik bilgi ihtiyacını kısaltır (navigasyon kararı, kullanıcı onayı).",
+   "'Maintenance, next 14 days' kutusu bakım sayfasına gidiyor ama 14 günlük filtreyi uygulamıyor; bağlantıya tarih filtresi parametresi eklenirse amir tek tıkla ilgili kayda ulaşır (route arama parametresi, kullanıcı onayı).",
+   "Bu sayfanın planlama mantığına etkisi yok; plan uyarıları usePlanAlarms üzerinden geliyor. Planning Logic sayfasında 'duran tezgâh, beklenen dönüş boşsa dışarıda kalır' kuralının anlatıldığı doğrulanmalı (planlogic.tsx korunan alan, yalnız öneri)."
+  ]
+ },
+ {
   "zaman": "20261101-1940",
   "odak": "src/routes/machine-followup/breakdowns.tsx",
   "ozet": "Toplantıda odak sayfa machine-followup/breakdowns.tsx incelendi (ilk 220 satır). Bildirim formu, tezgâh durduş bilgisi ve Alarms/Reports bağlantıları sayfa içinde tutarlı görünüyor. Fotoğraf yükleme hatasının kullanıcıya gösterilmediği ve sayfa ilişkilerinde tekrar eden yardımcıların (inputClass, hhmm, minuteOf) ortak yere taşınabileceği konuşuldu. Dosyanın kalanı görülmediği ve ciddi bir hata bulunmadığı için bu turda yazılacak görev çıkarılmadı; öneriler korunan alan ve kullanıcı onayı gerektiren maddeler olarak kaydedildi.",
