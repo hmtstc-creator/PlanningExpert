@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261101-0740",
+  "odak": "src/routes/die-followup/reports.tsx",
+  "ozet": "Toplantıda Die Reports sayfasının ilk 220 satırı incelendi. Veri moldProblems.list'ten geliyor, filtreleme istemci tarafında yapılıyor ve katman ihlali yok. Vardiya mühendisi ile amir için asıl sorun, veri yüklenirken 'Problems' ve 'Dies affected' kutularının 0 göstermesi; bu, 'sorun yok' diye okunabilir. Karar: yalnız yükleme durumunu düzelten küçük bir görev yazılacak. Tarih varsayılanı, kalıptan bakım ve sorun sayfalarına geçiş ile filtre kalıcılığı ise ayrı tasarım gerektirdiği için öneri olarak kaldı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Sayfa tüm geçmişi açıyor; vardiya amiri için varsayılan tarih aralığı (son 30 gün) hızlı bilgi verir. Bu veri varsayılanını değiştirdiği için kullanıcı onayı gerekir.",
+   "Seçili kalıp için kalıp sorunları (/die-followup/problems) ve kalıp bakımı (/die-followup/maintenance) sayfalarına bağlantı yok; ilişki haritasında Reports'un giden bağlantısı boş. Bu, navigasyon tasarımıyla birlikte ele alınmalı.",
+   "Seçili kalıp ve tarih aralığı URL arama parametresinde tutulmuyor; sayfa yenilenince filtre kayboluyor. Arama parametresi tasarlanmalı.",
+   "Başlangıç tarihi bitiş tarihinden büyükse sayfa sessizce boş liste gösterir olabilir; inRange bunu nasıl ele alıyor, doğrulanmalı ve gerekiyorsa kullanıcıya uyarı verilmeli.",
+   "Production lost değeri dakika olarak gösteriliyor; 1 saatin üzeri için 'h min' biçimi okunabilirliği artırır (düşük öncelik)."
+  ]
+ },
+ {
   "zaman": "20261101-0640",
   "odak": "src/routes/die-followup/problems.tsx",
   "ozet": "Odak sayfa Die Problems (/die-followup/problems) için yalnız ilk 220 satır görüldü. Veri sunucu sorgularından geliyor ve katman ihlali yok. Kalıp seçimi MaterialPicker ile yapılıyor, bu iyi bir koruma. Vardiya mühendisi bir sorun buldu: seçim listeleri (lookups) yüklenirken sayfa 'liste boş, sorun bildirilemez' uyarısını yanlışlıkla gösteriyor. Bu dar bir düzeltme olarak yazıldı. Gönderme düğmesi ve listenin geri kalanı görülmediği için başka görev yazılmadı.",
