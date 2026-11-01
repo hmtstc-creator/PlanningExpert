@@ -1,0 +1,12 @@
+[
+  {
+    "rol": "Planlama uzmanı",
+    "sayfa": "/planlama",
+    "gorev": "Geciken bir siparişi bul. Bu siparişin hangi makineye ve hangi tarihe planlandığını söyle. Bulamazsan nerede takıldığını yaz."
+  },
+  {
+    "rol": "Vardiya amiri",
+    "sayfa": "/board",
+    "gorev": "Vardiya başında 30 saniye içinde bugün durmuş bir makineyi ve duruş nedenini bul. Bulamazsan ilk ne baktığını yaz."
+  }
+]

@@ -22,3 +22,12 @@ command -v gh >/dev/null || apt-get install -y -qq gh >/dev/null 2>&1 || true
 if [ ! -d /home/otonom/PlanningExpert/.git ]; then
   sudo -u otonom git clone -q https://github.com/hmtstc-creator/PlanningExpert.git /home/otonom/PlanningExpert
 fi
+# Görüş pilotu: Playwright + Chromium, repodan ayrı klasörde (repoya bağımlılık eklenmez). Idempotent.
+ARAC=/home/otonom/gorus-araclar
+export PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+if [ ! -d "$ARAC/node_modules/playwright" ]; then
+  install -d -o otonom -g otonom "$ARAC"
+  (cd "$ARAC" && sudo -u otonom npm init -y >/dev/null && sudo -u otonom npm i --no-audit --no-fund playwright >/dev/null 2>&1 &&
+    npx playwright install --with-deps chromium >/dev/null 2>&1 && chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH") ||
+    echo "uyarı: Playwright/Chromium kurulamadı (görüş pilotu çalışmaz, döngü etkilenmez)"
+fi
