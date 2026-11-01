@@ -3,9 +3,9 @@
 > Üreten: `scripts/otonom/gunluk.mjs` (her yayında). Toplantı yalnız bunu okur.
 
 ## Son kararlar
+- 20261101-1240 · src/routes/kalipproblem.tsx · degisiklik-yok: Odak sayfa src/routes/kalipproblem.tsx incelendi. Dosya 10 satırlık bir yönlendirme: eski /kalipproblem adresi /die-followup/problems sayfasına taşınıyor, veri sorgusu ya da arayüz yok. Planlama uzmanı, AI uzmanı, mimari uzmanı, vardiya mühendisi ve vardiya amiri açısından ciddi bir sorun görülmedi; sayfa ilişki haritasıyla tutarlı. C
 - 20261101-1140 · src/routes/kaliplar.tsx · degisiklik-yok: Odak sayfa src/routes/kaliplar.tsx incelendi. Dosya yalnızca eski /kaliplar adresini /die-followup/maintenance sayfasına yönlendiren 10 satırlık bir redirect; veri sorgusu, arayüz ya da planlama mantığı içermiyor. Sayfa ilişki haritasıyla tutarlı. Ciddi bir hata ya da katman ihlali bulunmadığı için somut bir görev yazılmadı.
 - 20261101-1040 · src/routes/index.tsx · degisiklik-yok: Toplantıda odak sayfa src/routes/index.tsx (portal ana sayfası, ilk 220 satır) incelendi. Modül kartlarındaki bağlantılar ve yetki filtreleri tutarlı görüldü, sayfa planlama motoruna dokunmuyor ve katman ihlali bulunmadı. Küçük bir arayüz tutarsızlığı var: bölümün aria-label'ı 'Administration' iken görünen başlık 'Manage'. Ciddi bir hata çık
-- 20261101-0940 · src/routes/hammadde.tsx · degisiklik-yok: Toplantıda Hammadde (Raw Material Coverage) sayfasının ilk 220 satırı incelendi. Veri tek bir sorgudan ve kurallar src/lib/rawMrp.ts içinden geliyor, sayfa planlama motoruna dokunmuyor, katman ihlali görülmedi. Planlama uzmanı ve vardiya amiri için sayfanın hesap ayarları iyi çalışıyor. Vardiya mühendisi ise Safety stock alanına 0 yazıldı
 
 ## Bekleyen öneriler (korunan alan / büyük iş — Claude ya da kullanıcı)
 - Eski /kaliplar yönlendirmesinin ne kadar kullanıldığı izlenebilir. Kullanım bittikten sonra kaldırılması, yer imi ve dış bağlantılar kontrol edildikten sonra kullanıcı kararıyla yapılmalı (dosya silme bu otonom döngünün görev kapsamında değil).
