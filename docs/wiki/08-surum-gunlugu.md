@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| — | 2026-11-01 | **Yanıt üslubu kuralı** — kullanıcı isteği: kısa yanıt, kalıcı bilgi wiki'de (`07` çalışma kuralları)
 | — | 2026-11-01 | **Görüş pilotu (otonom)** — roller planlama ve amir sayfalarını tarayıcıda görüp ölçüm + ekran görüntüsüyle rapor yazar; `gorus.sh` / `gorus.mjs` / senaryo ve kurulum adımı; yalnız okur, elle çalışır. Neden: eski toplantı kod metnini okuyordu, görsel ve kanıtsız öneriler çıkıyordu |
 | — | 2026-10-31 | **PlanningExpert üst bar: Analysis, SAP data, Master data, Help bara çıktı** — dört grup Plan · Overview'dan sonra bar düğmesi olarak durur; ayrı *Menu* düğmesi kalktı (`src/lib/navigation.ts` → `PLANNING.nav`). Sayfa adları ve Ctrl+K aynı ağaçtan okunur | Kullanıcı isteği 2026-10-31: grupların bara eklenmesi, Menu'ye gerek kalmaması |
 | — | 2026-10-31 | **Bildirimler üst çubukta; ana sayfa sadeleşti** — karşılamadaki "N new" çipi ve Updates paneli kaldırıldı; üst çubukta zil düğmesi (kırmızı sayaç) açılınca son olaylar listesi çıkar. Ana sayfadan *Latest data* ve *Today* kaldırıldı (veri tazeliği ve Today Planning sayfasında). "New" işareti artık yalnızca panel açılınca sıfırlanır | Kullanıcı 2026-10-31 |
