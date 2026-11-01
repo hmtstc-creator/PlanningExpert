@@ -1,5 +1,15 @@
 [
  {
+  "zaman": "20261101-1740",
+  "odak": "src/routes/kpi/weekly/dashboard.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/kpi/weekly/dashboard.tsx incelendi. Dosya 8 satırlık bir sarmalayıcı: KpiDashboardPage bileşenini period=\"week\" ile çağırıyor, kendi veri sorgusu ya da yazma işlemi yok. Planlama, vardiya ve amir açısından ciddi bir hata ya da katman ihlali bulunmadı. Önceki toplantılardaki 'alt sayfalar yalnız 8 satır' sorusu bu okumayla kapandı, ancak durum özetindeki ilgili madde hâlâ açık görünüyor. Görev yazılmadı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Durum özetindeki 'alt sayfalar yalnız 8 satır, doğrulanmalı' maddesi üç ardışık toplantıda aynı şekilde tekrarlandı. Bu madde scripts/otonom/gunluk.mjs tarafında kapatılmalı; korunan alan olduğu için kullanıcı onayı gerekir."
+  ]
+ },
+ {
   "zaman": "20261101-1640",
   "odak": "src/routes/kpi/monthly/entry.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/kpi/monthly/entry.tsx incelendi. Dosya 8 satırlık bir sarmalayıcı: KpiSeriesEntry bileşenini period=\"month\" ile çağırıyor, kendi veri sorgusu ya da yazma işlemi yok. Bu, önceki toplantıdaki 'alt sayfalar yalnız 8 satır, yönlendirme mi eksik bileşen mi' sorusunu yanıtlıyor: sayfa eksik değil, bileşene bağlı bir giriş noktası. Planlama, vardiya ve amir açısından ciddi bir hata ya da katman ihlali bulunmadı; korunan alanlara dokunan iş de olmadığı için görev yazılmadı. Haritadaki boş Okur/Yazar sütunları bileşen takibinin eksik olmasından kaynaklanıyor.",
