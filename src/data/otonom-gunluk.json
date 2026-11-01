@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261101-2140",
+  "odak": "src/routes/machine-followup/maintenance.tsx",
+  "ozet": "Toplantıda odak sayfa machine-followup/maintenance.tsx'in ilk 220 satırı incelendi. Bakım kaydı formu, planlanan ve gerçekleşen saat girişi ile yaklaşan/geçmiş ayrımı doğru veri akışına bağlı görünüyor; ilk 220 satırda planlama ya da katman ihlali bulunmadı. Bulunan iki sahada sorun var: eksik zorunlu alanda Add düğmesi sessizce dönüyor, ve tarihi geçmiş ama tamamlanmamış planlı bakımlar 'history' listesine karışıyor. Ciddi ve kesin bir hata bulunmadığı için bu saat görev yazılmadı; maddeler öneri olarak bırakıldı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Eksik zorunlu alan (Work center veya Reason boş) ya da geçersiz saat girildiğinde submit() ve submitActual() sessizce döner; vardiya kullanıcısı neden kaydedilmediğini görmez. Form alanının yanında kısa İngilizce uyarı metni eklenmesi 30 saniyelik kullanımı kolaylaştırır (kullanıcı onayı: önce JSX'in geri kalanı doğrulanmalı).",
+   "Tarihi geçmiş ama status 'planned' olan bakımlar 'history' listesinde tamamlanmış kayıtlarla aynı yere düşüyor. Gecikmiş bakımın görünür bir 'overdue' işareti olmazsa amir bakımın yapılmadığını fark edemeyebilir; liste ayrımı için kullanıcı onayı gerekir.",
+   "Gerçekleşen saat kutusu tek bir actualDate/actualStart/actualEnd durumu paylaşıyor; bir satırda açık kutu varken başka satır 'Record actual' a basıldığında değerler önceki satırdan kalabilir. Satır başına açılışta mevcut plan değerlerinin doldurulması daha güvenli olur (küçük arayüz kararı).",
+   "planlogic.tsx (korunan alan, yalnız öneri): sayfadaki 'hours are taken out of that work center automatically' cümlesi, planlamacının bakım saatlerini gerçekten düşüldüğünü anlatmalı; bu kuralın Planning Logic sayfasında anlatıldığı doğrulanmalı.",
+   "parseClock, clockLabel ve inputClass yardımcıları bu dosyada yeniden tanımlı; 'Rakam girildi ama aralık geçersiz' (ör. 25:99 ya da bitiş < başlangıç) kontrolü yok. Ortak saat yardımcısı ve doğrulama, şema ya da motor katmanına dokunmadan src/lib altında yapılabilir (birden çok dosya, kullanıcı onayı)."
+  ]
+ },
+ {
   "zaman": "20261101-2040",
   "odak": "src/routes/machine-followup/index.tsx",
   "ozet": "Toplantıda odak sayfa machine-followup/index.tsx incelendi. Dört üst kutu (plana engel, duran tezgâh, açık arıza, 14 gün bakım) ve açık arıza listesi, veriyi doğru kaynaklardan okuyup doğru sayfalara bağlıyor; planlama ve vardiya açısından yanlış veri ya da kırık bağlantı bulunmadı. Bulgular düşük öncelikli: tipler inline cast ile tanımlanıyor, renkler tema token'ı yerine sabit sınıflarla yazılıyor ve arıza satırından ilgili arıza kaydına gidilemiyor. Ciddi bir hata olmadığı için yazılacak görev yok; konular öneri olarak bırakıldı.",
