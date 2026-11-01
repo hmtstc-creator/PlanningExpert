@@ -42,7 +42,7 @@ describe('AutonomousLog', () => {
         ]}
       />,
     )
-    expect(getByText('2026-10-30 23:00')).toBeTruthy()
+    expect(getByText('2026-10-31 01:00 EET')).toBeTruthy()
     expect(getByText('Live')).toBeTruthy()
     expect(getByText('Before: Bağlantı yok.')).toBeTruthy()
     expect(getByText('After: Tek tıkla plana gider.')).toBeTruthy()
