@@ -33,9 +33,7 @@ sunucuda: `deploy/.env` ve `/etc/planningexpert/portal.env` (ikisi de `chmod 600
    `/opt/planningexpert` ve compose projesi `planningexpert` ile çalışır.
 2. **İnternete kapı açılmaz** (sunucunun kuralı). Dışarıya yalnızca Tailscale Funnel,
    yalnızca PlanningExpert'in iki adresi.
-3. **Bellek**: program sunucuda **X GB** bellek izniyle çalışır; kapsayıcı sınırları
-   toplamı bu izni aşmaz (backend 1200 MB, site 384 MB, Tailscale 128 MB; `X` her
-   sunucuda kendi kapasitesine göre yazılır). Derleme gibi ağır işlerden önce `free -m`;
+3. **Bellek**: her kapsayıcıda sınır (backend 1200 MB, site 384 MB, Tailscale 128 MB). Derleme gibi ağır işlerden önce `free -m`;
    kullanılabilir bellek **1 GB'ın altına düşecekse durulur**. Sunucuda test koşulmaz (`SKIP_LOCAL_VERIFY=1`); yalnızca
    CI'da yeşil commit yayınlanır.
 4. **Tek veritabanı**: yayın ve yedek betikleri yalnızca kendi Convex sunucumuza
