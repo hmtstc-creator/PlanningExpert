@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261102-1440",
+  "odak": "src/routes/oee/settings.tsx",
+  "ozet": "Toplantıda src/routes/oee/settings.tsx'in ilk 220 satırı incelendi: kurulum adımları (veri yükleme, öneri, kontrol, kaydetme), masraf yeri ve vardiya listeleri ile departman ayarları tek bir draft/kaydet akışından besleniyor. Ciddi bir veri ya da sayfa ilişki hatası bulunmadı, bu yüzden yazılacak görev yok. Üç öneri not edildi: 'Suggest from data' düğmesinin mevcut düzenlemeleri onaysız üzerine yazması, yükleme sırasında her render'da yeni dizi üretilmesi ve kısa bir eylem dili ihtiyacı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "'Suggest from data' düğmesi, kullanıcının önceden yaptığı ad değişikliklerini ve kod listelerini onay sormadan üzerine yazıyor; kaydedilmemiş bir draft varken ya da listeler dolu iken önce onay penceresi gösterilmesi kullanıcı kararıyla değerlendirilmeli.",
+   "days, shifts ve downRaw için '?? []' yükleme sırasında her render'da yeni bir dizi üretiyor; found, downtimes ve undefinedCodes gibi useMemo'lar bu yüzden her render'da yeniden hesaplanır. Sabit bir boş dizi kullanılarak düzeltilebilir, ancak bu değişiklik korunan alana dokunmuyor ve kullanıcı onayıyla yapılmalı.",
+   "'Check and rename' adımındaki sorun metni (ör. 'Everything is defined.' ya da uyarı listesi) vardiya amiri için hangi alanın düzeltileceğini söylemiyor; hangi kartta eksik olduğunu gösteren bağlantı ya da kısa eylem cümlesi kullanıcı onayıyla eklenmeli.",
+   "Departments kartının info metni çok uzun ve masraf yeri / makine seçimi açıklamasını tek satırda vermiyor; vardiya amiri için ilk cümlede tek anlamlı özet eklenmesi kullanıcı onayıyla düşünülmeli.",
+   "rc1Values ve texts listeleri her render'da hesaplanıyor; yalnız düzenleme sırasında kullanılıyorsa useMemo ile sarılması performans için küçük bir iyileştirme olur, ama davranış değişmez."
+  ]
+ },
+ {
   "zaman": "20261102-1340",
   "odak": "src/routes/oee/report.tsx",
   "ozet": "Toplantıda src/routes/oee/report.tsx'in ilk 220 satırı incelendi: OEE Daily Report'un veri akışı (oee.days, lossDays, stopDays, orders, shifts) tek yoldan besleniyor, vardiya ve makine filtreleri Loss Bridge ile ortak, kayıp hesabı oeeDailyReport'tan geliyor. Ciddi bir veri ya da ilişki hatası bulunmadı, bu yüzden yazılacak görev yok. Vardiya amiri açısından boş durum ve bilgi notlarındaki jargon (\"materials of the downtimes\", \"Click a part (reference)\") sahada belirsiz bulundu; bunlar kullanıcı kararıyla ele alınmalı.",
