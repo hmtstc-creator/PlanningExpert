@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values'
 
-import { DIE_OR_PLANNING, guardedMutation, guardedQuery } from './guarded'
+import { DIE_OR_PLANNING, guardedMutation, guardedQuery, plantInternalMutation } from './guarded'
 import { liveRows } from './sapLive'
 import { productionRowsFor } from '../src/lib/stockLocations'
 import { loadStockScope } from './stockScope'
@@ -160,6 +160,22 @@ export const sync = guardedMutation({
   args: {},
   returns: v.object({ opened: v.number(), cleared: v.number() }),
   handler: async (ctx) => runSync(ctx),
+})
+
+/**
+ * MB51 yüklemesinden sonra, yükleme ayrı bir işlem olarak kaydedildikten
+ * sonra çalışır. Alarm hesabı (bütün MB51 satırlarını okur) büyük dosyada
+ * tek işlemin okuma sınırını aşabilir; bu durumda yalnız alarm güncellenmez,
+ * yüklenen dosya etkilenmez. Yetki kontrolü yok (sunucu zamanlayıcısı çağırır);
+ * fabrika kapsamı `plantInternalMutation` ile korunur.
+ */
+export const syncAfterUpload = plantInternalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    await runSync(ctx)
+    return null
+  },
 })
 
 /**

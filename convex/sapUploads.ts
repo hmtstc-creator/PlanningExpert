@@ -1,7 +1,7 @@
 import { ConvexError, v } from 'convex/values'
 
+import { internal } from './_generated/api'
 import { guardedMutation, guardedQuery } from './guarded'
-import { runSync } from './moldAlarms'
 import { planStatusDoc } from './planQueue'
 import { TABLE_OF, liveUploadAt, uploadRecord } from './sapLive'
 import { filterRows, knownLocationCodes, knownMaterialCodes, rawMaterialCodes } from './uploadFilter'
@@ -151,9 +151,10 @@ export const finishUpload = guardedMutation({
     }
     if (current) await ctx.db.replace(current._id, doc)
     else await ctx.db.insert('sapUploads', doc)
-    // Gerçekleşen üretim vuruş sayısını artıran tek şey. Limiti aşan kalıp
-    // varsa alarm yüklemeyle birlikte doğsun.
-    if (key === 'actuals') await runSync(ctx)
+    // Gerçekleşen üretim vuruş sayısını artıran tek şey. Alarm hesabı ayrı
+    // bir işlemde çalışır: büyük MB51 dosyasında bu hesap tek işlemin okuma
+    // sınırına takılıp yüklemeyi geri almasın (yüklemenin kendisi kaydedilmiş olur).
+    if (key === 'actuals') await ctx.scheduler.runAfter(0, internal.moldAlarms.syncAfterUpload, { plantId: ctx.plantId })
     return null
   },
 })
