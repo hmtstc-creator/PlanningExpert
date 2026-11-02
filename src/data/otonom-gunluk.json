@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261102-0640",
+  "odak": "src/routes/oee/data.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/oee/data.tsx'in ilk 220 satırı incelendi. Sayfa, yüklenen Shiftly, Order ve Downtimes sayfalarını dosya sırasında gösteriyor; gün, hafta ve ay satırları vardiyalardan hesaplanıyor ve dönem ile kapsam filtresi tek yoldan geçiyor. Sayfanın kalan kısmındaki tekrar bulma (DuplicateCheck) akışı ve tablo ayrıntıları bu toplantıda okunmadı. Ciddi bir hata bulunmadığı için yazılacak görev yok; yalnız öneriler kaydedildi.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Data sayfasındaki 'Check duplicates' akışı (önce tarama, sonra onaylı silme) vardiya amiri için tehlikeli olabilir; onay metni ve silinecek kayıt sayısının açıkça gösterilmesi kullanıcı onayıyla gözden geçirilmeli.",
+   "Shiftly KPI, Order Based KPI ve Downtimes sekmelerinin açıklama satırları (note) İngilizce ve kısa; Türkçe karşılık ya da ilk satırda 'hangi dönem' bilgisi vardiya amirinin 30 saniyede anlaması için yardımcı olur. Arayüz metni değiştiği için kullanıcı onayı gerekir.",
+   "Satır sayısı 3000'i aşınca yalnız ilk 3000 satır gösteriliyor; kullanıcıya dışa aktarma (CSV) ya da filtre yönlendirmesi eklenmesi büyük bir fikir, kullanıcı kararı gerekir.",
+   "Sayfa ilişki haritasında /oee/data'dan /oee/dies ve /oee/report'a giden bağlantılar eksik görünüyor; relatedPages tanımı ile haritanın tutarlılığı salt okuma ile doğrulanmalı.",
+   "Odak dosyanın kalan ~600 satırı (DuplicateCheck ve sonrası) bir sonraki toplantıda okunmalı."
+  ]
+ },
+ {
   "zaman": "20261102-0540",
   "odak": "src/routes/oee/bridge.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/oee/bridge.tsx'in ilk 220 satırı incelendi. Dönem, vardiya ve makine filtreleri tek hesap yolunda birleşiyor; parça ve neden kırılımları ile Die Follow-up'a takip konusu açma akışı tutarlı görünüyor. Sayfanın 826 satırlık geri kalanı bu toplantıda okunmadı. Ciddi bir hata bulunmadığı için yazılacak görev çıkmadı; arayüz değişiklikleri kullanıcı onayı bekliyor.",
