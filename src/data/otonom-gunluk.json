@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261102-0840",
+  "odak": "src/routes/oee/guide.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/oee/guide.tsx'in ilk 220 satırı incelendi. Sayfa kullanım yöntemini beş adımda anlatıyor ve 'What is stored now' tablosu coverage ve settings verisini tek kaynaktan okuyor. Yükleme adresi (/oee/data) ve ayarlar (/oee/settings) bağlantıları doğru, kısa durak ve MES sabitleri koddan okunuyor. Adım 2'de 'Work center Save.' cümlesi anlamsız görünüyor (muhtemelen yazım hatası), ancak metin değişikliği olduğu ve niyetten %100 emin olunamadığı için görev yazılmadı, öneri olarak bırakıldı. Ciddi bir hata bulunmadığından görev yazılmadı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Guide sayfasında Adım 2'deki 'Work center Save.' cümlesi anlamsız görünüyor; muhtemelen 'Press Save.' olmalı. Niyet doğrulanıp kullanıcı onayıyla düzeltilmeli.",
+   "Guide sayfası uzun ve yalnızca okuma amaçlı; vardiya amiri için en üste 'Haftalık yükleme: Pazartesi başlayan dosya' gibi tek satırlık bir özet kutusu eklenmesi kullanıcı kararıyla düşünülmeli.",
+   "'What is stored now' tablosundaki 'nothing yet' durumu için ilgili yükleme sayfasına (/oee/data) doğrudan bağlantı eklenebilir; arayüz kararı kullanıcıya sorulmalı.",
+   "Guide sayfasının 220. satırdan sonrası (Status ve Step bileşenleri dışında kalan kısım) bu toplantıda yok; bir sonraki toplantıda başka odak sayfaya geçilmeli.",
+   "relatedPages('/oee/guide') bağlantıları ile haritadaki bağlantılar (/oee/data, /oee/settings) tutarlı; /oee/losses ve /oee/mttr gibi analiz sayfalarına 'sonraki adım' bağlantısı eklenip eklenmeyeceği kullanıcıya sorulmalı."
+  ]
+ },
+ {
   "zaman": "20261102-0640",
   "odak": "src/routes/oee/data.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/oee/data.tsx'in ilk 220 satırı incelendi. Sayfa, yüklenen Shiftly, Order ve Downtimes sayfalarını dosya sırasında gösteriyor; gün, hafta ve ay satırları vardiyalardan hesaplanıyor ve dönem ile kapsam filtresi tek yoldan geçiyor. Sayfanın kalan kısmındaki tekrar bulma (DuplicateCheck) akışı ve tablo ayrıntıları bu toplantıda okunmadı. Ciddi bir hata bulunmadığı için yazılacak görev yok; yalnız öneriler kaydedildi.",
