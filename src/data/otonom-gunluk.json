@@ -1,5 +1,19 @@
 [
  {
+  "zaman": "20261102-0540",
+  "odak": "src/routes/oee/bridge.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/oee/bridge.tsx'in ilk 220 satırı incelendi. Dönem, vardiya ve makine filtreleri tek hesap yolunda birleşiyor; parça ve neden kırılımları ile Die Follow-up'a takip konusu açma akışı tutarlı görünüyor. Sayfanın 826 satırlık geri kalanı bu toplantıda okunmadı. Ciddi bir hata bulunmadığı için yazılacak görev çıkmadı; arayüz değişiklikleri kullanıcı onayı bekliyor.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Bridge sayfasının üst bilgi metni uzun; vardiya amiri için ilk satıra 'Red = en büyük kayıp' gibi tek satırlık bir özet konabilir. Arayüz metni değiştiği için kullanıcı onayı gerekir.",
+   "Bridge sayfasından /oee/losses ve /oee/mttr'a giden bağlantılar var ama /oee/asakai-detail'a yok; kayıp sayfasından Asakai günlük ekranına relatedPages ile geçiş eklenirse vardiya amiri iki görünüm arasında tek tıkla geçer. Arayüz kararı kullanıcıya sorulmalı.",
+   "Parça ve neden satırlarında OEE/dakika birimi yalnız başlıkta; hücrelere birim eklenmesi okunabilirliği artırır. Görsel değişiklik olduğu için kullanıcı onayı gerekir.",
+   "Sayfanın kalan 606 satırı (Level 3 tablosu ve grafikler) bir sonraki toplantıda odaklanılmalı; gerçek ekran boyutunda ilk yüklemede 'Loading' yerine dolu tablo görünümü tarayıcıyla doğrulanmalı.",
+   "Bridge ile Die Follow-up arasında takip konusu açma akışı var; açılan konunun Die Follow-up'ta görünüp görünmediği ve geri dönüş bağlantısının olup olmadığı salt okuma ile kontrol edilmeli."
+  ]
+ },
+ {
   "zaman": "20261102-0440",
   "odak": "src/routes/oee/asakai-weekly.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/oee/asakai-weekly.tsx'in ilk 220 satırı incelendi. Sayfa, bugünü hesaba katmayıp en son dünü gösteriyor ve bu kuralı üst bilgi metninde açıklıyor. Masraf yerinin tüm iş yerleri satır olarak gösteriliyor, hafta ve ay hesapları aynı kaynaktan geliyor. Planlama mantığında, veri akışında veya katman ihlalinde ciddi bir hata bulunmadı. Karar: yazılacak görev yok; önceki turda çıkan arayüz önerileri (bağlantı, üst bilgi metninin kısaltılması, birim etiketleri) kullanıcı onayı bekliyor.",
