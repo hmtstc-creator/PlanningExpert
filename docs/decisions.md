@@ -310,7 +310,7 @@ düşebiliyordu; vinç kontrolü artık önceki günün kendi rezervasyonların�
   açık konular `docs/oeedashboard.md` → "Konuşma özeti ve kalıcı kurallar"
   ile "Bekleyen konular" bölümlerinde. Yeni sohbet oradan devam eder.
 
-- **OEE kısa duruşlar (2026-10-23, Ahmet):** plansız duruş < 2 dk performans (hız) kaybı, ≥ 2 dk
+- **OEE kısa duruşlar (2026-10-23, site sahibi):** plansız duruş < 2 dk performans (hız) kaybı, ≥ 2 dk
   availability kaybı; bütün OEE hesaplarında. MES'in Net Production Time'ı bunu zaten uyguluyor
   (doğrulandı), A / P değişmez; kayıp ekranları kodu olay süresine göre böler. Eşik OEE Settings'te
   (varsayılan 2 dk). Ayrıntı: `docs/oeedashboard.md` son bölüm.

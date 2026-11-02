@@ -222,7 +222,7 @@ export interface OeeConfig {
   agent?: Partial<import('./oeeAgent').AgentThresholds>
   /**
    * Kısa duruş eşiği (tam dakika; yoksa MES_SHORT_STOP_MIN). Plansız duruş
-   * < eşik → performans kaybı, ≥ eşik → kullanılabilirlik (Ahmet, 2026-10-23).
+   * < eşik → performans kaybı, ≥ eşik → kullanılabilirlik (site sahibi, 2026-10-23).
    */
   shortStopMin?: number
 }

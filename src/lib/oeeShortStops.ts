@@ -1,6 +1,6 @@
 /**
  * Kısa duruşlar: plansız duruş < eşik → performans kaybı, ≥ eşik →
- * kullanılabilirlik kaybı (Ahmet, 2026-10-23; docs/oeedashboard.md karar 14).
+ * kullanılabilirlik kaybı (site sahibi, 2026-10-23; docs/oeedashboard.md karar 14).
  *
  * MES'in Net Production Time'ı zaten yalnızca ≥ 2 dk (MES_SHORT_STOP_MIN)
  * plansız duruşları düşer; < 2 dk duruşlar Production − Operation'ın (hız

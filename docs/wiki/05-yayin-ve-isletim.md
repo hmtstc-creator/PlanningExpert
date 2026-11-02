@@ -5,7 +5,7 @@
 ## Çalışma şekli (özet)
 
 ```
-Claude (bulut oturumu)        GitHub                       VPS (Hetzner)
+Claude (bulut oturumu)        GitHub                       VPS
 dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
                                                               │  5 dakikada bir (systemd timer)
                                                               ▼
@@ -29,7 +29,7 @@ dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
 **yeni commit gelene ya da `--force`'a kadar yeniden denenmez** (5 dakikada bir yedek alınmasın).
 5. `deploy/systemd/planningexpert-*` birimlerini kurar / günceller (**root**; bu yüzden `main` yazma yetkisi ve CI zorunluluğu kritik).
 6. `portal.env` yükler, `SKIP_LOCAL_VERIFY=1 release.sh`: **yedek → Convex işlevleri + şema → site derlemesi** (`VITE_BUILD_*` gömülür: commit, mesaj, zaman).
-7. Yedekleri `chmod 600`, `restart web` (kuruluysa `sop-worker` da: `deploy/.env` → `SOP_WORKER_TOKEN`), yerel + Funnel 200 kontrolü, kapsayıcılar, backend restart / OOM, bellek; Karabasan'a **dokunulmaz**. Gizli değerler çıktıda maskelenir.
+7. Yedekleri `chmod 600`, `restart web` (kuruluysa `sop-worker` da: `deploy/.env` → `SOP_WORKER_TOKEN`), yerel + Funnel 200 kontrolü, kapsayıcılar, backend restart / OOM, bellek; diğer uygulamalara **dokunulmaz**. Gizli değerler çıktıda maskelenir.
 
 Yayını doğrulama: **System → Connection diagnostics → Version on this site** (commit, mesaj, yayın zamanı UTC + Türkiye).
 Hata ayıklama (sunucuda): `systemctl list-timers planningexpert-autodeploy.timer`, `journalctl -u planningexpert-autodeploy -n 50`.
@@ -53,4 +53,4 @@ Geri yükleme provası ayda bir (`deploy/README.md`). Şirket bazında dışa ak
 
 - `release.sh` sırası (yedek → Convex → derleme); Convex mevcut veriye uymayan şemayı reddeder — şema geri uyumlu kalmalı.
 - Yayın öncesi yedek; başarısız yayında site **eski haliyle** çalışmaya devam eder (web yeniden başlatılmaz).
-- Karabasan kapsayıcılarına dokunulmaz (aynı sunucu).
+- Sunucudaki diğer uygulamaların kapsayıcılarına dokunulmaz.

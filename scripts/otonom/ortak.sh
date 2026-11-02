@@ -9,7 +9,7 @@ OTONOM_REPO=/home/otonom/PlanningExpert
 KUYRUK=$OTONOM_STATE/kuyruk      # bekleyen görevler (toplantı yazar)
 HAZIR=$OTONOM_STATE/hazir        # testi + onayı geçen görevler (patch)
 BITEN=$OTONOM_STATE/biten        # yayınlanan / başarısız görevler
-REPO_SLUG=hmtstc-creator/PlanningExpert
+REPO_SLUG=${REPO_SLUG:-}   # <organizasyon>/PlanningExpert; değeri /etc/otonom/env içinde verilir
 
 log() { echo "[$(date '+%F %T')] $*"; }
 

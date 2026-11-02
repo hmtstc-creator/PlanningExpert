@@ -27,7 +27,7 @@ src/routes + src/components  (arayüz: veriyi okur, girdiyi yazar, HESAP YAPMAZ)
 ## Teknoloji
 
 React 19 · TanStack Start/Router · Tailwind v4 · **Convex (self-hosted)** · Docker Compose · Tailscale Funnel ·
-Hetzner VPS. Dış barındırma yok (Vercel / Convex Cloud kaldırıldı, 2026-10-16). Ayrıntı: [05](05-yayin-ve-isletim.md).
+VPS. Dış barındırma yok (Vercel / Convex Cloud kaldırıldı, 2026-10-16). Ayrıntı: [05](05-yayin-ve-isletim.md).
 
 ## Veri akışı
 

@@ -31,8 +31,8 @@ describe('parola kuralı', () => {
   })
 
   it('kullanıcı adı parola olamaz', () => {
-    expect(validatePassword('ahmet2026', 'Ahmet2026')).toBe('The password cannot be the user name')
-    expect(validatePassword('pres-2026!', 'ahmet')).toBeNull()
+    expect(validatePassword('kisi2026', 'Kisi2026')).toBe('The password cannot be the user name')
+    expect(validatePassword('pres-2026!', 'kisi')).toBeNull()
   })
 
   it('varsayılan parolayı tanır', () => {

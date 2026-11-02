@@ -26,7 +26,7 @@ export const BUILD: BuildInfo = {
   branch: env.VITE_BUILD_BRANCH ?? '',
 }
 
-export const REPO_URL = 'https://github.com/hmtstc-creator/PlanningExpert'
+export const REPO_URL = env.VITE_REPO_URL ?? ''  // https://github.com/<organizasyon>/<depo>, derleme ortamında tanımlanır (release.sh)
 
 /** "22 Oct 2026, 07:28 UTC · 10:28 Türkiye" */
 export function formatBuildTime(iso: string): string {

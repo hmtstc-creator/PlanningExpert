@@ -83,7 +83,7 @@ function freeMb() {
 
 function run(cmd, args) {
   return new Promise((resolve, reject) => {
-    // nice: botlar ve site önce gelsin.
+    // nice: site önce gelsin.
     const p = spawn('nice', ['-n', '10', cmd, ...args], { stdio: ['ignore', 'pipe', 'pipe'] })
     let out = ''
     let err = ''

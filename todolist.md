@@ -14,14 +14,14 @@ Ayrıntı ve gerekçe ilgili maddede; karar verilince madde güncellenir.
 
 | # | Karar | Madde |
 |---|---|---|
-| ~~K1~~ | ✅ ~~A~~ → **B** (2026-10-14): arayüz **ve Convex** VPS'te (Hetzner CX33) | 4.1 |
+| ~~K1~~ | ✅ ~~A~~ → **B** (2026-10-14): arayüz **ve Convex** VPS'te (VPS) | 4.1 |
 | K2 | Yedek hedefi: kabul edilen veri kaybı (RPO) ve geri dönüş süresi (RTO) | 4.1 |
 | ~~K3~~ | ✅ Evet: bölümün OEE'si olur, ayrı OEE alanı yok | 2, 4.2 |
 | ~~K4~~ | ✅ Hayır, gerek yok | 4.2 |
 | ~~K5~~ | ✅ Evet (2026-10-24): geçmiş arka planda taşınır, eski kodla gelen satır yeni koda yazılır | 4.2 |
 | ~~K6~~ | ✅ Hayır | 4.3 |
 | ~~K7~~ | ✅ Dördü de evet (2026-10-24) → geliştirme işi [G] | 2 |
-| ~~K8~~ | ✅ Varsayılan kabul (2026-10-24): bugünkü ağırlıklar kalır; Ahmet sitede düzeltecek | 2 |
+| ~~K8~~ | ✅ Varsayılan kabul (2026-10-24): bugünkü ağırlıklar kalır; site sahibi sitede düzeltecek | 2 |
 | K9 | OEE: Avg setup'a ara süreler; kayıp grubu adları | 2 |
 | K10 | Koddaki sabit sayılar: programda mı, kullanıcıda mı (P/K) | 2 |
 | K11 | Fabrika karşılaştırma ekranının içeriği | 2 |
@@ -40,8 +40,8 @@ Holding → Company → Plant → Department → Cost center → Work center
 
 - [ ] **[S]** Bir holding aç; holding'siz şirketleri (Metal Stamping, Hala5)
   şirket panelinde holding'e bağla.
-  Ad (Ahmet, 2026-10-24): holding **Ahmet**, gereken yeni adlar sırayla **Ahmet 2,
-  Ahmet 3 …**; doğru adlar sonra sitede düzeltilir. Canlı veri yalnız sitede
+  Ad (site sahibi, 2026-10-24): holding **Holding A**, gereken yeni adlar sırayla **Holding A 2,
+  Holding A 3 …**; doğru adlar sonra sitede düzeltilir. Canlı veri yalnız sitede
   (bulut oturumunun Convex erişimi yok) — Organization map'ten yapılır.
 - [ ] **[S]** Aynı şirkette iki "Stamping" plant'i var: biri fazlaysa sil
   (verisi olanı tut), değilse adını değiştir.
@@ -208,7 +208,7 @@ yapılacak (kullanıcı: "garanti edilmesi gereken kısım planlama").
 - [x] ✅ K8 (2026-10-24, varsayılan): Absenteeism % normal mevcudiyet saatiyle
   ağırlıklı (bugünkü gibi). *(docs/kpi.md)*
 - [x] ✅ K8 (varsayılan): Productivity adet/saat sayılır → toplam mevcudiyet
-  saatiyle ağırlıklı. Birim farklıysa Ahmet sitede bildirir. *(docs/kpi.md)*
+  saatiyle ağırlıklı. Birim farklıysa site sahibi sitede bildirir. *(docs/kpi.md)*
 - [x] ✅ K8 (varsayılan): saati boş satır — hiçbirinde saat yoksa eşit,
   bazılarında varsa 0 (bugünkü gibi). *(docs/kpi.md)*
 
@@ -263,7 +263,7 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
     `npm run verify` çalıştırır (docs/deployment.md); GitHub'da `main` için
     "Require status checks".
 - [x] ✅ **P0 — VPS'e taşıma** (karar 2026-10-14: B; tamamlandı 2026-10-16):
-  site, Convex ve yedek kendi sunucumuzda (Hetzner, Docker Compose, Tailscale
+  site, Convex ve yedek kendi sunucumuzda (VPS, Docker Compose, Tailscale
   Funnel). Vercel ve Convex Cloud kullanılmıyor; depodan onlara ait ayar, betik ve
   talimatlar kaldırıldı. İşletim kitabı: **deploy/README.md**.
   - [x] **[S] 🔑** (2026-10-19) Vercel projesini ve Vercel'in GitHub bağlantısını (GitHub →
@@ -544,9 +544,9 @@ güvenlik, kayıt ve sürüm disiplini. Öncelik: **P0** = müşteri almadan ön
 - [x] ✅ Bütün çıktılar "Save PDF" (2026-10-16): Chrome / Edge'de kayıt penceresi Masaüstünde, ad dolu açılır (docs/pdf.md). Firefox / Safari'de indirme klasörüne iner.
 - [ ] **[K]** Loss Bridge → "Pay Attention" bloğunun içeriği (şimdilik boş).
 - [ ] **[S]** OEE açık konular ajanı (2026-10-23): sunucudaki Convex'e (`npx convex env set`, adımlar docs/deployment.md) `AI_API_KEY` (ücretsiz Gemini ya da Groq anahtarı; isteğe bağlı `AI_API_URL`, `AI_MODEL`) eklenmeli — yoksa kurallar karar verir (docs/oee-agent-report.md → OEE open topics).
-- [ ] **[K]** OEE Agent Insights (2026-10-23): plan bağlantısı sinyali (geciken malzeme × o malzemenin OEE kaybı) ve kalıp değişimi sonrası ilk saatler (ham duruşlar 8 gün okunuyor); eşikler (`INSIGHT_DEFAULTS`) ayara. Önce gerçek veride ilk raporlar Ahmet'le okunsun.
+- [ ] **[K]** OEE Agent Insights (2026-10-23): plan bağlantısı sinyali (geciken malzeme × o malzemenin OEE kaybı) ve kalıp değişimi sonrası ilk saatler (ham duruşlar 8 gün okunuyor); eşikler (`INSIGHT_DEFAULTS`) ayara. Önce gerçek veride ilk raporlar site sahibiyle okunsun.
 - [ ] **[K]** OEE açık konular: eşikler (`TOPIC_DEFAULTS`: 60 dk / 120 dk / 6 hafta / 3 hafta / 12 aday) OEE Settings → Agent Report'a taşınsın; Agent Report'ta açık konular bölümüne bu liste de girsin.
-- [ ] **[S]** OEE kısa duruşlar (#46, #47, 2026-10-23) — sunucuda elle doğrulama (Karabasan oturumu): bir gün × iş yeri için Loading − Production = ≥ 2 dk plansız duruş toplamı mı; Loss Bridge A / P / OEE = Dashboard mı; "Machine < 2 min" ve MTTR makul mü; OEE Settings'te SCHED_DOWN `breakReasonCodes`'ta mı (YNT kayıp sayılmasın). Betik: `scripts/oee-shortstop-check.sh`. Ayrıntı: docs/wiki/09-acik-konular.md.
+- [ ] **[S]** OEE kısa duruşlar (#46, #47, 2026-10-23) — sunucuda elle doğrulama (sunucu oturumu): bir gün × iş yeri için Loading − Production = ≥ 2 dk plansız duruş toplamı mı; Loss Bridge A / P / OEE = Dashboard mı; "Machine < 2 min" ve MTTR makul mü; OEE Settings'te SCHED_DOWN `breakReasonCodes`'ta mı (YNT kayıp sayılmasın). Betik: `scripts/oee-shortstop-check.sh`. Ayrıntı: docs/wiki/09-acik-konular.md.
 
 ## 5. Yönetici gözüyle değerlendirme — CEO ve üretim direktörü (2026-10-05)
 

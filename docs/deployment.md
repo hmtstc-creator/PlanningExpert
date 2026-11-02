@@ -1,7 +1,6 @@
 # Dağıtım (deploy) — VPS
 
-Site ve veritabanı **kendi VPS'imizde** çalışır (Hetzner CX33, Karabasan botuyla aynı
-makine). Dış barındırma hizmeti yoktur: Vercel ve Convex Cloud kullanılmaz (taşıma
+Site ve veritabanı **kendi VPS'imizde** çalışır. Dış barındırma hizmeti yoktur: Vercel ve Convex Cloud kullanılmaz (taşıma
 2026-10-16'da tamamlandı). Adres ücretsiz: Tailscale Funnel
 (`https://planningexpert.<tailnet>.ts.net`), sunucuda internete kapı açılmaz; Convex
 SQLite ile, bellek sınırlı. Sunucu kitabı (güncelleme, yedek, geri yükleme, kurulum):
@@ -96,8 +95,7 @@ bilgisayarda bırakılmaz).
 ## Karar geçmişi: Convex nerede?
 
 2026-10-03: önce arayüz VPS'e, Convex bulutta (A). **2026-10-14: B** — Convex de
-VPS'e (veri tamamen bizim sunucumuzda; SQLite, çünkü sunucunun belleği botlarla
-paylaşılıyor, Postgres yok). 2026-10-16: taşıma tamamlandı; bulut hizmetleri
+VPS'e (veri tamamen bizim sunucumuzda; SQLite, çünkü sunucu belleği sınırlı, Postgres yok). 2026-10-16: taşıma tamamlandı; bulut hizmetleri
 bırakıldı. Bedeli: yedek ve backend güncellemesi bizim işimiz, tek sunucu = tek
 arıza noktası (izleme ve yedek şart).
 

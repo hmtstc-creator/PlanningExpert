@@ -1,4 +1,4 @@
-# PlanningExpert — kendi sunucumuzda (Hetzner CX33, Karabasan botuyla aynı makine).
+# PlanningExpert — kendi sunucumuzda (VPS).
 # deploy/README.md. Tek compose projesi: "planningexpert" (/opt/planningexpert/deploy).
 #
 #   ts        Tailscale cihazı "planningexpert": Funnel ile HTTPS, internete kapı açmadan
@@ -9,9 +9,9 @@
 #   dashboard Convex paneli — yalnızca gerektiğinde: `docker compose --profile tools up -d dashboard`
 #
 # Kurallar:
-# - Karabasan botunun kapsayıcılarına, ağına ve kapılarına dokunulmaz; burada yalnızca
-#   bu projenin servisleri var. Host'a yalnızca 127.0.0.1 kapıları (Convex CLI için).
-# - Her serviste bellek sınırı: botların belleği korunur.
+# - Sunucudaki başka uygulamaların kapsayıcılarına, ağına ve kapılarına dokunulmaz; burada
+#   yalnızca bu projenin servisleri var. Host'a yalnızca 127.0.0.1 kapıları (Convex CLI için).
+# - Her serviste bellek sınırı: program sunucuda izin verilen X GB'ı aşmaz (deploy/README.md).
 # - Veri volume'larda: `docker compose down -v` ASLA (veriyi siler).
 # - Değerler deploy/.env'de (örnek: deploy/.env.example; .env git'e girmez).
 

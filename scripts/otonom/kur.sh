@@ -20,7 +20,8 @@ fi
 command -v claude >/dev/null || npm install -g @anthropic-ai/claude-code >/dev/null 2>&1 || true
 command -v gh >/dev/null || apt-get install -y -qq gh >/dev/null 2>&1 || true
 if [ ! -d /home/otonom/PlanningExpert/.git ]; then
-  sudo -u otonom git clone -q https://github.com/hmtstc-creator/PlanningExpert.git /home/otonom/PlanningExpert
+  : "${OTONOM_CLONE_URL:?OTONOM_CLONE_URL tanımlı olmalı: https://github.com/<organizasyon>/PlanningExpert.git}"
+  sudo -u otonom git clone -q "$OTONOM_CLONE_URL" /home/otonom/PlanningExpert
 fi
 # Görüş pilotu: Playwright + Chromium, repodan ayrı klasörde (repoya bağımlılık eklenmez). Idempotent.
 ARAC=/home/otonom/gorus-araclar
