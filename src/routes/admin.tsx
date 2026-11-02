@@ -1,7 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { AutonomousLog, AutonomousSwitch } from '../components/AutonomousLog'
 import { CompanyUsers } from '../components/CompanyAdmin'
 import { PageHeader } from '../components/PageHeader'
 import { SecurityPanel } from '../components/security/SecurityPanel'
@@ -13,7 +12,7 @@ export const Route = createFileRoute('/admin')({
   component: AdminPage,
 })
 
-type Tab = 'organization' | 'generals' | 'security' | 'history' | 'errors' | 'autonomous'
+type Tab = 'organization' | 'generals' | 'security' | 'history' | 'errors'
 
 /**
  * Administration — yalnızca General (site sahibi ve General'ler). Holding'ler,
@@ -31,7 +30,6 @@ function AdminPage() {
     { key: 'security', label: 'Security' },
     { key: 'history', label: 'Platform history' },
     { key: 'errors', label: 'System errors' },
-    ...(owner ? [{ key: 'autonomous' as const, label: 'Autonomous development' }] : []),
   ]
   return (
     <div className="w-full px-4 py-6 pb-24 sm:px-6 sm:py-8">
@@ -76,12 +74,6 @@ function AdminPage() {
         {tab === 'security' && <SecurityPanel />}
         {tab === 'history' && <AuditList />}
         {tab === 'errors' && <SystemErrors />}
-        {tab === 'autonomous' && owner && (
-          <>
-            <AutonomousSwitch />
-            <AutonomousLog />
-          </>
-        )}
       </div>
     </div>
   )

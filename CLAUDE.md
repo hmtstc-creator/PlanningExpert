@@ -17,14 +17,12 @@ Bu dosya depoda çalışan her Claude oturumu (bulut ya da sunucu) için geçerl
 - **Kısa yanıt:** yapılanı özetlemek için dosyayı tekrar okuma; Edit hata vermediyse değişiklik yapılmıştır.
   Kullanıcıya 3–6 madde, kod dökümü yok.
 - **Model: en küçükten başla, gerekince büyüt, sonra geri in** (kullanıcı kararı 2026-10-31 — "acelemiz yok,
-  yavaş ama doğru yazması yeterli"). Hem kullanıcı talimatlarında hem otonom gelişimde geçerli:
+  yavaş ama doğru yazması yeterli"). Kullanıcı talimatlarında geçerli:
   - oturum `haiku` ile açılır (`.claude/settings.json`); iş önce en küçük modelle denenir;
   - zorluk artarsa bir basamak çıkılır: mekanik / çok dosyalı tarama → `hizli` (haiku), orta iş → sonnet,
     motor / doğrulayıcı / OEE mantığı, mimari karar, iki denemede çözülemeyen hata → `derin` (opus, yüksek çaba),
     **dar ve tek paragraflık** bir görevle;
   - zor parça bitince yeniden en küçük modele inilir (bir sonraki iş yine haiku'dan başlar).
-  - Otonom döngü aynı kuralı kodda uygular: `scripts/otonom/ortak.sh` → `claude_yaz` (haiku → sonnet → opus),
-    toplantı da haiku'dan başlar (`toplanti.sh`).
   Kullanıcıdan model değiştirmesi istenmez; yalnız `derin` de çözemezse kullanıcıya söylenir.
 
 ## Kodu Claude yazar (kullanıcı kararı 2026-10-31)
@@ -32,13 +30,6 @@ Bu dosya depoda çalışan her Claude oturumu (bulut ya da sunucu) için geçerl
 - Qwen / OpenRouter ve Gemini ile kod yazma **kaldırıldı** (ücretsiz kotalar doldu, kazanç sağlamadı). Kodu Claude
   yazar, yukarıdaki model kuralıyla. **SOP Builder'ın Gemini kullanımı ayrıdır ve dokunulmaz** (video → SOP).
 - Kullanıcıya sonunda kısa "çözdüm" özeti verilir; kopyala-yapıştır istenmez.
-
-## Otonom geliştirme (wiki 13)
-
-- VPS'te saatlik döngü (`scripts/otonom/*`, `planningexpert-otonom-*`). **Varsayılan kapalı**; yalnız site sahibi
-  Administration → *Autonomous development* sekmesindeki düğmeyle açar / kapatır (5 dakikada sunucuya geçer).
-- Claude döngüyü kendisi açmaz; korunan dosyalara (motor, doğrulayıcı, OEE, şema, Planning Logic, deploy, belge)
-  otonom döngü dokunmaz, yalnız öneri yazar.
 
 ## Her talimattan önce: mimari etki kontrolü (zorunlu)
 

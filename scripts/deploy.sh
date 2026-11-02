@@ -34,6 +34,23 @@ install_units() {
       echo "systemd: ${name} installed"
     fi
   done
+  # Kaldırılmış otonom geliştirme birimleri sunucuda kalmasın (repoda yoksa kapatılır ve silinir).
+  for u in /etc/systemd/system/planningexpert-otonom-*.timer /etc/systemd/system/planningexpert-otonom-*.service; do
+    [ -e "$u" ] || continue
+    name=$(basename "$u")
+    [ -f "deploy/systemd/${name}" ] && continue
+    systemctl disable --now -q "$name" 2>/dev/null || true
+    rm -f "$u"
+    changed=1
+    echo "systemd: ${name} removed"
+  done
+  # Otonom geliştirmenin ayar, gizli değer ve durum dosyaları: özellik kaldırıldı, sunucuda kalmasın.
+  for d in /etc/otonom /var/lib/otonom; do
+    if [ -e "$d" ]; then
+      rm -rf "$d"
+      echo "otonom: ${d} removed"
+    fi
+  done
   [ "$changed" = 1 ] && systemctl daemon-reload
   for f in deploy/systemd/planningexpert-*.timer; do
     name=$(basename "$f")
