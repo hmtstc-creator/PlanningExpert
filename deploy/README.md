@@ -1,8 +1,7 @@
 # VPS — site ve Convex kendi sunucumuzda
 
-PlanningExpert'in **tamamı** kendi sunucumuzda çalışır — Hetzner CX33 (Ubuntu 24.04),
-Karabasan botuyla **aynı makine**. Dış barındırma hizmeti (Vercel, Convex Cloud)
-kullanılmaz. Adres (ücretsiz, Tailscale Funnel; sunucuda internete kapı açılmaz):
+PlanningExpert'in **tamamı** kendi sunucumuzda çalışır — VPS (Ubuntu 24.04). Dış
+barındırma hizmeti (Vercel, Convex Cloud) kullanılmaz. Adres (ücretsiz, Tailscale Funnel; sunucuda internete kapı açılmaz):
 
 - Site: `https://planningexpert.<tailnet>.ts.net`
 - Convex API: `https://planningexpert.<tailnet>.ts.net:8443`
@@ -25,18 +24,19 @@ sunucuda: `deploy/.env` ve `/etc/planningexpert/portal.env` (ikisi de `chmod 600
 |---|---|
 | **Bulut oturumu** (Claude, bu depo) | Kodu, betikleri ve bu kitabı hazırlar; GitHub'a gönderir, CI'ın yeşil olduğunu görür. Sunucuya erişmez. |
 | **Sunucu oturumu** (sunucudaki Claude Code, Remote Control) | Komutları çalıştırır (güncelleme, yedek, geri yükleme provası), sonunda **rapor** verir. Kontrol kırmızıysa durur. |
-| **Ahmet** | Yalnızca 🔑 kapılarda: Tailscale onay bağlantıları, kesinti saati, geri yükleme kararı. |
+| **site sahibi** | Yalnızca 🔑 kapılarda: Tailscale onay bağlantıları, kesinti saati, geri yükleme kararı. |
 
 ## Kurallar (hiçbir işte çiğnenmez)
 
-1. **Karabasan botuna dokunulmaz**: kapsayıcıları, `/opt/karabasan-bot`, `karabasan-*`
-   servisleri, ufw kuralları ve 8080–8092 kapıları olduğu gibi kalır. PlanningExpert
-   yalnızca `/opt/planningexpert` ve compose projesi `planningexpert`.
+1. **Sunucudaki başka uygulamalara dokunulmaz**: kapsayıcıları, servisleri, güvenlik
+   duvarı kuralları ve kapıları olduğu gibi kalır. PlanningExpert yalnızca
+   `/opt/planningexpert` ve compose projesi `planningexpert` ile çalışır.
 2. **İnternete kapı açılmaz** (sunucunun kuralı). Dışarıya yalnızca Tailscale Funnel,
    yalnızca PlanningExpert'in iki adresi.
-3. **Bellek**: her kapsayıcıda sınır (backend 1200 MB, site 384 MB, Tailscale 128 MB).
-   Derleme gibi ağır işlerden önce `free -m`; kullanılabilir bellek **1 GB'ın altına
-   düşecekse durulur**. Sunucuda test koşulmaz (`SKIP_LOCAL_VERIFY=1`); yalnızca
+3. **Bellek**: program sunucuda **X GB** bellek izniyle çalışır; kapsayıcı sınırları
+   toplamı bu izni aşmaz (backend 1200 MB, site 384 MB, Tailscale 128 MB; `X` her
+   sunucuda kendi kapasitesine göre yazılır). Derleme gibi ağır işlerden önce `free -m`;
+   kullanılabilir bellek **1 GB'ın altına düşecekse durulur**. Sunucuda test koşulmaz (`SKIP_LOCAL_VERIFY=1`); yalnızca
    CI'da yeşil commit yayınlanır.
 4. **Tek veritabanı**: yayın ve yedek betikleri yalnızca kendi Convex sunucumuza
    yazar (`scripts/convex-target.sh`; `CONVEX_DEPLOY_KEY` ya da `CONVEX_DEPLOYMENT`
@@ -82,7 +82,7 @@ verilir, her adım için onay istenmez):
 Betik sırayla: bellek ≥ 1 GB değilse durur → `main`'i ileri sarar (ff-only) →
 `portal.env` → `SKIP_LOCAL_VERIFY=1 ./scripts/release.sh` (aşağıda) → yedekleri
 `chmod 600` → `restart web` → yerel / Funnel 200, kapsayıcılar, backend restart / OOM,
-bellek, Karabasan kapsayıcı sayısı. Gizli değerler çıktıda maskelenir. Elle aynısı:
+bellek. Gizli değerler çıktıda maskelenir. Elle aynısı:
 
 ```bash
 cd /opt/planningexpert
@@ -107,7 +107,7 @@ en üstüyle aynıysa site günceldir.
 
 - Gece yedeği: `planningexpert-backup.timer` → `scripts/backup.sh` → 
   `/opt/planningexpert/backups/daily-*.zip` (veri + dosyalar), son 30 tutulur.
-  Sunucu dışı kopya: `portal.env`'de `BACKUP_REMOTE` (ör. Hetzner Storage Box).
+  Sunucu dışı kopya: `portal.env`'de `BACKUP_REMOTE` (ör. uzak yedek sunucu).
   Durum: `systemctl list-timers planningexpert-backup.timer`,
   `journalctl -u planningexpert-backup`.
 - Her yayından önce `release.sh` ayrıca yedek alır (`before-release-*.zip`).
@@ -139,7 +139,7 @@ rm backups/restore-test.zip
 Kontrol: `compare-exports` **OK — every document of the source is in the target**;
 süre ve bellek tepe değeri rapora yazılır.
 
-## Geri dönüş (gerçek bir kayıpta, 🔑 Ahmet'in kararıyla)
+## Geri dönüş (gerçek bir kayıpta, 🔑 site sahibinin kararıyla)
 
 ```bash
 set -a; . /etc/planningexpert/portal.env; set +a
@@ -148,7 +148,7 @@ npx convex import --replace-all -y backups/<seçilen yedek>.zip
 ```
 
 Önce aynı yedek geri yükleme provasındaki gibi geçici Convex'te denenir. Yedekten
-sonra girilen veri kaybolur; bu yüzden kesinti saati 🔑 Ahmet'le seçilir.
+sonra girilen veri kaybolur; bu yüzden kesinti saati 🔑 site sahibiyle seçilir.
 
 ## Ortam değişkenleri (e-posta vb.)
 
@@ -187,12 +187,12 @@ Kullanıcı ilk girişte parolasını değiştirmek zorundadır.
 ```bash
 apt-get install -y unzip
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
-git clone -b main https://github.com/hmtstc-creator/PlanningExpert /opt/planningexpert
+git clone -b main https://github.com/<organizasyon>/PlanningExpert /opt/planningexpert
 install -d -m 700 /etc/planningexpert
 
 cd /opt/planningexpert/deploy
 cp .env.example .env && chmod 600 .env     # INSTANCE_SECRET=$(openssl rand -hex 32), sürüm etiketleri
-# Tailscale girişi (🔑 Ahmet onaylar). containerboot, TS_AUTHKEY yokken 60 sn sonra yeniden
+# Tailscale girişi (🔑 site sahibi onaylar). containerboot, TS_AUTHKEY yokken 60 sn sonra yeniden
 # başlayıp her seferinde YENİ bağlantı üretir; bu yüzden ya .env'e tek kullanımlık
 # TS_AUTHKEY, ya da aynı volume'la geçici kapsayıcıda bir kez:
 #   tailscaled --tun=userspace-networking --statedir=/var/lib/tailscale &
@@ -203,7 +203,7 @@ docker compose exec ts tailscale status --json | grep DNSName   # → planningex
 docker compose up -d backend
 docker compose exec backend ./generate_admin_key.sh   # → /etc/planningexpert/portal.env (chmod 600)
 docker compose exec ts tailscale funnel status        # 🔑 tailnet'te HTTPS + Funnel kapalıysa
-# bağlantı çıkar → Ahmet açar; sonra `docker compose restart ts` (serve.json yeniden yüklenir)
+# bağlantı çıkar → site sahibi açar; sonra `docker compose restart ts` (serve.json yeniden yüklenir)
 
 cd /opt/planningexpert
 set -a; . /etc/planningexpert/portal.env; set +a
@@ -218,7 +218,7 @@ systemctl daemon-reload && systemctl enable --now planningexpert-backup.timer
 - `CONVEX_BACKEND_TAG`: o günkü son kararlı sürüm, `.env`'e yazılır (latest değil).
 - `/etc/planningexpert/portal.env`: `deploy/portal.env.example`'dan.
 - Kontrol: `curl -fsS https://planningexpert.<tailnet>.ts.net:8443/version` (dışarıdan,
-  Funnel) cevap veriyor; `docker stats --no-stream` bellek sınırları; botlar etkilenmedi.
+  Funnel) cevap veriyor; `docker stats --no-stream` bellek sınırları; sunucudaki diğer servisler etkilenmedi.
 
 ## Geçmiş
 

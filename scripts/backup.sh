@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Günlük yedek (systemd timer, her gece 02:15 — deploy/systemd/planningexpert-backup.timer):
 # production verisi + dosyalar (fotoğraflar). Son 30 yedek tutulur.
-# BACKUP_REMOTE tanımlıysa (Hetzner Storage Box) yedek sunucu dışına da kopyalanır;
+# BACKUP_REMOTE tanımlıysa (uzak yedek sunucu) yedek sunucu dışına da kopyalanır;
 # kopyalanamazsa betik hata verir (journalctl -u planningexpert-backup).
 # Hedef: VPS'teki kendi Convex sunucumuz (scripts/convex-target.sh).
 set -euo pipefail

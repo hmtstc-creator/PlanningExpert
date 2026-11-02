@@ -12,7 +12,7 @@ const planners: PeopleGroup = {
 }
 const users: PeopleUser[] = [
   { _id: 'u1', name: 'zeynep', active: true, isCreator: false, groupIds: ['g1'] },
-  { _id: 'u2', name: 'ahmet', active: true, isCreator: true, groupIds: [] },
+  { _id: 'u2', name: 'kisi', active: true, isCreator: true, groupIds: [] },
   { _id: 'u3', name: 'can', active: true, isCreator: false, groupIds: ['gone'] },
   { _id: 'u4', name: 'gen', active: true, isCreator: false, groupIds: [], platformRole: 'general' },
 ]
@@ -20,7 +20,7 @@ const users: PeopleUser[] = [
 describe('peopleTree', () => {
   it('creatorlar, gruplar ve grubu olmayanlar; platform kullanıcıları yok', () => {
     const t = peopleTree(users, [planners])
-    expect(t.creators.map((u) => u.name)).toEqual(['ahmet'])
+    expect(t.creators.map((u) => u.name)).toEqual(['kisi'])
     expect(t.groups[0].members.map((u) => u.name)).toEqual(['zeynep'])
     expect(t.noGroup.map((u) => u.name)).toEqual(['can'])
   })

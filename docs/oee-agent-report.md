@@ -140,7 +140,7 @@ masraf yeri bazında. Agent Report günü her açılışta yeniden hesaplar; bu 
 
 - Kısa duruşlar ayrı konudur (2026-10-23): süre histogramı varsa aynı kod ikiye bölünür, `ARZ` ≥ eşik (kullanılabilirlik), `ARZ<` < eşik ("Machine breakdown < 2 min", hız kaybı). Eski açık konular `ARZ` anahtarıyla kalır; dakikaları artık yalnız uzun duruşlardır.
 
-## Agent Insights (2026-10-23, Ahmet — Karabasan oturumu üzerinden)
+## Agent Insights (2026-10-23, site sahibi — sunucu oturumu üzerinden)
 
 **OEE → Agent Insights** (`/oee/insights`): masraf yeri, iş yeri (ya da tümü) ve
 tarih aralığı (varsayılan son 4 tam hafta; hazır 1 / 4 / 12 hafta, en çok 13 hafta)

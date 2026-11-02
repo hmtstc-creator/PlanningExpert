@@ -684,7 +684,7 @@ Hesap ve veri:
 - Önceden yüklenmiş veri için histogram, herhangi bir OEE sayfası OEE veri yetkisiyle açılınca bir kez kurulur (yalnızca ekler, hiçbir şey silmez — gün toplamları ve kayıp özetleriyle aynı yol).
 - Parça / vardiya ayrıntısı (Daily Report paneli, Bridge vardiya sütunu, kovaların parça ve vardiyası) ham duruşlardan okunur: en çok 8 gün.
 
-## Kısa duruşlar: < 2 dk performans, ≥ 2 dk availability (2026-10-23, Ahmet)
+## Kısa duruşlar: < 2 dk performans, ≥ 2 dk availability (2026-10-23, site sahibi)
 
 Karar: "2 dk altı duruşları availability değil performans kısmında görüyoruz; hız kayıplarını analiz etmek
 için 2 dk altı duruşları, availability etkileri için 2 dk üstünü kullan. Bütün OEE hesaplarında bu

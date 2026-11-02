@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 echo "== 1/4 verify"
 npm ci
 if [ "${SKIP_LOCAL_VERIFY:-}" = "1" ]; then
-  # Küçük sunucu (botlarla aynı makine): testler CI'da koşar; yalnızca CI'da yeşil commit yayınlanır.
+  # Küçük sunucu (bellek sınırlı): testler CI'da koşar; yalnızca CI'da yeşil commit yayınlanır.
   echo "Skipping local tests (SKIP_LOCAL_VERIFY=1) — commit $(git rev-parse --short HEAD) must be green in CI."
 else
   npm run verify
@@ -31,6 +31,7 @@ npx convex codegen
 # Önce işlevler, sonra site — sitenin adresi VITE_CONVEX_URL (Funnel).
 npx convex deploy
 # Yayındaki sürüm (Connection diagnostics → "Version on this site"): siteye gömülür.
+export VITE_REPO_URL="${VITE_REPO_URL:-}"
 export VITE_BUILD_COMMIT="$(git rev-parse --short HEAD)"
 export VITE_BUILD_MESSAGE="$(git log -1 --format=%s)"
 export VITE_BUILD_COMMITTED_AT="$(git log -1 --format=%cI)"

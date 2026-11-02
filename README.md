@@ -6,7 +6,7 @@ Dashboard. Tek sistem, tek adres; her plant'in verisi ayrıdır.
 
 - Arayüz: React 19 + TanStack Start/Router + Tailwind v4
 - Sunucu ve veritabanı: Convex (self-hosted)
-- **Hepsi kendi VPS'imizde** (Hetzner, Docker Compose, Tailscale Funnel):
+- **Hepsi kendi VPS'imizde** (VPS, Docker Compose, Tailscale Funnel):
   site, veritabanı, yedek ve yayın sunucuda yönetilir. Dış barındırma
   hizmeti (Vercel, Convex Cloud) kullanılmaz — `deploy/README.md`.
 - Hesap kütüphanesi: `src/lib` (saf TypeScript, React'e ve Convex'e bağlı değil)

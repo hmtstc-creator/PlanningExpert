@@ -16,7 +16,7 @@
 // - Plansız duruş grupları kayıtlı süreleriyle gösterilir; Loading −
 //   Production ile kayıtların farkı ayrı küçük adımdır ("Not explained" ya
 //   da "Over-recorded downtime") — gruplara dağıtılmaz, köprü kapanır.
-// - Aile süreden gelir (Ahmet, 2026-10-23): plansız duruş < eşik (OEE
+// - Aile süreden gelir (site sahibi, 2026-10-23): plansız duruş < eşik (OEE
 //   Settings, varsayılan 2 dk = MES) performans, ≥ eşik availability. MES
 //   Production'dan yalnızca ≥ 2 dk duruşları düşer; kısa duruşlar Production −
 //   Operation'ın içindedir. Köprü bölünmüş özeti alır (oeeShortStops.ts):

@@ -5,7 +5,7 @@
 # Sunucudaki Claude oturumu her yayında yalnızca bu betiği çalıştırır; böylece
 # tek bir kalıcı izin yeter (planlamacı, 2026-10-20: her komut için onay
 # istenmesin). Kurallar README'deki gibi: bellek 1 GB'ın altındaysa durur,
-# yalnızca main ileri sarılır (ff-only), Karabasan'a dokunulmaz, gizli değerler
+# yalnızca main ileri sarılır (ff-only), diğer uygulamalara dokunulmaz, gizli değerler
 # çıktıya yazılmaz.
 #
 #   scripts/deploy.sh          yayındaki commit main'in ucuysa hiçbir şey yapmaz
@@ -137,7 +137,6 @@ main() {
   docker compose -f deploy/compose.yml ps --format '{{.Name}}\t{{.Status}}'
   docker inspect planningexpert-backend-1 --format 'backend: restart={{.RestartCount}} oom={{.State.OOMKilled}}' 2>/dev/null || true
   free -m | sed -n '2,3p'
-  echo "karabasan: $(docker ps --filter name=kb- --format '{{.Names}}' | wc -l) containers up (not touched)"
   if [ "$code" != 200 ]; then
     echo "$after" >"$state/failed-commit"
     echo "WARNING: the site did not answer 200 locally."

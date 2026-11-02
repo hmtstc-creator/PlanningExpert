@@ -91,12 +91,12 @@ describe('organizasyon ağacı', () => {
     ]
     const users = [
       { _id: 'u1', name: 'zeynep', active: true, isCreator: false, groupIds: ['g1', 'g2'] },
-      { _id: 'u2', name: 'ahmet', active: true, isCreator: true, groupIds: [] },
+      { _id: 'u2', name: 'kisi', active: true, isCreator: true, groupIds: [] },
       { _id: 'u3', name: 'can', active: true, isCreator: false, groupIds: ['g2'] },
     ]
     const rows = plantAccessRows(plant, company, users, groups)
     expect(rows.map((r) => [r.user.name, r.via])).toEqual([
-      ['ahmet', ['Creator']],
+      ['kisi', ['Creator']],
       ['zeynep', ['Plant manager']],
     ])
     // Şirketin kiralamadığı modül (die) creator'da da yok.
