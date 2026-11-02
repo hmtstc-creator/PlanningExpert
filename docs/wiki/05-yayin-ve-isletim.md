@@ -1,6 +1,6 @@
 # 05 · Yayın ve işletim
 
-> Son güncelleme: 2026-10-31 (Qwen / Gemini kod yazma kaldırıldı; otonom birimleri) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
+> Son güncelleme: 2026-11-02 (otonom geliştirme kaldırıldı; Qwen / Gemini kod yazma kaldırıldı; otonom birimleri) · Kaynak: `deploy/README.md` (**sunucu kitabı**), `docs/deployment.md`, `scripts/*.sh`, `.github/workflows/`
 
 ## Çalışma şekli (özet)
 
@@ -20,7 +20,6 @@ dal → npm run verify  ─push→  taslak PR → CI verify ─merge→ main
 - **Yayın otomatiktir** (2026-10-22): `planningexpert-autodeploy.timer` → `scripts/deploy.sh`. Elle çalıştırmak gerekmez.
 - **Qwen / Gemini ile kod yazma kaldırıldı** (2026-10-31, kullanıcı kararı): `qwen-yesil.yml`, `scripts/qwen-yesil.sh`,
   `QWEN.md` silindi; kodu Claude yazar (CLAUDE.md → *Model*). SOP Builder'ın Gemini'si ayrıdır, yerinde.
-- **Otonom geliştirme** (wiki 13): `planningexpert-otonom-*` birimleri; aç / kapat sitedeki düğmeyle.
 
 ## `scripts/deploy.sh` ne yapar
 

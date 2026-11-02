@@ -1,9 +1,0 @@
-[Unit]
-Description=PlanningExpert otonom — site düğmesini 5 dakikada bir oku
-
-[Timer]
-OnBootSec=2min
-OnUnitInactiveSec=5min
-
-[Install]
-WantedBy=timers.target

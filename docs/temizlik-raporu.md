@@ -32,11 +32,8 @@ Bu bilgiler silindiğinde sistemin doğru çalışması için yeni organizasyond
    `planningexpert` compose projesini kullanır. Deploy betiğinde diğer kapsayıcıları sayan satır
    kaldırıldı; bu satır betiğin çalışmasını etkilemiyordu.
 3. **Bellek:** Kapsayıcı sınırları programa tanımlıdır (backend 1200 MB, site 384 MB, Tailscale 128 MB). Deploy öncesi "boş bellek en az 1 GB" kontrolü aynen duruyor.
-4. **GitHub adı:** Üç yerde ayarlanır, kodda sabit ad yoktur:
+4. **GitHub adı:** Derleme ortamında ayarlanır, kodda sabit ad yoktur:
    - Derleme: `VITE_REPO_URL` (`scripts/release.sh` geçirir). Boş kalırsa sürüm bağlantıları çalışmaz.
-   - Otonom betikler: `/etc/otonom/env` içinde `REPO_SLUG=<organizasyon>/PlanningExpert`.
-   - Otonom kurulumu: `OTONOM_CLONE_URL=https://github.com/<organizasyon>/PlanningExpert.git`
-     (`scripts/otonom/kur.sh` bu değişken yoksa durur).
 5. **VPS bağlantısı:** Adres şablonu (`planningexpert.<tailnet>.ts.net`), `/opt/planningexpert` ve
    `/home/otonom` gibi yollar kalır. Gerçek adres ve anahtarlar yalnızca sunucudadır.
 
@@ -46,9 +43,7 @@ Bu bilgiler silindiğinde sistemin doğru çalışması için yeni organizasyond
   işlevsel bir ayar. Kişinin konumu değildir.
 - **Test ve örnek verilerindeki fabrika adı** (ör. "Romanya Martur"): şirket verisi, kişisel değil.
   Yeni organizasyonda genel bir adla değiştirilebilir.
-- **Otonom geliştirme sistemi:** Program özelliği olarak kaldı (`scripts/otonom/`, `deploy/systemd/`).
-  Bot adı ya da bot kaynağı içermez. Sunucuda çalışan başka bir bot olarak değerlendirilip
-  kaldırılmasını isterseniz söylenir.
+- **Otonom geliştirme:** 2026-11-02'de site sahibinin kararıyla kaldırıldı (sayfa, betikler, birimler). Sunucudaki kalıntı birimler `deploy.sh` ile kapatılıp silinir.
 - **Sürüm ve karar kayıtlarındaki PR numaraları ve tarihler:** Program geçmişidir.
 
 ## 4. Açık kalanlar (karar gerekiyor)
@@ -60,7 +55,7 @@ Bu bilgiler silindiğinde sistemin doğru çalışması için yeni organizasyond
   - Bu commit'lerin kimliği ve geçmişteki kayıtlar bu PR'dan değiştirilmedi.
 - **`deploy/.env.example`:** Bu dosya oturum izinleri nedeniyle okunamadı. Yalnızca bellek yorum
   satırı değiştirildi. Yeni organizasyondan önce elle kontrol edilmeli.
-- **İki ortam değişkeni** (`VITE_REPO_URL`, `REPO_SLUG`) ve `OTONOM_CLONE_URL` yeni sunucuda doldurulmalı.
+- **`VITE_REPO_URL`** yeni sunucuda doldurulmalı (sürüm bağlantıları için).
 
 ## 5. Doğrulama
 
