@@ -1,5 +1,18 @@
 [
  {
+  "zaman": "20261102-0340",
+  "odak": "src/routes/oee/asakai-detail.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/oee/asakai-detail.tsx'in ilk 220 satırı incelendi. Sayfa günü, dünü en son gün sayacak şekilde sınırlıyor ve bu kuralı üst bilgi metninde açıklıyor. Tüm iş yerlerini (masraf yeri sırasıyla) satır olarak gösterdiği, sütun ve satır sayılarının tutarlı olduğu görüldü. Bu bölümde planlama veya katman ihlali bulunmadı. Ciddi bir hata bulunmadığı için görev yazılmadı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Sayfada /oee/asakai-weekly ile /oee/asakai-detail arasında doğrudan bağlantı yok; ilgili sayfa bağlantısı (relatedPages) eklenirse vardiya amiri haftalık ve günlük Asakai arasında geçişi tek tıkla yapar. Arayüz kararı, kullanıcı onayı gerekir.",
+   "Üst bilgi metni (info) üç uzun paragraf; vardiya amiri için 30 saniyede okunabilir olması adına kısaltılabilir veya ilk satır olarak 'Red = en büyük 6 duruş' gibi tek satırlık bir özet öne alınabilir. Arayüz metni, kullanıcı onayıyla değiştirilmeli.",
+   "Sayfanın ilk 220 satırında en çok kullanılan bilgi (OEE ve Loading time) ekranın üst kısmında; gerçek ekran boyutunda ilk görünümün 'Loading…' yerine dolu tablo gösterdiği bir kez kontrol edilmeli.",
+   "İş yeri ve vardiya satırlarında 'OEE' ve 'Loading' değerlerinin birimi (% ve dakika) yalnız başlıkta ve hücrelerin biçiminde belli; birim etiketi eklemek okunabilirliği artırır. Görsel değişiklik, kullanıcı onayı gerekir."
+  ]
+ },
+ {
   "zaman": "20261102-0240",
   "odak": "src/routes/oee/agent.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/oee/agent.tsx'in 220 satırı incelendi. Sayfa, OEE verisini ve açık konuları tek bir rapor fonksiyonuna (agentReport) veriyor; rapor günü, veri sonu tarihine göre kırpılıyor ve bu durum bir uyarı metniyle gösteriliyor. Kalıp ve makine konuları yalnızca ilgili izinler varsa okunuyor, sunucu tarafı izin kontrolüyle de uyumlu görünüyor. Bu 220 satırda planlama mantığı, katman ihlali ya da veri hatası görülmedi, bu nedenle yazılacak görev yok.",
