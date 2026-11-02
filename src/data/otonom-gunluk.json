@@ -1,5 +1,15 @@
 [
  {
+  "zaman": "20261102-0040",
+  "odak": "src/routes/machine-followup/sop/index.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/machine-followup/sop/index.tsx incelendi. Form alanları, dosya seçimi ve yükleme akışı tek kaynaktan çalışıyor; planlama veya katman ihlali bulunmadı. Bulunan somut hata: video yüklenirken makine, hazırlayan ve tarih alanlarında yapılan değişiklikler, gönderim bittiğinde submit anındaki eski değerlerle ezilebiliyor. Bu düzeltme tek dosyada küçük bir görev olarak açıldı. Bekleyen öneriler tekrar edilmedi.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Saniye ve yükleme kalitesi için sunucu tarafı doğrulama (convex/sop.ts) bekleyen öneri olarak kalsın; convex ve korunan alan olduğu için bu toplantıda dokunulmadı."
+  ]
+ },
+ {
   "zaman": "20261101-2340",
   "odak": "src/routes/machine-followup/sop/$id.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/machine-followup/sop/$id.tsx'in ilk 220 satırı incelendi. Sayfa veriyi sop.get üzerinden tek kaynaktan okuyor ve planlama ya da katman ihlali bulunmadı. Saniye giriş kutusunda boş değerin 0 olarak kabul edildiği ve '+ Second photo' akışında saniyenin video süresine sınırlanmadığı tespit edildi; ikisi de küçük, tek dosyalık düzeltmeler olarak görevlendirildi.",
