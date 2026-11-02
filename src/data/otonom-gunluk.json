@@ -1,5 +1,20 @@
 [
  {
+  "zaman": "20261102-1040",
+  "odak": "src/routes/oee/insights.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/oee/insights.tsx'in ilk 220 satırı incelendi. Masraf yeri ve iş yeri seçimi, tarih aralığı ön ayarları ve geçmiş rapor listesi tek veri yolundan (oee.days, oeeInsights.list) besleniyor; ciddi bir veri ya da ilişki hatası bulunmadı. Rapor üretme yetkisi (canRun) düğme ve Regenerate davranışında tutarlı uygulanıyor. Vardiya amiri için açıklama metninin uzunluğu ve masraf yeri yokken düğmenin açıklamasız pasif kalması iyileştirme adayı olarak not edildi; korunan alana ya da arayüz metnine dokunulmadı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Sayfa açıklaması (info) üç uzun paragraf; vardiya amiri için ilk satıra tek cümlelik özet ('Pick a cost center and a period, then press Agent report') eklenmesi kullanıcı onayıyla düşünülmeli.",
+   "Masraf yeri listesi boşken 'Agent report' düğmesi sebepsiz pasif kalıyor; title ile 'No cost center in this period' gibi bir neden gösterilmesi kullanıcı kararıyla değerlendirilmeli.",
+   "Sayfanın 220. satırdan sonrası (ReportView ayrıntısı ve kalan bileşenler) bu toplantıda okunmadı; bir sonraki toplantıda devam edilmeli.",
+   "Hata mesajı doğrudan e.message olarak gösteriliyor; sahada anlaşılır bir metin için kullanıcı onayıyla kısa bir çeviri ya da genel uyarı önerilir.",
+   "'Regenerate' yalnız done/failed/stale durumda görünüyor; kullanıcı bunu bulamayabilir. Görünürlük kararı kullanıcıya sorulmalı.",
+   "Rapor geçmişi listesinde iş yeri 'all work centers' İngilizce metni vardiya amiri için kısaltılabilir; arayüz metni değişikliği kullanıcı onayı gerektirir."
+  ]
+ },
+ {
   "zaman": "20261102-0940",
   "odak": "src/routes/oee/index.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/oee/index.tsx'in ilk 220 satırı incelendi. Trend sayfası OEE hesabını tek veri yolundan (days, shifts, periods) alıyor ve sütundan Loss Bridge'e geçiş yetki kontrolüyle çalışıyor; ciddi bir veri ya da ilişki hatası bulunmadı. Boş durum mesajındaki 'Upload data' ifadesi tıklanabilir değil, vardiya amiri için yükleme sayfasına doğrudan bağlantı eksik. Ayrıca 'Shifts worked' notu çok uzun olduğu için okunması zor bulundu. Bu toplantıda yalnız boş durum bağlantısı için küçük bir görev yazılmasına karar verildi.",
