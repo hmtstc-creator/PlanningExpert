@@ -44,6 +44,13 @@ install_units() {
     changed=1
     echo "systemd: ${name} removed"
   done
+  # Otonom geliştirmenin ayar, gizli değer ve durum dosyaları: özellik kaldırıldı, sunucuda kalmasın.
+  for d in /etc/otonom /var/lib/otonom; do
+    if [ -e "$d" ]; then
+      rm -rf "$d"
+      echo "otonom: ${d} removed"
+    fi
+  done
   [ "$changed" = 1 ] && systemctl daemon-reload
   for f in deploy/systemd/planningexpert-*.timer; do
     name=$(basename "$f")
