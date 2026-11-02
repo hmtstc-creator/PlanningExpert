@@ -1,5 +1,20 @@
 [
  {
+  "zaman": "20261102-1540",
+  "odak": "src/routes/oee/topics.tsx",
+  "ozet": "Toplantıda src/routes/oee/topics.tsx'in ilk 220 satırı incelendi: açık konular sayfası, ajanın bulduğu kronik ve kritik kayıpları masraf yeri bazında gruplar ve kapatma/yeniden açma işlemlerini sunuyor. Veri tek kaynak olan oeeTopics.list ve oeeTopics.runs sorgularından geliyor, kurallar sayfa üstündeki bilgi metninde açıklanıyor. Ciddi bir veri ya da sayfa ilişki hatası bulunmadı, bu yüzden yazılacak görev yok. Vardiya amiri için sayfa başlığındaki uzun bilgi metni ve 'Analyse the last day' düğmesinin yetki kontrolüyle görünmesi gibi konular öneri olarak not edildi.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "Sayfanın üstündeki bilgi metni üç uzun paragraf; vardiya amiri için ilk cümlede tek satırlık özet (ör. 'Chronic losses to act on, per cost center') eklenmesi kullanıcı onayıyla düşünülmeli.",
+   "Kapatma notu alanı boş iken 'Close' düğmesi pasif; neden pasif olduğunu gösteren kısa bir ipucu (ör. 'Write what was done to close') eklenmesi vardiya amiri için okunabilirliği artırır, ama arayüz metni olduğu için kullanıcı onayı gerekir.",
+   "'Analyse the last day' düğmesi yalnız oee.data düzenleme yetkisi olanlara görünüyor; yetkisiz kullanıcı neden düğmeyi göremediğini anlayamaz. Bu bir yetki/arayüz kararı, kullanıcı onayı gerekir.",
+   "'Last analysis' satırındaki 'added / seen again' ifadesi ve 'AI not set up: the rules decide.' cümlesi teknik; vardiya amirinin anlayacağı kısa bir Türkçe/İngilizce etiket düşünülebilir.",
+   "Kronik konu kartındaki 'AI' / 'rules' etiketi ne anlama geldiğini açıklamıyor; kısa bir açıklama veya ipucu kullanıcı kararıyla eklenmeli.",
+   "Yükleme sırasında 'Loading…' ve boş durumda 'No open topic.' gösteriliyor; 'No open topic' ifadesinin son analiz tarihiyle birlikte gösterilmesi, konunun gerçekten temiz mi yoksa analiz mi yapılmadı sorusunu yanıtlar. Bu değişiklik sayfa mantığını etkilediği için önce kullanıcıya sorulmalı."
+  ]
+ },
+ {
   "zaman": "20261102-1440",
   "odak": "src/routes/oee/settings.tsx",
   "ozet": "Toplantıda src/routes/oee/settings.tsx'in ilk 220 satırı incelendi: kurulum adımları (veri yükleme, öneri, kontrol, kaydetme), masraf yeri ve vardiya listeleri ile departman ayarları tek bir draft/kaydet akışından besleniyor. Ciddi bir veri ya da sayfa ilişki hatası bulunmadı, bu yüzden yazılacak görev yok. Üç öneri not edildi: 'Suggest from data' düğmesinin mevcut düzenlemeleri onaysız üzerine yazması, yükleme sırasında her render'da yeni dizi üretilmesi ve kısa bir eylem dili ihtiyacı.",
