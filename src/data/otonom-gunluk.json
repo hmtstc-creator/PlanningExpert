@@ -1,5 +1,20 @@
 [
  {
+  "zaman": "20261102-1240",
+  "odak": "src/routes/oee/mttr.tsx",
+  "ozet": "Toplantıda src/routes/oee/mttr.tsx'in ilk 220 satırı incelendi. MTTR ve MTBF hesabı tek veri yolundan (oee.days, oee.stopDays, oee.downtimeDays) besleniyor, dönemler (ay, hafta, gün) aynı yardımcılarla üretiliyor ve kısa duruş eşiği OEE Settings'ten gelip sayfa tercihiyle geçersiz kılınabiliyor. Ciddi bir veri ya da ilişki hatası bulunmadı, bu yüzden görev yazılmadı. Sayfanın 220. satırdan sonrası bu toplantıda okunmadı.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "days değişkeni (useQuery(...) ?? []) yükleme sırasında her render'da yeni dizi üretiyor; grids, periods ve weekByMachine gibi useMemo'lar bu yüzden her render'da yeniden hesaplanabilir. Düzeltme için days'i useMemo ile sabitlemek mantık değiştirmez ama mttr.tsx'in bu bölümü kullanıcı onayıyla ele alınmalı.",
+   "Boş durum notundaki 'open this page with OEE data rights once' ifadesi vardiya amiri için belirsiz; yetki gerektiğini ve kime başvuracağını kısa bir cümleyle yazmak kullanıcı kararıyla değerlendirilmeli.",
+   "weekByMachine useMemo bağımlılıklarında sel.monday var ama hafta dönemi sel.sunday'i de kullanıyor; eksik bağımlılık eşitlenmeli (eslint-disable ile gizlenmiş).",
+   "Info metni üç uzun paragraf; vardiya amiri için ilk satıra tek cümlelik özet (ör. 'MTTR = average stop length, MTBF = average run time between stops') eklenmesi kullanıcı onayıyla düşünülmeli.",
+   "'Min. duration' alanı varsayılan değeri (OEE Settings kısa duruş eşiği) sahada gösterilmiyor; title ile görünür ipucu verilmesi kullanıcı kararıyla değerlendirilmeli.",
+   "Sayfanın 220. satırdan sonrası (ayrı kova tablosu ve pres/parça/vardiya ayrıntısı) bir sonraki toplantıda ayrı odak olarak okunmalı."
+  ]
+ },
+ {
   "zaman": "20261102-1140",
   "odak": "src/routes/oee/losses.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/oee/losses.tsx'in ilk 220 satırı incelendi. Kayıp seçimi, alt kayıp karşılaştırması, iş merkezi filtresi ve paretoların hepsi tek veri yolundan (oee.days, oee.lossDays, oee.stopDays) besleniyor; hafta ve gün dönemleri ile Speed ayrımı tutarlı. Ciddi bir veri ya da ilişki hatası bulunmadı. Sayfanın 220. satırdan sonrası (PDF sayfası ve kalan bölümler) bu toplantıda okunmadı; yeni görev yazılmadı.",
