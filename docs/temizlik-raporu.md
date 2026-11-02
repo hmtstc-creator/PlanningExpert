@@ -16,7 +16,7 @@ bulgu ya kuralla değiştirildi ya da bilerek bırakıldı (aşağıda).
 | GitHub kullanıcı adı | derleme sabiti, otonom betikleri, kurulum kitabı | Sabit ad kaldırıldı; ortam değişkenine çevrildi (4. kural) |
 | Kişinin bulunduğu ülke | wiki sürüm günlüğü | Cümle kaldırıldı; saat dilimi kaydı kaldı |
 | Sunucudaki başka bot uygulaması (ad, dizin, servis, kapsayıcı, kapı, güvenlik duvarı kuralı) | deploy kitabı, compose dosyası, deploy betiği, dokümanlar | Kaldırıldı; yerine 2. kural yazıldı |
-| Bota ayrılan bellek ve bot gerekçeleri | deploy kitabı, compose, `.env` örneği, yorumlar | Gerekçe kaldırıldı; yerine 3. kural yazıldı |
+| Bota ayrılan bellek ve bot gerekçeleri | deploy kitabı, compose, `.env` örneği, yorumlar | Gerekçe kaldırıldı; kapsayıcı sınırları ayar olarak kaldı |
 | VPS sağlayıcı adı ve plan bilgisi | README, kitap, wiki, yedek betiği | "VPS" yazıldı |
 
 Değişen dosya sayısı: 28 (`git diff --stat`). Program davranışı değişmedi; yalnızca iki yeni ortam
@@ -31,9 +31,7 @@ Bu bilgiler silindiğinde sistemin doğru çalışması için yeni organizasyond
    duvarı kurallarına ve kapılarına dokunmaz. Program yalnızca `/opt/planningexpert` dizinini ve
    `planningexpert` compose projesini kullanır. Deploy betiğinde diğer kapsayıcıları sayan satır
    kaldırıldı; bu satır betiğin çalışmasını etkilemiyordu.
-3. **Bellek:** Program sunucuda **X GB** bellek izniyle çalışır. Kapsayıcı sınırlarının toplamı bu
-   izni aşmaz (backend 1200 MB, site 384 MB, Tailscale 128 MB). `X` değeri her sunucuda kendi
-   kapasitesine göre yazılır. Deploy öncesi "boş bellek en az 1 GB" kontrolü aynen duruyor.
+3. **Bellek:** Kapsayıcı sınırları programa tanımlıdır (backend 1200 MB, site 384 MB, Tailscale 128 MB). Deploy öncesi "boş bellek en az 1 GB" kontrolü aynen duruyor.
 4. **GitHub adı:** Üç yerde ayarlanır, kodda sabit ad yoktur:
    - Derleme: `VITE_REPO_URL` (`scripts/release.sh` geçirir). Boş kalırsa sürüm bağlantıları çalışmaz.
    - Otonom betikler: `/etc/otonom/env` içinde `REPO_SLUG=<organizasyon>/PlanningExpert`.
@@ -62,8 +60,7 @@ Bu bilgiler silindiğinde sistemin doğru çalışması için yeni organizasyond
   - Bu commit'lerin kimliği ve geçmişteki kayıtlar bu PR'dan değiştirilmedi.
 - **`deploy/.env.example`:** Bu dosya oturum izinleri nedeniyle okunamadı. Yalnızca bellek yorum
   satırı değiştirildi. Yeni organizasyondan önce elle kontrol edilmeli.
-- **`X GB` değeri ve iki ortam değişkeni** (`VITE_REPO_URL`, `REPO_SLUG`, `OTONOM_CLONE_URL`) yeni
-  sunucuda doldurulmalı.
+- **İki ortam değişkeni** (`VITE_REPO_URL`, `REPO_SLUG`) ve `OTONOM_CLONE_URL` yeni sunucuda doldurulmalı.
 
 ## 5. Doğrulama
 
