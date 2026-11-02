@@ -1,5 +1,17 @@
 [
  {
+  "zaman": "20261102-0940",
+  "odak": "src/routes/oee/index.tsx",
+  "ozet": "Toplantıda odak sayfa src/routes/oee/index.tsx'in ilk 220 satırı incelendi. Trend sayfası OEE hesabını tek veri yolundan (days, shifts, periods) alıyor ve sütundan Loss Bridge'e geçiş yetki kontrolüyle çalışıyor; ciddi bir veri ya da ilişki hatası bulunmadı. Boş durum mesajındaki 'Upload data' ifadesi tıklanabilir değil, vardiya amiri için yükleme sayfasına doğrudan bağlantı eksik. Ayrıca 'Shifts worked' notu çok uzun olduğu için okunması zor bulundu. Bu toplantıda yalnız boş durum bağlantısı için küçük bir görev yazılmasına karar verildi.",
+  "durum": "degisiklik-yok",
+  "gorevler": [],
+  "oneriler": [
+   "'Shifts worked' açıklaması (shiftNote) yaklaşık 300 karakter ve üç farklı hesap kuralını bir arada anlatıyor; vardiya amiri için kısa bir ilk satır ('Shifts worked = loading ÷ net shift') ve ayrıntının ayrı bir bilgi satırına alınması kullanıcı kararıyla düşünülmeli.",
+   "Sayfa 220. satırdan sonra okunmadı; bir sonraki toplantıda kalan kısmı (Section sonrası ve varsa ek bileşenler) ayrı bir odak olarak incelenmeli.",
+   "Düzen: son Section'dan sonra gereksiz boş satır var ve sayfa sonundaki 'Losses Trend' bağlantısı yalnız küçük metin olarak duruyor; vardiya amiri için üst kısımda da analiz sayfalarına bağlantı konup konmayacağı kullanıcı onayıyla belirlenmeli."
+  ]
+ },
+ {
   "zaman": "20261102-0840",
   "odak": "src/routes/oee/guide.tsx",
   "ozet": "Toplantıda odak sayfa src/routes/oee/guide.tsx'in ilk 220 satırı incelendi. Sayfa kullanım yöntemini beş adımda anlatıyor ve 'What is stored now' tablosu coverage ve settings verisini tek kaynaktan okuyor. Yükleme adresi (/oee/data) ve ayarlar (/oee/settings) bağlantıları doğru, kısa durak ve MES sabitleri koddan okunuyor. Adım 2'de 'Work center Save.' cümlesi anlamsız görünüyor (muhtemelen yazım hatası), ancak metin değişikliği olduğu ve niyetten %100 emin olunamadığı için görev yazılmadı, öneri olarak bırakıldı. Ciddi bir hata bulunmadığından görev yazılmadı.",
