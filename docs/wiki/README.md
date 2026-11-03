@@ -5,7 +5,7 @@ gelince ilk bakılan yer burasıdır. Burası dağınık belgelerin (`docs/*.md`
 sitedeki *Planning Logic*) yerine geçmez; hepsine **yön gösterir** ve konuşmalarda alınan
 kararları, öğrenilenleri ve sürüm geçmişini tek yerde toplar.
 
-> Son güncelleme: 2026-11-02 (13 Otonom geliştirme (VPS) kaldırıldı)
+> Son güncelleme: 2026-11-03 (14 Excel planlama modülü eklendi)
 
 ## Nereden başlamalı
 
@@ -23,6 +23,7 @@ kararları, öğrenilenleri ve sürüm geçmişini tek yerde toplar.
 | Bu kelime ne demek? (lot, kova, kontrol noktası…) | [10 Sözlük](10-sozluk.md) |
 | Neden böyle yapıldı? | [11 Karar günlüğü](11-karar-gunlugu.md) |
 | **SOP oluşturma**: videodan SOP, şablon formatı (%100 uyum kuralı) | [12 SOP oluşturma](12-sop-olusturma.md) |
+| Planlama Excel'de (makrolu .xlsm): ne var, ne yok, nasıl doğrulandı | [14 Excel planlama modülü](14-excel-planlama.md) |
 
 ## Belge haritası (wiki dışındakiler)
 
