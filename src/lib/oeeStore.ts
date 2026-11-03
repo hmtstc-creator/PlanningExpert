@@ -149,8 +149,15 @@ export const mergeEvents = mergeDowntimes
  * Yükleme API'si — hepsi "ekle ya da güncelle": hiçbir çağrı geçmişi silmez.
  * Aynı satır (anahtar) tekrar gelirse güncellenir, yeni satır eklenir.
  */
+/** Shiftly satırlarının yazım sonucu (eklendi / güncellendi / aynı olduğu için yazılmadı). */
+export interface ShiftCounts {
+  inserted: number
+  updated: number
+  unchanged: number
+}
+
 export interface OeeApi {
-  upsertShifts: (args: { rows: unknown[] }) => Promise<unknown>
+  upsertShifts: (args: { rows: unknown[] }) => Promise<ShiftCounts>
   upsertDaily: (args: { rows: unknown[] }) => Promise<unknown>
   upsertOrders: (args: { rows: unknown[] }) => Promise<unknown>
   upsertWeekly: (args: { rows: unknown[] }) => Promise<unknown>
@@ -191,8 +198,9 @@ export async function importOee(
   fileName: string,
   api: OeeApi,
   onStep: (text: string) => void = () => {},
-): Promise<{ ranges: string[][] }> {
+): Promise<{ ranges: string[][]; shifts: ShiftCounts }> {
   const ranges: string[][] = []
+  const shifts: ShiftCounts = { inserted: 0, updated: 0, unchanged: 0 }
   const range = (label: string, dates: string[]) => {
     const r = dateRange(dates)
     if (r) ranges.push([label, r.from, r.to])
@@ -201,7 +209,12 @@ export async function importOee(
 
   if (range('shifts', parsed.shifts.map((r) => r.date))) {
     onStep(`Shiftly KPI: ${parsed.shifts.length} rows`)
-    for (const rows of chunkBySize(parsed.shifts)) await api.upsertShifts({ rows })
+    for (const rows of chunkBySize(parsed.shifts)) {
+      const c = await api.upsertShifts({ rows })
+      shifts.inserted += c.inserted
+      shifts.updated += c.updated
+      shifts.unchanged += c.unchanged
+    }
   }
   if (range('daily', parsed.daily.map((r) => r.date))) {
     onStep(`Daily KPI: ${parsed.daily.length} rows`)
@@ -234,7 +247,7 @@ export async function importOee(
     sheets: parsed.read.map((r) => [r.sheet, r.kind, r.rows]),
     ranges,
   })
-  return { ranges }
+  return { ranges, shifts }
 }
 
 /** Sistemin eklediği alanlar: karşılaştırmada sayılmaz. */

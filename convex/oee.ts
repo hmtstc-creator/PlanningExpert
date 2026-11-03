@@ -50,11 +50,18 @@ function checkRange(from?: string, to?: string) {
   }
 }
 
-async function upsert(ctx: Ctx, existing: Ctx | null, table: string, doc: Ctx) {
+/** Yazım sonucu: eklendi, güncellendi ya da aynı olduğu için yazılmadı. */
+type WriteResult = 'inserted' | 'updated' | 'unchanged'
+
+async function upsert(ctx: Ctx, existing: Ctx | null, table: string, doc: Ctx): Promise<WriteResult> {
   // Değişmeyen satır yeniden yazılmaz (aynı dosyanın tekrar yüklenmesi).
-  if (existing && sameStored(existing, doc)) return
-  if (existing) await ctx.db.replace(existing._id, doc)
-  else await ctx.db.insert(table, doc)
+  if (existing && sameStored(existing, doc)) return 'unchanged'
+  if (existing) {
+    await ctx.db.replace(existing._id, doc)
+    return 'updated'
+  }
+  await ctx.db.insert(table, doc)
+  return 'inserted'
 }
 
 /** Gün × iş merkezi anahtarındaki bütün kayıtlar (indeks sırası: ilk yazılan önce). */
@@ -130,24 +137,25 @@ export const upsertShifts = guardedMutation({
   areas: ['oee.data'],
   modules: OEE,
   args: { rows: v.array(v.object(shiftFields)) },
-  returns: v.number(),
+  returns: v.object({ inserted: v.number(), updated: v.number(), unchanged: v.number() }),
   affectsPlan: false,
   handler: async (ctx, { rows: raw }) => {
     const rows = await mapAliases(ctx.db, raw)
     plantCostCentersOnly(ctx, rows)
     const touched = new Map<string, { date: string; workCenter: string }>()
+    const counts = { inserted: 0, updated: 0, unchanged: 0 }
     for (const r of rows) {
       // Aynı gün + vardiya + makine tek kayıt: en son yüklenen geçerli, fazlası silinir.
       const [hit, ...extra] = await ctx.db
         .query('oeeShifts')
         .withIndex('by_key', (q: Ctx) => q.eq('date', r.date).eq('workCenter', r.workCenter).eq('shiftGroup', r.shiftGroup))
         .collect()
-      await upsert(ctx, hit ?? null, 'oeeShifts', r)
+      counts[await upsert(ctx, hit ?? null, 'oeeShifts', r)] += 1
       for (const x of extra) await ctx.db.delete(x._id)
       touched.set(`${r.date}|${r.workCenter}`, { date: r.date, workCenter: r.workCenter })
     }
     for (const { date, workCenter } of touched.values()) await refreshDay(ctx, date, workCenter)
-    return rows.length
+    return counts
   },
 })
 

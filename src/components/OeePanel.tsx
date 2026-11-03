@@ -313,7 +313,10 @@ export function OeeUploadButton() {
       const { parsed, skipped } = forPlantCostCenters(all, codes)
       const kept = parsed.shifts.length + parsed.orders.length + parsed.daily.length + parsed.weekly.length + parsed.monthly.length + parsed.downtimes.length
       if (!kept) throw new Error(`No row of this file belongs to the cost centers of ${plant?.plantName} (${codes.join(', ')}).`)
-      await importOee(parsed, file.name, calls, (step) => setState({ kind: 'busy', step }))
+      const { shifts: sc } = await importOee(parsed, file.name, calls, (step) => setState({ kind: 'busy', step }))
+      const shiftNote = parsed.shifts.length
+        ? ` Shiftly KPI: ${sc.inserted.toLocaleString('en-GB')} added, ${sc.updated.toLocaleString('en-GB')} updated, ${sc.unchanged.toLocaleString('en-GB')} unchanged.`
+        : ''
       const other = skipped.length ? ` Not this plant (skipped): ${skipped.map((s) => `${s.costCenter} ${s.rows.toLocaleString('en-GB')}`).join(', ')}.` : ''
       const defined = new Set(presses.filter((p) => p.costCenter && codes.includes(p.costCenter)).map((p) => p.name))
       const hidden = defined.size
@@ -332,7 +335,7 @@ export function OeeUploadButton() {
           parsed.monthly.length && `${parsed.monthly.length} monthly`,
         ]
           .filter(Boolean)
-          .join(', ')}. Nothing was deleted.${other}${notDefined}`,
+          .join(', ')}. Nothing was deleted.${shiftNote}${other}${notDefined}`,
       })
     } catch (e) {
       setState({ kind: 'error', text: friendlyError(e).message || 'Upload failed' })
