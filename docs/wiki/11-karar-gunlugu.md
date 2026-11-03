@@ -9,10 +9,24 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
 - **Site kapatılacak; tek program Python uygulaması olacak** — Excel/VBA sürümü beğenilmedi (makro hata verdi).
   *Neden:* tek kopya kalsın; site + Excel + Python üç kopya olurdu. *Alternatif:* Python arayüzü + mevcut TS motoru
   (Node) — site kalkınca TS kodunu taşımak gereksiz bağımlılık.
-- **Amaç: 3 haftalık üretim planı, basit takvim** — pres başına haftada gün × günde vardiya + tatiller (istisna hafta,
-  mesai yok; sonra eklenebilir). Görünüm: pres × gün ızgarası, geç / plansız listesi, haftalık doluluk, Excel / PDF çıktı.
-- **Veri:** sabit veri (parça, pres / hol, vardiya, planlı duruş, tatil) SQLite'ta, bir kez Excel'den yüklenir, sonra
-  ekrandan yönetilir; değişen veri (ZPP, ZPP_DAILY, MB52) her plan öncesi SAP Excel'inden okunur ve denetlenir.
+- **Amaç: 3 haftalık üretim planı, basit takvim** — pres başına haftada gün × günde vardiya + tatiller + mesai (istisna
+  hafta yok; sonra eklenebilir).
+- **Bütün veri bir klasördeki Excel dosyalarında** (2026-11-03, SQLite kararının yerine) — `PlanVeri/sabit/` (parçalar,
+  presler / holler, vardiyalar, planlı duruşlar, tatiller, sac tedarik süreleri), `PlanVeri/sap/` (ZPP, ZPP_DAILY, MB52,
+  **MB51 = gerçekleşen**), `PlanVeri/plan/` (manuel işler, mesai), `PlanVeri/cikti/` (programın yazdığı plan Excel'i / PDF).
+  Program dosya değişince kendiliğinden yeniden okur. *Neden:* kullanıcı her şeyi Excel'de görmek ve yönetmek istiyor;
+  veri tek yerde. Program yalnız `plan/` ve `cikti/` klasörlerine yazar.
+- **Uygulama: tam ekran, tek sayfada her şey ("kontrol odası")** — Python + Dash (Plotly), koyu tema, tarayıcı kiosk
+  modunda tam ekran açılır, tek tıkla başlar. *Alternatif:* PySide6 masaüstü — bu kadar grafik için geliştirmesi yavaş.
+  - **Ana ekran:** üst şerit (3 haftalık doluluk %, geç iş, plansız, bakiye, kritik malzeme, eksik sac); orta pres × gün
+    ızgarası (renk = doluluk, hücrede işler, kapalı vardiya gri); sağda kritiklik listesi (stoğu yakında biten, geç,
+    plansız); altta hol / pres kapasite çubukları ve eksik hammadde (sac, eksik kg, en geç sipariş günü); köşede plan /
+    gerçek özeti.
+  - **Sekme 1 — Genel dashboard:** ana ekranın ayrıntısı + süzgeçler (hol, pres, malzeme).
+  - **Sekme 2 — Çalışma takvimi:** pres × gün × vardiya; açık / kapalı vardiya, mesai, tatil. **Mesai bu ekrandan
+    tıklanarak açılıp kapanır** (kayıt `plan/` klasöründeki mesai Excel'ine yazılır).
+  - **Sekme 3 — Plan / gerçek:** MB51'den gerçekleşen üretim (101/102, sitedeki üretim deposu kuralı); iş / gün / pres
+    bazında plan adedi ↔ gerçek, sapma %, haftalık uyum.
 - **Motor Python'a aktarılır, site motoruyla aynı kurallar** — doğrulama: site kodu silinmeden önce
   `tools/excel/engine-compare.test.ts` yöntemiyle aynı veride `computePlan` ile karşılaştırılır (eş ürünlü veri dahil).
   Depo ve wiki silinmez (başvuru kaynağı). Senaryo / yerel arama ilk sürümde yok, sonra eklenebilir.
@@ -22,6 +36,9 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
   - **Makine bloke yok** (kapalı aralık, arıza duruşu çıkar).
   - **Kalıp bloke yok** (bakım, hazır değil, alarm çıkar). "Kalıp aynı anda iki preste olamaz" kuralı kalır (fiziksel kısıt).
   - **Planlı duruş var** — vardiya, saat, süre, tür; setup çay / yemek / molada durmadan sürer, devir / bakımda durur.
+  - **Mesai var** — tarihli mesai pencereleri, sitedeki gibi vardiya ızgarasının dışında (`pressCalendar.overtimeWindows`).
+  - **Hammadde planı var** — işlerin sac ihtiyacı (kg), hammadde depolarındaki stok, tedarik süresi, en geç sipariş günü
+    (sitedeki `rawMrp` / `rawLeadTime`).
 - **Manuel iş, motor etrafını doldurur** (sitedeki kilitli / elle eklenen iş mantığı) — planı başlatabilmek için:
   - Alanlar: pres, malzeme, adet, başlangıç günü + saati (saat boşsa o günün ilk boş anı).
   - Plan başında yarım iş: **kalan adet** girilir, setup var / yok işareti girenindir.
