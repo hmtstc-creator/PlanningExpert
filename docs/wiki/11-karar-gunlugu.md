@@ -1,8 +1,53 @@
 # 11 · Karar günlüğü (neden böyle?)
 
-> Son güncelleme: 2026-11-02 (otonom geliştirme kaldırıldı; PDF yönü sayfaya özel; Qwen / Gemini kod yazma kaldırıldı, model en küçükten başlar, otonom düğme; kod görevleri önce Gemini; Production Plan takvim kutusu cost center modeline göre, ekip Work Calendar'da; SOP: PDF + düzenleme ekranı, kare adımdan, video volume'de; plan süzgeci yalnız görünüm; Loading time dosyadan olduğu gibi; Asakai: bugün gizli, bütün iş yerleri; Work calendar Edit / Save; Asakai kırmızı = en büyük 2 duruş, vardiyalar da; gün kaydı, ZPP_DAILY önceliği, kapalı aralık, iş penceresi durumu) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
+> Son güncelleme: 2026-11-03 (Python planlama uygulaması kararları; otonom geliştirme kaldırıldı; PDF yönü sayfaya özel; Qwen / Gemini kod yazma kaldırıldı, model en küçükten başlar, otonom düğme; kod görevleri önce Gemini; Production Plan takvim kutusu cost center modeline göre, ekip Work Calendar'da; SOP: PDF + düzenleme ekranı, kare adımdan, video volume'de; plan süzgeci yalnız görünüm; Loading time dosyadan olduğu gibi; Asakai: bugün gizli, bütün iş yerleri; Work calendar Edit / Save; Asakai kırmızı = en büyük 2 duruş, vardiyalar da; gün kaydı, ZPP_DAILY önceliği, kapalı aralık, iş penceresi durumu) · Kaynak: `docs/decisions.md` (iş kararlarının tam listesi) + bu sohbetlerdeki mühendislik kararları
 
 Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
+
+## Python planlama uygulaması (2026-11-03, kullanıcı kararları — kod henüz yok)
+
+- **Site kapatılacak; tek program Python uygulaması olacak** — Excel/VBA sürümü beğenilmedi (makro hata verdi).
+  *Neden:* tek kopya kalsın; site + Excel + Python üç kopya olurdu. *Alternatif:* Python arayüzü + mevcut TS motoru
+  (Node) — site kalkınca TS kodunu taşımak gereksiz bağımlılık.
+- **Amaç: 3 haftalık üretim planı, basit takvim** — pres başına haftada gün × günde vardiya + tatiller + mesai (istisna
+  hafta yok; sonra eklenebilir).
+- **Bütün veri bir klasördeki Excel dosyalarında** (2026-11-03, SQLite kararının yerine) — `PlanVeri/sabit/` (parçalar,
+  presler / holler, vardiyalar, planlı duruşlar, tatiller, sac tedarik süreleri), `PlanVeri/sap/` (ZPP, ZPP_DAILY, MB52,
+  **MB51 = gerçekleşen**), `PlanVeri/plan/` (manuel işler, mesai), `PlanVeri/cikti/` (programın yazdığı plan Excel'i / PDF).
+  Program dosya değişince kendiliğinden yeniden okur. *Neden:* kullanıcı her şeyi Excel'de görmek ve yönetmek istiyor;
+  veri tek yerde. Program yalnız `plan/` ve `cikti/` klasörlerine yazar.
+- **Uygulama: tam ekran, tek sayfada her şey ("kontrol odası")** — Python + Dash (Plotly), koyu tema, tarayıcı kiosk
+  modunda tam ekran açılır, tek tıkla başlar. *Alternatif:* PySide6 masaüstü — bu kadar grafik için geliştirmesi yavaş.
+  - **Ana ekran:** üst şerit (3 haftalık doluluk %, geç iş, plansız, bakiye, kritik malzeme, eksik sac); orta pres × gün
+    ızgarası (renk = doluluk, hücrede işler, kapalı vardiya gri); sağda kritiklik listesi (stoğu yakında biten, geç,
+    plansız); altta hol / pres kapasite çubukları ve eksik hammadde (sac, eksik kg, en geç sipariş günü); köşede plan /
+    gerçek özeti.
+  - **Sekme 1 — Genel dashboard:** ana ekranın ayrıntısı + süzgeçler (hol, pres, malzeme).
+  - **Sekme 2 — Çalışma takvimi:** pres × gün × vardiya; açık / kapalı vardiya, mesai, tatil. **Mesai bu ekrandan
+    tıklanarak açılıp kapanır** (kayıt `plan/` klasöründeki mesai Excel'ine yazılır).
+  - **Sekme 3 — Plan / gerçek:** MB51'den gerçekleşen üretim (101/102, sitedeki üretim deposu kuralı); iş / gün / pres
+    bazında plan adedi ↔ gerçek, sapma %, haftalık uyum.
+- **Motor Python'a aktarılır, site motoruyla aynı kurallar** — doğrulama: site kodu silinmeden önce
+  `tools/excel/engine-compare.test.ts` yöntemiyle aynı veride `computePlan` ile karşılaştırılır (eş ürünlü veri dahil).
+  Depo ve wiki silinmez (başvuru kaynağı). Senaryo / yerel arama ilk sürümde yok, sonra eklenebilir.
+- **Kurallar:**
+  - **Eş ürün aynen sitedeki gibi** — hafta bazında ihtiyacın büyüğü ikisine; rulo yalnız asıl ürünün brüt ağırlığından;
+    tek iş, tek setup; eşin adedi vuruş × kendi göz sayısı (`planning.ts` `levelToRequired`, `mergeCoProductLots`).
+  - **Makine bloke yok** (kapalı aralık, arıza duruşu çıkar).
+  - **Kalıp bloke yok** (bakım, hazır değil, alarm çıkar). "Kalıp aynı anda iki preste olamaz" kuralı kalır (fiziksel kısıt).
+  - **Planlı duruş var** — vardiya, saat, süre, tür; setup çay / yemek / molada durmadan sürer, devir / bakımda durur.
+  - **Mesai var** — tarihli mesai pencereleri, sitedeki gibi vardiya ızgarasının dışında (`pressCalendar.overtimeWindows`).
+  - **Hammadde planı var** — işlerin sac ihtiyacı (kg), hammadde depolarındaki stok, tedarik süresi, en geç sipariş günü
+    (sitedeki `rawMrp` / `rawLeadTime`).
+- **Manuel iş, motor etrafını doldurur** (sitedeki kilitli / elle eklenen iş mantığı) — planı başlatabilmek için:
+  - Alanlar: pres, malzeme, adet, başlangıç günü + saati (saat boşsa o günün ilk boş anı).
+  - Plan başında yarım iş: **kalan adet** girilir, setup var / yok işareti girenindir.
+  - Manuel iş ana pres dışındaki bir prese de konabilir (sitedeki gibi).
+  - Planlı duruşa ya da başka manuel işe çakışan giriş **reddedilir**, nedeni yazılır.
+  - Manuel işler önce yerleşir, yeniden hesapta oynamaz; adedi talepten düşer; motor önündeki boşluğu da kullanır;
+    aynı kalıbın sonraki lotu setup'sız arkasına gelir.
+- **Sıradaki adım:** kullanıcı Excel taslaklarını (sabit veri, ZPP / ZPP_DAILY / MB52 örneği, istenen plan görünümü) verir;
+  ondan sonra kod yazılır.
 
 ## Çalışma düzeni
 
