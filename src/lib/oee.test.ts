@@ -405,8 +405,13 @@ describe('oee store and upload — history is never deleted', () => {
       calls.push(`${k}:${(a.rows ?? a.days ?? []).length}`)
       return 0
     }
+    // Vardiya yazımı: her parti için eklendi / güncellendi / aynı sayaçları döner.
+    const shiftCounts = async (a: { rows: unknown[] }) => {
+      calls.push(`shifts:${a.rows.length}`)
+      return { inserted: a.rows.length, updated: 1, unchanged: 2 }
+    }
     const api = {
-      upsertShifts: rec('shifts'),
+      upsertShifts: shiftCounts,
       upsertDaily: rec('daily'),
       upsertOrders: rec('orders'),
       upsertWeekly: rec('weekly'),
@@ -418,6 +423,24 @@ describe('oee store and upload — history is never deleted', () => {
     expect(Object.keys(api).some((k) => /clear|delete|remove/i.test(k))).toBe(false)
     expect(calls.filter((c) => c.startsWith('shifts')).reduce((a, c) => a + Number(c.split(':')[1]), 0)).toBe(parsed.shifts.length)
     expect(calls.some((c) => c.startsWith('downtimes'))).toBe(true)
+  })
+
+  it('reports shift write counts summed over all batches', async () => {
+    const { importOee } = await import('./oeeStore')
+    const api = {
+      upsertShifts: async (a: { rows: unknown[] }) => ({ inserted: a.rows.length, updated: 1, unchanged: 2 }),
+      upsertDaily: async () => 0,
+      upsertOrders: async () => 0,
+      upsertWeekly: async () => 0,
+      upsertMonthly: async () => 0,
+      upsertDowntimeDays: async () => 0,
+      finishImport: async () => null,
+    }
+    const res = await importOee(parsed, 'test.xlsx', api)
+    const batches = Math.ceil(parsed.shifts.length / 200) || 0
+    expect(res.shifts.inserted).toBe(parsed.shifts.length)
+    expect(res.shifts.updated).toBeGreaterThanOrEqual(batches > 0 ? 1 : 0)
+    expect(res.shifts.unchanged).toBeGreaterThanOrEqual(batches > 0 ? 2 : 0)
   })
 })
 
