@@ -4,6 +4,7 @@
 
 | PR | Tarih | Ne | Neden / not |
 |---|---|---|---|
+| — | 2026-11-04 | **Python uygulaması: cost center'lar ayrı planlanır** (yalnız belge) — wiki 11 + 15; cost centerlar arası bağ yok | Kullanıcı kararı; SAP teslim tarihlerini zaten veriyor |
 | — | 2026-11-04 | **Python uygulaması: dosya şeması taslağı** (yalnız belge) — wiki 15; ham SAP başlıkları, 3 cost center, MB51 üretim deposu = `countProduction` | Kullanıcı yanıtları; Excel örneği gelince sütunlar güncellenecek |
 | — | 2026-11-03 | **Python planlama uygulaması kararları** (yalnız belge) — site kapatılacak, tek program Python; 3 haftalık plan; bütün veri klasördeki Excel'lerde; tam ekran Dash pano + takvim (mesai ekrandan) + plan / gerçek (MB51) sekmeleri; hammadde planı; eş ürün sitedeki gibi; makine / kalıp bloke yok; planlı duruş var; manuel iş girilir, motor etrafını doldurur ([11](11-karar-gunlugu.md)) | Kullanıcı kararları 2026-11-03; kod Excel taslaklarından sonra |
 | — | 2026-11-03 | **Excel planlama modülü** — `docs/excel/PlanningExpert_Planlama.xlsm` (+ örnekli kopya): talep → lot → pres planı VBA'da (`tools/excel/PlanEngine.bas`), Lots / Production Plan / Unplanned / Load / Check sayfaları, Run plan · Check data · Clear outputs düğmeleri. Site motoru değişmedi. Karşılaştırma testi (`tools/excel/engine-compare.test.ts`, elle): örnek + 8 rastgele veri setinde site motoruyla aynı plan | Kullanıcı isteği 2026-11-03 (yalnız planlama modülü, liste yeter, doğruluk önemli) · Senaryo / yerel arama, eş ürün, onaylı plan Excel'de yok ([14](14-excel-planlama.md)) |

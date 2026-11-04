@@ -1,13 +1,13 @@
 # 15 · Python planlama uygulaması — klasör ve dosya şeması
 
-> Son güncelleme: 2026-11-04 (ilk taslak; kullanıcı Excel örneği vermedi, sütunlar sitenin yükleme biçiminden alındı) ·
+> Son güncelleme: 2026-11-04 (cost center'lar ayrı planlanır; ilk taslak; kullanıcı Excel örneği vermedi, sütunlar sitenin yükleme biçiminden alındı) ·
 > Kararlar: `11-karar-gunlugu.md` → *Python planlama uygulaması* · Kod: `planapp/` (iskelet)
 
 ## Kullanıcı yanıtları (2026-11-04)
 
 - **Taslak yok:** sütunlar sitenin Excel çıktıları / yükleme biçiminden alındı (`src/lib/sapParsers.ts`, `tools/excel/build_excel.py`); kullanıcı sonra düzeltir.
 - **SAP dosyaları ham dışa aktarım:** başlıklar SAP'nin verdiği gibi; program başlığı eşleştirir (büyük/küçük harf, boşluk, Türkçe karakter duyarsız). Dosyaya elle dokunulmaz.
-- **3 cost center:** ikisi birlikte, biri ayrı planlanır (pres ve punta hattı konuşması). Ayrı planlanan kısmın hammaddesi diğer ikisinden gelebilir → ara mamul kuralı (`11`: ara mamul yalnız mamul tarafında sayılır) ve cost center başına depo rolü gerekir.
+- **3 cost center, planlar AYRI (2026-11-04, kullanıcı kararı):** her cost center kendi planını alır; cost centerlar arası hammadde / ara mamul bağlantısı kurulmaz. *Neden:* SAP ZPP / ZPP_DAILY teslim tarihlerini zaten hesaplayıp veriyor, hatları birbirine bağlamak gereksiz efor. Sonuç: ara mamul kuralı uygulanmaz; her cost center kendi depo rolleriyle ve kendi setup / vinç sınırıyla ayrı çalışır (sitedeki "tek fabrika planı" kararından bilinçli sapma).
 - **MB51 üretim deposu:** sitedeki `countProduction` aynen = depo başına "üretim girişi" tiki; 101/102 hareketleri yalnız tikli depolarda üretimdir (`src/lib/stockLocations.ts`).
 
 ## Klasörler
@@ -18,7 +18,7 @@
 
 | Dosya (sayfa) | Sütunlar | Not |
 |---|---|---|
-| `sabit/parcalar.xlsx` | Material, Description, Main work center, Alt work center 1–4, Flexible (Y/N), Cycle time (min/pc), SPM, Cavities, Gross weight (kg/pc), Coil weight (kg), Min. lot (pcs), Setup (min), Coil change (min), Quality approval (min), Performance factor (0-1), Max shots, Co-product (malzeme kodu), Raw material (sac kodu) | Zorunlu: Material, Main work center, çevrim ya da SPM, Gross weight |
+| `sabit/parcalar.xlsx` | Material, Description, Main work center, Alt work center 1–4, Flexible (Y/N), Cycle time (min/pc), SPM, Cavities, Gross weight (kg/pc), Coil weight (kg), Min. lot (pcs), Setup (min), Coil change (min), Quality approval (min), Performance factor (0-1), Max shots, Co-product (malzeme kodu), Raw material (sac kodu; yalnız kendi cost center'ının) | Zorunlu: Material, Main work center, çevrim ya da SPM, Gross weight |
 | `sabit/presler.xlsx` | Work center, Hall, Cost center, Feeds coil (Y/N), Working days / week, Shifts / day | Hol = Hall |
 | `sabit/vardiyalar.xlsx` | Shift (1-3), Start (HH:MM), Length (min) | Varsayılan 07:00, 480 dk |
 | `sabit/planli_durus.xlsx` | Shift, Name, Kind (tea/meal/break/handover/maintenance/other), Start, Duration (min) | Setup tea/meal/break'te sürer |
@@ -35,4 +35,4 @@
 
 ## Açık sorular
 
-Excel örnekleri gelince bu tablo gerçek başlıklarla değiştirilir; cost center'lar arası hammadde akışının dosyada nasıl görüneceği (hangi sac kodu hangi cost center'ın ürünü) kullanıcıya sorulacak.
+Excel örnekleri gelince tablo gerçek başlıklarla değiştirilir. İstenen örnekler: parça listesi, presler / holler, vardiya + planlı duruş + tatil, depo listesi (rolleriyle), sac tedarik süreleri, ZPP, ZPP_DAILY, MB52, MB51 (her biri birkaç satır, en az bir eş ürünlü parça), varsa mevcut bir plan Excel'i.
