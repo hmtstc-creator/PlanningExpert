@@ -46,6 +46,7 @@ Biçim: **Karar** — *neden* — *alternatif* (neden seçilmedi).
   - Planlı duruşa ya da başka manuel işe çakışan giriş **reddedilir**, nedeni yazılır.
   - Manuel işler önce yerleşir, yeniden hesapta oynamaz; adedi talepten düşer; motor önündeki boşluğu da kullanır;
     aynı kalıbın sonraki lotu setup'sız arkasına gelir.
+- **Cost center'lar ayrı planlanır** (2026-11-04, kullanıcı kararı) — her cost center kendi planını alır; aralarında hammadde / ara mamul bağı kurulmaz (SAP teslim tarihlerini zaten veriyor). Ayrıntı: `15-python-uygulama-sema.md`.
 - **Sıradaki adım:** kullanıcı Excel taslaklarını (sabit veri, ZPP / ZPP_DAILY / MB52 örneği, istenen plan görünümü) verir;
   ondan sonra kod yazılır.
 
