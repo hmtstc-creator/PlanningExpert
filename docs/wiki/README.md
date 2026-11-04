@@ -24,6 +24,7 @@ kararları, öğrenilenleri ve sürüm geçmişini tek yerde toplar.
 | Neden böyle yapıldı? | [11 Karar günlüğü](11-karar-gunlugu.md) |
 | **SOP oluşturma**: videodan SOP, şablon formatı (%100 uyum kuralı) | [12 SOP oluşturma](12-sop-olusturma.md) |
 | Planlama Excel'de (makrolu .xlsm): ne var, ne yok, nasıl doğrulandı | [14 Excel planlama modülü](14-excel-planlama.md) |
+| Python planlama uygulaması: klasör ve dosya şeması (sütunlar, birim, zorunlu) | [15 Python uygulama şeması](15-python-uygulama-sema.md) |
 
 ## Belge haritası (wiki dışındakiler)
 
